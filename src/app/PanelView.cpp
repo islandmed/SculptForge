@@ -8,6 +8,7 @@
 #include "app/App.h"
 #include "app/I18n.h"
 #include "app/Ui.h"
+#include "core/TierConfig.h"
 
 #include <IconsLucide.h>
 
@@ -44,6 +45,39 @@ std::string aspectActionId(int i) {
 
 void App::registerViewUiCommands() {
     using T = ParamSpec::Type;
+    commands_.add({"view_shadows",
+                   "Shadows and ambient occlusion in the view (Preferences > Display, Material > Viewport Shading): the key "
+                   "light's cast shadows and the darkening of creases and hollows, worked out from the drawn view. "
+                   "In the PBR view, and in the Lit Sphere shading with lit_sphere on. Saved with the preferences.",
+                   {{"ao", T::String, "on, off or auto (by the hardware tier; the default).", false},
+                    {"shadows", T::String, "on, off or auto (by the hardware tier; the default).", false},
+                    {"ao_strength", T::Number, "How dark the occlusion gets, 0 to 1 (default 0.8).", false},
+                    {"ao_softness", T::Number, "How soft it is, 0 to 1 (default 0.4).", false},
+                    {"shadow_softness", T::Number, "How soft the shadows' edges are, 0 to 1 (default 0.35).", false},
+                    {"lit_sphere", T::Bool, "Also with Lit Sphere shading (default off).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       auto parseMode = [&](const char* key, int& out) {
+                           if (!a.contains(key)) return true;
+                           const std::string m = argString(a, key);
+                           if (m == "on" || m == "true" || m == "1") out = 1;
+                           else if (m == "off" || m == "false" || m == "0") out = 0;
+                           else if (m == "auto") out = -1;
+                           else return false;
+                           return true;
+                       };
+                       UiPrefs& p = uiPrefs_;
+                       if (!parseMode("ao", p.viewAo) || !parseMode("shadows", p.viewShadows)) return {false, "ao and shadows are on, off or auto"};
+                       p.aoStrength = std::clamp(float(argNumber(a, "ao_strength", p.aoStrength)), 0.0f, 1.0f);
+                       p.aoSoftness = std::clamp(float(argNumber(a, "ao_softness", p.aoSoftness)), 0.0f, 1.0f);
+                       p.shadowSoftness = std::clamp(float(argNumber(a, "shadow_softness", p.shadowSoftness)), 0.0f, 1.0f);
+                       p.viewOcclusionLitSphere = argBool(a, "lit_sphere", p.viewOcclusionLitSphere);
+                       applyViewEffects();
+                       const RenderSettings& v = renderSettings_;
+                       char buf[160];
+                       std::snprintf(buf, sizeof buf, "View AO %s, shadows %s%s", v.ambientOcclusion ? "on" : "off",
+                                     v.shadows ? "on" : "off", p.viewOcclusionLitSphere ? " (PBR and Lit Sphere)" : " (PBR)");
+                       return {true, buf};
+                   }});
     commands_.add({"light",
                    "The light of the Lit Sphere and studio shading (#80): turn it from where the material has it, set its "
                    "intensity, and lift the shadows with ambient light. Only changes what the view (and Save Render) "
@@ -201,6 +235,80 @@ void App::runSaveRender() {
 }
 
 // Material: Save Render with its size, shape and format.
+void App::applyViewEffects() {
+    const TierConfig tier = currentTierConfig();
+#ifdef SF_GLES
+    const bool headroom = false; // (phones and tablets: off unless chosen)
+#else
+    const bool headroom = tier.hwTier >= HwTier::Standard;
+#endif
+    RenderSettings& v = renderSettings_;
+    v.ambientOcclusion = uiPrefs_.viewAo < 0 ? headroom : uiPrefs_.viewAo == 1;
+    v.shadows = uiPrefs_.viewShadows < 0 ? headroom : uiPrefs_.viewShadows == 1;
+    v.aoStrength = uiPrefs_.aoStrength;
+    v.aoSoftness = uiPrefs_.aoSoftness;
+    v.shadowSoftness = uiPrefs_.shadowSoftness;
+    v.occlusionInLitSphere = uiPrefs_.viewOcclusionLitSphere;
+    // While the view moves or a stroke runs: off where they would cost the frame, back when it is still.
+    const bool busy = perf_.movingNow || doc_.sculptor.strokeActive() || strokeFinishing_;
+    const double now = ImGui::GetTime();
+    if (!busy) {
+        viewEffectsDropped_ = false;
+        viewEffectsBusyFrames_ = 0;
+    } else {
+        const double ms = (now - viewEffectsBusyAt_) * 1000.0;
+        if (viewEffectsBusyFrames_ > 0) viewEffectsBusyMs_ = viewEffectsBusyFrames_ == 1 ? ms : 0.7 * viewEffectsBusyMs_ + 0.3 * ms;
+        viewEffectsBusyAt_ = now;
+        ++viewEffectsBusyFrames_;
+        const double budgetMs = 1250.0 / double(std::clamp(tier.targetHz, 30, 60));
+        if (tier.hwTier == HwTier::Floor || turbo_ || (viewEffectsBusyFrames_ > 4 && viewEffectsBusyMs_ > budgetMs))
+            viewEffectsDropped_ = true;
+    }
+    if (viewEffectsDropped_) v.ambientOcclusion = v.shadows = false;
+}
+
+void App::drawViewEffectsControls(const char* idSuffix) {
+    const char* path = "Preferences > Display";
+    UiPrefs& p = uiPrefs_;
+    auto mode = [&](const char* label, const char* key, int value, const char* help) {
+        ImGui::SetNextItemWidth(-1);
+        const char* names[] = {tr("Auto"), tr("Off"), tr("On")};
+        const std::string preview = std::string(tr(label)) + ": " + names[value + 1];
+        if (ImGui::BeginCombo(("##" + std::string(key) + idSuffix).c_str(), preview.c_str())) {
+            for (int i = -1; i <= 1; ++i)
+                if (ImGui::Selectable(names[i + 1], value == i))
+                    runCommand("view_shadows", {{key, std::string(i < 0 ? "auto" : i ? "on" : "off")}});
+            ImGui::EndCombo();
+        }
+        ui::HelpText(label, nullptr, help, path);
+    };
+    auto slider = [&](const char* label, const char* key, float* value, const char* fmt, const char* help) {
+        ImGui::SetNextItemWidth(-1);
+        ImGui::SliderFloat((std::string("##") + key + idSuffix).c_str(), value, 0.0f, 1.0f, tr(fmt));
+        if (ImGui::IsItemDeactivatedAfterEdit()) runCommand("view_shadows", {{key, double(*value)}});
+        else if (ImGui::IsItemActive()) applyViewEffects(); // (live while dragging)
+        ui::HelpText(label, nullptr, help, path);
+    };
+    ImGui::TextDisabled("%s", tr("Shadows & AO"));
+    mode("Shadows", "shadows", p.viewShadows,
+         "Shadows cast by the key light: the nose on the cheek, the brow over the eyes. Auto: on when the graphics card "
+         "has room for them (Standard tier and up). They step aside while you orbit or sculpt if the frame needs it.");
+    if (renderSettings_.shadows || p.viewShadows == 1)
+        slider("Shadow softness", "shadow_softness", &p.shadowSoftness, "Shadow softness %.2f", "How soft the shadows' edges are.");
+    mode("Ambient occlusion", "ao", p.viewAo,
+         "Creases and hollows darken where the light around the model can't reach. Auto: on when the graphics card has "
+         "room for it (Standard tier and up).");
+    if (renderSettings_.ambientOcclusion || p.viewAo == 1) {
+        slider("AO strength", "ao_strength", &p.aoStrength, "AO strength %.2f", "How dark the occlusion gets.");
+        slider("AO softness", "ao_softness", &p.aoSoftness, "AO softness %.2f", "How soft and wide the occlusion looks.");
+    }
+    bool lit = p.viewOcclusionLitSphere;
+    if (ui::Checkbox((std::string(tr("With Lit Sphere shading")) + "##occlit" + idSuffix).c_str(), &lit))
+        runCommand("view_shadows", {{"lit_sphere", lit}});
+    ui::HelpText("With Lit Sphere shading", nullptr,
+                 "Shadows and ambient occlusion with the Lit Sphere and studio shading too, not only in the PBR view.", path);
+}
+
 void App::drawSaveRenderControls() {
     ui::ActionButton(*this, "render.save_image", ImVec2(-1, 0), ui::Look::IconLabel);
     const int count = int(std::size(kRenderSizes));

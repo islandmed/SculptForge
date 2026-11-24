@@ -19,14 +19,42 @@
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.12.0", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.13.13", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
-  <link rel="stylesheet" href="style.css?v=35">
-  <script src="motion.js?v=12" defer></script>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="style.css?v=44">
+  <script src="motion.js?v=15" defer></script>
   <script src="testimonials.js?v=2" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+  <style>
+    /* Built in (site/standout): two lead rows in the hero, then a six-tile band. Blender and splats lead on every width. */
+    .stand-lead { list-style: none; margin: 18px 0 4px; padding: 0; display: grid; gap: 10px; max-width: 36em; }
+    .stand-lead a { display: flex; align-items: center; gap: 14px; padding: 8px 14px 8px 8px; color: var(--muted); font-size: 0.92rem; line-height: 1.35;
+                    background: rgba(242, 140, 60, 0.07); border: 1px solid #4a3321; border-radius: 14px; }
+    .stand-lead a:hover, .stand-lead a:focus-visible { border-color: var(--accent); text-decoration: none; }
+    .stand-lead img { flex: none; width: 76px; height: 52px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+    .stand-lead strong, .stand-text strong { display: block; color: var(--text); font-weight: 600; }
+    .standout { padding: 64px 0 72px; background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .stand-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .stand-grid > li:empty { display: none; } /* a tile whose picture the deploy took down (media_takedown.py) */
+    .demo.clip:not(:has(video, img)) { display: none; } /* a clip the deploy took down (media_takedown.py) */
+    .stand-tile { display: flex; flex-direction: column; height: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; color: var(--muted); }
+    .stand-tile:hover, .stand-tile:focus-visible { border-color: var(--accent); text-decoration: none; }
+    .stand-img { display: block; position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: #14141a; border-bottom: 1px solid var(--border); }
+    .stand-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .stand-img.contain img { object-fit: contain; }
+    .stand-text { display: block; padding: 16px 18px 20px; font-size: 0.95rem; line-height: 1.5; }
+    .stand-text strong { font-size: 1.05rem; margin-bottom: 4px; }
+    .stand-foot { margin: 28px 0 0; color: var(--muted); }
+    @media (max-width: 960px) { .stand-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 620px) {
+      .stand-lead { order: 3; margin: 0 0 16px; }
+      .stand-grid { grid-template-columns: 1fr; gap: 14px; }
+      .standout { padding: 44px 0 52px; }
+    }
+  </style>
 </head>
 <body>
   <div class="scroll-progress" aria-hidden="true"></div>
@@ -40,32 +68,50 @@
         <a href="guide/index.html">Guide</a>
         <a href="studios.html">For studios</a>
         <a href="why.html">About</a>
+        <a href="labs/index.html">Labs</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
+        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#facebook"/></svg></a></span>
         <a class="nav-support" href="support.html">Support</a>
         <a class="nav-dl" href="#download">Download</a>
-        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
-        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
       </nav>
     </div>
   </header>
 
   <main id="top">
+    <!-- news-hero:start (build_site.py rewrites this bar and the hero line below from the newest What's New version each release; a hand-edited one for the same version is kept) -->
+    <aside class="news-bar" data-version="0.13.13" aria-label="Latest release">
+      <div class="wrap news-bar-inner">
+        <a class="news-bar-link" href="guide/whats-new.html#version-01313"><span class="news-pill">New</span><span class="news-bar-text">New in 0.13.13: Contact facing keeps your brush off the far wall of a slot or the other side of a fold, Engrave walls stay smooth, dense Micro levels shade Undo and Move at once, and Shift smooths every painted channel</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
+        <button class="news-bar-x" type="button" aria-label="Dismiss this announcement">&times;</button>
+      </div>
+    </aside>
+    <script>(function(){var b=document.querySelector(".news-bar");if(!b)return;try{if(localStorage.getItem("sf-news-x")===b.dataset.version)b.hidden=true}catch(e){}
+b.querySelector(".news-bar-x").onclick=function(){b.hidden=true;try{localStorage.setItem("sf-news-x",b.dataset.version)}catch(e){}}})()</script>
+    <!-- news-hero:end -->
+
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <p class="eyebrow">The free, open-source sculpting app</p>
+          <!-- hero-news:start -->
+          <!-- hero-news:end -->
           <h1>Change how software is built.</h1>
           <p class="lede">We build the orchestration layer, and our agents build the software, openly, with the artists
             who use it. New versions every few days, bug fixes sooner.</p>
           <p class="lede-short">We build the orchestration layer, and our agents build the software, openly, with the
             artists who use it. New versions every few days.</p>
           <p class="tagline">Sculpt it. Forge it. Ship it.</p>
+          <ul class="stand-lead" aria-label="Built in">
+            <li><a href="guide/blender.html"><img src="guide/images/blender-menu.jpg" alt="" width="880" height="610"><span><strong>Blender round-trip</strong>Send objects over and back in one click.</span></a></li>
+            <li><a href="guide/blender.html#splats-with-blender"><img src="guide/images/splats.jpg" alt="" width="980" height="775"><span><strong>Gaussian splats, with Blender 5.3</strong>Sculpt over a splat, send it back.</span></a></li>
+          </ul>
           <div class="ctas">
             <a class="btn primary" href="#download">Download</a>
             <a class="btn" href="why.html">Why we're doing this</a>
           </div>
           <p class="hero-note">Linux, macOS and Windows. No account, no subscription.</p>
-          <p class="speed-line">On an RTX 3060, a sculpted 112-million-triangle scan orbits at 33 frames a second right
-            after a big stroke. <a href="performance/">How we measure &rarr;</a></p>
+          <p class="speed-line">Orbiting 805 million micro triangles in our benchmark scene (not a sculpt) runs at 212 frames a second on an Apple M1 Pro limited to entry-level budgets (simulated), measured on 0.13.11. <a href="fast/">How we measure &rarr;</a></p>
           <p class="first-sculpt"><a href="guide/first-sculpt.html">New to sculpting? Make your first sculpt in 10 minutes &rarr;</a></p>
           <ul class="pills" aria-label="Built for studios">
             <li>VFX Reference Platform</li><li>OpenUSD</li><li>Houdini via USD</li><li>Unreal Engine</li><li>Native Wayland</li><li>Python API</li><li>Classic sculpting keys</li><li>Game-ready LODs</li>
@@ -84,6 +130,26 @@
           <figcaption class="hero-credit">Video review by <a href="https://www.youtube.com/watch?v=8oMCKB_7TRs" rel="noopener">askNK</a>
             on YouTube. It loads from YouTube when you press play.</figcaption>
         </figure>
+      </div>
+    </section>
+
+    <!-- Built in (site/standout): what sets us apart, each claim checked against the guide and a shipped release. Splats +
+         Blender 5.3 round-trip: 0.12.7; Blender bridge, Make sculptable, Quad Remesh, Bake, Brush Lab: 0.10.6 or earlier;
+         Garments: 0.11.12. Words: "built in" / "in SculptForge", never "only" or "first". Images are the guide's real shots. -->
+    <section id="standout" class="section standout" aria-labelledby="standout-title">
+      <div class="wrap">
+        <p class="eyebrow">Built in</p>
+        <h2 id="standout-title">What you get in SculptForge</h2>
+        <p class="section-lede">Each of these ships today and has a chapter in the guide.</p>
+        <ul class="stand-grid">
+          <li><a class="stand-tile" href="guide/blender.html"><span class="stand-img"><img src="guide/images/blender-menu.jpg" alt="" width="880" height="610" loading="lazy"></span><span class="stand-text"><strong>Blender round-trip</strong>One click sends objects to SculptForge and back. They update in place, with transform, materials and modifiers kept (Blender 4.2+).</span></a></li>
+          <li><a class="stand-tile" href="guide/blender.html#splats-with-blender"><span class="stand-img"><img src="guide/images/splats.jpg" alt="" width="980" height="775" loading="lazy"></span><span class="stand-text"><strong>Gaussian splats, with Blender 5.3</strong>Send a splat from Blender 5.3, sculpt over it, and send the splats back to the same object.</span></a></li>
+          <li><a class="stand-tile" href="guide/scan-to-sculptable.html"><span class="stand-img"><img src="guide/images/face-landmarks.jpg" alt="" width="1100" height="700" loading="lazy"></span><span class="stand-text"><strong>Capture to sculptable mesh</strong>One click turns a splat capture into clean quads with its colours.</span></a></li>
+          <li><a class="stand-tile" href="guide/retopology.html"><span class="stand-img"><img src="guide/images/qremesh.jpg" alt="" width="1100" height="660" loading="lazy"></span><span class="stand-text"><strong>Quad retopology and baking</strong>Quad Remesh with your own guide curves, then bake normal, displacement and occlusion maps.</span></a></li>
+          <li><a class="stand-tile" href="guide/garments.html"><span class="stand-img"><img src="guide/images/garments.jpg" alt="" width="600" height="340" loading="lazy"></span><span class="stand-text"><strong>Garments and cloth</strong>Real-size sewing patterns from 8 templates, draped with a cloth brush.</span></a></li>
+          <li><a class="stand-tile" href="guide/brush-lab.html"><span class="stand-img contain"><img src="guide/images/brush-lab.jpg" alt="" width="457" height="230" loading="lazy"></span><span class="stand-text"><strong>Optional AI brushes</strong>Describe a brush in words and Brush Lab makes it. Your own provider, no account, and one switch turns AI off.</span></a></li>
+        </ul>
+        <p class="stand-foot">Free and open source (GPL v3) on Linux, macOS and Windows. <a href="guide/whats-new.html">A new version every few days &rarr;</a></p>
       </div>
     </section>
 
@@ -122,15 +188,51 @@
             <figcaption><span class="voice-name">Richard Throgmorton (MakIt3D)</span><span class="voice-role">environment artist</span></figcaption>
           </figure>
           <figure class="voice">
-            <blockquote><p>You add it so quick !!? On Saturday !? Wow !</p></blockquote>
-            <p class="voice-context">About the Tube drawing tool</p>
-            <figcaption><span class="voice-name">GABO - Gabriel Abdala</span><span class="voice-role">Sculptor</span></figcaption>
-          </figure>
-          <figure class="voice">
             <blockquote><p>After years of struggling with expensive software subscriptions, finding SculptForge felt like a breath of fresh air. It is evolving fast, with new improvements arriving regularly, and I genuinely believe it has a bright future. What excites me most is how it is made: artists steering and agents building is a monumental change in how software gets developed. My advice as a Senior Lead Character &amp; Creature Artist and mentor: don't chase millions of polygons. Plan your models, build your forms intelligently, and add detail when needed. I strongly recommend every artist give it a try.</p></blockquote>
             <figcaption><span class="voice-name">Abhik Mitra (VOIDART ACADEMY)</span><span class="voice-role">Senior Lead Character &amp; Creature Artist</span></figcaption>
           </figure>
+          <figure class="voice">
+            <blockquote><p>I'm primarily focused on digital sculpting and using SculptForge for my workflow as a multimedia freelancer. I was really happy to find software that lets me get into my creative flow. And boy does it handle the polygon counts.</p></blockquote>
+            <figcaption><span class="voice-name">Hameron</span></figcaption>
+          </figure>
+          <figure class="voice">
+            <blockquote><p>I've had a long-standing interest in sculpting various human faces. My goal is to block out the primary forms in Blender, send the base mesh or Shape Keys to SculptForge to sculpt fine forms and surface textures, and then complete the piece.</p></blockquote>
+            <p class="voice-context">Blender to SculptForge for fine detail</p>
+            <figcaption><span class="voice-name">Hong's Art Lab (hmh426)</span></figcaption>
+          </figure>
+          <figure class="voice">
+            <blockquote><p>Any open source program is a win in my book. So when I saw this and the membership for a reasonable price to support, I jumped on it. I really want to see a program that is not driven by subscriptions with very little return year after year.</p></blockquote>
+            <figcaption><span class="voice-name">Artizmo</span></figcaption>
+          </figure>
+          <figure class="voice">
+            <blockquote><p>I'm a product designer by education, but I've been 3D modelling for more than a decade and sculpting for about 5 years now. I mostly sculpt characters and assets for my own game projects.</p></blockquote>
+            <figcaption><span class="voice-name">Can Ugur</span><span class="voice-role">Wily Marble (wilymarble.com)</span></figcaption>
+          </figure>
+          <figure class="voice">
+            <blockquote><p>I'm really happy to be part of the SculptForge community. I'm genuinely impressed by what the team is building, and I really appreciate the effort and dedication that goes into developing such a powerful sculpting application. I have high hopes for SculptForge, and I'm excited to see how it continues to grow and evolve!</p></blockquote>
+            <figcaption><span class="voice-name">A SculptForge member</span></figcaption>
+          </figure>
+          <figure class="voice">
+            <blockquote><p>I mainly create characters, creatures, and various 3D models. I'm particularly interested in its sculpting capabilities, Quad Remesh, and integration with AI tools. Features such as face extrusion, inset, bevel, edge loops, and bridge operations would make SculptForge even more powerful.</p></blockquote>
+            <figcaption><span class="voice-name">TETSUYA</span><span class="voice-role">Freelance modeler and painter</span></figcaption>
+          </figure>
+          <figure class="voice">
+            <blockquote><p>I like how powerful SculptForge is already.</p></blockquote>
+            <figcaption><span class="voice-name">Rand_gogh</span><span class="voice-role">Character and hard-surface artist</span></figcaption>
+          </figure>
         </div>
+      </div>
+    </section>
+
+    <section id="made-with" class="section" aria-labelledby="made-with-title">
+      <div class="wrap">
+        <p class="eyebrow">Artist work</p>
+        <h2 id="made-with-title">A cyclops by fxrtst</h2>
+        <figure style="margin:24px 0 0;max-width:960px">
+          <img src="media/made-with-fxrtst-cyclops.jpg" width="1200" height="675" loading="lazy" style="width:100%;height:auto;border-radius:8px"
+            alt="A wrinkled bald cyclops bust with a single blue eye, sculpted and painted in SculptForge and rendered with soft studio light">
+          <figcaption style="margin-top:12px">Sculpted, painted and rendered in SculptForge. Shared with permission.</figcaption>
+        </figure>
       </div>
     </section>
 
@@ -165,6 +267,51 @@
       </div>
     </section>
 
+<!-- community-videos:start -->
+    <section id="community-videos" class="section cv" aria-labelledby="cv-title">
+      <div class="wrap">
+        <p class="eyebrow">Community videos</p>
+        <h2 id="cv-title">From the community</h2>
+        <p class="section-lede">Walkthroughs and experiments from artists using SculptForge. A video loads from YouTube only when you press play.</p>
+        <div class="cv-grid">
+          <article class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/hNL7kkXLaD4?rel=0&amp;autoplay=1" data-title="An illustrated walkthrough of SculptForge, from high-resolution sculpting to engine-ready assets.">
+            <div class="cv-media">
+              <img src="media/cv-hNL7kkXLaD4.jpg" alt="" width="1280" height="720" loading="lazy" decoding="async">
+              <button type="button" class="cv-play" aria-label="Play: An illustrated walkthrough of SculptForge, from high-resolution sculpting to engine-ready assets."><span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>Play</span></button>
+            </div>
+            <div class="cv-body">
+              <p class="cv-caption">An illustrated walkthrough of SculptForge, from high-resolution sculpting to engine-ready assets.</p>
+              <p class="cv-by">By <a href="https://www.youtube.com/@alexander-hitt" rel="noopener">Alex Hitt</a> <span aria-hidden="true">&middot;</span> <a href="https://www.youtube.com/watch?v=hNL7kkXLaD4" rel="noopener">Watch on YouTube</a></p>
+              <details class="cv-note"><summary>Since this video (16 Nov)</summary><ul><li>Sculpt layers go to Blender and back as shape keys (0.13.10). <a href="guide/blender.html">Details</a></li><li>Splats show their view-dependent colour in the viewport (0.13.8; not on the Essential tier). .splat files still have none. <a href="guide/scan-to-splat.html">Details</a></li><li>Windows code signing is in progress; builds stay unsigned until it is live. <a href="code-signing.html">Details</a></li></ul><p>Still true: the benchmark figures are our own measurements. Raw outputs are on the <a href="benchmarks/">benchmarks page</a>.</p></details>
+            </div>
+          </article>
+          <article class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/qiNPiWJ5PRM?rel=0&amp;autoplay=1" data-title="An illustrated overview of sculpting, painting, AI creation and the Blender bridge in SculptForge.">
+            <div class="cv-media">
+              <img src="media/cv-qiNPiWJ5PRM.jpg" alt="" width="1280" height="720" loading="lazy" decoding="async">
+              <button type="button" class="cv-play" aria-label="Play: An illustrated overview of sculpting, painting, AI creation and the Blender bridge in SculptForge."><span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>Play</span></button>
+            </div>
+            <div class="cv-body">
+              <p class="cv-caption">An illustrated overview of sculpting, painting, AI creation and the Blender bridge in SculptForge.</p>
+              <p class="cv-by">By <a href="https://www.youtube.com/@alexander-hitt" rel="noopener">Alex Hitt</a> <span aria-hidden="true">&middot;</span> <a href="https://www.youtube.com/watch?v=qiNPiWJ5PRM" rel="noopener">Watch on YouTube</a></p>
+              
+            </div>
+          </article>
+          <article class="cv-card" data-embed="https://www.youtube-nocookie.com/embed/AL5q4gKyiZc?rel=0&amp;autoplay=1" data-title="A screen recording of the Blob-It Python script building a head in SculptForge.">
+            <div class="cv-media">
+              <img src="media/cv-AL5q4gKyiZc.jpg" alt="" width="1280" height="720" loading="lazy" decoding="async">
+              <button type="button" class="cv-play" aria-label="Play: A screen recording of the Blob-It Python script building a head in SculptForge."><span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>Play</span></button>
+            </div>
+            <div class="cv-body">
+              <p class="cv-caption">A screen recording of the Blob-It Python script building a head in SculptForge.</p>
+              <p class="cv-by">By <a href="https://www.youtube.com/@tpqztpqz5738" rel="noopener">TPQZ</a> <span aria-hidden="true">&middot;</span> <a href="https://www.youtube.com/watch?v=AL5q4gKyiZc" rel="noopener">Watch on YouTube</a></p>
+              
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+    <!-- community-videos:end -->
+
     <a class="platform-strip" href="#vfx" aria-label="Built for VFX and animation: VFX Reference Platform support">
       <div class="wrap strip-inner">
         <span class="strip-label">Built for VFX &amp; animation</span>
@@ -197,9 +344,8 @@
         <div class="grid">
           <article class="card">
             <h3>Dense scans that keep up</h3>
-            <p>On an RTX 3060, a sculpted 112-million-triangle scan orbits at 33 frames a second right after a big stroke.
-              On our simulated entry-level tier, the slowest frames orbiting a 28-million-triangle scan went from 24 to
-              12 ms in 0.11.7.</p>
+            <p>Orbiting 805 million micro triangles in our benchmark scene (not a sculpt) averages 212 frames a second on an Apple M1 Pro limited to entry-level budgets (simulated), using about 4.2 GB of memory in all, 1.6 GB for the app plus 2.6 GB of graphics buffers (median of three runs, measured on 0.13.11).</p>
+            <p>A 33-million-triangle head's slowest frame in a full test is 103 ms on the entry-level tier and 132 ms on an RTX 3060. Big brushes still trail the pen. Other numbers are the median of three runs, with the raw results published.</p>
           </article>
           <article class="card">
             <h3>Open file formats</h3>
@@ -238,8 +384,8 @@
         <div class="grid">
           <article class="card">
             <h3>Sculpt the way you already do</h3>
-            <p>Twenty built-in brushes including Clay Block, Sharp Crease, Tendril, Trim and Move, plus sixty
-              ready-tuned brushes in six packs, with alphas, Lazy Stroke, symmetry, tablet pressure, classic, Blender and Maya-style navigation, subdivision and voxel remesh.</p>
+            <p>Twenty built-in brushes including Clay Block, Sharp Crease, Tendril, Trim and Move, plus eighty-seven
+              ready-tuned brushes in eight packs, with alphas, Lazy Stroke, symmetry, tablet pressure, classic, Blender and Maya-style navigation, subdivision and voxel remesh.</p>
           </article>
           <article class="card">
             <h3>Masking and face groups</h3>
@@ -373,10 +519,10 @@ rez-env sculptforge -- sculptforge troll.usda \
         <h2>See it in action</h2>
         <p class="section-lede">Real recordings of the app at real speed, with nothing edited in.</p>
 
-        <div class="demo">
-          <video aria-label="Packing UVs into a 4 by 3 grid of UDIM tiles, then a 10 by 2 grid" poster="media/poster-udim.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/udim-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/udim.mp4?v=1" type="video/mp4">
+        <div class="demo clip">
+          <video aria-label="Packing UVs into a 4 by 3 grid of UDIM tiles, then a 10 by 2 grid" poster="media/poster-udim.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/udim-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/udim.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>UDIM tiles in any grid</h3>
@@ -385,10 +531,10 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo reverse">
-          <video aria-label="Moving a masked nose forward on its own sculpt layer, then dialling the layer's weight" poster="media/poster-layer-weight.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/layer-weight-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/layer-weight.mp4?v=1" type="video/mp4">
+        <div class="demo clip reverse">
+          <video aria-label="Moving a masked nose forward on its own sculpt layer, then dialling the layer's weight" poster="media/poster-layer-weight.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/layer-weight-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/layer-weight.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>Move a feature on its own layer</h3>
@@ -397,10 +543,10 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo">
-          <video aria-label="Vector displacement horns stamped in different directions with angle jitter" poster="media/poster-vdm.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/vdm-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/vdm.mp4?v=1" type="video/mp4">
+        <div class="demo clip">
+          <video aria-label="Vector displacement horns stamped in different directions with angle jitter" poster="media/poster-vdm.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/vdm-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/vdm.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>Vector stamps that turn</h3>
@@ -409,10 +555,10 @@ rez-env sculptforge -- sculptforge troll.usda \
           </div>
         </div>
 
-        <div class="demo reverse">
-          <video aria-label="Rolling, resetting, zooming toward the pointer and framing the view with the industry-standard keys" poster="media/poster-view-keys.jpg?v=1" muted loop playsinline preload="none" data-inview tabindex="0">
-            <source src="media/view-keys-4k.mp4?v=1" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
-            <source src="media/view-keys.mp4?v=1" type="video/mp4">
+        <div class="demo clip reverse">
+          <video aria-label="Rolling, resetting, zooming toward the pointer and framing the view with the industry-standard keys" poster="media/poster-view-keys.jpg?v=2" muted loop playsinline preload="none" data-inview tabindex="0">
+            <source src="media/view-keys-4k.mp4?v=2" type="video/mp4" media="(min-width: 1600px) and (min-resolution: 1.5dppx), (min-width: 2600px)">
+            <source src="media/view-keys.mp4?v=2" type="video/mp4">
           </video>
           <div>
             <h3>The view keys you already know</h3>
@@ -442,18 +588,18 @@ rez-env sculptforge -- sculptforge troll.usda \
 
     <section id="whats-new" class="section">
       <div class="wrap">
-        <h2>What's new in 0.12</h2>
+        <h2>What's new in 0.13</h2>
         <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
-        <p class="section-lede">New in 0.12.0: Garments and cloth, sandboxed plugins, a Tool palette in the order you work, and cleaner cuts and creases. <a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
+        <p class="section-lede"><a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-0120"><div class="wn-pic"><img src="guide/images/wn-0120-garments.jpg" alt="" width="600" height="340" loading="lazy" decoding="async"></div><div class="wn-card-body"><h3>Garments and cloth, Plugins, The Tool palette in the order you work <small>new in 0.12.0</small></h3><p>Garments and cloth, sandboxed plugins, a Tool palette in the order you work, and cleaner cuts and creases.</p><ul><li>Garments and cloth</li><li>Plugins</li><li>Pose all Parts</li><li>Tube shapes</li><li>Edge creases</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-01116"><div class="wn-card-body"><h3>Gizmo All, Split can keep the original, macOS <small>new in 0.11.16</small></h3><p>One gizmo for move, rotate and scale, symmetric cuts, and clearer labels.</p><ul><li>One gizmo with move, rotate and scale handles at once, on Shift+W (thanks fenix on Discord, @fenixpoints)</li><li>Cut with symmetry cuts both sides alike, and Blender keys get Ctrl+Shift cut shapes and Alt+Q to pick a Part (thanks dm4nd on Discord)</li><li>Copy hidden, masked or unmasked areas into a new Part and leave the source as it is (thanks _tfx on Discord)</li><li>Tool &gt; Geometry is reorganised by task (Levels, Micro Detail, Resolution, Cleanup, Symmetry) with clearer names, Extract reads Thickness, Edge Smooth, Both Sides, Corners and Border, and popups are fully opaque</li><li>SculptForge &gt; Preferences... in the app menu opens Preferences (thanks @fenixpoints)</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-01115"><div class="wn-card-body"><h3>Fixed, Tube, Parts tools <small>new in 0.11.15</small></h3><p>Micro sculpting fixed, a 3D tube pen, and tools for tidy Parts.</p><ul><li>Big Clay strokes on Micro levels could break the surface into shards (since 0.11.10); Micro sculpting is back to 0.11.9&#x27;s speed</li><li>Draw clay tubes in the air like a 3D pen, then edit their points (thanks GABO on Discord)</li><li>Split hidden, masked or unmasked areas into a new Part, merge points by distance, and Find Problems with a Fix for each problem (thanks foirgairwolf on Discord)</li><li>SculptForge tunes itself to your computer, with a memory readout in the top bar (thanks Oslen on Discord)</li><li>Side shelves no longer scroll sideways (thanks dm4nd on Discord), and Frame fits the model into the free area of the canvas</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01313"><div class="wn-card-body"><h3>Contact facing, Smooth carved walls, Instant shading on Micro levels <small>new in 0.13.13</small></h3><ul><li>Contact facing</li><li>Smooth carved walls</li><li>Instant shading on Micro levels</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01312"><div class="wn-card-body"><h3>Round Tendril horns, Clean Palette Knife, Smooth Gizmo on heavy Parts <small>new in 0.13.12</small></h3><p>Tendril pulls round horns with Dynamic on, Palette Knife strokes cross without creasing, the Gizmo stays smooth on heavy Parts, and Nudge and Layer stay off the far side.</p><ul><li>Round Tendril horns</li><li>Clean Palette Knife</li><li>Smooth Gizmo on heavy Parts</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01311"><div class="wn-card-body"><h3>Smooth Forge Sphere chains, Smooth colour on textures, View falloff stays in front <small>new in 0.13.11</small></h3><p>Forge Sphere chains stay smooth while you drag, Shift blends colour on textured Parts, View falloff stays off the far side, and pen orbit is steady again.</p><ul><li>Smooth Forge Sphere chains</li><li>Smooth colour on textures</li><li>View falloff stays in front</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
-          <a class="wn-home-group" href="guide/whats-new.html#versions-0110-to-01114"><h3>0.11.0 to 0.11.14</h3><ul><li>Linked duplicates</li><li>Your languages</li><li>Stencil</li><li>Exports keep their real size</li><li>Folders in Tool &gt; Parts</li><li>Clearer corner axes</li></ul><span>All changes &rarr;</span></a>
-          <a class="wn-home-group" href="guide/whats-new.html#versions-010x"><h3>0.10.x</h3><ul><li>Your first sculpt in 10 minutes</li><li>A new look</li><li>PBR viewport</li><li>UV Editor</li><li>Keep Masked remeshing</li><li>Micro levels</li></ul><span>All changes &rarr;</span></a>
-          <a class="wn-home-group" href="guide/whats-new.html#versions-09-and-earlier"><h3>0.9 and earlier</h3><ul><li>Faster big brushes</li><li>Extract</li><li>Forge Spheres</li><li>Scan to sculptable</li><li>Dynamic topology</li><li>Subdivision levels</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-0130-to-01310"><h3>0.13.0 to 0.13.10</h3><ul><li>Insert works on a mesh with subdivision levels</li><li>Safer plugins</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-012x"><h3>0.12.x</h3><ul><li>Booleans between Parts</li><li>Pan and zoom keys work again</li><li>Garments and cloth</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-011-and-earlier"><h3>0.11 and earlier</h3><ul><li>Gizmo All</li><li>Fixed</li><li>Linked duplicates</li><li>Your languages</li><li>Stencil</li><li>Exports keep their real size</li></ul><span>All changes &rarr;</span></a>
         </div>
         <!-- whats-new:end -->
       </div>
@@ -477,12 +623,14 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.12.0. All builds come from the
+        <p class="section-lede">Version 0.13.13. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
-          SHA-256 checksums. Free forever; <a href="support.html">membership</a> adds betas and early builds, Member Requests, a roadmap vote and credits.</p>
+          SHA-256 checksums. Free forever; <a href="support.html">membership</a> adds early builds, like SculptForge for Android today, plus Member Requests, a roadmap vote and credits.</p>
         <div class="downloads">
           <a class="dl" href="https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-windows-x86_64-setup.exe">
             <strong>Windows</strong><span>10 / 11 · installer (.exe)</span></a>
+          <a class="dl" href="https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-windows-x86_64-portable.zip">
+            <strong>Windows portable</strong><span>.zip · No install: unzip and run. Settings stay in your user folder.</span></a>
           <a class="dl" href="https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-macos.dmg">
             <strong>macOS</strong><span>11+ · Apple Silicon &amp; Intel · .dmg</span></a>
           <a class="dl" href="https://github.com/islandmed/SculptForge/releases/latest/download/sculptforge_amd64.deb">
@@ -495,6 +643,8 @@ rez-env sculptforge -- sculptforge troll.usda \
             <strong>Blender add-on</strong><span>Blender 4.2+ · send to SculptForge and back</span></a>
           <a class="dl" href="https://github.com/islandmed/SculptForge/tree/main/packaging/arch">
             <strong>Arch Linux</strong><span>PKGBUILD · <code>makepkg -si</code></span></a>
+          <a class="dl" href="support.html?utm_campaign=android-site">
+            <strong>Android: members' early build</strong><span>Members today, free for everyone on 26 November · Android 9+ · tablets, phones &amp; Chromebooks</span></a>
           <a class="dl vfx-dl" href="https://github.com/islandmed/SculptForge/releases/latest">
             <strong>VFX Reference Platform</strong><span>CY2026 (Rocky 8) &amp; CY2027 (Rocky 9) · .tar.gz with Python module</span></a>
           <a class="dl" href="https://github.com/islandmed/SculptForge/blob/main/docs/studios.md#deploying-with-rez">
@@ -502,14 +652,24 @@ rez-env sculptforge -- sculptforge troll.usda \
         </div>
         <p class="fine">Each button downloads the newest version.
           <a href="https://github.com/islandmed/SculptForge/tree/main/install#install-sculptforge">All downloads</a>
-          (ARM64, portable .zip, one-command install) · on macOS also
+          (ARM64, one-command install) · on macOS also
           <code>brew install --cask islandmed/tap/sculptforge</code> ·
           <a href="https://github.com/islandmed/SculptForge/releases">older versions</a>.</p>
+        <p class="fine">The interface speaks English, Español, 繁體中文, 简体中文 and 日本語 (Edit &gt; Preferences &gt; Interface &gt; Language;
+          it starts in your computer's language when SculptForge has it).
+          <a href="getting-started-ja.html" hreflang="ja" lang="ja">日本語のはじめ方</a>.</p>
+        <p class="fine"><strong>Android is an early test build.</strong> Members get the .apk today; it is free for everyone on 26 November.</p>
+        <ul class="fine">
+          <li>Members: the .apk is in the members' releases (the invitation comes with <a href="support.html?utm_campaign=android-site">membership</a>)</li>
+          <li>Sideload it: allow installs from your browser or file manager</li>
+          <li>Uninstall any earlier test APK first (it was signed with a different key); a later version will need one more reinstall</li>
+          <li>Found a bug? Tell us on <a href="https://github.com/islandmed/SculptForge/issues">GitHub</a> or Discord</li>
+        </ul>
         <p class="fine">Package managers: Homebrew is live; winget and Omarchy are in review; the AUR package is ready
           but not published yet; apt and dnf repositories are being built. Status:
           <a href="guide/installing.html">Install guide</a>.</p>
         <p class="fine">The builds aren't code-signed yet. Windows code signing via SignPath Foundation is being set up
-          (<a href="code-signing.html">code signing policy</a>). On macOS, right-click the app and choose <em>Open</em>
+          (<a href="code-signing.html">Code signing policy</a>). On macOS, right-click the app and choose <em>Open</em>
           the first time. On Windows, if SmartScreen appears, choose <em>More info → Run anyway</em>.
           You can also <a href="https://github.com/islandmed/SculptForge#building">build from source</a>.</p>
       </div>
@@ -530,11 +690,13 @@ rez-env sculptforge -- sculptforge troll.usda \
             the Python plugin and tick "Enable Remote Execution"; there's nothing to install in your project.
             You can always export an Unreal-ready FBX instead.</p></details>
         <details><summary>I already sculpt in another app. Will my habits carry over?</summary>
-          <p>Mostly, yes. Blocking out, sculpting forms and detail, blend shapes, LODs and getting assets into Unreal,
-            glTF or USD all work today, with familiar brushes and controls. Masking, face groups and hide/show, vertex
-            paint, lit spheres, project files, subdivision levels, dynamic topology, Quad Remesh retopology with guides,
-            UVs and vector displacement brushes are in too. Pick <strong>Classic sculpting keys</strong> at the first
-            start, and bring models over as OBJ, FBX, glTF or USD, or through the Bridge.</p></details>
+          <p><strong>Mostly, yes.</strong> Pick <strong>Classic sculpting keys</strong> at the first start and bring models over as OBJ, FBX, glTF or USD, or through the Bridge.</p>
+          <p>Already in, with familiar brushes and controls:</p>
+          <ul>
+            <li>Blocking out, sculpting forms and detail, blend shapes, LODs, and getting assets into Unreal, glTF or USD</li>
+            <li>Masking, face groups, hide/show, vertex paint, lit spheres and project files</li>
+            <li>Subdivision levels, dynamic topology, Quad Remesh with guides, UVs and vector displacement brushes</li>
+          </ul></details>
         <details><summary>Does it fit a VFX studio pipeline?</summary>
           <p>Yes. Every release includes VFX Reference Platform CY2026 and CY2027 builds (Rocky Linux 8 and 9, GCC
             14.2, Python 3.13), there's a Rez package, and everything the app does can be scripted from Python or the
@@ -557,21 +719,25 @@ rez-env sculptforge -- sculptforge troll.usda \
       </div>
       <div class="links">
         <a href="performance/">Performance</a>
+        <a href="labs/index.html">Labs</a>
         <a href="guide/index.html">User guide</a>
-        <a href="benchmarks/">Benchmarks: 15M and 33M</a>
+        <a href="benchmarks/">Benchmarks: 33M, 104M, 201M</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="why.html">Why SculptForge</a>
         <a href="support.html">Membership</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=footer" rel="noopener">Shop</a>
         <a href="supporters.html">Members</a>
         <a href="terms.html">Terms</a>
-        <a href="code-signing.html">Code signing</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="code-signing.html">Code signing policy</a>
         <a href="jobs.html">Jobs</a>
         <a href="ai.html">AI tools</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/SECURITY.md">Security</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/CODE_OF_CONDUCT.md">Code of conduct</a>
+        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#facebook"/></svg></a></div>
       </div>
       <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners. Unreal and Unreal Engine are trademarks of Epic
         Games, Inc. glTF is a trademark of the Khronos Group Inc. All other
@@ -607,6 +773,18 @@ rez-env sculptforge -- sculptforge troll.usda \
   </script>
   <script>
     (function () {
+      document.querySelectorAll(".cv-card").forEach(function (card) {
+        card.querySelector(".cv-play").addEventListener("click", function () {
+          var f = document.createElement("iframe");
+          f.src = card.getAttribute("data-embed");
+          f.title = card.getAttribute("data-title");
+          f.allow = "accelerometer; autoplay; encrypted-media; picture-in-picture; fullscreen";
+          f.allowFullscreen = true;
+          f.referrerPolicy = "strict-origin-when-cross-origin";
+          card.querySelector(".cv-media").replaceChildren(f);
+          f.focus();
+        });
+      });
       var fig = document.getElementById("hero-yt"); if (!fig) return;
       var btn = fig.querySelector(".hero-yt-play"), box = fig.querySelector(".hero-yt-box");
       btn.addEventListener("click", function () {

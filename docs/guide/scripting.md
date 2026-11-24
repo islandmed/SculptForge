@@ -1,5 +1,12 @@
 # Scripting and automation
 
+![The console showing commands run from the interface and typed by hand](images/console.jpg)
+
+> **In short:**
+> - Every operation is a named command with parameters.
+> - Run commands from the console, script files, `sculptforge-cli`, Python or AI agents.
+> - <kbd>F3</kbd> opens the command palette to find any command by name.
+
 Every operation in SculptForge is a named command with parameters. The same commands run from the console
 inside the app, from script files, from the `sculptforge-cli` tool on a build farm, from Python, and from AI
 agents through the Model Context Protocol (MCP). This chapter explains the script language, the console, both
@@ -35,8 +42,6 @@ Scripts stop at the first command that fails.
 Press the backtick key (left of <kbd>1</kbd>), or choose **File > Script > Console**, to open the console strip above
 the bottom shelf. Drag its top edge to resize it.
 
-![The console showing commands run from the interface and typed by hand](images/console.jpg)
-
 - **Every command you run appears in the console as a script line**, whether it came from a button, a
   shortcut, the command palette or the console itself, followed by its result. Failures show in red with the
   reason.
@@ -62,11 +67,12 @@ The console buttons (also in **File > Script**):
 
 ## The command palette
 
-Press <kbd>F3</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, or click **Search** at the top right of the window)
-to search every command, brush and setting by name. <kbd>Enter</kbd> runs the highlighted entry;
+Press <kbd>F3</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, or click **Search** at the top right of the
+window) to search every command, brush and setting by name. <kbd>Enter</kbd> runs the highlighted entry;
 <kbd>Shift</kbd>+<kbd>Enter</kbd> opens it in the console so you can add parameters first. Commands that need
-parameters always open in the console. With an empty search, the palette lists what you used recently. See
-[The interface](interface.md).
+parameters always open in the console.
+
+With an empty search, the palette lists what you used recently. See [The interface](interface.md).
 
 ![The command palette searching for a command](images/command-palette.jpg)
 
@@ -86,7 +92,7 @@ the ones you will use most:
 | Files | `save_project` | `path` (default: the current project) |
 | Files | `open_project` | `path` |
 | Geometry | `subdivide` | `levels` (1 to 4, default 1) |
-| Geometry | `remesh` | `resolution` (32 to 512, default 200) |
+| Geometry | `remesh` | `resolution` (32 to 4096, default 200) |
 | Geometry | `decimate` | `ratio` (default 0.5) or `triangles` |
 | Geometry | `qremesh` | `target` (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_vertexpaint`, `symmetry`, `keep_original` |
 | Parts | `project_all` | `distance` (default 0.02), `mean`, `blur`, `geometry`, `vertexpaint`, `source` |
@@ -204,9 +210,10 @@ under a virtual display such as Xvfb (`xvfb-run sculptforge ...`).
 
 ## Python
 
-SculptForge has a Python module, `sculptforge`, with the same commands plus NumPy access to the mesh. It is
-included in the VFX Reference Platform builds and the Rez package (see [For studios](studios.md)); when
-building from source, configure CMake with `-DSCULPTFORGE_BUILD_PYTHON=ON`.
+SculptForge has a Python module, `sculptforge`, with the same commands plus NumPy access to the mesh. Install the wheel
+from the release page (see [The Python package](python-package.md); PyPI coming); it is also included in the VFX
+Reference Platform builds and the Rez package (see [For studios](studios.md)), and when building from source,
+configure CMake with `-DSCULPTFORGE_BUILD_PYTHON=ON`.
 
 ```python
 import sculptforge as sf
@@ -242,12 +249,16 @@ print([c["name"] for c in sf.commands()])            # every command with its pa
 Failures raise `sculptforge.CommandError`. Long operations release the GIL, so you can run them on worker
 threads.
 
+The same module runs inside the app, against the open scene, from the console and from script files: see
+[Python scripting](python.md).
+
 ## AI agents (MCP)
 
-An AI tool (Claude Code, Claude Desktop, Cursor and others) can work in the SculptForge window while you watch. The
-AI blocks out a starting point and shows you options; you do the art. **Help > Connect an AI tool...** is the guide
-in the app, on one screen; it is there while AI features are on (**Edit > Preferences > AI**). It says what this
-section says, in the same words.
+An AI tool (Claude Code, Claude Desktop, Cursor and others) can work in the SculptForge window while you watch. The AI
+blocks out a starting point and shows you options; you do the art.
+
+**Help > Connect an AI tool...** is the guide in the app, on one screen; it is there while AI features are on
+(**Edit > Preferences > AI**). It says what this section says, in the same words.
 
 ### Connect an AI tool
 
@@ -313,8 +324,47 @@ requests are rate limited, and what the tool sends is data: tool names and value
 `sculptforge-cli --mcp` runs SculptForge as an MCP server with a scene of its own, no window needed: for batch jobs
 and your own agents. The AI tool gets every command as a tool and works on that scene for the session: it can open
 files, generate models, sculpt strokes, remesh, paint and export. It starts `sculptforge-cli` on your computer and
-talks to it over standard input and output. Nothing listens on the network, and nothing is installed into the AI
-tool. The setups below use the name `sculptforge` and `--mcp`; the Claude Desktop bundle is this server too.
+talks to it over standard input and output.
+
+Nothing listens on the network, and nothing is installed into the AI tool. The setups below use the name `sculptforge`
+and `--mcp`; the Claude Desktop bundle is this server too.
+
+**All or nothing, and ways back.** Besides the commands, the headless server has tools for sequences:
+
+- `batch` runs up to 64 commands as **one undo step**. At the first error everything the batch did is rolled back, so
+  the scene is exactly as it was before (the reply says which command failed and why, with each command's result).
+  `stop_on_error: false` keeps going and keeps what worked. Each command passes your studio's policy and the audit log
+  as if it were called alone. Files an export wrote stay on disk if the batch is rolled back later.
+- `checkpoint_save`, `checkpoint_restore` and `checkpoint_list` name places in the undo history and go back (or
+  forward) to them in one go, across Parts too. They cost no memory: a checkpoint is a mark on the history, not a
+  copy of the scene. `undo` takes a restore back. A new edit after going back drops the steps ahead, and so the
+  checkpoints there; a new scene or an open clears them all. `checkpoint_restore` then says why it can't.
+
+### Numbers an agent can read
+
+The headless server answers in two forms. Every tool result still has its text line, and also a `structuredContent`
+object (every tool lists its `outputSchema` in `tools/list`), so an agent never has to parse a sentence:
+
+| Field | What it is |
+|---|---|
+| `ok`, `message`, `ms` | whether the call worked, the text line, how long it took in milliseconds |
+| `triangles`, `vertices`, `bounds` | the active Part, the same numbers `mesh_info` prints (`bounds` has `min` and `max`) |
+| `parts`, `activePart` | how many Parts the scene holds, and the active one (`index`, `name`) |
+| `undoDepth`, `canRedo` | undo steps the active Part's history holds, and whether redo has one to bring back |
+| `scene` | totals over every visible Part, with their combined bounds |
+
+The scene is also a set of read-only **resources** (`resources/list`, `resources/read`), JSON that costs no tool call
+and no undo step:
+
+| URI | What it holds |
+|---|---|
+| `sculptforge://scene` | the summary above, plus the file name and whether there are unsaved changes |
+| `sculptforge://parts` | every Part: name, triangles, vertices, visibility, subdivision levels |
+| `sculptforge://part/{index}` | one Part in detail: size and bounds, each subdivision level's triangles, the micro level (grid, triangles, memory), the material (vertex colour, paint layers, texture and its channels), UVs, mask, face groups and sculpt layers |
+| `sculptforge://history` | the last undo steps of the active Part, newest first (`?limit=50`, up to 200) |
+
+Resources follow the same studio rules as tools: when the policy doesn't let AI tools read ("info"), the numbers and
+resources are left out, and every read goes into the audit log.
 
 ### I have a subscription
 
@@ -413,6 +463,24 @@ use live mode, above, to watch it work).
   other tools that show MCP prompts, pick one from the prompt menu: a creature head from a description, a stylised
   bust from a reference image, a game-ready asset (retopology, UVs, baked maps and LODs for Unreal or Godot),
   rock variations, and a step-by-step lesson.
+
+**Fine detail.** The server tells every agent how a sculpt gets to finished detail: block out, then subdivide to
+about 1 million triangles for the secondary forms, then to 3-6 million before pores and wrinkles, with brush sizes
+for each stage. Three tools help it get there:
+
+- **detail_pass** puts one kind of detail over a region in one undo step: pores, skin texture, wrinkles, scales or
+  scars, pressed in along the surface. It is plain brush work, evenly scattered, and the same seed gives the same
+  result. On a mesh too coarse for the detail it stops and says how far to subdivide.
+- **Detail presets** for strokes: Detail Crease (eyelids, lips, folds), Detail Wrinkle, Detail Pores, Detail Skin,
+  Detail Scales and Detail Scar bring their own brush, size and strength (round, so symmetry mirrors them exactly), so
+  a detail stroke isn't a big soft blob.
+  Your own alpha setting stays as it is.
+- **view_closeup** shows one spot up close, lit low from the side, so the agent can judge pores and creases the way
+  you would zoomed in. It also reports the triangles there and the finest detail the mesh can hold. In live mode
+  your view doesn't move.
+
+Ask for detail by region ("pores on the cheeks and nose, wrinkles around the eyes") and the agent will look at each
+one up close.
 
 ### Your own agent
 

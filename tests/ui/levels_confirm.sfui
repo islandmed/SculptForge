@@ -1,0 +1,62 @@
+# #173 (@TheLycanFenrir): Voxel Remesh, Quad Remesh and Decimate drop the subdivision levels, so on a Part with levels they
+# ask first: Cancel leaves the Part untouched, Freeze Levels and Proceed does what it always did (undo brings the levels
+# back), a Part without levels is not asked, and Don't ask again goes straight through.
+run new_sphere subdivisions=1
+run part_append type=cube name=Box
+run part_delete index=0
+orbit 140 -70
+key f
+click "Geometry##tool.geometry"
+click "Geometry/Rebuild Lower Levels"
+click "Geometry/Rebuild Lower Levels"
+expect_value sdiv_levels == 3
+expect_value triangles > 1000
+
+# Decimate: the prompt; it opens clear of the button; Cancel changes nothing.
+click "Geometry/Decimate"
+expect "Levels/Freeze Levels and Proceed"
+expect_text "This drops 3 subdivision levels"
+expect_clear "Levels/Freeze Levels and Proceed" "Geometry/Decimate"
+shot prompt-levels
+click "Levels/Cancel##remesh_levels"
+expect_not "Levels/Freeze Levels and Proceed"
+expect_value sdiv_levels == 3
+
+# Voxel Remesh and Quad Remesh ask too (Escape cancels).
+action geometry.remesh
+expect "Levels/Freeze Levels and Proceed"
+expect_text "Voxel Remesh keeps the level shown"
+key escape
+expect_value sdiv_levels == 3
+click "QRemesh/Quad Remesh"
+expect "Levels/Freeze Levels and Proceed"
+expect_text "Quad Remesh keeps the level shown"
+key escape
+expect_value sdiv_levels == 3
+
+# Proceed: Decimate runs as before; undo brings the levels back.
+click "Geometry/Decimate"
+click "Levels/Freeze Levels and Proceed"
+expect_value sdiv_levels == 0
+key ctrl+z
+expect_value sdiv_levels == 3
+
+# No levels, no prompt.
+click "Geometry/Decimate"
+click "Levels/Freeze Levels and Proceed"
+expect_value sdiv_levels == 0
+click "Geometry/Decimate"
+expect_not "Levels/Freeze Levels and Proceed"
+
+# Don't ask again.
+key ctrl+z
+key ctrl+z
+expect_value sdiv_levels == 3
+click "Geometry/Decimate"
+click "Levels/Don't ask again##remesh_levels"
+click "Levels/Freeze Levels and Proceed"
+expect_value sdiv_levels == 0
+key ctrl+z
+click "Geometry/Decimate"
+expect_not "Levels/Freeze Levels and Proceed"
+expect_value sdiv_levels == 0

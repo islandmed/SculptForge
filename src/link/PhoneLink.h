@@ -11,13 +11,16 @@
 //    GLB (Android: sent over the WebRTC link to the website's WebXR page), re-exported after strokes while the
 //    phone is looking;
 //  - the live face feed: link/FaceFeed.h messages over WebRTC (link/PhoneRtc.h) or HTTP, and face takes.
-// Security: everything but the page itself needs the session token (in the QR code's URL; the page also pairs
+//  - Forge Deck (prototype): a control pad page (website/link/deck.html: brush tiles, Size, Intensity, Undo, Redo, Mirror) whose messages are
+//    allowlisted commands (link/DeckCommands.h). Off at every start(); the app turns it on for the session.
+// Security: everything but the capture page itself needs the session token (in the QR code's URL; the page also pairs
 // with a 6-digit code typed on the phone). The token changes every time the window opens and expires if no
 // phone uses it within 10 minutes. Only local-network clients are answered, uploads have size limits, file names
 // are reduced to safe characters and written only inside the session's own capture folders. Nothing listens
 // while the window is closed.
 #pragma once
 
+#include "link/DeckCommands.h"
 #include "link/FaceFeed.h"
 #include "link/HttpServer.h"
 
@@ -27,6 +30,7 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <set>
 #include <mutex>
 #include <functional>
 #include <string>
@@ -143,6 +147,16 @@ struct PhoneLinkStatus {
     std::string lastError;
 };
 
+struct DeckStatus {
+    bool enabled = false;
+    bool connected = false; // the Deck page asked for something in the last 6 seconds
+    std::string device;
+    double secondsSinceSeen = -1;
+    int accepted = 0, refused = 0;
+    std::string lastRefusal;
+    std::string transport; // "WebRTC" (the direct link) or "relay"
+};
+
 class PhoneLink {
 public:
     PhoneLink();
@@ -187,6 +201,38 @@ public:
     // re-exported.
     double secondsSinceArViewed() const;
 
+    // --- Forge Deck (prototype) ---
+    // Off at every start(). While off, every Deck request answers 403. The app publishes what the phone shows
+    // (setDeckState: JSON, plus PNG tiles by name) and runs the actions it takes, on the main thread.
+    void setDeckEnabled(bool on);
+    bool deckEnabled() const;
+    void setDeckState(std::string json);
+    void setDeckImage(const std::string& name, std::string png);
+    bool hasDeckImage(const std::string& name) const;
+    std::vector<DeckAction> takeDeckActions();
+    DeckStatus deckStatus() const;
+    // Tests: another rate limit (the cap on waiting commands is otherwise out of reach of the limiter).
+    void setDeckRateLimit(double perSecond, double burst) {
+        std::lock_guard lock(mutex_);
+        deckLimit_ = DeckRateLimit(perSecond, burst);
+    }
+    // The kill switch: the token changes (the phone's link is dead), the Deck turns off.
+    void deckDisconnect();
+    // Called (from the server's threads) for every Deck command that ran or was refused: audit logging.
+    void setDeckLog(std::function<void(const std::string& command, bool ok, const std::string& message)> log) {
+        deckLog_ = std::move(log);
+    }
+
+    // The Deck page's URL (website/link/deck.html) with the pending offer, token and key in its #fragment: scan it,
+    // and the commands go up a WebRTC data channel (nothing of them touches an HTTP route). Creates a new link each
+    // call (the previous one is closed). Needs the WebRTC build.
+    bool createDeckLink(std::string& deckUrl, std::string& error);
+    // One message from the Deck page (any transport; public for tests): a control message (hello/ping/bye) or ONE
+    // allowlisted command. False with `error` when refused (counted, logged, shown on the desktop).
+    bool receiveDeckMessage(const std::string& text, const std::string& transport, std::string& error);
+    // Sends the Deck page what changed (state, new tiles) down its channel; called from the main loop every frame.
+    void pumpDeck();
+
     // One request, as the server hands it over (public for tests: no sockets needed).
     HttpResponse handle(const HttpRequest& request);
     // A face message from any transport (public for tests).
@@ -197,7 +243,7 @@ public:
     // (website/link/ar.html) instead: the phone asks for the sculpt over it, and each model published while it is
     // open goes down it (`arScope` "part"/"scene" and `arSizeCm` are passed to the page, which asks with them).
     bool createFaceLink(std::string& faceUrl, std::string& error, bool ar = false, const std::string& arScope = "part",
-                        float arSizeCm = 20.0f);
+                        float arSizeCm = 20.0f, bool deck = false);
     // An AR page message ({"type":"ar","scope","size"} asks for a model, {"type":"ar-ping"} says it's still
     // looking); public for tests.
     bool receiveArMessage(const std::string& text, std::string& error);
@@ -213,6 +259,7 @@ private:
     bool authorised(const HttpRequest& request);
     void noteDevice(const HttpRequest& request);
     std::function<void()> wake_;
+    std::function<void(const std::string&, bool, const std::string&)> deckLog_;
     void pushEvent(PhoneEvent event);
     void newToken();
     std::string statusJson();
@@ -226,6 +273,11 @@ private:
     HttpResponse requestAr(const HttpRequest& request);
     HttpResponse serveArModel(bool usdz);
     HttpResponse faceLink(const HttpRequest& request);
+    void onDeckState(int state);
+    // The Deck's fallback through the relay (see docs/phone-link.md): only while the direct link is down.
+    void deckRelayLoop(std::string base, std::string topic, std::string key);
+    void stopDeckRelay();
+    std::string deckStateMessage(uint64_t& serial); // the state as the page gets it (mutex_ not held)
     void sendArModelToPage(); // the latest model (or error) to the AR page, if one is connected
     void uploadArModel();     // the latest model, encrypted, to the relay for the AR page (Android Chrome)
     HttpResponse directAnswer(const HttpRequest& request);
@@ -252,6 +304,25 @@ private:
     int capturesReceived_ = 0;
     std::deque<PhoneEvent> events_;
     std::string lastError_;
+    // Forge Deck (mutex_)
+    bool deckEnabled_ = false;
+    std::string deckState_ = "{}";
+    std::map<std::string, std::string> deckImages_;
+    std::deque<DeckAction> deckActions_;
+    DeckRateLimit deckLimit_;
+    Clock::time_point deckSeen_{};
+    bool deckSeenEver_ = false;
+    std::string deckDevice_, deckLastRefusal_;
+    int deckAccepted_ = 0, deckRefused_ = 0;
+    DeckRateLimit deckControlLimit_{5.0, 10.0}; // hello / ping / bye
+    uint64_t deckStateSerial_ = 1;
+    std::string deckTransport_;
+    std::set<std::string> deckImagesUnsent_; // (mutex_)
+    uint64_t deckImagesSerial_ = 0;          // (mutex_) counts setDeckImage calls: the relay path re-uploads its tiles blob when it moves
+    uint64_t deckStateSentSerial_ = 0;       // (rtcMutex_)
+    bool deckPong_ = false;                  // the page pinged: answer (mutex_)
+    std::thread deckRelayThread_;
+    std::atomic<bool> deckRelayStop_{false}, deckRelayBye_{false};
     // AR
     std::string arGlb_, arUsdz_, arSummary_, arError_;
     uint64_t arVersion_ = 0;

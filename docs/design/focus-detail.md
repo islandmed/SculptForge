@@ -182,14 +182,32 @@ without them, so it overstates what prediction misses. The quiet run will remeas
 **Missing / not true yet:**
 - **CPU memory isn't sparse.** `disp` stays a dense 2 bytes per point (1.04 GB at 1B) because every consumer indexes it
   directly. Promotion saves decompression and I/O, not RAM. At 1B this is fine (RSS ~1.2-1.5 GB). At 4B+ it isn't.
-- **GPU memory doesn't scale with the focus.** The renderer uploads every tile's full grid (6 B a point: ~3.1 GB at
-  1B; on unified-memory machines that's system RAM). Per-tile GPU levels are perf-moonshots #8 (estimate: 3.1 GB →
-  ~0.6 GB with this focus).
-- **First shading** of all tiles in the renderer (~5 s at 1B Micro 5, docs/performance.md) still runs at open,
-  coarse or not. Shading coarse tiles at their 45 points would cut it ~180×.
-- **Not wired into projects:** a `.sfproj` doesn't reference a `.sfdetail`; the app has no Save for it yet (the core
-  `save()` is tested). Compaction of garbage, Windows mapping, masks on streamed tiles (`mask` stays dense), layers,
-  and multiple streamed Parts aren't done.
+- ~~GPU memory doesn't scale with the focus~~ **Done (11-06, `perf/focus-gpu-levels`, render/MicroFocus.h):** per
+  tile a record (coarse grid + its three edges at full resolution, 426 values at level 7) that the vertex shader
+  rebuilds exactly as `disp` holds it (test `focus_detail_gpu_record_rebuilds_coarse_tiles_exactly`); full grids
+  only in a page pool (384 MB cap) for full tiles the last frame drew finer than level 3. Measured on standard-1b
+  (laptop, floor profile, a busy machine, functional runs): GPU buffers mapped from the render node 87 MB against
+  3,006 MB for v0.11.9 on the same file (/proc/self/smaps; Asahi has no fdinfo memory counters); the renderer's own
+  count 64 MB framed, at most 186 MB in a 1080p close-up sweep (2,432 full tiles).
+- ~~First shading of all tiles~~ **Done with it:** coarse tiles are shaded on the coarse level
+  (`MicroShader::shadeLevel`); pages get their full shading within the frame's shading budget. standard-1b opened in
+  0.49 s with the first frame fully shaded at 0.65 s (same run). The official bench.sh focus rows replace these.
+- ~~Not wired into projects~~ **Done (11-06, `feat/focus-detail-app`):** Divide to Micro past `kFocusTriangles`
+  (300M micro triangles; `SF_FOCUS_DETAIL=0/1` overrides) writes the new level to a detail file and streams it
+  (`FocusDetail::create`). A `.sfproj` (format 9) names `<stem>.sfdetail` beside it; Save writes it in place
+  (changed tiles appended) or, the first time and on Save As, as a compact copy the Part then streams from
+  (`saveAs`: unchanged tiles copied as stored, written beside the file and renamed over it). A save whose garbage
+  would pass half the file compacts the same way. Autosave only names the file as last saved: a crash keeps the
+  last Ctrl+S of a streamed level, not the minutes after it. Brushes widening the range (`MicroMesh::widen`) used to
+  leave tiles still in the file at the old scale: `rescale()` now divides coarse grids and parked tiles and records a
+  per-tile shift that reads apply. Bake, displacement export, surface noise, a whole-surface undo step and a copy of
+  the level (`mutableMicro`) make every tile full first. Still missing: a sparse CPU array (`disp` stays dense; phase 4),
+  Windows mapping, masks on streamed tiles (`mask` stays dense, saved in the project), layers, and several streamed
+  Parts are untested beyond naming (`<stem>-2.sfdetail`).
+- **A detail file truncated while mapped can crash the app (SIGBUS).** The level is read through `mmap`; if another
+  program shortens the `.sfdetail` while it's open, touching a page past the new end raises SIGBUS. That's local only
+  (it needs write access to the user's file); a crafted file is refused at open (`focus_detail_crafted_fields_are_refused`).
+  A fix would map a private copy or handle the signal; not planned before phase 4's Windows mapping.
 - **Today's micro level already meets the brief's 1B targets** (docs/performance.md: 1.02B at Micro 5, RSS 1.7 GB,
   open 0.5 s). Focus Detail at 1B wins on disk size, save time and the scaling path, not on RAM.
 

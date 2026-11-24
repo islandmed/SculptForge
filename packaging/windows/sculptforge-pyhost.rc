@@ -1,0 +1,27 @@
+// SculptForge Windows resources: version information of the Python scripting host (sculptforge_pyhost.dll; the
+// product name and version SignPath enforces on every signed file, tools/ci/check_pe_metadata.ps1).
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+ PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_DLL
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904b0"
+    BEGIN
+      VALUE "CompanyName", "The SculptForge contributors"
+      VALUE "FileDescription", "SculptForge - Python scripting"
+      VALUE "FileVersion", "@PROJECT_VERSION@"
+      VALUE "LegalCopyright", "Copyright (C) 2026 The SculptForge contributors. GPL-3.0-or-later."
+      VALUE "ProductName", "SculptForge"
+      VALUE "ProductVersion", "@PROJECT_VERSION@"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

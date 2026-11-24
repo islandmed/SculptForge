@@ -1778,16 +1778,26 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
              const QRemeshProgress& progress, QRemeshStats* stats) {
     const auto start = std::chrono::steady_clock::now();
     static const bool timing = std::getenv("SF_QREMESH_TIMING") != nullptr; // stage times on stderr
+    float lastReported = -1.0f; // (the Cancel checks inside long phases report the same fraction again)
+    auto lastAsked = start;     // timing: a gap between Cancel checks over half a second is printed (gh#226)
     auto report = [&](float f) {
-        if (timing)
-            std::fprintf(stderr, "qremesh %.2f: %.3f s\n", f,
-                         std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+        if (timing) {
+            const auto now = std::chrono::steady_clock::now();
+            const double gap = std::chrono::duration<double>(now - lastAsked).count();
+            if (gap > 0.5)
+                std::fprintf(stderr, "qremesh CANCEL GAP %.2f s before %.2f (from %.2f)\n", gap, f, lastReported);
+            lastAsked = now;
+            if (f != lastReported)
+                std::fprintf(stderr, "qremesh %.2f: %.3f s\n", f, std::chrono::duration<double>(now - start).count());
+        }
+        lastReported = f;
         if (progress && !progress(std::clamp(f, 0.0f, 1.0f))) {
             error = "Quad Remesh cancelled";
             return false;
         }
         return true;
     };
+    auto asked = [&] { return report(std::max(lastReported, 0.0f)); }; // Cancel between steps, the bar where it is
     auto mark = [&](const char* what) {
         if (timing)
             std::fprintf(stderr, "  %-28s %.3f s\n", what,
@@ -1818,6 +1828,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     TriangleBVH full;
     auto buildFull = [&] {
         if (full.empty()) full.build(source.positions, source.triangles);
+        return asked();
     };
 
     // Symmetry: find the mirror plane (the world's, or the model's own when it sits off the origin) and check
@@ -1826,7 +1837,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     int axis = -1;
     float center = 0.0f;
     if (askedAxis >= 0) {
-        buildFull();
+        if (!buildFull()) return false;
         double totalArea = 0.0;
         for (const glm::uvec3& t : work.T)
             totalArea += 0.5 * glm::length(glm::cross(work.P[t.y] - work.P[t.x], work.P[t.z] - work.P[t.x]));
@@ -1847,6 +1858,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
         best.mean = std::numeric_limits<float>::max();
         for (float c : candidates) {
             const MirrorFit f = mirrorFit(full, work, askedAxis, c, 0.25f * diag);
+            if (!asked()) return false;
             if (timing)
                 std::fprintf(stderr, "  symmetry plane %.4f: mean %.4f, 98%% %.4f (edge %.4f)\n", c, f.mean, f.high, edge);
             if (f.mean < best.mean) best = f, center = c;
@@ -1861,6 +1873,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     if (axis >= 0) {
         for (vec3& p : work.P) p[axis] -= center;
         work = cutAtPlane(work, axis, 1e-6f * diag);
+        if (!asked()) return false;
         if (work.T.empty()) {
             error = "Quad Remesh: nothing on the positive side of the symmetry plane";
             return false;
@@ -1871,7 +1884,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     // were drawn) and, with symmetry, mirrored, so a curve drawn on either side guides both.
     // A guide mostly off the surface (the Part was moved after it was drawn) is left out.
     std::vector<QRemeshGuide> guides;
-    if (!opt.guides.empty()) buildFull();
+    if (!opt.guides.empty() && !buildFull()) return false;
     for (const QRemeshGuide& g : opt.guides) {
         QRemeshGuide s = g;
         size_t on = 0;
@@ -1952,6 +1965,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     {
         size_t count = 0;
         const std::vector<uint32_t> piece = pieceOfTriangles(work, count);
+        if (!asked()) return false;
         st.pieces = count;
         std::vector<double> pieceArea(count, 0.0);
         double area = 0.0;
@@ -2155,7 +2169,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     // Attributes from the closest point of the original sculpt.
     const bool needAttr = source.hasMask() || source.hasColors() || opt.keepGroups;
     if (needAttr) {
-        buildFull();
+        if (!buildFull()) return false;
         const float reach = diag;
         if (source.hasMask() || source.hasColors()) {
             if (source.hasMask()) m.ensureMask();
@@ -2212,8 +2226,9 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     st.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
     if (opt.measureQuality) st.quality = quadQuality(m, &source);
     if (stats) *stats = st;
+    if (!report(1.0f)) return false; // (a Cancel at the very end writes nothing either)
     out = std::move(m);
-    return report(1.0f);
+    return true;
 }
 
 TopologyReport topologyReport(const Mesh& mesh) {

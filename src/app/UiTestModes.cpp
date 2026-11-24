@@ -20,6 +20,7 @@
 //                              brush on the shelf, Draw, Move, Scale, Rotate, a palette action, undo) is tried from it
 //                              and the invariants checked. A new mode is covered without a line here; a mode no
 //                              exit leaves fails with its id. Each case's script goes to --ui-out/replay-*.sfui.
+//                              SF_MODE_MATRIX_SHARD=K/N probes only every Nth entry from the Kth (ui_mode_matrix_KofN).
 //   monkey SEED STEPS [COUNT] [known=FILE]   COUNT (default 1) seeded random sequences of STEPS user actions (brushes, strokes,
 //                              undo / redo, panels, mode toggles, view changes) from a new sphere, then Esc and a
 //                              brush, and the invariants: nothing latched, a stroke sculpts, the mesh is valid, and
@@ -40,6 +41,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <set>
@@ -159,6 +162,7 @@ const char* const kNeverRun[] = {
     "sculptable.", // Make sculptable: a splat and its workers
     "studio.",     // studio mode: its own folder
     "discord.",    // Rich Presence: Discord's socket
+    "ui.my_panel", // a floating window of its own at the cursor (ui_my_panel); one more toggle shifted every seed's picks
 };
 
 bool neverRun(const std::string& id) {
@@ -295,6 +299,17 @@ std::string Demo::writeReplay(size_t end) const {
 bool Demo::parseModeStep(int line, const std::vector<std::string>& w, std::string& error, bool& handled) {
     handled = true;
     const std::string& verb = w[0];
+    if (verb == "drag_item_to") return parseDragItemTo(line, w, error); // not in the chain: MSVC C1061 nesting limit
+    if (verb == "gl_limits" || verb == "render_cell") return parseRenderStep(line, w, error); // (UiTestRender.cpp)
+    if (verb == "start_view") { // start_view: the camera as a fresh start has it, then the first frame's fit (App::fitStartView)
+        run([this] {
+            app_.camera_ = Camera();
+            app_.autoFramed_ = false;
+            app_.updateCameraAspect();
+            app_.fitStartView(false);
+        });
+        return true;
+    }
     if (verb == "expect_latched") {
         if (w.size() < 2) {
             error = "'expect_latched' needs none or what is latched";
@@ -502,7 +517,7 @@ int Demo::openEdges() const {
 // The set-up every generated case starts from: a small sphere, the Standard brush, nothing latched.
 // (wait_idle: a background job an earlier case started, Quad Remesh, would write its progress over the status bar)
 static const std::vector<std::string> kReset = {"release", "hold none", "key escape", "unlatch", "wait_idle 120", "run new_sphere subdivisions=3",
-                                                "action brush.standard", "action tool.draw", "unlatch", "wait 0.1"};
+                                                "action brush.standard", "action tool.draw", "unlatch", "reset_sliders", "wait 0.1"};
 
 // tests/ui/mode_matrix_known.txt: "ID | EXIT | the fix task" per line. Those cases' failures are logged as KNOWN, not
 // failed; one that passes now (or whose action is no longer a mode) fails, so the line goes when the fix lands.
@@ -571,6 +586,20 @@ bool Demo::buildModeMatrix(int line, const std::vector<std::string>& args, std::
     std::vector<Entry> entries;
     for (const Action* a : candidates) entries.push_back({a->id, a->label, {"action " + a->id}, {"try_action " + a->id}, true});
     for (const auto& [name, lines] : extraEntries_) entries.push_back({name, name, lines, lines, false});
+    // SF_MODE_MATRIX_SHARD=K/N: only every Nth entry from the Kth (CMake runs N shards side by side: one matrix took
+    // 3-10 min on a CI runner, the longest test of every app T0).
+    if (const char* sh = std::getenv("SF_MODE_MATRIX_SHARD"); sh && *sh) {
+        int k = -1, n = 0;
+        if (std::sscanf(sh, "%d/%d", &k, &n) != 2 || n < 1 || k < 0 || k >= n) {
+            error = std::string("mode_matrix: SF_MODE_MATRIX_SHARD=") + sh + " is not K/N with 0 <= K < N";
+            return false;
+        }
+        std::vector<Entry> mine;
+        for (size_t i = 0; i < entries.size(); ++i)
+            if (int(i % size_t(n)) == k) mine.push_back(std::move(entries[i]));
+        SDL_Log("mode_matrix: shard %d/%d: %zu of %zu entries", k, n, mine.size(), entries.size());
+        entries = std::move(mine);
+    }
     for (const Entry& en : entries) {
         const std::string id = en.id, label = en.label;
         std::vector<std::string> enter = kReset;

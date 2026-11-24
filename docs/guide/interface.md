@@ -1,13 +1,20 @@
 # The interface
 
-SculptForge's window has the 3D view (the canvas) in the middle, shelves of the most-used controls around it,
-menus along the top that hold every function, and trays at the sides where panels can stay open. It comes in two
-layouts: the **SculptForge layout** (the default), with menus by task, and the **Classic layout**, with a bar
-of alphabetical palettes. Both hold the same controls; see [Looks and layouts](#looks-and-layouts) to switch. This
-chapter walks through each region, the pop-up pickers, the Library, the built-in help, and how to rearrange the
-interface and keep your changes. The pictures show the default look and layout.
-
 ![The SculptForge window with its main regions labelled](images/interface-overview.jpg)
+
+> **In short:**
+> - The canvas sits in the middle, with shelves, menus and trays around it.
+> - Two layouts, **SculptForge** (default) and **Classic**, hold the same controls.
+> - <kbd>Tab</kbd> hides the shelves and trays for a bigger canvas.
+> - Your art is never uploaded or used for training.
+
+SculptForge's window has the 3D view (the canvas) in the middle, shelves of the most-used controls around it, menus
+along the top that hold every function, and trays at the sides where panels can stay open. It comes in two layouts:
+the **SculptForge layout** (the default), with menus by task, and the **Classic layout**, with a bar of alphabetical
+palettes. Both hold the same controls; see [Looks and layouts](#looks-and-layouts) to switch.
+
+This chapter walks through each region, the pop-up pickers, the Library, the built-in help, and how to rearrange the
+interface and keep your changes. The pictures show the default look and layout.
 
 ## The regions at a glance
 
@@ -74,6 +81,12 @@ borders, and nothing lights up under the pointer), **Off** (no borders; the gaps
 100%) fades the borders further into the panels. Hovering a control only gives that control a faint fill, never a
 bright border.
 
+**Pop-up colours** sets how pop-ups stand out from the panels. **By role** (the default) gives each kind its own
+colour, as a strip across the top, an edge and an icon beside the title, with the surface a step lighter than the
+panels: tips and help in blue, the welcome and the quick tour in teal, What's New and the membership cards in the
+SculptForge orange, warnings in amber and deletes in red. The title and the icon say the same thing, so the colour is
+never the only cue. **Plain** draws pop-ups in the panels' own colours, as before. Nothing moves either way.
+
 **The first start** shows three looks to pick from in the welcome: **Neutral**, **Forge Terminal** (Tokyo Night)
 and **Classic layout** (Classic with the palette bar). **Coming from** sets the keys and the layout together:
 Classic sculpting keys (the keys and the Classic layout), Blender, Maya or New to sculpting (their keys, the SculptForge layout).
@@ -83,7 +96,9 @@ Choosing Forge Terminal, Phosphor or Blueprint also switches to the SculptForge 
 Classic layout again right after. The look and layout are remembered for the next start on their own, like every
 [preference](#saving-preferences-and-layouts).
 
-**Updating from an older version** keeps the look and layout you had. A card, **SculptForge has a new look**,
+**Updating from an older version** opens What's New as **New since** the version you last used: the features of
+every version you skipped, newest first (the first eight, then "and N more improvements", which opens the What's New
+chapter). Help > What's New shows the newest version. It also keeps the look and layout you had. A card, **SculptForge has a new look**,
 shows once: **Try it** switches to Forge Terminal with the Neutral colours and the SculptForge layout; **Keep my layout**
 changes nothing. Either way, Edit > Preferences > Interface > Look changes it later.
 
@@ -93,24 +108,27 @@ In scripts: `ui_look look=forge scheme=neutral outlines=subtle layout=sculptforg
 
 Your art is never uploaded or used for training. AI features run only when you use them and can be turned off.
 
-**Edit > Preferences > AI > Enable AI features** turns off everything AI: **AI Brush** (Brush Lab, where you describe a
-brush in words) and **Generate 3D** (image or text to a model) leave the shelves, menus and the command palette,
-their commands leave scripts, `sculptforge-cli` and the MCP tool list, and SculptForge makes no AI network calls.
-The offline image tools (**Relief**, **Inflate**, **Stamp**) and the MCP server stay. The first-run welcome asks
-the same question. The choice is saved at once; turn it back on the same way, or search the command palette for
-"Enable AI".
+**Edit > Preferences > AI > Enable AI features** turns off everything AI: **AI Brush** (Brush Lab, where you describe
+a brush in words) and **Generate 3D** (image or text to a model) leave the shelves, menus and the command palette,
+their commands leave scripts, `sculptforge-cli` and the MCP tool list, and SculptForge makes no AI network calls. The
+offline image tools (**Relief**, **Inflate**, **Stamp**) and the MCP server stay.
+
+The first-run welcome asks the same question. The choice is saved at once; turn it back on the same way, or search the
+command palette for "Enable AI".
 
 Studios can turn it off for everyone with the environment variable `SF_AI=off` (or start with `--no-ai`); the
 setting is then locked. See [Studios](studios.md#environment-variables).
 
 ## What leaves your computer
 
-Your sculpt never does. An AI feature sends only the request below, only when you press its button. The first time
-a service on someone else's computer would receive anything, the panel says what is sent, to which address and who
-pays, and nothing goes until you press **Allow** (asked once per service). **Use local instead** switches to a model
-on this computer when one is running (Ollama or LM Studio for brushes, ComfyUI for 3D); otherwise **Set up local**
-shows how. **Edit > Preferences > AI > Online AI services** lists each service as **Allowed** or **Asks first**, with
-**Revoke**. Models on this computer (`localhost`, `127.0.0.1`) never ask.
+Your sculpt never does. An AI feature sends only the request below, only when you press its button. The first time a
+service on someone else's computer would receive anything, the panel says what is sent, to which address and who pays,
+and nothing goes until you press **Allow** (asked once per service).
+
+**Use local instead** switches to a model on this computer when one is running (Ollama or LM Studio for brushes,
+ComfyUI for 3D); otherwise **Set up local** shows how. **Edit > Preferences > AI > Online AI services** lists each
+service as **Allowed** or **Asks first**, with **Revoke**. Models on this computer (`localhost`, `127.0.0.1`) never
+ask.
 
 | You use | Sent | To | Who pays |
 |---|---|---|---|
@@ -118,7 +136,7 @@ shows how. **Edit > Preferences > AI > Online AI services** lists each service a
 | AI Brush, Anthropic, OpenAI or OpenRouter | The same text | `api.anthropic.com`, `api.openai.com` or `openrouter.ai` | You, on your own key |
 | AI Brush, Ollama, LM Studio, llama.cpp, vLLM | The same text | This computer (or the server address you typed) | Nobody / your server |
 | Generate 3D, **Hugging Face** (the default) | The picture (framed, at most 1024 px) or your text | The model author's Space, for example `tencent-hunyuan3d-2-1.hf.space` | Hugging Face's free shared GPUs (a daily allowance) |
-| Generate 3D, fal.ai, Meshy, Hyper3D | The picture or your text | `queue.fal.run`, `api.meshy.ai` or `api.hyper3d.com` | You, per generation, on your own key |
+| Generate 3D, fal.ai, Meshy, Hyper3D, Tripo | The picture or your text | `queue.fal.run`, `api.meshy.ai`, `api.hyper3d.com` or `openapi.tripo3d.ai` | You, per generation, on your own key |
 | Generate 3D, ComfyUI | The picture or your text | Your ComfyUI (this computer by default) | Your own GPU |
 | Generate 3D, your command, Offline blockout | Nothing | Stays on this computer | - |
 | Connect an AI tool (MCP) | Nothing from SculptForge | Your AI tool talks to SculptForge on this computer | Your tool |
@@ -165,19 +183,21 @@ right:
 
 ## Menus and palettes
 
-Every function in SculptForge lives in one of 16 palettes. In the SculptForge layout each palette is a section
-of one task menu (the table below); in the Classic layout the palettes sit side by side in the palette bar.
+Every function in SculptForge lives in one of 16 palettes. In the SculptForge layout each palette is a section of one
+task menu (the table below); in the Classic layout the palettes sit side by side in the palette bar.
+
 Either way, click the name and the palette drops down under it. Click another name to switch, or press
 <kbd>Esc</kbd> or click outside to close it.
 
 ![The Sculpt menu open on its Stroke section](images/palette-dropdown.jpg)
 
-Menu paths in this guide name what you click in the SculptForge layout: **Edit > Preferences > Input** is the
-**Edit** menu, its **Preferences** section, then the **Input** sub-palette. **File** and **Edit** have a section
-of the same name, which paths leave out (**File > Save**). Paths starting with **Tool** are in the Tool panel in
-the right tray, in both layouts (it is also **Mesh > Parts & Geometry**). In the Classic layout, drop the
-menu: **Edit > Preferences > Input** is **Input** in the palette named **Preferences**, and **Sculpt > Stroke**
-is the palette named **Stroke**.
+Menu paths in this guide name what you click in the SculptForge layout: **Edit > Preferences > Input** is the **Edit**
+menu, its **Preferences** section, then the **Input** sub-palette. **File** and **Edit** have a section of the same
+name, which paths leave out (**File > Save**).
+
+Paths starting with **Tool** are in the Tool panel in the right tray, in both layouts (it is also
+**Mesh > Parts & Geometry**). In the Classic layout, drop the menu: **Edit > Preferences > Input** is **Input** in the
+palette named **Preferences**, and **Sculpt > Stroke** is the palette named **Stroke**.
 
 In the Classic layout, the palette bar lists **File** and **Edit** first and **Help** last, where other
 desktop applications put them, and the rest in alphabetical order. If you prefer strict A to Z order,
@@ -204,10 +224,12 @@ turn on **Edit > Preferences > Interface > Palettes strictly A-Z (strict order)*
 
 ### Sub-palettes
 
-Large palettes are divided into **sub-palettes**: headers you click to open or close. The Tool palette is the
-main example (Part, Layers, Geometry and so on). By default opening one sub-palette closes the others in
-the same palette, which keeps the palette short. **Shift**+click a header to open it without closing the
-others, or turn off **Edit > Preferences > Interface > One sub-palette open**.
+Large palettes are divided into **sub-palettes**: headers you click to open or close. The Tool palette is the main
+example (Part, Layers, Geometry and so on).
+
+By default opening one sub-palette closes the others in the same palette, which keeps the palette short.
+**Shift**+click a header to open it without closing the others, or turn off
+**Edit > Preferences > Interface > One sub-palette open**.
 
 ## Trays
 
@@ -236,6 +258,28 @@ When you open a Gaussian splat capture, **Render > Gaussian Splats** moves into 
 > open as drop-downs only. The left-shelf tiles get smaller and the bottom shelf scrolls sideways with the
 > mouse wheel.
 
+## My Panel
+
+**My Panel** is a panel you build yourself, out of the buttons and sections you use most. It is in the **Edit** menu
+(**Edit > My Panel...**; the Classic layout's palette bar shows it once it holds something or sits in a tray), and it
+works like any other palette: put it in a tray, or open it in a window of its own for a second monitor.
+
+- **Add a button or a whole section**: hold <kbd>Alt</kbd> and drag it from any palette (or a shelf) into My Panel.
+  A section keeps all its controls, live, so **Masking** or **Geometry** can sit next to the three buttons you press
+  all day. A line shows where it will land.
+- **Reorder**: hold <kbd>Alt</kbd> and drag an entry to a new place in My Panel.
+- **Take one out**: drag it out of My Panel (still holding <kbd>Alt</kbd>) and let go anywhere else, or right-click it
+  and choose **Remove from My Panel**.
+- **Fold a section** in My Panel by clicking its title. This does not change the same section in its own palette.
+- **Open it where you are working**: press <kbd>F4</kbd> (change the key in **Edit > Preferences > Hotkeys**, the action is
+  **My Panel**). My Panel appears at the cursor; press the key again or <kbd>Esc</kbd> to close it.
+
+Buttons and sections can be dragged in. Sliders and checkboxes on their own cannot; drag the section that holds them.
+
+However My Panel is open (its key, the Edit menu, a tray, or a window of its own), hold <kbd>Alt</kbd> and drag an
+entry onto it. In a window of its own the entry lands at the end of the panel; drag within that window to reorder.
+What is in My Panel is saved with your layout (**Edit > Preferences > Saving & Layouts**), and **Reset Layout** empties it.
+
 ## The shelves
 
 Shelves surround the canvas and hold the controls you use all the time. Point at anything with <kbd>Ctrl</kbd>
@@ -262,8 +306,10 @@ and Intensity on the first; **AI Brush**, **Front**, symmetry, **Pressure > Stre
 Size**, and the **ActiveTris / TotalTris** count on the second. In the SculptForge layout these are in the
 **Sculpt** menu (AI Brush, Front, pressure) and **View** menu (Library).
 
-Size and Intensity are sliders with the label inside: drag along them, or
-<kbd>Ctrl</kbd>+click to type a value.
+Size and Intensity are sliders with the label inside: drag along them, or double-click (or
+<kbd>Ctrl</kbd>+click; a pen's double-tap too) to type a value. This works on every slider and drag number in the
+panels, the top bar and Brush Lab: <kbd>Enter</kbd> applies, <kbd>Esc</kbd> cancels, <kbd>Tab</kbd> goes on to the next
+field, and a number past the slider's ends is moved to the end.
 
 ### Left shelf
 
@@ -288,7 +334,7 @@ unmasked area with the main colour.
   lock** sets it.
 - **Ortho** (<kbd>Numpad 5</kbd>): an orthographic view (on) or perspective (off).
 - **Floor**: the floor grid under the model, as **View > Floor grid**.
-- In a window too short for all of them, Turn, Ortho, Floor and Flat fold into one **View** button: click it for
+- In a window too short for all of them, Turn, Ortho, Floor, Flat and Unlit fold into one **View** button: click it for
   their list.
 - **Wire** (<kbd>Shift</kbd>+<kbd>F</kbd>): shows the mesh's polygons: quads as quads, triangles as triangles.
 - **Groups**: colours each face group.
@@ -296,6 +342,10 @@ unmasked area with the main colour.
   the mask, which still protects the surface.
 - **Paint**: shows vertex paint colours (on by default).
 - **Flat**: flat shading, every polygon its own face (on), or smooth shading (off), as **Render > Materials > Smooth | Flat**.
+- **Unlit** (<kbd>Alt</kbd>+<kbd>L</kbd>, **Render > Materials > Unlit**, or in the **View** list when the shelf is folded; not a default shelf button, but Customize can add one): the base colour alone, with no lighting, Lit Sphere or PBR shading, so vertex
+  paint, texture paint and PBR base colour read exactly as stored. The mask tint and **Wire** still draw. The status
+  bar shows **Unlit** while it is on. Saved with the project (a new session starts shaded); `set_unlit on=true`
+  from a script. Suggested by @nagdav853.
 - **Solo**: shows only the active Part (available with two or more Parts).
 - **Splats**: shows or hides a Gaussian splat capture (only shown while one is loaded).
 
@@ -328,9 +378,11 @@ The active brush is outlined in the accent colour.
 
 ## Pop-up pickers
 
-Pickers are pop-up grids of thumbnails. They open beside the left-shelf tile you click, or under the mouse
-when you use a key. They close when you pick something, press <kbd>Esc</kbd> or click elsewhere. Pointing at a
-tile for a moment shows **help box**: a large preview and a description.
+Pickers are pop-up grids of thumbnails. They open beside the left-shelf tile you click, or under the mouse when you
+use a key.
+
+They close when you pick something, press <kbd>Esc</kbd> or click elsewhere. Pointing at a tile for a moment shows
+**help box**: a large preview and a description.
 
 ### Brush picker
 
@@ -369,11 +421,13 @@ brushes](brush-lab.md)).
 
 ### Sliders at the cursor and the Quick Menu
 
-Press <kbd>S</kbd> for a Size slider under the mouse, <kbd>U</kbd> for Intensity,
-<kbd>I</kbd> for Colour intensity or <kbd>O</kbd> for Falloff. Drag the slider, or type a number and press
-<kbd>Enter</kbd> (<kbd>Esc</kbd> cancels). The pop-up closes when you release the slider. <kbd>[</kbd> and
-<kbd>]</kbd> make the brush 10% smaller or larger at any time. <kbd>Space</kbd> (or a right click on the canvas) opens the Quick Menu with all of
-them and the brush, stroke, alpha and material (see [The Quick Menu](sculpting.md#the-quick-menu)).
+Press <kbd>S</kbd> for a Size slider under the mouse, <kbd>U</kbd> for Intensity, <kbd>I</kbd> for Colour intensity or
+<kbd>O</kbd> for Falloff. Drag the slider, or type a number and press <kbd>Enter</kbd> (<kbd>Esc</kbd> cancels). The
+pop-up closes when you release the slider.
+
+<kbd>[</kbd> and <kbd>]</kbd> make the brush 10% smaller or larger at any time. <kbd>Space</kbd> (or a right click on
+the canvas) opens the Quick Menu with all of them and the brush, stroke, alpha and material (see [The Quick
+Menu](sculpting.md#the-quick-menu)).
 
 ## The Library
 
@@ -439,10 +493,11 @@ help**, and make the box more or less see-through with **Help box opacity**.
 
 ### The Controls sheet
 
-Press <kbd>F1</kbd> (or **Help > Controls**) for the **Controls** window. The **Keyboard** tab lists every
-action that has a shortcut, grouped by palette and generated from the actions themselves, so it always shows
-your current keys. The **Mouse & pen** tab lists the gestures. Type in the filter field to search both.
-Double-click a row on the Keyboard tab to give that action a new key.
+Press <kbd>F1</kbd> (or **Help > Controls**) for the **Controls** window. The **Keyboard** tab lists every action that
+has a shortcut, grouped by palette and generated from the actions themselves, so it always shows your current keys.
+The **Mouse & pen** tab lists the gestures.
+
+Type in the filter field to search both. Double-click a row on the Keyboard tab to give that action a new key.
 
 ### This guide
 
@@ -481,6 +536,29 @@ to find any action or command by name and run it. It opens at the top centre of 
 
 Everything scriptable is in the command palette, including commands that have no button in the interface.
 
+### Say what you want
+
+You can also just type what you want, in plain words. The first row says what <kbd>Enter</kbd> will do before it
+does it, and nothing runs until you press <kbd>Enter</kbd>.
+
+| Type | What happens |
+|---|---|
+| `clay 40` | Picks the Clay brush and sets its size to 40. `clay 40 30%` also sets its intensity to 30%. |
+| `intensity 30`, `size 40` | Sets that one number. A number past the end of the slider is moved to the end. |
+| `mirror x`, `symmetry off`, `wireframe on` | Flips or sets a switch. `on` and `off` only change it when it is not already so. |
+| `remesh 200k` | Voxel Remesh to about 200 000 triangles. `remesh 300` is 300 voxels across. |
+| `hide all but head`, `show all`, `isolate body` | Shows and hides Parts by name. |
+| `ortho`, `turntable` | A plain action name, as before. |
+
+- It forgives typos (`smoth`, `wirefrmae`) and understands other names for things (`no perspective` finds
+  Orthographic). Names work in every interface language, with or without accents, and numbers may be written
+  `40`, `40px`, `30%`, `200k` or `1.5m`.
+- A word that means nothing here is just a normal search, so nothing odd runs.
+- The result line at the bottom shows the shortcut for what you ran, so the next time it is one key.
+- <kbd>Up</kbd> in an empty field brings back the last command you ran (the last 50 are kept, also
+  when you restart); <kbd>Up</kbd> again goes further back and <kbd>Down</kbd> returns. <kbd>Enter</kbd> runs it again.
+- It never goes online, and it only runs what the buttons and menus already run.
+
 ## The console
 
 Press <kbd>`</kbd> (the backtick key, left of <kbd>1</kbd> on US keyboards) to open the console, a strip
@@ -502,8 +580,8 @@ See [Scripting and automation](scripting.md) for the command language, scripts a
 ## Customizing the interface
 
 Everything about the layout can change: which palettes sit in the trays, what's on each shelf, and which keys
-do what. **Shortcuts and preferences save themselves**; layout changes (shelves, trays) last until you quit unless
-you keep them with **Save Layout**.
+do what. **Shortcuts, preferences and the layout save themselves** (the layout a couple of seconds after a change and when
+you quit); **Save Layout** marks the layout **Revert to Saved Layout** returns to.
 
 ### Move, add and remove shelf items
 
@@ -535,21 +613,24 @@ which action lost it.
 ### Saving preferences and layouts
 
 Every preference (key style, shortcuts, tablet, interface, performance, radial menus...) **saves itself** a moment
-after you change it; there is nothing to press. The layout is the one thing kept on purpose, with **Save Layout**.
-All in **Edit > Preferences > Saving & Layouts**:
+after you change it; there is nothing to press. So does the layout: what you change in the shelves, trays and open
+palettes is written a couple of seconds later and when you quit, so a restart or a crash brings it back.
+
+**Save Layout** marks a layout you like, so **Revert to Saved Layout** can return to it later. All in
+**Edit > Preferences > Saving & Layouts**:
 
 | Item | What it does |
 |---|---|
-| **Save Layout** | Keeps the current shelves, trays and open palettes for future sessions |
-| **Revert to Saved Layout** | Goes back to the layout the last Save Layout kept |
-| **Reset Layout and Shortcuts** | Goes back to the built-in layout, shortcuts and radial menus (Save Layout afterwards to keep the layout) |
+| **Save Layout** | Marks the current shelves, trays and open palettes as the layout Revert returns to |
+| **Revert to Saved Layout** | Goes back to the layout the last Save Layout kept (the autosave then keeps that one) |
+| **Reset Layout and Shortcuts** | Goes back to the built-in layout, shortcuts and radial menus (Revert to Saved Layout still returns to the one Save Layout kept) |
 | **Export Interface...** | Saves the layout, shortcuts and preferences to a `.json` file you can share |
-| **Import Interface...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (Save Layout afterwards to keep its layout) |
+| **Import Interface...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (its layout saves itself like any other) |
 
 The command palette (<kbd>F3</kbd>) also has **Save Preferences Now**, which writes them at once; you never need it.
 
-The first time you change the layout in a session, the status line reminds you once: "Layout changed -
-Edit > Preferences > Saving & Layouts > Save Layout keeps it". What a session changes by itself (the console and Library being open, the Library
+The first time you change the layout in a session, the status line tells you once: "Layout changes save themselves -
+Edit > Preferences > Saving & Layouts > Save Layout sets what Revert returns to". What a session changes by itself (the console and Library being open, the Library
 tab) doesn't count as a layout change.
 
 ### Layout presets
@@ -561,8 +642,8 @@ arrangements of the current layout:
 2. **Sculpt**: both trays closed, for the largest canvas.
 3. **Wide**: Brush, Stroke and Alpha in the left tray, Tool and Material in the right tray.
 
-A preset changes the layout only (the console, Library and left-handed setting stay as they are). Save
-Layout keeps it.
+A preset changes the layout only (the console, Library and left-handed setting stay as they are). The
+layout saves itself.
 
 ### Interface preferences
 
@@ -574,8 +655,9 @@ Layout keeps it.
 
 | Setting | Default | What it does |
 |---|---|---|
-| **Look**, **Outlines** and **Layout** | Forge Terminal, Neutral, Subtle, SculptForge | See [Looks and layouts](#looks-and-layouts) |
-| **Language** | English | The interface language: **English**, **Español**, Traditional Chinese or Simplified Chinese (see below) |
+| **Look**, **Outlines**, **Pop-up colours** and **Layout** | Forge Terminal, Neutral, Subtle, By role, SculptForge | See [Looks and layouts](#looks-and-layouts) |
+| **Language** | English | The interface language: **English**, **Español**, Traditional Chinese, Simplified Chinese or **Japanese** (see below) |
+| **Show startup splash** | On | The SculptForge logo and version at every start, for half a second or more while SculptForge loads, then it fades into the main window. Turn it off for an instant start. Applies at the next start |
 | **Ctrl+hover help** | On | Ctrl-hover help boxes |
 | **Help box opacity** | 0.97 | How solid the help box is |
 | **Tooltip delay** | 0.5 s | How long to point at an icon-only button before its name appears |
@@ -583,23 +665,40 @@ Layout keeps it.
 | **One sub-palette open** | On | Opening a sub-palette closes the others in that palette |
 | **Auto collapse left tray** / **right tray** | On / Off | Collapse other palettes in the tray when one wouldn't fit |
 | **Palettes strictly A-Z (strict order)** | Off | Classic layout: strict alphabetical palette bar instead of File and Edit first, Help last |
+| **Show newer menu rows** | Off in Classic, on in SculptForge | File > Render with..., Edit > Preferences > Scripts and Edit > Preferences > Render bridge (added after 0.13.0); a feature you have set up keeps its row either way |
 | **Left-handed layout** | Off | Mirrors the shelves and trays: tools on the right, navigation on the left |
 | **UI scale** | Automatic | Size of text and controls (100% to 200%), applied at once; Automatic follows the monitor (see below) |
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |
 
-**Language** changes the interface at once, without a restart; saved automatically for the next start. In
-**Español** the menus, the palettes, the shelves, the Library, the command palette and the Ctrl-help titles
-are in Spanish, while the names of tools and brushes stay in English, as Spanish-speaking sculptors use them (Parts,
-Quad Remesh, Forge Spheres, Library, Lit Sphere, Clay Block, Add). The command palette finds a command by its Spanish or its
-English name. **Traditional Chinese** (the button with its Chinese name; contributed by yoyomaimai) works the same way, with Taiwan usage
-and the brush and tool names in English; **Simplified Chinese** (the fourth button) is the same translation in simplified
-characters with mainland terms, drawn with mainland glyph shapes. Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and
-`sculptforge-cli` commands are the same in every language.
+**Language** changes the interface at once, without a restart; saved automatically for the next start. In **Español**
+the menus, the palettes, the shelves, the Library, the command palette and the Ctrl-help titles are in Spanish, while
+the names of tools and brushes stay in English, as Spanish-speaking sculptors use them (Parts, Quad Remesh, Forge
+Spheres, Library, Lit Sphere, Clay Block, Add). The command palette finds a command by its Spanish or its English
+name.
+
+**Traditional Chinese** (the button with its Chinese name; contributed by yoyomaimai) works the same way, with Taiwan
+usage and the brush and tool names in English; **Simplified Chinese** (the fourth button) is the same translation in
+simplified characters with mainland terms, drawn with mainland glyph shapes. The fifth button, **Japanese**, is Japanese
+with the same rules: names of tools and brushes stay in English, polite form in tooltips and help, Japanese glyph shapes.
+It is a first translation and a native speaker's review is welcome (tell us in #testers on Discord or open an issue).
+Anything not translated yet (most Ctrl-help descriptions, this guide) shows in English. Scripts and `sculptforge-cli`
+commands are the same in every language.
+
+**On the first start** SculptForge looks at the language your computer's interface is in (Windows display language,
+macOS preferred language, or `LC_ALL`, `LC_MESSAGES` and `LANG` on Linux). If it is one of the five above it starts in
+it, with a small note along the bottom, *SculptForge is in Español. Change*, in that language and in English;
+**Change** opens Edit > Preferences > Interface.
+
+Any other computer language (Portuguese, French...) starts in English, and the **Language** row at the top of the
+welcome shows the five names, each in its own script: one click switches the whole interface. **Help > Welcome** shows
+the row again. Nothing is ever sent anywhere, and the choice is asked once.
 
 **UI scale** also applies at once: text, buttons, shelves and trays resize on the next frame; saved automatically.
 **Automatic** uses the scale of the monitor the window is on (Windows: **Settings > Display > Scale**; macOS and
-Wayland: the display's scaling; X11: the desktop's font DPI). Drag the window to a monitor at another scale, or
-change the system setting, and the interface follows. A chosen size (100% to 200%) stays the same on every monitor.
+Wayland: the display's scaling; X11: the desktop's font DPI).
+
+Drag the window to a monitor at another scale, or change the system setting, and the interface follows. A chosen size
+(100% to 200%) stays the same on every monitor.
 
 **Edit > Preferences > Cursor**:
 
@@ -619,27 +718,33 @@ on it, as you would scroll a list with a finger (#100).
 
 **Edit > Preferences > Input** sets the key **Style** (the first start sets it from your **Coming from** answer):
 **SculptForge** (the default for new installs): <kbd>1</kbd> to <kbd>9</kbd> and <kbd>0</kbd> pick the first ten
-brushes, <kbd>I</kbd> opens Intensity like <kbd>U</kbd>, and <kbd>Ctrl</kbd>+drag on the background zooms when
-nothing is masked; **Classic**: the Classic sculpting keys, with the number keys free (<kbd>9</kbd> is Save Snapshot),
-<kbd>I</kbd> for Colour intensity and <kbd>Ctrl</kbd>+drag on the background for a mask rectangle (see
-[the Classic sculpting keys](shortcuts.md#classic-sculpting-keys)); **Maya**: Maya's view controls; or **Blender**: middle-drag navigation,
-the numpad views and Blender's sculpt-mode keys (see [Blender keys](shortcuts.md#blender-keys)). In the Blender
-style, **Emulate Numpad** makes the number row work as the numpad, and **Import Blender keymap...** takes the keys
-from a keymap you exported in Blender. **Right click opens the Quick Menu** (on by default, in every style) opens
-the [Quick Menu](sculpting.md#the-quick-menu) with a right click on the canvas; a right drag navigates either
-way. **Hold Space and drag to move the camera** (off by default) turns <kbd>Space</kbd> into a camera key: held,
-left-drag rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (see
-[Navigation](navigation.md#mouse-and-pen)). **Radial Menus** edits your pie menus and their keys (see [Radial menus](sculpting.md#radial-menus)).
-**Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see
-[Size and Falloff](sculpting.md#size-intensity-colour-intensity-and-falloff)); off, they are flat circles on the screen. **Rotation** chooses free rotation or a turntable. See
-[Quick tour for experienced sculptors](quick-tour.md).
+brushes, <kbd>I</kbd> opens Intensity like <kbd>U</kbd>, and <kbd>Ctrl</kbd>+drag on the background zooms when nothing
+is masked; **Classic**: the Classic sculpting keys, with the number keys free (<kbd>9</kbd> is Save Snapshot),
+<kbd>I</kbd> for Colour intensity and <kbd>Ctrl</kbd>+drag on the background for a mask rectangle (see [the Classic
+sculpting keys](shortcuts.md#classic-sculpting-keys)); **Maya**: Maya's view controls; or **Blender**: middle-drag
+navigation, the numpad views and Blender's sculpt-mode keys (see [Blender keys](shortcuts.md#blender-keys)). In the
+Blender style, **Emulate Numpad** makes the number row work as the numpad, and **Import Blender keymap...** takes the
+keys from a keymap you exported in Blender. **Right click opens the Quick Menu** (on by default, in every style) opens
+the [Quick Menu](sculpting.md#the-quick-menu) with a right click on the canvas; a right drag navigates either way.
+
+**Hold Space and drag to move the camera** (off by default) turns <kbd>Space</kbd> into a camera key: held, left-drag
+rotates, right- or middle-drag pans and <kbd>Ctrl</kbd>+drag zooms (see [Navigation](navigation.md#mouse-and-pen)).
+**Radial Menus** edits your pie menus and their keys (see [Radial menus](sculpting.md#radial-menus)).
+**Cursor follows surface** (on by default) lays the brush rings on the model under the pointer (see [Size and
+Falloff](sculpting.md#size-intensity-colour-intensity-and-falloff)); off, they are flat circles on the screen.
+
+**Rotation** chooses free rotation or a turntable. **Orbit around the pointer** (on for new installs) turns the view
+about the point of the model under the pointer when a rotation starts over it, and about the model, not the view's
+middle, when it starts beside a small model that is off-centre (see
+[Navigation](navigation.md#orbit-around-the-pointer)). See [Quick tour for experienced sculptors](quick-tour.md).
 
 ### The background
 
-**Edit > Preferences > Display** (and the **View** menu) sets the view's **Background**: **Gradient**, the
-charcoal radial gradient (the default), or **Flat Colour**, one solid colour without the gradient. Click the
-**Background colour** swatch to pick the colour; picking one switches to Flat Colour. The choice
-saves itself for the next session, and each project keeps the background it was saved with. From a script:
+**Edit > Preferences > Display** (and the **View** menu) sets the view's **Background**: **Gradient**, the charcoal
+radial gradient (the default), or **Flat Colour**, one solid colour without the gradient. Click the
+**Background colour** swatch to pick the colour; picking one switches to Flat Colour.
+
+The choice saves itself for the next session, and each project keeps the background it was saved with. From a script:
 `set_background mode=flat`, `set_background color=60,70,80` or `set_background mode=gradient`.
 
 **Edit > Preferences > Library** has **Show at startup** (on by default), the number of **Rows**, the **Thumbnails** size, **Placement**

@@ -9,6 +9,7 @@
 #include "app/App.h"
 #include "app/Support.h"
 #include "app/Theme.h"
+#include "app/Ui.h"
 
 #include <IconsLucide.h>
 #include <imgui.h>
@@ -62,10 +63,10 @@ constexpr TourSlide kSlides[] = {
     {"Masking", "images/quick-tour/06-masking.jpg",
      "Hold Ctrl and paint to mask, Ctrl+Alt to unmask. Tool > Masking inverts, blurs and grows the mask, and builds "
      "one By cavity, By face group or along the border. Press G for the stroke popup: its Shapes row picks Mask Pen, "
-     "Lasso Mask or Rectangle Mask for the next Ctrl stroke.",
+     "Lasso Mask, Rectangle Mask or Circle Mask for the next Ctrl stroke.",
      "tool.masking", "ui.palette.tool"},
     {"Cut, Clip and Fill Holes", "images/quick-tour/07-cut.jpg",
-     "Pick a shape in Tool > Cut and draw it with Ctrl+Shift: a line, lasso, rectangle or polyline goes straight "
+     "Pick a shape in Tool > Cut and draw it with Ctrl+Shift: a line, lasso, rectangle, circle or polyline goes straight "
      "through the whole Part, and a closed Part stays closed. Cut it away, cut in, add, or Clip: press everything "
      "outside the shape flat onto its outline. Fill Holes (Tool > Geometry) caps every open boundary.",
      "tool.cut", "ui.palette.tool"},
@@ -82,7 +83,7 @@ constexpr TourSlide kSlides[] = {
      "tool.bake", "ui.palette.tool"},
     {"SculptForge stays free", "images/wn-first-sculpt.jpg",
      "Everything in this tour is free, and stays free. If SculptForge helps your work, a membership keeps it moving: "
-     "members get betas and early builds, vote on what we build next and ask for the brushes and alphas they want.",
+     "members get early builds, like SculptForge for Android today, vote on what we build next and ask for the brushes and alphas they want.",
      nullptr, nullptr},
 };
 constexpr int kSlideCount = int(std::size(kSlides));
@@ -143,7 +144,11 @@ void App::drawQuickTour() {
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
-        if (ImGui::Begin("##quicktour_offer", nullptr, flags)) {
+        ui::PushRole(theme::Role::Learn);
+        const bool began = ImGui::Begin("##quicktour_offer", nullptr, flags);
+        ui::PopRole();
+        if (began) {
+            ui::RoleStrip(theme::Role::Learn);
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted(tr("New to SculptForge? A two-minute tour shows where everything is."));
             ImGui::SameLine();
@@ -169,7 +174,11 @@ void App::drawQuickTour() {
         const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
-        if (ImGui::Begin("##quicktour_aside", nullptr, flags)) {
+        ui::PushRole(theme::Role::Learn);
+        const bool began = ImGui::Begin("##quicktour_aside", nullptr, flags);
+        ui::PopRole();
+        if (began) {
+            ui::RoleStrip(theme::Role::Learn);
             ImGui::AlignTextToFramePadding();
             ImGui::Text(tr("Quick tour %d / %d: %s"), i + 1, kSlideCount, slide.title);
             ImGui::SameLine();
@@ -192,7 +201,11 @@ void App::drawQuickTour() {
     ImGui::SetNextWindowSize(ImVec2(w, 0.0f), ImGuiCond_Always);
     bool open = true;
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize;
-    if (ImGui::Begin(tr("New to SculptForge? A quick tour##quicktour"), &open, flags)) {
+    ui::PushRole(theme::Role::Learn);
+    const bool began = ImGui::Begin(tr("New to SculptForge? A quick tour##quicktour"), &open, flags);
+    ui::PopRole();
+    if (began) {
+        ui::RoleStrip(theme::Role::Learn);
         // The picture: a screenshot of the part of SculptForge the slide is about, in a band of one height.
         const float iw = ImGui::GetContentRegionAvail().x, band = std::floor(std::min(iw * 0.577f, 360.0f * s));
         const ImVec2 at = ImGui::GetCursorScreenPos();
@@ -226,7 +239,7 @@ void App::drawQuickTour() {
         const ImVec4 accent = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
         if (last) {
             ImGui::PushStyleColor(ImGuiCol_Button, accent);
-            if (ImGui::Button(tr(ICON_LC_HEART "  See memberships##quicktour"))) openSupportPage();
+            if (ImGui::Button(tr(ICON_LC_HEART "  See memberships##quicktour"))) openSupportPage("quick-tour");
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Opens sculptforge.app/support.html in your browser."));
             ImGui::SameLine();

@@ -1,0 +1,235 @@
+# Close-up: detail_pass and the detail presets on the template head at subdivide 3 (1.8M; tools/qa/closeup.py judges
+# each step: spikes, folds; mirror_check.py the symmetric ones). Region edges, wrinkle row ends, two passes stacked,
+# symmetry x, and the user's own alpha kept after a preset stroke.
+run ui_look look=classic layout=classic
+run new_head
+run subdivide levels=3
+wait_idle 120
+print triangles
+camera 0 0
+key f
+wait_idle 30
+run save_obj path=cf_00.obj
+run detail_pass kind=wrinkles center=-0.0006,0.0710,0.1049 radius=0.035
+wait_idle 60
+run save_obj path=cf_01.obj
+#step 00 01 any wrinkles forehead
+hover_window 0.97 0.5
+camera 0 0
+look -0.0006 0.0710 0.1049
+zoom 3.5
+wait_idle 30
+shot d01-wrinkles-forehead-0
+camera 0 40
+look -0.0006 0.0710 0.1049
+zoom 3.5
+wait_idle 30
+shot d01-wrinkles-forehead-1
+camera 0 0
+key f
+wait_idle 30
+run detail_pass kind=pores center=0.0511,-0.0065,0.0885 radius=0.03
+wait_idle 60
+run save_obj path=cf_02.obj
+#step 01 02 any pores cheek
+hover_window 0.97 0.5
+camera 30 0
+look 0.0511 -0.0065 0.0885
+zoom 4
+wait_idle 30
+shot d02-pores-cheek-0
+camera 70 5
+look 0.0511 -0.0065 0.0885
+zoom 4
+wait_idle 30
+shot d02-pores-cheek-1
+camera 0 0
+key f
+wait_idle 30
+run detail_pass kind=skin center=0.0611,-0.0165,0.0835 radius=0.03
+wait_idle 60
+run save_obj path=cf_03.obj
+#step 02 03 any skin stacked on pores
+hover_window 0.97 0.5
+camera 30 0
+look 0.0511 -0.0065 0.0885
+zoom 4
+wait_idle 30
+shot d03-skin-stacked-on-pores-0
+camera 70 5
+look 0.0511 -0.0065 0.0885
+zoom 4
+wait_idle 30
+shot d03-skin-stacked-on-pores-1
+camera 0 0
+key f
+wait_idle 30
+run detail_pass kind=scales center=0.0710,0.0462,0.0460 radius=0.025
+wait_idle 60
+run save_obj path=cf_04.obj
+#step 03 04 any scales temple
+hover_window 0.97 0.5
+camera 70 0
+look 0.0710 0.0462 0.0460
+zoom 4
+wait_idle 30
+shot d04-scales-temple-0
+camera 100 10
+look 0.0710 0.0462 0.0460
+zoom 4
+wait_idle 30
+shot d04-scales-temple-1
+camera 0 0
+key f
+wait_idle 30
+run detail_pass kind=scars center=0.0017,-0.0810,0.0896 radius=0.02 density=1
+wait_idle 60
+run save_obj path=cf_05.obj
+#step 04 05 any scars chin
+hover_window 0.97 0.5
+camera 0 -10
+look 0.0017 -0.0810 0.0896
+zoom 5
+wait_idle 30
+shot d05-scars-chin-0
+camera 40 -10
+look 0.0017 -0.0810 0.0896
+zoom 5
+wait_idle 30
+shot d05-scars-chin-1
+camera 0 0
+key f
+wait_idle 30
+run detail_pass kind=wrinkles center=0.0311,0.0488,0.0990 radius=0.02 symmetry=x direction=0,1,0
+wait_idle 60
+run save_obj path=cf_06.obj
+#step 05 06 any wrinkles brows symx
+hover_window 0.97 0.5
+camera 0 0
+look 0 0.0488 0.0990
+zoom 3.5
+wait_idle 30
+shot d06-wrinkles-brows-symx-0
+camera 0 30
+look 0 0.0488 0.0990
+zoom 3.5
+wait_idle 30
+shot d06-wrinkles-brows-symx-1
+camera 0 0
+key f
+wait_idle 30
+run detail_pass kind=pores center=0.0511,-0.0065,0.0885 radius=0.03 symmetry=x seed=7
+wait_idle 60
+run save_obj path=cf_07.obj
+#step 06 07 any pores cheeks symx stacked
+hover_window 0.97 0.5
+camera 0 0
+look 0 -0.0065 0.0885
+zoom 2.5
+wait_idle 30
+shot d07-pores-cheeks-symx-stacked-0
+camera 40 0
+look 0 -0.0065 0.0885
+zoom 2.5
+wait_idle 30
+shot d07-pores-cheeks-symx-stacked-1
+camera 0 0
+key f
+wait_idle 30
+run detail_pass kind=wrinkles center=-0.0006,0.0710,0.1049 radius=0.035 seed=3
+wait_idle 60
+run save_obj path=cf_08.obj
+#step 07 08 any wrinkles forehead again
+hover_window 0.97 0.5
+camera 0 0
+look -0.0006 0.0710 0.1049
+zoom 3.5
+wait_idle 30
+shot d08-wrinkles-forehead-again-0
+camera 0 40
+look -0.0006 0.0710 0.1049
+zoom 3.5
+wait_idle 30
+shot d08-wrinkles-forehead-again-1
+camera 0 0
+key f
+wait_idle 30
+run brush_set_alpha name=scales
+print alpha_index
+run stroke brush="Detail Wrinkle" points="-0.045,0.035,0.2 -0.015,0.03,0.2"
+wait_idle 60
+run save_obj path=cf_09.obj
+#step 08 09 any preset Detail Wrinkle
+hover_window 0.97 0.5
+camera 0 0
+look -0.03 0.033 0.1
+zoom 5
+wait_idle 30
+shot d09-preset-Detail-Wrinkle-0
+camera -40 0
+look -0.03 0.033 0.1
+zoom 5
+wait_idle 30
+shot d09-preset-Detail-Wrinkle-1
+camera 0 0
+key f
+wait_idle 30
+print alpha_index
+run stroke brush="Detail Crease" points="-0.03,-0.06,0.2 0.03,-0.06,0.2" symmetry=x
+wait_idle 60
+run save_obj path=cf_10.obj
+#step 09 10 any preset Detail Crease symx
+hover_window 0.97 0.5
+camera 0 0
+look 0 -0.06 0.1
+zoom 5
+wait_idle 30
+shot d10-preset-Detail-Crease-symx-0
+camera 0 -30
+look 0 -0.06 0.1
+zoom 5
+wait_idle 30
+shot d10-preset-Detail-Crease-symx-1
+camera 0 0
+key f
+wait_idle 30
+run stroke brush="Detail Scar" points="0.03,0.0,0.2 0.045,-0.03,0.2"
+wait_idle 60
+run save_obj path=cf_11.obj
+#step 10 11 any preset Detail Scar
+hover_window 0.97 0.5
+camera 30 0
+look 0.0511 -0.0065 0.0885
+zoom 5
+wait_idle 30
+shot d11-preset-Detail-Scar-0
+camera 70 5
+look 0.0511 -0.0065 0.0885
+zoom 5
+wait_idle 30
+shot d11-preset-Detail-Scar-1
+camera 0 0
+key f
+wait_idle 30
+run stroke brush="Detail Pores" points="-0.06,-0.02,0.2 -0.04,0.0,0.2"
+wait_idle 60
+run save_obj path=cf_12.obj
+#step 11 12 any preset Detail Pores
+hover_window 0.97 0.5
+camera -30 0
+look -0.0511 -0.0065 0.0885
+zoom 5
+wait_idle 30
+shot d12-preset-Detail-Pores-0
+camera -70 5
+look -0.0511 -0.0065 0.0885
+zoom 5
+wait_idle 30
+shot d12-preset-Detail-Pores-1
+camera 0 0
+key f
+wait_idle 30
+print alpha_index
+hover_window 0.97 0.5
+wait_idle 30
+shot d99-face

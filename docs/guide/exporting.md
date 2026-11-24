@@ -1,5 +1,12 @@
 # Exporting, Unreal and Bridge
 
+![A game-ready lion bust](images/hero-game-ready.jpg)
+
+> **In short:**
+> - Export to glTF, FBX, OpenUSD, OBJ, STL and PLY; every visible Part is written.
+> - Make LOD chains for games, or send a mesh straight into a running Unreal Editor.
+> - To keep everything (Parts, layers, mask, paint), save a project instead.
+
 This chapter covers getting your sculpt out of SculptForge: the export formats and what each one keeps, LOD
 chains for games, sending a mesh straight into a running Unreal Editor, and exchanging models with another sculpting
 application through the Bridge. To keep everything (Parts, layers, mask, vertex paint, brushes) use a project file instead; see
@@ -18,7 +25,7 @@ or mark it saved, so your next <kbd>Ctrl</kbd>+<kbd>S</kbd> still saves the proj
 | FBX for Unreal (`.fbx`) | **File > Export FBX for Unreal...** | Unreal naming and scale, quads, UVs, LOD group, layers as blend shapes, the painted texture as a PNG beside it | Unreal Engine (by hand) |
 | Wavefront OBJ (`.obj`) | **File > Export OBJ...** | One `o` object per Part, quads, face groups as `g` groups, vertex paint as vertex colour, UVs, the painted texture through a `.mtl` (`map_Kd`) and a PNG beside it. Layers are baked into the current blend | Any 3D app |
 | Bridge file | **File > Bridge > Export Bridge file...** | Quads, face groups, mask, vertex paint, UVs, the painted texture as a PNG beside it | The [Bridge](#exchange-models-through-the-bridge) |
-| STL (`.stl`) | **File > Bridge > Export STL...** | Geometry only (triangles), visible Parts merged, in millimetres with Z up | [3D printing](#3d-printing) |
+| STL (`.stl`) | **File > Export STL...** | Geometry only (triangles), visible Parts merged, in millimetres with Z up | [3D printing](#3d-printing) |
 | PLY (`.ply`) | `export_ply` command | Geometry, quads and vertex paint, visible Parts merged | Scan tools, MeshLab, Blender |
 | FBX (general) | `export_fbx` command | One model per Part, quads, UVs, blend shapes, optional LOD groups, the painted texture | Other FBX pipelines |
 
@@ -32,12 +39,13 @@ only hold triangles.
 ![The Tool > Export sub-palette with a generated LOD chain and the Unreal Engine settings](images/export.jpg)
 
 UVs are kept through OBJ, FBX, USD, glTF and Bridge files, in and out. A Part with a painted
-[texture](texture-painting.md) is exported with it: the PNG is written next to the file as
-`<name>_color.png` (`<name>_<Part>_color.png` with several Parts) and referenced by the model, or embedded
-in GLB and USDZ files. Spaces in the file name become `_` in the names of the files written beside it
-(`my scene.obj` gets `my_scene.mtl` and `my_scene_color.png`), because OBJ and MTL separate file names with
-spaces. **Tool > Texture Image > Auto UV** gives any sculpt UVs before export. Normal, displacement and other maps
-come from [Tool > Bake](baking.md) as separate image files.
+[texture](texture-painting.md) is exported with it: the PNG is written next to the file as `<name>_color.png`
+(`<name>_<Part>_color.png` with several Parts) and referenced by the model, or embedded in GLB and USDZ files. Spaces
+in the file name become `_` in the names of the files written beside it (`my scene.obj` gets `my_scene.mtl` and
+`my_scene_color.png`), because OBJ and MTL separate file names with spaces.
+
+**Tool > Texture Image > Auto UV** gives any sculpt UVs before export. Normal, displacement and other maps come from
+[Tool > Bake](baking.md) as separate image files.
 
 [Edge creases](edges.md#creases) go out and come back in through USD only (`creaseIndices`, `creaseLengths`,
 `creaseSharpnesses`, with `subdivisionScheme` set so other apps subdivide the cage with them). glTF, OBJ, FBX, PLY
@@ -97,7 +105,7 @@ sculptforge-cli -c 'open path=bust.sfproj; export_stl path=bust.stl; export_ply 
 
 ## 3D printing
 
-**File > Bridge > Export STL...** writes every visible Part as one binary STL, ready for a slicer
+**File > Export STL...** writes every visible Part as one binary STL, ready for a slicer
 (PrusaSlicer, Cura, Bambu Studio, OrcaSlicer ...). The status line gives the printed size, for example
 "Exported lion.stl (47214 triangles, 320.8 x 206.6 x 436.4 mm)": width, depth and height as the slicer shows them.
 
@@ -216,7 +224,6 @@ application's own exchange plug-in does, on Windows and macOS. The commands are 
 | **Custom bridge folder (optional)** | Use another bridge folder, for example inside a Wine prefix |
 | **Import Bridge file...** | Opens a Bridge file, replacing the scene |
 | **Export Bridge file...** | Writes a Bridge file. With several visible Parts, one file per Part next to the path |
-| **Export STL...** | Writes a binary STL of the visible Parts |
 
 On Windows and macOS the Bridge finds the shared exchange folder by itself; nothing to install. On Linux it needs a
 custom folder; Bridge files still import and export.

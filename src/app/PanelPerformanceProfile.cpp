@@ -97,7 +97,7 @@ void App::initHardwareProfile() {
     const char* inTests = std::getenv("SF_HW_PROFILE_IN_TESTS");
     const bool testThis = !options_.uiTest.empty() && inTests && std::string(inTests) == "1";
     if (!testThis && (uiConfigDeterministic_ || !options_.renderPath.empty() || !options_.recordPath.empty() ||
-                      !options_.uiTest.empty() || options_.measureIdle > 0.0f || options_.measureStroke > 0.0f))
+                      !options_.uiTest.empty() || options_.measureIdle > 0.0f || options_.measureStroke > 0.0f || options_.measureKeyNav))
         return;
     hwProfile_ = std::make_shared<HwProfileUi>();
     HwProfileUi& hw = *hwProfile_;
@@ -314,7 +314,7 @@ bool App::hardwareCalibrating() const { return hwProfile_ && hwProfile_->calibra
 void App::drawHardwareProfileOverlay() {
     // The first-run card is for people: benchmarks, takes and demos run without it (a take's stroke would land on it).
     const bool scripted = options_.benchmark || !options_.benchmarkScript.empty() || !options_.demo.empty();
-    if (hwProfile_ && !hwProfile_->calibrator && hwProfile_->tierCard && !scripted) drawTierCard();
+    if (hwProfile_ && !hwProfile_->calibrator && hwProfile_->tierCard && !scripted && !tierCardCovered()) drawTierCard();
     if (!hwProfile_ || !hwProfile_->calibrator) return;
     HwProfileUi& hw = *hwProfile_;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -512,6 +512,8 @@ void App::drawPerformanceProfileSection() {
         {
             uint64_t threads = uint64_t(o.threads);
             number(tr("Threads (next start)"), threads, uint64_t(p.automatic.threads), 1.0, "");
+            // Up to every hardware thread (the default is 16; a value above it is the user's to ask for).
+            if (p.hardware.cpuThreads > 0) threads = std::min<uint64_t>(threads, uint64_t(p.hardware.cpuThreads));
             o.threads = int(threads);
         }
         const char* draftNames[] = {tr("Draft brushes: automatic"), tr("Draft brushes: always"), tr("Draft brushes: never")};

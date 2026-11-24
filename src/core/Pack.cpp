@@ -14,6 +14,7 @@
 #include "core/UpdateCheck.h"
 #include "core/Vdm.h"
 #include "io/Zip.h"
+#include "core/Utf8Path.h"
 
 #include <stb_image.h>
 
@@ -80,7 +81,7 @@ bool readWholeFile(const std::string& path, std::vector<uint8_t>& out, uint64_t 
         return false;
     }
     if (size > cap) {
-        error = fs::path(p).filename().string() + " is too big (" + std::to_string(size >> 20) + " MB; at most " +
+        error = pathToUtf8(p.filename()) + " is too big (" + std::to_string(size >> 20) + " MB; at most " +
                 std::to_string(cap >> 20) + " MB)";
         return false;
     }

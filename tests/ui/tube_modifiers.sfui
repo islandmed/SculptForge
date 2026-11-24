@@ -1,0 +1,47 @@
+# Tube strands and Repeat along curve (Tool > Tube, PanelTube.cpp; requested by Artizmo on Discord): a rope of one strand is
+# a spring, Strands sets a rope's and braid's count, a braid weaves, and a small Part repeats along the curve like chain links.
+# The shots feed the guide's Tube chapter.
+run ui_look look=classic layout=classic
+wait 0.3
+run part_append type=capsule name=Link size=0.12
+click "Tube##tool.tube"
+run tube_new points=-1.5,1.6,0|-0.6,2.1,0.2|0.5,1.4,-0.2|1.5,1.9,0 radius=0.07 curve=true
+expect_value tube_parts == 1
+run part_select index=2
+expect_value tube_curve == 1
+key f                                          # frame the curve
+wait 0.3
+click "Tube/Rope"
+click "Tube/Tube from curve"
+expect_value tube_profile == 4
+expect_value tube_strands == 3
+shot rope-three
+drag_item "Tube/##tubestrands" -400 0
+wait 0.2
+expect_value tube_strands == 1
+expect_value open_edges == 0
+shot spring
+drag_item "Tube/##tubestrands" 400 0
+wait 0.2
+expect_value tube_strands == 8
+expect_value open_edges == 0
+click "Tube/Braid"
+expect_value tube_profile == 5
+run tube_set strands=3
+expect_value tube_strands == 3
+expect_value open_edges == 0
+shot braid
+# Repeat the Link along the tube, overlapping like chain links, each one turned 90 degrees.
+expect "Tube/Repeat along curve"
+run tube_repeat part=1 spacing=0.8 turn=90
+expect_status "Repeated"
+hover "Tube/Repeat along curve"
+wait 0.2
+shot repeat
+ui_scale 200
+wait 0.3
+shot repeat-200
+ui_scale 100
+wait 0.3
+key ctrl+z
+expect_value tube_strands == 3

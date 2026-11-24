@@ -35,6 +35,26 @@ StrokeLatch strokeModifierLatch(StrokeModifier m) {
     }
 }
 
+const char* strokeModifierKeys(int inputStyle, StrokeModifier m) {
+    struct Row {
+        const char *sub, *smooth, *mask, *select;
+    };
+    static const Row kRows[] = {
+        {"Alt", "Shift", "Ctrl", "Ctrl+Shift"},      // Classic sculpting keys
+        {"Alt", "Shift", "Ctrl", "Ctrl+Shift"},      // SculptForge (the default): the same
+        {"Ctrl", "Shift", "Alt", "Ctrl+Shift"},      // Blender: Ctrl inverts, Alt masks (5.1+), as its own sculpt mode
+        {"Ctrl", "Shift", "Ctrl+Alt", "Ctrl+Shift"}, // Maya: Ctrl inverts, Ctrl+Alt masks
+    };
+    const Row& r = kRows[inputStyle < 0 ? 0 : inputStyle > 3 ? 3 : inputStyle];
+    switch (m) {
+    case StrokeModifier::Sub: return r.sub;
+    case StrokeModifier::Smooth: return r.smooth;
+    case StrokeModifier::Mask: return r.mask;
+    case StrokeModifier::Select: return r.select;
+    default: return "";
+    }
+}
+
 namespace {
 
 int sectionOf(int item) { return strokePopupIsStroke(item) ? 0 : strokePopupIsShape(item) ? 2 : 1; }

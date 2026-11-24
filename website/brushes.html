@@ -17,8 +17,9 @@
   <meta property="og:url" content="https://sculptforge.app/brushes.html">
   <link rel="canonical" href="https://sculptforge.app/brushes.html">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=35">
-  <script src="motion.js?v=12" defer></script>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="style.css?v=44">
+  <script src="motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <style>
     /* Most-wanted brushes (#requests): the list is generated from brush-requests.json. */
@@ -46,10 +47,12 @@
         <a href="guide/index.html">Guide</a>
         <a href="studios.html">For studios</a>
         <a href="why.html">About</a>
+        <a href="labs/index.html">Labs</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
+        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#facebook"/></svg></a></span>
         <a class="nav-support" href="support.html">Support</a>
         <a class="nav-dl" href="index.html#download">Download</a>
-        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
-        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
       </nav>
     </div>
   </header>
@@ -140,7 +143,7 @@
       <div class="wrap">
         <div class="gallery-head">
           <h2>Built-in brush packs</h2>
-          <p class="fine"><!-- packs:count -->60 brushes in 6 packs<!-- /packs:count --></p>
+          <p class="fine"><!-- packs:count -->87 brushes in 8 packs<!-- /packs:count --></p>
         </div>
         <p class="section-lede">These ship with SculptForge, nothing to install. Open <strong>Sculpt &gt; Brush</strong>
           and pick one, or choose <strong>Sort: Pack</strong> to see them grouped like this. A pack brush brings its
@@ -166,6 +169,7 @@
           <ul class="pack-grid">
             <li class="pack-brush"><img src="img/brush-packs/bevel-scrape.webp" alt="Bevel Scrape brush preview" width="96" height="96" loading="lazy"><div><h4>Bevel Scrape</h4><p>Scrapes high points into a bevel along an edge, for chamfers.</p></div></li>
             <li class="pack-brush"><img src="img/brush-packs/bolt-head.webp" alt="Bolt Head brush preview" width="96" height="96" loading="lazy"><div><h4>Bolt Head</h4><p>Stamps a hexagonal bolt on a washer; space the dabs out or click once.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/crisp-flatten.webp" alt="Crisp Flatten brush preview" width="96" height="96" loading="lazy"><div><h4>Crisp Flatten</h4><p>Flattens to the plane the stroke starts on with a clean, sharp edge, for hard planes and bevels.</p></div></li>
             <li class="pack-brush"><img src="img/brush-packs/flat-plane.webp" alt="Flat Plane brush preview" width="96" height="96" loading="lazy"><div><h4>Flat Plane</h4><p>Presses a perfectly flat face with a hard edge, for machined surfaces.</p></div></li>
             <li class="pack-brush"><img src="img/brush-packs/grid-studs.webp" alt="Grid Studs brush preview" width="96" height="96" loading="lazy"><div><h4>Grid Studs</h4><p>An even grid of small studs, for grip textures and tread plates.</p></div></li>
             <li class="pack-brush"><img src="img/brush-packs/hard-cut.webp" alt="Hard Cut brush preview" width="96" height="96" loading="lazy"><div><h4>Hard Cut</h4><p>Cuts the surface flat below the stroke, for sharp silhouettes and clean cuts.</p></div></li>
@@ -236,6 +240,42 @@
             <li class="pack-brush"><img src="img/brush-packs/stud-row.webp" alt="Stud Row brush preview" width="96" height="96" loading="lazy"><div><h4>Stud Row</h4><p>Rounded studs spaced along the stroke, for belts, doors and armour trims.</p></div></li>
           </ul>
         </div>
+        <div class="pack" id="pack-wood">
+          <div class="pack-head"><h3>Wood</h3><p>Weathered grain, splinters, cracks, knots, end-grain rings and plank seams for old timber. <a href="guide/brush-packs.html#wood">In the guide</a></p></div>
+          <ul class="pack-grid">
+            <li class="pack-brush"><img src="img/brush-packs/board-gap.webp" alt="Board Gap brush preview" width="96" height="96" loading="lazy"><div><h4>Board Gap</h4><p>A clean, narrow gap between two boards with softened edges.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/check-split.webp" alt="Check Split brush preview" width="96" height="96" loading="lazy"><div><h4>Check Split</h4><p>One deep, pinched split along the stroke, for dried beams.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/end-rings.webp" alt="End Rings brush preview" width="96" height="96" loading="lazy"><div><h4>End Rings</h4><p>Stamps the rings and radial checks of a sawn log end; click once.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/grain-cracks.webp" alt="Grain Cracks brush preview" width="96" height="96" loading="lazy"><div><h4>Grain Cracks</h4><p>Narrow forked splits that run along the grain, for dried and checked timber.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/knot.webp" alt="Knot brush preview" width="96" height="96" loading="lazy"><div><h4>Knot</h4><p>Stamps a round knot with the grain bending around it; click once.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/plank-seams.webp" alt="Plank Seams brush preview" width="96" height="96" loading="lazy"><div><h4>Plank Seams</h4><p>Two boards meeting at a seam with grain and nail dimples, for floors and doors; drag along the seam.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/raised-grain.webp" alt="Raised Grain brush preview" width="96" height="96" loading="lazy"><div><h4>Raised Grain</h4><p>Hard late-wood lines standing proud of the surface, as on sandblasted or driftwood boards.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/splinters.webp" alt="Splinters brush preview" width="96" height="96" loading="lazy"><div><h4>Splinters</h4><p>A fan of sharp, torn splinters standing up from the surface, for broken planks.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/weathered-planks.webp" alt="Weathered Planks brush preview" width="96" height="96" loading="lazy"><div><h4>Weathered Planks</h4><p>Long worn grain lines with the soft wood eaten away between, for old boards; drag along the grain.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/wood-chaff.webp" alt="Wood Chaff brush preview" width="96" height="96" loading="lazy"><div><h4>Wood Chaff</h4><p>Scattered shavings and chips of torn fibre, for splintered ends and chopped wood.</p></div></li>
+          </ul>
+        </div>
+        <div class="pack" id="pack-creature-skin">
+          <div class="pack-head"><h3>Creature Skin</h3><p>High-resolution hide wrinkles, scales, skin and nose pores and fine skin, for close-up creature detail. <a href="guide/brush-packs.html#creature-skin">In the guide</a></p></div>
+          <ul class="pack-grid">
+            <li class="pack-brush"><img src="img/brush-packs/dinosaur-hide.webp" alt="Dinosaur Hide brush preview" width="96" height="96" loading="lazy"><div><h4>Dinosaur Hide</h4><p>Pebbled hide with feature scales and wandering folds, for dinosaurs and beasts.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/elephant-hide.webp" alt="Elephant Hide brush preview" width="96" height="96" loading="lazy"><div><h4>Elephant Hide</h4><p>Thick hide with a deep net of creases, for elephants, rhinos and old skin.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/hide-folds.webp" alt="Hide Folds brush preview" width="96" height="96" loading="lazy"><div><h4>Hide Folds</h4><p>Rings of heavy folds across the stroke, for trunks, necks and joints; drag along the limb.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/nose-pores-dense.webp" alt="Nose Pores Dense brush preview" width="96" height="96" loading="lazy"><div><h4>Nose Pores Dense</h4><p>Close-packed round pores, for the tip and wings of the nose.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/nose-pores-furrowed.webp" alt="Nose Pores Furrowed brush preview" width="96" height="96" loading="lazy"><div><h4>Nose Pores Furrowed</h4><p>Pores joined by fine furrows, for weathered noses and cheeks.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/nose-pores-open.webp" alt="Nose Pores Open brush preview" width="96" height="96" loading="lazy"><div><h4>Nose Pores Open</h4><p>Large, deep pores with small ones between, for the nose and chin.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/overlap-scales.webp" alt="Overlap Scales brush preview" width="96" height="96" loading="lazy"><div><h4>Overlap Scales</h4><p>Rounded overlapping scales with growth rings, for fish and dragons; draw head to tail.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/pebble-scales.webp" alt="Pebble Scales brush preview" width="96" height="96" loading="lazy"><div><h4>Pebble Scales</h4><p>Small domed scales with larger rosettes, for lizards, geckos and crocodile flanks.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/pores-clustered.webp" alt="Pores Clustered brush preview" width="96" height="96" loading="lazy"><div><h4>Pores Clustered</h4><p>Pores of two sizes gathered in patches, for natural, uneven skin.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/pores-fine.webp" alt="Pores Fine brush preview" width="96" height="96" loading="lazy"><div><h4>Pores Fine</h4><p>Dense, tiny pores over fine skin texture, for cheeks and close-ups.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/pores-stretched.webp" alt="Pores Stretched brush preview" width="96" height="96" loading="lazy"><div><h4>Pores Stretched</h4><p>Pores drawn out across the stroke with stretch lines, for foreheads and necks.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/scute-plates.webp" alt="Scute Plates brush preview" width="96" height="96" loading="lazy"><div><h4>Scute Plates</h4><p>Rows of square keeled plates, for crocodile backs and armoured tails; drag along the spine.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/skin-crosshatch.webp" alt="Skin Crosshatch brush preview" width="96" height="96" loading="lazy"><div><h4>Skin Crosshatch</h4><p>Fine furrows crossing in a diamond net, for the backs of hands and aged skin.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/skin-fine-lines.webp" alt="Skin Fine Lines brush preview" width="96" height="96" loading="lazy"><div><h4>Skin Fine Lines</h4><p>Fine wrinkle lines across the stroke that break and merge, for eye corners and knuckles.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/skin-micro-grain.webp" alt="Skin Micro Grain brush preview" width="96" height="96" loading="lazy"><div><h4>Skin Micro Grain</h4><p>A soft stipple of tiny bumps, the last pass of skin texture.</p></div></li>
+            <li class="pack-brush"><img src="img/brush-packs/snake-skin.webp" alt="Snake Skin brush preview" width="96" height="96" loading="lazy"><div><h4>Snake Skin</h4><p>Keeled diamond scales in overlapping rows; draw from head to tail.</p></div></li>
+          </ul>
+        </div>
         <!-- packs:end -->
       </div>
     </section>
@@ -275,7 +315,20 @@
 <!-- requests:start (generated from brush-requests.json; do not edit by hand) -->
         <ol class="requests">
           <li><a href="https://discord.com/channels/1566592020024266812/1568970781587677346">Big Feature Request: Brush Automasking</a><span class="votes" title="3 votes">👍 3</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1568700704518832160">Brush size</a><span class="votes" title="1 vote">👍 1</span></li>
           <li><a href="https://discord.com/channels/1566592020024266812/1568923216314114069">brushes #brushes wood detailing</a><span class="votes" title="1 vote">👍 1</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1568121378601705472">brush size preview</a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1568255009135661116">Insert brush on the shelf + chisel brushes</a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1568645496283603014"><span class="renamed">Assign brushes to modifier keys (Shift / Ctrl)</span></a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1568870328883617893">brush size radius should visible during increasing time !</a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1568897761183539200">brush improvement please for the primary one -move, clay , standerd...etc</a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1568906864387817482">smooth group border/mesh</a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1569678144829661335">smooth peaks brush !!!!</a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1570174112855236669">Move tool needs a buffer distance when trying to grabe and object from its sides</a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1571110009947951144">Replay strokes</a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1571133063600013396">Brush Falloff</a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1572495689722761216">🔷 Topology: Decimate and a more powerful Voxel Remesh</a><span class="votes" title="0 votes">👍 0</span></li>
+          <li><a href="https://discord.com/channels/1566592020024266812/1574052555896524800">the Projection Strength slider controls the degree to which a mesh or shape is deformed toward the</a><span class="votes" title="0 votes">👍 0</span></li>
         </ol>
 <!-- requests:end -->
       </div>
@@ -292,15 +345,19 @@
       </div>
       <div class="links">
         <a href="performance/">Performance</a>
+        <a href="labs/index.html">Labs</a>
         <a href="https://github.com/islandmed/sculptforge-brushes">Gallery repository</a>
         <a href="guide/brush-lab.html">Brush guide</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="support.html">Membership</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=footer" rel="noopener">Shop</a>
         <a href="supporters.html">Members</a>
         <a href="terms.html">Terms</a>
+        <a href="privacy.html">Privacy</a>
         <a href="jobs.html">Jobs</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/CODE_OF_CONDUCT.md">Code of conduct</a>
+        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#facebook"/></svg></a></div>
       </div>
       <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners. The site uses the Inter typeface (SIL Open Font License), self-hosted, and
         no cookies. Visits and download clicks are counted anonymously with

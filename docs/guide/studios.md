@@ -1,15 +1,24 @@
 # SculptForge for studios
 
+![A game-ready lion bust](images/hero-game-ready.jpg)
+
+> **In short:**
+> - Native on Linux, scriptable and standards-based, with no licence server.
+> - VFX Reference Platform builds, Rez packages and shared brush libraries.
+> - `sculptforge-cli` runs editing operations headless on servers and farms.
+
 SculptForge is built to drop into animation, VFX and game studios that run their own pipelines: native on
-Linux, scriptable, standards-based, with no licence server and nothing that phones home. This chapter is for
+Linux, scriptable, standards-based, with no licence server and no telemetry. This chapter is for
 pipeline TDs and IT: the VFX Reference Platform builds, Rez deployment, shared brush libraries, environment
 variables, headless use, licensing and [IT deployment](#it-deployment) (a managed policy, the AI audit log, single
 sign-on, AI gateways and air-gapped use).
+For the checkable facts with their methods and sources (performance, platforms, OpenUSD, automation, security and what is
+not done yet), see the [technical brief](https://sculptforge.app/studios/brief).
 
 ## VFX Reference Platform builds
 
-SculptForge tracks the [VFX Reference Platform](https://vfxplatform.com). Every commit is built and tested in
-the platform's reference environments:
+SculptForge tracks the [VFX Reference Platform](https://vfxplatform.com). Every push to main and every merge batch
+is built and tested in the platform's reference environments:
 
 | | CY2026 | CY2027 | SculptForge |
 |---|---|---|---|
@@ -83,6 +92,7 @@ rez-env sculptforge -- sculptforge
 | `SF_POLICY` | A policy file, when there is no system-wide one (see [The policy file](#the-policy-file)) |
 | `SF_KEYCHAIN` | `none`: don't use the OS keychain (render nodes, CI); keys last for the session or come from the environment |
 | `SCULPTFORGE_BRUSH_PATH` | Read-only studio brush folders (`:`-separated, `;` on Windows) |
+| `SCULPTFORGE_SCRIPT_PATH` | Folders of Python scripts listed in **File > Script** (`:`-separated, `;` on Windows); run by a click only, never at start-up (see [Python scripting](python.md#script-files)) |
 | `SCULPTFORGE_STUDIO_BRUSHES` | With the Rez package: appended to `SCULPTFORGE_BRUSH_PATH` |
 | `SCULPTFORGE_BRUSH_GALLERY` | Use another community brush gallery index (a URL or a folder), for example an in-house mirror |
 | `HF_TOKEN` (or `HUGGING_FACE_HUB_TOKEN`) | Hugging Face token for the free image-to-3D models |
@@ -151,10 +161,10 @@ SculptForge is free software under the GNU General Public License, version 3 or 
 
 ## Studio membership
 
-SculptForge is free for any number of artists, and nothing in the app is ever paywalled. A Studio membership is
-a flat $300 a month for the whole studio, any number of artists. The first 10 studios become Founding
-Studios at a flat $150 a month, locked for as long as they stay subscribed. Each artist gets everything in Member, and the
-studio gets:
+SculptForge is free for any number of artists, and nothing in the app is ever paywalled. Studio: personalized quote.
+Use **Get a quote** on the [Studios page](https://sculptforge.app/studios.html) with your team size, platforms and pipeline needs.
+
+Each artist gets everything in Member, and the studio gets:
 
 - **Its own build** with its brushes, alphas, Lit Spheres, keymaps, macros, preferences, paths and logo built in.
 - **Isolation:** a private release channel, and no outside connections by default (see
@@ -162,7 +172,7 @@ studio gets:
 - **A pinned version:** you choose when to move. Security fixes are backported to the current release and one
   long-term support (LTS) line, and your studio is always on one of those two.
 - **An offline signed installer** with checksums for IT.
-- **Support:** a first response within 2 business days (a response, not a fix), up to 3 custom items a month
+- **Support:** a first response within 12 hours (a response, not a fix), up to 3 custom items a month
   (bigger features are quoted separately), your requests first on the roadmap, and a private Discord channel.
 
 Every release stays free for everyone; bug-fix and security releases go out to everyone the same day. Join at
@@ -188,6 +198,7 @@ Your build is SculptForge with a **studio profile** baked in: one `studio.json` 
   "ai": false,
   "packs": ["packs/acme.sfpack"],
   "brushPaths": ["/studio/brushes"],
+  "scriptPaths": ["/studio/scripts"],
   "preferences": "ui.json",
   "branding": {"logo": "logo.png", "title": "Acme"}
 }
@@ -201,6 +212,7 @@ Your build is SculptForge with a **studio profile** baked in: one `studio.json` 
 | `ai` | `true` keeps the AI features; they can still reach only the URLs above |
 | `packs` | Your brushes, alphas, Lit Spheres, keymaps and macros as `.sfpack` files, installed at first start |
 | `brushPaths` | Read-only brush shares, as `SCULPTFORGE_BRUSH_PATH` |
+| `scriptPaths` | Python script folders, as `SCULPTFORGE_SCRIPT_PATH` |
 | `preferences` | The first-start interface settings: layout, shortcuts and UI scale (**Edit > Preferences > Interface** exports them) |
 | `branding` | Your logo in **Help > About** and a word in the title bar |
 
@@ -275,6 +287,8 @@ the system file exists, `SF_POLICY` is ignored, so an artist can't loosen it.
   "network": {"enabled": false, "allow": ["https://sw.acme.internal/"], "localNetwork": false},
   "mcp": {"enabled": true, "live": "never", "categories": ["info", "edit", "files"]},
   "maya": {"link": "never"},
+  "python": {"scripts": "never"},
+  "render": {"bridge": "allowed"},
   "audit": {"path": "//fs01/audit/sculptforge/{user}@{host}.jsonl", "maxMB": 20, "keep": 10, "required": true},
   "signIn": {"issuer": "https://acme.okta.com/oauth2/default", "clientId": "0oa1example",
              "useFor": ["https://llm.acme.internal/"]},
@@ -301,6 +315,8 @@ code 2 when it is broken); use it to check a file before you deploy it.
 | `mcp.enabled` | `false`: no AI tool can connect (`sculptforge-cli --mcp` refuses to start, and **Help > Connect an AI tool** is gone) |
 | `mcp.live` | `"never"`: AI tools work only on their own scene and can never control an open SculptForge window (the window never listens for them; **Let AI tools control this window** is locked off) |
 | `maya.link` | `"never"`: the [Maya Live link](maya.md#live-link) can't be turned on (the window never listens for Maya; the folder bridge still works) |
+| `render.bridge` | `"never"`: [Render with... (preview)](render-bridge.md) is gone (the menu item, the window and the `render_bridge` command; no render helper is ever started) |
+| `python.scripts` | `"never"`: [Python scripting](python.md) can't be turned on (Python is never loaded; command scripts and macros still work) |
 | `mcp.categories` | The kinds of command AI tools may use: `info` (read the scene), `edit` (change it in memory), `files` (open, save, export, bridges), `scripts` (macros), `network` (brush gallery, Unreal), `ai` (AI generation). Left out: all |
 | `audit.path`, `audit.maxMB`, `audit.keep` | Where the [audit log](#audit-log) goes, when it rotates (10 MB) and how many old files it keeps (5) |
 | `audit.required` | `true`: an AI action whose audit line can't be written (the share is down) is refused |
@@ -384,11 +400,13 @@ a key typed in lasts until SculptForge quits; the environment variables `ANTHROP
 
 ### Single sign-on
 
-With `signIn` in the policy, **Edit > Preferences > AI > Studio sign-in** signs the artist in with the studio
-account (Okta, Microsoft Entra ID, Google Workspace, Auth0, Keycloak or any OpenID Connect provider). It uses the
+With `signIn` in the policy, **Edit > Preferences > AI > Studio sign-in** signs the artist in with the studio account
+(Okta, Microsoft Entra ID, Google Workspace, Auth0, Keycloak or any OpenID Connect provider). It uses the
 **device authorization grant** only: SculptForge shows a short code and opens your provider's page, and the artist
-signs in there, in their browser, with your usual login and MFA. Nothing on the artist's computer listens for the
-answer: no local port, no redirect, no embedded browser. `sculptforge-cli --sign-in` does the same in a terminal.
+signs in there, in their browser, with your usual login and MFA.
+
+Nothing on the artist's computer listens for the answer: no local port, no redirect, no embedded browser.
+`sculptforge-cli --sign-in` does the same in a terminal.
 
 The tokens are kept in the keychain and refreshed when they expire. The access token is sent as
 `Authorization: Bearer` only to the addresses in `signIn.useFor` (default: `ai.endpoints`), such as your AI gateway;

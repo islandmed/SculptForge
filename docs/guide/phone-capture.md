@@ -1,5 +1,12 @@
 # Phone capture and AR
 
+![A Gaussian splat of a lion bust](images/splats.jpg)
+
+> **In short:**
+> - Your phone becomes SculptForge's camera and second screen.
+> - Scan an object, turn a photo into a model, or see your sculpt in AR.
+> - No app and no account: the phone's browser talks to SculptForge over Wi-Fi.
+
 Your phone becomes SculptForge's camera and second screen. Scan an object by walking around it, send a photo to
 turn into a model, bring in a splat from a scanning app, look at your sculpt standing on your real desk in AR,
 and drive a character's face with your own. There is no app to install and no account: the phone's browser talks
@@ -65,17 +72,21 @@ it into a Gaussian splat that sharpens in the viewport while it trains. See [Gau
 ## One photo to 3D
 
 Tap **One photo to 3D** and take a photo (or choose one). One object, the whole of it in the picture, on a plain
-background works best. SculptForge loads it into **Mesh > Generate 3D > Image to 3D** and starts generating with the service
-chosen there (free Hugging Face models by default). Turn off **Generate from a photo at once** in the window to
-check the photo first and press **Generate** yourself. See [Image and text to 3D](generate-3d.md).
+background works best. SculptForge loads it into **Mesh > Generate 3D > Image to 3D** and starts generating with the
+service chosen there (free Hugging Face models by default).
+
+Turn off **Generate from a photo at once** in the window to check the photo first and press **Generate** yourself. See
+[Image and text to 3D](generate-3d.md).
 
 The phone sends large photos at about 2048 pixels, which is plenty and much faster.
 
 ## Send a splat file
 
-Already scanned it with Scaniverse, Polycam or Luma? Export a Gaussian splat `.ply` from the app, tap **Send a splat
-file** and choose it. It opens next to your sculpt as a splat. A `.ply` that is a plain mesh becomes a new Part
-instead, so it never replaces your work.
+Already scanned it with Scaniverse, Polycam or Luma? Export a Gaussian splat `.ply` from the app, tap
+**Send a splat file** and choose it.
+
+It opens next to your sculpt as a splat. A `.ply` that is a plain mesh becomes a new Part instead, so it never
+replaces your work.
 
 ## View in AR
 

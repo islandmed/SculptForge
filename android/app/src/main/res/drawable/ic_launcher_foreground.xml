@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app icon's outline cube (Lucide "box", ISC, THIRD_PARTY_NOTICES.md), at the size it has on the icon's tile (its 24-unit
+     box is 62.5 % of the 72 dp the launcher always shows), inside the adaptive icon's 66 dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:translateX="31.5" android:translateY="31.5" android:scaleX="1.875" android:scaleY="1.875">
+        <path android:fillColor="#00000000" android:strokeColor="#F28C3C" android:strokeWidth="2.2"
+            android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M21,8a2,2 0,0 0,-1 -1.73l-7,-4a2,2 0,0 0,-2 0l-7,4A2,2 0,0 0,3 8v8a2,2 0,0 0,1 1.73l7,4a2,2 0,0 0,2 0l7,-4A2,2 0,0 0,21 16Z" />
+        <path android:fillColor="#00000000" android:strokeColor="#F28C3C" android:strokeWidth="2.2"
+            android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M3.3,7l8.7,5l8.7,-5" />
+        <path android:fillColor="#00000000" android:strokeColor="#F28C3C" android:strokeWidth="2.2"
+            android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M12,22L12,12" />
+    </group>
+</vector>

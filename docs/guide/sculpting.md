@@ -1,10 +1,15 @@
 # Sculpting and brushes
 
+![Sculpting the lion head with X symmetry](images/sculpt-lion.jpg)
+
+> **In short:**
+> - Nineteen sculpting brushes plus the Paint brush, and custom brushes that ship with it.
+> - <kbd>B</kbd> opens the brush picker under the mouse.
+> - Covers size, strength, modifier keys, strokes, alphas, symmetry and pen pressure.
+
 This chapter covers everything that happens when you drag a brush across a model: the built-in brushes and
 the custom brushes that ship with SculptForge, brush size and strength, modifier keys, stroke types, alphas,
 symmetry and pen pressure. To design your own brushes, see [Brush Lab and sharing brushes](brush-lab.md).
-
-![Sculpting the lion head with X symmetry](images/sculpt-lion.jpg)
 
 ## Your first stroke
 
@@ -39,7 +44,7 @@ are on the bottom shelf by default and in the brush picker.
 | **Pinch** | <kbd>8</kbd> | Pulls the surface toward the stroke to tighten edges. | Spreads it apart |
 | **Sharp Crease** | <kbd>9</kbd> | A narrow, deep V-shaped crease with the sides pinched in. | A sharp ridge |
 | **Clay Block** | <kbd>0</kbd> | Square, flat-topped clay strokes for blocking in forms. | Carves flat-bottomed |
-| **Tendril** | | Pulls the surface out into horns and tendrils that taper as you drag. | No change |
+| **Tendril** | | Pulls the surface out into horns and tendrils that taper as you drag. For long pulls, turn on **Dynamic** on the top shelf ([dynamic topology](dynamic-topology.md)) so the surface adds detail as it stretches; the horns then stay round tubes, never thinner than about two triangle edges. | No change |
 | **Trim** | | Trim: shaves away everything above a plane for hard surfaces. | Fills up to the plane |
 | **Layer** | | Raises the surface to one fixed height per stroke; overlapping passes never stack. | Lowers to a fixed depth |
 | **Nudge** | | Slides the surface sideways along the stroke without lifting it. | No change |
@@ -51,6 +56,7 @@ are on the bottom shelf by default and in the brush picker.
 | **DetailClone** | | Paints copies of a captured detail (the VDM brush's map) along the stroke, each turned to follow it. | Digs them in |
 | **Morph** | | Pulls the surface back toward the morph target, a selection set with its shape ([Selection sets](selection-sets.md#morph-targets)). Does nothing until you pick one. | Pushes away from it |
 | **Cloth** | | Moves the surface like fabric: drag it and it folds where it bunches up (see [Cloth brush](#cloth-brush)). | Push mode: pulls out |
+| **Smooth Peaks** | | Smooths only the high points: lowers what sticks out above the surrounding surface and leaves the hollows alone. <kbd>Shift</kbd> still gives the plain Smooth. | No change |
 | **Paint** | <kbd>P</kbd> | Paints colour without sculpting. See [Vertex Paint and materials](vertex-paint.md). | Paints back to white |
 
 Notes on particular brushes:
@@ -142,22 +148,24 @@ the whole alpha shows, hard to its edges (a Square alpha stamps the full square)
 rounds a square's corners; at +100 only a soft point in the middle is left.
 
 Over the model, the rings lie on the surface: true circles in the plane of the surface under the pointer, at the
-brush's real size there, with a short line pointing out of the surface. The plane follows the form averaged over
-the whole brush, so the rings stay round and steady over fine bumps and detail. With symmetry on (mirror or
-radial), a dot shows where each copy of the brush lands. Off the model the rings are flat circles.
-**Edit > Preferences > Cursor**: **Cursor follows surface** (on by default) switches back to flat rings everywhere, and
-**Hide ring while stroking** (off by default) shows only the dot while a stroke runs. The crosshair pointer stays
-while you turn the view.
+brush's real size there, with a short line pointing out of the surface. The plane follows the form averaged over the
+whole brush, so the rings stay round and steady over fine bumps and detail. With symmetry on (mirror or radial), a dot
+shows where each copy of the brush lands.
+
+Off the model the rings are flat circles. **Edit > Preferences > Cursor**: **Cursor follows surface** (on by default)
+switches back to flat rings everywhere, and **Hide ring while stroking** (off by default) shows only the dot while a
+stroke runs. The crosshair pointer stays while you turn the view.
 
 The <kbd>S</kbd>, <kbd>U</kbd>, <kbd>I</kbd> and <kbd>O</kbd> pop-ups take the mouse or the keyboard: drag the
 slider and release to close it, or type a number and press <kbd>Enter</kbd> (a minus first for a negative Falloff). <kbd>Esc</kbd> closes the pop-up without typing anything new.
 
 ### Each brush keeps its own settings
 
-Every brush remembers its own **Size**, **Intensity**, **Falloff**, **Colour intensity**, [stroke](#strokes)
-and [alpha](#alphas). That includes custom and Community brushes. Set up a small, sharp crease brush and a big
-Clay brush, and each one comes back the way you left it when you switch between them. A brush you haven't used
-yet in the session starts from the values you have now, so nothing jumps.
+Every brush remembers its own **Size**, **Intensity**, **Falloff**, **Colour intensity**, [stroke](#strokes) and
+[alpha](#alphas). That includes custom and Community brushes.
+
+Set up a small, sharp crease brush and a big Clay brush, and each one comes back the way you left it when you switch
+between them. A brush you haven't used yet in the session starts from the values you have now, so nothing jumps.
 
 - **Sculpt > Brush > Save Brush Settings** keeps the current brush's values for every new session (in
   `brush-settings.json`, in SculptForge's user data folder).
@@ -188,9 +196,10 @@ bumps but leaves the form where it is (a Taubin smooth, one step in and a slight
 ### Smooth face group borders
 
 **Smooth face group borders only** in **Sculpt > Brush** turns Smooth (and <kbd>Shift</kbd>) into a border
-straightener: only the points on a border between [face groups](face-groups.md) move, each along the surface
-toward its neighbours on the border, so a jagged edge (a cuff, a collar, the hem of a shirt, a panel line) becomes
-a clean line while the rest of the model stays where it is. Corners where three or more groups meet stay put.
+straightener: only the points on a border between [face groups](face-groups.md) move, each along the surface toward
+its neighbours on the border, so a jagged edge (a cuff, a collar, the hem of a shirt, a panel line) becomes a clean
+line while the rest of the model stays where it is. Corners where three or more groups meet stay put.
+
 Group the clothing first (for example **Group from Mask** after masking it), then brush over the edge. Saved with the
 project (#81).
 
@@ -223,7 +232,8 @@ are saved with the preferences and the project (custom brushes can turn them on 
 | Option | What it does |
 |---|---|
 | **Connected only** | The brush only moves the surface joined to the point under the cursor, within the brush size. Inflate a finger and the next finger stays as it is; Move one leg and the other doesn't follow, however close they are. |
-| **View falloff** | The falloff is measured on screen, across the view: everything inside the brush circle is reached, through the model and out the back, as a cylinder along the view. Add **Connected only** to keep it to the piece under the cursor. |
+| **Contact facing** | The surface under the cursor decides what moves. The falloff is measured along the surface, so what the brush only reaches round a fold stays put: brush along the edge of a narrow slot and the opposite wall stays where it is, while the rim under the cursor follows smoothly. Surface turned away from the one under the cursor fades as well: **Facing angle** (180 at first) keeps full strength up to half of it and none past it, so at 180 only surface turned back toward the cursor's (the back of a thin part) fades; lower it to also keep walls and floors at right angles. Smooth forms move exactly as without it, and so do shallow folds that face the way the surface under the cursor does, such as the lids round an eye or the lips: Clay over an eye still smooths over it, with no seam. The cut is for folds deeper than about the brush size, and for surface turned across or against the cursor's. On Micro levels the surface distance is measured on the base mesh, so a slot carved into the micro detail only, shallower than the brush, still needs a lower Facing angle. Move and Grab still reach everything. In the Classic layout this row shows with **Edit > Preferences > Interface > Show newer menu rows**. |
+| **View falloff** | The falloff is measured on screen, across the view, as a cylinder along the view: Move and the grab brushes reach everything inside the brush circle, through the model and out the back. Add **Front faces only** to keep Move to the near side of one piece (a head's back is connected to its front), or **Connected only** to keep it to the piece under the cursor when the model is in separate pieces. The brushes that pull to a plane (Clay, Clay Block, Flatten, Trim) take the plane of the surface under the cursor and reach as deep behind it as the brush is wide: through an ear or a horn, not out the back of a head. The brushes that build or cut along the surface (Standard, Inflate, Crease, Pinch, Sharp Crease, Layer, Nudge) stop about 1.5 to 3 brush radii behind the surface under the cursor, so the far side of the model stays as it is. | **Tendril** leaves what lies more than about 1.5 radii behind the tip alone, so a pull does not drag front and back together.
 
 Kelvinlet brushes keep their own elastic falloff, and the Gizmo's falloff eases in from the mask's edge rather
 than from a brush centre, so these options don't apply to them. On a 10-million-vertex Part a dab that moves half
@@ -234,19 +244,40 @@ a million vertices takes about 10 ms, and about 16 ms with Connected only.
 | Hold | Effect |
 |---|---|
 | <kbd>Alt</kbd> | Inverts the brush for this stroke (see the table of brushes). For Move, Tendril, Elastic Tendril and KelvinGrab, which have nothing to invert, it moves the surface along the normal instead (below). |
-| <kbd>Shift</kbd> (before the stroke) | Smooths with the Smooth brush, whatever brush is active, at Smooth's own Intensity. With the Paint brush active, <kbd>Shift</kbd> still smooths the shape. |
+| <kbd>Shift</kbd> (before the stroke) | Smooths with the Smooth brush, whatever brush is active, at Smooth's own Intensity (or uses your [Shift brush](#shift-and-ctrl-brushes)). With the Paint brush active, <kbd>Shift</kbd> still smooths the shape. |
 | <kbd>Shift</kbd> (after the stroke started) | Draws a straight line from where you pressed <kbd>Shift</kbd>, snapped to 45 degree steps on screen. Let go of <kbd>Shift</kbd> to carry on freehand. |
-| <kbd>Ctrl</kbd> | Paints a mask instead of sculpting; <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases it. A <kbd>Ctrl</kbd>+click without dragging blurs the mask (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it). See [Masking](masking.md). |
+| <kbd>Ctrl</kbd> | Paints a mask instead of sculpting; <kbd>Ctrl</kbd>+<kbd>Alt</kbd> erases it. A <kbd>Ctrl</kbd>+click without dragging blurs the mask (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it). See [Masking](masking.md). With a [Ctrl brush](#shift-and-ctrl-brushes) set, <kbd>Ctrl</kbd> on the model sculpts with it instead. |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> | Visibility gestures: isolate, hide and show face groups. See [Face Groups and visibility](face-groups.md). |
+
+### Shift and Ctrl brushes
+
+Holding <kbd>Shift</kbd> smooths and holding <kbd>Ctrl</kbd> masks, but either key can hold another brush, so you
+can switch between two or three brushes without leaving the one you are working with:
+
+- **Shift+click** a brush on the bottom shelf (or in the brush picker) and holding <kbd>Shift</kbd> sculpts with it,
+  for example Trim or Flatten. The status line says **Shift brush: Trim** and the tile gets a small **Shift** badge.
+  Your main brush stays as it was.
+- **Ctrl+click** a brush on the bottom shelf and holding <kbd>Ctrl</kbd> on the model sculpts with it instead of
+  masking (badge **Ctrl**). <kbd>Ctrl</kbd>+<kbd>Alt</kbd> still erases the mask, <kbd>Ctrl</kbd> beside the model
+  still draws the mask rectangle, and <kbd>Ctrl</kbd>+<kbd>Shift</kbd> keeps the visibility gestures.
+- Each key's brush keeps its own Intensity, as Smooth does: hold the key and the Intensity slider (or
+  <kbd>U</kbd>) shows and sets it, for example **Trim Intensity (Shift)**.
+- **Going back**: Shift+click Smooth, or **Reset Shift brush (Smooth)** in the command palette. For Ctrl, pick a
+  mask brush with <kbd>Ctrl</kbd> held (the left shelf's brush tile or <kbd>Ctrl</kbd>+<kbd>B</kbd>), or **Reset Ctrl
+  brush (Mask)**. Smooth on <kbd>Shift</kbd> works exactly as before, alternate smooth included.
+- The Paint brush keeps <kbd>Shift</kbd>'s smooth and <kbd>Ctrl</kbd>'s mask, and a pen button or eraser set to
+  Smooth still smooths. Only built-in brushes can be bound for now (not custom brushes).
+- The choice is kept in the preferences. Scripts: `set_modifier_brush shift=trim ctrl=flatten` (`default` goes back).
 
 ### Along the normal
 
-Move, Tendril, Elastic Tendril and KelvinGrab normally move the surface across the screen. Hold <kbd>Alt</kbd> as
-you start the stroke (<kbd>Ctrl</kbd> in the Blender and Maya styles, where that key inverts) and the surface moves
-along the average normal under the brush where you pressed instead (from the discussions): drag out and it pulls
-straight out of the surface, drag back and it pushes straight in, however the view is turned. When the normal
-points right at you, drag up to pull it out. **Edit > Preferences > Input > Along the normal** can make it **Always**
-(no key needed, handy with a pen) or **Never**.
+Move, Tendril, Elastic Tendril and KelvinGrab normally move the surface across the screen. Hold <kbd>Alt</kbd> as you
+start the stroke (<kbd>Ctrl</kbd> in the Blender and Maya styles, where that key inverts) and the surface moves along
+the average normal under the brush where you pressed instead (from the discussions): drag out and it pulls straight
+out of the surface, drag back and it pushes straight in, however the view is turned.
+
+When the normal points right at you, drag up to pull it out. **Edit > Preferences > Input > Along the normal** can
+make it **Always** (no key needed, handy with a pen) or **Never**.
 
 ## The Quick Menu
 
@@ -262,9 +293,11 @@ works the same way. Turn it off with **Edit > Preferences > Input > Right click 
 
 ## Radial menus
 
-Radial (pie) menus put the tools you use most around the cursor. Hold a menu's key, flick the pointer toward an
-item and let go: it runs. Let go in the middle and nothing happens. Tap the key instead and the pie stays open:
-click an item, or click in the middle or press <kbd>Esc</kbd> to close it. Three menus are built in:
+Radial (pie) menus put the tools you use most around the cursor. Hold a menu's key, flick the pointer toward an item
+and let go: it runs. Let go in the middle and nothing happens.
+
+Tap the key instead and the pie stays open: click an item, or click in the middle or press <kbd>Esc</kbd> to close it.
+Three menus are built in:
 
 | Key | Menu | Items |
 |---|---|---|
@@ -316,11 +349,13 @@ Smooth takes about 0.5 s, Balloon 0.7 s, Relax 0.9 s and Polish 2 s (Apple M1 Pr
 
 ### Size
 
-**Tool > Reshape > Size** shows the active Part's width (**X**), height (**Y**) and depth (**Z**) in scene
-units (requested by foirgairwolf on Discord). Drag one, or double-click it and type an exact value: the Part resizes about its
-centre as one undo step. With **Uniform** on (the default) the other sides follow in proportion; off, only that side
-changes. The mask holds what it covers. Command: `deform_size x=2.5` (any of `x`, `y`, `z`), or `deform_size
-uniform=10` for the largest side.
+**Tool > Reshape > Size** shows the active Part's width (**X**), height (**Y**) and depth (**Z**) in scene units
+(requested by foirgairwolf on Discord). Drag one, or double-click it and type an exact value: the Part resizes about
+its centre as one undo step. With **Uniform** on (the default) the other sides follow in proportion; off, only that
+side changes.
+
+The mask holds what it covers. Command: `deform_size x=2.5` (any of `x`, `y`, `z`), or `deform_size uniform=10` for
+the largest side.
 
 ### Deformation stack
 
@@ -349,10 +384,11 @@ picks one; click a step to set its amount, its axes (**X Y Z**, any mix) and, wh
 Flatten's cut. Steps work about the Part's centre, or about the gizmo's pivot when you placed it.
 
 The checkbox beside a step switches it off without losing it; **Repeat** adds the selected step again; **Remove**
-takes it out. **Apply** keeps the result (one undo step) and starts a new stack, **Apply Selected** keeps only
-the selected step, and **Reset** takes the preview back off. The mask holds what it covers and hidden faces stay.
-For scripts and the AI: `deform_stack ops="bend 45 y soft; twist 90 y; taper -30 y"`, or one step at a time with
-`deform_bend amount=45 axes=y soft=true direction=90`.
+takes it out. **Apply** keeps the result (one undo step) and starts a new stack, **Apply Selected** keeps only the
+selected step, and **Reset** takes the preview back off.
+
+The mask holds what it covers and hidden faces stay. For scripts and the AI: `deform_stack ops="bend 45 y soft; twist
+90 y; taper -30 y"`, or one step at a time with `deform_bend amount=45 axes=y soft=true direction=90`.
 
 ## Strokes
 
@@ -380,7 +416,10 @@ Notes:
 - With **Drag Stamp**, the stamp is placed where you first click. While you drag, it is redrawn at the new size
   and angle, and it is committed when you release.
 - With **Slide Stamp**, the stamp appears under the cursor at once and follows it while you drag; the mesh under it
-  goes back to how it was as it moves on.
+  goes back to how it was as it moves on. Hold <kbd>Shift</kbd> after the drag has begun and the stamp stays put while
+  its alpha turns toward the cursor; let go and it slides on with that turn. The turn belongs to that stroke and
+  leaves the brush's **Angle** alone. Held at the press, <kbd>Shift</kbd> still smooths. The key is
+  **Edit > Preferences > Input > Slide Stamp rotates with** (Shift, Ctrl, Alt or Off).
 - Mask strokes (<kbd>Ctrl</kbd>) always use dots, even when Drag Stamp or Slide Stamp is selected.
 - Custom brushes set their own dab spacing and can add jitter (see [Brush Lab](brush-lab.md)).
 
@@ -391,15 +430,19 @@ the **Stroke** tile on the left shelf. The top row holds the stroke types, then 
 
 | Modifier | What it does | Instead of holding |
 |---|---|---|
-| **Add** / **Sub** | Brushes add to or subtract from the surface (the same switch as Add / Sub on the top shelf). | <kbd>Alt</kbd> |
+| **Add** / **Sub** | Brushes add to or subtract from the surface (the same switch as Add / Sub on the top shelf). | <kbd>Alt</kbd> (<kbd>Ctrl</kbd> in the Blender and Maya styles) |
 | **Smooth** | Strokes smooth. | <kbd>Shift</kbd> |
-| **Mask** | Strokes paint the mask (<kbd>Alt</kbd> or <kbd>Ctrl</kbd> unmasks). | <kbd>Ctrl</kbd> |
+| **Mask** | Strokes paint the mask (<kbd>Alt</kbd> or <kbd>Ctrl</kbd> unmasks). | <kbd>Ctrl</kbd> (<kbd>Alt</kbd> in the Blender style, <kbd>Ctrl</kbd>+<kbd>Alt</kbd> in Maya) |
 | **Select** | Strokes draw the selection (hide) shape. | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> |
 
-**Shapes** pick how Mask and Select draw: **Mask Pen**, **Lasso Mask** and **Rectangle Mask** turn Mask on with that
-shape, **Cut Line**, **Cut Lasso**, **Cut Rect** and **Cut Polyline** turn Select on with that Cut shape. A plain drag
+The keys are the ones your input style (**Edit > Preferences > Input > Style**) uses; each tile's corner shows them.
+
+**Shapes** pick how Mask and Select draw: **Mask Pen**, **Lasso Mask**, **Rectangle Mask** and **Circle Mask** turn Mask on with that
+shape, **Cut Line**, **Cut Lasso**, **Cut Rect**, **Cut Circle** and **Cut Polyline** turn Select on with that Cut shape. A plain drag
 then masks or cuts with it, no keys held (with a mask shape, <kbd>Ctrl</kbd>+drag unmasks; **Tool > Cut** still sets
-Away, In, Add or Clip). The label next to the brush cursor names the shape. Pick it again to go back to sculpting.
+Away, In, Add or Clip).
+
+The label next to the brush cursor names the shape. Pick it again to go back to sculpting.
 
 - **Hold and let go**: hold <kbd>G</kbd>, move over an item and let go. It opens with your current stroke under the
   pointer, so letting go without moving changes nothing. A pen hovering over the tablet works the same.
@@ -417,17 +460,21 @@ Away, In, Add or Clip). The label next to the brush cursor names the shape. Pick
 Pores, wrinkles, jewellery and hard-surface trims need a brush that goes exactly where you mean, at exactly the
 size you mean. These tools work with every brush and every stroke type.
 
-**Steady Stroke** (<kbd>L</kbd>, or the checkbox in the stroke picker). The brush trails the cursor on a string
-and only moves once the string is taut, so hand shake never reaches the surface. It works with Dots, Drag Stamp,
-Slide Stamp and Spray. The viewport draws the string and a faint circle of its length. **Steady radius** sets the
-length (longer is steadier). **Catch up on release** (on by default) finishes the line to where the cursor is when
-you let go; turn it off to end the line a string's length behind.
+**Steady Stroke** (<kbd>L</kbd>, or the checkbox in the stroke picker). The brush trails the cursor on a string and
+only moves once the string is taut, so hand shake never reaches the surface. It works with Dots, Drag Stamp, Slide
+Stamp and Spray.
+
+The viewport draws the string and a faint circle of its length. **Steady radius** sets the length (longer is
+steadier). **Catch up on release** (on by default) finishes the line to where the cursor is when you let go; turn it
+off to end the line a string's length behind.
 
 **World Size** (**Sculpt > Draw & Tablet**). Size is normally in screen pixels, so the brush gets smaller on the model
-as you zoom in. With World Size on, the size is kept in model units instead: a 0.4 mm pore brush stays 0.4 mm
-whether you are looking at the whole head or one eyelid. Every Size slider shows both numbers, for example
-**Size 12 px 0.40 mm**; the mm figure is the brush radius on the surface under the cursor (a model unit is a
-metre, as when exporting for 3D printing).
+as you zoom in.
+
+With World Size on, the size is kept in model units instead: a 0.4 mm pore brush stays 0.4 mm whether you are looking
+at the whole head or one eyelid. Every Size slider shows both numbers, for example **Size 12 px 0.40 mm**; the mm
+figure is the brush radius on the surface under the cursor (a model unit is a metre, as when exporting for 3D
+printing).
 
 **Finer size control.**
 
@@ -444,16 +491,18 @@ shows next to the cursor for a moment after it changes (all the time with World 
 **Precision drag** (<kbd>Shift</kbd>+<kbd>Alt</kbd>, held while drawing). Start the stroke, then hold
 <kbd>Shift</kbd>+<kbd>Alt</kbd>: the brush moves at a quarter of the pen's speed, drawn as a blue ring with a line
 back to the pen, and works at **Precision Intensity** (stroke picker, default 10). Let go and the brush glides back
-under the pen as you keep moving; it never jumps. Hold the keys after the stroke has started: at the press,
-<kbd>Shift</kbd>+<kbd>Alt</kbd> still selects and frames a Part, and in the Blender
-style <kbd>Alt</kbd>+click still navigates. The same works in every input style.
+under the pen as you keep moving; it never jumps.
 
-**A pressure curve for each brush.** Every brush keeps its own pen pressure curve, applied after the tablet's
-curve. Edit it in **Brush Lab** (under the recipe sliders) or in **Edit > Preferences > Tablet** (under the tablet's
-curve); both edit the brush you are holding. Drag a point, double-click the curve to add one (up to 5), right-click
-a point to remove it. The presets are **Soft**, **Linear**, **Firm** and **Fine detail**: Fine detail keeps light
-pressure very light and tops out below full strength, for pores and fine lines. Curves are saved as you change
-them.
+Hold the keys after the stroke has started: at the press, <kbd>Shift</kbd>+<kbd>Alt</kbd> still selects and frames a
+Part, and in the Blender style <kbd>Alt</kbd>+click still navigates. The same works in every input style.
+
+**A pressure curve for each brush.** Every brush keeps its own pen pressure curve, applied after the tablet's curve.
+Edit it in **Brush Lab** (under the recipe sliders) or in **Edit > Preferences > Tablet** (under the tablet's curve);
+both edit the brush you are holding. Drag a point, double-click the curve to add one (up to 5), right-click a point to
+remove it.
+
+The presets are **Soft**, **Linear**, **Firm** and **Fine detail**: Fine detail keeps light pressure very light and
+tops out below full strength, for pores and fine lines. Curves are saved as you change them.
 
 **Accuracy.** The brush centre sits exactly under the cursor at any zoom and on HiDPI screens (to a fraction of a
 pixel), and the surface point under the brush is lightly filtered, so strokes on very dense meshes don't wobble
@@ -461,12 +510,13 @@ with every tiny bump. A real step in the surface is followed at once.
 
 ## Alphas
 
-An alpha is a grayscale stamp that shapes the brush tip: white is full effect, black is none. It affects every
-brush, built-in or custom. Choose one from the **Alpha** tile on the left shelf (the alpha picker) or the
-**Sculpt > Alpha**, which also shows a large preview of the current alpha.
-[Falloff](#size-intensity-colour-intensity-and-falloff) fades it: set it to -100 to
-stamp the whole alpha (a crisp square, or a pattern out to its edges), 0 for a soft round fade, +100 for a soft
-point. Alphas work on [micro levels](micro-levels.md) too, with every stroke type including Drag Stamp.
+An alpha is a grayscale stamp that shapes the brush tip: white is full effect, black is none. It affects every brush,
+built-in or custom. Choose one from the **Alpha** tile on the left shelf (the alpha picker) or the **Sculpt > Alpha**,
+which also shows a large preview of the current alpha.
+
+[Falloff](#size-intensity-colour-intensity-and-falloff) fades it: set it to -100 to stamp the whole alpha (a crisp
+square, or a pattern out to its edges), 0 for a soft round fade, +100 for a soft point. Alphas work on [micro
+levels](micro-levels.md) too, with every stroke type including Drag Stamp.
 
 ![The alpha picker](images/alpha-picker.jpg)
 
@@ -491,10 +541,39 @@ point. Alphas work on [micro levels](micro-levels.md) too, with every stroke typ
 All of them are made by SculptForge itself the first time they're needed (no image files are downloaded or
 shipped). They show in the alpha picker and in the Library's **Alpha** tab (`brush_set_alpha name=cracks`).
 
+### Creature Skin alphas
+
+Sixteen high-resolution alphas (2048 x 2048) for close-up creature and skin detail on [micro levels](micro-levels.md).
+Each repeats without a seam, so **Tile** makes the pattern finer without a visible join. They have their own section
+when the alpha picker is sorted by pack, and each has a ready brush in the **Creature Skin** [brush pack](brush-packs.md).
+
+| Alpha | What it does |
+|---|---|
+| **Elephant Hide** | Thick hide cut by a deep net of creases with finer ones between, for elephants and old skin. |
+| **Hide Folds** | Rings of heavy folds with short cross creases, for trunks, necks and leg joints. |
+| **Dinosaur Hide** | Pebbled hide with bigger feature scales and deep, wandering folds, for dinosaurs and beasts. |
+| **Snake Scales** | Overlapping keeled diamond scales in offset rows (Follow stroke, draw head to tail). |
+| **Overlap Scales** | Rounded overlapping scales with fine growth rings, for fish and dragons (Follow stroke). |
+| **Pebble Scales** | Small domed scales packed together with larger rosettes, for lizards and geckos. |
+| **Scute Plates** | Rows of square keeled plates with pitted tops, for crocodiles and armoured backs. |
+| **Pores Fine** | Dense, tiny pores over fine skin texture, for cheeks and close-ups. |
+| **Pores Clustered** | Pores of two sizes gathered in patches, for natural, uneven skin. |
+| **Pores Stretched** | Pores drawn out sideways with faint stretch lines, for foreheads, necks and tight skin. |
+| **Nose Pores Open** | Large, deep, steep-walled pores with small ones between, for the nose and chin. |
+| **Nose Pores Dense** | Close-packed round pores, for the tip and wings of the nose. |
+| **Nose Pores Furrowed** | Pores joined by fine furrows, for weathered noses and cheeks. |
+| **Skin Crosshatch** | Fine furrows crossing in a diamond net, for the backs of hands and aged skin. |
+| **Skin Fine Lines** | Fine, near-parallel wrinkle lines that break and merge, for eye corners and knuckles. |
+| **Skin Micro Grain** | A soft stipple of tiny bumps, the last pass of skin texture. |
+
+Each is made once, the first time a brush uses it (a fraction of a second), and kept until you quit.
+
 To use your own image:
 
 1. Click **Load image...** in the alpha picker or **Sculpt > Alpha**.
-2. Choose a PNG, JPG, BMP, TGA, PSD or GIF. Colour images are converted to grayscale.
+2. Choose a PNG, OpenEXR, JPG, BMP, TGA, PSD or GIF. Colour images are converted to grayscale. 16-bit PNGs and EXRs
+   (half or full float) keep their full precision, so smooth height maps don't step; an EXR whose values run outside
+   0 to 1 is stretched to its own lowest and highest values. Images are used at up to 2048 pixels a side.
 3. Turn on **Invert loaded image** *before* loading if your image is white where it should have no effect.
 
 Images you keep in the `Alphas` folder of your Library library (Documents/SculptForge/Alphas by default)
@@ -512,14 +591,41 @@ Under the preview in **Sculpt > Alpha**:
 | **Follow stroke direction** | The alpha turns with the stroke, its top pointing the way you draw: scales, stitches and hair line up along the stroke. Small wobbles are smoothed out, as with Blender's Rake: the direction is taken again each time the cursor has gone 20 pixels. |
 | **Angle** | Turns the alpha by a fixed angle (-180 to 180 degrees, counter-clockwise), on its own or on top of the stroke's direction. |
 | **Angle jitter** | Turns each dab by a random angle, up to this many degrees either way, to break up repeats. |
+| **Scale jitter** | Makes each dab bigger or smaller by a random amount, up to this many percent either way (0 to 90). |
+| **Position jitter** | Moves each dab off the cursor by a random amount, up to this many percent of the brush radius (0 to 100), along the surface. |
 | **Tile across** / **Tile down** | Repeats the alpha 1 to 8 times across and down inside the brush; the preview shows the result. |
 
-They work with every brush, custom and Community brushes included, and each brush keeps its own (see
-[Each brush keeps its own settings](#each-brush-keeps-its-own-settings)). **Save Brush Settings** on a custom brush
-also writes Follow stroke direction, Angle and Angle jitter into its brush file, so a brush you share (a brush code,
-a .sfpack) turns its alpha the same way for everyone. Vector displacement stamps have the same options: see
-[Stamp rotation](#stamp-rotation). From a script:
-`brush_alpha_options follow_stroke=true angle=30 angle_jitter=10 tile_x=2 tile_y=2`.
+They work with every brush, custom and Community brushes included, and each brush keeps its own (see [Each brush keeps
+its own settings](#each-brush-keeps-its-own-settings)). **Save Brush Settings** on a custom brush also writes Follow
+stroke direction, Angle and Angle jitter into its brush file, so a brush you share (a brush code, a .sfpack) turns its
+alpha the same way for everyone. Vector displacement stamps have the same options: see [Stamp
+rotation](#stamp-rotation).
+
+From a script: `brush_alpha_options follow_stroke=true angle=30 angle_jitter=10 scale_jitter=20 position_jitter=30
+tile_x=2 tile_y=2`. Scale and Position jitter are for the dots strokes; a Drag Stamp keeps the size and place you give
+it.
+
+### Alpha pool
+
+An **alpha pool** makes each dab draw with a different alpha, picked at random from a set: planks, pores or chips
+that never repeat. Together with Angle, Scale and Position jitter, a long stroke looks like many separate stamps.
+
+1. Put your images in a sub-folder of the Library's `Alphas` folder (for example `Alphas/Planks`); any PNG, JPG, BMP or
+   TGA works, and the **Alpha** tab shows the sub-folder as its own tile.
+2. In **Library > Alpha**, right-click the folder and choose **Use folder as alpha pool** (up to 32 images, taken
+   A-Z). Or right-click single alphas, in the Library or the alpha list, and choose **Add to alpha pool**.
+3. **Sculpt > Alpha** shows *Alpha pool: N* with a **Clear** button. Stroke as usual; a **Drag Stamp** takes one alpha
+   per stamp.
+
+A stroke repeats the same way when it is played back, and each new stroke picks a different order. The pool is kept
+until you quit and is not part of a brush or a project; Tile does not apply to pool alphas.
+
+Images are used at up to 512 px. From a script: `brush_alpha_pool folder=...`, `brush_alpha_pool name=...`,
+`brush_alpha_pool path=...`, `brush_alpha_pool clear=true`.
+
+**Procedural wood grains.** Three alphas made in code come with the app: **Procedural Wood Straight**, **Procedural
+Wood Cathedral** and **Procedural Wood Weathered**. They are not scans and say so; they stand in until you have real
+scans of your own planks (scan or photograph boards you own, or use images you have the licence to use).
 
 ### Stencil
 
@@ -551,10 +657,11 @@ stroke over it, turn the model or move the stencil, and stroke again.
 | **Opacity** | How strongly the overlay shows. The brushes always take the whole image (use Intensity to go lighter). |
 | **Size** / **Angle** | Its height in percent of the view's, and its turn; **Reset placement** centres it again. |
 
-With symmetry on, the mirrored side gets the stencil mirrored, as the stroke is. Stencils work on
-[micro levels](micro-levels.md) too. Move, the Kelvinlet brushes, vector displacement stamps and the mask brush don't
-use it. Texture painting doesn't take it yet (Vertex Paint does). The stencil isn't saved with the project. From a
-script: `stencil_load path=skin.png`, `stencil_set x=0.5 y=0.5 size=0.8 angle=30 tile=true`, `stencil_clear`.
+With symmetry on, the mirrored side gets the stencil mirrored, as the stroke is. Stencils work on [micro
+levels](micro-levels.md) too. Move, the Kelvinlet brushes, vector displacement stamps and the mask brush don't use it.
+
+Texture painting doesn't take it yet (Vertex Paint does). The stencil isn't saved with the project. From a script:
+`stencil_load path=skin.png`, `stencil_set x=0.5 y=0.5 size=0.8 angle=30 tile=true`, `stencil_clear`.
 
 ## Vector displacement brushes
 
@@ -622,9 +729,10 @@ moved, sideways and up.
 
 ### Load and export maps
 
-**Load VDM...** reads an OpenEXR (16- or 32-bit, any compression) or a `.sfvdm`; dropping an `.exr` on the window
-does the same. A loaded EXR is kept in your brush library as a `.sfvdm`, so it's there next time. **Export
-EXR...** writes the brush's map as a 32-bit float EXR. Right-click a map you made or loaded to delete it.
+**Load VDM...** reads an OpenEXR (16- or 32-bit, any compression) or a `.sfvdm`; dropping an `.exr` on the window does
+the same. A loaded EXR is kept in your brush library as a `.sfvdm`, so it's there next time.
+
+**Export EXR...** writes the brush's map as a 32-bit float EXR. Right-click a map you made or loaded to delete it.
 
 Maps use the convention of Blender's **VDM Brush Baker** and its Draw brush with *Vector Displacement*:
 
@@ -734,10 +842,11 @@ which also holds the Cloth brush's settings):
 - **Collide with other Parts**: the cloth rests on the other visible Parts (hide a Part to let the cloth fall
   through it).
 
-**Simulate** shows the cloth moving live. When it comes to rest the result is kept as one undo step;
-**Pause** / **Resume** stop and continue, **Keep** stops and keeps where it got to, **Reset** puts the Part back.
-Sculpting or running a command while it moves keeps where it got to first. The result is a normal Part: sculpt it,
-or give it thickness with Extract. From a script: `cloth_drape fabric=denim`.
+**Simulate** shows the cloth moving live. When it comes to rest the result is kept as one undo step; **Pause** /
+**Resume** stop and continue, **Keep** stops and keeps where it got to, **Reset** puts the Part back. Sculpting or
+running a command while it moves keeps where it got to first.
+
+The result is a normal Part: sculpt it, or give it thickness with Extract. From a script: `cloth_drape fabric=denim`.
 
 ## Capture an alpha or a VDM from the model
 
@@ -768,10 +877,12 @@ second for a small detail and a second or so for a large patch of a 20-million-t
 ### Detail Clone
 
 **DetailClone** stamps the VDM brush's map (a captured one or any other) along your stroke, one copy every stamp
-width, each turned so its top points the way the stroke goes: rows of scales, rivets, stitches or warts that
-follow a curve. **Clone Spacing** sets the distance between copies (1 = edge to edge) and **Clone follows
-stroke** can keep every copy upright instead. Size sets their size and Intensity their depth; a click
-without moving stamps one. Each copy is shaped to the surface under it.
+width, each turned so its top points the way the stroke goes: rows of scales, rivets, stitches or warts that follow a
+curve. **Clone Spacing** sets the distance between copies (1 = edge to edge) and **Clone follows stroke** can keep
+every copy upright instead.
+
+Size sets their size and Intensity their depth; a click without moving stamps one. Each copy is shaped to the surface
+under it.
 
 ## Symmetry
 
@@ -830,13 +941,14 @@ Two toggles decide what pressure does. They are on the top shelf and in **Sculpt
 
 **Each brush can override them.** **Sculpt > Brush > Pen pressure** (and the same switches in [Brush
 Lab](brush-lab.md) and **Edit > Preferences > Tablet**) sets **Size** and **Strength** for the brush you are holding
-to **Use global**, **On** or **Off**. **Use global** follows the toggles above; **On** and **Off** apply to that
-brush whatever the toggles say, so you can keep Pressure > Size on for Clay and off for Standard. Grab brushes
-(Move, KelvinGrab, KelvinTwist, KelvinScale, Tendril and Elastic Tendril) start with **Size: Off**, every other
-brush with **Use global**. The switches are kept per brush like its size and alpha: **Sculpt > Brush > Save Brush
-Settings** keeps them for the next start, **Reset Brush to Default** puts back the brush's default, and a custom
-brush also keeps them in its `.sfbrush` file. Brush settings saved before 0.11.1 load as **Use global** (grab
-brushes: **Size: Off**).
+to **Use global**, **On** or **Off**. **Use global** follows the toggles above; **On** and **Off** apply to that brush
+whatever the toggles say, so you can keep Pressure > Size on for Clay and off for Standard. Grab brushes (Move,
+KelvinGrab, KelvinTwist, KelvinScale, Tendril and Elastic Tendril) start with **Size: Off**, every other brush with
+**Use global**.
+
+The switches are kept per brush like its size and alpha: **Sculpt > Brush > Save Brush Settings** keeps them for the
+next start, **Reset Brush to Default** puts back the brush's default, and a custom brush also keeps them in its
+`.sfbrush` file. Brush settings saved before 0.11.1 load as **Use global** (grab brushes: **Size: Off**).
 
 Pressure applies only to strokes made with the pen; mouse strokes always use full pressure. Custom brushes
 also have a **Pressure curve** setting that makes them respond to a light or a firm touch (see
@@ -874,8 +986,8 @@ Move, Smooth, Inflate, Pinch, Flatten, Crease, Trim, Tendril, Layer, Nudge and P
   tile to a new place.
 - **Change a brush's key**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click its tile, then press the new key.
 
-Shelf changes last until you quit. **Edit > Preferences > Saving & Layouts > Save Layout** keeps
-them. See [The interface](interface.md) for more on customizing.
+Shelf changes save themselves. **Edit > Preferences > Saving & Layouts > Save Layout** marks the layout that
+**Revert to Saved Layout** returns to. See [The interface](interface.md) for more on customizing.
 
 ## Sculpt from a script
 

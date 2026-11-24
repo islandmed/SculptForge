@@ -1,0 +1,53 @@
+# Revert to Saved Layout and Reset Layout from a broken layout (Discord #bug-reports, phoenix / raffaele_3d_design):
+# a palette out in a window, every shelf item dragged off (the colour picker with them), then Revert must not crash and must
+# bring the picker back; Reset Layout (Window menu / command palette) always does.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+expect_value shelf_has_widget.color == 1
+click "Color##palette.color"
+click "Color/##detach"
+wait 0.2
+expect_value detached_panels == 1
+key f3
+type "##Command palette" "save layout"
+key enter
+expect_status "Layout saved"
+# Unsaved work (a stroke) is put on disk before Revert / Reset run, whatever happens next.
+click "Clay##brush.clay"
+stroke 0.35 0.4 0.65 0.6
+expect_value dirty == 1
+expect_value autosave_file == 0
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value customize == 1
+hold ctrl+alt
+drag_item "##grab.widget.color" 300 -100
+hold none
+expect_value shelf_has_widget.color == 0
+shot picker_gone
+key f3
+type "##Command palette" "revert to saved"
+key enter
+expect_status "Saved layout restored"
+expect_value autosave_file == 1
+expect_value shelf_has_widget.color == 1
+expect_value detached_panels == 1
+wait 0.3
+shot reverted
+action config.reset_layout
+expect_status "Standard layout restored"
+expect_value shelf_has_widget.color == 1
+expect_value detached_panels == 0
+wait 0.3
+# The colour picker taken off the shelf again (Customize is still on): Preferences > Saving & Layouts puts it back.
+hold ctrl+alt
+drag_item "##grab.widget.color" 300 -100
+hold none
+expect_value shelf_has_widget.color == 0
+click "Preferences##palette.preferences"
+click "Saving & Layouts##preferences.config"
+shot put_back_button
+click "Put back on the shelf: color##putback.widget.color"
+expect_value shelf_has_widget.color == 1
+shot put_back

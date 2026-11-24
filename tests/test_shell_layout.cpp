@@ -283,3 +283,227 @@ TEST(window_fits_display) {
     f = fitWindow({-1900, 50, 1600, 960}, true, true, 1.0f, {-1920, 0, 1920, 1040}, {30, 0, 0, 0}, 1.0f);
     CHECK(f.rect.x == -1900 && f.rect.y == 50);
 }
+
+// Panels in their own windows (docs/design/detach-panels.md): panels.json round trip, bad entries dropped, and a
+// stored position used only while a display still shows the window's top.
+TEST(panel_placements_json) {
+    std::vector<PanelPlacement> in{{"palette.tool", -1700, 120, 340, 700, true}, {"guide", 0, 0, 900, 700, false}};
+    std::vector<PanelPlacement> out = panelPlacementsFromJson(panelPlacementsToJson(in));
+    CHECK(out.size() == 2);
+    CHECK(out[0].id == "palette.tool" && out[0].placed && out[0].x == -1700 && out[0].y == 120 && out[0].w == 340 && out[0].h == 700);
+    CHECK(out[1].id == "guide" && !out[1].placed && out[1].w == 900);
+    Json j;
+    std::string err;
+    CHECK(Json::parse(R"({"panels": [{"id": "controls", "w": 5, "h": 99999}, {"id": "controls"}, {"w": 300},
+                                      {"id": ""}, {"id": "palette.brush", "x": "left", "y": 3}]})",
+                      j, err));
+    out = panelPlacementsFromJson(j);
+    CHECK(out.size() == 2);
+    CHECK(out[0].id == "controls" && out[0].w == 160 && out[0].h == 16384 && !out[0].placed);
+    CHECK(out[1].id == "palette.brush" && !out[1].placed);
+    CHECK(panelPlacementsFromJson(Json()).empty());
+    // The main monitor and one to its left; the left one unplugged.
+    const std::vector<DisplayRect> two{{0, 0, 2560, 1400}, {-1920, 0, 1920, 1040}}, one{{0, 0, 2560, 1400}};
+    const PanelPlacement left{"palette.tool", -1700, 120, 340, 700, true};
+    CHECK(panelOnDisplays(left, two));
+    CHECK(!panelOnDisplays(left, one));
+    CHECK(!panelOnDisplays({"guide", 0, 0, 900, 700, false}, two)); // the window system places it
+}
+
+// Revert to Saved Layout and Reset Layout read whatever ui.json holds (#bug-reports: Revert crashed on a layout with its
+// shelf items dragged off): a corrupt or odd layout must load into something the shell can lay out, in every built-in
+// The left shelf's width: 88 (72 narrow) unless dragged, between that and 168, kept in the layout file.
+TEST(left_shelf_width_default_clamp_and_roundtrip) {
+    CHECK(leftShelfWidth(0.0f, 1600.0f) == 88.0f && leftShelfWidth(0.0f, 1000.0f) == 72.0f);
+    CHECK(leftShelfWidth(140.0f, 1600.0f) == 140.0f);
+    CHECK(leftShelfWidth(9999.0f, 1600.0f) == 168.0f && leftShelfWidth(10.0f, 1600.0f) == 88.0f);
+    CHECK(leftShelfWidth(168.0f, 1000.0f) <= 300.0f); // (a narrow window: at most 30 % of it)
+    UiLayout l = standardLayout();
+    l.leftShelfWidth = 132.0f;
+    const ShellGeometry g = computeShell(l, 1600.0f, 900.0f, 1.0f);
+    CHECK(g.leftShelf.w == 132.0f && g.canvas.x == g.leftShelf.x + 132.0f);
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(toJson(l), back, err));
+    CHECK(back.leftShelfWidth == 132.0f);
+    CHECK(!toJson(standardLayout()).has("leftShelfWidth")); // (the default is not stored)
+    Json bad;
+    CHECK(Json::parse(R"({"leftShelfWidth": -40})", bad, err) && fromJson(bad, back, err) && back.leftShelfWidth == 0.0f);
+}
+
+// layout, and the standard one is always a way back.
+TEST(layout_from_corrupt_or_odd_json_still_lays_out) {
+    const char* const files[] = {
+        R"({})",
+        R"({"layout": 5})",
+        R"({"topShelf": [], "leftShelf": [], "rightShelf": [], "bottomShelf": []})",
+        R"({"topShelf": [1, null, {"a": 1}, "no.such.item"], "leftShelf": "widget.color", "rightShelf": [[], "sep", "sep"]})",
+        R"({"leftTrayWidth": -50, "rightTrayWidth": 1e9, "consoleHeight": 0, "libraryTile": 99999, "libraryRows": -3})",
+        R"({"leftTray": ["palette.nope", 7], "rightTray": [], "openSubpalettes": [null, "tool.part"]})",
+    };
+    const float sizes[][2] = {{800, 600}, {1440, 900}, {2880, 1800}, {3840, 2160}};
+    for (int shell = 0; shell <= 1; ++shell) {
+        for (const char* text : files) {
+            Json j;
+            std::string err;
+            if (!Json::parse(text, j, err)) continue; // (a file that is not JSON never gets this far)
+            UiLayout layout = standardLayout(shell);
+            fromJson(j, layout, err, shell);
+            for (const auto& s : sizes) {
+                const ShellGeometry g = computeShell(layout, s[0], s[1], 1.0f);
+                CHECK(g.canvas.w > 0 && g.canvas.h > 0);
+            }
+            CHECK(layout.libraryTile >= kLibraryTileMin && layout.libraryTile <= kLibraryTileMax);
+            UiLayout again = standardLayout(shell);
+            CHECK(fromJson(toJson(layout), again, err, shell)); // what Save Layout writes reads back
+        }
+        // The Classic layout keeps the colour picker on a shelf (Reset Layout brings it back).
+        const UiLayout std_ = standardLayout(shell);
+        auto holds = [](const UiLayout& l, const char* id) {
+            for (const auto* shelf : {&l.topShelf, &l.leftShelf, &l.rightShelf, &l.bottomShelf})
+                if (std::find(shelf->begin(), shelf->end(), id) != shelf->end()) return true;
+            return false;
+        };
+        if (shell == 0) CHECK(holds(std_, "widget.color"));
+    }
+}
+
+// My Panel (PanelMyPanel.cpp): what was dragged in is saved with the layout; bad entries, repeats and extras are dropped.
+TEST(my_panel_layout_json) {
+    CHECK(!toJson(standardLayout()).has("myPanel")); // nothing stored for an empty panel
+    UiLayout l = standardLayout();
+    l.myPanel = {"action:view.wire", "section:tool.masking"};
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(toJson(l), back, err));
+    CHECK(back.myPanel == l.myPanel);
+    Json j;
+    CHECK(Json::parse(R"({"myPanel": ["action:a.b", "action:a.b", "bogus", "section:", "action:", "section:tool.part", 7]})", j, err));
+    CHECK(fromJson(j, back, err));
+    CHECK(back.myPanel.size() == 2 && back.myPanel[0] == "action:a.b" && back.myPanel[1] == "section:tool.part");
+    Json many = Json::array();
+    for (int i = 0; i < 100; ++i) many.push("action:x." + std::to_string(i));
+    Json big = Json::object();
+    big.set("myPanel", many);
+    CHECK(fromJson(big, back, err));
+    CHECK(back.myPanel.size() == kMyPanelMax);
+    CHECK(myPanelEntry("section:tool.geometry").section && myPanelEntry("section:tool.geometry").id == "tool.geometry");
+    CHECK(!myPanelEntry("tool.geometry").valid());
+}
+
+// ui.json keeps the layout in use ("layout", autosaved) and the one Save Layout kept ("layoutSaved", what Revert returns to).
+TEST(ui_json_layout_and_saved_layout) {
+    auto parse = [](const char* text) {
+        Json j;
+        std::string err;
+        Json::parse(text, j, err);
+        return j;
+    };
+    // A file from before the autosave: the one layout is both.
+    const UiLayoutPair old = layoutsFromUiJson(parse(R"({"version": 1, "layout": {"leftShelf": ["view.wire"]}, "prefs": {}})"));
+    CHECK(old.current.isObject() && old.saved.isObject());
+    CHECK(old.current.dump() == old.saved.dump());
+    // The new format: two layouts.
+    const UiLayoutPair two = layoutsFromUiJson(parse(R"({"layout": {"leftShelf": ["a"]}, "layoutSaved": {"leftShelf": ["b"]}})"));
+    CHECK(two.current.isObject() && two.saved.isObject());
+    CHECK(two.current.dump() != two.saved.dump());
+    // Autosaved before any Save Layout ("layoutSaved": null), or a file with no layout at all.
+    const UiLayoutPair none = layoutsFromUiJson(parse(R"({"layout": {"leftShelf": ["a"]}, "layoutSaved": null})"));
+    CHECK(none.current.isObject() && none.saved.isNull());
+    const UiLayoutPair empty = layoutsFromUiJson(parse(R"({"prefs": {}})"));
+    CHECK(empty.current.isNull() && empty.saved.isNull());
+    // Corrupt: never a layout, never a crash.
+    for (const char* text : {R"({"layout": 5, "layoutSaved": [1]})", R"([])", R"(null)", R"({"layout": "x", "layoutSaved": "y"})"}) {
+        const UiLayoutPair bad = layoutsFromUiJson(parse(text));
+        CHECK(bad.current.isNull());
+        CHECK(bad.saved.isNull());
+    }
+
+    // The round trip through the writer: both layouts come back, the runtime-only bits of the one in use are shut.
+    for (int shell = 0; shell <= 1; ++shell) {
+        UiLayout inUse = standardLayout(shell), kept = standardLayout(shell);
+        inUse.leftShelf.push_back("view.wire");
+        inUse.consoleOpen = true;
+        inUse.libraryOpen = true;
+        inUse.customize = true;
+        inUse.rightTrayOpen = false;
+        Json ui = Json::object();
+        layoutsToUiJson(ui, toAutosaveJson(inUse), toJson(kept));
+        Json again;
+        std::string err;
+        CHECK(Json::parse(ui.dump(true), again, err));
+        const UiLayoutPair back = layoutsFromUiJson(again);
+        UiLayout cur, sav;
+        CHECK(fromJson(back.current, cur, err, shell));
+        CHECK(fromJson(back.saved, sav, err, shell));
+        CHECK(!cur.consoleOpen && !cur.libraryOpen && !cur.customize);
+        CHECK(!cur.rightTrayOpen);
+        CHECK(cur.leftShelf == inUse.leftShelf);
+        CHECK(sav.leftShelf == kept.leftShelf && sav.rightTrayOpen == kept.rightTrayOpen);
+        // Never saved: "layoutSaved" is written as null, not left out (left out would read as the old format).
+        Json fresh = Json::object();
+        layoutsToUiJson(fresh, toAutosaveJson(inUse), Json());
+        CHECK(fresh.has("layoutSaved"));
+        CHECK(layoutsFromUiJson(fresh).saved.isNull());
+    }
+}
+
+// A phone held upright at 300 % UI scale is 360 logical px wide: the tray there is 40 % of the window (Hameron, Pixel, 11-12:
+// an open tray plus the two shelves left the 3D view nothing), one at a time. A tablet upright or at 260 % (a member,
+// 0.12.14-beta.2: "I still can't open the Right Tray", 2000x1200 at 2.62 = 763 logical px) opens either tray by a tap.
+TEST(shell_narrow_windows_open_one_tray_at_a_time) {
+    UiLayout l = standardLayout();
+    l.leftTrayOpen = true;
+    l.rightTrayOpen = true;
+    const float s = 3.0f;
+    ShellGeometry g = computeShell(l, 1080.0f, 2400.0f, s); // 360 logical
+    CHECK(g.narrow && g.leftTray.w > 0.0f && near(g.rightTray.w, 0.0f)); // the left one wins; the right is not asked for
+    CHECK(near(g.leftTray.w, 180.0f * s));
+    CHECK(g.canvas.w > 0.0f && g.leftDivider.w > 0.0f); // (a sliver of view, the handle to close it: a phone is not the target)
+    l.leftTrayOpen = false;
+    g = computeShell(l, 1080.0f, 2400.0f, s);
+    CHECK(near(g.rightTray.w, 0.0f)); // open in the layout, hidden until asked for
+    l.rightTrayPeek = true;
+    g = computeShell(l, 1080.0f, 2400.0f, s);
+    CHECK(near(g.rightTray.w, 180.0f * s) && g.rightTray.x + g.rightTray.w <= 1080.0f);
+    CHECK(g.rightDivider.w > 0.0f && g.canvas.w > 0.0f);
+    // The tablet: 2000x1200 at 2.62 (763 logical px): both trays open in turn at their 300 px.
+    const float ts = 2.62f;
+    l.rightTrayPeek = false;
+    l.leftTrayOpen = true;
+    g = computeShell(l, 2000.0f, 1200.0f, ts);
+    CHECK(g.narrow && near(g.leftTray.w, 300.0f * ts) && near(g.rightTray.w, 0.0f));
+    l.leftTrayOpen = false;
+    l.rightTrayPeek = true;
+    g = computeShell(l, 2000.0f, 1200.0f, ts);
+    CHECK(near(g.rightTray.w, 300.0f * ts) && near(g.leftTray.w, 0.0f));
+    CHECK(g.canvas.w > 200.0f * ts);
+    // Upright (1200x2000 at 2.62: 458 logical px): 40 % of the window.
+    g = computeShell(l, 1200.0f, 2000.0f, ts);
+    CHECK(near(g.rightTray.w, 480.0f) && g.canvas.w > 100.0f * ts);
+    // A wide window is as it was: both open, no peek needed.
+    l.rightTrayPeek = false;
+    l.leftTrayOpen = true;
+    g = computeShell(l, 2560.0f, 1600.0f, 1.5f);
+    CHECK(!g.narrow && g.leftTray.w > 0.0f && g.rightTray.w > 0.0f);
+}
+
+// A shelf slot's brush id (custom brush slots find their brush by it) survives the layout file; hand-edited junk is dropped.
+TEST(shell_layout_keeps_brush_slot_ids) {
+    UiLayout l = standardLayout();
+    l.bottomShelf.push_back("brush.recipe.Finish - Classic");
+    l.brushIds["Finish - Classic"] = "00ff00ff00ff00ff";
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(toJson(l), back, err));
+    CHECK(back.brushIds.size() == 1 && back.brushIds["Finish - Classic"] == "00ff00ff00ff00ff");
+    CHECK(std::find(back.bottomShelf.begin(), back.bottomShelf.end(), "brush.recipe.Finish - Classic") != back.bottomShelf.end());
+    Json j = toJson(l);
+    Json ids = Json::object();
+    ids.set("A", 5.0);
+    ids.set("B", std::string());
+    ids.set("C", std::string(200, 'x'));
+    j.set("brushIds", ids);
+    CHECK(fromJson(j, back, err) && back.brushIds.empty());
+    CHECK(toJson(standardLayout()).has("brushIds") == false);
+}

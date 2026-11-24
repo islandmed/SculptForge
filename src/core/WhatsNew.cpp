@@ -207,4 +207,24 @@ Page build(const guide::Document& doc, std::string_view current, int detailed) {
     return page;
 }
 
+Since cardsSince(const Page& page, std::string_view since, int maxCards) {
+    Since out;
+    if (page.versions.empty()) return out;
+    const bool span = !since.empty() && compareVersions(page.versions[0].version, since) > 0;
+    for (const Version& v : page.versions) {
+        if (span ? compareVersions(v.version, since) <= 0 : &v != &page.versions[0]) break;
+        out.versions.push_back(v.version);
+        if (v.cards.empty()) out.more += int(v.highlights.size());
+        for (const Card& c : v.cards) {
+            if (int(out.cards.size()) < maxCards) {
+                out.cards.push_back(c);
+                out.cardVersions.push_back(v.version);
+            } else {
+                ++out.more;
+            }
+        }
+    }
+    return out;
+}
+
 } // namespace sf::whatsnew

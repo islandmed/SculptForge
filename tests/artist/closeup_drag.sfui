@@ -1,0 +1,58 @@
+# Close-up: the dragging brushes (Tendril, Palette Knife, Nudge) on a dense curved form (tools/qa/closeup.py judges it).
+# A drag must never fold the surface (0 triangles turned inside out), even where a second stroke crosses the first with
+# rising pen pressure; Nudge's two mirror halves must agree; a long Tendril pull must not stall or flatten ahead.
+run ui_look look=classic layout=classic
+key ctrl+n
+wait 0.2
+key ctrl+d
+key ctrl+d
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+run save_obj path=cf_00.obj
+
+click "Tendril##brush.tendril"
+brush_size 50
+stroke 0.30 0.30 0.45 0.30
+pen_stroke 0.38 0.20 0.38 0.42 0.2 1.0
+wait_idle 30
+run save_obj path=cf_01.obj
+#step 00 01 any Tendril crossing
+shot c01-tendril-cross
+brush_size 40
+drag_path 0.55 0.30 0.62 0.30 0.70 0.31 0.78 0.32 S=1.2
+wait_idle 30
+run save_obj path=cf_02.obj
+#step 01 02 any Tendril long pull
+shot c02-tendril-long
+
+run brush_use name="Palette Knife"
+brush_size 50
+stroke 0.30 0.62 0.45 0.62
+pen_stroke 0.38 0.52 0.38 0.74 0.2 1.0
+stroke 0.32 0.66 0.44 0.70
+wait_idle 30
+run save_obj path=cf_03.obj
+#step 02 03 any Palette Knife crossing + overlap
+shot c03-knife-cross
+
+click "Nudge##brush.nudge"
+brush_size 50
+stroke 0.58 0.62 0.72 0.62
+pen_stroke 0.65 0.52 0.65 0.74 0.2 1.0
+wait_idle 30
+run save_obj path=cf_04.obj
+#step 03 04 any Nudge crossing (X symmetry)
+shot c04-nudge-cross
+
+hover_window 0.97 0.5
+zoom 2.2
+wait_idle 30
+shot c10-close-front
+camera 50 10
+wait_idle 30
+shot c11-close-graze-side
+camera -50 10
+wait_idle 30
+shot c12-close-graze-other

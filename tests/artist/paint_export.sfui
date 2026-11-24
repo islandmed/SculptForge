@@ -1,0 +1,95 @@
+# Artist session 3, vertex paint + save / reopen + export round trip (tools/qa/artist_pass.py runs it; not a ctest
+# case): paint a divided head-sized sphere with fills and soft and hard brush edges, save the project, reopen it and
+# expect the same mesh and colour, then export GLB / OBJ / USD and open the GLB again (what Blender would get).
+run ui_look look=classic layout=classic
+key ctrl+n
+wait 0.2
+key ctrl+d
+key ctrl+d
+wait_idle 60
+camera 0 0
+key f
+wait 0.3
+click "Inflate##brush.inflate"
+brush_size 60
+stroke 0.36 0.45 0.36 0.45
+stroke 0.64 0.45 0.64 0.45
+click "Crease##brush.crease"
+brush_size 20
+drag_path 0.35 0.68 0.45 0.71 0.55 0.71 0.65 0.68 S=0.8
+
+# Colour: a warm fill, a soft cheek blush, hard-edged eyes, a dark line.
+run set_color color=196,140,110
+run paint_fill
+print colored
+key p
+brush_size 90
+mouse_move 0.6 0.5
+key o
+key 0
+key enter
+run set_color color=214,110,100
+stroke 0.30 0.58 0.34 0.60 0.5
+mouse_move 0.6 0.5
+key o
+key minus
+key 1
+key 0
+key 0
+key enter
+brush_size 30
+run set_color color=30,24,20
+stroke 0.36 0.45 0.36 0.45
+run set_color color=90,30,30
+brush_size 10
+drag_path 0.35 0.68 0.45 0.71 0.55 0.71 0.65 0.68 S=0.8
+print colored
+expect_value colored > 0
+print longest_frame_ms
+hover_window 0.97 0.5
+wait 0.3
+shot p01-painted
+remember triangles tri
+remember vertices verts
+remember colored col
+print size_x
+print size_y
+print size_z
+
+# Save, start over, reopen: identical.
+run save_project path=artist_paint.sfproj
+key ctrl+n
+wait 0.3
+run open_project path=artist_paint.sfproj
+wait_idle 30
+print longest_frame_ms
+expect_value triangles == $tri
+expect_value vertices == $verts
+expect_value colored == $col
+camera 0 0
+key f
+wait 0.3
+hover_window 0.97 0.5
+wait 0.3
+shot p02-reopened
+
+# Export for Blender and the game engines, then open the GLB as the next app would.
+run export_glb path=artist_paint.glb
+run save_obj path=artist_paint.obj
+run export_usd path=artist_paint.usda
+run export_ply path=artist_paint.ply
+run open path=artist_paint.glb
+wait_idle 30
+print triangles
+print vertices
+print colored
+print size_x
+print size_y
+print size_z
+expect_value colored > 0
+camera 0 0
+key f
+wait 0.3
+hover_window 0.97 0.5
+wait 0.3
+shot p03-glb-reopened

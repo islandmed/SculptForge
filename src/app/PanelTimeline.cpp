@@ -7,13 +7,14 @@
 // Right-click a stroke to re-tune its strength. Timelapse renders the history as a turntable video. The data
 // side is core/Timeline.h; Help > Benchmark (proof mode) is in ProofMode.cpp.
 #include "app/App.h"
-#include "app/ShellQuote.h"
+#include "ai/VideoEncoder.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 
 #include "core/Json.h"
 #include "core/Timeline.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 
@@ -72,7 +73,7 @@ std::string ago(double unixTime) {
 } // namespace
 
 struct TimelapseJob {
-    FILE* ffmpeg = nullptr;
+    ai::VideoEncoder encoder;
     std::string path;
     int width = 1920, height = 1080, fps = 30;
     int frame = 0, frames = 0, hold0 = 0, hold1 = 0;
@@ -95,6 +96,8 @@ struct TimelineUiState {
     uint32_t retuneNode = Timeline::kNone;
     float retuneValue = 1.0f;
     std::string message;
+    std::string failure;       // why the last export failed: shown in a dialog until closed (a status line scrolls by)
+    bool failureOpen = false;
     // Timelapse dialog
     bool timelapseDialog = false;
     int timelapseRes = 0; // 0 = 1080p, 1 = 4K
@@ -214,6 +217,7 @@ void App::startTimelapse(const std::string& path, int width, int height, float s
     if (!t || t->cursor() == 0) {
         s.message = "There is no history to make a timelapse of (sculpt something first, or open a project saved with its history)";
         status_ = s.message;
+        SDL_Log("Timelapse: %s", s.message.c_str());
         return;
     }
     t->sync(doc_);
@@ -233,23 +237,22 @@ void App::startTimelapse(const std::string& path, int width, int height, float s
     job->camera.distance *= 0.72f; // frame() leaves room for any view direction; a turntable can come closer
     job->camera.aspect = float(job->width) / float(std::max(job->height, 1));
     job->yaw0 = camera_.yaw;
-    const std::string quoted = shellQuote(path); // (never a shell-active file name)
-    if (quoted.empty()) {
-        status_ = s.message = "Timelapse: choose a file name without \" % ! ^ & | < > in it";
+    ai::VideoEncoderSpec spec;
+    spec.output = path;
+    spec.width = job->width;
+    spec.height = job->height;
+    spec.fps = job->fps;
+    spec.what = "timelapse";
+    spec.outputArgs = {"-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart"};
+    spec.log = [](const std::string& m) { SDL_Log("%s", m.c_str()); };
+    std::string error;
+    if (!job->encoder.start(spec, error)) { // (said once to the log by the encoder)
+        status_ = s.message = s.failure = error;
+        s.failureOpen = true;
+        lastCommandOk_ = false;
         return;
     }
-    const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(job->width) + "x" +
-                            std::to_string(job->height) + " -r " + std::to_string(job->fps) +
-                            " -i - -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart " + quoted;
-#if defined(_WIN32)
-    job->ffmpeg = _popen(cmd.c_str(), "wb");
-#else
-    job->ffmpeg = popen(cmd.c_str(), "w");
-#endif
-    if (!job->ffmpeg) {
-        status_ = s.message = "Timelapse needs ffmpeg (it couldn't be started)";
-        return;
-    }
+    job->path = spec.output;
     s.job = std::move(job);
     status_ = "Rendering the timelapse...";
 }
@@ -264,23 +267,28 @@ bool App::timelapseStep(double budgetSeconds) {
     auto finish = [&](bool ok) {
         std::string err;
         if (t) t->seek(doc_, std::min(j.restore, t->path().size() - 1), &err); // back to where the user was
-#if defined(_WIN32)
-        const int status = _pclose(j.ffmpeg);
-#else
-        const int status = pclose(j.ffmpeg);
-#endif
+        std::string failure;
+        bool saved = false;
         if (j.cancelled) {
-            std::error_code ec;
-            std::filesystem::remove(fsPathOf(j.path), ec);
+            j.encoder.cancel();
             status_ = "Timelapse cancelled";
-        } else if (!ok || status != 0) {
-            status_ = "The timelapse couldn't be written" + (j.error.empty() ? std::string() : ": " + j.error);
+        } else if (!ok && !j.error.empty()) { // (the frames themselves failed: ffmpeg is stopped, nothing to write)
+            j.encoder.cancel();
+            failure = "The timelapse couldn't be rendered: " + j.error;
+            SDL_Log("%s", failure.c_str());
         } else {
-            status_ = "Timelapse saved: " + j.path + " (" + std::to_string(j.frames) + " frames, " +
-                      std::to_string(j.frames / j.fps) + " s)";
+            saved = j.encoder.finish(failure); // (a failure is said once to the log by the encoder)
+            if (saved)
+                status_ = "Timelapse saved: " + j.path + " (" + std::to_string(j.frames) + " frames, " +
+                          std::to_string(j.frames / j.fps) + " s)";
+        }
+        if (!failure.empty()) {
+            status_ = failure;
+            timelineUi_->failure = failure;
+            timelineUi_->failureOpen = true;
         }
         timelineUi_->message = status_;
-        lastCommandOk_ = ok && status == 0 && !j.cancelled;
+        lastCommandOk_ = saved;
         timelineUi_->job.reset();
         return false;
     };
@@ -302,10 +310,7 @@ bool App::timelapseStep(double budgetSeconds) {
             return finish(false);
         }
         for (size_t i = 3; i < j.rgba.size(); i += 4) j.rgba[i] = 255;
-        if (std::fwrite(j.rgba.data(), 1, j.rgba.size(), j.ffmpeg) != j.rgba.size()) {
-            j.error = "ffmpeg stopped";
-            return finish(false);
-        }
+        if (!j.encoder.write(j.rgba.data(), j.rgba.size())) return finish(false); // (finish asks the encoder why)
         ++j.frame;
         if (budgetSeconds > 0 && std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() > budgetSeconds)
             return true;
@@ -362,6 +367,19 @@ void App::drawTimelineUi() {
     }
     if (proof_) drawProofUi();
     if (take_) drawTakeHud(); // (BenchTake.cpp)
+    if (s.failureOpen) {
+        ImGui::OpenPopup("###timelapse.failed");
+        s.failureOpen = false;
+    }
+    if (ImGui::BeginPopupModal(tr("Export timelapse###timelapse.failed"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 460.0f * uiScale_);
+        ImGui::TextUnformatted(s.failure.c_str());
+        ImGui::PopTextWrapPos();
+        if (ImGui::Button(tr("Copy"))) ImGui::SetClipboardText(s.failure.c_str());
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Close")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
     // Keep a timeline on the active Part's history (each Part's travels with its undo stack).
     Timeline* t = Timeline::of(doc_.undo);
     if (!t && s.record) t = Timeline::attach(doc_).get();
@@ -629,7 +647,7 @@ void App::drawTimelineUi() {
     const float laneTop = y;
     size_t span = n > 1 ? n - 1 : 1; // steps the track shows: the active branch, or a longer other branch
     for (const Timeline::Branch& b : branches) span = std::max(span, b.from + b.length);
-    const float step = (x1 - x0) / float(span);
+    const float step = std::max(x1 - x0, 1.0f) / float(span); // (a track narrower than its margins: tick stride was 0, an endless loop)
     auto xOf = [&](double i) { return x0 + float(i) * step; };
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     uint32_t hovered = Timeline::kNone;

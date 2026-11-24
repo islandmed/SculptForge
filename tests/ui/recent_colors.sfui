@@ -50,5 +50,10 @@ expect "##recent7"
 shot eight-recent
 ui_scale 200
 wait_idle 10
-expect "##recent7"
+# A short shelf (800 x 480 logical) shows the newest two rows (the cells keep their size; colour_cells_narrow.sfui): the older ones
+# return on a taller shelf.
+expect "##recent0"
+expect "##recent3"
+expect_not "##recent7"
+expect_value recent_colors == 8
 shot eight-recent-200

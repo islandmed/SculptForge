@@ -1,19 +1,26 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <csignal>
+#include "core/DataDir.h"
+#include "core/ExitWatchdog.h"
 #include "app/App.h"
+#include "app/Python.h"
+#include "app/BooleanPreview.h"
 #include "app/NativeDialog.h"
+#include "core/FocusDetail.h"
 #include "app/Pickers.h"
 #include "app/BrandMark.h"
 #include "io/BridgeProtocol.h"
 #include "core/ThreadPool.h"
 #include "core/LayerStack.h"
 #include "core/HardwareProfile.h"
-#include "app/ShellQuote.h"
 #include "app/SpaceCamera.h"
 #include "app/IconsUsed.h"
 #include "app/UiScale.h"
 #include "app/AirStroke.h"
 #include "app/I18n.h"
+#include "app/StartupSplash.h"
+#include "app/StartupSplashWindow.h"
 #include "app/AsyncStroke.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
@@ -21,11 +28,14 @@
 
 #include "ai/AiCommands.h"
 #include "ai/Oidc.h"
+#include "ai/VideoEncoder.h"
 #include "ai/Secrets.h"
 #include "core/AuditLog.h"
 #include "core/Keychain.h"
 #include "core/ManagedPolicy.h"
 #include "ai/Hyper3D.h"
+#include "ai/SpaceHealth.h"
+#include "ai/Tripo.h"
 #include "ai/Providers.h"
 #include "app/Demo.h"
 #include "app/Shell.h"
@@ -39,6 +49,7 @@
 #include <IconsLucide.h>
 
 #include <imgui_internal.h>
+#include <fstream>
 #include "ai/Generator3D.h"
 #include "core/Micro.h"
 #include "core/VertexPaint.h"
@@ -50,8 +61,11 @@
 #include "core/ImageTo3D.h"
 #include "core/Project.h"
 #include "core/Script.h"
+#include "core/TierConfig.h"
 #include "io/BlenderBridge.h"
 #include "render/GL.h"
+#include "render/MicroFocus.h"
+#include "core/Utf8Path.h"
 
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
@@ -66,6 +80,7 @@
 #include <cfloat>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <iterator>
 #include <memory>
 #include <thread>
@@ -87,6 +102,8 @@ extern const unsigned char fontCjk[];
 extern const unsigned long long fontCjk_size;
 extern const unsigned char fontCjkSc[];
 extern const unsigned long long fontCjkSc_size;
+extern const unsigned char fontCjkJp[];
+extern const unsigned long long fontCjkJp_size;
 extern const unsigned char appIcon[];
 extern const unsigned long long appIcon_size;
 extern const unsigned char appIconSmall[];
@@ -98,7 +115,7 @@ namespace {
 const SDL_DialogFileFilter kObjFilters[] = {{"Wavefront OBJ", "obj"}, {"All files", "*"}};
 const SDL_DialogFileFilter kGlbFilters[] = {{"glTF binary", "glb"}, {"All files", "*"}};
 const SDL_DialogFileFilter kBrushFilters[] = {{"SculptForge brush", "sfbrush"}, {"All files", "*"}};
-const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
+const SDL_DialogFileFilter kModelFilters[] = {{"Projects, models and splats", "sfproj;sfdetail;obj;fbx;glb;gltf;ply;stl;" SF_BRIDGE_MESH_EXTS ";splat;usda;usd;usdz"}, {"All files", "*"}};
 const SDL_DialogFileFilter kFbxFilters[] = {{"FBX", "fbx"}, {"All files", "*"}};
 const SDL_DialogFileFilter kUsdFilters[] = {{"USDZ package", "usdz"}, {"USD text", "usda"}};
 const SDL_DialogFileFilter kSplatFilters[] = {{"Gaussian splats (PLY)", "ply"}, {"glTF splats", "glb"}, {"OpenUSD", "usda;usdz"}};
@@ -134,8 +151,15 @@ struct StartupTimer {
 App::App() = default;
 App::~App() = default;
 
+bool App::usesProfileThreads(const AppOptions& options) {
+    const bool recording = !options.recordPath.empty() || !options.uiTest.empty();
+    const bool headless = !options.renderPath.empty() || recording || !options.timelapsePath.empty();
+    return !headless && options.demo.empty();
+}
+
 bool App::init(const AppOptions& options) {
     options_ = options;
+    startedAt_ = std::chrono::steady_clock::now();
     StartupTimer timer;
     const bool recording = !options.recordPath.empty() || !options.uiTest.empty();
     const bool headless = !options.renderPath.empty() || recording || !options.timelapsePath.empty();
@@ -149,7 +173,6 @@ bool App::init(const AppOptions& options) {
     SDL_SetHint(SDL_HINT_PEN_TOUCH_EVENTS, "0");
     // Full screen on one monitor stays up when the pointer clicks on another (Windows multi-monitor, Discord).
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
-    if (!headless && options.demo.empty()) applyCachedThreadCount(); // the hardware profile's threads, before any brush work
     // The graphics card chosen in Preferences > Performance, before the GL context (a failed start falls back).
     std::string gpuNotice;
     if (!headless && options.demo.empty() && !sharedWindow_) gpuNotice = applyCachedGpuChoice();
@@ -158,6 +181,28 @@ bool App::init(const AppOptions& options) {
         startError_ = std::string("The window system did not start: ") + SDL_GetError();
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
+    }
+    // The start-up splash (StartupSplash.h): the main window starts hidden, and shows after its first frame. Never for
+    // tests, renders, recordings, benchmarks or a window system that draws nowhere (SDL_VIDEO_DRIVER=offscreen).
+    {
+        splash::Setting setting;
+        setting.interactive = !headless && options.demo.empty() && !sharedWindow_ && !options.benchmark &&
+                              options.benchmarkScript.empty() && options.measureIdle <= 0.0f && options.measureStroke <= 0.0f && !options.measureKeyNav;
+        const char* off = std::getenv("SF_STARTUP_SPLASH"); // SF_STARTUP_SPLASH=0: not this run (comparisons, bug reports)
+        if (off && *off == '0' && !splash::forcedFromEnv(std::getenv("SF_SPLASH"))) setting.interactive = false;
+        const char* driver = SDL_GetCurrentVideoDriver();
+        setting.videoDriver = driver ? driver : "";
+        if (setting.interactive && !setting.videoDriver.empty()) { // (ui.json is read in full later: this is only the two settings)
+            if (const std::string dir = userDataDir(); !dir.empty()) {
+                std::ifstream in(std::filesystem::path(std::u8string(dir.begin(), dir.end())) / "ui.json", std::ios::binary);
+                const std::string text((std::istreambuf_iterator<char>(in)), {});
+                setting.preference = splash::preferenceFromUiJson(text);
+                setLanguage(languageFromCode(splash::languageFromUiJson(text))); // (for the version line; applyLook sets it again)
+            }
+        }
+        splashForced_ = splash::forcedFromEnv(std::getenv("SF_SPLASH")); // SF_SPLASH=1: to see it (StartupSplash.h)
+        if (splashForced_) setting.preference = true;
+        splashEnabled_ = splash::enabled(setting);
     }
     if (!headless) macmenu::install(); // SculptForge > Preferences... in the macOS app menu (#111)
     // Joysticks for a 3Dconnexion SpaceMouse (SpaceMouse.cpp). Not fatal: the app works without them.
@@ -169,7 +214,7 @@ bool App::init(const AppOptions& options) {
     glWindowAttributes();
 
     const SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
-                                  (headless ? SDL_WINDOW_HIDDEN : 0) |
+                                  ((headless || splashEnabled_) ? SDL_WINDOW_HIDDEN : 0) |
                                   (options.fullscreen && !headless ? SDL_WINDOW_FULLSCREEN : 0);
     const bool sized = recording || options.benchmark; // proof mode: --size (1920x1080 by default)
     rememberWindow_ = !sized && !headless && options.demo.empty() && !options.fullscreen;
@@ -186,6 +231,7 @@ bool App::init(const AppOptions& options) {
         SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         return false;
     }
+    mainWindowHidden_ = splashEnabled_;
     wintab_.open(window_); // Windows: pressure from a tablet driver without Windows Ink (Wintab.h)
     // Focused from the start when the window system says so: the FOCUS_GAINED event can come before the loop runs.
     windowFocused_ = (SDL_GetWindowFlags(window_) & SDL_WINDOW_INPUT_FOCUS) != 0;
@@ -217,18 +263,29 @@ bool App::init(const AppOptions& options) {
     }
     glContext_ = sharedContext_ ? sharedContext_ : SDL_GL_CreateContext(window_);
     if (!glContext_) {
+#ifdef SF_GLES
+        startError_ = std::string("OpenGL ES 3.2 is not available: ") + SDL_GetError();
+#else
         startError_ = std::string("OpenGL 3.3 is not available: ") + SDL_GetError();
+#endif
         SDL_Log("OpenGL 3.3 context creation failed: %s", SDL_GetError());
         return false;
     }
     SDL_GL_MakeCurrent(window_, glContext_);
     SDL_GL_SetSwapInterval(1);
     timer.step("window, GL context");
+    splashCheckpoint();
 
     if (const char* missing = sharedContext_ ? nullptr // (loaded by the server)
                               : gl::load([](const char* n) { return reinterpret_cast<gl::GenericProc>(SDL_GL_GetProcAddress(n)); })) {
         startError_ = std::string("The graphics driver lacks the OpenGL function ") + missing + ".";
         SDL_Log("Missing OpenGL function: %s", missing);
+        return false;
+    }
+    if (!gl::GetString(GL_VERSION)) makeMainContextCurrent(true); // (#192: "OpenGL (null)" - nothing was current; one more try)
+    if (!gl::GetString(GL_VERSION)) {
+        startError_ = "The graphics driver has no current OpenGL context at start-up (try SF_STARTUP_SPLASH=0).";
+        SDL_Log("%s", startError_.c_str());
         return false;
     }
     SDL_Log("OpenGL %s on %s", reinterpret_cast<const char*>(gl::GetString(GL_VERSION)),
@@ -242,7 +299,12 @@ bool App::init(const AppOptions& options) {
     }
     if (!headless && options.demo.empty() && !sharedWindow_) gpuChoiceStarted(); // (the chosen card works)
     if (!gpuNotice.empty()) status_ = gpuNotice;
+    if (const std::string note = portableFallbackNote(); !note.empty()) { // a portable copy on a read-only stick: said once
+        status_ = note;
+        SDL_Log("%s", note.c_str());
+    }
     timer.step("renderer");
+    splashCheckpoint();
     renderer_.setEnvironmentWake([] { wakeMainLoop(); }); // (PBR view: a new environment's lighting is ready)
     // Fill layers ask for Mesh Maps: the app bakes them on a worker thread (PanelFill.cpp, updateMeshMaps).
     setMeshMapRequester([this](Document&) { meshMapsWanted_ = true; });
@@ -259,6 +321,7 @@ bool App::init(const AppOptions& options) {
         io.IniFilename = nullptr;
     }
     if (!options.uiTest.empty()) policy::resetPolicyForTests(); // (a UI test's ui_policy never reaches the next one)
+    if (!options.uiTest.empty()) ai::health::set({});          // (nor its ui_space_health)
     if (!options.uiTest.empty()) aiSettings_.sendAllowed.clear(); // UI tests: every online AI service asks first
     // Preferences > AI: tests, renders and videos start with AI on whatever this computer chose (SF_AI still wins).
     ai::setAiEnabled(ai::aiFeaturesAllowed(headless || !options.demo.empty() || aiSettings_.enabled));
@@ -288,27 +351,47 @@ bool App::init(const AppOptions& options) {
     initUiConfig(headless || !options.demo.empty()); // ui.json (layout, shortcuts, UI scale); never for tests and videos
     uiScale_ = targetUiScale(); // the style follows in applyLook below
     buildUiFonts(uiScale_);
+#ifdef __ANDROID__
+    logWindowGeometry();
+#endif
     timer.step("ImGui, settings, fonts");
+    splashCheckpoint();
     if (recording || !options.benchmarkScript.empty()) { // (a benchmark take: the same scripts)
         ImGui::GetCurrentContext()->TestEngineHookItems = true; // lets the demo find buttons by label
         io.IniFilename = nullptr;                               // fixed, reproducible layout
     }
     applyLook(); // Preferences > Interface > Look (after the fonts it may switch to)
     ImGui_ImplSDL3_InitForOpenGL(window_, glContext_);
+#ifdef SF_GLES
+    ImGui_ImplOpenGL3_Init("#version 300 es");
+#else
     ImGui_ImplOpenGL3_Init("#version 330 core");
+#endif
 
     for (int i = 0; i < int(FileAction::Count); ++i) dialogRequests_[i] = {this, FileAction(i)};
     initBrushLibrary(); // before a project can bring its own brushes
     timer.step("look, brush library");
+    splashCheckpoint();
     initProject(); // before opening anything, so it lands in the recent files
     initActions(); // the default shortcuts and every command, for keys, help and the command palette
+    actions_.setAloneHook([this](SDL_Keycode key, bool begin) { // a first key that waited: a pie menu on it holds open only while it is down
+        if (!begin) keyDown_ = aloneSavedKey_;
+        else {
+            aloneSavedKey_ = keyDown_;
+            keyDown_ = std::any_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == key; }) ? key : SDLK_UNKNOWN;
+        }
+    });
+    BrushAlpha::setDeferCreature(true); // (Creature Skin alphas are made in the background: a pick never stalls a frame)
     initBrushSettings(); // each brush's own size, intensity, stroke and alpha (#78)
     loadBrushCurves(); // each brush's own pressure curve (Precision.cpp)
     initPhoneActions(); // File > Capture from phone (PanelPhone.cpp)
+    initDeckActions();  // File > Forge Deck (PanelDeck.cpp)
     initLibraryBrowser();
     timer.step("project, actions, library");
+    splashCheckpoint();
     runCommand("new_sphere");
     timer.step("new sphere");
+    splashCheckpoint();
     if (!options.openPath.empty()) openPath(options.openPath);
     if (!options.script.empty()) {
         std::vector<ScriptStatement> statements;
@@ -338,11 +421,13 @@ bool App::init(const AppOptions& options) {
     }
     initHardwareProfile(); // the cached hardware profile, or calibration over the first frames (PanelPerformanceProfile.cpp)
     timer.step("hardware profile");
+    splashCheckpoint();
     initialised_ = true;
     return true;
 }
 
 void App::shutdown() {
+    closeSplash(); // (before SDL_Quit)
     if (!initialised_) { // init stopped early (no window or no OpenGL): nothing but SDL to take down
         if (sharedWindow_) return; // --ui-serve: the server's window, context and SDL stay
         if (glContext_) SDL_GL_DestroyContext(glContext_);
@@ -355,8 +440,10 @@ void App::shutdown() {
     discordClosed_ = true;
     discordClient_.reset();
     saveWindowState();
+    closePanelWindows(); // (panels.json keeps them for the next start)
     autosavePrefs(true); // a change still waiting for its moment
     if (doc_.sculptor.strokeActive()) endStroke();
+    if (!drainQueue_.empty()) runDrainQueue(); // (a save asked during the stroke's end still happens)
     solver_.reset(); // (its thread uses the renderer)
     flushBrushEdits();
     if (blenderInitialised_) writeBridgeHeartbeat(blenderExchangeRoot(), true); // the add-on starts a new one
@@ -367,6 +454,7 @@ void App::shutdown() {
     if (refTexture_) gl::DeleteTextures(1, &refTexture_);
     gallery_.reset(); // its preview textures need the GL context
     thumbs_.clear();
+    shutdownRenderBridge(); // the still's texture
     clearPartThumbnails();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
@@ -380,22 +468,110 @@ void App::shutdown() {
         wintab_.close();
         return;
     }
+#if defined(__linux__)
+    // Closed with Alt+F4: the window stays until the keys are up (2 s at most). Gone while they were held, the repeat
+    // or the release landed on the desktop behind it, where Alt+F4 can be Log out (#183: X11, GNOME).
+    waitWhileHeld(
+        [] {
+            int n = 0;
+            const bool* keys = SDL_GetKeyboardState(&n);
+            auto down = [&](SDL_Scancode k) { return keys && int(k) < n && keys[k]; };
+            return down(SDL_SCANCODE_F4) || down(SDL_SCANCODE_LALT) || down(SDL_SCANCODE_RALT);
+        },
+        2000, 10, [] { SDL_PumpEvents(); });
+#endif
     if (glContext_) SDL_GL_DestroyContext(glContext_);
     if (window_) SDL_DestroyWindow(window_);
     SDL_Quit();
 }
 
+// The splash window system may leave another context current (#192): the main window's goes back after every splash step.
+// `force`: SDL remembers which context it made current and skips a repeat, so after the splash's window opened or closed (its
+// accelerated surface may have bound and released a context behind SDL's back) detach first, then bind again.
+void App::makeMainContextCurrent(bool force) {
+    if (!window_ || !glContext_) return;
+    if (!force && SDL_GL_GetCurrentContext() == glContext_) return;
+    if (force) SDL_GL_MakeCurrent(window_, nullptr);
+    if (!SDL_GL_MakeCurrent(window_, glContext_)) SDL_Log("Could not make the OpenGL context current after the splash: %s", SDL_GetError());
+}
+
+void App::splashCheckpoint() {
+    if (!splashEnabled_) return;
+    if (splash_) {
+        splash_->pump();
+        makeMainContextCurrent();
+        return;
+    }
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - startedAt_).count();
+    if (!splash::due(true, splashShown_)) return;
+    splashShown_ = true; // (once: a window system that said no isn't asked again)
+    auto window = std::make_unique<splash::Window>();
+    if (window->open(splashVersionLine(), splash::pathFromEnv(std::getenv("SF_SPLASH_PATH")))) { // (SF_SPLASH_PATH: one way only, to check it)
+        splash_ = std::move(window);
+        splashOpenedAt_ = std::chrono::steady_clock::now();
+        SDL_Log("Start-up splash shown after %.0f ms (%s)", ms,
+                splash_->usedPath() == splash::Path::Surface ? "window surface" : splash_->usedPath() == splash::Path::Renderer ? "renderer" : "software renderer");
+    } else
+        SDL_Log("Start-up splash could not open after %.0f ms: %s", ms, SDL_GetError());
+    makeMainContextCurrent(true);
+}
+
+void App::revealMainWindow() {
+    mainWindowHidden_ = false;
+    if (splash_) { // up for at least kMinVisibleMs, so it is seen (a start slower than that waits for nothing)
+        const double visible = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - splashOpenedAt_).count();
+        for (double left = splash::holdMs(visible); left > 0.0; left -= 16.0) {
+            splash_->pump();
+            SDL_Delay(16);
+        }
+    }
+    if (window_) {
+        SDL_ShowWindow(window_);
+        SDL_RaiseWindow(window_);
+    }
+    activeUntil_ = std::max(activeUntil_, double(SDL_GetTicksNS()) * 1e-9 + 0.5); // (a few frames for the window system to map it)
+    if (splash_) splash_->fadeOut(splash::kFadeMs); // (the main window is under it, already drawn: no black frame between)
+    closeSplash();
+}
+
+std::string App::splashVersionLine() { return std::string(tr("Version")) + " " + appVersionLabel(); }
+
+void App::closeSplash() {
+    const bool wasOpen = splash_ != nullptr;
+    if (wasOpen)
+        SDL_Log("Start-up splash closed after %.0f ms on screen",
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - splashOpenedAt_).count());
+    splash_.reset();
+    if (wasOpen) makeMainContextCurrent(true);
+}
+
 void App::glWindowAttributes() {
+#ifdef SF_GLES
+    // Android (SCULPTFORGE_GLES): OpenGL ES 3.2; render/GL.cpp compiles the shaders as GLSL ES 3.20.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+#endif
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     // No multisampling in the window: the 3D view antialiases in its own target (Renderer::drawView), so it can
     // draw with fewer samples while a huge scene moves (Preferences > Performance).
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+}
+
+uint64_t App::nativeWindowHandle() const {
+    if (!window_) return 0;
+    const SDL_PropertiesID props = SDL_GetWindowProperties(window_);
+    if (!props) return 0;
+    if (void* p = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr)) return uint64_t(uintptr_t(p));
+    if (void* p = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, nullptr)) return uint64_t(uintptr_t(p));
+    return uint64_t(SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0));
 }
 
 void App::shareWindow(SDL_Window* window, SDL_GLContext context) {
@@ -410,6 +586,7 @@ int App::renderHeadless() {
     camera_.pitch = glm::radians(options_.pitchDegrees);
     camera_.distance /= options_.zoom;
     renderSettings_.wireframe = renderSettings_.wireframe || options_.wireframe; // syncScene builds its edges
+    applyViewEffects();
     RenderSettings settings = renderSettings_;
     settings.wireframe = options_.wireframe;
     settings.showFaceGroups = settings.showFaceGroups || options_.facegroups;
@@ -424,6 +601,18 @@ int App::renderHeadless() {
         img.width = options_.width;
         img.height = options_.height;
         std::string err;
+        // Focus Detail: frames for the detail to stream in where the camera looks (promotion, then GPU pages).
+        if (doc_.mesh.micro && doc_.mesh.micro->focus)
+            for (int k = 0; k < 16; ++k) {
+                updateFocusDetail(float(img.height));
+                syncScene();
+                std::vector<uint8_t> warm;
+                renderer_.renderToImage(camera_, img.width, img.height, settings, warm, err);
+            }
+        if (doc_.mesh.micro && doc_.mesh.micro->focus) {
+            const FocusStats st = doc_.mesh.micro->focus->stats();
+            SDL_Log("Focus Detail: %zu of %zu tiles full, GPU buffers %zu MB", st.fullTiles, st.tiles, renderer_.gpuBytes() >> 20);
+        }
         if (!renderer_.renderToImage(camera_, img.width, img.height, settings, img.rgba, err)) {
             SDL_Log("Render failed: %s", err.c_str());
             return 1;
@@ -444,6 +633,18 @@ int App::renderHeadless() {
     return 0;
 }
 
+namespace {
+// tests/e2e scripts: a `# xfail: BUG-ID what` line marks a bug whose fix isn't merged yet. The script is expected to
+// fail (XFAIL, exit 0); once the fix lands it passes (XPASS, exit 0) and the line is deleted. Either way nothing blocks.
+std::string xfailLine(const std::string& script) {
+    std::ifstream in(script);
+    std::string line;
+    for (int n = 0; n < 40 && std::getline(in, line); ++n)
+        if (line.rfind("# xfail:", 0) == 0) return line.substr(8);
+    return {};
+}
+} // namespace
+
 int App::runUiTest(int w, int h, int fps) {
     // Same frame loop as a recording, but frames are only read back for screenshots.
     std::vector<uint8_t> rgba;
@@ -461,28 +662,26 @@ int App::runUiTest(int w, int h, int fps) {
     };
     // --ui-record: every frame to ffmpeg, paced to real time (background jobs run at their real speed in the video);
     // frames that take longer than 1/fps can't keep up, so the log says how much faster than real time the video ran.
-    FILE* video = nullptr;
+    ai::VideoEncoder videoEncoder;
+    ai::VideoEncoder* video = nullptr;
     if (!options_.uiRecordPath.empty()) {
-        if (shellQuote(options_.uiRecordPath).empty()) {
-            SDL_Log("--ui-record: choose a file name without \" %% ! ^ & | < > in it");
-            return 1;
-        }
-        const std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(w) + "x" +
-                                std::to_string(h) + " -r " + std::to_string(fps) +
-                                " -i - -c:v libx264 -preset slow -crf 16 -pix_fmt yuv420p -movflags +faststart " +
-                                shellQuote(options_.uiRecordPath);
-#if defined(_WIN32)
-        video = _popen(cmd.c_str(), "wb");
-#else
-        video = popen(cmd.c_str(), "w");
-#endif
-        if (!video) {
-            SDL_Log("Cannot start ffmpeg");
-            return 1;
-        }
+        ai::VideoEncoderSpec spec;
+        spec.output = options_.uiRecordPath;
+        spec.width = w;
+        spec.height = h;
+        spec.fps = fps;
+        spec.what = "recording";
+        spec.outputArgs = {"-vf", "crop=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libx264", "-preset",
+                           options_.uiRecordClip ? "veryfast" : "slow", "-crf", options_.uiRecordClip ? "23" : "16",
+                           "-pix_fmt", "yuv420p", "-movflags", "+faststart"};
+        spec.log = [](const std::string& m) { SDL_Log("--ui-record: %s", m.c_str()); };
+        std::string error;
+        if (!videoEncoder.start(spec, error)) return 1; // (the cause is in the log, once)
+        video = &videoEncoder;
     }
     const auto recordStart = std::chrono::steady_clock::now();
     int lateFrames = 0;
+    bool videoBroken = false;
     while (frames < fps * 60 * 30) {
         if (timed && (frames == 1 || frames == 5 || frames == 20)) {
             std::fprintf(stderr, "frames to %2d: polls %.1f, new frame %.1f, UI %.1f, scene %.1f ms\n", frames, frameMs[0],
@@ -515,10 +714,21 @@ int App::runUiTest(int w, int h, int fps) {
         pollBake();
         pollQRemesh();
         pollSplatTrain();
+        pollRenderBridge();
         pollSculptable();
+        tickKeySequence(dt);
         updateCameraAspect();
         updateSpaceMouse(dt);
+        updateKeyNav(dt);
         touchTick(); // a finger's press that waited for a second finger long enough goes through
+        if (interactiveStrokes_) { // (`interactive_strokes on`: what run() does each frame for a stroke's queued dabs)
+            flushGrab();
+            if (drainNextFrame_) {
+                drainNextFrame_ = false;
+                runDrainQueue();
+            } else if (asyncStroke_) pumpStroke();
+            else drainStrokeDabs(0.010);
+        }
 
         hardwareProfileFrameBegin(); // (only with SF_HW_PROFILE_IN_TESTS=1: tests use fixed settings)
         // Help > Record a performance trace: run()'s phases, roughly (no events, dabs or 3D view drawn here).
@@ -558,6 +768,7 @@ int App::runUiTest(int w, int h, int fps) {
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
         viewSamples(); // keeps Fast Navigation's view of the camera current (UI tests read view_samples)
         noteStillness();
+        applyViewEffects();
         hardwareProfileFrameEnd();
         if (tracing) {
             tracePhase[4] = tracePhase[5] = tracePhase[6] = double(SDL_GetTicksNS()) * 1e-6;
@@ -571,14 +782,25 @@ int App::runUiTest(int w, int h, int fps) {
             return 1;
         }
         renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        // (a streamed level's detail pages come a frame after the first draw that shows them: a shot waits as a window would)
+        for (int k = 0; k < 24 && !shot.empty() && renderer_.microPendingPages() > 0; ++k) {
+            syncScene();
+            renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        }
+        renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
         if (video) {
-            fwrite(rgba.data(), 1, rgba.size(), video);
-            const auto due = recordStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                                               std::chrono::duration<double>(double(frames) * double(dt)));
-            if (std::chrono::steady_clock::now() < due) std::this_thread::sleep_until(due);
-            else ++lateFrames;
+            if (!video->write(rgba.data(), rgba.size()) && !videoBroken) {
+                videoBroken = true; // (the verdict below says why, once, and fails the run)
+                SDL_Log("Recording stopped at frame %d", frames);
+            }
+            if (!options_.uiRecordClip) { // (a bug clip runs as fast as the frames come, not paced to the clock)
+                const auto due = recordStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                                   std::chrono::duration<double>(double(frames) * double(dt)));
+                if (std::chrono::steady_clock::now() < due) std::this_thread::sleep_until(due);
+                else ++lateFrames;
+            }
         }
         if (shot.empty()) continue;
         Image img;
@@ -600,19 +822,25 @@ int App::runUiTest(int w, int h, int fps) {
     }
     for (auto& write : shotWrites) write.get(); // every screenshot on disk before the verdict
     if (video) {
-#if defined(_WIN32)
-        const int status = _pclose(video);
-#else
-        const int status = pclose(video);
-#endif
+        std::string videoError;
+        const bool videoOk = video->finish(videoError); // (a failure is said once to the log)
         const double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - recordStart).count();
         const double length = double(frames) * double(dt);
         SDL_Log("Recorded %d frames (%.1f s) to %s in %.1f s: background jobs play at %.2fx, %d frames late%s", frames,
                 length, options_.uiRecordPath.c_str(), wall, wall / std::max(length, 1e-3), lateFrames,
-                status == 0 ? "" : " (ffmpeg failed)");
-        if (status != 0) return 1;
+                videoOk ? "" : " (ffmpeg failed)");
+        if (!videoOk) return 1;
     }
     demo_->printProfile();
+    const std::string known = xfailLine(options_.uiTest);
+    if (!known.empty()) {
+        for (const auto& f : demo_->failures()) std::fprintf(stderr, "known failure: %s\n", f.c_str());
+        if (demo_->failures().empty())
+            std::printf("XPASS %s:%s: fixed, delete its `# xfail:` line\n", options_.uiTest.c_str(), known.c_str());
+        else
+            std::printf("XFAIL %s:%s (known bug, not fixed yet)\n", options_.uiTest.c_str(), known.c_str());
+        return 0;
+    }
     for (const auto& f : demo_->failures()) std::fprintf(stderr, "FAIL %s\n", f.c_str());
     if (demo_->failures().empty())
         std::printf("PASS %s (%d frames)\n", options_.uiTest.c_str(), frames);
@@ -696,6 +924,12 @@ int App::runRecording() {
     if (testing ? !demo_->loadScript(options_.uiTest, err)
                 : !demo_->load(options_.demo.empty() ? "sculpt" : options_.demo, err)) {
         SDL_Log("%s", err.c_str());
+        // A script that names a hook its unmerged fix adds doesn't parse yet: that is the known failure (see xfailLine).
+        if (testing)
+            if (const std::string known = xfailLine(options_.uiTest); !known.empty()) {
+                std::printf("XFAIL %s:%s (known bug, not fixed yet: %s)\n", options_.uiTest.c_str(), known.c_str(), err.c_str());
+                return 0;
+            }
         return 1;
     }
     const int w = options_.width, h = options_.height, fps = std::max(options_.fps, 1);
@@ -704,22 +938,19 @@ int App::runRecording() {
     // virtual camera and downsampled.
     const int ss = std::max(options_.supersample, 1), ow = w / ss, oh = h / ss;
     // Frames go straight to ffmpeg as raw RGBA.
-    if (shellQuote(options_.recordPath).empty()) {
-        SDL_Log("--record: choose a file name without \" %% ! ^ & | < > in it");
-        return 1;
-    }
-    std::string cmd = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s " + std::to_string(ow) + "x" + std::to_string(oh) +
-                      " -r " + std::to_string(fps) +
-                      " -i - -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart " +
-                      shellQuote(options_.recordPath);
-#if defined(_WIN32)
-    FILE* ff = _popen(cmd.c_str(), "wb");
-#else
-    FILE* ff = popen(cmd.c_str(), "w");
-#endif
-    if (!ff) {
-        SDL_Log("Cannot start ffmpeg");
-        return 1;
+    ai::VideoEncoder encoder;
+    {
+        ai::VideoEncoderSpec spec;
+        spec.output = options_.recordPath;
+        spec.width = ow;
+        spec.height = oh;
+        spec.fps = fps;
+        spec.what = "recording";
+        spec.outputArgs = {"-vf", "crop=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libx264", "-preset", "slow", "-crf", "18",
+                           "-pix_fmt", "yuv420p", "-movflags", "+faststart"};
+        spec.log = [](const std::string& m) { SDL_Log("--record: %s", m.c_str()); };
+        std::string error;
+        if (!encoder.start(spec, error)) return 1; // (the cause is in the log, once)
     }
     std::vector<uint8_t> rgba, frame;
     const float dt = 1.0f / float(fps);
@@ -740,6 +971,7 @@ int App::runRecording() {
         pollBake();
         pollQRemesh();
         pollSplatTrain();
+        pollRenderBridge();
         pollSculptable();
         updateCameraAspect();
 
@@ -762,6 +994,7 @@ int App::runRecording() {
         buildGhost(); // (the stroke preview, as run() draws it)
 
         syncScene();
+        applyViewEffects();
         ++frames;
         // While waiting on a model, keep only every Nth frame (marked on screen as sped up).
         if ((frames % demo_->frameStride()) != 0) continue;
@@ -770,28 +1003,26 @@ int App::runRecording() {
             break;
         }
         renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
         ImVec2 vc;
         float vz;
         demo_->view(vc, vz);
         if (ss == 1 && vz <= 1.0f) {
-            fwrite(rgba.data(), 1, rgba.size(), ff);
+            if (!encoder.write(rgba.data(), rgba.size())) break; // (finish below says why)
         } else {
             const float cw = float(w) / vz, ch = float(h) / vz;
             cropResample(rgba, w, h, vc.x - cw * 0.5f, vc.y - ch * 0.5f, cw, ch, ow, oh, frame);
-            fwrite(frame.data(), 1, frame.size(), ff);
+            if (!encoder.write(frame.data(), frame.size())) break;
         }
         ++written;
     }
-#if defined(_WIN32)
-    const int status = _pclose(ff);
-#else
-    const int status = pclose(ff);
-#endif
+    std::string recordError;
+    const bool recorded = encoder.finish(recordError); // (a failure is said once to the log)
     if (!status_.empty()) SDL_Log("Last status: %s", status_.c_str());
-    SDL_Log("Recorded %d frames (%.1f s) to %s", written, float(written) / float(fps), options_.recordPath.c_str());
-    return status == 0 ? 0 : 1;
+    if (recorded) SDL_Log("Recorded %d frames (%.1f s) to %s", written, float(written) / float(fps), options_.recordPath.c_str());
+    return recorded ? 0 : 1;
 }
 
 namespace {
@@ -819,7 +1050,7 @@ void wakeMainLoop() {
 bool App::backgroundBusy() const {
     auto running = [](const auto& f) { return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready; };
     return running(pendingBrush_) || running(localProbe_) || running(pendingGenerator_) || running(pendingBase_) || running(pendingModels_) || running(pendingUnreal_) ||
-           running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ ||
+           running(pendingComfyCheck_) || galleryBusy() || thumbs_.busy() || libraryScanner_.busy() || autoUv_ || generateCommand_ ||
            bakeBusy() || qremesh_ || voxelRemesh_ || updateJob_ || splatTrainBusy() || sculptableBusy() || phoneBusy() || uvEditorBusy() ||
            renderer_.environmentPending() || meshMapsBusy();
 }
@@ -851,10 +1082,16 @@ bool App::wantsFrames(double now) const {
            strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
+           keyNavMoving() || // a held pan or zoom key sends no events after its first repeat
+           actions_.sequenceWaiting() || // a first key waiting for its second, then for its own action (Actions.cpp)
            spaceMouseMoving() || // a held SpaceMouse cap sends no events, but the view keeps moving (SpaceMouse.cpp)
            perf_.framesStill < 10 || // the view just moved: Fast Navigation's full-quality frame comes after it stops
            (perf_.proxyPrebuild && renderer_.proxiesPending()) || // motion proxies left to build, a few ms a frame
-           renderer_.coarseStillWanted(); // coarse levels: the full-detail still frame comes once the view rests
+           renderer_.coarseStillWanted() || // coarse levels: the full-detail still frame comes once the view rests
+           renderer_.microTilePagesWantFrame() || // Adaptive Detail tiles: pages for what came into view, on the next frame
+           renderer_.microPendingCoarse() > 0 || // a micro level's coarse shading still waits for a frame's budget (after a stroke)
+           renderer_.microShadingWantsFrame() || // ... and without Focus Detail its patches' shading (a big stroke's backlog, #184)
+           renderer_.microPendingPages() > 0; // a streamed level's pages still wait to be shaded (the fine detail on open)
 }
 
 uint64_t App::frameKey() const {
@@ -873,6 +1110,7 @@ int App::run() {
         if (!startTake()) return 1;
     } else if (options_.benchmark) startProofMode(); // runs in this loop (ProofMode.cpp)
     if (g_wakeEvent == 0) g_wakeEvent = SDL_RegisterEvents(1);
+    restorePanelWindows(); // the panels last session kept in windows of their own (PanelWindows.cpp)
     // Dabs are queued and placed within a time budget each frame (strokeTo). SF_STROKE_IMMEDIATE=1 places them all
     // as each pointer sample arrives, as before 0.9.6 (for comparison).
     const char* immediateEnv = std::getenv("SF_STROKE_IMMEDIATE");
@@ -933,6 +1171,10 @@ int App::run() {
         std::vector<float> radii;       // each dab's brush radius (px)
         // SF_MEASURE_VERIFY=1: the mesh before the stroke, to check undo and replay the dabs (verifyStroke).
         uint64_t before = 0;
+        // SF_MEASURE_DRAIN=undo / stroke: right after the release, a Ctrl+Z (as the shortcut runs it) or a click on the
+        // model while the solver is still placing the dabs: it must wait for them (no frame blocked on them) and then run.
+        bool drainQueued = false, drainHeld = false;
+        double drainWorstFrame = 0.0, drainLast = 0.0;
         // SF_MEASURE_SNAPSHOT=prefix: the canvas at a few points of the stroke, as prefix-N.png.
         int snapshots = 0;
     } sm;
@@ -943,6 +1185,7 @@ int App::run() {
     const bool verify = verifyEnv && *verifyEnv && *verifyEnv != '0';
     const char* snapshotEnv = std::getenv("SF_MEASURE_SNAPSHOT");
     while (running_) {
+        if (mainWindowHidden_) splashCheckpoint(); // (before the first frame: restoring panel windows and the first frame can be slow too)
         const double t0 = seconds();
         if (options_.measureIdle > 0.0f) {
             if (!measuring && t0 >= measureFrom) {
@@ -978,6 +1221,14 @@ int App::run() {
             if ((strokeProbe_ || takeRunning()) && ((ev.type >= SDL_EVENT_MOUSE_MOTION && ev.type <= SDL_EVENT_MOUSE_WHEEL) ||
                                                     (ev.type >= SDL_EVENT_PEN_PROXIMITY_IN && ev.type <= SDL_EVENT_PEN_AXIS)))
                 return; // --measure-stroke, a take: the real pointer stays out of the scripted stroke
+            // A panel in a window of its own (PanelWindows.cpp): hovering it redraws only that panel, not the view.
+            if (const PanelEvent pe = panelWindowEvent(ev); pe != PanelEvent::None) {
+                if (pe == PanelEvent::Main) {
+                    draw = true;
+                    activeUntil_ = std::max(activeUntil_, seconds() + 0.75);
+                }
+                return;
+            }
             handleEvent(ev);
             if (ev.type == SDL_EVENT_KEYMAP_CHANGED || ev.type == SDL_EVENT_KEYBOARD_ADDED ||
                 ev.type == SDL_EVENT_KEYBOARD_REMOVED || ev.type == SDL_EVENT_MOUSE_ADDED ||
@@ -1011,6 +1262,9 @@ int App::run() {
         if (!continuous && !draw) {
             int timeout = io.WantTextInput ? kCaretTickMs : kIdleTickMs;
             if (redrawAt_ > 0.0) timeout = std::clamp(int((redrawAt_ - t0) * 1000.0) + 1, 0, timeout);
+            if (panelsActiveUntil_ > t0) timeout = std::min(timeout, 16); // a hovered panel window's tooltips
+            if (double in = 0.0; python_ && python_->timerWake(in)) // a script's timer (sf.ui.timer)
+                timeout = std::clamp(int(in * 1000.0) + 1, 0, timeout);
             if (SDL_WaitEventTimeout(&e, timeout)) {
                 onEvent(e);
             } else if (io.WantTextInput) {
@@ -1021,8 +1275,11 @@ int App::run() {
         phases = 0;
         mark();
         while (SDL_PollEvent(&e)) onEvent(e);
+        if (python_) python_->tickTimers(); // a script's due timers (what they change shows through frameKey)
         flushPenMotion(); // the batch's last pen motion, which waited for its pressure (Tablet.cpp)
         if (take_) takeBeforeFrame(); // a take's input since the last frame, at the wall clock's pace
+        if (options_.measureKeyNav && t0 - started >= kMeasureSettle && !backgroundBusy())
+            if (const int r = measureKeyNavStep(draw); r >= 0) return r; // (Input.cpp)
         mark();
         // (The window must have settled too: a window manager that maximises it late, on a busy machine, changes
         // the canvas and with it the brush's size in the world mid-stroke.)
@@ -1039,7 +1296,11 @@ int App::run() {
             const CanvasRect c = canvasRect();
             sm.cx = c.x + c.w * 0.5f;
             sm.cy = c.y + c.h * 0.5f;
-            sm.r = 0.25f * std::min(c.w, c.h);
+            static const float circle = [] { // SF_MEASURE_CIRCLE: the circle's radius, a fraction of the view (a thin model)
+                const char* v = std::getenv("SF_MEASURE_CIRCLE");
+                return v && *v ? std::clamp(float(std::atof(v)), 0.01f, 0.45f) : 0.25f;
+            }();
+            sm.r = circle * std::min(c.w, c.h);
             sm.started = true;
             sm.start = sm.lastFrame = sm.pressAt = seconds();
             strokeProbe_ = &sm.dabs;
@@ -1047,6 +1308,8 @@ int App::run() {
             if (options_.measureStrokeRadius > 0.0f) radiusPx_ = std::clamp(options_.measureStrokeRadius, 2.0f, 800.0f);
             if (const char* b = std::getenv("SF_MEASURE_BRUSH")) // e.g. KelvinGrab: measure another built-in brush
                 if (BrushType t; brushFromName(b, t)) brush_ = t, doc_.activeBrush = -1;
+            if (const char* v = std::getenv("SF_MEASURE_STRENGTH")) // e.g. 0.35: the Intensity (the preview's pull depends on it)
+                strength_ = std::clamp(float(std::atof(v)), 0.0f, 1.0f);
             if (verify) sm.before = meshStateHash(doc_.mesh);
             onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT);
             if (drag_ != Drag::Stroke) {
@@ -1074,9 +1337,35 @@ int App::run() {
                 sm.releaseAt = seconds();
                 onMouseUp(); // places the dabs still waiting (or, with predictive strokes, leaves them to the solver)
                 sm.releaseMs = (seconds() - sm.releaseAt) * 1000.0;
+                const double actionAt = seconds();
+                if (const char* drain = std::getenv("SF_MEASURE_DRAIN"); drain && *drain && strokeDraining()) {
+                    if (std::string(drain) == "none") { // (the frames of a stroke's end alone, to compare)
+                        sm.drainQueued = true;
+                    } else if (std::string(drain) == "esc") { // Ctrl+Z, then Esc while it waits: the stroke stays
+                        runInteractive([this] { runCommand("undo"); });
+                        sm.drainQueued = !drainQueue_.empty();
+                        onKey(SDLK_ESCAPE, SDL_KMOD_NONE, false);
+                        sm.drainHeld = drainQueue_.empty(); // (cancelled)
+                    } else if (std::string(drain) == "save") { // (Ctrl+S: the file must hold the finished stroke)
+                        const std::string path = (std::filesystem::temp_directory_path() / "sf-measure-drain.sfproj").string();
+                        runInteractive([this, path] { runCommand("save_project", {{"path", path}}); });
+                    } else if (std::string(drain) == "stroke") {
+                        onMouseDown(sm.cx + sm.r, sm.cy, SDL_BUTTON_LEFT); // (on the circle: on the model)
+                        onMouseUp();
+                        sm.drainHeld = holdingPointer_;
+                    } else {
+                        runInteractive([this] { runCommand("undo"); });
+                    }
+                    if (std::string(drain) != "none" && std::string(drain) != "esc") sm.drainQueued = !drainQueue_.empty();
+                    sm.drainWorstFrame = seconds() - actionAt; // (the shortcut's own time: finishing the stroke here froze the window)
+                }
                 sm.moving = false;
                 sm.releasing = true;
             }
+        } else if (sm.releasing && (doc_.sculptor.strokeActive() || !drainQueue_.empty())) {
+            const double t = seconds(); // (the frames while the stroke drains: from one to the next, the release's own included)
+            sm.drainWorstFrame = std::max(sm.drainWorstFrame, t - (sm.drainLast > 0.0 ? sm.drainLast : sm.releaseAt));
+            sm.drainLast = t;
         } else if (sm.releasing && !doc_.sculptor.strokeActive()) {
             {
                 const double releaseDoneMs = (seconds() - sm.releaseAt) * 1000.0;
@@ -1119,7 +1408,30 @@ int App::run() {
                 if (verify && !(now == sm.view))
                     std::printf("verify: skipped (the view changed during the stroke: distance %.3f -> %.3f, canvas %.0fx%.0f -> %.0fx%.0f)\n",
                                 double(sm.view.distance), double(now.distance), double(sm.view.w), double(sm.view.h), double(now.w), double(now.h));
-                else if (verify && !verifyStroke(sm.before, sm.dabs, sm.radii)) return 1;
+                else if (const char* drain = std::getenv("SF_MEASURE_DRAIN"); drain && *drain) {
+                    // The queued Ctrl+Z took the whole stroke back; the held click became a stroke of its own after it.
+                    const bool none = std::string(drain) == "none", save = std::string(drain) == "save", esc = std::string(drain) == "esc";
+                    const bool undo = !none && !save && !esc && std::string(drain) != "stroke";
+                    bool saved = true;
+                    if (save) { // the saved file, opened again, is the finished stroke's mesh, bit for bit
+                        Document reread;
+                        std::string error;
+                        const std::string path = (std::filesystem::temp_directory_path() / "sf-measure-drain.sfproj").string();
+                        saved = loadProject(path, reread, error) && meshStateHash(reread.mesh) == meshStateHash(doc_.mesh);
+                        if (!saved) std::printf("drain: the saved file differs from the mesh%s%s\n", error.empty() ? "" : ": ", error.c_str());
+                        std::filesystem::remove(path);
+                    }
+                    // Saving never holds a frame up: no frame while the stroke drains is much slower than the stroke's
+                    // own (50 ms, or 1.5x the stroke's p99 frame on a slow machine such as CI's software GL).
+                    const double drainBound = std::max(0.05, 1.5 * framePct(0.99) / 1000.0);
+                    const bool ok = sm.drainQueued && saved && (!save || sm.drainWorstFrame < drainBound) &&
+                                    (!esc || (sm.drainHeld && meshStateHash(doc_.mesh) != sm.before)) && // (Esc: dropped, the stroke kept)
+                                    (none || save || esc || (undo ? meshStateHash(doc_.mesh) == sm.before : !sm.drainHeld || !holdingPointer_));
+                    std::printf("drain: %s %s while the stroke drained, worst frame meanwhile %.1f ms: %s\n",
+                                none ? "nothing" : esc ? "Ctrl+Z then Esc" : save ? "Ctrl+S" : undo ? "Ctrl+Z" : "a click",
+                                sm.drainQueued ? "waited" : "did NOT wait", sm.drainWorstFrame * 1000.0, ok ? "ok" : "FAILED");
+                    if (!ok) return 1;
+                } else if (verify && !verifyStroke(sm.before, sm.dabs, sm.radii)) return 1;
                 // The test (ui_stroke_path, a light sphere): every dab placed, all of them on the circle.
                 const float spacing = dabSpacingPx(radiusPx_, 0.15f);
                 const double expected = 4.0 * 3.14159265358979 * double(sm.r) / double(spacing);
@@ -1135,7 +1447,7 @@ int App::run() {
         // for a limited time, then look at the pointer again.
         // Continuous (#31): a pointer held still keeps dabbing where it is, 30 times a second.
         if (strokeContinuous_ && drag_ == Drag::Stroke && !firstDabPending_ && dabQueue_.empty() &&
-            strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::SnakeHook && strokeType_ != StrokeType::DragRect &&
+            strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::Tendril && strokeType_ != StrokeType::DragRect &&
             strokeType_ != StrokeType::DragDot) {
             const double nowS = double(SDL_GetTicksNS()) * 1e-9;
             if (nowS - strokeMovedAt_ > 0.05 && nowS - continuousDabAt_ > 1.0 / 30.0) {
@@ -1147,7 +1459,12 @@ int App::run() {
         // the memory on Apple silicon: Lucy 28M stroke frame p99 31 -> 37 ms); light strokes keep overlapping.
         if (solverBound_ && (drag_ == Drag::Stroke || solverBusy())) waitLastFrame();
         flushGrab(); // Move: the pointer's moves since the last frame, as one
-        if (asyncStroke_) pumpStroke();
+        flushGizmoDrag(); // a Gizmo drag: where the pointer is now
+        flushForgeSphereDrag(); // a Forge Sphere drag: the same
+        if (drainNextFrame_) { // (the stroke ended last frame: what waited for it runs now, its own frame)
+            drainNextFrame_ = false;
+            runDrainQueue();
+        } else if (asyncStroke_) pumpStroke();
         else drainStrokeDabs(kStrokeBudgetSeconds);
         mark();
         kelvinCatchUp(); // a long Kelvinlet move, a bounded part per frame (PanelKelvinlet.cpp)
@@ -1174,6 +1491,7 @@ int App::run() {
             pollBake();
             pollQRemesh();
             pollSplatTrain();
+            pollRenderBridge();
             pollSculptable();
         }
         tickProject(dt); // the title and autosave, asleep or not
@@ -1192,6 +1510,10 @@ int App::run() {
         // its window and draws nothing, yet must see the new version start (or its deadline) and quit; it never did,
         // and kept running hidden, "Playing SculptForge" on Discord (@ebarranco, 0.11.1 -> 0.11.10).
         if (!draw && !continuous && !wantsFrames(t)) {
+            if (panelsDirty_ || t < panelsActiveUntil_) { // only a panel window changed (hover): just it
+                drawPanelWindows(true);
+                updateMouseCursor();
+            }
             tickSelfUpdate();
             continue;
         }
@@ -1205,10 +1527,16 @@ int App::run() {
             continue;
         }
         if (measuring) cpuFrameStart = processCpuSeconds();
+        tickKeySequence(dt);
         updateCameraAspect();
+        if (!startFrameChecked_) { // (the first frame that knows the 3D view's shape)
+            startFrameChecked_ = true;
+            fitStartView(false);
+        }
         // The SpaceMouse moves the view by its held axes every frame (frame-rate independent); while it does,
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
+        updateKeyNav(dt); // the held pan and zoom keys (runUiTest calls it too)
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
@@ -1247,6 +1575,7 @@ int App::run() {
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
         noteStillness();
+        applyViewEffects();
         renderSettings_.materialTint = materialTintFor(doc_.paintColor); // (Color > Colour tints the material)
         renderSettings_.resolutionScale = float(uiPrefs_.viewResolution) / 100.0f; // (#80; only the window's view)
         if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops
@@ -1284,15 +1613,31 @@ int App::run() {
         // (the input lag doesn't grow): the last frame's GPU work is done before this one is shown.
         waitLastFrame();
         SDL_GL_SwapWindow(window_);
+        if (mainWindowHidden_) revealMainWindow(); // the first frame is on the window: show it, the splash goes
         lastFrameFence_ = gl::FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
         gl::Flush(); // (to the GPU now: an offscreen swap sends nothing)
+        drawPanelWindows(false); // panels in windows of their own (PanelWindows.cpp), after the main window's swap
         mark();
         if (phases == 7) // (Help > Benchmark splits each phase's frames by these)
             for (int k = 0; k < 6; ++k) frameSplitMs_[k] = phase[k + 1] - phase[k];
-        if (phases == 7 && frameLogMs >= 0.0 && phase[6] - phase[0] > frameLogMs)
-            SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
-                    phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
-                    phase[5] - phase[4], phase[6] - phase[5]);
+        if (phases == 7 && frameLogMs >= 0.0) {
+            // A streamed Micro level (Focus Detail) adds its main-thread parts and the coarse shading still waiting (#184's
+            // freeze: SF_FRAME_LOG=100 for the reporter's log). (Taken every frame, so a slow frame shows its own; not while
+            // Help > Benchmark runs, which takes them itself.)
+            double f[MicroFocus::kParts] = {};
+            const bool focus = !proof_ && doc_.mesh.micro && doc_.mesh.micro->focus;
+            if (focus) renderer_.takeFocusSplit(f);
+            if (phase[6] - phase[0] > frameLogMs) {
+                SDL_Log("frame %.1f ms: events %.1f, dabs %.1f, UI %.1f, ghost + sync %.1f, draw %.1f, UI draw + swap %.1f",
+                        phase[6] - phase[0], phase[1] - phase[0], phase[2] - phase[1], phase[3] - phase[2], phase[4] - phase[3],
+                        phase[5] - phase[4], phase[6] - phase[5]);
+                if (focus)
+                    SDL_Log("frame micro: promote %.1f, coarse %.1f, records %.1f, shade coarse %.1f, pages %.1f, shade pages %.1f, "
+                            "whole %.1f ms; %zu tiles waiting for shading%s",
+                            doc_.mesh.micro->focus->lastUpdateMs(), f[0], f[1], f[2], f[3], f[4], f[5], renderer_.microPendingCoarse(),
+                            doc_.sculptor.strokeActive() ? ", stroking" : "");
+            }
+        }
         if (phases == 7 && perftrace::on()) tracePerfFrame(phase); // Help > Record a performance trace
         ++framesDrawn;
         if (measuring) cpuInFrames += processCpuSeconds() - cpuFrameStart;
@@ -1338,6 +1683,7 @@ int App::run() {
     }
     finishProject();
     if (take_) return takeExitCode_;
+    if (options_.benchmark && proofFailed()) return 1; // (--benchmark-pack: a scene that wouldn't build)
     return options_.benchmark && proofSkippedScenes() ? 2 : 0; // (--benchmark: a scene skipped for memory)
 }
 
@@ -1400,15 +1746,16 @@ void App::requestUiScale() {
     redrawIn(0.0);
 }
 
-// Noto Sans CJK TC and SC (SIL OFL), each cut down to its table's characters (tools/i18n/subset_cjk_font.py), merged
+// Noto Sans CJK TC, SC and JP (SIL OFL), each cut down to its table's characters (tools/i18n/subset_cjk_font.py), merged
 // into the font added just before: in Traditional Chinese all of TC, in Simplified Chinese all of SC (mainland glyph
-// shapes). Otherwise only the languages' own names (繁體中文, 简体中文: the Preferences buttons) are merged, so the
-// atlas stays Latin-sized.
+// shapes), in Japanese all of JP. Otherwise only the languages' own names (繁體中文, 简体中文, 日本語: the Preferences
+// buttons) are merged, so the atlas stays Latin-sized.
 void App::mergeCjkFont(float px) {
     // CJK punctuation, full-width forms and the unified ideographs; the subset has only what the table uses.
     static const ImWchar kCjkRanges[] = {0x2000, 0x206F, 0x3000, 0x30FF, 0x4E00, 0x9FFF, 0xFF00, 0xFFEF, 0};
     static const ImWchar kTraditionalName[] = {0x4E2D, 0x4E2D, 0x6587, 0x6587, 0x7E41, 0x7E41, 0x9AD4, 0x9AD4, 0}; // 中文繁體
     static const ImWchar kSimplifiedName[] = {0x4E2D, 0x4E2D, 0x4F53, 0x4F53, 0x6587, 0x6587, 0x7B80, 0x7B80, 0};  // 中体文简
+    static const ImWchar kJapaneseName[] = {0x65E5, 0x65E5, 0x672C, 0x672C, 0x8A9E, 0x8A9E, 0};                     // 日本語
     auto merge = [px](const unsigned char* data, unsigned long long size, const ImWchar* ranges) {
         ImFontConfig cjk;
         cjk.MergeMode = true;
@@ -1419,9 +1766,12 @@ void App::mergeCjkFont(float px) {
     // The interface's own face first: a codepoint both have (中文) keeps the glyph merged first.
     const bool traditional = fontsLanguage_ == Language::TraditionalChinese;
     const bool simplified = fontsLanguage_ == Language::SimplifiedChinese;
+    const bool japanese = fontsLanguage_ == Language::Japanese;
+    if (japanese) merge(assets::fontCjkJp, assets::fontCjkJp_size, kCjkRanges);
     if (simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kCjkRanges);
     merge(assets::fontCjk, assets::fontCjk_size, traditional ? kCjkRanges : kTraditionalName);
     if (!simplified) merge(assets::fontCjkSc, assets::fontCjkSc_size, kSimplifiedName);
+    if (!japanese) merge(assets::fontCjkJp, assets::fontCjkJp_size, kJapaneseName);
     glyphs::merge(px); // what people typed that the bundled fonts lack, from the system's fonts (UserGlyphs.h)
 }
 
@@ -1431,7 +1781,8 @@ void App::buildUiFonts(float scale) {
     fontsLanguage_ = language();
     { // the bundled fonts a typed character is looked for in first: the interface's Chinese face, then Inter
         const bool tc = fontsLanguage_ == Language::TraditionalChinese;
-        const glyphs::Embedded embedded[] = {{tc ? assets::fontCjk : assets::fontCjkSc, size_t(tc ? assets::fontCjk_size : assets::fontCjkSc_size)},
+        const bool jp = fontsLanguage_ == Language::Japanese;
+        const glyphs::Embedded embedded[] = {{jp ? assets::fontCjkJp : tc ? assets::fontCjk : assets::fontCjkSc, size_t(jp ? assets::fontCjkJp_size : tc ? assets::fontCjk_size : assets::fontCjkSc_size)},
                                              {tc ? assets::fontCjkSc : assets::fontCjk, size_t(tc ? assets::fontCjkSc_size : assets::fontCjk_size)},
                                              {assets::fontRegular, size_t(assets::fontRegular_size)}};
         glyphs::install(embedded, 3, !options_.uiTest.empty());
@@ -1558,6 +1909,10 @@ void App::handleEvent(const SDL_Event& event) {
 }
 
 void App::dispatchEvent(const SDL_Event& event) {
+    if ((event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) && event.key.key == SDLK_AC_BACK) { // Android's Back
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) androidBack();
+        return;
+    }
     if (strayMouseMotion(event)) { // neither the canvas nor the UI follows a driver's stray mouse events
         ++penDiag_.strayMouse;
         return;
@@ -1575,12 +1930,16 @@ void App::dispatchEvent(const SDL_Event& event) {
     wintabEvent(event); // Windows Ink off: the tablet driver's pressure for its mouse events (Tablet.cpp)
     SDL_Event e = event;
     mapPenPosition(e); // a tablet in mouse mode moves the cursor relatively (#54), for the canvas and the UI
+    if (palmMouseEvent(e)) return; // a palm resting by the pen: not a click anywhere (Touch.cpp)
     if (supportCardEvent(e)) return;  // the support card at launch takes clicks and keys while open
     if (whatsNewEvent(e)) return;     // so does What's New (WhatsNewPopup.cpp)
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
     if (tierCardEvent(e)) return;     // the first-run tier card's buttons and keys (PanelHardwareTier.cpp)
-    closePopupsOnPressOutside(e);         // a press outside open menus and popups acts, not only closes them (Shell.cpp)
+    if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !e.key.repeat && !ImGui::GetIO().WantTextInput &&
+        closeTopPopupOnEscape())
+        return; // Esc closes the top context menu or combo list and nothing else sees it (#210; the Library's Esc would close it)
+    pressSpent_ = closePopupsOnPressOutside(e); // a press outside open menus and popups acts, not only closes them (Shell.cpp)
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
     if (touchMouseEvent(e)) return; // a finger's press waits for a second finger; a gesture's stay off (Touch.cpp)
@@ -1589,6 +1948,17 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_QUIT:
         requestQuit();
         break;
+#ifdef __ANDROID__
+    case SDL_EVENT_DID_ENTER_BACKGROUND:
+        // Android may end a background app without a word: the sculpt and the preferences are saved now, not in
+        // the next autosave interval (the restore offer brings the sculpt back at the next start).
+        touchReset();
+        autosaveTimer_ = std::max(autosaveTimer_, float(std::max(autosaveMinutes_, 1)) * 60.0f);
+        autosaveRevision_ = ~uint64_t(0);
+        tickProject(0.0f);
+        autosavePrefs(true);
+        break;
+#endif
     case SDL_EVENT_JOYSTICK_ADDED:
     case SDL_EVENT_JOYSTICK_REMOVED:
     case SDL_EVENT_JOYSTICK_AXIS_MOTION:
@@ -1600,11 +1970,28 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
+        // A pen button or the tip let go in another window never reaches us: its view drag, held buttons and stroke end
+        // here, or the pen's next press only navigates (#216).
+        if (penInProximity_ || penButtons_ || (dragFromPen_ && drag_ != Drag::None)) penLeft();
+        touchReset(); // (a lift in another window never reaches us)
+        keysDown_.clear(); // a key let go in another window never reaches us: the pan and zoom keys stop
+        actions_.dropSequence(); // a first key still waiting for its second does nothing, here or in the other window
         if (radial_.hold != RadialHold::None) closeRadialMenu(); // its key or button's release won't come here
         if (strokePopup_.held) closeStrokePopup();
-        spaceHeld_ = false; // Space let go in another window never reaches us
+        spaceHeld_ = selectSpace_ = false; // Space let go in another window never reaches us
         quickRemeshDragKey_ = SDLK_UNKNOWN; // (the same for the Quick Remesh drag key)
         break;
+#ifdef __ANDROID__
+    case SDL_EVENT_WINDOW_RESIZED: // rotation, split screen, a free-form window: the geometry the touches map onto changed
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        if (e.window.windowID == SDL_GetWindowID(window_)) {
+            touchReset();
+            logWindowGeometry();
+            updateCameraAspect(); // (the turned view's shape, before the model is framed into it)
+            fitStartView(true);
+        }
+        break;
+#endif
     case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: // dragged to a monitor at another scale, or the system setting changed
     case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
         if (e.window.windowID == SDL_GetWindowID(window_)) requestUiScale();
@@ -1620,6 +2007,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_PEN_AXIS:
     case SDL_EVENT_PEN_BUTTON_DOWN:
     case SDL_EVENT_PEN_BUTTON_UP:
+        if (e.type == SDL_EVENT_PEN_DOWN) actions_.flushSequence(); // the pen starts a stroke: a first key waiting runs alone now
         handlePenEvent(e);
         break;
     case SDL_EVENT_FINGER_DOWN:
@@ -1639,13 +2027,17 @@ void App::dispatchEvent(const SDL_Event& event) {
         tabletDeviceEvent(e); // a tablet plugged in or out (Tablet.cpp)
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        actions_.flushSequence(); // a click is not the second key: the first key runs alone before it
         lastInputPen_ = e.button.which == SDL_PEN_MOUSEID;
         // Strokes and navigation start only on the canvas, never on the shell around it.
         // (Nor under a floating window the pointer only now reached: ImGui's hover is a frame behind, #161.)
+        // (Nor while the S / U / I / O pop-up follows the pointer: that click keeps or cancels the value.)
         if (!io.WantCaptureMouse && canvasRect().contains(e.button.x, e.button.y) &&
-            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y))) {
+            !ui::FloatingWindowAt(ImVec2(e.button.x, e.button.y)) && !PickerUi::sliderFollowing(*this) && !pressSpent_) {
             mouseClicks_ = e.button.clicks;
+            pointerEventNs_ = e.button.timestamp; // (the pen predictor's first sample)
             onMouseDown(e.button.x, e.button.y, e.button.button);
+            pointerEventNs_ = 0;
             mouseClicks_ = 1;
         }
         break;
@@ -1656,15 +2048,25 @@ void App::dispatchEvent(const SDL_Event& event) {
         onMouseUp();
         break;
     case SDL_EVENT_MOUSE_MOTION:
+        pointerEventNs_ = e.motion.timestamp; // (the pen predictor's sample time: a batch is handled all at once)
         onMouseMove(e.motion.x, e.motion.y, e.motion.xrel, e.motion.yrel, e.motion.which == SDL_PEN_MOUSEID);
+        pointerEventNs_ = 0;
         break;
     case SDL_EVENT_MOUSE_WHEEL:
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
+        ++penDiag_.wheel;
+        if (penInProximity_) ++penDiag_.wheelPenInRange;
         if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y) &&
             !ui::FloatingWindowAt(ImVec2(e.wheel.mouse_x, e.wheel.mouse_y)))
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
+        if (!isModifierKey(e.key.key) && std::none_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == e.key.key; }))
+            keysDown_.emplace_back(e.key.key, e.key.mod);
+        if (e.key.key == SDLK_SPACE && drag_ == Drag::Select && !io.WantTextInput) { // #214: slide the shape
+            selectSpace_ = true; // (before the camera and the QuickMenu: Space mid-drag is only for this)
+            break;
+        }
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
             spaceCameraKeyDown(uiPrefs_.spaceCamera, io.WantTextInput || io.WantCaptureKeyboard)) {
             spaceHeld_ = true;
@@ -1673,10 +2075,13 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (!io.WantCaptureKeyboard && !e.key.repeat) quickRemeshKey(e.key.key, e.key.mod, true); // held: drag remeshes
         if (!io.WantCaptureKeyboard && !e.key.repeat) onKey(e.key.key, e.key.mod);
         else if (!io.WantCaptureKeyboard && brushSizeStep(actions_.actionForKey(e.key.key, e.key.mod)))
-            onKey(e.key.key, e.key.mod); // held brush size keys repeat, whatever they are bound to
+            onKey(e.key.key, e.key.mod, true); // held brush size keys repeat, whatever they are bound to
         break;
     case SDL_EVENT_KEY_UP:
-        if (e.key.key == SDLK_SPACE) spaceHeld_ = false;
+        actions_.keyUp(e.key.key); // (a two-key shortcut's waiting key let go)
+        std::erase_if(keysDown_, [&](const auto& k) { return k.first == e.key.key; });
+        if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
+        if (e.key.key == SDLK_SPACE) spaceHeld_ = selectSpace_ = false;
         quickRemeshKey(e.key.key, e.key.mod, false);
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
         radialKeyUp(e.key.key);                        // a radial menu's held key: run the slot pointed at
@@ -1734,8 +2139,14 @@ void App::updateMouseCursor() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
     const ImGuiMouseCursor ui = ImGui::GetMouseCursor();
+    // Over a panel in a window of its own: that panel's (PanelWindows.cpp; there is one system cursor).
+    int panel = -2;
+    if (SDL_Window* over = drag_ == Drag::None && !panelWindows_.empty() ? SDL_GetMouseFocus() : nullptr; over && over != window_)
+        for (const PanelWindow& p : panelWindows_)
+            if (p.window == over) panel = p.cursor == ImGuiMouseCursor_None ? kCursorHidden : p.cursor;
     // (Mouse mode with the pen: the system's would sit where the pen is on the tablet, not at the cursor.)
-    cursorKind_ = penSoftCursor()           ? kCursorHidden
+    cursorKind_ = panel != -2               ? panel
+                  : penSoftCursor()         ? kCursorHidden
                   : viewportCursorWanted()  ? kCursorCrosshair
                   : ui == ImGuiMouseCursor_None || io.MouseDrawCursor ? kCursorHidden
                                                                       : int(ui);
@@ -1775,19 +2186,42 @@ void App::updateMouseCursor() {
 BrushType App::activeBrush() const {
     // classic convention: holding Shift temporarily switches to Smooth.
     // The pen's eraser end can be set to smooth too (Preferences > Tablet).
-    const bool smooth = (inputMods() & SDL_KMOD_SHIFT) || (erasing() && eraserAction() == PenAction::Smooth);
-    return smooth ? BrushType::Smooth : brush_;
+    if (erasing() && eraserAction() == PenAction::Smooth) return BrushType::Smooth;
+    // Shift+click / Ctrl+click on a shelf brush rebinds Shift / Ctrl (ModifierBrush.cpp).
+    if (const ModifierSlot slot = heldSlot(); slot != ModifierSlot::None) return BrushType(uiPrefs_.modifierBrushes.brush(slot));
+    // The Paint brush colours whatever brush was picked before it: Smooth picked, then Paint, painted nothing (a member's
+    // strokes smoothed the shape for good). Only a held Shift smooths while painting.
+    return (inputMods() & SDL_KMOD_SHIFT) ? BrushType::Smooth : paintMode_ && brush_ == BrushType::Smooth ? BrushType::Standard : brush_;
 }
 
 void App::onMouseDown(float x, float y, Uint8 button) {
-    if (strokeFinishing_) endStroke(); // the last stroke's dabs still being placed: finish them first
+    if (holdingPointer_ || strokeDraining() || !drainQueue_.empty()) { // the last stroke's dabs still being placed (or what waited for them): this press waits
+        if (!holdingPointer_) drainQueue_.emplace_back(kHeldPress, Args{});
+        holdingPointer_ = true;
+        heldPointer_.push_back({HeldPointer::Down, x, y, 0.0f, 0.0f, button, false, pointerEventNs_ ? pointerEventNs_ : SDL_GetTicksNS()});
+        mouseX_ = x;
+        mouseY_ = y;
+        status_ = drainStatus();
+        return;
+    }
+    if (strokeFinishing_) endStroke(); // (a stroke ending on this thread)
     mouseX_ = x;
     mouseY_ = y;
     const SDL_Keymod mod = inputMods();
     const SDL_Keymod nav = inputMods(false); // (navigation ignores the stroke popup's latched Smooth / Mask / Select)
     // A pen button is already driving the view: touching down with the tip keeps navigating.
     if (penNavButton_ && (drag_ == Drag::Orbit || drag_ == Drag::Pan)) return;
-    dragFromPen_ = lastInputPen_;
+    // The right button is already down and dragging the view: a driver's second press for the same button (beside a pen's
+    // side button) is not a new click, which would arm the menu again in the middle of the drag.
+    if (button == SDL_BUTTON_RIGHT && rightClick_.down && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) return;
+    // A right / middle click the compositor's pointer sends for the pen's barrel buttons while the pen is sending samples
+    // (KDE's tablet defaults) is the pen's drag: the pen is the one source that never lags, the pointer only shadows it, and
+    // a drag the pointer owned ignored the pen's samples whenever the pointer had just moved and caught up after: the view
+    // skipped (#216). One source for the whole drag, chosen here; the pointer's moves are strays until the release.
+    constexpr Uint64 kPenActiveNs = 100000000ull;
+    const bool penActive = button != SDL_BUTTON_LEFT && penInProximity_ && clickClockNs() - lastPenNs_ < kPenActiveNs;
+    dragFromPen_ = lastInputPen_ || penActive;
+    pointerDragMoved_ = false;
     doc_.syncBvh();
     if (button == SDL_BUTTON_LEFT && erasing() && eraserAction() != PenAction::Invert && eraserAction() != PenAction::Smooth) {
         // The eraser end set to Erase mask or Nothing (Preferences > Tablet).
@@ -1799,6 +2233,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     // only once it moves past the slop.
     rightClick_.pending = button == SDL_BUTTON_RIGHT && uiPrefs_.rightClickQuickMenu &&
                           !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
+    rightClick_.down = button == SDL_BUTTON_RIGHT;
     rightClick_.x = x;
     rightClick_.y = y;
     rightClick_.dx = rightClick_.dy = 0.0f;
@@ -1837,6 +2272,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
         if (forgesphereMouseDown(x, y, mod)) return; // a Forge Sphere Part takes clicks on it (PanelForge Spheres.cpp)
         if (tubeMouseDown(x, y, mod)) return;        // Draw Tube, a Tube Part's points (PanelTube.cpp)
+        if (referenceMouseDown(x, y, nav)) return; // Adjust Reference: move, scale it (ReferenceImages.cpp)
         if (stencilMouseDown(x, y, nav)) return; // Adjust Stencil: move, scale, turn it (StencilOverlay.cpp)
         if (gradientMouseDown(x, y, nav)) return; // Line Gradient: a new line or an end handle (LineGradient.cpp)
         if (edgesMouseDown(x, y, mod)) return; // Edges mode: clicks select edges (PanelEdges.cpp)
@@ -1846,6 +2282,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (uvToolMouseDown(x, y, mod)) return; // the UV Editor's Seam / Select in 3D tool (PanelUvEditor.cpp)
         if (guideMouseDown(x, y, mod)) return; // the QRemesh Guides brush (PanelRetopo.cpp)
         if (faceMouseDown(x, y, mod)) return;  // placing facial landmarks (PanelFace.cpp)
+        if (garmentPlaceMouseDown(x, y, mod)) return; // Garments > Place panels (PanelGarmentDrape.cpp)
         if (sculptableMouseDown(x, y)) return; // Make sculptable: landmarks, crop box (PanelSculptable.cpp)
         if (captureMouseDown(x, y)) return;    // Capture from view: the drag draws the square (PanelKelvinlet.cpp)
         // A triple-click on another Part makes it the active one and frames it (#43). (Its first two clicks
@@ -1855,7 +2292,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         const bool penNear = penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
         if (mouseClicks_ >= 3 && !lastInputPen_ && !wintabPen_ && !penNear && !(mod & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
             insertType_.empty() && doc_.partCount() > 1) {
-            const int target = pickPart(x, y);
+            const int target = pickPartNear(x, y);
             if (target >= 0 && target != doc_.activePart) {
                 runCommand("part_select", {{"index", double(target)}});
                 partSelected("triple-click");
@@ -1871,7 +2308,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         const bool frameClick = (keys & SDL_KMOD_ALT) && (mod & SDL_KMOD_SHIFT) && !ctrlDown(mod);
         if (!blenderStyle() && (keys & SDL_KMOD_ALT) && !ctrlDown(mod) && (frameClick || !(mod & SDL_KMOD_SHIFT)) &&
             (doc_.partCount() > 1 || frameClick)) {
-            const int target = pickPart(x, y);
+            const int target = pickPartNear(x, y);
             partClickFrame_ = frameClick;
             if (target >= 0 && (target != doc_.activePart || frameClick)) {
                 drag_ = Drag::PartClick;
@@ -1883,7 +2320,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
             }
         }
         RayHit hit;
-        const bool maskMod = ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT);
+        const bool maskMod = ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT) && heldSlot() != ModifierSlot::Ctrl; // (a Ctrl brush sculpts)
         if (!insertType_.empty() && !maskMod && previewLod_ < 0 && pick(x, y, hit)) { // Append > Insert (#34)
             drag_ = Drag::Insert;
             insertAt_ = hit.position;
@@ -1896,7 +2333,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         if (previewLod_ < 0 && pick(x, y, hit)) {
             if (maskMod) beginMaskStroke(x, y);
             else beginStroke(x, y, hit);
-        } else if (airStrokeMouseDown(x, y, mod)) { // Start strokes off the model (#62, Input.cpp)
+        } else if (notePressOnAnotherPart(x, y), airStrokeMouseDown(x, y, mod)) { // Start strokes off the model (#62, Input.cpp)
         } else if (blenderStyle()) {
             // Blender: a drag beside the model navigates as the middle button would (Shift pans, Ctrl zooms).
             const SDL_Keymod keys = SDL_GetModState();
@@ -1963,9 +2400,38 @@ bool App::blenderNavigationDown(Uint8 button) {
 }
 
 void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
+    if (holdingPointer_) { // (after a held press: it moves as it did once the stroke before is done)
+        heldPointer_.push_back({HeldPointer::Move, x, y, dx, dy, 0, fromPen, pointerEventNs_ ? pointerEventNs_ : SDL_GetTicksNS()});
+        mouseX_ = x;
+        mouseY_ = y;
+        return;
+    }
     // (A driver's stray mouse events beside the pen's never get here: strayMouseMotion.) A pen that went quiet
     // without saying it left (some drivers never do) hands the cursor back to the mouse.
-    if (!fromPen && penInProximity_) penLeft();
+    // A view drag a mouse button began (a compositor that maps the pen's barrel buttons to a right / middle click, KDE's
+    // tablet defaults, sends the click as the pointer's) is the pointer's to the end once the pointer moves it, as
+    // strayMouseMotion keeps a pen's drag the pen's: the pointer moves with the pen, so the pen's own samples between its
+    // events were a second path for the same drag. Each one reset the right click's slop, and the drag never began or was
+    // carried twice (#216). (A pointer that never moves, a driver's click only: the pen's samples are the drag.) The pen
+    // is not gone for that pointer (it would let go of the side buttons held), the drag goes by the pointer's position,
+    // not SDL's steps (which the pen's own mouse events may have moved on), and at the pen's view speed.
+    const bool viewDrag = drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom || drag_ == Drag::Roll;
+    const bool pointerDrag = viewDrag && !dragFromPen_;
+    const bool withPen = !fromPen && pointerDrag && penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
+    if (!fromPen && penInProximity_ && !withPen) penLeft();
+    if (withPen) {
+        dx = x - mouseX_;
+        dy = y - mouseY_;
+    }
+    // (Only while the pointer keeps moving it: a compositor whose pointer sent one move after the click and then went quiet
+    // while the cursor went on left the drag, and the ring that follows it, where the click began, #216. The pen's samples
+    // carry it from the pointer's last place, as soon as the pointer has been still for kPointerDragNs.)
+    constexpr Uint64 kPointerDragNs = 60000000ull;
+    if (!fromPen && pointerDrag) {
+        pointerDragMoved_ = true;
+        pointerDragNs_ = clickClockNs();
+    }
+    if (fromPen && pointerDrag && pointerDragMoved_ && clickClockNs() - pointerDragNs_ < kPointerDragNs) return;
     if (fromPen) {
         // The pen moves by the distance from its last position taken here, not by SDL's xrel: SDL keeps one cursor
         // position for the pen and every mouse, so with a driver's stray mouse events in between (a Ugee pen on
@@ -1974,7 +2440,12 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         dy = y - mouseY_;
         // The pen's first position after coming into range, or after the mouse moved the cursor, is a jump from
         // wherever the cursor was, not a motion: it must not throw a drag (the view) across the screen.
-        if (penJump_ || !lastInputPen_) dx = dy = 0.0f;
+        if (penJump_ || !lastInputPen_) {
+            dx = dy = 0.0f;
+            rightClick_.x = x; // a right click waiting starts over from here: the jump is no drag
+            rightClick_.y = y;
+            rightClick_.dx = rightClick_.dy = 0.0f;
+        }
         penJump_ = false;
     }
     mouseX_ = x;
@@ -1985,10 +2456,19 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         // drag goes on by everything since the press, so it loses nothing.
         rightClick_.dx += dx;
         rightClick_.dy += dy;
-        if (std::hypot(rightClick_.dx, rightClick_.dy) <= kRightClickSlop) return;
+        // The distance from the press counts too: input that moves with no steps of its own (a warped or relative
+        // pointer, a pen's position only) was a click however far it went, and the menu opened after every drag.
+        const float px = x - rightClick_.x, py = y - rightClick_.y;
+        const float steps = std::hypot(rightClick_.dx, rightClick_.dy), away = std::hypot(px, py);
+        if (std::max(steps, away) <= kRightClickSlop) return;
         rightClick_.pending = false;
-        dx = rightClick_.dx;
-        dy = rightClick_.dy;
+        if (steps >= away) {
+            dx = rightClick_.dx;
+            dy = rightClick_.dy;
+        } else {
+            dx = px;
+            dy = py;
+        }
     }
     // start a pan with Alt, then let go of Alt while still dragging to zoom.
     if (drag_ == Drag::Pan && panFromAlt_ && !(inputMods(false) & SDL_KMOD_ALT)) drag_ = Drag::Zoom;
@@ -2004,13 +2484,13 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         }
     }
     // Preferences > Tablet > View speed: the pen's view drags (tip or side button) by its own amount per pixel.
-    if (fromPen && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) {
+    if ((fromPen || withPen) && (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom)) {
         dx *= uiPrefs_.tablet.viewSpeed;
         dy *= uiPrefs_.tablet.viewSpeed;
     }
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
-    case Drag::Orbit: orbitBy(x, y, dx, dy); break;
+    case Drag::Orbit: orbitBy(x, y, dx, dy, !(fromPen || withPen)); break;
     case Drag::Roll:
         if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
         else rollBy(x, y, dx, dy);
@@ -2020,14 +2500,21 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::MaskCanvas: maskCanvasMove(x, y); break;
     case Drag::PartClick: partClickMove(x, y); break;
     case Drag::Select: selectionMove(x, y); break;
-    case Drag::Gizmo: gizmoDragTo(x, y); break;
+    case Drag::Gizmo:
+        if (interactiveStrokes_) gizmo_.pending = true, gizmo_.pendingAt = ImVec2(x, y); // (flushGizmoDrag, once a frame)
+        else gizmoDragTo(x, y);
+        break;
     case Drag::Guide: guideDragTo(x, y); break;
     case Drag::UvTool: uvToolDragTo(x, y); break;
     case Drag::Sculptable: sculptableMouseMove(x, y); break;
     case Drag::Capture: captureMouseMove(x, y); break;
     case Drag::Gradient: gradientMouseMove(x, y); break;
     case Drag::Stencil: stencilMouseMove(x, y); break;
-    case Drag::ForgeSphere: forgesphereDragTo(x, y); break;
+    case Drag::Reference: referenceMouseMove(x, y); break;
+    case Drag::ForgeSphere:
+        if (interactiveStrokes_) zsDrag_.pendingMove = true, zsDrag_.atX = x, zsDrag_.atY = y; // (flushForgeSphereDrag)
+        else forgesphereDragTo(x, y);
+        break;
     case Drag::Tube: tubeDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::QuickRemesh: break; // (remeshes when let go)
@@ -2090,23 +2577,103 @@ void App::resetView() {
     status_ = "View reset";
 }
 
-void App::orbitBy(float x, float y, float dx, float dy) {
+void App::orbitBy(float x, float y, float dx, float dy, bool mouse) {
     if (autoOrtho_) { // an axis view turned: back to perspective (Blender's Auto Perspective)
         camera_.ortho = false;
         autoOrtho_ = false;
+    }
+    if (!orbitPivotPicked_) { // once per drag, where it began: no readback while the view turns
+        orbitPivotPicked_ = true;
+        orbitPivot_ = orbitPivotAt(x - dx, y - dy);
+        if (orbitPivot_) camera_.targetDepthOf(*orbitPivot_);
     }
     if (!orbitStarted_) {
         orbitRaw_ = camera_;
         orbitStarted_ = true;
     }
     const int lock = forceTurntable_ ? 1 : uiPrefs_.orbitLock;
+    // Preferences > Input > Mouse orbit speed scales the angle per pixel in every input style; the pen's drags were
+    // scaled by its own View speed already. The roll's sweep is an angle about the view's centre: scaled the same.
+    const float speed = mouse && !forceTurntable_ ? clampMouseOrbitSpeed(uiPrefs_.mouseOrbitSpeed) : 1.0f;
+    const float roll = (lock == 2 || lock == 3) ? rollSweep(x, y, dx, dy) : 0.0f;
+    dx *= speed;
+    dy *= speed;
     if (lock == 1) orbitRaw_.orbit(dx, dy);
-    else if (lock == 2) orbitRaw_.orbitAbout(glm::vec3(1, 0, 0), dx, dy, rollSweep(x, y, dx, dy));
-    else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, rollSweep(x, y, dx, dy));
+    else if (lock == 2) orbitRaw_.orbitAbout(glm::vec3(1, 0, 0), dx, dy, roll * speed);
+    else if (lock == 3) orbitRaw_.orbitAbout(glm::vec3(0, 0, 1), dx, dy, roll * speed);
     else orbitRaw_.orbitFree(dx, dy);
     // Holding Shift snaps to the nearest view along an axis; letting go continues from where the cursor took it.
-    if (inputMods(false) & SDL_KMOD_SHIFT) camera_.setOrientation(Camera::snapped(orbitRaw_.orientation()));
-    else camera_.setOrientation(orbitRaw_.orientation());
+    const glm::quat q = (inputMods(false) & SDL_KMOD_SHIFT) ? Camera::snapped(orbitRaw_.orientation()) : orbitRaw_.orientation();
+    if (orbitPivot_) camera_.turnAbout(q, *orbitPivot_);
+    else camera_.setOrientation(q);
+}
+
+// Orbit around the pointer: the nearest visible Part's surface under (x, y), in world space; none over the background,
+// with the preference off, in demos (their scripted moves turn about the target), or while the mesh is busy
+// (mid-stroke, a preview level).
+std::optional<glm::vec3> App::orbitPivotAt(float x, float y) {
+    if (!uiPrefs_.orbitAtPointer || forceTurntable_ || solverBusy() || previewLod_ >= 0) return std::nullopt;
+    doc_.syncBvh();
+    RayHit hit;
+    if (pickPart(x, y, &hit) < 0) return backgroundOrbitPivot();
+    return hit.position;
+}
+
+// A rotation that starts over the background: when the view's middle is on the model, turning about it keeps the model
+// near (as before); when it is on empty space (a small model panned aside), that swings the model off the screen. Then
+// turn about where the last stroke landed if that is in view, else about the middle of the scene's box, or of what shows of it when that is off screen.
+std::optional<glm::vec3> App::backgroundOrbitPivot() {
+    const CanvasRect c = canvasRect();
+    if (c.w <= 0.0f || c.h <= 0.0f) return std::nullopt;
+    const float cx = c.x + c.w * 0.5f * (1.0f + camera_.shift.x), cy = c.y + c.h * 0.5f * (1.0f - camera_.shift.y);
+    RayHit middle;
+    if (pickPart(cx, cy, &middle) >= 0) return std::nullopt;
+    const glm::mat4 vp = camera_.projection() * camera_.view();
+    auto onScreen = [&](const glm::vec3& p, glm::vec2& out) {
+        const glm::vec4 h = vp * glm::vec4(p, 1.0f);
+        if (!(h.w > 0.0f)) return false;
+        out = glm::vec2(c.x + (h.x / h.w * 0.5f + 0.5f) * c.w, c.y + (1.0f - h.y / h.w) * 0.5f * c.h);
+        return std::isfinite(out.x) && std::isfinite(out.y);
+    };
+    glm::vec2 s;
+    if (const auto last = lastStrokePoint(); last && onScreen(*last, s) && c.contains(s.x, s.y)) return last;
+    const AABB b = sceneBounds();
+    if (!b.valid()) return std::nullopt;
+    if (onScreen(b.center(), s) && c.contains(s.x, s.y)) return b.center();
+    glm::vec2 lo(1e30f), hi(-1e30f);
+    for (int k = 0; k < 8; ++k) {
+        if (!onScreen(glm::vec3((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z), s))
+            return std::nullopt; // (reaches behind the eye: no sure middle)
+        lo = glm::min(lo, s);
+        hi = glm::max(hi, s);
+    }
+    lo = glm::max(lo, glm::vec2(c.x, c.y)); // what shows of it
+    hi = glm::min(hi, glm::vec2(c.x + c.w, c.y + c.h));
+    if (lo.x >= hi.x || lo.y >= hi.y) return std::nullopt;
+    // The point on the ray through that middle at the depth of the box's centre.
+    glm::vec3 o, d;
+    canvasRay((lo.x + hi.x) * 0.5f, (lo.y + hi.y) * 0.5f, o, d);
+    const float along = glm::dot(d, camera_.forward());
+    if (!(along > 1e-6f)) return std::nullopt;
+    return o + d * (glm::dot(b.center() - o, camera_.forward()) / along);
+}
+
+void App::noteStrokePoint(const glm::vec3& local) {
+    if (!std::isfinite(local.x + local.y + local.z)) return;
+    lastStrokeLocal_ = local;
+    lastStrokePart_ = doc_.activePart;
+}
+
+// The last stroke's place in the scene; none before the first stroke, or once its Part is gone or the spot is off it.
+std::optional<glm::vec3> App::lastStrokePoint() const {
+    const int i = lastStrokePart_;
+    if (i < 0 || i >= doc_.partCount()) return std::nullopt;
+    const AABB local = doc_.partMesh(i).bounds();
+    if (!local.valid()) return std::nullopt;
+    const glm::vec3 pad = local.extent() * 0.01f + glm::vec3(1e-4f);
+    if (glm::any(glm::lessThan(lastStrokeLocal_, local.min - pad)) || glm::any(glm::greaterThan(lastStrokeLocal_, local.max + pad)))
+        return std::nullopt;
+    return glm::vec3(doc_.parts[size_t(i)].transform * glm::vec4(lastStrokeLocal_, 1.0f));
 }
 
 void App::rollBy(float x, float y, float dx, float dy) {
@@ -2130,11 +2697,17 @@ float App::rollSweep(float x, float y, float dx, float dy) const {
 }
 
 void App::onMouseUp() {
+    if (holdingPointer_) {
+        heldPointer_.push_back({HeldPointer::Up, mouseX_, mouseY_, 0.0f, 0.0f, 0, false, pointerEventNs_ ? pointerEventNs_ : SDL_GetTicksNS()});
+        return;
+    }
     rollPending_ = false;
     rollSideways_ = false;
-    rightClick_.pending = false;
+    rightClick_.pending = rightClick_.down = false;
     zsMenu_.armed = false;
     orbitStarted_ = false;
+    orbitPivotPicked_ = false;
+    orbitPivot_.reset();
     panFromAlt_ = false;
     if (drag_ == Drag::Select) selectionMouseUp();
     if (drag_ == Drag::QuickRemesh) quickRemesh(RemeshTrigger::Quick);
@@ -2160,6 +2733,7 @@ void App::onMouseUp() {
         }
     }
     if (drag_ == Drag::Stroke && !maskClickPending_) steadyCatchUp(); // Steady Stroke: on to the pointer (Precision.cpp)
+    if (drag_ == Drag::Stroke && haveLastDab_ && !asyncStroke_) noteStrokePoint(lastDabCentre_);
     if (drag_ == Drag::SizeScrub) status_ = drawSizeStatus();
     if (drag_ == Drag::Stroke && maskClickPending_) maskClickRelease(); // Ctrl+click: blur / sharpen the mask
     else if (drag_ == Drag::Stroke && asyncStroke_) {
@@ -2176,19 +2750,22 @@ void App::onMouseUp() {
     if (drag_ == Drag::Capture) captureMouseUp();
     if (drag_ == Drag::Gradient) gradientMouseUp();
     if (drag_ == Drag::Stencil) stencilMouseUp();
+    if (drag_ == Drag::Reference) referenceMouseUp();
     if (drag_ == Drag::ForgeSphere) forgesphereRelease();
     if (drag_ == Drag::Tube) tubeRelease();
     if (drag_ == Drag::AirStroke) airStrokeRelease();
     gizmoRelease();
     drag_ = Drag::None;
     dragFromPen_ = false;
+    pointerDragMoved_ = false;
     penNavButton_ = 0;
 }
 
-void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
+void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
     if (tubeKey(key, mod)) return;   // Esc / Undo / Redo during a tube stroke or point drag drop it (PanelTube.cpp)
     if (cutPolylineKey(key)) return; // Enter ends a Cut Polyline, Esc drops it (PanelCut.cpp)
     if (gradientKey(key)) return;    // Enter keeps a Line Gradient, Esc takes it back (LineGradient.cpp)
+    if (referenceKey(key, mod)) return; // Adjust Reference's keys, Enter / Esc ends it (ReferenceImages.cpp)
     if (stencilKey(key, mod)) return; // Adjust Stencil's keys, Enter / Esc ends it (StencilOverlay.cpp)
     if (key == SDLK_ESCAPE && radial_.menu >= 0) {
         closeRadialMenu();
@@ -2236,7 +2813,17 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
         !actions_.actionForChord(chordFromEvent(key, mod)))
         key = key == SDLK_0 ? SDLK_KP_0 : SDL_Keycode(SDLK_KP_1 + (key - SDLK_1));
     keyDown_ = key; // a radial menu's key holds it open until this key is let go (RadialMenu.cpp)
-    actions_.handleKey(key, mod);             // the shortcut map: Config.cpp initActions()
+    actions_.setSequenceWindow(uiPrefs_.twoKeyWindow);
+    if (key == SDLK_ESCAPE && !drainQueue_.empty()) { // Esc drops the commands waiting for the stroke
+        drainQueue_.clear();
+        heldPointer_.clear();
+        holdingPointer_ = false;
+        status_ = "Finishing stroke (queued commands cancelled)";
+        return;
+    }
+    ++interactiveCommand_;
+    actions_.handleKey(key, mod, repeat);     // the shortcut map: Config.cpp initActions()
+    --interactiveCommand_;
     keyDown_ = SDLK_UNKNOWN;
 }
 
@@ -2245,7 +2832,7 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod) {
 // ---------------------------------------------------------------------------
 
 bool App::alongNormalBrush(BrushType t) const {
-    return t == BrushType::Move || t == BrushType::SnakeHook || t == BrushType::KelvinSnake || t == BrushType::KelvinGrab;
+    return t == BrushType::Move || t == BrushType::Tendril || t == BrushType::KelvinSnake || t == BrushType::KelvinGrab;
 }
 
 // Along the normal (from the discussions): with the invert key held as the stroke begins (Preferences > Input >
@@ -2282,6 +2869,7 @@ glm::vec3 App::alongNormalTarget(float x, float y) const {
 void App::beginStroke(float x, float y, const RayHit& hit) {
     refreshSymmetryPivot(); // (local symmetry: the active Part's centre as the stroke starts)
     strokeBrush_ = activeBrush();
+    strokeSlot_ = heldSlot(); // a Shift / Ctrl brush: its own Intensity (ModifierBrush.cpp)
     strokeAlongNormal_ = false;
     straight_ = {};
     straight_.shiftAtStart = (inputMods() & SDL_KMOD_SHIFT) != 0;
@@ -2294,8 +2882,10 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     grabScreenOffset_ = glm::vec2(0.0f);
     pickSmoother_.reset();
     strokeInvert_ = invertToggle_ != (((inputMods() & SDL_KMOD_ALT) != 0) || (erasing() && eraserAction() == PenAction::Invert));
-    // Shift still smooths geometry while the Paint brush is active.
-    strokePaint_ = strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_);
+    // Shift with the Paint brush smooths the colour (vertex colours or texels) and never the shape; with a sculpt brush
+    // (Rgb on) it still smooths the shape.
+    strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_;
+    strokePaint_ = strokeColourSmooth_ || (strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_));
     strokeSculpt_ = !(strokePaint_ && paintMode_);
     const BrushRecipe* recipe = strokeRecipe();
     { // the brush's own pressure curve (Precision.cpp)
@@ -2305,6 +2895,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     haveLastDab_ = false;
     doc_.sculptor.draftStrokes = draftStrokes() && asyncStrokeAllowed(); // (AsyncStroke.cpp)
     doc_.sculptor.adaptiveDabs = fastBigBrushes();
+    doc_.sculptor.keepEditable = doc_.mesh.micro && keepStrokesEditable(); // (Forge Ink: micro levels only)
     // Big brushes where the CPU has room: the exact normals the analytic ones defer land at the pen-up. On a 4-core
     // floor machine that cost more than it saved (E-core floor, 120 px release 0.5 -> 1.3 s), and at 120 px even on
     // the 3060 (release +190 ms for -45 ms lag); from 160 px on 6+ threads it wins (3060 240 px p50 428 -> 283 ms,
@@ -2317,6 +2908,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     fusedDabs_ = 64.0;
     if (drape_) finishDrape(true); // (PanelDrape.cpp: the stroke sculpts the kept result)
     if (strokeSculpt_ && !recipe && strokeBrush_ == BrushType::Cloth) prepareClothColliders(); // (PanelCloth.cpp)
+    BrushAlpha::finishCreature(doc_.brushAlpha, true); // (picked a moment ago: the full alpha, never its tile)
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
@@ -2325,6 +2917,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         return;
     }
     drag_ = Drag::Stroke;
+    noteStrokePoint(hit.position); // (the first dab: where it began; the last dab replaces it as the stroke ends)
     playingLayer_ = -1;
     if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) doc_.sculptor.holdTopology(); // (they re-stamp)
     // (Only when there are LODs: clearing forgets which mesh was shown, so the next frame sent the whole mesh
@@ -2343,9 +2936,11 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     // the stroke's own copies of the recipe and the alpha, which the solver thread reads (DabSettings).
     asyncStroke_ = asyncStrokeAllowed();
     strokeRecipe_ = asyncStroke_ && recipe ? std::make_shared<const BrushRecipe>(*recipe) : nullptr;
-    strokeAlpha_ = asyncStroke_ && !doc_.brushAlpha.empty() ? std::make_shared<const BrushAlpha>(doc_.brushAlpha) : nullptr;
+    strokeAlpha_ = nullptr;
+    if (asyncStroke_ && !doc_.brushAlpha.empty()) // (a Creature Skin alpha is shared, not copied: 16 MB)
+        if (!(strokeAlpha_ = BrushAlpha::shared(doc_.brushAlpha))) strokeAlpha_ = std::make_shared<const BrushAlpha>(doc_.brushAlpha);
     pointerLatest_ = glm::vec2(x, y);
-    pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
+    pointerLatestAt_ = pointerEventSeconds();
     penPredictor_.reset(pointerLatest_, pointerLatestAt_);
     {
         const glm::vec3 n = glm::dot(hit.normal, partCamera().forward()) > 0.0f ? -hit.normal : hit.normal;
@@ -2367,12 +2962,14 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         p.focal = focalShift_;
         p.connectedOnly = uiPrefs_.connectedOnly;
         p.viewFalloff = uiPrefs_.viewFalloff;
+        p.frontFacesOnly = frontFacesOnly_;
         grabPending_ = false;
+        grabQueued_.clear();
         doc_.sculptor.beginGrab(doc_.mesh, doc_.bvh, p, symmetry_);
         liveMove_ = {};
-        if (liveMoveEnabled() && !p.connectedOnly && !p.viewFalloff && !doc_.mesh.micro && !doc_.mesh.hasMask() &&
+        if (liveMoveEnabled(doc_.sculptor.grabVertices()) && !p.connectedOnly && !p.viewFalloff && !p.frontFacesOnly && !doc_.mesh.micro && !doc_.mesh.hasMask() &&
             !doc_.mesh.hasHidden() && doc_.mesh.layers.empty() && !doc_.sculptor.dyntopo.enabled &&
-            &displayedMesh() == &doc_.mesh)
+            &displayedMesh() == &doc_.mesh && Sculptor::copies(symmetry_).size() <= GhostStroke::kMaxMirrors) // (radial: the preview draws 8)
             liveMove_ = {true, p.center, glm::vec3(0.0f), p.radius, std::clamp(p.strength * 2.0f, 0.0f, 1.0f)};
         grabLast_ = hit.position;
         beginAlongNormal(hit, p.radius);
@@ -2384,14 +2981,18 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
         return;
     }
     lazyMouse_.reset(glm::vec2(x, y));
-    if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
-        grabLast_ = hit.position; // the pulled tip (see snakeHookTo)
+    if ((strokeBrush_ == BrushType::Tendril || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
+        grabLast_ = hit.position; // the pulled tip (see tendrilTo)
         beginAlongNormal(hit, radiusPx_ * partCamera().worldPerPixel(hit.position, canvasHeight()));
         return;
     }
     if (strokeType_ == StrokeType::DragRect || strokeType_ == StrokeType::DragDot) {
         stampJitter_ = alphaJitterAngle(alphaOptions_.jitter, stampSeed_);
+        stampAlpha_ = alphaPool_ && !alphaPool_->empty() ? alphaPool_->pick(stampSeed_) : nullptr; // (one alpha per stamp)
         stampPressure_.reset();
+        stampPlaced_ = false;
+        slideTurn_.reset();
+        slideKeysAtStart_ = inputMods();
     }
     if (strokeType_ == StrokeType::DragRect) {
         dragAnchor_ = glm::vec2(x, y);
@@ -2409,12 +3010,12 @@ void App::strokeTo(float x, float y) {
     strokeMovedAt_ = double(SDL_GetTicksNS()) * 1e-9; // (Continuous dabs wait for the pointer to rest)
     if (asyncStroke_) {
         pointerLatest_ = glm::vec2(x, y);
-        pointerLatestAt_ = double(SDL_GetTicksNS()) * 1e-9;
+        pointerLatestAt_ = pointerEventSeconds();
         penPredictor_.add(pointerLatest_, pointerLatestAt_);
     }
     // the classic alternate smooth (#40): Shift let go while the stroke it began goes on.
-    if (strokeBrush_ == BrushType::Smooth && straight_.shiftAtStart && !strokeAltSmooth_ && !strokeMask_ &&
-        !(inputMods() & SDL_KMOD_SHIFT)) {
+    if (!strokeColourSmooth_ && alternateSmoothStarts(strokeBrush_, straight_.shiftAtStart, strokeAltSmooth_, strokeMask_,
+                                                      (inputMods() & SDL_KMOD_SHIFT) != 0)) {
         strokeAltSmooth_ = true;
         status_ = smoothKeepVolume_ ? "Smooth: plain (Shift let go)" : "Smooth: keeping volume (Shift let go)";
     }
@@ -2459,8 +3060,8 @@ void App::strokeTo(float x, float y) {
         kelvinTo(x, y);
         return;
     }
-    if ((strokeBrush_ == BrushType::SnakeHook || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
-        snakeHookTo(x, y);
+    if ((strokeBrush_ == BrushType::Tendril || strokeBrush_ == BrushType::KelvinSnake) && !recipe && strokeSculpt_) {
+        tendrilTo(x, y);
         return;
     }
     if (steadyOn()) { // Steady Stroke, with every stroke type: the brush trails the pointer on a string
@@ -2494,8 +3095,8 @@ void App::strokeTo(float x, float y) {
         }
         firstDabPending_ = false;
         lastStrokePressure_ = strokePressure();
-        if (asyncStroke_) dabQueue_.push({lastX_, lastY_, lastStrokePressure_}); // (the solver thread places it)
-        else dabAt(lastX_, lastY_, lastStrokePressure_);
+        if (asyncStroke_) dabQueue_.push({lastX_, lastY_, lastStrokePressure_, true}); // (the solver thread places it)
+        else dabAt(lastX_, lastY_, lastStrokePressure_, true);
     }
 
     // Place dabs at even screen-space spacing along the cursor path. Every input sample counts (pens
@@ -2537,7 +3138,27 @@ void App::strokeTo(float x, float y) {
 
 void App::drainStrokeDabs(double budgetSeconds) {
     if (dabQueue_.empty()) return;
+    // A widen of a Micro level's range (MicroMesh::widen) that takes the frame's budget ends its frame's dabs, and the
+    // next frame places none while the renderer re-sends the heights (resendLater, MicroRenderer::sync): the work spread
+    // over two frames, not one (#184: 0.7-1 s mid-stroke on a 2.6M base). A quick widen re-sends in its own frame and the
+    // dabs go on (holding them two frames was lag on a billion-triangle level). (Unbudgeted calls place every dab.)
+    // A widen due within two dabs happens first, at the frame's start (MicroStroke::widenAhead).
+    MicroMesh* const live = budgetSeconds > 0.0 && doc_.mesh.micro && doc_.mesh.micro->stroking ? doc_.mesh.micro.get() : nullptr;
+    if (live && live->rescaled && live->resendLater) return;
     static const bool log = std::getenv("SF_STROKE_LOG") != nullptr; // per frame: dabs waiting, placed, ms
+    // (SF_WIDEN_SPLIT_MS: the widen time from which it splits; tests set 0 to see the split on any computer)
+    static const double splitMs = [] {
+        const char* v = std::getenv("SF_WIDEN_SPLIT_MS");
+        return v && *v ? std::max(0.0, std::strtod(v, nullptr)) : -1.0;
+    }();
+    auto slowWiden = [&] {
+        if (log) SDL_Log("stroke: widen %.1f ms", double(live->widenMs));
+        return double(live->widenMs) >= (splitMs >= 0.0 ? splitMs : budgetSeconds * 1000.0);
+    };
+    if (live && doc_.sculptor.microStroke().widenAhead(*live) && slowWiden()) {
+        live->resendLater = true;
+        return;
+    }
     const auto start = std::chrono::steady_clock::now();
     const size_t waiting = dabQueue_.size();
     const SculptTimings before = doc_.sculptor.timings;
@@ -2546,8 +3167,13 @@ void App::drainStrokeDabs(double budgetSeconds) {
     while (!dabQueue_.empty()) {
         const PathDab d = dabQueue_.pop();
         const auto dabStart = std::chrono::steady_clock::now();
-        dabAt(d.x, d.y, d.pressure);
+        const bool wasRescaled = live && live->rescaled;
+        dabAt(d.x, d.y, d.pressure, d.stamp);
         ++placed;
+        if (live && !wasRescaled && live->rescaled && slowWiden()) {
+            live->resendLater = true;
+            break;
+        }
         if (doc_.sculptor.batchWaiting() > 0) continue; // (its cost shows when the batch is placed, below)
         // what a dab costs on this mesh with this brush (the backlog limit in strokeTo)
         const double cost = std::chrono::duration<double>(std::chrono::steady_clock::now() - dabStart).count();
@@ -2564,6 +3190,10 @@ void App::drainStrokeDabs(double budgetSeconds) {
     } else {
         doc_.sculptor.endBatch(doc_.mesh, doc_.bvh);
     }
+    // A slow remeshing frame says so in the log (Help > Copy log): a Dynamic dab used to stall for seconds with no trace.
+    if (const double remeshMs = doc_.sculptor.timings.remeshMs - before.remeshMs; remeshMs > 150.0)
+        SDL_Log("Dynamic: %llu dabs remeshed in %.0f ms (%llu triangles in the Part)", (unsigned long long)placed, remeshMs,
+                (unsigned long long)doc_.mesh.triangleCount());
     if (log) {
         const SculptTimings& t = doc_.sculptor.timings;
         SDL_Log("stroke: %llu waiting, %llu placed in %.1f ms (kernel %.1f, normals %.1f, BVH %.1f, %llu vertices), %llu left",
@@ -2574,7 +3204,13 @@ void App::drainStrokeDabs(double budgetSeconds) {
     }
 }
 
-void App::dabAt(float x, float y, float pressure) {
+void App::dabAt(float x, float y, float pressure, bool stamp) {
+    // (tests: SF_DAB_DELAY_MS slows every dab, on the stroke thread too, so a stroke is still draining when the next input comes)
+    static const int delayMs = [] {
+        const char* v = std::getenv("SF_DAB_DELAY_MS");
+        return v && *v ? std::max(0, std::atoi(v)) : 0;
+    }();
+    if (delayMs > 0) std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
     // On the solver thread (predictive strokes) the dab sees the view and the brush settings as they were when its
     // batch began (DabSettings), and nothing the main thread changes meanwhile.
     const DabSettings live = dabView_ ? DabSettings() : dabSettings();
@@ -2586,6 +3222,8 @@ void App::dabAt(float x, float y, float pressure) {
         strokeProbe_->emplace_back(x, y);
         if (strokeRadiusProbe_) strokeRadiusProbe_->push_back(st.radiusPx);
     }
+    std::vector<uint8_t>* hitProbe = dabView_ ? dabView_->hitProbe : strokeProbe_ ? strokeHitProbe_ : nullptr;
+    if (hitProbe) hitProbe->push_back(1); // (0 below when the dab finds no surface)
     const Camera cam = dabView_ ? dabView_->camera : partCamera(); // (a moved linked copy: its own space)
     const glm::vec2 pathPoint(x, y); // (before any scatter: the rake follows the stroke itself)
     const BrushRecipe* recipe = st.recipe;
@@ -2613,7 +3251,10 @@ void App::dabAt(float x, float y, float pressure) {
     RayHit hit;
     // Off the surface but the brush still over it (sliding over a silhouette, #84): the nearest surface within it.
     auto cast = [&](float cx, float cy, RayHit& h) { return dabView_ ? pickWith(*dabView_, cx, cy, h) : pick(cx, cy, h); };
-    if (!pickNearCursor(x, y, st.radiusPx * dabRadiusScale_, cast, hit)) return;
+    if (!pickNearCursor(x, y, st.radiusPx * dabRadiusScale_, cast, hit)) {
+        if (hitProbe) hitProbe->back() = 0;
+        return;
+    }
     if (pressure < 0.0f) pressure = strokePressure();
     pressure = st.pressureCurve.apply(pressure); // the brush's own curve, after the tablet's
 
@@ -2648,6 +3289,10 @@ void App::dabAt(float x, float y, float pressure) {
     p.pickDir = cam.ortho ? cam.forward() : hit.position - cam.position();
     p.pickNormal = glm::length(hit.normal) > 0.0f ? glm::normalize(hit.normal) : glm::vec3(0.0f);
     p.radius = baseRadius * (st.pressureSize ? std::max(pressure, 0.05f) : 1.0f) * dabRadiusScale_;
+    { // (the view's scale at the dab, kept with a Forge Ink dab record: detail depth is picked from it, never re-derived)
+        const float wpp = cam.worldPerPixel(hit.position, canvasH);
+        p.pxPerUnit = wpp > 0.0f ? 1.0f / wpp : 0.0f;
+    }
     // Smooth keeps its own Intensity, whether picked or held with Shift.
     p.strength = (st.brush == BrushType::Smooth ? st.smoothStrength : st.strength) * dabStrengthScale_;
     p.keepVolume = st.brush == BrushType::Smooth && st.smoothKeepVolume;
@@ -2657,10 +3302,16 @@ void App::dabAt(float x, float y, float pressure) {
     p.frontFacesOnly = st.frontFacesOnly;
     p.connectedOnly = st.connectedOnly;
     p.viewFalloff = st.viewFalloff;
+    p.contactFacing = st.contactFacing;
+    p.facingAngle = st.facingAngle;
+    p.stampFootprint = stamp || benchStampFootprint_;
     p.focal = st.focal;
     if (!dabView_) { // (the solver's: when its batch is committed)
         lastDabScreen_ = glm::vec2(x, y);
         lastDabCentre_ = hit.position;
+    } else {
+        dabView_->lastHit = hit.position; // (the solver thread's: the main thread reads it as the batch is committed)
+        dabView_->lastHitSeen = true;
     }
     if (st.mask) {
         p.strength = st.maskStrength;
@@ -2672,10 +3323,18 @@ void App::dabAt(float x, float y, float pressure) {
     // Spray's own turn. Custom and Community brushes get them too: dabRecipe turns their alpha by alphaUp.
     if (!haveLastDab_) {
         alphaRake_.reset(pathPoint);
-        alphaSeed_ = 0x9e3779b9u;
+        alphaSeed_ = 0x9e3779b9u + 0x632be5abu * ++alphaStrokeSerial_;
     }
+    if (st.pool && !st.pool->empty()) p.alpha = st.pool->pick(alphaSeed_).get(); // (the stroke's pool keeps it alive)
     alphaRake_.update(pathPoint);
     dabAngle_ += alphaDabAngle(st.alphaOptions, alphaRake_, alphaSeed_);
+    if (const AlphaDabJitter j = alphaDabJitter(st.alphaOptions, alphaSeed_); j.scale != 1.0f || j.offset != glm::vec2(0.0f)) {
+        p.radius *= j.scale;
+        // Moved on the screen's plane, kept on the surface (along the tangent plane at the hit).
+        glm::vec3 move = (cam.orientation() * glm::vec3(j.offset.x, j.offset.y, 0.0f)) * p.radius;
+        if (glm::length(p.pickNormal) > 0.0f) move -= p.pickNormal * glm::dot(move, p.pickNormal);
+        p.center += move;
+    }
     lastDabAngle_ = dabAngle_;
     p.alphaUp = cam.orientation() * glm::vec3(-std::sin(dabAngle_), std::cos(dabAngle_), 0.0f); // screenUpVector
     p.vdm = st.vdm;
@@ -2700,17 +3359,24 @@ void App::dabAt(float x, float y, float pressure) {
 void App::queueGrab(const glm::vec3& delta) {
     // Move followed every pointer sample with a whole move of its region (positions, normals, BVH): at 240 samples
     // a second on 33M triangles a frame did several, the next frame got more samples, and the view stalled for
-    // seconds. Each sample still moves the positions (the cheap part); the normals and the BVH, which depend only on
-    // where the vertices end up, follow once a frame (flushGrab): the same mesh, bit for bit. Scripts and
-    // recordings do both at once.
-    doc_.sculptor.grabMove(doc_.mesh, delta);
+    // seconds. The normals and the BVH, which depend only on where the vertices end up, follow once a frame
+    // (flushGrab); in the app's loop so do the positions: a frame's samples move the region in one pass, each vertex
+    // by each sample in turn (Sculptor::grabMoves: the same bits; 7M triangles at 240 px cost ~30 ms a sample, so
+    // a slow frame took more samples and the next was slower). Scripts and recordings do it all at once.
     grabPending_ = true;
-    if (!interactiveStrokes_) flushGrab();
+    if (interactiveStrokes_) {
+        grabQueued_.push_back(delta);
+        return;
+    }
+    doc_.sculptor.grabMove(doc_.mesh, delta);
+    flushGrab();
 }
 
 void App::flushGrab() {
     if (!grabPending_) return;
     grabPending_ = false;
+    doc_.sculptor.grabMoves(doc_.mesh, grabQueued_);
+    grabQueued_.clear();
     doc_.sculptor.grabFinish(doc_.mesh, doc_.bvh);
 }
 
@@ -2720,6 +3386,11 @@ void App::endStroke() {
     doc_.sculptor.microBaseFuse = true; // (big dabs on a micro level's base: these go through together)
     drainStrokeDabs(0.0); // the dabs still waiting belong to this stroke
     doc_.sculptor.microBaseFuse = false;
+    if (stampPlaced_ && !strokeMask_ && doc_.sculptor.strokeActive()) { // Drag / Slide Stamp: the final stamp takes the footprint, once (#174)
+        stampPlaced_ = false;
+        if (strokeType_ == StrokeType::DragRect) dragRectTo(stampCursor_.x, stampCursor_.y, true);
+        else if (strokeType_ == StrokeType::DragDot) dragDotTo(stampCursor_.x, stampCursor_.y, true);
+    }
     doc_.sculptor.flushDetailClone(doc_.mesh, doc_.bvh, symmetry_); // a Detail Clone click
     kelvinFinish(); // the rest of a Kelvinlet move (PanelKelvinlet.cpp)
     // (a command can end a Ctrl+click before its release: finishStrokeNow clears the mask click too)
@@ -2731,6 +3402,12 @@ void App::endStroke() {
 // ---------------------------------------------------------------------------
 
 void App::runCommand(const std::string& name, const Args& args) {
+    if (interactiveCommand_ > 0 && macros_.runDepth == 0 && commandSource_.empty() && (strokeDraining() || !drainQueue_.empty())) {
+        drainQueue_.emplace_back(name, args);
+        status_ = drainStatus();
+        lastCommandOk_ = true;
+        return;
+    }
     // In the app a macro asks before it first runs and a pack is reviewed before it's installed (PanelPacks.cpp),
     // whether they come from a button, a key, the console or a script.
     if (name == "macro_run" && macros_.runDepth == 0) {
@@ -2752,17 +3429,46 @@ void App::runCommand(const std::string& name, const Args& args) {
         lastCommandOk_ = packs_.review != nullptr;
         return;
     }
+    if (name == "open") { // a Focus Detail file is the app's (a streamed level), not the core command's
+        const std::string path = argString(args, "path");
+        std::string ext = extensionUtf8(path);
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        if (ext == ".sfdetail") {
+            lastCommandOk_ = openFocusDetail(path);
+            return;
+        }
+    }
+    // #173: these rebuild the Part's mesh, so a Part with subdivision levels loses them: ask first (Undo brings them back).
+    // A running macro and the "keep original" / preview forms don't touch the levels.
+    if (macros_.runDepth == 0) {
+        const char* op = nullptr;
+        if (name == "delete_masked") op = "Delete Masked";
+        else if (name == "delete_hidden") op = "Remove Hidden";
+        else if (name == "mirror") op = "Mirror";
+        else if (name == "mirror_and_weld") op = "Make Symmetric";
+        else if (name == "weld_points" && !argBool(args, "preview", false)) op = "Merge by Distance";
+        else if ((name == "part_split_hidden" || name == "part_split_masked" || name == "part_split_unmasked") &&
+                 !argBool(args, "keep", false))
+            op = "Split";
+        if (op && !levelsAllow(op, [this, name, args] { runCommand(name, args); })) {
+            lastCommandOk_ = false;
+            return;
+        }
+    }
     // A big mesh (Subdivide, Add Level, micro, remesh) asks first when it wouldn't fit the memory free now.
     if (!memoryAllows(name, args, [this, name, args] { runCommand(name, args); })) {
         lastCommandOk_ = false;
         return;
     }
     if (doc_.sculptor.strokeActive()) endStroke();
+    if (!drainQueue_.empty()) runDrainQueue(); // (what a shortcut queued runs before this, as it was asked first)
     if (drape_) finishDrape(true); // (a running Drape keeps where it got to first: undo, save... see a real step)
-    if (name == "save_project") storeProjectSettings();
+    if (name == "garment_drape") garmentDraped(); // (the placement preview would be a collider: it goes first)
+    if (name == "save_project" || name == "save_visible_parts") storeProjectSettings(); // (the copy keeps the view's materials too)
     flushBrushEdits(); // commands may replace brushes: save edits first, then watch what's there afterwards
     crashlog::action(name); // (failures reach the log through SDL_Log below)
     const auto commandStart = std::chrono::steady_clock::now();
+    const size_t trisBefore = name == "subdivide" ? doc_.mesh.triangleCount() : 0;
     // OBJ and PLY have no units: read them in the Preferences > Interface > OBJ/PLY in unit unless the call says.
     Args withUnit;
     if ((name == "open" || name == "open_obj" || name == "part_append") && !args.contains("unit")) {
@@ -2776,8 +3482,11 @@ void App::runCommand(const std::string& name, const Args& args) {
     }
     // Auto UV unwraps on a worker (seconds on big meshes): the frame never waits for it. A running macro keeps the
     // synchronous command, as its next steps read the UVs at once.
+    // Image / text to 3D waits on a hosted model (seconds to minutes): the same, the window never freezes.
+    const bool generates = (name == "image_to_3d" || name == "text_to_3d") && macros_.runDepth == 0 && commands_.find(name);
     CommandResult r = name == "uv_auto" && macros_.runDepth == 0 ? startAutoUvCommand(args)
-                                                                 : commands_.execute(doc_, name, withUnit.empty() ? args : withUnit);
+                      : generates                               ? startGenerateCommand(name, args)
+                                                                : commands_.execute(doc_, name, withUnit.empty() ? args : withUnit);
     if (perftrace::on()) { // a command that held up the frames (remesh, Add Level, micro, open...)
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count();
         if (ms > perf_.traceLongMs) {
@@ -2789,6 +3498,7 @@ void App::runCommand(const std::string& name, const Args& args) {
     status_ = r.message;
     if (name.rfind("uv_", 0) == 0 || name == "texture_create" || name == "texture_delete") uvEditorChanged();
     garmentsChanged(name.rfind("garment_", 0) == 0); // (the Pattern window re-reads the pattern)
+    if (name == "garment_drape") garmentPreviewDirty_ = false; // (no preview over the Part it made)
     lastCommandOk_ = r.ok;
     if (r.ok && name != "export_glb" && name != "export_lods" && name != "export_usd" && name != "export_fbx" &&
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
@@ -2805,6 +3515,9 @@ void App::runCommand(const std::string& name, const Args& args) {
     if (r.ok && name == "save_obj" && !doc_.mesh.layers.empty())
         status_ += " (OBJ stores the current blend; export GLB to keep layers as blend shapes)";
     if (!r.ok) SDL_Log("%s failed: %s", name.c_str(), r.message.c_str());
+    if (r.ok && name == "subdivide") // (a log that ends in a refusal shows what the presses before it made, and what they took)
+        SDL_Log("subdivide: %zu -> %zu triangles, %.0f ms", trisBefore, doc_.mesh.triangleCount(),
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - commandStart).count());
     if (r.ok && (name == "new_sphere" || name == "new_plane" || name == "new_head" || name == "new_starter_mesh" ||
                  name == "open_obj" || name == "open" || name == "image_relief" || name == "image_inflate" || name == "splat_to_mesh" ||
                  (name == "splat_transform" && args.contains("fit"))))
@@ -2849,9 +3562,9 @@ void App::queueFile(FileAction action, std::string path) {
                 : action == FileAction::ExportUsd  ? ".usdz"
                 : action == FileAction::SaveSplats ? ".ply"
                 : action == FileAction::ExportUnreal ? ".fbx"
-                : action == FileAction::SaveProject ? ".sfproj"
+                : action == FileAction::SaveProject || action == FileAction::SaveVisibleParts ? ".sfproj"
                                                    : ".glb";
-    else if (action == FileAction::SaveProject && !path.empty() && !isProjectPath(path))
+    else if ((action == FileAction::SaveProject || action == FileAction::SaveVisibleParts) && !path.empty() && !isProjectPath(path))
         path += kProjectExtension; // as save_project does, so the recent list gets the real name
     std::lock_guard lock(pendingMutex_);
     pendingFiles_.push_back({action, std::move(path)});
@@ -2871,9 +3584,10 @@ void App::openFileDialog() {
 
 // Opens models, brushes or reference images based on the file type.
 void App::openPath(const std::string& path) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = extensionUtf8(path);
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     if (Image::isImagePath(path)) {
+        if (takeReferenceDrop(path)) return; // View > Reference images showing: it becomes one (ReferenceImages.cpp)
         if (loadReferenceImage(path)) {
             if (ai::aiEnabled()) showImageTo3D_ = true;
             else status_ = "Image loaded: Relief, Inflate or Stamp it from Mesh > From Image";
@@ -3005,6 +3719,9 @@ void App::processPendingFiles() {
             break;
         }
         case FileAction::SaveProject: saveProjectTo(f.path); break;
+        case FileAction::SaveVisibleParts:
+            if (!f.path.empty()) runCommand("save_visible_parts", {{"path", f.path}});
+            break;
         case FileAction::AppendPart:
             runCommand("part_append", {{"path", f.path}});
             if (lastCommandOk_) frameView(sceneBounds()); // a model can be any size, anywhere
@@ -3015,7 +3732,7 @@ void App::processPendingFiles() {
             insertType_ = "mesh";
             insertMeshKey_ = "file";
             insertMeshValue_ = f.path;
-            status_ = "Insert " + std::filesystem::path(std::u8string(f.path.begin(), f.path.end())).filename().string() +
+            status_ = "Insert " + fileNameUtf8(f.path) +
                       ": drag on the model to place it. Esc or a brush stops.";
             break;
         case FileAction::InsertSet: chooseInsertSet(f.path); break; // Insert on the model > Set (PanelParts.cpp)
@@ -3033,6 +3750,7 @@ Mesh& App::displayedMesh() {
 }
 
 void App::syncScene() {
+    renderer_.setReferences(doc_.references); // View > Reference images (ReferenceImages.cpp; not the mesh: always)
     if (solverBusy()) return; // the solver thread is changing the mesh: the GPU keeps what it has (AsyncStroke.cpp)
     updateFloorHeight();
     // Fill layers: Mesh Maps bakes started and landed (live after sculpting), and a painted mask's tiles evaluated.
@@ -3043,8 +3761,10 @@ void App::syncScene() {
     Mesh& shown = displayedMesh();
     if (&shown != lastDisplayed_) shown.topologyDirty = true;
     lastDisplayed_ = &shown;
+    updateBooleanPreview(); // (before the upload clears this frame's dirty marks: BooleanPreview.cpp)
+    Mesh* booleanResult = booleanPreviewMesh();
     std::vector<SceneMesh> scene;
-    scene.reserve(doc_.parts.size());
+    scene.reserve(doc_.parts.size() + 1);
     for (int i = 0; i < doc_.partCount(); ++i) {
         Part& s = doc_.parts[size_t(i)];
         const bool active = i == doc_.activePart;
@@ -3054,12 +3774,30 @@ void App::syncScene() {
         const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
         const uint32_t key = doc_.meshKey(i); // (linked Parts, #94: one GPU mesh, drawn where each is)
         scene.push_back({key, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
-        scene.back().model = s.transform;
+        scene.back().model = gizmoDrawnTransform(i);
         scene.back().pbr = renderSettings_.pbr();
         if (active && &shown == &doc_.mesh) scene.back().overlay = uvEditorOverlay(s.id); // the UV Editor's colours
+        if (booleanResult && booleanPreviewDrawn(s.id)) scene.back().visible = false; // (the result stands in for it)
+    }
+    if (booleanResult) {
+        // Drawn as the active Part is when that is one of its sources (not dimmed), else like the others.
+        const bool activeSource = booleanPreviewDrawn(doc_.activePartInfo().id);
+        scene.push_back({BooleanPreviewState::kKey, booleanResult, activeSource, true, nullptr,
+                         activeSource && renderSettings_.wireframe, renderSettings_.flatShading});
+        scene.back().pbr = renderSettings_.pbr();
     }
     renderer_.syncScene(scene);
-    renderer_.syncSplats(doc_.splats, doc_.splatsVersion);
+    renderer_.syncSplats(doc_.splats, doc_.splatsVersion,
+                         splatViewColorForced_ || currentTierConfig().hwTier != HwTier::Floor);
+    // A texture the GPU cannot show on this model (renderer: past its limits): say so once, rather than leave a model
+    // that paints nothing and no word why.
+    {
+        const bool notShown = hasTexture(doc_.mesh) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart));
+        if (notShown && !textureNoticeShown_)
+            status_ = "This graphics chip can't show the texture on a model this dense: painting goes into the texture (see the UV view), lower the triangle count to see it";
+        textureNoticeShown_ = notShown;
+    }
+    updateUndoNotice();
     if (partPanelShown_) updatePartThumbnails(); // from the buffers just synced (PanelParts.cpp)
     partPanelShown_ = false;
 }
@@ -3092,15 +3830,38 @@ void App::generateLods() {
 }
 
 void App::clearLods() {
+    // The LODs go; the shown mesh changes only when one was previewed. Otherwise syncScene keeps sending just what
+    // changed (an undo on a 6M triangle mesh was a full upload and proxy rebuild each, half a second, #181).
+    const bool previewed = previewLod_ >= 0;
     lods_.clear();
     previewLod_ = -1;
-    lastDisplayed_ = nullptr;
+    if (previewed) lastDisplayed_ = nullptr;
+}
+
+void App::updateUndoNotice() {
+    size_t dropped = 0;
+    bool over = false;
+    for (int i = 0; i < doc_.partCount(); ++i) {
+        const UndoStack::Notice n = doc_.partUndo(i).takeNotice();
+        dropped += n.dropped;
+        over = over || n.lastStepOver;
+    }
+    if (!dropped && !over) return;
+    std::string msg;
+    if (dropped) {
+        char buf[160];
+        std::snprintf(buf, sizeof buf, dropped == 1 ? tr("Oldest undo step removed to free memory") : tr("Oldest %d undo steps removed to free memory"),
+                      int(dropped));
+        msg = buf;
+    }
+    if (over) msg += (msg.empty() ? "" : ". ") + std::string(tr("The last step alone is over the undo budget, so it is kept"));
+    status_ = msg;
 }
 
 void App::updateTitle() {
     std::string name = doc_.path.empty()
                            ? std::string("Untitled")
-                           : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
+                           : fileNameUtf8(doc_.path);
     updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
     // "Head.sfproj* — SculptForge 0.11.13": the document first (taskbars and Alt-Tab cut the end off), the version
     // last, so support screenshots show it.
@@ -3117,6 +3878,11 @@ void App::updateTitle() {
 // ---------------------------------------------------------------------------
 
 void App::drawUi() {
+    // A press in the window a context menu or combo list came from, which ImGui left open: closed once the frame is drawn (#210).
+    struct CloseAfter {
+        App& app;
+        ~CloseAfter() { app.closeParentPressPopup(); }
+    } closeAfter{*this};
     // An Extract preview goes once its source changes or another Part is picked (strokes aren't commands).
     if (doc_.extractPreview.id && !doc_.sculptor.strokeActive()) doc_.dropExtractPreview(true);
     drawProjectPopups();
@@ -3133,11 +3899,14 @@ void App::drawUi() {
     drawBrushGallery();
     if (showImageTo3D_ && ai::aiEnabled()) drawImageTo3D(); // (closed when AI goes off; never drawn while it is)
     drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
+    drawDeckWindow();  // File > Forge Deck (PanelDeck.cpp)
     drawUvEditor();    // Tool > Texture Image > UV Editor (PanelUvEditor.cpp)
     drawGarments();    // Tool > Garments > Pattern (PanelGarments.cpp)
     drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
     pollAlphaFile();
+    BrushAlpha::finishCreature(doc_.brushAlpha, false); // a Creature Skin alpha made in the background since the pick
     pollStencilFile();
+    pollReferenceFiles();
     syncBrushSettings(); // a brush switch brings back that brush's own settings (#78); before pollVdm's stroke
     syncWorldSize(); // World Size: the brush keeps its size on the surface as you zoom (Precision.cpp)
     pollVdm();
@@ -3150,6 +3919,7 @@ void App::drawUi() {
     }
     const ImVec2 mouse(mouseX_, mouseY_);
     drawStencilOverlay(); // the Stencil and, in Adjust, its handles (StencilOverlay.cpp)
+    drawReferenceOverlay(); // Adjust Reference's outlines and handles (ReferenceImages.cpp)
     drawGizmo(); // Transform gizmo handles and panel (Gizmo.cpp)
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
     drawEdgeOverlay();   // Edges mode: the selected edges (PanelEdges.cpp)
@@ -3166,12 +3936,14 @@ void App::drawUi() {
     drawTubeOverlay();        // Draw Tube's trail and cursor, a Tube Part's points (PanelTube.cpp)
     drawFaceOverlay();   // facial landmarks (PanelFace.cpp)
     drawSplatTrainOverlay(); // splat training progress (PanelSplatTrain.cpp)
+    drawRenderBridgeOverlay(); // the Render window, the render helper prompt (PanelRenderBridge.cpp)
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     drawGradientOverlay();   // Line Gradient: the line and its end handles (LineGradient.cpp)
     if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
     if (uiPrefs_.showViewFigure) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
+    drawViewportToast();
     if (drag_ == Drag::Insert) { // the size the insert will get
         insertPx_ = std::hypot(mouse.x - insertX_, mouse.y - insertY_);
         ImGui::GetForegroundDrawList()->AddCircle(ImVec2(insertX_, insertY_), std::max(insertPx_, 12.0f * uiScale_),
@@ -3203,6 +3975,7 @@ void App::drawUi() {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::Begin(tr("About SculptForge"), &showAbout_, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
+            const float headerY = ImGui::GetCursorPosY();
             brand::bustItem(64.0f * uiScale_); // the bust; beside it the name, version and what it is
             ImGui::SameLine(0.0f, 12.0f * uiScale_);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f);
@@ -3210,6 +3983,13 @@ void App::drawUi() {
             ImGui::Text(tr("SculptForge %s"), appVersionLabel().c_str());
             ImGui::TextUnformatted(tr("Free and open-source digital sculpting."));
             ImGui::EndGroup();
+            const float headerEnd = ImGui::GetCursorPosY();
+            // the community icons, top right, level with the version line
+            drawSocialRow("about", ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x - socialRowWidth(),
+                                          ImGui::GetWindowPos().y - ImGui::GetScrollY() + headerY +
+                                              (64.0f * uiScale_ - 2.0f * ImGui::GetTextLineHeightWithSpacing()) * 0.5f +
+                                              ImGui::GetTextLineHeight() * 0.5f));
+            ImGui::SetCursorPosY(headerEnd);
             ImGui::Spacing();
             if (const StudioStart& studio = studioMode(); studio.active) { // a studio build: its logo and name
                 const StudioProfile& p = studio.profile;
@@ -3249,11 +4029,14 @@ void App::drawUi() {
         ImGui::End();
     }
     drawSupportUi(); // the first-run welcome, the one support reminder (PanelSupport.cpp)
-    guide_.draw(*this);  // Help > User Guide
+    if (!panelDetached("guide")) guide_.draw(*this); // Help > User Guide (or in its own window: PanelWindows.cpp)
+    drawFloatingPanels(); // palettes detached where there are no windows of their own (PanelWindows.cpp)
+    drawMyPanelFloating(); // My Panel on its key (PanelMyPanel.cpp)
     drawBrushSetSave();  // Save Shelf as Brush Set, Delete Brush Set (PanelBrushSets.cpp)
     drawPacksUi();       // pack review, New Pack, macro confirmation and editor (PanelPacks.cpp)
     drawPluginWindow();  // a plugin's parameters, Apply / Add Part, Stop (PanelPlugins.cpp)
     drawMemoryConfirm(); // "Not enough free memory" before a big mesh (MemoryConfirm.cpp)
+    drawVoxelHighResConfirm(); // Voxel Remesh above 512: what it will make, once (PanelRetopo.cpp)
     drawAiLink();        // live mode: Approve / Allow dialogs, the "AI connected" badge (PanelAiLink.cpp)
     drawMayaLinkDialog(); // the Maya Live link's warning (PanelMaya.cpp)
     drawConnectAi();     // Help > Connect an AI tool (PanelConnectAi.cpp)
@@ -3494,9 +4277,16 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
             break;
         case RecipeParam::Kind::Bool:
             ImGui::Checkbox(p.label, &recipe.frontFacesOnly);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", p.help);
             ImGui::Checkbox(tr("Connected only##recipe"), &recipe.connectedOnly); // (falloff options, not recipeParams)
             ImGui::Checkbox(tr("View falloff##recipe"), &recipe.viewFalloff);
-            break;
+            ImGui::Checkbox(tr("Lock plane##recipe"), &recipe.planeLock); // (hard-surface planes, not recipeParams)
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", tr("Keep the plane the stroke starts on for the whole stroke."));
+            ImGui::Checkbox(tr("Crisp edge##recipe"), &recipe.crispEdge);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                ImGui::SetTooltip("%s", tr("A hard, clean tip edge and a full plane pull, for hard-surface planes."));
+            continue; // (each has its own tooltip)
         case RecipeParam::Kind::Enum: {
             int idx = recipe.enumIndex(p.key);
             if (ImGui::Combo(p.label, &idx, p.options.data(), int(p.options.size()))) recipe.setEnumIndex(p.key, idx);
@@ -3793,6 +4583,11 @@ bool App::loadReferenceImage(const std::string& path) {
     }
     refImage_ = std::move(img);
     refImagePath_ = path;
+    { // does Generate 3D get a clean subject from this picture? (transparent, or a plain backdrop it can cut out)
+        bool cut = false;
+        refImage_.withoutPlainBackground(&cut);
+        refImageBusyBackground_ = !cut && refImage_.transparentFraction() < 0.10f;
+    }
     if (!refTexture_) gl::GenTextures(1, &refTexture_);
     gl::BindTexture(GL_TEXTURE_2D, refTexture_);
     gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -4001,6 +4796,11 @@ void App::drawImageTo3D() {
         auto fileName = std::filesystem::path(std::u8string(refImagePath_.begin(), refImagePath_.end())).filename().u8string();
         ImGui::TextDisabled("%s  (%dx%d)", std::string(fileName.begin(), fileName.end()).c_str(), refImage_.width,
                             refImage_.height);
+        if (refImageBusyBackground_) { // (before anything is sent)
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.45f, 1.0f));
+            ImGui::TextWrapped("%s", tr("Best results: a single object on a plain or transparent background."));
+            ImGui::PopStyleColor();
+        }
     }
 
     auto hint = [](const char* text) {
@@ -4018,10 +4818,12 @@ void App::drawImageTo3D() {
     hint(tr(textMode_ ? "Builds a whole model from the description with a generative 3D model, then makes it sculptable."
                    : "Builds the whole model - limbs, face, back - from one picture with a reconstruction model, then "
                      "makes it sculptable. Characters on a transparent background work best."));
+    drawRecommendedModels(); // PanelGenerate3D.cpp
     const char* services[] = {tr("Hugging Face - free models"), tr("fal.ai - paid, your key"), tr("Meshy - paid, your key"),
-                              tr("Hyper3D Rodin (direct) - paid, your key"), tr("ComfyUI - your server"),
+                              tr("Hyper3D Rodin (direct) - paid, your key"), tr("Tripo (direct) - paid, your key"),
+                              tr("ComfyUI - your server"),
                               tr("My generator command"), tr("Offline blockout (inflate silhouette)")};
-    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "hyper3d", "comfyui", "command", "inflate"};
+    static const char* serviceIds[] = {"huggingface", "fal", "meshy", "hyper3d", "tripo", "comfyui", "command", "inflate"};
     constexpr int kServices = int(std::size(serviceIds));
     int service = 0;
     for (int i = 0; i < kServices; ++i)
@@ -4040,15 +4842,27 @@ void App::drawImageTo3D() {
         for (const auto& p : presets)
             if (aiSettings_.hfModel == p.id) preview = tr(p.label);
         if (ImGui::BeginCombo(tr("Model"), preview)) {
-            for (const auto& p : presets)
-                if (ImGui::Selectable(tr(p.label), aiSettings_.hfModel == p.id)) {
+            for (const auto& p : presets) {
+                // A Space the feed reports switched off is greyed with the reason, not offered to hang on.
+                const ai::health::Entry hs = ai::health::of(p.id);
+                const bool off = hs.state == ai::health::State::Off;
+                std::string label = tr(p.label);
+                if (hs.state != ai::health::State::Up)
+                    label += std::string("  (") + tr(ai::health::label(hs.state)) + (hs.note.empty() ? "" : ": " + hs.note) + ")";
+                if (off) ImGui::BeginDisabled();
+                if (ImGui::Selectable((label + "##" + p.id).c_str(), aiSettings_.hfModel == p.id)) {
                     aiSettings_.hfModel = p.id;
                     aiSettings_.hfModelChosen = true;
                 }
+                if (off) ImGui::EndDisabled();
+            }
             ImGui::EndCombo();
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr(ai::kHunyuanLicenceNote));
         const bool hasToken = hfToken_[0] || !ai::AiSettings{}.resolvedHfToken().empty(); // field, else HF_TOKEN
+        if (std::string note; ai::resolveHfPreset(aiSettings_, textMode_, &note).id != aiSettings_.hfModel && !note.empty() &&
+                              ai::health::of(aiSettings_.hfModel).state == ai::health::State::Off)
+            hint(note.c_str()); // (the chosen Space is switched off: this one runs instead)
         if (ai::hunyuanModel(aiSettings_.hfModel)) hint(tr(ai::kHunyuanLicenceNote));
         if (aiSettings_.hfModel == "trellis-2" && !hasToken)
             hint(tr("TRELLIS.2 needs a free Hugging Face token; without one, Hunyuan3D 2.1 runs instead."));
@@ -4097,6 +4911,23 @@ void App::drawImageTo3D() {
                      : tr("Using your key from the system keychain."));
         hint(tr("Sends your image or description to Hyper3D (api.hyper3d.com), which builds the model. Each generation "
                 "is billed to your Hyper3D account. Basic API access covers Extreme Low and Low."));
+    } else if (serviceId == "tripo") {
+        const auto& models = ai::tripo::models();
+        const std::string model = ai::tripo::resolvedModel(aiSettings_.tripoModel);
+        const char* preview = tr(models[0].label);
+        for (const auto& m : models)
+            if (model == m.id) preview = tr(m.label);
+        if (ImGui::BeginCombo(tr("Model"), preview)) {
+            for (const auto& m : models)
+                if (ImGui::Selectable(tr(m.label), model == m.id)) aiSettings_.tripoModel = m.id;
+            ImGui::EndCombo();
+        }
+        ImGui::InputText(tr("API key##tripo"), tripoKey_, sizeof tripoKey_, ImGuiInputTextFlags_Password);
+        if (!tripoKey_[0])
+            hint(aiSettings_.resolvedTripoKey().empty() ? tr("Off until you add your own key from your Tripo account (developers.tripo3d.ai).")
+                                                        : tr("Using your key from the system keychain."));
+        hint(tr("Sends your image or description to Tripo (openapi.tripo3d.ai), which builds the shape. About $0.20 a picture "
+                "and $0.10 a description, billed to your Tripo account."));
     } else if (serviceId == "comfyui") {
         drawComfyUi();
     } else if (serviceId == "command") {
@@ -4110,12 +4941,13 @@ void App::drawImageTo3D() {
     if (serviceId != "inflate") {
         // Candidates: several shapes side by side to pick from. Billed services start at one (each is a generation
         // on the user's key); the free and local ones at three.
-        int& count = serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d" ? paidCandidateCount_ : candidateCount_;
+        const bool paid = serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d" || serviceId == "tripo";
+        int& count = paid ? paidCandidateCount_ : candidateCount_;
         ImGui::SliderInt(tr("Candidates"), &count, 1, 3);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
             ImGui::SetTooltip("%s", tr("How many shapes to make at once, shown side by side so you can pick the strongest "
                                        "form before you spend time sculpting it."));
-        if (count > 1 && (serviceId == "fal" || serviceId == "meshy" || serviceId == "hyper3d")) {
+        if (count > 1 && paid) {
             char billed[160];
             std::snprintf(billed, sizeof billed, tr("Each candidate is one generation on your key: %d are billed."), count);
             hint(billed);
@@ -4148,8 +4980,30 @@ void App::drawImageTo3D() {
             if (generatorProgress_) generatorProgress_->cancel = true;
             for (const auto& p : candidateProgress_) p->cancel = true;
         }
+    } else if (const std::string offReason = hfOffReason(); !offReason.empty()) {
+        ImGui::BeginDisabled();
+        ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0));
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", offReason.c_str());
+        hint(offReason.c_str());
+        hint(tr("Choose another model, or a paid service from the Recommended list."));
+    } else if (const std::string offKey = textOffKey(); !offKey.empty() && textOffPresets_.count(offKey)) {
+        ImGui::BeginDisabled();
+        ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0));
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", tr("Switched off by the Space's owner, use Image to 3D"));
+        if (ImGui::SmallButton(tr("Try again"))) {
+            textOffPresets_.erase(offKey);
+            generatorError_.clear();
+        }
     } else if (ImGui::Button(tr("Generate 3D model"), ImVec2(-1, 0))) {
         startGenerator();
+    }
+    if (!generatorError_.empty() && !pendingGenerator_.valid()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.45f, 0.40f, 1.0f));
+        ImGui::TextWrapped("%s", generatorError_.c_str());
+        ImGui::PopStyleColor();
     }
     drawSendNotice(SendPanel::Generate3D);
     if (openHunyuanNotice_) {
@@ -4157,7 +5011,11 @@ void App::drawImageTo3D() {
         openHunyuanNotice_ = false;
     }
     ImGui::SetNextWindowSize(ImVec2(320 * scale, 0));
-    if (ImGui::BeginPopupModal(tr("Hunyuan3D licence###hunyuan.licence"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ui::PushRole(theme::Role::Warning);
+    const bool licenceOpen = ImGui::BeginPopupModal(tr("Hunyuan3D licence###hunyuan.licence"), nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (licenceOpen) {
+        ui::RoleStrip(theme::Role::Warning);
         ImGui::TextWrapped("%s", tr(ai::kHunyuanLicenceNote));
         ImGui::TextDisabled("%s", tr("This stays in the Model tooltip."));
         if (ImGui::Button(tr("OK"), ImVec2(-1, 0))) ImGui::CloseCurrentPopup();
@@ -4169,6 +5027,7 @@ void App::drawImageTo3D() {
         aiSettings_.falModel = falModel_;
         aiSettings_.meshyKey = meshyKey_;
         aiSettings_.hyper3dKey = hyper3dKey_;
+        aiSettings_.tripoKey = tripoKey_;
         aiSettings_.hfToken = hfToken_;
         aiSettings_.comfyUrl = comfyUrl_;
         std::string err;
@@ -4374,6 +5233,7 @@ bool App::axisGizmoMouseDown(float x, float y) {
     const bool plain = !((SDL_GetModState() | keyMods()) & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
     if (hit < 0 && plain && uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
         drag_ = Drag::Orbit;
+        orbitPivotPicked_ = true; // (about the target: the gizmo's disc is not a point on the model)
         rightClick_.pending = false;
         return true;
     }
@@ -4555,15 +5415,18 @@ void App::drawBrushCursor() {
     if (sizeRingPreview_) {
         at = glm::vec2(opened.x, opened.y);
         if (which == PickerUi::Slider::DrawSize) r = value;
-        else focal = value;
+        else if (which == PickerUi::Slider::FocalShift) focal = value;
+        else r = radiusPx_; // Intensity: the ring keeps the size, the disc inside it is the strength
         sizeRingPreviewPx_ = r;
+        sizeRingPreviewValue_ = value;
+        sizeRingPreviewIntensity_ = which == PickerUi::Slider::ZIntensity || which == PickerUi::Slider::RgbIntensity;
     }
     const ImVec2 c(at.x, at.y);
     const SDL_Keymod mod = inputMods();
     const bool inverted = drag_ == Drag::Stroke ? strokeInvert_
                                                 : invertToggle_ != (((mod & SDL_KMOD_ALT) != 0) ||
                                                                     (erasing() && eraserAction() == PenAction::Invert));
-    const bool masking = drag_ == Drag::Stroke ? strokeMask_ : ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT);
+    const bool masking = drag_ == Drag::Stroke ? strokeMask_ : ctrlDown(mod) && !(mod & SDL_KMOD_SHIFT) && heldSlot() != ModifierSlot::Ctrl;
     if (masking && drag_ != Drag::Stroke && maskShape_ != SelectShape::Pen) { // MaskLasso / MaskRect: a crosshair
         const float arm = 8.0f * uiScale_;
         dl->AddLine(ImVec2(c.x - arm, c.y), ImVec2(c.x + arm, c.y), IM_COL32(230, 230, 230, 220), 1.5f);
@@ -4591,6 +5454,30 @@ void App::drawBrushCursor() {
         } else {
             dl->AddCircleFilled(c, 2.0f * uiScale_, col);
         }
+    }
+    if (sizeRingPreview_) {
+        // While a pop-up sets it, the ring must read on any model and in both themes: a dark halo under a full-strength
+        // ring, flat on the screen (the surface ring above lies on the model and can be faint at a glancing angle).
+        const ImU32 solid = (col & 0x00ffffff) | 0xff000000;
+        dl->AddCircle(c, r, IM_COL32(0, 0, 0, 170), 64, 4.0f * uiScale_);
+        dl->AddCircle(c, r, solid, 64, 2.0f * uiScale_);
+        if (sizeRingPreviewIntensity_) { // Intensity: a disc whose radius is the strength, an opacity ring at its rim
+            const float rr = r * std::clamp(sizeRingPreviewValue_, 0.0f, 1.0f);
+            dl->AddCircleFilled(c, rr, (solid & 0x00ffffff) | (150u << 24), 64);
+            dl->AddCircle(c, rr, IM_COL32(255, 255, 255, 230), 64, 1.5f * uiScale_);
+        }
+    }
+    // Front faces only is easy to leave on and then wonder why Smooth and the other brushes skip the inner side of
+    // a thin Part (an Extract's inside, #bug-reports): say so by the cursor while it is on.
+    frontFacesTagShown_ = frontFacesOnly_ && !masking && !sizeRingPreview_;
+    if (frontFacesTagShown_) {
+        const char* label = tr("Front faces only");
+        const ImVec2 size = ImGui::CalcTextSize(label);
+        const float pad = 3.0f * uiScale_;
+        const ImVec2 at0(c.x - size.x * 0.5f, c.y + r + 6.0f * uiScale_);
+        dl->AddRectFilled(ImVec2(at0.x - pad, at0.y - pad), ImVec2(at0.x + size.x + pad, at0.y + size.y + pad),
+                          IM_COL32(20, 20, 24, 190), 3.0f * uiScale_);
+        dl->AddText(at0, IM_COL32(255, 210, 130, 255), label);
     }
     if (!sizeRingPreview_) drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp; the pop-up shows the size itself)
 }

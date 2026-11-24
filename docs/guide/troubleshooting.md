@@ -1,5 +1,12 @@
 # Troubleshooting: tablets, display, crashes and FAQ
 
+![Ctrl-hover help on a button](images/ctrl-help.jpg)
+
+> **In short:**
+> - Fixes for start-up, graphics, tablet and AI service problems.
+> - Starts with a quick-answers table for the common problems.
+> - Also covers settings locations, resetting the interface and reporting a bug.
+
 This chapter collects fixes for common problems: start-up and graphics errors, tablets, AI service messages,
 ComfyUI errors, the camera notch, first-launch warnings on macOS and Windows, where SculptForge keeps its
 settings, how to reset the interface, and how to report a bug.
@@ -63,8 +70,11 @@ documentation** opens links to it).
 - Hide Parts you aren't working on, or **Solo** the active one.
 - A large Gaussian splat capture costs GPU time too: lower the count with **Clean floaters**, or untick
   **Show** in **Render > Gaussian Splats** while you sculpt.
-- On laptops with two GPUs, make sure SculptForge runs on the dedicated one (in the GPU maker's control panel
-  or the operating system's graphics settings).
+- On laptops with two GPUs, make sure SculptForge runs on the dedicated one. Windows picks it by itself on most
+  machines; to check, start SculptForge from a terminal, or open the log file (see below) and read the
+  `OpenGL ... on ...` line: it names the card that draws. If it names the built-in graphics (Intel UHD, AMD
+  Radeon Graphics), choose **Edit > Preferences > Performance > Graphics card** and restart, or set SculptForge to
+  *High performance* in Windows Settings > System > Display > Graphics (or the GPU maker's control panel).
 - **Edit > Preferences > Performance**: lower **Antialiasing** (or turn it off), try **View resolution** 75% or 50%,
   keep **Fast Navigation** on, and look at **Last stroke** to see whether brushes or the graphics card take the time. Step down a
   [subdivision level](subdivision-levels.md) for big changes. See [Performance and big meshes](performance.md).
@@ -141,17 +151,33 @@ If no pen is detected or pressure doesn't change:
 | *Out of credits on your Hyper3D account* | Top up on hyper3d.ai |
 | *Refused the model file* | The result came from somewhere other than Hyper3D's servers, so SculptForge didn't download it. The model isn't lost: it stays in your Hyper3D account (hyper3d.ai dashboard) under the task id in the message. If it keeps happening, [report it](https://github.com/islandmed/SculptForge/issues) |
 
+### Tripo (direct)
+
+| Message | What to do |
+|---|---|
+| *Add your Tripo API key* | It stays off until you add your own key (developers.tripo3d.ai) in the Generate 3D window |
+| *Tripo rejected the API key* | Check the key, or make a new one |
+| *Out of credits on your Tripo account* | Top up with that service; nothing was charged for the failed call |
+| *Tripo is rate limiting* / *Tripo is already running your other generations* | Wait a moment and try again, or make fewer candidates at once |
+| *Tripo retired this model version* | Update SculptForge, or choose another model |
+| *Tripo refused the content* | The picture or description was refused by the provider's content check; you were not charged |
+| *Tripo took longer than 10 minutes* | The task stays in your Tripo account; try again |
+| *Refused the model file* | The result came from somewhere other than Tripo's servers, so SculptForge didn't download it. The model stays in your Tripo account (developers.tripo3d.ai) under the task id in the message |
+| *The free models were not tried* | A paid service was unreachable and you haven't allowed the free Hugging Face models yet: choose one once and press **Allow** |
+| *Switched off* next to a free model | The Space's owner switched it off (the update check says so, once a day): choose another model; Generate already uses the first one that is up |
+
 ### Brush Lab
 
-The default **Free** provider uses a hosted open model with no account. If it is unreachable and Ollama runs
-on your computer, SculptForge uses your local model instead. "Rate limited by the provider" means too many
-requests in a short time: wait a few seconds. For setup of local models, see
-[Brush Lab and sharing brushes](brush-lab.md).
+The default **Free** provider uses a hosted open model with no account. If it is unreachable and Ollama runs on your
+computer, SculptForge uses your local model instead.
+
+"Rate limited by the provider" means too many requests in a short time: wait a few seconds. For setup of local models,
+see [Brush Lab and sharing brushes](brush-lab.md).
 
 ### No connection at all
 
 AI features need internet access (except a local Ollama, LM Studio or ComfyUI). Behind a company proxy or
-firewall, ask IT to allow the service you use: huggingface.co (and `*.hf.space`), fal.ai, meshy.ai, api.hyper3d.com (and Hyper3D's file servers), or the
+firewall, ask IT to allow the service you use: huggingface.co (and `*.hf.space`), fal.ai, meshy.ai, api.hyper3d.com (and Hyper3D's file servers), openapi.tripo3d.ai (and `*.tripo3d.com`, `*.tripo3d.ai` for the model file), or the
 Pollinations.ai text endpoint for the free Brush Lab model.
 
 ## ComfyUI errors
@@ -191,14 +217,19 @@ font DPI (Xft.dpi); if Automatic looks wrong there, pick a size.
 
 ### My layout is gone after a restart
 
-Shortcuts and preferences save themselves; the layout (shelves, trays, open palettes) waits for
-**Edit > Preferences > Saving & Layouts > Save Layout**. See [The interface](interface.md#saving-preferences-and-layouts).
+Shortcuts, preferences and the layout (shelves, trays, open palettes) save themselves: the layout a couple of seconds after
+you change it, and again when you quit. If a layout is not what you left, **Revert to Saved Layout**
+(**Edit > Preferences > Saving & Layouts**) goes back to the one **Save Layout** last kept, and a copy of `ui.json` from
+before each session that changed it is kept as `ui.prev.json` and `ui.prev2.json` in the settings folder (quit, rename one to
+`ui.json`). See [The interface](interface.md#saving-preferences-and-layouts).
 
 ### Reset the interface
 
-- **Edit > Preferences > Saving & Layouts > Reset Layout and Shortcuts** returns to the built-in layout and default shortcuts. The shortcuts
-  save themselves; press **Save Layout** afterwards to keep the layout.
-- **Revert to Saved Layout** goes back to the layout the last Save Layout kept.
+- **Edit > Preferences > Saving & Layouts > Reset Layout and Shortcuts** returns to the built-in layout and default shortcuts. Both
+  save themselves; **Revert to Saved Layout** still returns to the layout **Save Layout** last kept.
+- **Reset Layout** (same place, or <kbd>F3</kbd> and type "reset layout") restores only the shelves, trays and panels and keeps your shortcuts and preferences. It works whatever state the layout is in. Starting `sculptforge --reset-layout` does it before the window opens.
+- A colour picker, brush tile or slider you dragged off a shelf is listed in the same section with **Put back on the shelf**.
+- **Revert to Saved Layout** goes back to the layout the last **Save Layout** kept (the layout in use saves itself, so Revert is the way back to the one you marked).
 - To start completely fresh, quit SculptForge and delete `ui.json` (layout, shortcuts, interface preferences)
   and `imgui.ini` (positions of floating windows such as Brush Lab) from the settings folder below.
 
@@ -217,10 +248,12 @@ SculptForge keeps its settings in one folder per user:
 | Linux | `~/.local/share/SculptForge/SculptForge/` (or `$XDG_DATA_HOME/SculptForge/SculptForge/`) |
 | macOS | `~/Library/Application Support/SculptForge/SculptForge/` |
 | Windows | `%APPDATA%\SculptForge\SculptForge\` (usually `C:\Users\<you>\AppData\Roaming\SculptForge\SculptForge\`) |
+| Portable copy | the `data` folder next to `sculptforge.exe` (see [A portable copy](installing.md#a-portable-copy-a-usb-stick)) |
 
 | File or folder | What it holds |
 |---|---|
-| `ui.json` | Shortcut changes and preferences (saved as you change them) and the layout (written by **Save Layout**) |
+| `ui.json` | Shortcut changes, preferences and the layout (saved as you change them), and the layout **Save Layout** kept |
+| `ui.prev.json`, `ui.prev2.json` | Copies of `ui.json` from before the last two sessions that changed the layout |
 | `imgui.ini` | Positions and sizes of floating windows |
 | `ai.json` | AI settings: providers, models, keys, ComfyUI address (readable only by your account) |
 | `project.json` | Recent files and the autosave interval |
@@ -250,29 +283,31 @@ SculptForge writes what it does to `sculptforge.log` in its [settings folder](#w
 | macOS | `~/Library/Application Support/SculptForge/SculptForge/sculptforge.log` |
 | Linux | `~/.local/share/SculptForge/SculptForge/sculptforge.log` |
 
-It holds the version, your system and GPU (the `OpenGL ... on ...` line), warnings and errors, and each command
-you ran. If SculptForge crashes, it ends with lines starting `CRASH:` that say what crashed and what was done
-last. Every start keeps the previous session's log as `sculptforge-previous.log` beside it, so after a crash
-**attach `sculptforge-previous.log` to your report** (the new `sculptforge.log` is the session after it). It holds
-no models and no keys, only command names and messages, which may include file names.
+It holds the version, your system and GPU (the `OpenGL ... on ...` line), warnings and errors, and each command you
+ran. If SculptForge crashes, it ends with lines starting `CRASH:` that say what crashed and what was done last.
+
+Every start keeps the previous session's log as `sculptforge-previous.log` beside it, so after a crash
+**attach `sculptforge-previous.log` to your report** (the new `sculptforge.log` is the session after it). It holds no
+models and no keys, only command names and messages, which may include file names.
 
 ### A performance trace
 
-When SculptForge gets slow, **Help > Record a performance trace** shows where the time goes. Turn it on, do what
-feels slow (the stroke, the orbit, the remesh), then choose it again to stop. `sculptforge-trace.log` beside the
-log then lists every frame that took longer than 33 ms with its parts (events, dabs, interface, GPU uploads,
-drawing, GPU time), each stroke's timings, commands that held up the frames, background jobs starting and
-ending, the mesh size and levels, and on its first line your GPU, driver and CPU. **Attach it to your report.**
-It is off by default and costs nothing when off; it stays small (2 MB, then the older lines move to
-`sculptforge-trace-previous.log`) and never leaves your computer.
+When SculptForge gets slow, **Help > Record a performance trace** shows where the time goes. Turn it on, do what feels
+slow (the stroke, the orbit, the remesh), then choose it again to stop.
+
+`sculptforge-trace.log` beside the log then lists every frame that took longer than 33 ms with its parts (events,
+dabs, interface, GPU uploads, drawing, GPU time), each stroke's timings, commands that held up the frames, background
+jobs starting and ending, the mesh size and levels, and on its first line your GPU, driver and CPU.
+**Attach it to your report.** It is off by default and costs nothing when off; it stays small (2 MB, then the older
+lines move to `sculptforge-trace-previous.log`) and never leaves your computer.
 
 ## Recovering work after a crash
 
 SculptForge autosaves unsaved work every 5 minutes by default (**Edit > Preferences > Autosave**, 0 turns it off).
-After a crash, the next start asks "SculptForge did not close normally last time. Restore the autosaved
-work?". **Restore** opens it as unsaved work (save it under a name); **Discard** deletes it. See
-[Projects, autosave and snapshots](projects.md). The dialog also points to the crashed session's
-[log file](#the-log-file).
+After a crash, the next start asks "SculptForge did not close normally last time. Restore the autosaved work?".
+
+**Restore** opens it as unsaved work (save it under a name); **Discard** deletes it. See [Projects, autosave and
+snapshots](projects.md). The dialog also points to the crashed session's [log file](#the-log-file).
 
 ## Frequently asked questions
 

@@ -1,0 +1,120 @@
+# Pen side-button orbit (#216): a button press starts the orbit where the pen IS, whatever position the button event
+# carries (SDL keeps the last motion's, 0 0 before the first), so the first frame does not move the view, and a pen that
+# leaves with a button held (its release never comes) or a window that loses focus does not leave the view dragging.
+run ui_look look=classic layout=classic
+wait 0.2
+run new_sphere subdivisions=4
+snapshot
+
+# 1. The button event's position is stale (far from the pen): the view stays put at the press, then turns by the pen's
+#    own movement only (a few pixels = a few degrees, not the 650 px between the stale position and the pen).
+pen_hover 0.5 0.5
+remember camera_yaw yaw0
+remember camera_pitch pitch0
+remember camera_distance dist0
+pen_button 1 down at 0.05 0.05
+wait 0.2
+expect_value view_dragging == 1
+expect_value camera_yaw == $yaw0
+expect_value camera_pitch == $pitch0
+expect_value camera_distance == $dist0
+pen_hover 0.51 0.5
+expect_value camera_yaw != $yaw0
+expect_value camera_yaw < $yaw0+20
+expect_value camera_yaw > $yaw0-20
+expect_value camera_pitch < $pitch0+20
+expect_value camera_pitch > $pitch0-20
+pen_button 1 up at 0.05 0.05
+expect_value view_dragging == 0
+expect_value pen_nav_button == 0
+key f
+
+# 1b. The stale position on the canvas itself: the same.
+pen_hover 0.5 0.5
+remember camera_yaw yawb
+remember camera_pitch pitchb
+pen_button 1 down at 0.35 0.7
+wait 0.2
+expect_value camera_yaw == $yawb
+pen_hover 0.51 0.5
+expect_value camera_yaw < $yawb+20
+expect_value camera_yaw > $yawb-20
+expect_value camera_pitch < $pitchb+20
+expect_value camera_pitch > $pitchb-20
+pen_button 1 up
+key f
+
+# 2. The same press as the first event after coming into range (no motion yet): no jump at the first motion either.
+pen_hover 0.5 0.5
+pen_out
+remember camera_yaw yaw1
+remember camera_pitch pitch1
+pen_button 1 down at 0.9 0.9
+wait 0.2
+expect_value camera_yaw == $yaw1
+pen_hover 0.51 0.5
+expect_value camera_yaw < $yaw1+20
+expect_value camera_yaw > $yaw1-20
+expect_value camera_pitch < $pitch1+20
+expect_value camera_pitch > $pitch1-20
+pen_button 1 up
+key f
+
+# 3. The pen leaves with the button held; its release never comes. The next stroke works, and so does the next orbit.
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_hover 0.6 0.5
+expect_value view_dragging == 1
+pen_out
+expect_value view_dragging == 0
+expect_value pen_buttons == 0
+pen_stroke 0.3 0.45 0.7 0.55 0.6 0.6
+expect_value moved_out > 0
+expect_value stroking == 0
+key ctrl+z
+pen_button 1 up
+expect_value view_dragging == 0
+pen_hover 0.5 0.5
+remember camera_yaw yaw2
+pen_button 1 down
+pen_hover 0.6 0.5
+expect_value camera_yaw != $yaw2
+pen_button 1 up
+key f
+
+# 4. The window loses focus during the orbit (a pop-up or another window takes the pen): the release goes elsewhere.
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_hover 0.55 0.5
+expect_value view_dragging == 1
+window_focus 0
+window_focus 1
+expect_value view_dragging == 0
+expect_value pen_buttons == 0
+pen_stroke 0.3 0.45 0.7 0.55 0.6 0.6
+expect_value moved_out > 0
+key ctrl+z
+pen_button 1 up
+key f
+
+# 5. A second side-button orbit starts from the view as it is: the first one's start state (the camera it began from, its
+#    pivot) was kept when the button's release ended it, so the next orbit snapped the view back and turned it about the
+#    old pivot: the view shifted and zoomed while the ring was elsewhere (#216, Wacom on Wayland).
+camera 0 0
+pen_move 0.4 0.5
+pen_button 1 down
+pen_move 0.5 0.5 0.5
+pen_button 1 up
+remember camera_yaw yawA
+remember camera_distance distA
+key f
+camera 0 0
+pen_move 0.4 0.5
+pen_button 1 down
+pen_move 0.5 0.5 0.5
+pen_button 1 up
+expect_value camera_yaw < $yawA+0.5
+expect_value camera_yaw > $yawA-0.5
+expect_value camera_distance < $distA+0.01
+expect_value camera_distance > $distA-0.01
+key f

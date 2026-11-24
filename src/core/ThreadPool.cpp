@@ -2,12 +2,50 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/ThreadPool.h"
 
+#include <algorithm>
+#include <cerrno>
 #include <cstdlib>
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <pthread.h>
+#include <sys/qos.h>
+#elif defined(__linux__)
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
 
 namespace sf {
 
 namespace {
 thread_local bool insidePoolJob = false;
+}
+
+LowerThreadPriority::LowerThreadPriority() {
+#if defined(_WIN32)
+    old_ = GetThreadPriority(GetCurrentThread());
+    set_ = old_ != THREAD_PRIORITY_ERROR_RETURN && SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+#elif defined(__APPLE__)
+    set_ = pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0) == 0; // (std::async: a thread of its own here)
+#elif defined(__linux__)
+    const id_t tid = static_cast<id_t>(syscall(SYS_gettid)); // (per thread on Linux: its own nice)
+    errno = 0;
+    old_ = getpriority(PRIO_PROCESS, tid);
+    set_ = errno == 0 && setpriority(PRIO_PROCESS, tid, std::min(old_ + 10, 19)) == 0;
+#endif
+}
+
+LowerThreadPriority::~LowerThreadPriority() {
+    if (!set_) return;
+#if defined(_WIN32)
+    SetThreadPriority(GetCurrentThread(), old_);
+#elif defined(__linux__)
+    setpriority(PRIO_PROCESS, static_cast<id_t>(syscall(SYS_gettid)), old_); // (may be refused unprivileged: harmless)
+#endif
 }
 
 ThreadPool::ThreadPool(int threads) {
@@ -29,18 +67,23 @@ std::atomic<bool> g_sharedMade{false};
 } // namespace
 
 bool ThreadPool::setSharedThreadCount(int threads) {
-    g_sharedThreads.store(std::clamp(threads, 0, 64));
+    g_sharedThreads.store(std::clamp(threads, 0, kMaxThreads));
     return !g_sharedMade.load();
+}
+
+int ThreadPool::sharedSizeFor(int requested, int env, unsigned hardware) {
+    const int wanted = requested > 0 ? requested : env;
+    if (wanted > 0) return std::min(wanted, kMaxThreads);
+    return int(std::clamp(hardware, 1u, unsigned(kDefaultMaxThreads)));
 }
 
 ThreadPool& ThreadPool::shared() {
     static ThreadPool pool([] {
         g_sharedMade.store(true);
-        int wanted = g_sharedThreads.load();
         // SF_THREADS: a parallel test run (tools/test/run.py --threads-per-test) gives each process its share of
         // the cores; ten processes with a pool as big as the machine each spend their time waiting for a core.
-        if (const char* env = std::getenv("SF_THREADS"); wanted <= 0 && env) wanted = std::clamp(std::atoi(env), 0, 64);
-        return wanted > 0 ? wanted : int(std::clamp(std::thread::hardware_concurrency(), 1u, 16u));
+        const char* env = std::getenv("SF_THREADS");
+        return sharedSizeFor(g_sharedThreads.load(), env ? std::atoi(env) : 0, std::thread::hardware_concurrency());
     }());
     return pool;
 }

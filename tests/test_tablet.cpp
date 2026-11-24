@@ -281,6 +281,18 @@ TEST(tablet_settings_classic_pen_timing_round_trip) {
     CHECK(!old.classicTiming);
 }
 
+TEST(tablet_settings_palm_rejection_round_trip) {
+    TabletSettings t;
+    t.palmRejection = !t.palmRejection; // (on for Android, off elsewhere: either way it follows the file)
+    TabletSettings back;
+    fromJson(toJson(t), back);
+    CHECK(back.palmRejection == t.palmRejection);
+    TabletSettings old; // ui.json from before the setting: the platform's default
+    const bool def = old.palmRejection;
+    fromJson(Json::object(), old);
+    CHECK(old.palmRejection == def);
+}
+
 // A pen without a pressure axis (Windows Ink off) sends 0 while touching: after a few motions it draws at full
 // pressure instead of never starting the stroke; a pen with pressure never does.
 TEST(pen_pressure_tracker_no_pressure_axis) {
@@ -351,6 +363,9 @@ TEST(pen_diagnostics_report) {
     CHECK(r.find("Last pressure: none yet") != std::string::npos);
     d.motion = 12;
     d.lostSamples = 3;
+    d.wheel = 7;
+    d.wheelPenInRange = 2;
+    d.fingers = 4;
     d.touchDown();
     d.sampled(0.25f, true);
     d.sampled(0.75f, true);
@@ -358,6 +373,7 @@ TEST(pen_diagnostics_report) {
     r = penReport({}, d);
     CHECK(r.find("motion 12,") != std::string::npos);
     CHECK(r.find("Lost pressure samples: 3") != std::string::npos);
+    CHECK(r.find("View input: wheel 7 (pen in range 2), finger touches 4, pinches 0") != std::string::npos);
     CHECK(r.find("Last pressure: 0.000") != std::string::npos);
     CHECK(r.find("Last stroke's pressure: 0.250 to 0.750") != std::string::npos);
 }

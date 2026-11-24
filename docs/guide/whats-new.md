@@ -5,6 +5,905 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.14
+
+```features
+date: 2026-11-23
+tagline: Sculpting with Dynamic on no longer erases the texture of a painted Part.
+highlight: Sculpting with Dynamic on no longer erases the texture of a painted Part
+title: Dynamic keeps your paint
+line: Sculpt with Dynamic on over a painted Part and the texture stays, through Undo, Redo and reopening the file.
+action: guide:texture-painting.md
+```
+
+- **Dynamic** keeps a painted Part's texture: on 0.13.11 and 0.13.12, sculpting with Dynamic on could erase the
+  paint. If you lost paint to this, we are sorry; it won't happen again.
+
+## Version 0.13.13
+
+```features
+date: 2026-11-23
+tagline: Contact facing keeps your brush off the far wall of a slot, Engrave walls stay smooth, dense Micro levels shade Undo and Move at once, and Shift smooths every painted channel.
+highlight: Contact facing keeps your brush off the far wall of a slot or the other side of a fold
+highlight: Engrave and Crease Line keep smooth walls when one stroke runs up and down the same line
+highlight: Dense Micro levels show Undo, Redo and Move at once, with fewer pauses as strokes start and end
+highlight: Shift with the Paint brush smooths every channel you paint, across UV seams too
+highlight: Texture painting works on more Android phones and tablets
+title: Contact facing
+line: A new brush falloff option: sculpt one side of a narrow slot or fold and the far wall stays put.
+action: guide:sculpting.md
+title: Smooth carved walls
+line: Engrave, Crease Line and the other pinching carve brushes keep clean walls on strokes that go back and forth.
+action: guide:sculpting.md
+title: Instant shading on Micro levels
+line: Undo, Redo and Move on a dense Micro level show their new shading on the next frame.
+action: guide:micro-levels.md
+```
+
+- **Contact facing** (Sculpt > Brush, off at first): the surface under the cursor decides what moves, so the far
+  wall of a narrow slot or the other side of a fold stays put. In the Classic layout it shows with **Show newer menu rows**.
+- **Carving brushes** that pinch (Engrave, Crease Line, Panel Groove...) keep smooth walls when one stroke goes up
+  and down the same line.
+- **Dense Micro levels**: Undo, Redo and Move show the new shading at once, and strokes pause less as they start and
+  end (#184). Reported by @HG4Science.
+- **Texture painting**: Shift with the Paint brush smooths Roughness, Metallic, Normal and Height strokes as well as
+  colour, across UV seams too. Reported by Fenix on Discord.
+- **Android**: texture painting works on phones and tablets with small texture buffers; where a chip still can't
+  show a texture, the status bar says so.
+- **Brush thumbnails** stay put after you pick a brush that carries its own alpha (Hard Cut, Flat Plane, Engrave...).
+- **Focus Detail**: opening a detail file shows its fine detail at once, and **Open** lists .sfdetail files.
+- **Chinese, Japanese and Korean** Part and layer names are readable in the title strip's info line.
+- **Move** honours **Front faces only**: with View falloff on, the far side of a one-piece model stays put.
+- **Tendril** is now its name everywhere, and old saved brushes still load.
+- **Plugin sandbox updated**: plugins now run on wasmtime 51.0.0. Nothing changes for plugins or their limits.
+- "**Contact facing**: a new brush falloff option. The surface under the cursor decides what moves, so the far wall of
+  a narrow slot or the other side of a fold stays put while you sculpt one side. Reported on Discord."
+- **Texture painting on Android**: a Part with many triangles can now show its texture on phones and tablets whose
+  graphics chips have small texture buffers (it went dark and strokes left nothing). Where a chip still cannot show
+  it, the status bar and the Texture Image panel say so.
+- **Chinese, Japanese and Korean names**: a Part or layer named in those scripts is readable in the title strip's info
+  line (it is drawn in the regular size, not the small one).
+- "**Move** honours **Front faces only**: with View falloff on, Move now leaves the far side of a one-piece model
+  alone when Front faces only is on."
+- **Shift smooths every channel you paint**: with the Paint brush, Shift now softens Roughness, Metallic, Normal and
+  Height strokes as well as the colour, across UV seams too.
+
+## Version 0.13.12
+
+```features
+date: 2026-11-22
+tagline: Tendril pulls round horns with Dynamic on, Palette Knife strokes cross without creasing, the Gizmo stays smooth on heavy Parts, and Nudge and Layer stay off the far side.
+highlight: Tendril pulls round, tapering horns, even with Dynamic on
+highlight: Palette Knife strokes cross and stack without creasing
+highlight: The Gizmo stays smooth on multi-million triangle Parts, with a clearer All mode
+highlight: Nudge and Layer leave the far side alone under View falloff, and a Level slider click switches at once
+title: Round Tendril horns
+line: With Dynamic on, a long Tendril pull stays a round, tapering tube instead of thinning into a flat sheet.
+action: guide:sculpting.md
+title: Clean Palette Knife
+line: Crossing and stacked knife strokes, big brushes and mirrored strokes leave the surface smooth, with no dark creases.
+action: guide:sculpting.md
+title: Smooth Gizmo on heavy Parts
+line: Dragging a Gizmo handle on a multi-million triangle Part stays as smooth as turning the view.
+action: guide:gizmo.md
+```
+
+- **Tendril**: with Dynamic on, long pulls stay round tubes; with **View falloff** on, the far side stays put.
+  Reported by @Tpqz_.
+- **Palette Knife** no longer creases where strokes overlap, with big brushes and mirrored strokes too (#198).
+- **Gizmo**: dragging a handle on a multi-million triangle Part stays as smooth as turning the view; in **All** mode
+  a ring seen edge-on fades and can't be pressed by mistake. Idea by Fenix on Discord.
+- **Nudge and Layer** with **View falloff** work only the surface facing you; Move and Grab still reach through.
+- **Level slider**: a click switches the level at once again; a double-click still opens the number field.
+- **Classic layout**: File > Render with..., Preferences > Scripts and > Render bridge show when you turn on
+  **Preferences > Interface > Show newer menu rows**.
+- **Remesh after each stroke** says why it skipped a Part and names the key that remeshes it anyway.
+- **Texture painting**: Alt-erase on the Base also clears metal; **Forge Spheres**: a selecting click adds no
+  empty undo step.
+- "**Clearer gizmo (All mode)**: a ring seen edge-on fades and is not pressed by mistake, a ring turned a little picks
+  out at its rim past the arrows, and an arrow pointing at you fades. Idea by Fenix on Discord."
+- **Classic menus keep their old rows**: File > Render with..., Preferences > Scripts and > Render bridge show in the
+  SculptForge layout; in Classic, turn them on with **Preferences > Interface > Show newer menu rows**.
+- **Palette Knife no longer creases where strokes overlap**: crossing and stacked strokes, big brushes and mirrored
+  strokes too, stay clean.
+- **Gizmo on heavy Parts**: pressing and dragging a handle (arrows, balls, rings, squares) stays as smooth as turning
+  the view, also on multi-million triangle Parts.
+- **Nudge and Layer with View falloff** only work the surface facing you: the far side of a thick part no longer moves
+  with it. Move and Grab still carry everything inside the circle.
+- **Tendril tip**: for long pulls, turn on **Dynamic** on the top shelf so the surface adds detail as it stretches.
+
+## Version 0.13.11
+
+```features
+date: 2026-11-21
+tagline: Forge Sphere chains stay smooth while you drag, Shift blends colour on textured Parts, View falloff stays off the far side, and pen orbit is steady again.
+highlight: Forge Sphere chains stay smooth while you drag, even with hundreds of spheres
+highlight: Shift with the Paint brush blends colour on textured Parts and never moves the shape
+highlight: View falloff keeps Standard, Inflate and Crease off the far side of your model
+highlight: Pen side-button orbit and pan move steadily again, and Inflate swells evenly at tube ends
+highlight: Bakes tell you when the search distance is too short, with one click to bake again
+title: Smooth Forge Sphere chains
+line: Moving a sphere follows the pointer smoothly on any armature size, and picks, delete and undo answer right after you let go.
+action: guide:forge-spheres.md
+title: Smooth colour on textures
+line: With the Paint brush, hold Shift to blend texture colour into its neighbours, across UV seams; the shape stays put.
+action: guide:texture-painting.md
+title: View falloff stays in front
+line: With View falloff on, Standard, Inflate, Crease and Pinch fade out behind the surface; Move and grab brushes still reach through.
+action: guide:sculpting.md
+```
+
+- **Forge Spheres**: moving a sphere follows the pointer smoothly on big armatures.
+- **Smooth colour on textures**: with the Paint brush, **Shift** blends texture colour like vertex colour, across UV
+  seams, and never moves the shape.
+- **View falloff**: Standard, Inflate, Crease, Pinch and Sharp Crease no longer change the far side of the model;
+  Move and the grab brushes still reach through.
+- **Pen side buttons** (KDE on Wayland): orbit and pan follow the pen steadily again (#216).
+- **Bake**: when the search distance is too short, the Bake panel says how much of the map missed and offers
+  **Bake Again with Suggested Distance**.
+- **Stroke popup**: the Sub, Smooth, Mask and Select keys follow your input style (#233). Reported by @Velisariy.
+- **Inflate** swells evenly at the ends of tubes; **Save Visible Parts As** keeps PBR, environment and exposure.
+- **Parts**: a press that lands on a Part in front of the one you're sculpting says so in the status line.
+- **macOS**: Voxel Remesh no longer refuses modest jobs on Macs running the Intel build.
+- **Forge Spheres move smoothly**: a dragged sphere stays under the pointer at its depth, even on long chains; hold
+  **Shift** to swing it around the sphere it grows from (its link keeps its length), **Tool > Forge Spheres > Snap to
+  Surface** seats it on the sphere under the pointer, and **Move Branch** brings what grows from it along.
+- **Membership card, yearly first**: the Member plan shows $48 a year ($4 a month, billed yearly); $5 a month is one
+  small link away.
+- **Bake search distance**: a bake whose search distance was too short now says how much of the map found no surface
+  and which distance fixes it, with a **Bake Again with Suggested Distance** button.
+- **Inflate and deflate on thin tubes**: a big brush over a coarse tube or limb now thickens (Inflate) or thins (Sub,
+  or Alt) it evenly, each point along its own normal, instead of moving the area as one lump.
+- **A Part inside another Part** (an eye in its socket): the brush says why when the pointer is over the Part in front
+  ("Head is in front: Alt+Q selects it"), and **Frame Part** says when the view ended up inside another Part.
+- **Shift with the Paint brush** never changes the shape any more, on any Part. On a Part that paints into a texture
+  it smooths the colour in the texture (it used to smooth the shape and dent it).
+- The **stroke popup** shows the keys of your input style: with the Blender style Sub reads Ctrl and Mask reads Alt,
+  with Maya Mask reads Ctrl+Alt.
+- **Save Visible Parts As** keeps your material look: the copy opens with the same shading (PBR, environment,
+  exposure, Lit Sphere), view and settings as a normal Save As.
+
+## Version 0.13.10
+
+```features
+date: 2026-11-20
+tagline: Sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes respond faster on dense Micro levels, and 16 new Creature Skin brushes arrive.
+highlight: Sculpt layers travel to Blender and back as shape keys, with names and order kept
+highlight: Hold Shift with the Paint brush to blend colours smoothly
+highlight: Long Clay strokes on dense Micro levels respond faster
+highlight: Voxel Remesh lets you proceed when memory is tight, and timelapses keep your Micro level strokes
+highlight: 16 new Creature Skin brushes for scales, hide and pores, made by request
+title: Layers to Blender and back
+line: Shape keys sent from Blender arrive as sculpt layers with their names, values and order, and go back as shape keys; glTF, FBX and USD exports keep the same layers.
+action: guide:layers.md
+title: Smooth colour with Shift
+line: With the Paint brush, hold Shift to blend the vertex colours under the brush into their neighbours; the shape stays put.
+action: guide:vertex-paint.md
+title: Creature Skin brushes
+line: Sixteen brushes for scales, hide, folds and pores, each with its own full-precision alpha.
+action: guide:brush-packs.md
+```
+
+- **Creature Skin brushes**: sixteen high-resolution brushes for hide wrinkles, snake and lizard scales, croc plates,
+  skin and nose pores and fine skin, tuned to read at micro level 3 or 4 (**Sculpt > Brush**, pack Creature Skin).
+  Requested by @RodTDai.
+- **Alphas from 16-bit PNG and OpenEXR** keep their full precision: smooth height maps no longer step.
+- **Layers round trip**: shape keys sent from Blender arrive as sculpt layers (names, values, order kept), and layers
+  go back as shape keys; glTF, FBX and USD files exported from SculptForge open with the same layers.
+- **AI agents see progress and can cancel**: long steps (remesh, subdivide, decimate, LOD export, 3D generation)
+  report how far they are, and an agent can stop one; the scene stays as it was.
+- **Smooth colour**: with the Paint brush, hold **Shift** to blend the vertex colours under the brush into their
+  neighbours. The shape stays put. Requested by fxrtst and others in the community.
+- **Member builds**: "Open the invitations page" now opens the organization invitation, so members can accept it.
+- **AI tools**: AI clients that never refresh their tool list (ChatGPT) now see every SculptForge tool as soon as they
+  connect, not only `live_connect`.
+- "**Orbit beside a small model**: pressing on the background next to a small, off-centre model no longer swings it
+  off the screen. With **Orbit around the pointer** on, the view turns about where you last sculpted, or about the
+  model."
+- **Paint after Smooth**: the Paint brush colours again when Smooth was the brush before it; strokes no longer blend
+  instead of painting.
+- **Timelapse and history on a Micro level**: strokes on a Micro level are saved with the project's history and show
+  in its timelapse.
+- **Clay at Micro level 4**: a long Clay stroke on a dense Micro level keeps up with the pointer much better; the
+  lighting under the last stretch of the brush may look slightly stale for a few seconds after the stroke while it
+  catches up.
+- **Voxel Remesh no longer refuses when memory is tight**: if a remesh needs more than the free memory but the
+  computer can hold it, it says so and lets you **Proceed anyway** (it may use swap and be slow). One that can't fit
+  at all says which Resolution would.
+
+## Version 0.13.9
+
+```features
+date: 2026-11-19
+tagline: The Gizmo and the Move brush follow the pen on meshes of millions of triangles, Crisp Flatten cuts clean, Quad Remesh finishes on grainy scans and cancels at once, and big micro levels settle fast after strokes.
+highlight: The Gizmo and the Move brush now follow the pen on meshes of millions of triangles
+highlight: Crisp Flatten cuts ridges and steep walls clean, with Symmetry on too
+highlight: Quad Remesh finishes on grainy, scanned sculpts, and Cancel stops it at once
+highlight: Big micro levels settle back to a smooth view right after your strokes
+title: Dense meshes follow the pen
+line: On a mesh of millions of triangles, a high Voxel Remesh say, the Gizmo's Move, Rotate and Scale and the Move brush now keep up with the pen.
+action: guide:gizmo.md
+title: Crisp Flatten cuts clean
+line: Crisp Flatten cuts ridges and steep walls flat without teeth, shards or folded triangles, with a big brush on a dense mesh and with Symmetry on.
+action: guide:sculpting.md
+```
+
+- **Shared script folders**: set `SCULPTFORGE_SCRIPT_PATH` (or a studio profile's `scriptPaths`) and the `.py` files
+  in those folders are listed under **File > Script**, marked with their folder.
+- **Script windows stay with SculptForge**: a script's own window (PySide, Qt) can be parented to SculptForge's main
+  window with `sf.ui.main_window_handle()`, so it groups with it in the taskbar and stays on top.
+- **Render with your renderer**: **File > Render with... (preview)** renders a still of your sculpt from the current
+  view with a renderer you already have (any Hydra render delegate your OpenUSD install finds), shows it, keeps it in
+  your Renders folder and opens it in any image editor you choose: a client preview in one click. Set it up once in
+  **Edit > Preferences > Render bridge**.
+- **Crisp Flatten** cuts ridges and steep walls clean, without teeth, shards or folded triangles along the cut, with a
+  big brush on a dense mesh and with Symmetry on.
+- **AI tools**: connecting to a live SculptForge window no longer shows as failed in clients such as Codex, so the
+  sculpting tools appear right after you approve.
+- **Move on a Micro level** next to a mask no longer leaves crumpled speckle or folded, leaf-like lumps around the
+  stroke.
+- **Bigger colour cells**: the main and second colour and the recent colours in the left column are larger (at least
+  20 px), the recent ones wrap instead of shrinking, and you can drag the column's edge to make it wider. Requested by
+  a member.
+- **Make sculptable** (Render > Gaussian Splats): smooth curves such as a forehead come out smooth, without contour
+  rings.
+- **Timelapse and video export** say what went wrong: ffmpeg missing (and how to get it), ffmpeg stopped (with its own
+  message), a folder that can't be written. No more empty black window on Windows, and ffmpeg is found in Homebrew's
+  and winget's folders.
+- **Dense meshes move smoothly**: on a mesh of millions of triangles (a high Voxel Remesh, say), the Gizmo's Move,
+  Rotate and Scale and the Move brush now follow the pen; before, a 7M-triangle mesh dragged at under one frame a
+  second.
+- **Big micro levels settle after strokes**: on a base of millions of triangles at micro level 4, the view held still
+  no longer stays at a few frames a second after you sculpt; the full detail fills in over a second or two and the
+  view is smooth again.
+
+## Version 0.13.8
+
+```features
+date: 2026-11-18
+tagline: 805 million triangles of detail still orbit at 209 frames a second in our benchmark (an Apple M1 Pro limited to entry-level budgets), finer micro detail up close, Python buttons and panels, and splats with view-dependent colour.
+highlight: In our benchmark on an Apple M1 Pro limited to entry-level budgets, 805 million triangles of detail still orbit at 209 frames a second
+highlight: Finer micro detail up close: the view draws past the stored micro level as you zoom in
+highlight: Python scripts can add their own buttons and panels
+highlight: Splats show the sheen that changes as you orbit
+highlight: Files with non-English names open on Windows again
+highlight: Size and Intensity follow the pen as it hovers above the tablet
+title: 805 million triangles, still smooth
+line: In our benchmark, 805 million triangles of detail still orbit at 209 frames a second, on an Apple M1 Pro limited to entry-level budgets. It is a benchmark scene, not a sculpt.
+image: images/wn-0138-engine.jpg
+action: guide:performance.md
+title: Finer detail up close
+line: Zoom in on a micro level in smooth shading and the view draws up to two levels finer than the stored grid, following the surface's curve, with no extra memory or file size. Brushes and picks are unchanged.
+image: images/wn-0138-detail.jpg
+action: guide:micro-levels.md
+title: Buttons and panels from Python
+line: A Python script can add its own panels of buttons, sliders and check boxes under File > Script, and actions to the command palette, shelves and My Panel.
+image: images/wn-0138-panel.jpg
+action: guide:python.md
+title: Splats that shine as you orbit
+line: Splat captures that store view-dependent colour now show the sheen and highlights that change as you orbit, and keep them when you turn and save them.
+image: images/wn-0138-splats.jpg
+action: guide:splats.md
+title: Size follows the pen
+line: Press S (or U) with a pen in range and move it above the tablet: the size follows live, and a tap keeps it.
+image: images/wn-0138-pen.jpg
+action: guide:sculpting.md
+```
+
+- Scripts and tools that use SculptForge's Python API or command line can be under any licence (new scripting
+  exception).
+- **Python package**: download the wheel for your platform from the release page and `pip install` it: the sculpting
+  engine in your own Python, for procedural assets, batch exports and pipeline tests (PyPI coming).
+- **Scripts can add buttons and panels**: a Python script can add actions (command palette, shelves, My Panel, keys)
+  and panels of labels, buttons, sliders and check boxes under **File > Script**. Scripts ticked under **Edit >
+  Preferences > Scripts > Run at start-up** bring theirs back at every start; a script that changed since you trusted
+  it does not run until you trust it again.
+- **Splats with view-dependent colour**: captures with spherical harmonics (SH 1-3) now show the sheen and highlights
+  that change as you orbit, as splat viewers do, and keep them when you turn and save them.
+- **What's New since your last version**: after an update the window shows the features of every version you skipped,
+  newest first (the first eight, then "and N more improvements"), each with its Try it button.
+- **Size and Intensity follow the pen**: press S (or U) with a pen in range and move it above the tablet; the size
+  follows live, a tap keeps it. Pressing straight down on the slider's knob still drags it.
+- **The guide stands out**: the User Guide window has its own colour now, with an edge, a strip and a lighter page, so
+  it no longer blends into the app.
+- **Smooth on a Micro level**: a big Smooth no longer leaves a diamond lattice of fine creases (after a big Flatten,
+  for example).
+- **Files with non-English names** open on Windows again: a model with a Japanese name, a folder in Cyrillic or
+  Korean, an emoji in the name no longer closes SculptForge.
+
+## Version 0.13.7
+
+```features
+date: 2026-11-17
+tagline: Circle shapes for Mask, Select and Cut, Space slides a selection, exact slider values, a portable copy and Python scripting.
+highlight: Circle and ellipse shapes for Mask, Select and Cut
+highlight: Hold Space to slide a selection while you draw it
+highlight: Type an exact value on any slider
+highlight: A portable copy on a USB stick that carries your settings, brushes and library
+highlight: Python scripting in the app
+title: Circles for Mask, Select, Cut
+line: Draw a circle or an ellipse from its centre to mask, select or cut a round area in one drag. Pick Circle Mask in the Mask tool (B), or Select Circle and Cut Circle in Tool > Cut.
+image: images/wn-0137-circles.jpg
+action: guide:masking.md
+title: Slide a selection as you draw
+line: Hold Space while you drag a rectangle, lasso or circle to move the whole shape, then let go to keep sizing it. It works for Mask, Select and Cut.
+image: images/wn-0137-slide.jpg
+action: guide:masking.md
+title: Type any value on a slider
+line: Double-click (or Ctrl+click) any slider or number, type the value and press Enter; Esc cancels. Now it works in every panel, the top bar and Brush Lab.
+image: images/wn-0137-slider.jpg
+action: guide:interface.md
+title: Your setup on a USB stick
+line: The Windows portable .zip keeps your settings, brushes and library in a folder next to the program, so your workbench follows you from PC to PC. Unzip it anywhere and run it.
+image: images/wn-0137-usb.jpg
+action: guide:installing.md#a-portable-copy-a-usb-stick
+title: Script SculptForge in Python
+line: Turn it on in Edit > Preferences > Scripts, then open the console and click Python: loops, conditions and every command, each run one undo step. Scripts are programs, so run only ones you trust.
+image: images/wn-0137-python.jpg
+action: guide:python.md
+```
+
+- **Brush thumbnails show the alpha**: a brush with an alpha shows it pressed into the ball in the brush's own stroke
+  type (Dots, Drag Stamp, Drag Dot, Spray), in the shelf slot, the picker and the Library; right-click > **Regenerate
+  thumbnail** makes it again.
+- "**Circle shapes**: Circle Mask, Select Circle and Cut Circle draw a circle or ellipse from its centre. Shift keeps
+  it round."
+- **Portable copy on a USB stick**: the Windows portable .zip now keeps everything in a `data` folder next to the
+  program (settings, brushes, library, layouts, hotkeys, My Panel, recent files, logs), so the folder carries your
+  workbench between PCs. Requested by Lex.
+- **Python scripting in the app**: turn it on in **Edit > Preferences > Scripts**, then the console's **Python** mode
+  runs Python against the open scene (loops, conditions, every command), and `.py` files in your Scripts folder are
+  listed under **File > Script**. Each line or script is one undo step. Scripts are programs: only run ones you trust.
+- **Type an exact value on any slider**: double-click (or Ctrl+click, or double-tap with a pen) any slider or drag
+  number in the panels, the top bar and Brush Lab, type the number and press Enter. Esc cancels, Tab goes to the next
+  field.
+- **Slide a selection while you draw it**: hold **Space** while dragging a Mask, Select or Cut rectangle or lasso to
+  move the whole shape; let go of Space to keep sizing.
+- **Menus close when you click away**: a left click or pen tap anywhere outside a right-click menu or drop-down list
+  closes it, in any panel, and a click on the model only closes it (no stroke).
+- **My Panel** takes an Alt+drag however it is open: from the **Edit** menu, in a tray, or in a window of its own
+  (before, only when opened with its key).
+- **Two-finger twist** now rolls the view with your fingers, is ignored under Turntable and the other rotation locks,
+  and **Preferences > Input > Invert twist** flips it.
+
+## Version 0.13.6
+
+```features
+date: 2026-11-17
+tagline: Insert works on meshes with subdivision levels, heavy meshes no longer freeze after a stroke, and a benchmark anyone can run.
+highlight: Insert works on a mesh with subdivision levels: the piece becomes a new Part and every level keeps its detail
+highlight: Heavy meshes: Undo, Save or a new click right after a stroke no longer freezes the window
+highlight: A public benchmark you can run in one command
+title: Insert keeps every level
+line: Add a horn, an ear or any shape to a mesh that has subdivision levels: it becomes its own Part and every level keeps its detail. Parts > Append > Insert on the model.
+image: images/wn-0136-insert.jpg
+action: guide:parts.md
+title: No freeze after a heavy stroke
+line: On a very dense mesh, Undo, Save or a click right after a stroke no longer freezes the window.
+image: images/wn-0136-nofreeze.jpg
+action: guide:sculpting.md
+```
+
+- **Benchmark scene pack**: download a pack of our own sculpts and run `sculptforge --benchmark-pack bench-pack --out
+  results.json` on any computer; the result lists your hardware and the frame times, so computers can be compared.
+- **Insert on a mesh with subdivision levels**: Append > Insert on the model no longer asks you to Freeze Levels
+  first. The piece becomes a new Part beside the mesh, and every level keeps its detail. Requested by a member.
+- **Windows installer**: a "Check for updates once a day" box (on by default) says what the check sends; the choice
+  sets **Edit > Preferences > Updates**, which you can still change any time.
+- **Scoop**: on Windows, `scoop install sculptforge` installs the portable build and `scoop update sculptforge` keeps
+  it current (bucket: islandmed/scoop-sculptforge, see the install page).
+
+## Version 0.13.5
+
+```features
+date: 2026-11-16
+tagline: Safer plugins, and AI agents that can run a list of commands as one undo step.
+highlight: Safer plugins: a plugin can no longer stop SculptForge or use up your memory without limit
+highlight: AI agents can run a list of commands as one undo step that rolls back whole if one fails
+highlight: AI agents can read the scene as plain numbers without changing it
+title: Safer plugins
+line: A plugin can no longer stop SculptForge or use up your memory, so trying one from a pack is safer. Plugins still have no access to your files or the network.
+image: images/wn-0135-plugins.jpg
+action: guide:packs-and-macros.md#plugins
+```
+
+- **Blender 5.3 supported**: the Blender bridge is tested on Blender 4.2 LTS, 5.2 and 5.3.
+- **AI tools read the scene as data**: an AI agent connected to SculptForge now gets every result as structured
+  numbers (triangles, bounds, Parts, undo depth, time) and can read the scene, its Parts and the undo history without
+  a tool call.
+- **Batch and checkpoints for AI agents**: an agent can run a list of commands as one undo step that rolls back whole
+  if one fails, and name moments in the undo history to come back to.
+
+## Version 0.13.4
+
+```features
+date: 2026-11-15
+tagline: Saves on Windows retry instead of failing, and a short note from the members.
+highlight: On Windows a save that meets a busy or read-only file retries instead of failing, and a save that still can't land names the file in the status bar
+highlight: A short note from the members: once per version, a small card says SculptForge runs on its members; Not now closes it, and members never see it
+highlight: Membership links in the app carry a small source tag, so we can see which one helps
+title: Saves that don't give up
+line: On Windows, a save that meets a busy or read-only file tries again instead of failing, and if it still can't save, the status bar names the file.
+image: images/wn-0134-save.jpg
+action: guide:projects.md
+```
+
+- **Saves that fail tell you**: if your settings, layout, brushes or recent projects can't be written, the status bar
+  names the file instead of staying quiet.
+- **Membership links say where they came from**: the in-app links to the membership page now carry a small source tag
+  in the address, so we can see which one helps.
+- **A short note from the members**: once per version, from your second start, a small card says SculptForge runs on
+  its members; Not now closes it. Members never see it.
+
+## Version 0.13.3
+
+```features
+date: 2026-11-15
+tagline: Dynamic first strokes no longer freeze, and C picks colour from any Part.
+highlight: Dynamic on a dense Part with a big brush no longer freezes the first stroke
+highlight: Pick colour (C) picks from any Part under the pointer, and says why when it can't
+highlight: A right drag that turned the view no longer opens the Quick Menu when you let go
+```
+
+- **Dynamic** on a dense Part with a big brush no longer freezes the first stroke: the surface under the brush is
+  remeshed a bounded amount per dab and the view keeps drawing.
+- **Pick colour (C)** now picks from any Part under the pointer, not only the selected one, and says why when it
+  can't.
+- **Right-drag to turn the view**: a right drag (or a pen's side button set to Right click) that turned the view never
+  opens the Quick Menu when you let go, whatever the mouse, pen or driver reports.
+
+## Version 0.13.2
+
+```features
+date: 2026-11-14
+tagline: Turning the view with a pen's side button starts where the pen is, and the pen no longer gets stuck.
+highlight: Turning the view with a pen's side button starts where the pen is, with no jump of the model
+highlight: A side button let go, or a window change mid-drag, no longer leaves the pen stuck
+highlight: After lifting the pen out of range or switching windows, the next stroke sculpts as it should
+```
+
+- **Pen side buttons**: turning the view with a pen's side button starts where the pen is, with no jump of the model,
+  and a button or window change mid-drag no longer leaves the pen stuck.
+
+## Version 0.13.1
+
+```features
+date: 2026-11-14
+tagline: Long Tubes edit without crashing, and heavy Ropes and Braids stay in check.
+highlight: Moving or resizing the points of a long Tube no longer closes the app
+highlight: A Rope or Braid that would grow too heavy is drawn with longer edges instead of running away
+highlight: A Tube edit that cannot be drawn keeps the last good shape, and autosave waits while a point is dragged
+```
+
+- **Tube point edits no longer crash**: moving or resizing the points of a long Tube (many points) closed the
+  app; and a Rope or Braid that would be too heavy is drawn with longer edges instead of running away.
+
+## Version 0.13.0
+
+```features
+date: 2026-11-13
+tagline: Shadows and ambient occlusion in the PBR view, and say what you want in the F3 search.
+highlight: Shadows and ambient occlusion in the PBR view: the key light casts shadows and creases darken, so form reads at a glance
+highlight: Say what you want in the F3 search: type clay 40, mirror x or hide all but head and Enter does it
+highlight: Start from an image, then make it yours: Recommended 3D models with their prices, and Tripo with your own key
+```
+
+- **Start from an image, then make it yours**: a **Recommended models** list in the Generate 3D window shows what each
+  model costs per generation, what it is good at and a **Get a key** button. **Tripo v3.1** (about $0.20 a picture) is
+  new, with your own key. A free model that is switched off is greyed out with the reason, and a paid service that is
+  down falls back to the free models you have allowed instead of hanging.
+- **Say what you want** (<kbd>F3</kbd>): type `clay 40`, `intensity 30`, `mirror x`, `remesh 200k` or `hide all but
+  head` in the search and the first row shows what <kbd>Enter</kbd> will do. Typos are forgiven, every interface
+  language works, <kbd>Up</kbd> brings back your last commands, and the result line shows the key.
+- **Shadows and ambient occlusion in the view**: the key light casts shadows on the sculpt (the nose on the cheek, the
+  brow over the eyes) and creases and hollows darken softly. **Material > Viewport Shading** (PBR) and **Preferences >
+  Display > Shadows & AO**: on, off or Auto, with AO strength, AO softness and shadow softness.
+
+## Version 0.12.16
+
+```features
+date: 2026-11-13
+tagline: Pop-ups and the guide take colour by role, and sculpts with Micro detail show again in PBR shading.
+highlight: Pop-ups and the guide take colour by role: tips, lessons, what's new, warnings and deletes each look their own, and Plain keeps the old look
+highlight: Sculpts with Micro detail show again in PBR shading, however big the model
+highlight: A thin shell keeps a clean surface while you orbit, without dark specks
+```
+
+- **Pop-up colours**: pop-ups now stand out from the panels, each kind in its own colour with an icon: tips blue, the
+  welcome and the quick tour teal, What's New orange, warnings amber, deletes red. **Preferences > Interface > Look >
+  Pop-up colours > Plain** keeps the old look. The User Guide's tips, notes and warnings get the same colours and
+  icons, and each part of the guide has its own accent.
+- **Micro levels in the PBR view**: a mesh with a micro level (Geometry > Micro) now draws in **Material > Viewport
+  Shading > PBR**; before, it vanished and only the other Parts showed.
+
+## Version 0.12.15
+
+```features
+date: 2026-11-13
+tagline: Android tablet trays open again, and links on Linux open one browser window.
+highlight: On Android tablets the trays open again: a narrow window holds one tray at a time, opened with a tap on its handle
+highlight: On Linux, Support and other links open one browser window in your own environment, not a pile of crashing ones from the AppImage
+highlight: Start a model from an image from an AI tool, the console or a script, then make it yours: it runs in the background with live status, and the window no longer freezes
+```
+
+- **Trays on tablets**: the Right Tray and the Left Tray open with one tap on their edge handle on tablets, held
+  either way up.
+- **Image to 3D no longer freezes the window** when an AI tool (or the console or a script) runs it: it works in the
+  background, shows its progress in the status line, and the model replaces the scene when it arrives.
+
+## Version 0.12.14
+
+```features
+date: 2026-11-13
+tagline: Shelf slots keep your own brushes after a restart, and the welcome window fits a phone held sideways.
+highlight: A bottom-shelf slot for one of your own brushes keeps its brush and key after a restart, whatever the name
+highlight: On Android the welcome window on a phone held sideways fits the screen, scrolls with a swipe and closes with Back
+highlight: On Android the model draws on phones and tablets whose driver lacks the multi-draw extension, and Help > Copy log is in the menu
+```
+
+- **Welcome on a phone**: held sideways, the welcome window fits the screen, keeps **Close** at its bottom and scrolls
+  with a swipe. Android's Back button closes it (and the other cards that open by themselves).
+- **Help > Copy log to clipboard** is in the Help menu now (it was only in the command search), for reports from a
+  phone where the app's folder can't be opened.
+
+## Version 0.12.13
+
+```features
+date: 2026-11-12
+tagline: SculptForge now speaks Japanese, a human base mesh is ready to sculpt, and AI agents reach fine detail.
+highlight: SculptForge now speaks Japanese, a machine translation of the whole interface, and native review is welcome
+highlight: A sculpt-ready human base mesh, an athletic man in A-pose with clean quads and UVs, in File > New from Starter Mesh
+highlight: AI agents connected over MCP reach fine detail such as pores and wrinkles
+highlight: Masks on Micro levels hold, so Move, the Kelvin brushes and Detail Clone leave masked areas alone
+highlight: Windows laptops with two graphics chips start on the faster one, and the Clay live preview matches the final stroke
+highlight: A sculpt-ready human base mesh
+highlight: Japanese interface
+highlight: AI agents sculpt down to pores and wrinkles
+```
+
+- **Human (male, A-pose)** starter mesh: an athletic adult man, 180 cm, clean quads with edge loops at the eyes, mouth
+  and joints, UVs, ready to sculpt (**File > New from Starter Mesh**). Built from the CC0 MakeHuman base mesh and
+  shape targets.
+- **Japanese**: the whole interface in Japanese, from **Edit > Preferences > Interface > Language**; computers set to
+  Japanese start in it. A first translation: **native review wanted**, tell us what reads wrong in #testers or an
+  issue.
+- **AI agents reach fine detail**: an AI tool connected over MCP now gets a step-by-step route to finished detail (how
+  dense the mesh must be at each stage, brush sizes), **detail_pass** for pores, skin, wrinkles, scales and scars over
+  a region in one undo step, detail presets for strokes (Detail Crease, Detail Wrinkle, Detail Pores...) and
+  **view_closeup** to look at one spot up close.
+- **Clay:** the live stroke preview now matches the final result (it was drawn too strong).
+- **Masks on Micro levels** now hold: Move no longer pushes masked areas, and the Kelvin brushes and Detail Clone
+  leave a masked Micro level alone where the mask is.
+- **Paint across subdivision levels**: a paint stroke on a lower level blends into the finer detail above it at the
+  stroke's strength. Fine dots and edges the stroke did not touch keep their exact colour (no more black dots or pale
+  halos).
+- **A brush on your shelf stays on your shelf**: rename the brush, sort its file into a folder, or change its name in
+  the file, and the shelf slot still finds it.
+- **Customize Shelves**: Guide Strength, Target Quads (Remesh) and Level (Geometry) can be dragged onto a shelf with
+  Ctrl+Alt+drag, like Voxel Resolution.
+
+## Version 0.12.12
+
+```features
+date: 2026-11-12
+tagline: The user guide is redesigned, with new pictures, and big Clay strokes no longer ring.
+highlight: The user guide is redesigned, with new pictures, an In short box on every chapter and menu paths as chips
+highlight: 25 guide pictures are re-taken on the current version and the home page demo clips are re-recorded
+highlight: The Voxel Resolution slider can be dragged onto a shelf in Customize Shelves and stays there (#191)
+highlight: Big Clay strokes leave one even band, not a row of rings, and symmetry near the mirror plane matches (#196)
+highlight: Proof mode runs the standard strokes on a 104 million triangle head, and the Performance guide shows measured times
+```
+
+- **A friendlier User Guide**: every chapter opens with a picture and an "In short" box, menu paths show as chips, and
+  the Welcome page is a grid of places to start. **Help > User Guide** (Shift+F1).
+- **Clay on big brushes** leaves one even band, not a row of ring edges along the stroke.
+- **Customize Shelves**: the Voxel Resolution slider can be dragged from the Remesh palette onto a shelf
+  (Ctrl+Alt+drag) and stays there.
+
+## Version 0.12.11
+
+```features
+date: 2026-11-12
+tagline: Braid is round woven strands, the start-up splash shows on every start, and the brushes tear and fold less.
+highlight: Braid is round woven strands with a Spread from loose to tight, and Turn, Twist and Spin work as before
+highlight: The start-up splash shows on every start, works on Wayland and floats centred on Hyprland and Omarchy
+highlight: Inflate over a Crease no longer tears the surface (#194)
+highlight: Palette Knife and Nudge no longer fold the surface (#198, #199)
+highlight: The Undo memory budget follows free memory, shown live in Preferences > Performance (#202)
+```
+
+- **Nudge and Palette Knife fold the surface less**: a second stroke across a dragged area leaves fewer creases, and
+  Nudge's two halves agree under symmetry.
+- **Startup splash on every start**: the logo and version now show at every start for at least half a second, centred,
+  then fade into the main window, and it now shows on Wayland, where it never appeared. **Preferences > Interface >
+  Show startup splash** turns it off for an instant start.
+- **Inflate over a Crease groove**: stacked Crease and Inflate strokes no longer tear needles and streaks into a
+  divided mesh.
+
+## Version 0.12.10
+
+```features
+date: 2026-11-11
+tagline: Mouse orbit speed, plus exact symmetry for textured brushes and a cleaner Crisp Flatten.
+highlight: Mouse orbit speed: Preferences > Input slows the mouse or trackpad turn (0.1x to 2x) if the view spins too fast (thanks hullalmiah on Discord)
+highlight: Symmetry with textured brushes: Dragon Scales, Skin Pores, Wood Grain and other stamp brushes mirror exactly under X symmetry (#197)
+highlight: Crisp Flatten only cuts: it never adds clay, and pen pressure no longer changes how deep it cuts (thanks Hameron on Discord)
+highlight: Two-key shortcuts also work with both keys pressed together, and brush Size keeps its value at the canvas edge
+```
+
+- **Crisp Flatten** only cuts now: it lowers what is above its plane and never raises or adds clay, and the edges of
+  its facets are clean; pen pressure no longer changes how deep it cuts.
+- **Mouse orbit speed** in **Preferences > Input**: slow the mouse or trackpad turn down (0.1x to 2x) if the view
+  spins too fast.
+- **Symmetry with textured brushes**: Dragon Scales, Skin Pores, Wood Grain and the other textured and turning-stamp
+  brushes now sculpt the same pattern on both sides of X symmetry.
+
+## Version 0.12.9
+
+```features
+date: 2026-11-11
+tagline: Brush Size and Intensity follow the mouse, and Undo is faster on dense models.
+highlight: Brush Size and Intensity follow the mouse: press S or F (or U, Shift+F), move sideways and the value changes live
+highlight: A click elsewhere after moving keeps the new Size or Intensity
+highlight: Faster Undo and Redo of a stroke on dense models of several million triangles (#181)
+```
+
+- **Faster Undo and Redo on dense models**: Ctrl+Z / Ctrl+Shift+Z of a brush stroke on a model of several million
+  triangles no longer stalls for half a second; it takes a few milliseconds. Thanks @TheLycanFenrir and @Devon0209
+  (#181).
+
+## Version 0.12.8
+
+```features
+date: 2026-11-11
+tagline: Reference images: your front and side drawings in the view while you sculpt; SculptForge should start again on Linux NVIDIA; two-key shortcuts.
+highlight: Reference images: your front and side drawings in the view while you sculpt (idea by Oslen on Discord)
+highlight: Start-up fix: SculptForge should start again on Linux NVIDIA drivers where 0.12.5 to 0.12.7 stopped with a shader error (#192)
+highlight: Two-key shortcuts: bind an action to two keys in a row, like A then S (requested by Artizmo on Discord)
+highlight: Shortcuts with two keys in a row
+highlight: Reference images to sculpt against
+```
+
+- **Two-key shortcuts**: bind an action to two different keys in a row, like A then S (**Edit > Preferences >
+  Hotkeys**, the small button beside a key).
+- **Reference images**: **View > Reference images** keeps pictures in the view while you sculpt: behind the model, or
+  as planes at its front, side or top that turn with the view. **Front + side...** sets up a character's two drawings
+  in one go. They never take strokes and stay out of renders unless you ask.
+- **Start-up fix**: SculptForge should start again on graphics drivers where 0.12.5 and 0.12.6 stopped with "Shader
+  compile error".
+- **A fast mouse or trackpad stroke right after a pen stroke** keeps its whole line.
+
+## Version 0.12.7
+
+```features
+date: 2026-11-11
+tagline: Booleans between Parts, Gaussian splats with Blender, and a panel of your own.
+highlight: Booleans between Parts: Add, Subtract or Intersect from Tool > Parts, with a live preview
+highlight: Gaussian splats both ways with Blender 5.3 through the Blender bridge
+highlight: Crisp Flatten, Smooth Peaks, an alpha pool with jitter, and Shift and Ctrl brushes (thanks _tfx on Discord)
+highlight: My Panel: a panel of your own, built by Alt-dragging buttons and sections (requested by Hameron)
+highlight: Faster Undo after a remesh on dense meshes, and a Threads value above 16 now applies (#181, #184)
+highlight: Alpha pool and jitter for non-repeating detail
+highlight: Crisp Flatten: hard planes with a sharp edge
+highlight: Warnings before destructive operations
+highlight: Put any brush on Shift or Ctrl
+highlight: Orbit around the point under the pointer
+highlight: Exact Booleans between Parts, with a live preview
+highlight: My Panel, a panel you build from your own buttons and sections
+highlight: Smooth Peaks brush
+highlight: Repeat a Part along a curve, real braids and springs
+```
+
+- "**Alpha pool and jitter**: **Sculpt > Alpha** has **Scale jitter** and **Position jitter**, and right-clicking an
+  alpha or a folder of images in the Library gives **Add to alpha pool** / **Use folder as alpha pool**: each dab
+  takes a random alpha, for wood grain and scans that never repeat. Three procedural wood grains are included.
+  Requested by a member."
+- **Splats with Blender**: with the Blender add-on and Blender 5.3, Gaussian splats go to Blender and back with one
+  click, view-dependent colour and placement kept. **File > Export > Gaussian Splats (.ply)** in Blender saves them
+  (Blender can't), and a dropped `.splat` file imports there.
+- **Crisp Flatten** (Hard Surface pack; thanks _tfx on Discord): flattens to the plane the stroke starts on with a
+  clean, sharp edge instead of a soft fade, for hard planes and crisp bevels. In Brush Lab, any custom brush can use
+  the new **Lock plane** and **Crisp edge** options.
+- **More warnings before levels go**: Delete Masked, Remove Hidden, Split, Mirror, Make Symmetric and Merge by
+  Distance ask before they drop a Part's subdivision levels.
+- **Shift and Ctrl brushes**: **Shift+click** a brush on the bottom shelf (Trim, Flatten...) and holding Shift sculpts
+  with it instead of Smooth; **Ctrl+click** one and holding Ctrl sculpts with it instead of masking. Your main brush
+  stays.
+- **Orbit around the pointer**: Preferences > Input. A rotation that starts over the model turns the view about the
+  point under the pointer, and zooms after it work at that depth. On for new installs; turn it on there if you used
+  SculptForge before (thanks dm4nd on Discord).
+- **Booleans between Parts**: in **Tool > Parts**, click the mark in a Part's row for **Add**, **Subtract** or
+  **Intersect**; the view shows the result live, and **Make Boolean Mesh** turns it into a new Part (the sources stay,
+  hidden). Exact and watertight, with face groups, vertex paint and UVs kept.
+- "**My Panel** (Edit menu): a panel of your own. Hold Alt and drag any button or whole section from any palette into
+  it, then keep it in a tray or press F4 to open it at the cursor."
+- "**Smooth Peaks brush**: a new brush in the Smooth family that only lowers the high points, the parts that stick out
+  above the surrounding surface, and leaves the hollows alone. Shift-smooth is unchanged. Requested by ABHITAR."
+- **Tube**: Braid now weaves over and under, Rope and Braid take 1 to 8 **Strands** (one is a spring), and **Repeat
+  along curve** lays copies of another Part along a tube or curve (chain links, beads, scales).
+- **A leaner Welcome** (Help > Welcome): the 10-minute lesson and the quick tour side by side, shorter AI and
+  membership lines, and a row of small icons for Discord, GitHub, X, Bluesky, Instagram and Facebook (also in Help >
+  About).
+- The layout now saves itself. Customize Shelves edits, trays and palettes are written a couple of seconds after you
+  change them and when you quit, so a restart or a crash no longer loses them. **Save Layout** now marks the layout
+  that **Revert to Saved Layout** returns to.
+- **SpaceMouse** (macOS, Windows): a SpaceMouse that 3Dconnexion's driver was holding when SculptForge started should
+  be picked up on its own once the driver lets go, no unplugging needed.
+- **More threads, for real**: a **Threads** value above 16 (Preferences > Performance) now reaches the brushes and the
+  remesher after a restart.
+- **Faster Undo after a remesh**: undoing or redoing a Voxel Remesh (or another whole-model step) on a very dense
+  model no longer stops for a second while the model's search tree is rebuilt. Thanks @TheLycanFenrir and @Devon0209
+  (#181).
+
+## Version 0.12.6
+
+```features
+date: 2026-11-11
+tagline: Pan and zoom keys work again, layouts revert safely, and garments drape on a body.
+highlight: Pan and zoom keys work again: a tap nudges the view, holding glides (thanks Artizmo on Discord)
+highlight: Revert to Saved Layout should no longer crash, and the previous autosave is kept (thanks phoenix and raffaele_3d_design)
+highlight: Vertex paint keeps its detail across subdivision levels (thanks masterfull95 on Discord)
+highlight: Drape a garment on a body in Tool > Garments, with a steadier cloth rest
+highlight: Save Visible Parts As and a Mask colour preference
+highlight: Save only the visible Parts
+highlight: Featured creator card in the Welcome window
+```
+
+- **Drape a garment on a body**: in **Tool > Garments**, click the body once for each panel, press **Drape** and watch
+  the pattern sew itself shut and settle, then **Convert to Part** to sculpt it (UVs from the flat pattern).
+- "**Save Visible Parts As**: **File > Save Visible Parts As...** writes a copy of the project with only the Parts you
+  can see, keeping their materials, layers and the scene's cameras and settings. The open project is untouched."
+- **Featured creator**: the Welcome window (Help > Welcome) shows one video by an artist who made something about
+  SculptForge, with its picture, title and a **Watch** button that opens it in your browser. The small x hides that
+  video. It comes with the daily update check, so it is off with **Preferences > Updates > Check for updates** and
+  when you are offline.
+- **Alt+click a Part** finds thin and far Parts: a click a few points off the Part counts, and a trackpad click that
+  wobbles is still a click.
+- **Projects with no models** open: a project saved without any Parts loads as an empty scene, with its settings,
+  lights, cameras and views.
+- **Pan and zoom keys work again**: Pan left / right / up / down and Zoom in / out (on their own keys or rebound) move
+  the view again; a tap nudges it, holding glides.
+- **Revert to Saved Layout** should no longer crash (it, Reset Layout and Import Interface now run between frames), a
+  colour picker or tile taken off a shelf can be put back (**Preferences > Saving & Layouts**), and there is always a
+  way out of a broken layout: **Reset Layout** and `--reset-layout`.
+- **Mask colour**: **Edit > Preferences > Interface > Mask colour** picks the colour masked areas show.
+- **Vertex paint keeps its detail across subdivision levels**: paint a stroke at a low level and it blends over the
+  finer colour above instead of replacing it.
+
+## Version 0.12.5
+
+```features
+date: 2026-11-10
+tagline: Rgb colours Sub strokes, your brushes are safer, and the pan keys glide.
+highlight: Rgb lays colour on Sub strokes too, for every brush and stroke type
+highlight: Brushes you made are safer: a missing bottom-shelf brush shows a mark and comes back from its backup (thanks rand_gogh)
+highlight: Holding the pan and zoom keys glides smoothly at any frame rate (requested by Artizmo on Discord)
+highlight: Thread counts above 16 set in Preferences > Performance apply at the next start (#184)
+highlight: A startup splash shows the bust and version while SculptForge starts
+```
+
+- **Startup splash**: while SculptForge takes a moment to start, the bust, wordmark and version show on the dark
+  background, and the main window appears once it is ready (no empty window first). A quick start shows nothing.
+  **Preferences > Interface > Show startup splash** turns it off.
+- **Smooth pan and zoom keys**: holding Pan left/right/up/down or Zoom in/out now glides: it eases in over a tenth of
+  a second, moves at the same speed at any frame rate and eases out when you let go, instead of a jump and a pause.
+  Requested by Artizmo on Discord.
+- **Member sign-in says what happened**: after you enter the code on GitHub, **Preferences > Updates > Member builds**
+  now tells you the result: signed in with member builds on, signed in but not on the member list yet (or an
+  invitation still waiting, with a button to the invitations page), declined, or the code ran out.
+- **Rgb** now lays colour on Sub strokes too, for every brush and stroke type.
+- **Brushes you made are safer**: a brush file that can't be read is kept and comes back from its backup; a
+  bottom-shelf slot whose brush is missing shows a "missing" mark instead of a brush that looks usable.
+- **Threads above 16**: a thread count you set in **Preferences > Performance** (up to every thread your computer has)
+  now applies at the next start; the default stays at 16.
+
+## Version 0.12.4
+
+```features
+date: 2026-11-10
+tagline: Shortcuts ask before they take a key, and Front faces only shows when it is on.
+highlight: Shortcuts ask before they take a key another action uses (requested by Artizmo on Discord)
+highlight: Pan and zoom from the keyboard: Ctrl+Numpad 4, 6, 8, 2 and Zoom in/out keep moving while held
+highlight: Front faces only shows a tag by the brush cursor and a Turn off button (thanks rand_gogh)
+```
+
+- **Shortcuts ask before they take a key**: press a key that another action already uses and a box names that
+  action, with **Replace** (Enter) and **Cancel** (Esc); a changed shortcut has a reset arrow in **Preferences >
+  Hotkeys**. Requested by Artizmo on Discord.
+- **Pan and zoom keys**: Pan left, right, up and down (Ctrl+Numpad 4, 6, 8, 2) step on a press and keep moving while
+  held, like Zoom in and Zoom out; **Preferences > Input > Pan and zoom key speed** sets how fast.
+- **Front faces only** now shows when it is on: a small tag by the brush cursor and a line at the top of the Brush
+  palette, with a button to turn it off.
+
+## Version 0.12.3
+
+```features
+date: 2026-11-10
+tagline: Your language from the first start, and Slide Stamp turns as you slide.
+highlight: The interface starts in your language (Spanish, Traditional or Simplified Chinese)
+highlight: Hold Shift to turn a Slide Stamp as you slide it (thanks @Devon0209)
+highlight: The welcome has a Language row with all four languages, each in its own script
+```
+
+- **Your language on the first start**: if your computer is in Spanish, Traditional Chinese or Simplified Chinese,
+  SculptForge starts in it, with a note to change it. Any other language starts in English and the welcome has a
+  **Language** row with all four, each in its own script.
+- **Turn a Slide Stamp as you slide it**: hold **Shift** while dragging a Slide Stamp and the alpha turns toward the
+  cursor instead of the stamp moving; let go and it slides on with that turn. Thanks @Devon0209 (#175).
+
+## Version 0.12.2
+
+```features
+date: 2026-11-10
+tagline: Curves and rope tubes, a Wood brush pack, an Unlit view, and origin tools.
+highlight: Curves, and rope, braid and sleeve tubes (requested by Hameron)
+highlight: A Wood brush pack (requested by Hameron)
+highlight: Shift smoothing keeps Smooth's own Intensity in every stroke type (thanks @nekirk11)
+highlight: Unlit view on Alt+L (thanks @nagdav853); Center on origin and Drop to floor in the Gizmo panel
+```
+
+- **Curves**: **Tool > Tube > Result > Curve** draws a guide line on or over the model; **Resample** sets its point
+  count exactly and **Tube from curve** turns it into a tube. New tube profiles **Rope**, **Braid** and **Sleeve**,
+  and **Twist**, **Spin** and **Spread** sliders. Requested by Hameron.
+- **Wood brush pack**: ten brushes and six alphas for weathered grain, splinters, cracks, knots, end-grain rings and
+  plank seams (**Sculpt > Brush**, pack **Wood**). Requested by Hameron.
+- **Unlit view** (Render menu, <kbd>Alt</kbd>+<kbd>L</kbd>): shows the base colour alone, with no lighting, so painted
+  colour reads exactly as stored. Thanks @nagdav853.
+- **Center on origin, Drop to floor**: two buttons in the Gizmo panel put the Part's bounding-box centre on 0,0,0 or
+  rest it on the floor, in one undo step. With the Classic sculpting keys, **F** frames the active Part and **F**
+  twice quickly frames the whole scene.
+- **Shift smoothing keeps Smooth's own Intensity** in every stroke type, Drag Stamp too, from the first dab. Thanks
+  @nekirk11.
+- **Stencil**: Adjust, Tile and Remove are back in **Sculpt > Alpha > Stencil** in the SculptForge layout. Thanks
+  MasterFULL on Discord.
+- **Drape**: sleeves no longer jitter once the cloth is at rest.
+- **Customize Shelves**: every button and value field can be moved with Ctrl+Alt+drag, including greyed-out options
+  and the Size, Intensity and Detail fields.
+
+## Version 0.12.1
+
+```features
+date: 2026-11-09
+tagline: Panels on your second monitor, Voxel Remesh up to 4096, Forge Spheres in one mode, and a Find Problems that finishes the job.
+highlight: Palettes, the User Guide and Controls on your second monitor (requested by Richard Throgmorton (MakIt3D), our first Founding Member)
+highlight: Voxel Remesh up to 4096, with a live triangle estimate (thanks foirgairwolf on Discord)
+highlight: Forge Spheres: draw, move and resize without switching modes (thanks @tristratos)
+highlight: Find Problems: Fix all repairs messy meshes completely and says what it couldn't fix (thanks foirgairwolf on Discord)
+highlight: Drape settles in tight folds instead of twitching, and Clay, Flatten and Trim on micro levels avoid stretched triangles
+```
+
+- **Panels in their own windows**: every palette has a new **Open in its own window** icon in its header, and the
+  **User Guide** and **Controls** have one in their toolbar. Drag that window to your second monitor or pen display;
+  it opens there again next time. Close it (or **Back in the main window**) to bring the panel back. Requested by
+  Richard Throgmorton (MakIt3D), our first Founding Member.
+- **Solo** (Tool > Parts) puts back exactly the Parts that were shown before it: a Part you had hidden stays hidden.
+  Thanks MasterFULL on Discord.
+- **Voxel Remesh up to 4096**: the **Tool > Remesh** Resolution slider now goes to 4096 (two thirds of it still covers
+  32-512), the line under it estimates the triangles it makes, and above 512 it asks once and never starts a remesh
+  that won't fit in the free memory. A sculpted head remeshes at 1024 into about 5.6 million triangles in about 3 s.
+  Thanks foirgairwolf on Discord.
+- **Forge Spheres in one mode**: in **Tool > Forge Spheres > Draw**, click a sphere to grow a new one, drag it to
+  move it, drag near its edge to resize it; the cursor and a small tag say which. Each drag is one undo step. Thanks
+  @tristratos.
+- **Find Problems > Fix all** repairs messy meshes (a rough remesh, solids touching along an edge) completely, and
+  anything it can't fix is listed under **Not fixed**, with why. The inner wall of a hollow is no longer counted as
+  flipped. Thanks foirgairwolf on Discord.
+- **Drape** settles where it used to keep twitching: cloth pressed into an armpit or the inside of an elbow stays put,
+  and sewn seams no longer pull the cloth through the body while they close.
+- **Micro levels**: Clay, Clay Block, Flatten and Trim keep big moves from stretching triangles; ordinary strokes
+  look and feel the same.
+- **Focus Detail in projects**: a streamed level saves and reopens with its full detail, and bake, displacement
+  export, surface noise and copies use it too. Linux and macOS for now.
+- **Big stamps on curved surfaces**: Drag Stamp, Slide Stamp and every alpha brush now cover their whole footprint on
+  a curved surface, with no untouched gaps. Thanks @Devon0209 (#174).
+- **Remesh asks before dropping levels**: Voxel Remesh, Quad Remesh and Decimate say how many subdivision levels they
+  would drop, with **Freeze Levels**, **Proceed** or **Cancel**. Thanks @TheLycanFenrir (#173).
+- **Founding Studio** is for the first 5 studios, a flat $150 a month, locked.
+- **Keyboard and mouse** guide: Option is Alt on macOS, and how to make Option Alt and Cmd Ctrl when the Windows
+  version runs under CrossOver or Wine on a Mac. Thanks @fenixpoints.
+- **Find Problems**: **Fix all** now repairs messy meshes (a rough remesh, touching solids) completely, and anything
+  it can't fix is listed under **Not fixed**, with why.
+
 ## Version 0.12.0
 
 ```features
@@ -646,1245 +1545,3 @@ highlight: Show SculptForge on Discord (opt-in)
 - **Cmd+, opens Preferences** (Ctrl+, on Windows and Linux).
 - **Show SculptForge on Discord**: **Edit > Preferences > Integrations** lets your Discord friends see you're
   sculpting, with the elapsed time and, if you like, the monthly challenge's theme or the file name. Off by default.
-
-## Version 0.10.11
-
-```features
-date: 2026-11-03
-tagline: Voxel Remesh 3-4x faster, high-DPI laptops that fit the screen, the right tray in every look, and a Preview channel for betas.
-highlight: Voxel Remesh 3-4x faster, never freezes the app
-highlight: Classic sculpting keys and the Bridge: SculptForge's own names throughout
-```
-
-- **Update channel**: **Preferences > Updates > Update channel** picks **Stable** (finished releases, the default) or
-  **Preview (betas)**, which also offers the betas of the next version, a couple of weeks before it ships. A beta says
-  so in the title bar and About ("0.11.0 Beta 1"). Problems in a beta go to the Discord's #bug-reports.
-- **High-DPI laptops**: on a Windows laptop at 150-200 % scaling the window opens inside the screen at a size the
-  interface fits, and nothing runs past its edges.
-- **Right tray in every look**: Forge Terminal, Phosphor and Blueprint open the right tray on 1280 px screens, as
-  Classic does.
-- **QuickMenu**: square thumbnails and the look's own colours.
-- **Faster Voxel Remesh**: **Tool > Remesh > Voxel Remesh** is about 3-4 times faster (a 500,000-triangle sculpt at
-  the default resolution in about a third of a second) and runs in the background with a progress bar and Cancel, so
-  the app never freezes while it works.
-- **Our own names, everywhere**: the keymap is now **Classic sculpting keys** with the **Classic layout**, the
-  exchange menu is **File > Bridge** (Send, Receive, Import / Export Bridge file), and the brushes are stored as Sharp
-  Crease, Clay Block and Tendril. Older projects, brush files, hotkeys, shelves and radial menus load as before.
-
-## Version 0.10.10
-
-```features
-date: 2026-11-03
-tagline: Fill Holes, Clip and X-Ray, light you can turn, a faster view on slow machines, and more SpaceMouse devices.
-highlight: Mask and Cut shapes in the stroke popup, no keys held
-highlight: Fill Holes, Clip and X-Ray
-```
-
-- **Shapes in the stroke popup**: press **G** and pick Mask Pen, Lasso or Rect, or Cut Line, Lasso, Rect or Polyline.
-  A plain drag then masks or cuts with that shape, no Ctrl or Ctrl+Shift held (with a mask shape on, Ctrl unmasks).
-  Pick it again to turn it off.
-- **Background jobs keep your Part**: a Quad Remesh, Voxel Remesh, Auto UV or Unwrap that finishes after you picked
-  another Part puts its result on its own Part; the Part you picked stays active.
-- **SpaceMouse detection** (#104): more 3Dconnexion devices are recognised (by name, also over Bluetooth), and **Edit
-  > Preferences > Input > SpaceMouse** lists every controller SculptForge sees, says when another program (3DxWare,
-  spacenavd) holds the device, and has **Copy device report** for bug reports.
-- **Also new since 0.10.9** (missing from its notes): the brush ring is a true circle lying on the surface, symmetry
-  copies show as dots, the crosshair stays while you turn the view, and **Preferences > Cursor > Hide ring while
-  stroking** leaves only the dot while you sculpt (#88); drag empty panel space, or middle-drag anywhere in a panel,
-  to scroll it with a pen (#100); Neutral is the default look for new installs; **Look > Outlines** (#98); the Strokes
-  ring on <kbd>J</kbd>.
-- **Fill Holes**: **Tool > Geometry > Fill Holes** caps every open boundary of a Part with a patch that follows the
-  curve of the surface around it.
-- **Clip**: **Tool > Cut > Clip** presses everything on one side of a line, or outside a lasso or rectangle, flat onto
-  the shape. Nothing is removed. Use it for hard-surface planes and clean silhouettes.
-- **X-Ray**: the **X-Ray** button next to **Solo** shows the active Part through the others. It is also in **View**.
-- **Light**: **Render > Materials > Light** turns the light around the model with a small pad, and sets its intensity
-  and ambient light.
-- **View resolution**: **View** or **Preferences > Performance** draws the 3D view at 75% or 50% for slow GPUs.
-- **Save Render** sizes (up to 4096 px), shapes (1:1, 16:9, 9:16, 4:3) and JPG.
-- **Membership card**: a cleaner look, with a calm warm light instead of the sculpt picture, and the perks now say it
-  plainly: members **vote on what we build next** (#feature-vote on Discord; anyone can suggest in #ideas).
-
-## Version 0.10.9
-
-```features
-date: 2026-11-02
-tagline: Your first sculpt in ten minutes, starter meshes, brushes that keep their settings, and tablets that just work.
-highlight: Your first sculpt in 10 minutes: a beginner lesson from sphere to a rendered owl
-highlight: Starter meshes: heads, a body, hands and clean primitives, all quads with levels ready
-highlight: Each brush keeps its own size, intensity, stroke and alpha
-highlight: Tablets: plug in while running, pressure with or without Windows Ink, no camera jumps
-title: Your first sculpt
-line: A 12-step lesson that turns the default sphere into a painted, rendered owl head.
-image: images/wn-first-sculpt.jpg
-action: help.first_sculpt
-link: first-sculpt.md
-title: Starter meshes
-line: Start from a head, bust, body, hand or clean primitive, all quads at life size.
-image: images/wn-starter-meshes.jpg
-action: file.new_starter
-link: projects.md#start-from-a-starter-mesh
-title: Brushes keep their settings
-line: Size, intensity, falloff, stroke and alpha follow each brush; Save Brush Settings keeps them.
-image: images/wn-brush-settings.jpg
-action: brush:Clay
-link: sculpting.md#each-brush-keeps-its-own-settings
-title: What's New, redesigned
-line: The main features as cards with a Try it button; older versions fold into short groups.
-image: images/wn-whats-new.jpg
-action: guide:whats-new.md
-```
-
-- **Each brush keeps its own settings**: Size, Intensity, Falloff, Colour intensity, stroke and alpha follow
-  the brush, custom and Community brushes included. **Brush > Save Brush Settings** keeps them for the next start,
-  **Reset Brush to Default** puts back the shipped values, and **Preferences > Input > Share size and intensity
-  across brushes** keeps the old way (#78). See [Sculpting](sculpting.md#each-brush-keeps-its-own-settings).
-- **Alpha options** (**Alpha** palette): **Follow stroke direction** turns the alpha along the stroke, smoothed as
-  Blender's Rake does; **Angle** and **Angle jitter** turn it by a fixed or a random amount; **Tile** repeats it
-  inside the brush. They work with custom and Community brushes too, and each brush keeps its own (#76). See
-  [Alpha options](sculpting.md#alpha-options).
-- **Blender style: Alt+drag masks** on the model and Ctrl+Alt+drag unmasks, as in Blender 5.1 and later; beside the
-  model Alt+drag still turns the view. **Preferences > Input > Emulate 3 Button Mouse** makes Alt+drag turn the view
-  everywhere. Shift+F now sets the brush's Intensity, not Smooth's (#77).
-- **View > Lock camera** (<kbd>Shift</kbd>+<kbd>L</kbd>): drags that start beside the model sculpt instead of
-  turning the view, and the status bar shows **CAMERA LOCKED** while it is on (#62).
-- **Tablets**: plug a tablet in while SculptForge runs and it just works ("Tablet connected" in the status bar),
-  also through Wacom Bridge. On Windows, pressure works with the Wacom driver's **Use Windows Ink** on or off.
-  **Preferences > Input** shows whether pressure is detected, with a troubleshooting link. The view no longer jumps
-  when the pen comes back into range, and the active Part changes only with **Alt+click** on the keyboard; the
-  status bar names the new Part. See [Troubleshooting](troubleshooting.md#pen-tablets).
-- **Smaller (or larger) corner axes**: **Draw > Camera > Gizmo size** sets Small, Medium or Large
-  ([Navigation](navigation.md)).
-- **View Figure**: turn it on beside **Axes** for a small head in the corner that turns with the view; click it to
-  snap to the nearest side.
-- **Starter meshes**: start a sculpt from a human head with eye and mouth loops, a bust, a full body in A-pose, a
-  hand, a foot, an ear, an eye, a stylised head, a creature head, a torso, or a bevelled box, cylinder, capsule or
-  ring, all clean quads at life size with subdivision levels ready. **File > New from Starter Mesh**, the Library's
-  **Tool > Starter meshes**, or **Start from a head** in the welcome. See
-  [Projects](projects.md#start-from-a-starter-mesh).
-- **Your first sculpt in 10 minutes**: a step-by-step lesson for people who have never sculpted. Turn the
-  default sphere into a cute owl head with ear tufts, big amber eyes and a little beak, using Move, Clay,
-  Inflate and Smooth, Vertex Paint and PBR shading, and save a render to share. Start it from the
-  welcome's **Start the 10-minute lesson** button or **Help > Your first sculpt (10 min)**. See
-  [Your first sculpt](first-sculpt.md).
-- **Save Render** (**Render > Materials**): the view without the interface, at twice its size, as a PNG in your
-  Library (**Library > Image**).
-
-- **A new What's New**: after an update, a window shows the main features as cards with a picture, one line and a
-  **Try it** button that opens the feature (switch the look, select the brush, open the membership card...).
-  **Help > What's New** opens it again; <kbd>Esc</kbd> closes it. This chapter shows the last three versions in
-  full and folds the older ones into short groups, on the website too.
-- **Image to 3D with no setup**: the free default is now Hunyuan3D 2.1, which needs no token. TRELLIS.2 ("Best
-  detail") still needs a free Hugging Face token (**Preferences > AI**); without one, Hunyuan3D 2.1 runs instead
-  and the status line tells you. Your own model choice is kept. See [Image and text to 3D](generate-3d.md).
-- **Generated models arrive as clean quads**: Quad Remesh is now the default, with one subdivision level holding
-  the detail, so you can sculpt and subdivide straight away. Voxel remesh and Off are still in **Remesh**.
-- **Calm, clear hover**: buttons, menus and shelves brighten a little as you point at them, tiles lift a little,
-  sliders show their exact value, and the keyboard focus gets a ring as strong as your **Outlines** setting. Prefer less
-  movement? Turn on **Preferences > Interface > Reduce motion** ([Interface](interface.md)).
-- **Picker thumbnails on top**: the enlarged thumbnail you point at in a picker is no longer hidden under its
-  neighbours (#86).
-- **Focus Detail (experimental)**: sculpt a head of a billion micro triangles from one compressed file. Detail
-  loads where you look and where the brush is heading, and the rest shows a lighter version. Saving writes only
-  what you changed. Try it with `sculptforge --benchmark standard-1b` (Linux and macOS for now).
-- **Precision work** for pores, wrinkles, jewellery and trims: **Steady Stroke** (<kbd>L</kbd>) with every stroke
-  type and a catch-up on release; **World Size**, so the brush keeps its size in mm on the surface as you zoom;
-  Size down to 0.5 px with <kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd> for 1 px steps; hold
-  <kbd>Shift</kbd>+<kbd>Alt</kbd> while drawing to move the brush at a quarter of the pen's speed; and a pressure
-  curve for each brush with a **Fine detail** preset. The brush centre now sits exactly under the cursor at any
-  zoom. See [Precision work](sculpting.md#precision-work).
-- **UI scale works live**: **Preferences > Interface > UI scale** (100% to 200%) resizes text and panels at once,
-  no restart. **Automatic** follows the monitor the window is on, so on Windows moving it between a 100% and a
-  150% monitor rescales it right away (#87). See [The interface](interface.md#interface-preferences).
-- **The pen keeps working the panels**: with some tablets (Huion, pen displays, Wacom with Windows Ink on or off)
-  the pen picked one brush, then stopped clicking menus and the canvas until you used the mouse. SculptForge now
-  makes the pen's clicks itself (#95). See [Troubleshooting](troubleshooting.md#pen-tablets).
-- **Mouse mode is relative again**: with **Mouse mode** on (Preferences > Tablet) the pen moves the cursor by how
-  far it moves, whatever the driver's mode, and the arrow is drawn right at the brush (#72).
-- **Two screens**: SculptForge no longer slows down when the pointer is on your other screen; it rests only when
-  its window loses focus.
-- **Turn AI off**: **Preferences > AI > Enable AI features** (the welcome asks too). Off hides AI Brush and
-  Generate 3D everywhere and SculptForge makes no AI network calls. Your art is never uploaded or used for training. AI features run only when you use them and can be turned off. Studios can set `SF_AI=off`.
-  See [The interface](interface.md#turning-ai-off).
-- **Big brushes stay smooth on dense meshes**: on models from about 4 million triangles a stroke's dabs are worked
-  out beside the view, so a 240 px brush on 33 million triangles no longer freezes the view for a third of a
-  second at a time (slowest frames about 35 ms instead of 300), and letting go of the pen is instant. The stroke
-  itself comes out the same.
-- **Move keeps up on dense meshes**: Move no longer slows to a crawl on 33 million triangles with a fast pen, and the
-  first orbit after a long stroke no longer hitches.
-- **No more running out of memory**: **Help > Benchmark** skips a scene your computer hasn't got the free memory
-  for (and says how much to free), and Subdivide, Add Level, Micro and Voxel Remesh ask first when the result
-  wouldn't fit in the memory free now.
-- **Clay follows Intensity and pressure**: Clay and Clay Block build gently with a light pen or a low Intensity
-  instead of planing flat as at full strength (#83). See [Sculpting](sculpting.md#built-in-brushes).
-- **Alphas on micro levels**: Drag Stamp and every stroke stamp your alpha on a micro level too (#92).
-- **Brushes hold on at silhouettes**: a stroke sliding past the edge of a form in profile keeps sculpting while the
-  brush still covers it (#84).
-- **Smooth face group borders**: a Brush palette option that straightens jagged clothing edges between face
-  groups and leaves the rest alone (#81). See [Smooth face group borders](sculpting.md#smooth-face-group-borders).
-- **Colour tints the material**: pick a colour and Parts with no vertex paint take it on in the Lit Sphere
-  material. See [Vertex Paint and materials](vertex-paint.md#materials-lit-spheres).
-- **Cut**: one tool that cuts the active Part with a **Line**, **Lasso**, **Rectangle** or **Polyline**. **Away**
-  removes what the shape covers and closes the cut with a flat cap, **In** cuts a flat-bottomed pocket and **Add**
-  raises the shape out of the surface. The result stays watertight and follows the symmetry. Hold
-  <kbd>Ctrl</kbd>+<kbd>Shift</kbd> and pick a Cut shape, or open **Tool > Cut**. See [Cut](cut.md) (#101, #91).
-- **Mask: Front faces only**: Lasso Mask and Rectangle Mask can leave the far side alone
-  ([Masking](masking.md#mask-with-a-lasso-or-rectangle), #91).
-- **Duplicate Part** has a shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> ([Parts](parts.md)).
-- **Brush previews fixed**: the shelf shows Tendril and Elastic Tendril as long horns pulled out past the ball, as
-  they behave in the viewport, and Layer and Nudge with clean shapes; previews are rebuilt once after updating.
-- **Library**: projects no longer show twice on Windows (#90); the close button stays on small screens and
-  <kbd>Esc</kbd> closes the Library (#80).
-- **Cleaner outlines**: the right shelf's outline draws correctly and the **x** buttons are centred (#98).
-- **macOS**: a window closed in full screen reopens maximised, with the window buttons reachable (#85).
-- **Stroke popup**: press <kbd>G</kbd> (<kbd>Z</kbd> in the Blender style) or the button under the **Stroke**
-  tile for a grid at the cursor: the stroke types plus **Add**, **Sub**, **Smooth**, **Mask** and **Select**. Hold
-  the key, point and let go, or tap it and click. Smooth, Mask and Select stay on without holding
-  <kbd>Shift</kbd> or <kbd>Ctrl</kbd>. See [Strokes](sculpting.md#the-stroke-popup).
-
-## Version 0.10.8
-
-```features
-date: 2026-11-02
-tagline: Tablets in mouse mode follow the pen again.
-highlight: Tablet mouse mode: the brush follows the pen again on some Windows tablets (#72)
-```
-
-- **Tablets in mouse mode work again**: on some Windows tablets with **Mouse mode** on (Preferences > Tablet) the
-  brush stopped following the pen in 0.10.7. When the system can't say where its cursor is, the pen now moves the
-  brush by how far it moves, from where it was (#72).
-
-## Version 0.10.7
-
-```features
-date: 2026-11-01
-tagline: A new look, clearer memberships, full alphas on every brush and a benchmark you can run.
-highlight: A new look: Forge Terminal with menus by task, a status bar and a one-row tool shelf
-highlight: Memberships: Supporter, Insider and Studio, side by side on a clearer card
-highlight: Benchmark: a standard 15 or 33 million triangle scene that measures your machine
-title: A new look
-line: Forge Terminal with Tokyo Night and menus by task. Your layout stays until you try it.
-image: images/wn-new-look.jpg
-action: look:new
-link: interface.md#looks-and-layouts
-title: Clearer memberships
-line: Supporter, Insider and Studio side by side, in your look's colours.
-image: images/wn-memberships.jpg
-action: card:membership
-link: https://sculptforge.app/support.html
-title: Full alphas, every brush
-line: Custom and Community brushes show the whole alpha at Falloff -100 (#75).
-image: images/wn-full-alpha.jpg
-action: brush:Clay Slab
-link: sculpting.md
-title: Native Wayland
-line: Every Linux package opens without XWayland and stays sharp at fractional scales.
-image: images/wn-wayland.jpg
-action: guide:installing.md#wayland-and-x11
-title: Benchmark your machine
-line: Sculpt a standard 15 or 33 million triangle head and get frame times you can share.
-image: images/wn-benchmark.jpg
-action: help.benchmark
-link: performance.md#proof-mode-see-it-for-yourself
-```
-
-- **A clearer membership card**: the three memberships side by side with what each one gets you, in your look's
-  colours. **Maybe later** now hides it for 30 days.
-- **New memberships**: Supporters get the credits (in the app and on the website), the monthly pack and a vote;
-  Insiders also get daily drops and preview builds about a week early; Studio covers the whole company with a
-  custom studio build (Founding Studio: the first 10 studios lock in $150 a month). Every release stays free for
-  everyone; bug-fix and security releases go out to everyone the same day.
-- **Full alphas on custom brushes**: at Falloff -100, Clay Slab and the other custom and Community brushes now
-  show the whole alpha to its corners, as the built-in brushes do (#75).
-- **A new look**: new installs start in **Forge Terminal** with the Tokyo Night colours and the **SculptForge
-  layout**: menus by task (File, Edit, Sculpt, Paint, Mesh, View, Render, Help) holding every palette, a status
-  bar and a one-row tool shelf. If you are updating, nothing changes until you say so: a card offers **Try it** or
-  **Keep my layout**. Experienced sculptor? **Preferences > Interface > Look > Classic layout** (or the button in
-  the welcome) brings back the palette bar and the two-row shelf. Six more colour schemes, Match my desktop theme,
-  Phosphor, Blueprint and the Classic look are there too. See [The interface](interface.md#looks-and-layouts).
-- **Native Wayland on Linux**: every Linux package opens without XWayland, stays sharp at fractional scales and
-  reads pen pressure through tablet-v2. The RHEL and Rocky builds now include libdecor (title bars on GNOME
-  Wayland). See [Wayland and X11](installing.md#wayland-and-x11).
-- **Benchmark your machine** (**Help > Benchmark**, or `sculptforge --benchmark standard-15m`): a procedural 15 or
-  33 million triangle head sculpted with Clay at 25, 60 and 120 px, Move, Smooth and a 240 px brush, reporting frame
-  times (p50, p95, p99), stroke lag, the worst stall and memory. See [Performance](performance.md#proof-mode-see-it-for-yourself).
-
-## Version 0.10.6
-
-```features
-date: 2026-11-01
-tagline: See materials as a game engine does, wear that follows the sculpt, and packs you can share.
-highlight: PBR viewport: the texture's material lit by an environment, as fast as Lit Sphere
-highlight: Fill layers: edge wear, dirt and gradients laid through a mask of effects
-highlight: Packs and macros: install brushes, alphas and macros after a review of what's inside
-title: PBR viewport
-line: See the texture's material lit by an environment, as a game engine shows it.
-image: images/pbr-viewport.jpg
-action: guide:pbr-painting.md#the-pbr-viewport
-title: Fill layers
-line: Edge wear, dirt and gradients laid over the whole Part through a mask of effects.
-image: images/fill-painted-edges.jpg
-action: guide:fill-layers.md
-title: More maps to bake
-line: Curvature, thickness, position and ID, and UDIM tiles as one set of files per tile.
-image: images/bake-mesh-maps.jpg
-action: guide:baking.md
-```
-
-- **PBR viewport** (**Material > Viewport Shading > PBR**): see the texture's material as a game engine shows it,
-  lit by an environment: Studio, Photo Studio, Small Studio or Outdoor Sky, with exposure, rotation, the
-  environment behind the model and a choice of tone map. Painted height and normals catch the light. It stays as
-  fast as Lit Sphere on a 20-million-triangle Part. See [Material painting](pbr-painting.md#the-pbr-viewport).
-- **Fill layers** (**Tool > Paint Layers > + Fill Layer**): lay a material over the whole Part through a mask of
-  effects (edge wear, dirt, gradient, thickness, light direction, 3D noise, a painted mask, levels, blur) instead
-  of painting it by hand. Change it any time. See [Fill layers](fill-layers.md).
-- **Wear that follows the sculpt**: Fill layers read the Part's Mesh Maps (occlusion, curvature, thickness and
-  more), and after each stroke only the part of the maps near the stroke is baked again in the background, so
-  chipped paint and dirt move with the form while you sculpt.
-- **Material Recipes**: Worn Metal, Painted Edges, Dirt and Dust and Rusted Iron in one click, and your own saved
-  as small files.
-- **Packs and macros** (**File > Install Pack...**, **Library > Packs**): install a `.sfpack` of brushes, alphas,
-  Lit Spheres, Material Recipes, VDMs, keymaps, pie menus and macros after a review that shows exactly what's
-  inside, its license and its author. Switch packs off, remove them, or make your own with **New Pack**. Record
-  the commands you run as a **macro**, edit it as plain text, and run it from <kbd>F3</kbd>, a key or a pie menu as
-  one undo step. Packs are data only and macros only run SculptForge's own commands; `--no-packs` starts without
-  any pack. See [Packs and macros](packs-and-macros.md).
-- **More maps from Tool > Bake**: curvature, thickness, position and ID; bake a Part's top subdivision level (or
-  micro level) onto its lowest level without a second Part; UDIM tiles bake as one set of files per tile. See
-  [Baking](baking.md).
-- **Forge Spheres with the pointer alone** (#8): **Drag places child** (or <kbd>Ctrl</kbd> while you drag) moves a
-  new sphere away from its parent in one drag; **Delete Selected**, **Insert Between** and **Set as Root** work on
-  the sphere you last clicked, and a right click on a sphere opens a menu with the same. See
-  [Forge Spheres](forge-spheres.md#pointer-only).
-- **Maya zoom** (#32): in the Maya input style <kbd>Alt</kbd>+right drag now zooms with a sideways drag, as Maya's own
-  dolly (right zooms in). To keep zooming up and down as before, choose **Preferences > Input > Zoom drag > Up and
-  down**. **Invert zoom** turns any zoom drag around; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd> erases
-  the mask. See [Maya keys](shortcuts.md#maya-keys).
-- **Move along the normal** (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab started with
-  <kbd>Alt</kbd> held pull the surface straight out of itself (or push it straight in) instead of across the screen.
-  See [Sculpting](sculpting.md#along-the-normal).
-- **Polish, Relax, Smooth and Balloon** (from the discussions): **Tool > Reshape** works on the whole Part by an
-  amount: Polish flattens fine noise and keeps edges, Relax evens out the spacing, Smooth can keep the volume, and
-  Balloon fills the form out. The mask holds what it covers; one undo step each. See
-  [Sculpting](sculpting.md#whole-part-deformations).
-- **Smooth without remeshing** (from the discussions): **Smooth remesh** in **Draw > Dynamic topology** sets how
-  much Shift-smoothing changes the topology, down to **Smooth only**. See
-  [Dynamic topology](dynamic-topology.md#smooth-remesh).
-- **Connected only and View falloff** (from the discussions): brush options that keep a stroke to the piece under
-  the cursor (the other leg, the next finger stay put) or reach through the model along the view, as Blender's
-  proportional editing. See [Sculpting](sculpting.md#falloff-options).
-- **The SculptForge Discord** (**Help > Join the Discord...**): the official community, for questions, tips and
-  work in progress. It is also on the support card, in the welcome note and on the website. Bugs still go to
-  **Help > Report a problem** (GitHub issues).
-- **Backface culling** (#68, **Tool > Viewport Look**): don't draw the back faces of the model, for speed on open meshes
-  and to see through their openings. Brushes then work only on what you see. Off by default.
-- **A crosshair over the view** (#73): the pointer is a crosshair where brushes act and the arrow over the panels.
-  **Preferences > Interface > Viewport cursor** brings the arrow back.
-- **A radial menu on the right button** (#74): choose **Right mouse button** for a menu in **Preferences > Input >
-  Radial Menus**; turn the view with <kbd>Shift</kbd>+right-drag then. A menu on a mouse button now opens only
-  without modifier keys, so <kbd>Alt</kbd>+middle still pans.
-- **Fixed: Smooth on quad meshes** (#69): smoothing a Quad Remesh result no longer shears the quads into zigzags.
-- **Fixed: Keep Masked remeshing** (#67): Voxel Remesh with Keep Masked works on real sculpts, tidies awkward mask
-  edges by itself, and says what to change when it can't.
-- **Fixed: tablet mouse mode** (#72): the brush stays on the system cursor after the pen is lifted and put down
-  elsewhere, and clicks land where the arrow is.
-
-## Version 0.10.5
-
-```features
-date: 2026-11-01
-tagline: Selection sets, a full UV Editor, radial symmetry and SculptForge's own names.
-highlight: UV Editor: seams, unwrapping, UDIM packing and live stretch on the model
-highlight: Selection sets: named snapshots of mask, groups, visibility and shape
-highlight: Radial symmetry: every stroke repeated 2 to 64 times around an axis
-title: UV Editor
-line: Draw seams, unwrap, pack across UDIM tiles and see stretch live on the model.
-image: images/uv-editor.jpg
-action: ui.uv_editor
-link: uv-editor.md
-```
-
-- **Selection sets** (**Tool > Selection Sets**): store as many named snapshots of a Part's mask, face groups,
-  visibility, vertex paint, UVs and shape as you like, and restore them at any subdivision level, not only the one
-  they were stored at. Combine two sets (union, intersect, subtract), restore one onto the current mask or
-  visibility the same way, or take a quick set from the visible faces. Every step is one undo step, and the sets are
-  saved with the project. See [Selection sets](selection-sets.md).
-- **Morph brush and Morph to Set**: a set with its shape is a morph target. The new **Morph** brush pulls the
-  surface back toward it (<kbd>Alt</kbd> pushes away), and **Morph to Set** blends the whole Part toward it by any
-  amount, within the mask, at any subdivision level.
-- **Sets for pipelines**: `selection_set_*` commands for scripts, `sculptforge-cli` and the AI assistant,
-  `doc.selection_set()` / `doc.set_selection_set()` in Python, `.sfsets` files to move sets between Parts and
-  scenes, and USD exports that carry them as GeomSubsets and primvars (read back on import).
-- **UV Editor** (**Tool > Texture Image > UV Editor**, <kbd>Alt</kbd>+<kbd>U</kbd>): the Part's UVs flat over the UDIM
-  tiles, drawn by the graphics card so a million triangles stay smooth. Draw seams on the model with the **Seam
-  Tool** (or take them from face groups, island borders or sharp edges), then **Unwrap**: **Least Stretch**,
-  **Conformal**, **By Face Groups**, **Planar**, **Unfold Islands** or **Auto Seams**, with closed and tangled pieces
-  cut for you. **Pack** into one tile or across UDIM tiles, **Set** and **Match** texel density, lay islands into
-  **trim sheet** strips, and select vertices, edges, faces or islands (in the view or on the model) to move, rotate,
-  scale, pin, weld, split, straighten and flip them. The model shows stretch, texel density, islands and a checker
-  live while you edit, and a painted texture moves with every change so the model keeps its look. Every step is one
-  undo step and a `uv_*` command for scripts. See [UV Editor](uv-editor.md).
-
-- **Fixed: the viewport on some Windows PCs** (#29): on displays whose window uses another colour format (seen with
-  NVIDIA and high-resolution screens) the model never appeared and the cursor left trails. The view now reaches the
-  window on every format, and falls back to drawing directly if a driver still refuses.
-- **Features use SculptForge's own names** (Parts, Forge Spheres, Vertex Paint, Face Groups, Library, Lit Spheres,
-  Quad Remesh, Bridge, Snapshot...); the command palette finds them by what they do. See [Quick tour for experienced sculptors](quick-tour.md).
-- **New installs start with the SculptForge keys**, and the first start asks what you are coming from to pick the key style. Your saved style is kept; the Classic sculpting keys are
-  **Classic** in **Preferences > Input**. See [Keyboard and mouse](shortcuts.md#classic-sculpting-keys).
-
-### From your requests on GitHub
-
-- **Start strokes off the model** (#62): an option in **Preferences > Input**, off by default, and
-  <kbd>Shift</kbd>+<kbd>L</kbd> to turn it on and off. With it on, a left-drag that starts on the background
-  sculpts once it reaches the model instead of turning the view. See [Navigation](navigation.md#mouse-and-pen).
-- **Radial and local symmetry** (#63): **R** in **Transform > Symmetry** (and on the top shelf) repeats every
-  stroke around the X, Y or Z axis, 2 to 64 times (**Radial Copies**), together with the X / Y / Z mirrors. Every
-  brush, mask, vertex paint and texture stroke, the mask and select shapes, Dynamic Topology and Insert follow it,
-  and the brush cursor shows on every copy. **Local** puts the planes and the axis through the active Part's centre.
-  Saved with the project and scriptable (`radial`, `radial_axis`, `local`). See [Sculpting](sculpting.md#radial-symmetry).
-- **The Sculpt Timeline is at the top of the viewport** (#63), away from the brushes on the bottom shelf. **Preferences >
-  Interface > Timeline position** puts it back at the bottom; saved automatically. See
-  [Sculpt Timeline](timeline.md).
-
-## Version 0.10.4
-
-```features
-date: 2026-11-01
-highlight: Keep Masked remeshing: the masked part keeps its triangles and detail exactly
-highlight: Radial menus: hold T or Y, flick and let go, or make your own
-highlight: Insert your own mesh: a copy of a Part or an .obj, .ply or .glb, placed by a drag
-```
-
-### From your requests on GitHub
-
-- **Insert your own mesh** (#34): **Append > Insert on the model** now takes a copy of another Part or an
-  `.obj`, `.ply` or `.glb` file, placed, sized and turned by the drag like the shapes. See [Parts](parts.md).
-- **Keep Masked** for Voxel Remesh, Decimate and Quad Remesh (#43): the masked part keeps its triangles and detail
-  exactly; only the rest is rebuilt and joined to it. See [Geometry](geometry.md).
-- **Hold Space and drag to move the camera** (#43): an option in **Preferences > Input**, off by default. See
-  [Navigation](navigation.md).
-- **Triple-click** another Part in the viewport to select and frame it (#43).
-- **Twelve new alphas** (Pores, Cracks, Scales, Rivets, Stitches, Fabric Weave, Bark, Rock Strata, Wrinkles, Skin
-  Folds, Hair Strands, Dot Grid) and **six new VDM brushes** (Rivet, Stitches, Skin Fold, Wrinkle Line, Crack, Rock
-  Ledge), with thumbnails in the Library (#43). See [Sculpting](sculpting.md).
-- **Mask from the mesh border** (#61): **Tool > Masking > By border** masks open edges (and face group borders),
-  so sculpting leaves them in place. See [Masking](masking.md).
-- **SculptForge in Spanish** (#44): **Preferences > Interface > Language > Español**.
-- **Maya bridge** (#42): **File > Maya** and a SculptForge shelf for Maya swap meshes through a folder you
-  pick: no connections, nothing run. See [Working with Maya](maya.md).
-- **Radial (pie) menus** (#45): hold **T** (brushes) or **Y** (masking), flick and let go; make your own in
-  **Preferences > Input > Radial Menus**. See [Sculpting](sculpting.md#radial-menus).
-- **Falloff works with alphas** (#60): -100 shows the whole alpha, 0 rounds it off, +100 leaves a soft point
-  (alpha brushes are softer at the default 0 than before; set -100 for the old crisp look).
-- **Select Rectangle and Select Lasso** follow X / Y / Z symmetry, like the mask versions (#51).
-
-### Become an Insider
-
-SculptForge stays free for everyone. Every release stays free for everyone; bug-fix and security releases go out
-to everyone the same day. **Help > Support SculptForge** opens the page to join.
-
-When SculptForge starts for the first time, after an update, and otherwise at most once a week, a card shows the
-ways to support it: **Supporter**, **Insider** and **Studio** memberships and the one-time Supporter, each opening its
-checkout page in your browser. **Maybe later**, <kbd>Esc</kbd> or a click outside closes it; **I'm already a
-supporter** hides it for good, and **Preferences > Support** turns it off. It never shows while you work, and
-nothing about you is sent anywhere.
-
-## Version 0.10.3
-
-```features
-date: 2026-11-01
-highlight: Alternate smooth: let go of Shift mid-stroke to smooth without shrinking the form
-```
-
-### From your requests on GitHub
-
-- **Alternate smooth** (#40): start smoothing with Shift held, then let go of Shift while still pressing, and the
-  rest of the stroke smooths without shrinking the form. **Brush > Smooth keeps volume** makes it the default. See
-  [Sculpting](sculpting.md).
-- **Masking** (#48, #51): Ctrl+drag on the background draws a mask rectangle; Lasso and Rectangle masks follow
-  symmetry; a Ctrl+click with them blurs the mask. See [Masking](masking.md).
-- **Pen tablets in mouse mode** (#54): **Preferences > Tablet > Mouse mode (relative)** stops the cursor jumping
-  back when you lift the pen.
-- **Axis gizmo**: click X, Y or Z to snap to that view (#43). **Undo and Redo** on the right shelf, **Continuous**
-  in the stroke picker, **Part thumbnails**, and **Insert on the model** follows symmetry. See
-  [Navigation](navigation.md) and [Parts](parts.md).
-- **macOS** (#41): reopening in full screen keeps the menu bar and window buttons reachable.
-
-### Support SculptForge
-
-SculptForge stays free for everyone. **Help > Support SculptForge** opens the page where you can become a
-member. Every release stays free for everyone; bug-fix and security releases go out to everyone the same day.
-
-## Version 0.10.2
-
-```features
-date: 2026-11-01
-highlight: Quad Remesh 2: two to fifty times fewer poles, loops that follow the forms
-highlight: Elastic brushes: KelvinGrab, KelvinTwist, KelvinScale and Elastic Tendril
-highlight: Capture from view: turn any detail into an alpha or a vector displacement brush
-```
-
-### Quad Remesh 2
-
-A new quad remesher is now the default in **Tool > Remesh** and **Tool > Geometry**: two to fifty times fewer poles
-than before at the same accuracy, edge loops that follow the forms (round the mouth and nose), exact symmetry, and a
-quality report after each run. The previous method is still there as **Legacy**, and pieces with closed guide loops
-use it for now. See [Quad retopology](retopology.md).
-
-### Kelvinlet brushes and Capture from view
-
-**KelvinGrab**, **KelvinTwist**, **KelvinScale** and **Elastic Tendril** move the surface like elastic clay, with a Squash
-slider from rubber to firm clay; they're at their best below about 10 million triangles for now. **Capture from view**
-(<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>) turns any detail into an alpha or a vector displacement brush, and
-**Detail Clone** stamps it along a stroke. See [Sculpting](sculpting.md).
-
-### Also
-
-- Insert on the model (#34): the drag's direction also turns the shape about the surface.
-- Security: video exports (timelapse, Benchmark) no longer pass the file name to ffmpeg in a way a crafted name
-  could abuse. Update if you use them.
-- The local API added in 0.10.1 is removed; SculptForge doesn't listen for other programs.
-
-## Version 0.10.1
-
-```features
-date: 2026-11-01
-highlight: Micro levels: about a billion sculptable triangles in under 2 GB of memory
-highlight: PBR painting: roughness, metallic, normal and height, exported for every engine
-highlight: Sculpt Timeline: scrub back through every stroke and branch from any point
-highlight: Maya navigation: Alt+left orbits, Alt+middle pans, Alt+right zooms
-```
-
-### From your feedback on GitHub
-
-- **Maya navigation** (#32): **Preferences > Input > Maya**. Alt+left orbits, Alt+middle pans, Alt+right zooms.
-- **Focal length** (#26): **Draw > Camera**, 15-300 mm with 35 / 50 / 85 / 135 presets, saved with the project.
-- **More primitives** (#31): Cylinder, Cone, Torus, Capsule, Icosphere and Quad Sphere in **Tool > Parts >
-  Append**, plus **Insert on the model** (#34): choose a shape, then drag on the surface to add it.
-- **Continuous** in the Stroke palette keeps the brush working while you hold it still, and an X / Y / Z gizmo
-  shows the view's direction (#31).
-- **Local API** (#36): other programs on your computer (symmetry tools, scripts) can run commands in the open
-  app. Off by default; see [Scripting](scripting.md).
-- The window opens where and how big you left it (#35), and a drawing problem on some graphics drivers that left
-  trails in the viewport is fixed (#29).
-
-### Micro levels: hundreds of millions of polygons
-
-**Tool > Geometry > Micro** adds a micro-displacement level above your top subdivision level: up to about a
-billion sculptable triangles in under 2 GB of memory, drawn at the detail your screen can show. Move reshapes the
-base and the detail rides along. Bake it down or export displacement maps. See
-[Micro levels](micro-levels.md).
-
-### Material painting (PBR)
-
-Paint roughness, metallic, normal, height, AO, emissive and opacity alongside colour, per paint layer, and export
-packed maps with presets for Unreal, Unity, glTF, Godot, Blender and USD. Texture brushes are much faster on
-dense meshes. See [Material painting](pbr-painting.md) and [Export presets](export-presets.md).
-
-### Sculpt Timeline and proof mode
-
-Scrub back through every stroke, branch from any point, retune an old stroke's strength, and export a timelapse
-turntable. **Help > Benchmark** runs a scripted stroke on 5M to 33M triangles with a live readout and records a
-video and a report you can share. See [Sculpt Timeline](timeline.md) and [Performance](performance.md).
-
-### Hardware profile
-
-On first start SculptForge measures your computer for a second and picks settings for it (Laptop, Workstation or
-a safe mode); on battery it saves power. See **Preferences > Performance**.
-
-### Also new
-
-- The brush ring lies on the surface and follows its shape (#25). **Preferences > Input > Cursor follows surface**
-  turns it off.
-- Faster normals on big meshes. **Predictive strokes** (a GPU preview of each dab ahead of the solver) are in
-  **Preferences > Performance** as an experiment.
-- The status bar shows only the file name of what you open.
-
-## Version 0.9.7
-
-```features
-date: 2026-10-31
-highlight: Faster big brushes: half the lag for a 200-pixel brush on 21 million triangles
-```
-
-### Faster big brushes on dense meshes
-
-A large brush on a model of 20 million triangles or more keeps up much better: on a 21-million-triangle sphere
-with a 200-pixel brush, the brush now trails the pointer by half as far, a frame takes a third less time, the
-first dab appears in half the time, and lifting the pen no longer pauses for up to a second while waiting dabs
-are placed. See [Performance](performance.md).
-
-### Right click for the Quick Menu
-
-A right click on the canvas opens the Quick Menu under the cursor (Space still does too). A right
-drag turns the view as before, and **Preferences > Input > Right click opens the Quick Menu** turns it off. See
-[The Quick Menu](sculpting.md#the-quick-menu).
-
-### Fixes
-
-- The orthographic view (<kbd>Numpad 5</kbd>) shades like the perspective one: Lit Spheres and the lights no longer
-  look inside out.
-- Dynamic topology with symmetry now adds detail on the mirrored side too when the model's two sides aren't
-  built from mirrored polygons (a QRemeshed head, say): before, only the side under the brush got the new
-  triangles. See [Dynamic topology](dynamic-topology.md).
-
-## Version 0.9.6
-
-```features
-date: 2026-10-31
-highlight: Extract: a masked area becomes a shell that fits the surface exactly
-highlight: Make Symmetric: one side mirrored onto the other as one watertight mesh
-highlight: Flatpak: one sandboxed file for x86_64 and ARM64 Linux
-```
-
-### Extract
-
-Mask part of a Part and **Tool > Parts > Extract** turns it into a shell that fits the surface exactly: a
-helmet, a strap, a piece of armour. Set **Thick**, **Edge Smooth** and **Double** while the preview shows, then
-**Accept** keeps it as a new Part (and <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes it away again). **Corners** and
-**Border** give the rim triangles instead of quads. See [Extract a shell](parts.md#extract-a-shell).
-
-### Make Symmetric
-
-**Tool > Geometry > Symmetry > Make Symmetric** mirrors one side of a model onto the other across X, Y
-or Z and welds the seam into one watertight mesh, keeping face groups and vertex paint. **Tool > Reshape >
-Mirror** flips a Part. See [Make Symmetric](geometry.md#make-symmetric).
-
-### A flat background
-
-**Preferences > Display > Background** (also in the Render palette) switches the view from the gradient to a
-flat colour you pick. Saved automatically; projects keep their own. See
-[The background](interface.md#the-background).
-
-### Flatpak
-
-SculptForge comes as a Flatpak for x86_64 and ARM64 Linux: one file on the releases page that runs in Flatpak's
-sandbox on any distribution, installed with `flatpak install --user ./SculptForge-linux-x86_64.flatpak`. It can
-open projects and models anywhere in your home folder, works with pen tablets and a
-SpaceMouse, and the Blender bridge finds it by itself. See
-[Installing SculptForge](installing.md#flatpak).
-
-### Fixes
-
-- Fast strokes on very dense meshes keep their curve. When one dab cost more than a frame, a quick arc came out
-  as a straight line; now the dabs wait in a queue the app works through between frames, so it keeps reading
-  the pointer. Based on a patch by @bribblej-web. See [Performance](performance.md).
-- The AppImage has a PNG icon at its root, so AppImage managers (AppManager, Gear Lever) show SculptForge's
-  icon when they add it to your menu.
-- Add Level (<kbd>Ctrl</kbd>+<kbd>D</kbd>) no longer crashes on models with a point where many polygons meet, such
-  as a Blender cylinder with Triangle Fan caps of 22 or more sides or a UV sphere's poles.
-- Generating with a [ComfyUI](generate-3d.md) workflow and a fixed seed could crash at random; fixed.
-- SculptForge now keeps a log file, `sculptforge.log`, in its settings folder (**Help > Open log folder**). After
-  a crash it says what crashed and what you did last; attach it when you report a problem. See
-  [The log file](troubleshooting.md#the-log-file).
-
-## Version 0.9.5
-
-```features
-date: 2026-10-31
-highlight: Forge Spheres: block out bodies and creatures from connected spheres
-highlight: Blender keys: Blender's navigation and Sculpt Mode keys
-highlight: SpaceMouse: turn, pan and zoom with a 3Dconnexion SpaceMouse (experimental)
-```
-
-### Forge Spheres
-
-Block out a body, creature or plant from connected spheres: **Tool > Forge Spheres > New Forge Sphere**,
-drag on a sphere to grow a limb, Move and Scale it into proportion, Alt+click to delete, with Symmetry mirroring
-every edit. **Preview** (<kbd>A</kbd>) shows the skin, and **Make Mesh** turns it into a sculptable, all-quad
-Part with a face group per limb, keeping the Forge Spheres to change later. See [Forge Spheres](forge-spheres.md).
-
-### Blender keys
-
-**Preferences > Input > Style > Blender** brings Blender's navigation and Sculpt Mode keys: middle-drag to
-orbit (Alt+drag with a pen), the numpad views, F / Shift+F, V S P I G C K for brushes, M for the mask. You can
-also import a keymap you exported from Blender. See [Blender keys](shortcuts.md#blender-keys).
-
-### Flat shading
-
-**Material > Shading > Flat** shows every polygon as its own facet, to read a low-poly blockout's planes and
-check exactly what a brush did; **This Part** keeps one Part smooth or flat whatever the scene says. See
-[Vertex Paint and materials](vertex-paint.md).
-
-### SpaceMouse (experimental)
-
-A 3Dconnexion SpaceMouse now moves the view: twist, tilt and push the cap to turn, pan and zoom around the model
-with one hand while the other holds the pen, in every input style and even mid-stroke. The two side buttons
-frame the model and show the front. **Preferences > Input > SpaceMouse** sets the speed, the dead zone, turntable
-rotation, a dominant-axis mode, inverts any axis, and maps the buttons. It reads the device directly, without
-3Dconnexion's driver, and hasn't been tried on real hardware yet: see
-[SpaceMouse](navigation.md#spacemouse-experimental) if yours doesn't show up.
-
-### Your own Lit Spheres
-
-**Material > Load Lit Sphere...** turns any image (PNG, JPG or EXR) into a material, and images you put in
-**Documents/SculptForge/Lit Spheres** show up in the material list, even while SculptForge is running. Right-click one
-and choose **Remove** to send it to the trash. Projects carry the Lit Sphere they use, so they look the same on any
-computer. See [Your own Lit Spheres](vertex-paint.md#your-own-lit-spheres).
-
-### Fixes
-
-- Pens whose drivers send stray mouse events (a Ugee M708 on Linux) can rotate, pan and zoom on the background
-  again instead of shaking the view.
-- The S / U / I / O slider opens with its knob under the cursor and stays open while you drag it.
-- The Blender Bridge add-on installs again: its zip was missing a file.
-- Pens on Windows (Wacom Intuos Pro and others through Windows Ink): taps on menus and buttons land, and Alt+pen
-  drag, the Move button and the S / U / O slider follow the pen instead of jumping.
-- Idle, SculptForge no longer keeps your graphics card busy: it draws a new frame only when something changes
-  (before, 60 or more a second all the time).
-
-## Version 0.9.4
-
-```features
-date: 2026-10-29
-```
-
-### Fixes and packaging
-
-Exports without a material of their own (FBX, USD) and splats made from an unpainted sculpt use the Soft Clay
-grey instead of the old peach. Linux AppImages are now named `SculptForge-0.9.4-x86_64.AppImage` (and
-`-aarch64`) and carry update information for AppImageUpdate. On macOS you can install with Homebrew:
-`brew install --cask islandmed/tap/sculptforge`.
-
-## Version 0.9.3
-
-```features
-date: 2026-10-28
-```
-
-### A cleaner look
-
-The default material is now **Soft Clay**: matte, with a clear light and shadow side, so sculpted detail reads at
-a glance. Orange marks only the current tool; options that are on are a lighter grey with a thin orange line.
-Every brush icon is drawn the same way, with a mark that shows what the brush does. A material you picked
-before is kept: choose **Soft Clay** in the Material menu to see the new look. See [The interface](interface.md).
-
-### Bigger brush tiles, your size
-
-The brush tiles on the bottom shelf are bigger. Right-click any brush on the shelf and choose **Tile size**:
-Small, Medium or Large (also in **Preferences > Interface > Shelf tiles**).
-
-### Export STL from the File menu
-
-**File > Export STL...** is its own menu item, for 3D printing.
-
-## Version 0.9.2
-
-```features
-date: 2026-10-28
-```
-
-### View in AR on Android
-
-On Android, **View in AR** used to just download a file. It now opens an AR page in **Chrome**: your sculpt comes
-to it encrypted through SculptForge's relay, so it works even when Chrome can't reach your computer, and it updates
-as you sculpt. Show it with Chrome's AR or with Google's AR viewer. If the capture page is open in Firefox, tap
-**Open in Chrome**. See [Phone capture and AR](phone-capture.md).
-
-### One port for the phone link
-
-Face capture and AR now use the same network port as the capture page. On Linux with a firewall, allow that port
-for both TCP and UDP from your home network.
-
-## Version 0.9.1
-
-```features
-date: 2026-10-27
-```
-
-Fixes from the first day of 0.9.
-
-### Phone capture: when the phone can't open the page
-
-Recent versions of Chrome on Android can refuse to open any address on your home network and just say **This
-site can't be reached**. The **Capture from phone** window now says so and suggests Firefox, and its **The phone
-can't open the page?** list covers Linux firewalls too. See [Phone capture and AR](phone-capture.md).
-
-### Easier to read
-
-This guide, including What's New, and the update banner now use larger text.
-
-### Baking
-
-**Cancel** now stops small bakes too.
-
-## Version 0.9.0
-
-```features
-date: 2026-10-26
-highlight: Scan to sculptable: a phone scan becomes a clean, animatable quad mesh
-highlight: Facial shapes: the 52 ARKit blend shapes on any sculpted head, driven live by your face
-highlight: Phone capture: your phone as SculptForge's camera, with no app to install
-```
-
-Maquette to performance: scan an object or a clay maquette with your phone, turn the scan into a clean mesh you
-can sculpt and animate, give a head the 52 ARKit facial shapes, and drive them live with your own face.
-
-### Facial shapes and live face
-
-**Tool > Facial Shapes > Generate Facial Shapes** gives a sculpted head the 52 Apple ARKit blend shapes
-(`eyeBlinkLeft`, `jawOpen`, `mouthSmileRight`, ...) as sculpt layers, fitted to its proportions from a template head
-with those shapes (ICT-FaceKit, MIT licence). Eyes, teeth and tongue Parts get theirs too. Fix any shape by
-sculpting into its layer, check them with the **Face test** presets and sliders, and export them with their ARKit
-names to GLB, USD, FBX and Blender (as shape keys). `face_weights` drives them live from a face feed, and recorded
-takes play in the viewport and bake into a glTF animation or USD time samples. `new_head` starts a scene with a
-human head to sculpt on. See [Facial shapes and live face](facial-shapes.md).
-
-### Scan an object into a splat
-
-Film an object with your phone, or take photos all around it, and SculptForge trains a Gaussian splat from it on
-your own graphics card. The splat appears in the viewport after a few hundred steps and sharpens while it trains;
-you can orbit around it, stop when it's good enough, or cancel. Pick **Video...** or **Photos Folder...** under
-**Splats > Train from capture**, or drop a video onto the window. The free Brush trainer is offered as a one-click
-download the first time. See [Scan an object into a splat](scan-to-splat.md).
-
-### Make sculptable: from a scan to a production asset
-
-One click in the **Splats** palette turns a Gaussian-splat capture into a clean Part you can sculpt, rig and
-animate: a watertight surface with the floaters and background gone and open bottoms sealed, quad topology at a
-Game, Film or Sculpt budget, edge loops round the eyes and mouth and along the nasolabial folds when the capture
-is a head (mirrored across the face), and the capture's colours as vertex paint or a texture. A crop box cuts away
-the table or the room; Review shows the face landmarks to nudge before remeshing. The splats stay, hidden. Five
-million splats take about ten seconds on a laptop. See [From scan to sculptable mesh](scan-to-sculptable.md).
-
-### Your phone as SculptForge's camera
-
-**File > Capture from phone** shows a QR code: scan it and your phone's browser can send SculptForge a scan (walk
-round an object for 20 to 60 seconds), a photo to turn into a model, or a splat file from a scanning app. Tap
-**View in AR** to see your sculpt standing on your desk, updated as you sculpt, and **Face capture** to drive a
-character's facial shapes with your own face, live. No app to install. See [Phone capture and AR](phone-capture.md).
-
-## Version 0.8.1
-
-```features
-date: 2026-10-25
-```
-
-Fixes from a professional sculptor's testing, and a way to bring a library over.
-
-### More classic
-
-- **Classic zoom direction.** With the Classic input style, dragging up zooms out on every zoom drag.
-  See [Navigation](navigation.md).
-- **Ctrl and Ctrl+Shift brushes.** Hold <kbd>Ctrl</kbd> and the left shelf shows the mask brush; with
-  <kbd>Ctrl</kbd> held the Brush and Stroke pickers pick Mask Pen, Lasso Mask or Rectangle Mask. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>
-  does the same for Select Rectangle and Select Lasso. See [Masking](masking.md).
-- **Group by UVs.** One face group per UV island, in **Tool > Face Groups**. See [Face Groups and visibility](face-groups.md).
-
-### Texture painting: one click to start, and faster
-
-With the Paint brush on, a Part without a texture now shows **New Texture** on the top shelf and in the Color
-palette: click it and SculptForge unwraps the model if it has no UVs (Auto UV, in the background) and gives it a
-texture, so the next stroke paints texels. Big brushes on 4K textures paint four to five times faster. See
-[Texture painting](texture-painting.md).
-
-### Bring a library over
-
-A folder of numbered Bridge files opens as one scene, every Part with its face groups, vertex paint, mask and
-UVs.
-
-## Version 0.8
-
-```features
-date: 2026-10-25
-highlight: Dynamic topology: the brush adds triangles where it needs detail
-highlight: Vector displacement brushes: stamp whole shapes, overhangs and all
-highlight: Quad Remesh Guides: draw the edge loops you want
-```
-
-Dynamic topology, vector displacement brushes, Quad Remesh Guides, and sculpt layers on every subdivision level.
-
-### Dynamic topology
-
-Turn on **Dynamic** on the top shelf and the brush adds triangles where it needs detail and removes them where
-it doesn't: pull a sphere into horns or fingers without stretching, block in from a ball without remeshing.
-**Detail** sets how small the triangles get, relative to the brush (zoom in for finer ones) or, with **Constant
-detail**, one size for the whole mesh. Symmetry makes mirrored triangles, borders and masks are kept, and each
-stroke is one small undo step. See [Dynamic topology](dynamic-topology.md).
-
-### Vector displacement brushes
-
-One drag stamps a whole shape, overhangs and all: the new **VDM** brush presses a vector displacement map, so a
-horn can lean over, an ear can curl and scales can overlap, which no alpha can do. Four maps come with it (Horn,
-Ear Curl, Scales, Nostril); make your own by sculpting on a **VDM Plane** and clicking **Create VDM**, or load the
-EXRs Blender's VDM Brush Baker makes (and export yours for Blender). The new **Slide Stamp** stroke slides a stamp
-into place. See [Vector displacement brushes](sculpting.md#vector-displacement-brushes).
-
-### Classic sculpting keys in Blender's Sculpt Mode
-
-The Blender add-on has a new preference, **The Classic sculpting keys in Sculpt Mode**: S, U and O for Size,
-Strength and Falloff, B for the brushes by name, Space for the quick menu, Alt to dig in,
-Ctrl to mask, Ctrl+Shift to hide, D and Shift+D for subdivision levels, and more. See
-[Working with Blender](blender.md#classic-sculpting-keys-in-sculpt-mode).
-
-### Draw the edge loops you want
-
-**Quad Remesh Guides** work: draw curves on the sculpt, around the eyes, the mouth or a
-joint, and Quad Remesh puts an edge loop on each one and turns the flow around it to follow. A curve that ends where
-it started becomes a loop that closes cleanly, symmetry mirrors what you draw, and **Guide Strength** sets how far
-around a curve the flow follows it. Guides are kept with each Part and saved in the project. See
-[Quad Remesh Guides](retopology.md#quad-remesh-guides).
-
-### Sculpt layers on every subdivision level
-
-Sculpt layers now have a guide section on how they work with subdivision levels: record
-a layer at the top, step down and up, divide, reconstruct or delete levels, save, and it's still there, with one
-weight for every level. See [Layers and subdivision levels](layers.md#layers-and-subdivision-levels).
-
-## Version 0.7
-
-```features
-date: 2026-10-25
-highlight: Blender bridge: send models between Blender and SculptForge in one click
-```
-
-The Classic sculpting keys and gestures by default, and a bridge that sends models between Blender and SculptForge.
-
-### Your hands just work
-
-SculptForge now follows the Classic sculpting keys and gestures by default. A professional sculptor tried an earlier version and
-put it down because it didn't feel; this release goes through every habit of the first hour.
-[Quick tour for experienced sculptors](quick-tour.md) lists what's the same, what's different and every shortcut side by
-side.
-
-- **S, U, I, O** open Size, Intensity, Colour intensity and Falloff under the cursor, and
-  <kbd>Space</kbd> opens the Quick Menu with all of them plus the brush, stroke, alpha and material.
-- **Falloff** shapes the brush falloff, shown as the cursor's inner ring. **Colour intensity** gives painting a
-  strength of its own, and **Smooth keeps its own Intensity**, so a gentle brush still smooths properly.
-- **brush letters**: B C B Clay Block, B D S Sharp Crease, B M V Move, B I N Inflate...
-- **Masking**: <kbd>Ctrl</kbd>+click the model blurs the mask, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click sharpens it;
-  <kbd>Ctrl</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, <kbd>Ctrl</kbd>+<kbd>I</kbd>,
-  <kbd>Ctrl</kbd>+<kbd>H</kbd> and <kbd>Ctrl</kbd>+<kbd>W</kbd> (group from mask) work.
-- **Strokes and the view**: <kbd>Shift</kbd> pressed mid-stroke draws a straight line; <kbd>Shift</kbd>+click,
-  let go and drag rolls the view; <kbd>Shift</kbd>+<kbd>Alt</kbd>+click frames a Part; <kbd>L</kbd> toggles
-  Lazy Stroke and <kbd>V</kbd> swaps colours.
-- **Visibility**: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click on a partly hidden mesh hides the group.
-- **Prefer the old keys?** **Preferences > Input > Style > SculptForge** brings back the number keys for brushes,
-  <kbd>I</kbd> for Intensity and the <kbd>Ctrl</kbd>+drag zoom.
-
-See [Sculpting and brushes](sculpting.md), [Masking](masking.md) and [Keyboard and mouse](shortcuts.md).
-
-### Works with Blender
-
-Keep Blender for your scene and sculpt in SculptForge: the new **SculptForge Bridge** add-on for Blender 4.2 and
-newer sends the selected objects to SculptForge with one click (starting it if needed), and **File > Blender >
-Send to Blender** sends them back. The objects update in place, keeping their transform, materials and
-modifiers; quads, UVs, colours, the mask and face sets (face groups) come across both ways. See
-[Working with Blender](blender.md).
-
-## Version 0.6
-
-```features
-date: 2026-10-24
-highlight: Half the memory: 100 million triangles and more on a 32 GB laptop
-```
-
-Performance: half the memory, a view that turns twice as fast, quicker brushes on huge meshes, and SculptForge
-now tells you when there's a new version.
-
-### Lighter sculpts
-
-A sculpt with subdivision levels takes about half the memory it did: a 33 million triangle model with its levels
-needs about 3.4 GB instead of 5.6, so a laptop with 32 GB holds models of 100 million triangles and more.
-
-- **Add Level goes past 100 million triangles.** The limit now follows your computer's memory instead of stopping at
-  50 million.
-- **Opening a project is twice as fast** and no longer needs twice the model's memory while it loads. Project files
-  of divided models are about 30% smaller. Projects from 0.5 open as before; save a copy if you still need to open
-  it in 0.5.
-- Sculpting gives exactly the same results as before: only the way the levels and the mesh's neighbour lists are
-  stored changed.
-
-See [Performance and big meshes](performance.md).
-
-### Big brushes on huge meshes
-
-Brushes are quicker on tens of millions of polygons. On a 33 million triangle model a medium brush takes about
-7.5 ms per dab (12 in 0.5), a brush covering a tenth of the model (a million vertices per dab with symmetry)
-about 45 ms (60 to 80 in 0.5), and masking and painting about twice as fast. Undoing a big stroke is about twice
-as fast too, and sculpting needs about 300 MB less memory at that size. See
-[Performance and big meshes](performance.md).
-
-### A faster, lighter viewport
-
-Turning the view around a huge sculpt is now about twice as fast (a 33 million triangle model: 109 frames a
-second with 4x antialiasing, 270 with Fast Navigation, from 49 and 68), and the graphics card needs about a third
-of the memory it did.
-
-- **Only what you can see is drawn.** The mesh is drawn in patches of a few thousand triangles; patches outside
-  the view, and on closed meshes the ones facing away from you, are skipped.
-- **Fast Navigation draws a lighter version** of big meshes while the view moves, about a fifth of the triangles,
-  and the full mesh again as soon as it stops. A 100 million triangle sphere turns at about 100 frames a second
-  on an M1 Pro laptop.
-- **A third of the graphics memory**: about 15 bytes per triangle (it was over 40 on meshes with quads), so
-  bigger sculpts fit on the graphics card. The wireframe's edges are only kept while the wireframe is on.
-- Opening a big model or dividing it sends it to the graphics card about 40% faster.
-
-See [Performance and big meshes](performance.md).
-
-### STL files print at the right size
-
-STL export is now in millimetres with Z up, as slicers expect: models used to arrive 1000 times too small and
-lying on their back. Set a print height in millimetres when you export, and STL files you open come in upright
-at their real size. See [Exporting](exporting.md#3d-printing).
-
-### Update notifications
-
-Once a day SculptForge looks on its website for a newer version, and if there is one, a small banner says what's
-in it, with **What's new**, **Download**, **Later** and **Skip this version**. It downloads one small file and
-sends nothing about you or your computer. Turn it off under **Preferences > Updates**, or check by hand with
-**Help > Check for updates**. Builds from a package manager (such as the AUR package) leave the checking to the
-package manager.
-
-## Version 0.5
-
-```features
-date: 2026-10-23
-highlight: Subdivision levels: big forms low, fine detail high, without losing anything
-highlight: Map baking: normal, displacement and AO maps for game engines and renderers
-highlight: Gizmo: move, scale, rotate and pose the unmasked part
-```
-
-The sculpting workflow core: subdivision levels, quad retopology, map baking, the Gizmo, and speed at tens of
-millions of polygons.
-
-### Subdivision levels
-
-Sculpt one model at several resolutions: big forms low, fine detail high, and back down
-without losing anything.
-
-- **Add Level** (<kbd>Ctrl</kbd>+<kbd>D</kbd>) adds a level and keeps the ones below. Quads stay quads
-  (Catmull-Clark); **Smooth** off divides without smoothing.
-- **Lower Level** / **Higher Level** (<kbd>Shift</kbd>+<kbd>D</kbd> / <kbd>D</kbd>) and the **Level** slider step
-  between levels. Detail sculpted high rides along when you reshape low, and edits high show up softened below.
-  Stepping back and forth is instant, even at millions of polygons.
-- Mask, vertex paint, paint layers, face groups, hidden faces, UVs and sculpt layers follow the levels.
-- **Remove Below**, **Remove Above** and **Rebuild Lower Levels** (find the lower levels of a model subdivided
-  elsewhere). Undo walks back through strokes and level changes; projects save every level; the Parts list
-  shows "Level 3/5".
-- <kbd>Ctrl</kbd>+<kbd>D</kbd> now divides with levels; the old one-way **Subdivide** is still in
-  **Tool > Geometry**.
-
-See [Subdivision levels](subdivision-levels.md).
-
-### Gizmo: move, scale, rotate and pose
-
-Transform gizmo, with the same keys: <kbd>W</kbd> Move, <kbd>E</kbd> Scale, <kbd>R</kbd> Rotate, <kbd>Q</kbd>
-back to Draw (also on the top shelf and in the **Transform** palette).
-
-- **Handles over the model.** Arrows, plane squares and a free-move centre; axis rings and a view ring; axis
-  boxes and a uniform centre. <kbd>Shift</kbd> snaps to 15 degrees, the grid or 10% steps.
-- **Only the unmasked part moves**, so posing is: mask the body, <kbd>Alt</kbd>+click the shoulder to put the
-  pivot there, raise **Falloff** for a soft joint, turn the arm. With X symmetry both arms move together.
-- **Pivot tools**: <kbd>Alt</kbd>+drag the gizmo to move it alone, **Reset**, **To Surface**, World or Surface
-  axes.
-- **Numeric entry** in the Gizmo panel, **All Parts** (move, rotate and scale all Parts together), one undo step per drag, sculpt
-  layers move with the surface, and the `transform` command for scripts.
-- Fast on big models: a drag frame on 1.3 million triangles takes about 10 ms.
-
-<kbd>W</kbd> no longer toggles the wireframe: use <kbd>Shift</kbd>+<kbd>F</kbd> or **Wire** on the
-right shelf. See [Moving, rotating and posing](gizmo.md).
-
-### Normal, displacement and AO map baking
-
-Bake the detail of a high-poly sculpt into maps on a low-poly's UVs, for game engines and renderers:
-**Tool > Bake**.
-
-- **Six maps in one go**: tangent-space normal, object-space normal, displacement (16-bit PNG with mid-grey =
-  0, plus a 32-bit EXR in world units), ambient occlusion, cavity and colour (vertex paint or texture).
-- **Right in every engine.** Tangent-space maps use MikkTSpace tangents, as Blender, Unreal, Unity and Godot
-  do; pick the OpenGL or DirectX green convention.
-- **Check it on the model.** The low-poly shows its baked normal map in the viewport as soon as the bake ends,
-  next to the high-poly.
-- **The Classic sculpting keys**: source Part, 1K-8K, anti-aliasing, automatic or manual front and rear ray
-  distances, padding around UV islands. Bakes run in the background on every core, with progress and Cancel.
-- **Send to Unreal** brings the normal map along, set up as a normal map. The `bake` command does it all from
-  scripts.
-
-See [Baking normal and displacement maps](baking.md).
-
-### Quad retopology and detail projection
-
-- **Quad Remesh** (**Tool > Geometry**, like quad remesh) rebuilds a sculpt as clean quads whose edge loops follow
-  the forms, near a **Target Quads** count, in the background. **Follow Face Groups**, **Size Variation**,
-  **Use Vertex Paint**, **Symmetry** and **50% / 100% / 200%** work.
-- **Project Detail** (**Tool > Parts > Project**) puts the sculpted detail and vertex paint back onto the divided
-  quads, with **Dist**, **Mean** and **Blur**, and respects the mask.
-
-See [Quad retopology and detail projection](retopology.md).
-
-### Performance at tens of millions of polygons
-
-Sculpting a 33 million triangle model on a laptop now keeps up with the display: a medium brush costs about
-10 ms per dab instead of 400, and turning the view runs at 50-70 frames a second instead of 32.
-
-- **Brushes use every core**: every brush, mask and paint stroke, the normal updates and the picking structure.
-  Results are exactly the same as on one core.
-- **Strokes send the graphics card only what they changed.** Before, a dab with symmetry on a subdivided model
-  re-sent most of the mesh.
-- **Fast undo**: undo keeps only the vertices a stroke changed, and the first vertex paint stroke on a model no
-  longer copies the whole mesh for undo.
-- **Less memory**: about 30% less per triangle for a sculpting mesh.
-- **Faster projects**: saving and opening big projects is faster, and projects over 4 GB save (ZIP64).
-- **Preferences > Performance**: Antialiasing (Off to 8x), **Fast Navigation** (big scenes drop antialiasing
-  while the view moves), Multithreading, what your last stroke cost per dab, and the memory the scene holds. A
-  Part too big for the graphics card is left out of the view with a message, instead of failing.
-- `sculptforge --bench` measures your machine.
-
-See [Performance and big meshes](performance.md).
-
-### Polish
-
-- **Your paint survives Auto UV and retopology.** Auto UV on a painted Part moves the texture and its layers
-  onto the new UVs. Voxel Remesh and Quad Remesh have a **Keep Texture** option (on by default) that unwraps the new
-  surface and projects the texture onto it, and merging Parts keeps their textures in one. Each is a single
-  undo step. See [Texture painting](texture-painting.md#uvs-and-geometry).
-- **Faster, safer Auto UV on dense sculpts:** no more crash or folded UVs on dense smooth meshes, and a
-  million-triangle sculpt unwraps in a quarter of a minute or so. Decimate keeps the texture exact across UV
-  seams.
-- **Subdivision levels, polished.** Tools that rebuild the mesh (remesh, Decimate, Quad Remesh, Subdivide, Remove
-  Hidden, merge and split) tell you they removed the levels and that the level you were on became the new base;
-  <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings them all back. Sculpt layers' fine detail turns with a low level you pose
-  with the Gizmo, and Parts you aren't working on no longer hold cached levels in memory.
-- **Quad Remesh symmetry follows your model.** Symmetry (now on by default) mirrors across the model's own middle, so
-  a model away from the centre comes out mirror-symmetric too. If the model isn't symmetric, Quad Remesh remeshes it
-  whole and tells you. Eyes, teeth and rivets get their own quads instead of disappearing, and thin hard-edged
-  parts such as blades and fins keep both sides and their edges. See [Quad retopology](retopology.md).
-- **Tidier top shelf:** the **Vertex / Texture** paint target only shows when the Part has a texture.
-- **Exports checked by other tools:** textured GLB, USD/USDZ, FBX and OBJ files were checked with the Khronos
-  validator, OpenUSD and ufbx, and the texture is the right way up in each. A model saved as `my scene.obj` now
-  writes `my_scene.mtl` so other apps find it. See [Exporting](exporting.md#3d-printing).
-
-## Version 0.4.2
-
-```features
-date: 2026-10-23
-```
-
-### Texture painting on UV maps
-
-Paint into a texture instead of the vertices, so the colour detail comes from the texture (1K to 8K), not from
-the mesh: sharp decals, pores and freckles on a light game mesh.
-
-- **Auto UV.** **Tool > Texture Image > Auto UV** unwraps any sculpt in the background. Models that come in with
-  UVs keep them, and now OBJ, FBX, USD and glTF carry UVs in and out too.
-- **New Texture.** Pick a size and click **New Texture**: the Paint brush, **Rgb** sculpting, fills, cavity paint
-  and colour picking (<kbd>C</kbd>) now work on the texture, with the mask, symmetry, pen pressure and alphas.
-  Strokes never paint through to the far side, and seams stay invisible.
-- **Vertex or Texture.** A toggle on the top shelf chooses where paint goes for each Part.
-- **The same paint layers.** **Tool > Paint Layers** works on the texture's layers: blend modes, opacity,
-  merge, flatten, all undoable.
-- **Convert both ways**, **Show UVs**, **Import / Export Texture** (PNG). Projects save textures and their
-  layers, and model exports write the texture next to the model (OBJ `.mtl`, glTF, USD, FBX, Bridge files).
-
-See [Texture painting](texture-painting.md).
-
-## Version 0.4.1
-
-```features
-date: 2026-10-23
-```
-
-A fix for graphics tablets: the brush ring no longer flickers between two places on the model (it looked like
-a second brush blinking, most often while masking or smoothing). Some tablet drivers, Windows Ink among them,
-send extra mouse movements beside the pen's; now, while the pen is in range, only the pen moves the brush. See
-[Pen tablets](troubleshooting.md#pen-tablets) if your pen still misbehaves.
-
-## Version 0.4
-
-```features
-date: 2026-10-22
-```
-
-Version 0.4 is about making SculptForge feel like home to experienced sculptors. It was shaped by feedback from a
-working professional modeler and by what sculptors say on sculpting forums.
-
-### Classic navigation
-
-- **Free rotation.** Dragging turns the model the way the cursor moves and can roll it right over the top,
- . If you prefer the model to stay upright, set **Preferences > Interface > Rotation** to
-  **Turntable**.
-- **Snap to a view.** Hold <kbd>Shift</kbd> while rotating to snap to the nearest front, back, side, top or
-  bottom view.
-- **Classic zoom.** <kbd>Alt</kbd>+drag on the background pans; let go of <kbd>Alt</kbd> while still dragging
-  and the rest of the drag zooms. With the right mouse button, <kbd>Alt</kbd> pans and <kbd>Ctrl</kbd> zooms.
-
-See [Navigating the view](navigation.md).
-
-### Mask and isolate with a lasso or rectangle
-
-- **Lasso Mask and Rectangle Mask.** Pick the shape at the top of **Tool > Masking**, then <kbd>Ctrl</kbd>+drag to
-  mask everything inside it; add <kbd>Alt</kbd> to unmask. The drag can start on the model or beside it.
-- **Select Lasso.** In **Tool > Visibility**, pick **Select Lasso** next to Select Rectangle, then
-  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag a free-hand shape to keep only what's inside (add <kbd>Alt</kbd> to
-  hide it instead).
-
-See [Mask with a lasso or rectangle](masking.md#mask-with-a-lasso-or-rectangle) and
-[Face Groups and visibility](face-groups.md).
-
-### A material made for sculpting
-
-The new **Sculpt** material is the default: plain clay under a strong key light, with crisp highlights and
-deep shading in the creases, so even small strokes stay easy to read. The other materials are still in the
-material picker (<kbd>M</kbd>), and projects keep the material they were saved with. See
-[Vertex Paint and materials](vertex-paint.md).
-
-### Quads stay quads
-
-Models you bring in from the other app (Bridge) or as OBJ, FBX, PLY or USD keep their quads: **Wire** shows them as
-quads, and exporting writes them back as quads. Subdivide turns each quad into four, voxel remesh now gives
-an even grid of quads (like voxel remesh), and new cubes and planes are made of quads. See
-[Quads and triangles](geometry.md#quads-and-triangles).
-
-### Paint layers
-
-Vertex Paint now has layers, like Photoshop: each Part can have a stack of colour layers with their own
-opacity, visibility, lock and blend mode (Multiply, Screen, Overlay, Soft Light, Add and more). Painting on a
-layer never destroys what's underneath, and you can merge, flatten, duplicate and reorder layers. Find it in **Tool > Paint Layers**, and see [Paint layers](vertex-paint.md#paint-layers).
-
-![The Paint Layers sub-palette with three layers and their blend modes](images/paint-layers.jpg)
-
-### Easier to install
-
-The [download links](installing.md) now always get the newest version, and there are one-command installers
-for Windows, macOS and Linux.
-
-## Version 0.3
-
-```features
-date: 2026-10-22
-```
-
-- **Parts**: several separate meshes in one scene. Append, duplicate, split, merge, solo, and
-  <kbd>Alt</kbd>+click to select. See [Parts](parts.md).
-- **A classic interface**: shelves around the canvas, alphabetical palettes, the Library
-  (<kbd>,</kbd>), the brush, stroke, alpha and material pickers, hold-<kbd>Ctrl</kbd> help on every control
-  and a command palette (<kbd>F3</kbd>). See [The interface](interface.md).
-- **Graphics tablets**: pen pressure, the eraser end and pen buttons. See [Sculpting and brushes](sculpting.md).
-- **A brush library** with brush codes to share and a community gallery. See
-  [Brush Lab and sharing brushes](brush-lab.md).
-- **ComfyUI** workflows for image and text to 3D. See [Image and text to 3D](generate-3d.md).
-- **This user guide**, built into the app (**Help > User Guide**, <kbd>Shift</kbd>+<kbd>F1</kbd>).
-
-## Version 0.2
-
-```features
-date: 2026-10-21
-```
-
-- [Masking](masking.md), [face groups and visibility](face-groups.md), and
-  [vertex paint with Lit Spheres](vertex-paint.md).
-- New brushes: Sharp Crease, Clay Block, Tendril, Trim, Layer and Nudge, with strokes and alphas.
-- [Project files](projects.md) with autosave, recent files and snapshots, and
-  [exchange with the other app (Bridge)](exporting.md).
-
-## Version 0.1
-
-```features
-date: 2026-10-20
-```
-
-The first release: sculpting with symmetry and sculpt layers, voxel remesh and decimation, game-ready LOD
-chains and Send to Unreal, image and text to 3D with free AI models, Gaussian splats, OpenUSD, and scripting
-from the command line, Python and AI agents.

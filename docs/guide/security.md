@@ -1,5 +1,12 @@
 # Security overview for IT reviews
 
+![The lion head model (CC0, Poly Haven) in SculptForge](images/welcome-bust.jpg)
+
+> **In short:**
+> - A one-page summary for a studio's security or IT review.
+> - `sculptforge-cli --mcp` serves AI tools over stdio only.
+> - Single sign-on uses OpenID Connect; a read-only policy file sets central control.
+
 A one-page summary for a studio's security or IT review. Details and settings are in
 [SculptForge for studios](studios.md#it-deployment).
 
@@ -22,9 +29,18 @@ and installs no services, drivers or background processes.
 
 `sculptforge-cli --mcp` serves the Model Context Protocol over **stdio only**: the AI tool starts it as a child
 process; nothing listens on a port. Each command an AI tool runs is checked against the policy's allowed categories
-(read, edit, files, scripts, network, AI) and written to the audit log. AI tools can't install, remove or switch
-packs. Controlling an open SculptForge window can be forbidden outright (`"mcp": {"live": "never"}`), and MCP can be
-turned off entirely.
+(read, edit, files, scripts, network, AI) and written to the audit log.
+
+AI tools can't install, remove or switch packs. Controlling an open SculptForge window can be forbidden outright
+(`"mcp": {"live": "never"}`), and MCP can be turned off entirely.
+
+## Scripts and plugins
+
+**Python scripts** are trusted local code, like any program the artist runs: they can read and write files and reach
+the network. Python is off until the artist turns it on (**Edit > Preferences > Scripts**), can be locked off with
+`"python": {"scripts": "never"}`, opens no port, and runs only when the artist runs a script: no file, pack, macro or AI
+tool can start one. **Plugins** (`.sfplugin`) are the sandboxed way to share tools: WebAssembly with no access to
+files, the network, the clock or other programs. See [Python scripting](python.md).
 
 ## Data at rest
 

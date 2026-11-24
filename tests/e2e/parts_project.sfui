@@ -1,0 +1,51 @@
+# e2e: parts. Build a scene of Parts, hide one, sculpt another, save a project and reopen it: the same Parts, the same
+# visibility, the same triangle counts, the sculpt in place, the project clean. A save never changes the scene it saves.
+run new_sphere subdivisions=4
+click "Parts/Append"
+click "Cube"
+click "Parts/Append"
+click "Sphere"
+expect_value parts == 3
+double_click "Parts/Sphere 2"
+type "##rename" Eye
+key enter
+click "Parts/Cube"
+snapshot
+stroke 0.4 0.4 0.6 0.6
+expect_value edited_parts == 1
+remember triangles cube_tris
+click "Parts/##eye Eye"
+expect_value visible_parts == 2
+remember parts parts_before
+remember visible_parts visible_before
+remember active_part active_before
+
+run save_project path=sf_e2e_parts.sfproj
+expect_value dirty == 0
+expect_value visible_parts == $visible_before
+expect_value parts == $parts_before
+
+# A different scene, then the project back.
+run new_sphere subdivisions=2
+expect_value parts == 1
+run open path=sf_e2e_parts.sfproj
+expect_value parts == $parts_before
+expect_value visible_parts == $visible_before
+expect_value active_part == $active_before
+expect_value triangles == $cube_tris
+expect_value dirty == 0
+expect_value edited_parts == 0
+expect_text Eye
+snapshot
+expect_value moved == 0
+
+# The eye toggles on the reopened scene.
+click "Parts/##eye Eye"
+expect_value visible_parts == 3
+click "Parts/##eye Eye"
+expect_value visible_parts == 2
+
+# Exports carry the visible Parts only; opening the export gives them back as Parts.
+run export_glb path=sf_e2e_parts.glb
+run open path=sf_e2e_parts.glb
+expect_value parts == $visible_before

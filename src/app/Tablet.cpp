@@ -52,9 +52,10 @@ bool App::dropPenMouseEvent(const SDL_Event& e) const {
     }
 }
 
-void App::sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window) {
+void App::sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window, Uint64 timestamp) {
     SDL_Event m{};
     m.type = type;
+    m.common.timestamp = timestamp; // (the pen sample's time: the pen predictor reads it)
     if (type == SDL_EVENT_MOUSE_MOTION) {
         m.motion.windowID = window;
         m.motion.which = SDL_PEN_MOUSEID;
@@ -99,27 +100,27 @@ void App::penMouseEvents(const SDL_Event& e, bool before) {
     if (before) {
         if ((e.type == SDL_EVENT_PEN_PROXIMITY_OUT || e.type == SDL_EVENT_PEN_PROXIMITY_IN) && penMouseDown_) {
             penMouseDown_ = false;
-            sendPenMouse(SDL_EVENT_MOUSE_BUTTON_UP, penMouseX_, penMouseY_, e.pproximity.windowID);
+            sendPenMouse(SDL_EVENT_MOUSE_BUTTON_UP, penMouseX_, penMouseY_, e.pproximity.windowID, e.common.timestamp);
         }
         return;
     }
     switch (e.type) {
     case SDL_EVENT_PEN_DOWN:
         if (penMouseDown_) break; // another pen already touches
-        sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.ptouch.x, e.ptouch.y, e.ptouch.windowID);
+        sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.ptouch.x, e.ptouch.y, e.ptouch.windowID, e.common.timestamp);
         penMouseDown_ = true;
         penMouseOwner_ = e.ptouch.which;
-        sendPenMouse(SDL_EVENT_MOUSE_BUTTON_DOWN, e.ptouch.x, e.ptouch.y, e.ptouch.windowID);
+        sendPenMouse(SDL_EVENT_MOUSE_BUTTON_DOWN, e.ptouch.x, e.ptouch.y, e.ptouch.windowID, e.common.timestamp);
         break;
     case SDL_EVENT_PEN_UP:
         if (!penMouseDown_ || e.ptouch.which != penMouseOwner_) break;
         penMouseDown_ = false;
-        sendPenMouse(SDL_EVENT_MOUSE_BUTTON_UP, e.ptouch.x, e.ptouch.y, e.ptouch.windowID);
+        sendPenMouse(SDL_EVENT_MOUSE_BUTTON_UP, e.ptouch.x, e.ptouch.y, e.ptouch.windowID, e.common.timestamp);
         break;
     case SDL_EVENT_PEN_MOTION:
         if (penMouseDown_ && e.pmotion.which != penMouseOwner_) break;
         if (penNoise_ && mouseSincePen_) break; // a resting pen doesn't pull the cursor back from the mouse
-        sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.pmotion.x, e.pmotion.y, e.pmotion.windowID);
+        sendPenMouse(SDL_EVENT_MOUSE_MOTION, e.pmotion.x, e.pmotion.y, e.pmotion.windowID, e.common.timestamp);
         if (!penMouseDown_) {
             // A hovering pen presses nothing. Should the UI still hold a left button (a driver's press whose
             // release never came), let go of it: the pen's next tap is a click again.
@@ -146,6 +147,9 @@ bool App::strayMouseMotion(const SDL_Event& e) const {
                       e.button.which != SDL_PEN_MOUSEID && e.button.button == SDL_BUTTON_LEFT;
     if (!motion && !left) return false;
     if (dragFromPen_ && drag_ != Drag::None) return true;
+    // A drag the mouse began (its press got through: the pen had been still for 0.1 s) is the mouse's to the end, so a
+    // fast flick right after a pen stroke keeps every sample of its path, not only the press and the release (#195).
+    if (drag_ != Drag::None) return false;
     if (left) return penInProximity_ && (penTouching_ || clickClockNs() - lastPenTouchNs_ < 100000000ull);
     return penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
 }
@@ -177,6 +181,9 @@ bool App::penSoftCursor() const { return uiPrefs_.tablet.mouseMode && penInProxi
 void App::mapPenPosition(SDL_Event& e) {
     penCursor_.mouseMode = uiPrefs_.tablet.mouseMode;
     const Uint64 now = SDL_GetTicksNS();
+    if (e.type >= SDL_EVENT_PEN_PROXIMITY_IN && e.type <= SDL_EVENT_PEN_AXIS) { // (palmGuard, Touch.cpp)
+        palm_.pen(e.type != SDL_EVENT_PEN_PROXIMITY_OUT, double(now) * 1e-9);
+    }
     switch (e.type) {
     case SDL_EVENT_PEN_PROXIMITY_IN:
     case SDL_EVENT_PEN_PROXIMITY_OUT: penCursor_.proximity(); break;
@@ -229,6 +236,13 @@ void App::handlePenEvent(const SDL_Event& e) {
     if (!penNoise_) {
         lastPenNs_ = clickClockNs(); // (UI tests: the script's time, as the 1 s rules below count it)
         mouseSincePen_ = false;
+    }
+    switch (e.type) {
+    case SDL_EVENT_PEN_MOTION: penButtonsSync(e.pmotion.pen_state); break;
+    case SDL_EVENT_PEN_AXIS: penButtonsSync(e.paxis.pen_state); break;
+    case SDL_EVENT_PEN_DOWN:
+    case SDL_EVENT_PEN_UP: penButtonsSync(e.ptouch.pen_state); break;
+    default: break;
     }
     switch (e.type) {
     case SDL_EVENT_PEN_PROXIMITY_IN:
@@ -301,12 +315,20 @@ void App::handlePenEvent(const SDL_Event& e) {
     }
 }
 
+// A side button's press starts the drag (or the radial menu) where the app's cursor is, which the pen's own motion has
+// kept current (the cursor is mouse-mode mapped there, too): the position in the button event is SDL's last one for the
+// pen, stale before the first motion since the pen came into range and not the cursor's after the mouse moved it. Taking
+// it as the drag's start made the first pen motion a jump of the view across the screen (#216, Wacom on Wayland).
+// penJump_ keeps the first motion after coming into range from moving a drag.
 void App::penButton(int button, bool down, float x, float y) {
     if (button < 1 || button > 31) return;
     const uint32_t bit = 1u << button;
     if (((penButtons_ & bit) != 0) == down) return;
     penButtons_ = down ? penButtons_ | bit : penButtons_ & ~bit;
     penSeen_ = true;
+    if (!canvasRect().contains(mouseX_, mouseY_) && canvasRect().contains(x, y)) mouseX_ = x, mouseY_ = y; // (nothing moved yet)
+    x = mouseX_;
+    y = mouseY_;
     if (radialPenButton(button, down, x, y)) return; // a radial menu's button (RadialMenu.cpp)
     // Invert and Smooth need nothing here: inputMods() reports them as Alt / Shift while held.
     const PenAction a = penButtonAction(button);
@@ -317,25 +339,33 @@ void App::penButton(int button, bool down, float x, float y) {
         io.AddMouseButtonEvent(ImGuiMouseButton_Right, down);
     }
     if (down) {
+        // A pen drag whose end never came (the tip's lift lost, a window that took the pen): end it, the press is a new one.
+        if (drag_ != Drag::None && dragFromPen_ && !penTouching_ && !penNavButton_) onMouseUp();
         if (drag_ != Drag::None || io.WantCaptureMouse || !canvasRect().contains(x, y)) return;
         lastInputPen_ = true;
         if (a == PenAction::RightClick) {
             onMouseDown(x, y, SDL_BUTTON_RIGHT); // drag to rotate (Shift: pan), as with the mouse
         } else {
-            mouseX_ = x;
-            mouseY_ = y;
             drag_ = a == PenAction::RotateView ? Drag::Orbit : Drag::Pan;
             dragFromPen_ = true;
         }
         if (drag_ != Drag::None) penNavButton_ = button;
     } else if (penNavButton_ == button) {
         if (a == PenAction::RightClick) rightClickRelease(); // a tap of the button: the QuickMenu, as the mouse's
-        if (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom) {
-            drag_ = Drag::None;
-            dragFromPen_ = false;
-        }
+        // (The way the mouse's release ends it: the orbit's start state, the pivot it picked and the right click's
+        // slop are let go too. Without that the next orbit began from the view as this one began, or turned about
+        // its pivot: the view shifted and zoomed with the ring elsewhere, #216.)
+        if (drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom) onMouseUp();
         penNavButton_ = 0;
     }
+}
+
+// Every pen event carries the buttons SDL holds for it. A button the app holds and SDL does not is one whose release the
+// app never got (the pen left or the window lost focus with it down, a pop-up took the release): let go of it, or its
+// view drag goes on and the tip's next press only navigates (#216, "the stylus stops responding").
+void App::penButtonsSync(SDL_PenInputFlags state) {
+    for (int b = 1; b <= 5; ++b)
+        if ((penButtons_ & (1u << b)) && !(state & (1u << b))) penButton(b, false, mouseX_, mouseY_);
 }
 
 void App::penLeft() {
@@ -493,8 +523,8 @@ void App::firstDab(float x, float y) {
     }
     firstDabPending_ = false;
     lastStrokePressure_ = strokePressure();
-    if (asyncStroke_) dabQueue_.push({x, y, lastStrokePressure_}); // the solver thread places it (AsyncStroke.cpp)
-    else dabAt(x, y, lastStrokePressure_);
+    if (asyncStroke_) dabQueue_.push({x, y, lastStrokePressure_, true}); // the solver thread places it (AsyncStroke.cpp)
+    else dabAt(x, y, lastStrokePressure_, true);
 }
 
 // SDL has no pen names, so on Linux read the kernel's input device list; elsewhere the pen stays unnamed.
@@ -569,6 +599,11 @@ void App::drawTabletSection() {
                  "Turn on if the tablet driver is set to Mouse mode: the pen moves the cursor by how far it moves, and "
                  "lifting it and putting it down elsewhere leaves the cursor where it was. Off (Pen mode): the cursor "
                  "is where the pen is.",
+                 path);
+    ImGui::Checkbox(tr("Ignore fingers while the pen is near##tablet_palm"), &t.palmRejection);
+    ui::HelpText("Palm rejection", nullptr,
+                 "A hand resting on the screen while you draw is not a touch: fingers that land while the pen is in range, "
+                 "and for a moment after it leaves, do nothing. A trackpad is never ignored. On by default on Android.",
                  path);
     ImGui::SetNextItemWidth(-FLT_MIN);
     ui::SliderInside("##tablet_view_speed", &t.viewSpeed, 0.1f, 2.0f, "View speed %.2f");
@@ -802,6 +837,18 @@ std::string App::tabletReport() const {
         SDL_free(mice);
     }
     facts.push_back({"Tablet devices", tablets.empty() ? "-" : tablets});
+    std::string touch;
+    if (SDL_TouchID* ids = SDL_GetTouchDevices(&n)) { // a tablet's touch surface shows up here too (#216)
+        static const char* const kinds[] = {"invalid", "touch screen", "trackpad", "trackpad (relative)"};
+        for (int i = 0; i < n; ++i) {
+            const char* name = SDL_GetTouchDeviceName(ids[i]);
+            const int t = int(SDL_GetTouchDeviceType(ids[i])) + 1;
+            touch += (touch.empty() ? "" : ", ") + std::string(name ? name : "?") + " (" + kinds[t >= 0 && t < 4 ? t : 0] + ")";
+        }
+        SDL_free(ids);
+    }
+    facts.push_back({"Touch devices", touch.empty() ? "-" : touch});
+    facts.push_back({"Palm rejection", uiPrefs_.tablet.palmRejection ? "on" : "off"});
     facts.push_back({"Mouse mode", uiPrefs_.tablet.mouseMode ? "on" : "off"});
     facts.push_back({"Classic pen timing", uiPrefs_.tablet.classicTiming ? "on" : "off"});
     return penReport(facts, penDiag_);

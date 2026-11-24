@@ -111,7 +111,8 @@ void App::registerPerformanceUiActions() {
         [this] { return uiPrefs_.liveMove; },
         "Experimental. The Move brush's drag is drawn by the graphics card from where the surface started, so it "
         "follows the pen at the view's frame rate whatever the mesh size; the move itself is applied once, exactly, "
-        "when you lift the pen. Not with masks, hidden parts, sculpt layers, micro levels, Connected Only or View "
+        "when you lift the pen. Big drags on meshes of a million vertices or more always move this way; this turns it "
+        "on for every mesh and size. Not with masks, hidden parts, sculpt layers, micro levels, Connected Only or View "
         "falloff (Move works as before there).");
     add("perf.background_preview", "Background Preview (Experimental)",
         [this] {
@@ -142,6 +143,17 @@ void App::registerPerformanceUiActions() {
         "Lighter on laptops and on battery: the hardware profile turns it on there by itself (its Draft brushes "
         "setting); this turns it on everywhere. Brushes that follow the surface's direction (Inflate, the plane "
         "brushes) use its direction from the stroke's start, so the result can differ slightly from a full stroke.");
+    add("perf.keep_strokes_editable", "Keep Strokes Editable (Experimental)",
+        [this] {
+            uiPrefs_.keepStrokesEditable = !uiPrefs_.keepStrokesEditable;
+            status_ = uiPrefs_.keepStrokesEditable ? "Keep strokes editable on" : "Keep strokes editable off";
+        },
+        [this] { return uiPrefs_.keepStrokesEditable; },
+        "On a micro level, every stroke keeps the dabs it was made of, so it can be moved, changed or taken out later "
+        "and the strokes over it follow exactly. Each stroke sculpts and undoes exactly as before. Strokes that move "
+        "the base (big Standard, Clay and Inflate brushes, Move on the base) or use the Stencil fix the strokes they "
+        "reach in place; so does a stroke once 20 others sit on it. Off when memory is low. "
+        "Experimental: a tester reports Move results can snap back with it on; we're checking.");
     add("perf.fast_big_brushes", "Fast Big Brushes (Experimental)",
         [this] {
             uiPrefs_.fastBigBrushes = !uiPrefs_.fastBigBrushes;
@@ -256,6 +268,10 @@ void App::drawPerformanceSection() {
     bool draft = uiPrefs_.draftStrokes;
     if (ImGui::Checkbox(tr("Draft Strokes"), &draft)) actions_.find("perf.draft_strokes")->run();
     ui::HelpAction(*this, "perf.draft_strokes");
+    bool keepEditable = uiPrefs_.keepStrokesEditable;
+    if (ImGui::Checkbox(tr("Keep Strokes Editable (Experimental)"), &keepEditable))
+        actions_.find("perf.keep_strokes_editable")->run();
+    ui::HelpAction(*this, "perf.keep_strokes_editable");
     bool liveMove = uiPrefs_.liveMove;
     if (ImGui::Checkbox(tr("Live Move (Experimental)"), &liveMove)) actions_.find("perf.live_move")->run();
     ui::HelpAction(*this, "perf.live_move");
@@ -303,13 +319,13 @@ void App::drawPerformanceSection() {
     ImGui::TextUnformatted(tr("Memory"));
     ui::HelpText("Memory", nullptr,
                  "What the scene holds: the meshes with their topology, the BVHs, the subdivision levels kept for "
-                 "stepping between them, the undo history (Edit keeps up to 1 GB, dropping the oldest steps), painted textures "
+                 "stepping between them, the undo history (Edit keeps as much as free memory allows, dropping the oldest steps), painted textures "
                  "with their layers and material channels (only painted 64x64 tiles of a channel use memory), and the "
                  "GPU buffers of the visible Parts.",
                  kPath);
     const MemoryUse m = documentMemory(doc_);
     const std::string mem = "Meshes " + megabytes(m.mesh) + "  BVH " + megabytes(m.bvh) + "\nSubdivision levels " +
-                            megabytes(m.levels) + "\nUndo " + megabytes(m.undo) + " of " + megabytes(doc_.undo.byteBudget) +
+                            megabytes(m.levels) + "\nUndo " + megabytes(m.undo) + " of " + megabytes(doc_.undo.budget()) +
                             "\nTextures " + megabytes(m.textures) + " (material channels " + megabytes(m.channels) + ")" +
                             (m.paintCaches ? "\nTexture painting caches " + megabytes(m.paintCaches) : std::string()) +
                             "\nGPU buffers about " + megabytes(m.gpu);

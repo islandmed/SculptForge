@@ -22,6 +22,7 @@
 #include "core/Multires.h"
 #include "core/VertexPaint.h"
 #include "core/Texture.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 #include <imgui_internal.h>
@@ -40,6 +41,17 @@
 namespace sf {
 
 namespace {
+
+// Text with a Chinese, Japanese or Korean character (kana, ideographs, Hangul, full-width forms): the dense scripts.
+bool hasWideText(const char* text) {
+    for (const char* p = text; *p;) {
+        unsigned int c = 0;
+        p += ImTextCharFromUtf8(&c, p, nullptr);
+        if ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7AF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF))
+            return true;
+    }
+    return false;
+}
 
 constexpr ImGuiWindowFlags kShellFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                                          ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
@@ -168,8 +180,17 @@ void drawBrushIcon(ImDrawList* dl, ImVec2 c, float r, int type) {
         curve(w * 0.9f, hi, w * 0.5f);
         break;
     case BrushType::Smooth: dl->AddCircleFilled(ImVec2(c.x - r * 0.2f, c.y - r * 0.2f), r * 0.35f, IM_COL32(255, 240, 230, 40), 24); break;
+    case BrushType::SmoothPeaks: { // the waves with their crests cut off flat: the hollows stay
+        ImVec2 pts[12];
+        for (int i = 0; i < 12; ++i) {
+            const float u = float(i) / 11.0f;
+            pts[i] = ImVec2(c.x - r * 0.62f + r * 1.24f * u, c.y + std::max(std::sin(u * 6.28f) * r * 0.16f, -r * 0.06f));
+        }
+        dl->AddPolyline(pts, 12, hi, 0, w);
+        break;
+    }
     case BrushType::Move:
-    case BrushType::SnakeHook:
+    case BrushType::Tendril:
     case BrushType::Nudge: {
         const ImVec2 a(c.x - r * 0.45f, c.y + r * 0.35f), b(c.x + r * 0.45f, c.y - r * 0.35f);
         dl->AddLine(a, b, hi, w);
@@ -306,7 +327,7 @@ int brushTypeOfAction(std::string_view id) {
 constexpr float kCaptionTileH = 34.0f;
 
 static bool foldsIntoView(const std::string& item) {
-    return item == "view.turntable" || item == "view.ortho" || item == "view.floor_grid" || item == "view.flat_shading";
+    return item == "view.turntable" || item == "view.ortho" || item == "view.floor_grid" || item == "view.flat_shading" || item == "view.unlit";
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +392,7 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     ui::TileLiftScope lift; // the tile lifts on hover; the layout stays
     lift.lift = ui::BeginTileLift(p0, p1);
     dl->AddRectFilled(p0, p1, theme::u32(hovered ? theme::buttonHover : theme::tile, hovered ? 0.55f : 0.0f), theme::rounding(4.0f * s));
-    ImTextureID tex = type >= 0 ? app.thumbnails().brush(type) : ImTextureID(0);
+    ImTextureID tex = type >= 0 ? app.brushThumbnail(type) : ImTextureID(0);
     if (a.id == "draw.paint") { // the Paint brush's own preview (Pickers.cpp)
         BrushItem paint;
         paint.kind = BrushItem::Kind::Paint;
@@ -391,6 +412,20 @@ bool drawShelfTile(App& app, const Action& a, ImVec2 size) {
     const std::string key = app.actions().shortcutText(a.id);
     if (key.size() == 1 && caption)
         dl->AddText(caption, caption->FontSize, ImVec2(p0.x + 3 * s, p0.y + 1 * s), theme::u32(theme::textDim), key.c_str());
+    // The Shift / Ctrl brush (Shift+click / Ctrl+click a tile, ModifierBrush.cpp): a small badge in the top right.
+    if (type >= 0 && app.fontTiny_) {
+        float y = p0.y + 1.0f * s;
+        for (ModifierSlot slot : {ModifierSlot::Shift, ModifierSlot::Ctrl}) {
+            if (app.modifierBrushes().brush(slot) != type) continue;
+            ImFont* f = app.fontTiny_;
+            const char* text = modifierSlotName(slot);
+            const ImVec2 ts = f->CalcTextSizeA(f->FontSize, FLT_MAX, 0.0f, text);
+            const ImVec2 b1(p1.x - 1.0f * s, y + ts.y + 1.0f * s), b0(b1.x - ts.x - 4.0f * s, y);
+            dl->AddRectFilled(b0, b1, theme::u32(theme::accent, alpha), theme::rounding(3.0f * s));
+            dl->AddText(f, f->FontSize, ImVec2(b0.x + 2.0f * s, b0.y + 0.5f * s), theme::u32(theme::textOnAccent, alpha), text);
+            y = b1.y + 1.0f * s;
+        }
+    }
     if (leftShelf) {
         if (!fitCaption(dl, caption, ImVec2(p0.x, p1.y - capH), p1, theme::u32(on ? theme::accent : theme::text, alpha), label) &&
             hovered)
@@ -448,6 +483,7 @@ void App::registerShellActions() {
         "Pulls the surface back toward the morph target, a selection set's shape (Tool > Selection Sets > Morph "
         "Target); Alt pushes away. Works at any subdivision level.",
         "Moves the surface like fabric: drag it and it folds where it bunches up. Mode and fabric in Brush > Cloth.",
+        "Smooths only the high points: lowers what sticks out above the surrounding surface and leaves the hollows alone.",
     };
     static_assert(std::size(kBrushHelp) == size_t(BrushType::Count));
     for (int i = 0; i < int(BrushType::Count); ++i) {
@@ -488,17 +524,22 @@ void App::registerShellActions() {
          "Front faces only: brushes leave the far side of thin parts alone.");
     flag("draw.connected_only", "Connected only", nullptr, "Brush", "", &uiPrefs_.connectedOnly,
          "Brushes only reach the surface joined to the point under the cursor, within the brush size: the other leg, "
-         "the next finger or a lip across a gap stay as they are (Blender's Connected Only). Saved with the "
+         "the next finger or a lip across a gap stay as they are. Saved with the "
          "preferences and the project.");
     flag("draw.view_falloff", "View falloff", nullptr, "Brush", "", &uiPrefs_.viewFalloff,
-         "The brush falloff is measured on screen: everything inside the brush circle is reached, through the model "
-         "and out the back, as a cylinder along the view (Blender's Projected from View). Turn on Connected only too "
-         "to keep it to one piece.");
+         "The brush falloff is measured on screen, as a cylinder along the view. Move and Grab reach everything "
+         "inside the brush circle, through the model and out the back; the other brushes stop about 1.5 to 3 brush "
+         "radii behind the surface under the cursor. Turn on Connected only too to keep it to one piece.");
+    flag("draw.contact_facing", "Contact facing", nullptr, "Brush", "", &uiPrefs_.contactFacing,
+         "The surface under the cursor decides what moves: the falloff is measured along the surface, so the far wall "
+         "of a narrow slot or the other side of a fold stays as it is while the rim under the cursor follows. Facing "
+         "angle (180 at first) also fades surface turned away from it: full strength up to half of it, none past it. "
+         "Smooth forms move as without it. Move and Grab still reach everything. Saved with the preferences and the project.");
     add({"draw.dynamic", "Dynamic", nullptr,
          "Dynamic topology: brushes add triangles where they need detail and remove them "
          "where they don't, so you can pull out horns or fingers without stretching. Detail sets how small the "
          "triangles get; zoom in or shrink the brush for finer ones. Needs a mesh without subdivision levels; quads "
-         "under the brush become triangles and UVs are dropped (Undo brings them back).",
+         "under the brush become triangles; UVs and the painted texture are kept.",
          "Draw", "", "dyntopo", [this] { setDynamic(!doc_.sculptor.dyntopo.enabled); },
          [this] { return doc_.sculptor.dyntopo.enabled; }, nullptr});
     add({"draw.dynamic_freeze", "Freeze Levels + Dynamic", nullptr,
@@ -518,10 +559,16 @@ void App::registerShellActions() {
           "Ctrl+drag draws a lasso and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.");
     shape("mask.rect", "Rectangle Mask", "Tool > Masking", &maskShape_, SelectShape::Rect,
           "Ctrl+drag draws a rectangle and masks everything inside it; Ctrl+Alt+drag unmasks. The far side is included.");
+    shape("mask.circle", "Circle Mask", "Tool > Masking", &maskShape_, SelectShape::Circle,
+          "Ctrl+drag a circle from its centre and masks everything inside it; Ctrl+Alt+drag unmasks. Shift while dragging "
+          "keeps it round; drag from a corner with the option in Tool > Masking. The far side is included.");
     shape("select.rect", "Select Rectangle", "Tool > Visibility", &hideShape_, SelectShape::Rect,
           "Ctrl+Shift+drag a rectangle to keep what's inside and hide the rest; add Alt to hide the inside.");
     shape("select.lasso", "Select Lasso", "Tool > Visibility", &hideShape_, SelectShape::Lasso,
           "Ctrl+Shift+drag a lasso to keep what's inside and hide the rest; add Alt to hide the inside.");
+    shape("select.circle", "Select Circle", "Tool > Visibility", &hideShape_, SelectShape::Circle,
+          "Ctrl+Shift+drag a circle from its centre to keep what's inside and hide the rest; add Alt to hide the inside. "
+          "Let go of Shift while dragging to keep it round.");
     // Cut (PanelCut.cpp, core/Cut.h): the same Ctrl+Shift drag, cutting instead of hiding.
     shape("cut.line", "Cut Line", "Tool > Cut", &hideShape_, SelectShape::CutLine,
           "Ctrl+Shift+drag a line: the shaded side is cut (Alt: the other side). Away removes it through the whole "
@@ -532,6 +579,10 @@ void App::registerShellActions() {
     shape("cut.rect", "Cut Rectangle", "Tool > Cut", &hideShape_, SelectShape::CutRect,
           "Ctrl+Shift+drag a rectangle: Away cuts a hole through the Part, In a pocket Depth deep, Add a block, Clip "
           "presses what lies outside it onto its edges.");
+    shape("cut.circle", "Cut Circle", "Tool > Cut", &hideShape_, SelectShape::CutCircle,
+          "Ctrl+Shift+drag a circle from its centre (Alt at the press: from a corner): Away cuts a round hole through the "
+          "Part, In a pocket Depth deep, Add a round boss, Clip presses what lies outside it onto its rim. Let go of Shift "
+          "while dragging to keep it round.");
     shape("cut.polyline", "Cut Polyline", "Tool > Cut", &hideShape_, SelectShape::CutPolyline,
           "Ctrl+Shift+click points: click the first point to cut the polygon, double-click or Enter to cut along an "
           "open bent line (Alt: the other side), Esc to drop it.");
@@ -574,8 +625,8 @@ void App::registerShellActions() {
          "Browse, search and install brushes other sculptors shared.");
 
     // View (right shelf, Render palette). Frame keeps F; its short label fits the right shelf.
-    add({"view.frame", "Frame", ICON_LC_SCAN, "Fit the whole model in the view.", "Transform", "F", "",
-         [this] { frameView(sceneBounds()); }, nullptr, nullptr});
+    add({"view.frame", "Frame", ICON_LC_SCAN, "Fit the whole model in the view. Classic sculpting keys, with several Parts: F frames the active Part, F twice quickly frames the whole scene.", "Transform", "F", "",
+         [this] { frameKeyPress(); }, nullptr, nullptr});
         flag("view.wire", "Wire", ICON_LC_GRID_3X3, "Render", "", &renderSettings_.wireframe,
          "Wireframe: show the polygons of the active Part (Shift+F).");
     flag("view.facegroups", "Groups", ICON_LC_SHAPES, "Render", "", &renderSettings_.showFaceGroups,
@@ -610,6 +661,12 @@ void App::registerShellActions() {
          "Render", "", "set_shading",
          [this] { runCommand("set_shading", {{"mode", std::string(renderSettings_.flatShading ? "smooth" : "flat")}}); },
          [this] { return renderSettings_.flatShading; }, nullptr});
+    add({"view.unlit", "Unlit", ICON_LC_LIGHTBULB_OFF,
+         "Unlit view (on): the base colour alone, with no lighting, Lit Sphere or PBR shading, so painted colour reads "
+         "exactly as stored. Works with vertex paint, texture paint and PBR; the mask and wireframe still draw. Saved "
+         "with the project.",
+         "Render", "Alt+L", "set_unlit", [this] { runCommand("set_unlit", {}); },
+         [this] { return renderSettings_.unlit; }, nullptr});
     flag("view.vertexpaint", "Paint", ICON_LC_PALETTE, "Render", "", &renderSettings_.showVertexPaint,
          "Show vertex paint colours (off: plain material).");
     // Shading (Material palette, Tool > Viewport Look): the scene's, and the active Part's own.
@@ -754,18 +811,12 @@ void App::registerShellActions() {
          [this] { return layout_.paletteBarVisible; }, nullptr});
     add({"ui.tray.left", "Left tray", ICON_LC_PANEL_LEFT, "Open or close the left tray (or click its divider).",
          "Preferences", "", "",
-         [this] {
-             layout_.leftTrayOpen = !layout_.leftTrayOpen;
-             noteLayoutChanged();
-         },
+         [this] { setTrayOpen(false, !trayShown(false)); },
          [this] { return layout_.leftTrayOpen; }, nullptr});
     add({"ui.tray.right", "Right tray", ICON_LC_PANEL_RIGHT, "Open or close the right tray (or click its divider).",
          "Preferences", "", "",
-         [this] {
-             layout_.rightTrayOpen = !layout_.rightTrayOpen;
-             noteLayoutChanged();
-         },
-         [this] { return layout_.rightTrayOpen; }, nullptr});
+         [this] { setTrayOpen(true, !trayShown(true)); },
+         [this] { return layout_.rightTrayOpen && (!shell_.narrow || layout_.rightTrayPeek); }, nullptr});
     static const char* const kPresetHelp[] = {
         "Standard layout: Tool palette in the right tray, shelves around the canvas.",
         "Sculpt layout: both trays closed for the largest canvas.",
@@ -805,8 +856,10 @@ void App::registerShellActions() {
                     {"effects", ParamSpec::Type::Bool, "Phosphor's scanlines and glow (on the interface only).", false},
                     {"outlines", ParamSpec::Type::String, "The tiled looks' panel borders: off, subtle (the default) or on.", false},
                     {"outline_opacity", ParamSpec::Type::Number, "How strong those borders are, 0-100 (default 100).", false},
+                    {"popup_colors", ParamSpec::Type::String, "Pop-up colours: role (the default) or plain.", false},
                     {"layout", ParamSpec::Type::String, "sculptforge or classic (default: the look's, else unchanged).", false},
-                    {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false}},
+                    {"card", ParamSpec::Type::Bool, "Show the one-time \"SculptForge has a new look\" card (for tests).", false},
+                    {"newer_rows", ParamSpec::Type::Bool, "Show the menu rows added after 0.13.0 (default: by layout).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
                        theme::LookSettings& l = uiPrefs_.look;
                        int layoutKind = uiPrefs_.shellLayout;
@@ -832,11 +885,17 @@ void App::registerShellActions() {
                        }
                        if (a.contains("outline_opacity"))
                            l.outlineOpacity = std::clamp(float(argNumber(a, "outline_opacity", 100.0)) / 100.0f, 0.0f, 1.0f);
+                       if (a.contains("popup_colors")) {
+                           const std::string pc = argString(a, "popup_colors");
+                           if (pc != "role" && pc != "plain") return {false, "popup_colors must be role or plain"};
+                           l.rolePopups = pc == "role";
+                       }
                        if (a.contains("layout")) {
                            const std::string k = argString(a, "layout");
                            if (k != "sculptforge" && k != "classic") return {false, "layout must be sculptforge or classic"};
                            layoutKind = k == "sculptforge" ? 1 : 0;
                        }
+                       if (a.contains("newer_rows")) uiPrefs_.newerMenuRows = argBool(a, "newer_rows", false) ? 1 : 0;
                        setShellLayout(layoutKind);
                        lookDirty_ = true;
                        if (a.contains("card")) newLookCard_ = argBool(a, "card", false);
@@ -875,7 +934,29 @@ void App::registerShellActions() {
 // Layout
 // ---------------------------------------------------------------------------
 
+App::SafeInsets App::safeInsets() const {
+    if (safeInsetsTest_) return safeInsetsTestValue_;
+    SafeInsets in;
+    in.t = topInset();
+    SDL_Rect safe{};
+    int w = 0, h = 0;
+    SDL_GetWindowSize(window_, &w, &h);
+    if (SDL_GetWindowSafeArea(window_, &safe) && safe.w > 0 && safe.h > 0) {
+        in.l = float(std::max(safe.x, 0));
+        in.r = float(std::max(w - safe.x - safe.w, 0));
+        in.b = float(std::max(h - safe.y - safe.h, 0));
+    }
+    return in;
+}
+
+CanvasRect App::safeRect() const {
+    const ImVec2 screen = ImGui::GetIO().DisplaySize;
+    const SafeInsets in = safeInsets();
+    return {in.l, in.t, std::max(screen.x - in.l - in.r, 1.0f), std::max(screen.y - in.t - in.b, 1.0f)};
+}
+
 float App::topInset() const {
+    if (safeInsetsTest_) return safeInsetsTestValue_.t;
     // Laptop camera notches cover the top of a window that fills the screen (MacBooks since 2021).
     if (uiPrefs_.cameraNotch == 2 || hideUi_ || !options_.uiTest.empty() || !options_.recordPath.empty()) return 0.0f;
     // macOS (and any platform that knows) reports the safe area itself.
@@ -898,6 +979,50 @@ float App::topInset() const {
     const bool notched = band > bounds.h * 0.02f && band < bounds.h * 0.06f;
     if (uiPrefs_.cameraNotch == 1) return notched ? band : 32.0f * uiScale_;
     return appleLaptop && notched && coversDisplay ? band : 0.0f;
+}
+
+// The camera starts at Camera's defaults, made for a wide window: on a phone held upright the 3D view between the
+// shelves is narrower than the model, which then filled it edge to edge (Hameron, Pixel, 11-12: "nothing visible").
+// Once the first frame knows the view's shape the starting model is framed into it, when the default view would cut it
+// off (a wide desktop window keeps the view it always had). Turning the phone frames it again while nobody moved
+// the camera.
+void App::fitStartView(bool resized) {
+    if (resized) {
+        if (!autoFramed_ || camera_.distance != autoFramedDistance_ || camera_.target != autoFramedTarget_) return;
+    } else {
+        const Camera def;
+        if (camera_.distance != def.distance || camera_.target != def.target || camera_.shift != def.shift) return;
+    }
+    const AABB b = sceneBounds();
+    if (!b.valid()) return;
+    const glm::vec3 e = b.extent();
+    const float half = 0.5f * std::max(e.x, e.y);
+    const float halfH = camera_.distance * std::tan(camera_.fovY * 0.5f);
+    const float halfW = halfH * std::max(camera_.aspect, 1e-3f);
+    if (!resized && half * 1.05f <= std::min(halfH, halfW)) { // fits as it is: left alone, but watched for a turn
+        autoFramed_ = true;
+        autoFramedDistance_ = camera_.distance;
+        autoFramedTarget_ = camera_.target;
+        return;
+    }
+    frameView(b);
+    autoFramed_ = true;
+    autoFramedDistance_ = camera_.distance;
+    autoFramedTarget_ = camera_.target;
+}
+
+void App::logWindowGeometry() const {
+    int w = 0, h = 0, pw = 0, ph = 0;
+    SDL_GetWindowSize(window_, &w, &h);
+    SDL_GetWindowSizeInPixels(window_, &pw, &ph);
+    SDL_Rect safe{};
+    SDL_GetWindowSafeArea(window_, &safe);
+    const CanvasRect c = canvasRect();
+    SDL_Log("window %dx%d (%dx%d px, density %.2f, display scale %.2f), safe area %d,%d %dx%d, UI scale %.2f, canvas %.0f,%.0f %.0fx%.0f, "
+            "palm guard %s",
+            w, h, pw, ph, double(SDL_GetWindowPixelDensity(window_)), double(SDL_GetWindowDisplayScale(window_)), safe.x, safe.y,
+            safe.w, safe.h, double(uiScale_), double(c.x), double(c.y), double(c.w), double(c.h),
+            uiPrefs_.tablet.palmRejection ? "on" : "off");
 }
 
 ShellGeometry App::shellGeometry() const {
@@ -979,7 +1104,7 @@ void App::updateCameraAspect() {
     camera_.aspect = c.w / std::max(c.h, 1.0f);
 }
 
-// The one-time "Layout changed - ... Save Layout keeps it" hint comes from watchLayoutChanges (Config.cpp),
+// The one-time "Layout changes save themselves - ..." hint comes from watchLayoutChanges (Config.cpp),
 // which compares the layout with the stored one; shell edits only need to change layout_.
 void App::noteLayoutChanged() {}
 
@@ -994,6 +1119,7 @@ void App::applyPreset(int preset) {
     l.libraryTab = layout_.libraryTab;
     l.libraryBottom = layout_.libraryBottom;
     l.leftHanded = layout_.leftHanded;
+    l.myPanel = layout_.myPanel; // what you built is not a preset's to change
     static const char* const kNames[] = {"Standard", "Sculpt", "Wide"};
     if (preset == 1) {
         l.leftTrayOpen = l.rightTrayOpen = false;
@@ -1005,13 +1131,40 @@ void App::applyPreset(int preset) {
     layout_ = std::move(l);
     collapsedPalettes_.clear();
     dropdown_.clear();
-    status_ = std::string("Layout: ") + kNames[std::clamp(preset, 0, 2)] + " (Save Layout keeps it)";
+    status_ = std::string("Layout: ") + kNames[std::clamp(preset, 0, 2)]; // (the layout saves itself)
     lastCommandOk_ = true;
 }
 
 bool App::paletteInShownTray(const std::string& id) const {
     return std::count(layout_.leftTray.begin(), layout_.leftTray.end(), id) ||
-           (!shell_.narrow && std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id));
+           ((!shell_.narrow || (layout_.rightTrayPeek && !layout_.leftTrayOpen)) &&
+            std::count(layout_.rightTray.begin(), layout_.rightTray.end(), id));
+}
+
+// Open as the layout has it; on a narrow window, as drawn (the right tray is hidden there until asked for).
+bool App::trayShown(bool right) const {
+    if (!shell_.narrow) return right ? layout_.rightTrayOpen : layout_.leftTrayOpen;
+    return (right ? shell_.rightTray : shell_.leftTray).w > 0.0f;
+}
+
+// Opens or closes a tray: one tap on its divider, its action, or a palette's header icon. A narrow window (a tablet:
+// 760-1000 logical px, upright 450-800) holds one tray at a time and the right one only once asked for, so opening one
+// there closes the other, and what the tap changes is what is drawn, not the stored "open" the wide layout keeps.
+void App::setTrayOpen(bool right, bool open) {
+    if (shell_.narrow) {
+        if (right) {
+            layout_.rightTrayPeek = open;
+            if (open) layout_.rightTrayOpen = true, layout_.leftTrayOpen = false;
+            else layout_.rightTrayOpen = false;
+        } else {
+            layout_.leftTrayOpen = open;
+            if (open) layout_.rightTrayPeek = false;
+        }
+    } else {
+        (right ? layout_.rightTrayOpen : layout_.leftTrayOpen) = open;
+        layout_.rightTrayPeek = false;
+    }
+    noteLayoutChanged();
 }
 
 void App::removePaletteFromTrays(const std::string& id) {
@@ -1028,7 +1181,7 @@ void App::autoCollapseTray(bool right, const std::string& keep) {
 void App::movePaletteToTray(const std::string& id, bool right) {
     removePaletteFromTrays(id);
     (right ? layout_.rightTray : layout_.leftTray).push_back(id);
-    (right ? layout_.rightTrayOpen : layout_.leftTrayOpen) = true;
+    setTrayOpen(right, true);
     collapsedPalettes_.erase(std::remove(collapsedPalettes_.begin(), collapsedPalettes_.end(), id), collapsedPalettes_.end());
     autoCollapseTray(right, id);
     if (dropdown_ == id) {
@@ -1058,6 +1211,7 @@ void App::drawCanvasFrame() {
 
 void App::drawShell() {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
+    applyPendingLayoutOp(); // (Revert / Reset / Import asked last frame)
     if (lookDirty_) { // Preferences > Interface > Look changed: applied here, outside any pushed style
         lookDirty_ = false;
         applyLook();
@@ -1104,6 +1258,7 @@ void App::drawShell() {
     if (sculptForgeLayout()) drawTaskMenu();
     else drawPaletteDropdown();
     finishShelfDrag();
+    finishMyPanelDrag();
 }
 
 void App::drawTitleStrip(const ShellGeometry& g) {
@@ -1152,7 +1307,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     const bool mayaLink = mayaLink_ != nullptr; // the Maya Live link is on: its ember chip turns it off
     const std::string linkLabel = std::string(ICON_LC_RADIO " ") + tr("Live link on") + "##mayalink.chip";
     std::string name = doc_.path.empty() ? std::string(tr("Untitled"))
-                                         : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
+                                         : fileNameUtf8(doc_.path);
     if (doc_.dirty()) name += " *";
     auto rightWidth = [&] {
         float w = searchW + buttonW(tr(ICON_LC_MENU " Menus")) + 8.0f * s + 10.0f * s + 2.0f * windowButtonW + 2.0f * s;
@@ -1217,8 +1372,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
     // Info readout and the status message, elided to fit: secondary, so in the 12 px font.
     ImGui::SameLine(0.0f, 14.0f * s);
     const float infoX = ImGui::GetCursorPosX();
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::SetCursorPosY(std::floor((h - ImGui::GetTextLineHeight()) * 0.5f));
+    ImFont* const regularFont = ImGui::GetFont();
     size_t tris = 0, verts = 0;
     for (int i = 0; i < doc_.partCount(); ++i) {
         tris += doc_.partMesh(i).triangleCount();
@@ -1236,6 +1390,16 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         std::strncat(info, "   ", sizeof info - std::strlen(info) - 1);
         std::strncat(info, tr("Preview detail"), sizeof info - std::strlen(info) - 1);
     }
+    if (renderSettings_.unlit) { // the mode stays in view while it is on (#168)
+        std::strncat(info, "   ", sizeof info - std::strlen(info) - 1);
+        std::strncat(info, tr("Unlit"), sizeof info - std::strlen(info) - 1);
+    }
+    // A dense character (Chinese, Japanese, Korean: a Part named 頭, or those UIs' labels) is a grey smudge at 12 px: that
+    // readout takes the regular face; Latin keeps the small one, so its line is as it was.
+    ImFont* const infoFont = hasWideText(info) ? regularFont : fontSmall_;
+    if (infoFont) ImGui::PushFont(infoFont);
+    infoFontPx_ = ImGui::GetFontSize();
+    ImGui::SetCursorPosY(std::floor((h - ImGui::GetTextLineHeight()) * 0.5f));
     // The frame rate gets a fixed-width slot, refreshed twice a second: a number that changes width every frame
     // would make everything after it (the status message) jitter.
     if (ImGui::GetTime() - fpsShownAt_ > 0.5 || fpsShown_ < 0.0f) {
@@ -1260,19 +1424,19 @@ void App::drawTitleStrip(const ShellGeometry& g) {
             // The status message is what just happened, so it stands out from the readout: the regular font, in
             // the bright text colour (still elided to the space the small-font readout leaves).
             ImGui::SameLine(0.0f, 20.0f * s);
-            if (fontSmall_) ImGui::PopFont();
+            if (infoFont) ImGui::PopFont();
             ImGui::SetCursorPosY(std::floor((h - ImGui::GetTextLineHeight()) * 0.5f));
             const bool error = !layout_.customize && !lastCommandOk_ && ImGui::GetTime() - statusSince_ < 6.0;
             ImGui::PushStyleColor(ImGuiCol_Text, layout_.customize ? theme::accent : error ? theme::danger : theme::textBright);
             ImGui::TextUnformatted(elide(ImGui::GetFont(), msg, avail - infoW - 20.0f * s).c_str());
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered() && msg.size() > 40) ImGui::SetTooltip("%s", msg.c_str());
-            if (fontSmall_) ImGui::PushFont(fontSmall_);
+            if (infoFont) ImGui::PushFont(infoFont);
         }
     } else if (avail > 40.0f * s) {
         ImGui::TextDisabled("%s", elide(ImGui::GetFont(), info, avail).c_str());
     }
-    if (fontSmall_) ImGui::PopFont();
+    if (infoFont) ImGui::PopFont();
 
     // QuickSave, the layout presets and Menus are small dark chips with readable labels: buttons, but quieter than
     // the shelves (Menus on is an option: raised grey with an underline). 1 2 3 are segments of one control.
@@ -1381,6 +1545,9 @@ void App::drawPaletteBar(const ShellGeometry& g) {
     int help = -1;
     for (int i = 0; i < count; ++i) {
         if (!uiPrefs_.alphabeticalPalettes && std::string_view(list[i].id) == "help") help = i; // last, as usual
+        else if (std::string_view(list[i].id) == "mypanel" && layout_.myPanel.empty() && !paletteInShownTray("mypanel") &&
+                 dropdown_ != "mypanel")
+            continue; // (empty and not in use: off the bar, which is full on a tablet; Edit > My Panel opens it)
         else if (std::find(order.begin(), order.end(), i) == order.end()) order.push_back(i);
     }
     if (help >= 0) order.push_back(help);
@@ -1440,8 +1607,10 @@ UiLayout relayout(const UiLayout& from, int layoutKind) {
     l.rightTray = from.rightTray;
     l.leftTrayOpen = from.leftTrayOpen;
     l.rightTrayOpen = from.rightTrayOpen;
+    l.rightTrayPeek = from.rightTrayPeek;
     l.leftTrayWidth = from.leftTrayWidth;
     l.rightTrayWidth = from.rightTrayWidth;
+    l.leftShelfWidth = from.leftShelfWidth;
     l.openSubpalettes = from.openSubpalettes;
     l.consoleOpen = from.consoleOpen;
     l.consoleHeight = from.consoleHeight;
@@ -1805,7 +1974,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
         if (doc_.activeBrush >= 0 && doc_.activeBrush < int(doc_.brushes.size())) brush = doc_.brushes[size_t(doc_.activeBrush)].name;
         mods.push_back({ICON_LC_BRUSH, "brush", brush});
         std::string name = doc_.path.empty() ? std::string(tr("Untitled"))
-                                             : std::filesystem::path(std::u8string(doc_.path.begin(), doc_.path.end())).filename().string();
+                                             : fileNameUtf8(doc_.path);
         if (doc_.dirty()) name += " *";
         mods.push_back({ICON_LC_FILE, "file", name});
         size_t tris = 0;
@@ -2070,6 +2239,13 @@ void App::drawStatusBar(const ShellGeometry& g) {
     ImGui::End();
 }
 
+// My Panel open as a drop-down while an Alt-press starts a drag from somewhere else (the drag that fills it): the press
+// would close it (ImGui focuses the window pressed), so it is opened again, and the drop has its target. Only with Alt.
+static bool keepMyPanelDropdown(const std::string& dropdown) {
+    return dropdown == "mypanel" && ui::AltHeld() && !ui::CtrlHeld() && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+           !ImGui::IsPopupOpen("##palettedropdown");
+}
+
 // A task menu's drop-down: its sections (palettes) down the left, the chosen one beside them, under its header (whose
 // tray icon still pins it to a tray). dropdown_ is the chosen palette, so ui.palette.* and F3 open it in its menu.
 void App::drawTaskMenu() {
@@ -2078,6 +2254,8 @@ void App::drawTaskMenu() {
         openDropdown_ = false;
     }
     if (dropdown_.empty()) return;
+    const bool reopen = keepMyPanelDropdown(dropdown_); // (without taking the focus: that would end the drag's source item)
+    if (reopen) ImGui::OpenPopup("##palettedropdown");
     const int menuIndex = taskMenuOf(dropdown_);
     const PaletteDef* def = findPalette(dropdown_);
     if (menuIndex < 0 || !def) {
@@ -2107,7 +2285,7 @@ void App::drawTaskMenu() {
     ImGui::SetNextWindowPos(ImVec2(std::clamp(x, 4.0f * s, vp->Size.x - w - sb - 4.0f * s), y));
     ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w + sb, vp->Size.y - y - 8.0f * s));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, pad));
-    const bool open = ImGui::BeginPopup("##palettedropdown");
+    const bool open = ImGui::BeginPopup("##palettedropdown", reopen ? ImGuiWindowFlags_NoFocusOnAppearing : 0);
     ImGui::PopStyleVar();
     if (!open) {
         dropdown_.clear();
@@ -2168,12 +2346,19 @@ void App::drawTaskMenu() {
         Demo::pushScope(def->name);
         if (def->scope) Demo::pushScope(def->scope);
         const std::string id = dropdown_;
-        if (paletteHeader(id.c_str(), false, true)) drawPaletteBody(id);
+        if (PanelWindow* panel = findPanel("palette." + id)) { // in a window of its own (PanelWindows.cpp)
+            ImGui::TextDisabled("%s", tr("In a window of its own"));
+            if (panel->window && ImGui::Button(tr(ICON_LC_SQUARE_ARROW_OUT_UP_RIGHT "  Show it"))) SDL_RaiseWindow(panel->window);
+            ImGui::SameLine();
+            if (ImGui::Button(tr(ICON_LC_PANEL_TOP "  Back in the main window"))) dockPanel("palette." + id);
+        } else if (paletteHeader(id.c_str(), false, true)) {
+            drawPaletteBody(id);
+        }
         if (def->scope) Demo::popScope();
         Demo::popScope();
     }
     ImGui::EndGroup();
-    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsAnyItemActive()) ImGui::CloseCurrentPopup();
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !conflictPopupOpened_ && !ImGui::IsAnyItemActive()) ImGui::CloseCurrentPopup(); // (Esc answering the shortcut box closes only it)
     ImGui::EndPopup();
 }
 
@@ -2216,7 +2401,7 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     centredText(dl, nullptr, p, ImVec2(p.x + h, p.y + h), theme::u32(iconHovered ? theme::accentHover : theme::textDim),
                 inTray ? (right ? ICON_LC_PANEL_RIGHT : ICON_LC_PANEL_LEFT) : ICON_LC_PANEL_RIGHT);
     ImGui::SameLine();
-    const bool titleClicked = ImGui::InvisibleButton("##title", ImVec2(std::max(1.0f, w - 2.0f * h), h));
+    const bool titleClicked = ImGui::InvisibleButton("##title", ImVec2(std::max(1.0f, w - 3.0f * h), h));
     const bool titleHovered = ImGui::IsItemHovered();
     if (fontBold_) ImGui::PushFont(fontBold_);
     {
@@ -2239,6 +2424,17 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     ImGui::LogText("%s", tr(paletteTitle(*def)));
     if (fontBold_) ImGui::PopFont();
     ImGui::SameLine();
+    // Its own window, to keep on another monitor (PanelWindows.cpp, docs/design/detach-panels.md).
+    const bool detachClicked = ImGui::InvisibleButton("##detach", ImVec2(h, h));
+    const bool detachHovered = ImGui::IsItemHovered();
+    ui::HelpText("Open in its own window", nullptr,
+                 "Move this palette to a window of its own, to keep on another monitor or a pen display. Close that window "
+                 "to bring it back. It opens there next time too.",
+                 tr(paletteTitle(*def)));
+    ui::DelayedTooltip("Open in its own window");
+    centredText(dl, nullptr, ImVec2(p.x + w - 2.0f * h, p.y), ImVec2(p.x + w - h, p.y + h),
+                theme::u32(detachHovered ? theme::textHover : theme::textDim), ICON_LC_SQUARE_ARROW_OUT_UP_RIGHT);
+    ImGui::SameLine();
     const bool endClicked = ImGui::InvisibleButton(inTray ? "##collapse" : "##close", ImVec2(h, h));
     const bool endHovered = ImGui::IsItemHovered();
     centredText(dl, nullptr, ImVec2(p.x + w - h, p.y), ImVec2(p.x + w, p.y + h),
@@ -2247,6 +2443,11 @@ bool App::paletteHeader(const char* id, bool inTray, bool right) {
     ImGui::PopStyleVar();
     ImGui::Dummy(ImVec2(0, 2.0f * s));
 
+    if (detachClicked) {
+        if (!inTray) ImGui::CloseCurrentPopup();
+        detachPanel(std::string("palette.") + id);
+        return false;
+    }
     if (iconClicked) {
         if (inTray) {
             removePaletteFromTrays(id);
@@ -2281,45 +2482,87 @@ void App::drawPaletteBody(const std::string& id) {
     ImGui::PopID();
 }
 
-void App::closePopupsOnPressOutside(const SDL_Event& e) {
-    if (e.type != SDL_EVENT_MOUSE_BUTTON_DOWN) return;
+bool App::closePopupsOnPressOutside(const SDL_Event& e) {
+    if (e.type != SDL_EVENT_MOUSE_BUTTON_DOWN) return false;
     ImGuiContext* g = ImGui::GetCurrentContext();
-    if (!g || g->OpenPopupStack.Size == 0) return;
+    if (!g || g->OpenPopupStack.Size == 0) return false;
     const float x = e.button.x, y = e.button.y;
     auto inside = [&](float rx, float ry, float rw, float rh) { return x >= rx && x < rx + rw && y >= ry && y < ry + rh; };
     const ImGuiWindow* hovered = g->HoveredWindow ? g->HoveredWindow->RootWindow : nullptr;
     for (const ImGuiPopupData& p : g->OpenPopupStack) {
         if (!p.Window) continue;
-        if (p.Window->Flags & ImGuiWindowFlags_Modal) return; // (a modal dialog keeps its clicks: Esc or its buttons)
+        if (p.Window->Flags & ImGuiWindowFlags_Modal) return false; // (a modal dialog keeps its clicks: Esc or its buttons)
         // Its own press: over it as ImGui sees it (an auto-sized popup grows a frame after its content), or in its rect.
         if (hovered == p.Window->RootWindow || inside(p.Window->Pos.x, p.Window->Pos.y, p.Window->Size.x, p.Window->Size.y))
-            return;
-        // A press in the window that opened it (a combo's own button, which closes it): ImGui's, as before.
-        if (hovered && p.Window->ParentWindow && hovered == p.Window->ParentWindow->RootWindow) return;
+            return false;
+        // A press in the window that opened it: ImGui's first (a combo's own button closes it, an item acts). A menu
+        // still open when that frame ends was not closed by it (ImGui keeps one when the press lands on an item, #210):
+        // closeParentPressPopup closes it then.
+        if (hovered && p.Window->ParentWindow && hovered == p.Window->ParentWindow->RootWindow) {
+            parentPress_ = {p.PopupId, p.OpenFrameCount};
+            return false;
+        }
     }
-    if (!dropdown_.empty()) {
+    const bool palette = !dropdown_.empty();
+    if (palette) {
         const ImVec4 r = sculptForgeLayout() ? menuRect_ : dropdownRect_;
-        if (r.z > 0.0f && inside(r.x, r.y, r.z, r.w)) return;
+        if (r.z > 0.0f && inside(r.x, r.y, r.z, r.w)) return false;
         for (const CanvasRect& bar : {shell_.paletteBar, shell_.title})
-            if (inside(bar.x, bar.y, bar.w, bar.h)) return; // (the menu names switch to another menu or close this one)
+            if (inside(bar.x, bar.y, bar.w, bar.h)) return false; // (the menu names switch to another menu or close this one)
     }
     ImGui::ClosePopupToLevel(0, false);
     ImGui::FocusWindow(nullptr); // (a focused popup, even closed, blocks hovering the rest for a frame: the press)
     // On the bare canvas the press starts a stroke: ImGui still wants the mouse from the frame the popup was open.
-    if (!g->HoveredWindow || (g->HoveredWindow->RootWindow && (g->HoveredWindow->RootWindow->Flags & ImGuiWindowFlags_Popup)))
-        ImGui::GetIO().WantCaptureMouse = false;
+    // (Not for a context menu or combo list: that press only closes it, no accidental stroke, #210. A palette menu's
+    // press still acts, mode matrix.)
+    const bool bare = !g->HoveredWindow || (g->HoveredWindow->RootWindow && (g->HoveredWindow->RootWindow->Flags & ImGuiWindowFlags_Popup));
+    if (bare) ImGui::GetIO().WantCaptureMouse = false;
+    if (dropdown_ == "mypanel" && ui::AltHeld() && !ui::CtrlHeld()) return false; // an Alt-drag into it starts here: it comes back (keepMyPanelDropdown)
+    const bool spent = bare && !palette && e.button.button == SDL_BUTTON_LEFT;
     dropdown_.clear();
     dropdownRect_ = ImVec4();
     menuX_ = 0.0f;
     menuRect_ = ImVec4();
+    return spent;
+}
+
+void App::closeParentPressPopup() {
+    const auto press = std::exchange(parentPress_, {});
+    ImGuiContext* g = ImGui::GetCurrentContext();
+    if (!press.first || !g) return;
+    for (int i = 0; i < g->OpenPopupStack.Size; ++i)
+        if (g->OpenPopupStack[i].PopupId == press.first && g->OpenPopupStack[i].OpenFrameCount == press.second) {
+            ImGui::ClosePopupToLevel(i, false);
+            return;
+        }
+}
+
+bool App::closeTopPopupOnEscape() {
+    ImGuiContext* g = ImGui::GetCurrentContext();
+    // (With a palette drop-down open, its Esc closes it and what it holds together. A modal dialog keeps its Esc.)
+    if (!g || g->OpenPopupStack.Size == 0 || !dropdown_.empty()) return false;
+    if (shortcutConflictOpen() || !capturingShortcut_.empty()) return false; // (the shortcut editor's own Esc, Config.cpp)
+    for (const ImGuiPopupData& p : g->OpenPopupStack)
+        if (p.Window && (p.Window->Flags & ImGuiWindowFlags_Modal)) return false;
+    ImGui::ClosePopupToLevel(g->OpenPopupStack.Size - 1, true);
+    return true;
 }
 
 void App::drawPaletteDropdown() {
+    if (PanelWindow* panel = dropdown_.empty() ? nullptr : findPanel("palette." + dropdown_)) {
+        // In a window of its own: that window comes up instead of a drop-down (PanelWindows.cpp).
+        if (panel->window) SDL_RaiseWindow(panel->window);
+        dropdown_.clear();
+        openDropdown_ = false;
+        return;
+    }
     if (openDropdown_) {
         ImGui::OpenPopup("##palettedropdown");
         openDropdown_ = false;
     }
     if (dropdown_.empty()) return;
+    const bool reopen = keepMyPanelDropdown(dropdown_); // (without taking the focus: that would end the drag's source item)
+    if (reopen) ImGui::OpenPopup("##palettedropdown");
     const PaletteDef* def = findPalette(dropdown_);
     if (!def) {
         dropdown_.clear();
@@ -2336,7 +2579,7 @@ void App::drawPaletteDropdown() {
     ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0), ImVec2(w, vp->Size.y - y - 8.0f * s));
     // Whole-pixel padding: auto-fit truncates sizes, and a fraction of a pixel too little shows a scrollbar.
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(std::round(6.0f * s), std::round(6.0f * s)));
-    const bool open = ImGui::BeginPopup("##palettedropdown");
+    const bool open = ImGui::BeginPopup("##palettedropdown", reopen ? ImGuiWindowFlags_NoFocusOnAppearing : 0);
     ImGui::PopStyleVar();
     if (!open) {
         dropdown_.clear();
@@ -2353,7 +2596,7 @@ void App::drawPaletteDropdown() {
     if (paletteHeader(id.c_str(), false, true)) drawPaletteBody(id);
     if (def->scope) Demo::popScope();
     Demo::popScope();
-    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsAnyItemActive()) ImGui::CloseCurrentPopup();
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !conflictPopupOpened_ && !ImGui::IsAnyItemActive()) ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
 }
 
@@ -2368,6 +2611,20 @@ void App::drawTray(bool right, const CanvasRect& r) {
     for (const std::string& id : ids) {
         const PaletteDef* def = findPalette(id);
         if (!def) continue;
+        if (PanelWindow* panel = findPanel("palette." + id)) {
+            // In a window of its own (PanelWindows.cpp): a line that says so where it was, not a gap in the tray.
+            ImGui::PushID(id.c_str());
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s  %s", tr(def->name), tr("In a window of its own"));
+            if (panel->window) {
+                if (ImGui::SmallButton(tr(ICON_LC_SQUARE_ARROW_OUT_UP_RIGHT "  Show it"))) SDL_RaiseWindow(panel->window);
+                ImGui::SameLine();
+            }
+            if (ImGui::SmallButton(tr(ICON_LC_PANEL_TOP "  Back in the main window"))) dockPanel("palette." + id);
+            ImGui::Dummy(ImVec2(0, 4.0f * s));
+            ImGui::PopID();
+            continue;
+        }
         ImGui::PushID(id.c_str());
         Demo::pushScope(def->name);
         if (def->scope) Demo::pushScope(def->scope);
@@ -2415,7 +2672,7 @@ void App::drawDivider(bool right, const CanvasRect& r) {
         ImGui::End();
         return;
     }
-    const bool open = right ? layout_.rightTrayOpen && !shell_.narrow : layout_.leftTrayOpen;
+    const bool open = trayShown(right);
     ImGui::InvisibleButton(right ? "##rightdivider" : "##leftdivider", ImVec2(r.w, r.h));
     const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
     ImGuiIO& io = ImGui::GetIO();
@@ -2429,12 +2686,7 @@ void App::drawDivider(bool right, const CanvasRect& r) {
         noteLayoutChanged();
     }
     if (ImGui::IsItemDeactivated() && io.MouseDragMaxDistanceSqr[0] < 9.0f * s * s) {
-        if (right && shell_.narrow) {
-            status_ = "The window is too narrow for the tray - palettes open as drop-downs";
-        } else {
-            (right ? layout_.rightTrayOpen : layout_.leftTrayOpen) = !open;
-            noteLayoutChanged();
-        }
+        setTrayOpen(right, !open);
     }
     ui::HelpText(right ? "Right tray" : "Left tray", nullptr,
                  "Click to open or close the tray, drag to resize it. Palettes go in trays from their header icon.",
@@ -2444,6 +2696,44 @@ void App::drawDivider(bool right, const CanvasRect& r) {
     const ImU32 grip = theme::u32(hovered || active ? theme::accent : theme::textDim, hovered || active ? 1.0f : 0.5f);
     dl->AddRectFilled(ImVec2(cx - 1.0f * s, cy - 16.0f * s), ImVec2(cx + 1.0f * s, cy + 16.0f * s), grip, theme::rounding(1.0f * s));
     ImGui::End();
+}
+
+// The left shelf's inner edge: drag to widen or narrow the column (the colour field and its swatches grow with it, a
+// member couldn't manage the colours in the 88 px column), double-click for the default width. Kept in the layout.
+// Called inside the shelf's own window (a window of its own under the shelf never got the mouse): the strip lies in the
+// shelf's padding, where no item is.
+void App::drawLeftShelfGrip(const CanvasRect& shelf) {
+    const float s = uiScale_;
+    const float gripW = std::min(6.0f * s, shelf.w * 0.5f);
+    const ImRect bb(ImVec2(layout_.leftHanded ? shelf.x : shelf.x + shelf.w - gripW, shelf.y),
+                    ImVec2(layout_.leftHanded ? shelf.x + gripW : shelf.x + shelf.w, shelf.y + shelf.h));
+    const ImGuiID id = ImGui::GetID("##leftshelfgrip");
+    if (!ImGui::ItemAdd(bb, id)) return;
+    bool hovered = false, held = false;
+    ImGui::ButtonBehavior(bb, id, &hovered, &held, ImGuiButtonFlags_PressedOnClick);
+    ImGuiIO& io = ImGui::GetIO();
+    if (hovered || held) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    const float logicalW = io.DisplaySize.x / s;
+    if (held && io.MouseDelta.x != 0.0f) {
+        const float now = leftShelfWidth(layout_.leftShelfWidth, logicalW);
+        const float next = leftShelfWidth(now + (layout_.leftHanded ? -io.MouseDelta.x : io.MouseDelta.x) / s, logicalW);
+        const float stored = next <= leftShelfWidth(0.0f, logicalW) ? 0.0f : std::floor(next);
+        if (stored != layout_.leftShelfWidth) {
+            layout_.leftShelfWidth = stored;
+            noteLayoutChanged();
+        }
+    }
+    if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && layout_.leftShelfWidth != 0.0f) {
+        layout_.leftShelfWidth = 0.0f;
+        noteLayoutChanged();
+    }
+    ui::HelpText("Left shelf width", nullptr, "Drag to make the column wider or narrower (the colour field grows with it). Double-click for the default.",
+                 "Shell");
+    if (hovered || held) {
+        const float cx = layout_.leftHanded ? bb.Min.x + 1.0f * s : bb.Max.x - 1.0f * s, cy = (bb.Min.y + bb.Max.y) * 0.5f;
+        ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(cx - 1.0f * s, cy - 16.0f * s), ImVec2(cx + 1.0f * s, cy + 16.0f * s),
+                                                  theme::u32(theme::accent, 1.0f), theme::rounding(1.0f * s));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -2548,11 +2838,14 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         }
         const float needed = rects.back().Max.y + ImGui::GetScrollY() - r.y + pad.y;
         shelfClipped_[shelf] = int(std::count_if(rects.begin(), rects.end(), [&](const ImRect& rc) { return rc.Max.y > r.y + r.h + 0.5f; }));
+        const bool foldedBefore = rightShelfFolded_;
+        const float fitBefore = shelfFit_[shelf];
         if (shelf == kShelfRight && !layout_.customize) { // fold the view toggles when the shelf is too tall
             const int folds = int(std::count_if(list.begin(), list.end(), [](const std::string& id) { return foldsIntoView(id); }));
             if (!rightShelfFolded_ && folds > 0 && needed > r.h + 0.5f) {
                 rightShelfFolded_ = true;
-            } else if (rightShelfFolded_) {
+                rightShelfFoldH_ = r.h;
+            } else if (rightShelfFolded_ && r.h > rightShelfFoldH_ + 6.0f * s) { // (only for a taller shelf than the one that folded)
                 // Unfolded at full size: the buttons at fit 1, and the View button's place taken by all of them.
                 const float full = needed - scalable + scalable / std::max(shelfFit_[shelf], 0.1f) + float(folds - 1) * 44.0f * s;
                 if (full <= r.h - 4.0f * s) rightShelfFolded_ = false; // (a small margin: no flicker at the edge)
@@ -2562,10 +2855,18 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         if (scalable > 0.0f) {
             const float fixed = needed - scalable;
             const float want = std::clamp(fit * (r.h - 1.0f * s - fixed) / scalable, shelf == kShelfRight ? 0.5f : 0.6f, 1.0f); // (the right shelf: icons alone)
-            if (want < fit - 0.002f || want > fit + 0.02f) fit = want; // (growing back waits for a clear margin)
+            // Shrinking follows the overflow; growing back waits for a clear margin and for a taller shelf than the one it last
+            // shrank for, or the quantised button heights could make it grow and shrink every other frame.
+            if (want < fit - 0.002f) {
+                fit = want;
+                shelfShrinkH_[shelf] = r.h;
+            } else if (want > fit + 0.02f && std::abs(r.h - shelfShrinkH_[shelf]) > 0.5f) {
+                fit = want;
+            }
         } else {
             fit = 1.0f;
         }
+        if (shelf == kShelfRight && (rightShelfFolded_ != foldedBefore || fit != fitBefore)) ++rightShelfChanges_;
     }
 
     ImGuiWindow* window = ImGui::GetCurrentWindow();
@@ -2575,6 +2876,7 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         if (vertical) ImGui::SetScrollY(ImGui::GetScrollY() - ImGui::GetIO().MouseWheel * 60.0f * s);
         else ImGui::SetScrollX(ImGui::GetScrollX() - ImGui::GetIO().MouseWheel * 60.0f * s);
     }
+    if (shelf == kShelfLeft) drawLeftShelfGrip(r);
     if (layout_.customize)
         dashedRect(dl, ImVec2(r.x + 2.0f, r.y + 2.0f), ImVec2(r.x + r.w - 2.0f, r.y + r.h - 2.0f), theme::u32(theme::accent, 0.6f),
                    4.0f * s);
@@ -2643,6 +2945,13 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
     const float winW = ImGui::GetWindowWidth();
     const float padX = ImGui::GetStyle().WindowPadding.x;
     ImGui::PushID(index);
+    // Ctrl+Alt in Customize Shelves grabs a widget (sliders, tiles, the colour picker): it is drawn inert and a button over
+    // it takes the press, so the field can't swallow it (Voxel Resolution and the Draw slider wouldn't move).
+    const bool grab = layout_.customize && ui::CtrlHeld() && ui::AltHeld() && item.rfind("widget.", 0) == 0 && !actions_.find(item);
+    if (grab) {
+        ImGui::BeginGroup();
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    }
     auto centre = [&](float w) {
         if (vertical) ImGui::SetCursorPosX(std::max(padX, (winW - w) * 0.5f));
     };
@@ -2681,6 +2990,18 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * s, (rowH - ImGui::GetFontSize()) * 0.5f));
         ImGui::SetNextItemWidth((vertical ? 180.0f : 120.0f) * s);
         drawDetailSlider("##dyntopo_detail");
+        ImGui::PopStyleVar();
+    } else if (item == "widget.voxel_resolution") { // the Remesh palette's Voxel Resolution slider, on a shelf (Customize Shelves)
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * s, (rowH - ImGui::GetFontSize()) * 0.5f));
+        ImGui::SetNextItemWidth((vertical ? 180.0f : 150.0f) * s);
+        drawVoxelResolution(true);
+        ImGui::PopStyleVar();
+    } else if (item == "widget.guide_strength" || item == "widget.target_quads" || item == "widget.level") {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * s, (rowH - ImGui::GetFontSize()) * 0.5f));
+        ImGui::SetNextItemWidth((vertical ? 180.0f : 150.0f) * s);
+        if (item == "widget.guide_strength") drawGuideStrength(true);
+        else if (item == "widget.target_quads") drawTargetQuads(true);
+        else drawLevelSlider(true);
         ImGui::PopStyleVar();
     } else if (item == "widget.points") {
         size_t total = 0;
@@ -2746,9 +3067,12 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         else if (item == "widget.tile.material") drawMaterialTile("##tile.material", size);
         else ImGui::Dummy(size);
     } else if (item == "widget.color") {
-        const float w = fitW(std::floor((shell_.narrow ? 60.0f : 76.0f) * s * shelfFit_[shelf]));
+        // The column's whole inside (76 px by default, 60 narrow): it follows a dragged column width (drawLeftShelfGrip).
+        // `fit` shrinks the SV square and the swatch heights only (drawColorWidget): the cells keep their width.
+        const float w = vertical ? std::floor(std::max(1.0f, winW - 2.0f * padX))
+                                 : fitW(std::floor((shell_.narrow ? 60.0f : 76.0f) * s * shelfFit_[shelf]));
         centre(w);
-        drawColorWidget(w);
+        drawColorWidget(w, vertical ? shelfFit_[shelf] : 1.0f);
     } else if (item == "widget.nav.move" || item == "widget.nav.zoom" || item == "widget.nav.rotate") {
         const float navW = fitW(44.0f * s);
         centre(navW);
@@ -2759,7 +3083,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                         shelf == kShelfRight ? std::floor(40.0f * s * shelfFit_[shelf]) : 0.0f);
     } else if (item == "widget.view_fold") {
         // The folded view toggles (rightShelfFolded_): one button, lit while any of them is on, opening their list.
-        const char* ids[] = {"view.turntable", "view.ortho", "view.floor_grid", "view.flat_shading"};
+        const char* ids[] = {"view.turntable", "view.ortho", "view.floor_grid", "view.flat_shading", "view.unlit"};
         bool anyOn = false;
         for (const char* id : ids)
             if (const Action* a = actions_.find(id); a && a->checked && a->checked()) anyOn = true;
@@ -2771,7 +3095,7 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         const ImVec2 size(fitW(44.0f * s), std::floor(40.0f * s * shelfFit_[shelf]));
         centre(size.x);
         if (drawShelfTile(*this, fold, size)) ImGui::OpenPopup("##viewfold");
-        ui::HelpText("View", nullptr, "Turntable, Orthographic, Floor grid and Flat shading: the window is too short "
+        ui::HelpText("View", nullptr, "Turntable, Orthographic, Floor grid, Flat shading and Unlit: the window is too short "
                      "to show them as buttons here, so they wait in this list.", "Right shelf");
         const ImVec2 at = ImGui::GetItemRectMin();
         ImGui::SetNextWindowPos(ImVec2(at.x - 4.0f * s, at.y), ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
@@ -2808,9 +3132,34 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         ui::HelpText("Add a brush", nullptr, "Put another brush (built-in or one of yours) on this shelf.", "Bottom shelf");
     } else if (item.rfind("brush.recipe.", 0) == 0 || item.rfind("recipe:", 0) == 0) {
         const std::string name = item.substr(item[0] == 'r' ? 7 : 13); // custom brush, by name
-        int found = -1;
-        for (int i = 0; i < int(doc_.brushes.size()); ++i)
-            if (doc_.brushes[size_t(i)].name == name) found = i;
+        // The slot's brush: by the stable id it learned (a renamed brush, a file moved to another folder), else by name.
+        const auto slotId = layout_.brushIds.find(name);
+        const std::string wantId = slotId != layout_.brushIds.end() ? slotId->second : std::string();
+        int found = findBrushForSlot(doc_, name, wantId);
+        if (found < 0) { // a slot whose brush isn't loaded: look for its file now and then (a restored, moved or copied file returns it)
+            double& tried = shelfBrushTried_[name];
+            if (ImGui::GetTime() - tried > 3.0) {
+                const bool first = tried == 0.0;
+                tried = ImGui::GetTime();
+                std::string note;
+                found = relinkBrush(doc_, name, wantId, note);
+                if (found >= 0) status_ = note;
+                else if (first) SDL_Log("%s", describeMissingSlot(doc_, name, wantId).c_str());
+            }
+        } else {
+            shelfBrushTried_.erase(name);
+        }
+        if (found >= 0) {
+            const BrushRecipe& have = doc_.brushes[size_t(found)];
+            if (have.name != name) { // renamed or case-changed: the slot follows its brush (never cleared for a name it can't find)
+                for (auto* list : {&layout_.topShelf, &layout_.leftShelf, &layout_.rightShelf, &layout_.bottomShelf})
+                    for (std::string& other : *list)
+                        if (other == item) other = item.substr(0, item.size() - name.size()) + have.name;
+                layout_.brushIds.erase(name);
+                shelfBrushTried_.erase(name);
+            }
+            if (!have.id.empty()) layout_.brushIds[have.name] = have.id; // learn it (a slot from an older version gets its id here)
+        }
         const ImVec2 size(bottomTileW_, shell::bottomShelfSize(layout_.shelfTiles).tileH * s);
         const bool clicked = ImGui::InvisibleButton((name + "##" + item).c_str(), size);
         const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
@@ -2819,13 +3168,16 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         if (ImGui::IsItemHovered()) dl->AddRectFilled(a, b, theme::u32(theme::buttonHover, 0.55f), theme::rounding(4.0f * s));
         const float capH = (fontSmall_ ? fontSmall_->FontSize : 12.0f) + 2.0f * s;
         const float pic = size.y - capH;
-        ImTextureID tex = found >= 0 ? thumbs_.recipe(doc_.brushes[size_t(found)]) : ImTextureID(0);
+        ImTextureID tex = found >= 0 ? recipeThumbnail(doc_.brushes[size_t(found)]) : ImTextureID(0);
         const ImVec2 c((a.x + b.x) * 0.5f, a.y + pic * 0.5f);
         if (tex) dl->AddImageRounded(tex, ImVec2(c.x - pic * 0.5f, a.y), ImVec2(c.x + pic * 0.5f, a.y + pic), ImVec2(0, 0), ImVec2(1, 1),
                                      IM_COL32_WHITE, theme::rounding(4.0f * s));
+        else if (found < 0) // missing: a plain "not here" mark, not a brush that looks usable
+            centredText(dl, fontSmall_, ImVec2(a.x, a.y), ImVec2(b.x, a.y + pic), theme::u32(theme::textDim), ICON_LC_CIRCLE_ALERT);
         else drawBrushIcon(dl, c, pic * 0.36f, int(BrushType::Standard));
-        dl->AddText(fontSmall_, fontSmall_ ? fontSmall_->FontSize : 12.0f, ImVec2(a.x + 2.0f * s, a.y), theme::u32(theme::accent),
-                    ICON_LC_SPARKLE);
+        if (found >= 0)
+            dl->AddText(fontSmall_, fontSmall_ ? fontSmall_->FontSize : 12.0f, ImVec2(a.x + 2.0f * s, a.y), theme::u32(theme::accent),
+                        ICON_LC_SPARKLE);
         // Its key (a brush set gives it one, #143) in the other corner, as the built-in tiles show theirs.
         const std::string chord = actions_.shortcutText(item);
         if (chord.size() == 1 && fontSmall_) {
@@ -2840,10 +3192,14 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
         } else if (clicked && found >= 0) {
             doc_.activeBrush = found;
             paintMode_ = false;
+        } else if (clicked) {
+            status_ = "The brush '" + name + "' isn't in your library (right-click the slot > Remove from shelf)";
         }
         ui::HelpText(name.c_str(), chord.empty() ? nullptr : chord.c_str(),
-                     found >= 0 && !doc_.brushes[size_t(found)].description.empty() ? doc_.brushes[size_t(found)].description.c_str()
-                                                                                   : "One of your custom brushes.",
+                     found < 0 ? "This brush isn't in your library (its file is missing). It comes back by itself if the file returns. "
+                                 "Right-click > Remove from shelf to clear the slot."
+                     : !doc_.brushes[size_t(found)].description.empty() ? doc_.brushes[size_t(found)].description.c_str()
+                                                                       : "One of your custom brushes.",
                      "Bottom shelf");
     } else if (const Action* a = actions_.find(item == "brush.paint" ? std::string("draw.paint") : item)) {
         const ui::Look look = shelf != kShelfTop ? ui::Look::Tile
@@ -2892,6 +3248,14 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
             if (index < int(list.size()) && list[size_t(index)] == item) list.erase(list.begin() + index);
             noteLayoutChanged();
         }
+        // The brush's thumbnail shows its alpha and stroke (#208): made again from the alpha file as it is now.
+        const int typeSlot = brushTypeOfAction(item);
+        const bool recipeSlot = item.rfind("brush.recipe.", 0) == 0;
+        const int recipeFound = recipeSlot ? findBrushForSlot(doc_, item.substr(13), std::string()) : -1;
+        if ((typeSlot >= 0 || recipeFound >= 0) && ImGui::MenuItem(tr("Regenerate thumbnail"))) {
+            if (typeSlot >= 0) regenerateBrushThumbnail(typeSlot);
+            else regenerateRecipeThumbnail(doc_.brushes[size_t(recipeFound)]);
+        }
         if (shelf == kShelfBottom && ImGui::BeginMenu(tr("Brush set"))) { // also the Brush palette's (#143)
             drawBrushSetMenu();
             ImGui::EndMenu();
@@ -2903,6 +3267,20 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
             ImGui::EndMenu();
         }
         ImGui::EndPopup();
+    }
+    if (grab) {
+        ImGui::PopItemFlag();
+        ImGui::EndGroup();
+        const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+        ImGui::SetCursorScreenPos(lo);
+        ImGui::InvisibleButton(("##grab." + item).c_str(), ImVec2(std::max(hi.x - lo.x, 1.0f), std::max(hi.y - lo.y, 1.0f)));
+        // The press is taken by hand: the pointer over a field the shelf draws inert would otherwise fall through to moving the
+        // shelf's window, and the drag source (which needs an active item) never began.
+        ImGuiContext& g = *ImGui::GetCurrentContext();
+        if (ImGui::IsMouseClicked(0) && ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(lo, hi) && g.ActiveId == 0) {
+            ImGui::SetActiveID(ImGui::GetItemID(), ImGui::GetCurrentWindow());
+            g.ActiveIdMouseButton = 0;
+        }
     }
     // Customize mode: widgets (sliders, tiles, readouts) are Ctrl+Alt drag sources too.
     if (item != "sep" && (!actions_.find(item) || item.rfind("brush.recipe.", 0) == 0)) { // (custom brushes have actions, #143)
@@ -2935,6 +3313,13 @@ void App::freezeLevelsAndDynamic() {
 }
 
 void App::setMaskDarkness(float k) { uiPrefs_.maskDarkness = renderSettings_.maskDarkness = std::clamp(k, 0.0f, 1.0f); }
+
+void App::setMaskColor(bool custom, const glm::vec3& srgb) {
+    uiPrefs_.maskColorCustom = custom;
+    uiPrefs_.maskColor = glm::clamp(srgb, 0.0f, 1.0f);
+    renderSettings_.maskColorCustom = custom;
+    renderSettings_.maskColor = srgbToLinear(uiPrefs_.maskColor); // (the shader blends in linear light)
+}
 
 void App::confirmLevelDelete(const std::string& command) {
     pendingLevelDelete_ = command;
@@ -3036,6 +3421,43 @@ void App::drawDynamicOffer() {
         ImGui::EndPopup();
     }
 
+    // #173 (@TheLycanFenrir): the remesh operations drop the subdivision levels: say so before they do.
+    static constexpr const char* kLevels = "##levels_confirm";
+    if (openLevelsConfirm_) {
+        openLevelsConfirm_ = false;
+        ImGui::OpenPopup(kLevels);
+    }
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopup(kLevels)) {
+        Demo::pushScope("Levels");
+        if (!doc_.mesh.multires) {
+            levelsProceed_ = nullptr;
+            ImGui::CloseCurrentPopup();
+        } else {
+            const int n = subdivLevelCount(doc_.mesh);
+            ImGui::Text(n == 1 ? tr("This drops %d subdivision level. %s keeps the level shown as one plain mesh.")
+                               : tr("This drops %d subdivision levels. %s keeps the level shown as one plain mesh."),
+                        n, tr(levelsOperation_.c_str()));
+            ImGui::TextDisabled("%s", tr("Undo brings the levels back."));
+            bool ask = !uiPrefs_.confirmRemeshLevels;
+            if (ImGui::Checkbox(tr("Don't ask again##remesh_levels"), &ask)) uiPrefs_.confirmRemeshLevels = !ask;
+            ImGui::Spacing();
+            if (ImGui::Button(tr("Freeze Levels and Proceed"))) {
+                ImGui::CloseCurrentPopup();
+                levelsConfirmed_ = true;
+                if (std::function<void()> proceed = std::exchange(levelsProceed_, nullptr)) proceed();
+                levelsConfirmed_ = false;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(tr("Cancel##remesh_levels")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                levelsProceed_ = nullptr;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        Demo::popScope();
+        ImGui::EndPopup();
+    }
+
     static constexpr const char* kPopup = "##dynamic_offer";
     if (openDynamicOffer_) {
         openDynamicOffer_ = false;
@@ -3093,7 +3515,8 @@ void App::finishShelfDrag() {
                      : shelfDrag_.shelf == kShelfRight ? layout_.rightShelf
                                                        : layout_.bottomShelf;
         if (shelfDrag_.index >= 0 && shelfDrag_.index < int(list.size())) {
-            status_ = "Removed " + list[size_t(shelfDrag_.index)] + " from the shelf";
+            status_ = "Removed " + list[size_t(shelfDrag_.index)] + " from the shelf" +
+                      (list[size_t(shelfDrag_.index)].rfind("widget.", 0) == 0 ? " - Preferences > Saving & Layouts puts it back" : "");
             list.erase(list.begin() + shelfDrag_.index);
             noteLayoutChanged();
         }
@@ -3187,6 +3610,22 @@ void App::drawHeldBrushIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, const char* icon
 
 void App::drawBrushTile(const char* id, ImVec2 size) {
     const float s = uiScale_;
+    // A Ctrl brush (Ctrl+click on a shelf brush, ModifierBrush.cpp) shows while Ctrl is held; a click opens the mask
+    // brushes, and picking one makes Ctrl mask again.
+    if (heldBrush() == HeldBrush::Mask && heldSlot() == ModifierSlot::Ctrl) {
+        const int ctrlBrush = uiPrefs_.modifierBrushes.ctrl;
+        ImVec2 a, b;
+        ui::TileLiftScope lift;
+        const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, brushLabel(BrushType(ctrlBrush)), s, a, b);
+        if (ImTextureID tex = brushThumbnail(ctrlBrush)) {
+            squareIn(a, b, 2.0f * s);
+            ImGui::GetWindowDrawList()->AddImageRounded(tex, a, b, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
+        }
+        if (clicked) openPicker(Picker::Brush, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
+        ui::HelpText("Brush", "B", "Ctrl held: the Ctrl brush (Ctrl+click a brush on the bottom shelf sets it). Click to pick "
+                     "a mask brush instead, and Ctrl masks again.", "Left shelf");
+        return;
+    }
     // Ctrl held shows the mask brush, Ctrl+Shift the selection brush; a click picks among those.
     if (const HeldBrushItem* held = heldBrushCurrent(heldBrush())) {
         ImVec2 a, b;
@@ -3195,7 +3634,7 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
         drawHeldBrushIcon(ImGui::GetWindowDrawList(), a, b, held->icon, heldBrush() == HeldBrush::Select);
         if (clicked) openPicker(Picker::Brush, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
         ui::HelpText("Brush", "B", "Ctrl held: the mask brush (Ctrl+Shift: the selection brush). Click, or press B with Ctrl "
-                     "held, to pick Mask Pen, Lasso Mask or Rectangle Mask (Select Rectangle or Select Lasso).", "Left shelf");
+                     "held, to pick Mask Pen, Lasso Mask, Rectangle Mask or Circle Mask (Select Rectangle, Lasso or Circle).", "Left shelf");
         return;
     }
     const BrushRecipe* recipe = activeRecipe();
@@ -3204,7 +3643,7 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
     ui::TileLiftScope lift;
     const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, name, s, a, b);
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    ImTextureID tex = paintMode_ || guidesMode_ ? ImTextureID(0) : recipe ? thumbs_.recipe(*recipe) : thumbs_.brush(int(brush_));
+    ImTextureID tex = paintMode_ || guidesMode_ ? ImTextureID(0) : recipe ? recipeThumbnail(*recipe) : brushThumbnail(int(brush_));
     const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
     const float r = (b.x - a.x) * 0.36f;
     if (tex) {
@@ -3294,7 +3733,8 @@ void App::drawStrokeTile(const char* id, ImVec2 size) {
     const bool clicked = tileFrame(id, size, lift.lift, fontSmall_, strokeTypeName(strokeType_), s, a, b);
     drawStrokeIcon(ImGui::GetWindowDrawList(), a, b, strokeType_);
     if (clicked) openPicker(Picker::Stroke, ImVec2(ImGui::GetItemRectMax().x + 4.0f * s, ImGui::GetItemRectMin().y));
-    ui::HelpText("Stroke", nullptr, "How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose.",
+    ui::HelpText("Stroke", nullptr, "How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose. In Slide Stamp, hold Shift "
+                 "while dragging to turn the alpha toward the cursor (Preferences > Input).",
                  "Left shelf");
 }
 
@@ -3384,6 +3824,15 @@ bool App::unhideAllows(const char* operation, std::function<void()> proceed, boo
     unhideOperation_ = operation;
     unhideProceed_ = std::move(proceed);
     openUnhideConfirm_ = true;
+    return false;
+}
+
+bool App::levelsAllow(const char* operation, std::function<void()> proceed, bool skip) {
+    if (levelsConfirmed_) return true;
+    if (skip || !doc_.mesh.multires || subdivLevelCount(doc_.mesh) == 0 || !uiPrefs_.confirmRemeshLevels) return true;
+    levelsOperation_ = operation;
+    levelsProceed_ = std::move(proceed);
+    openLevelsConfirm_ = true;
     return false;
 }
 

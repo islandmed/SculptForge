@@ -33,6 +33,7 @@ import addon_utils  # noqa: E402
 addon_utils.enable("sculptforge_bridge", default_set=True)
 import sculptforge_bridge as bridge  # noqa: E402
 from sculptforge_bridge import exchange  # noqa: E402
+from sculptforge_bridge import splats as splat_io  # noqa: E402
 
 failures = []
 
@@ -228,6 +229,110 @@ def test_vdm_exr():
               "VDM EXR: Blender's %s-bit %s EXR loads in SculptForge (max diff %g)" % (depth, codec, np.abs(got - vec).max()))
 
 
+def sample_splats(n=400, degree=3, seed=5):
+    rng = np.random.default_rng(seed)
+    q = rng.normal(size=(n, 4))
+    q /= np.linalg.norm(q, axis=1, keepdims=True)
+    return splat_io.SplatArrays(rng.normal(size=(n, 3)), q, np.exp(rng.uniform(-6, -1, (n, 3))), rng.uniform(0.02, 0.98, n),
+                                rng.normal(scale=0.4, size=(n, (degree + 1) ** 2, 3)))
+
+
+def same_splats(a, b, what, atol=2e-5):
+    ok = len(a) == len(b) and a.sh.shape == b.sh.shape
+    err = {}
+    if ok:
+        sign = np.sign(np.sum(a.rotations * b.rotations, axis=1, keepdims=True))
+        err = {"positions": np.abs(a.positions - b.positions).max(), "rotations": np.abs(a.rotations - sign * b.rotations).max(),
+               "scales": np.abs(a.scales / b.scales - 1).max(), "opacities": np.abs(a.opacities - b.opacities).max(),
+               "sh": np.abs(a.sh - b.sh).max()}
+        ok = all(v < atol for v in err.values())
+    check(ok, "%s (%s)" % (what, ", ".join("%s %.2g" % kv for kv in err.items()) if err else "sizes %s vs %s" % (a.sh.shape, b.sh.shape)))
+
+
+def test_splats():
+    import mathutils
+    path = os.path.join(ROOT, "capture.ply")
+    a = sample_splats()
+    splat_io.write_ply(path, a)
+    dot = os.path.join(ROOT, "capture.splat")
+    with open(dot, "wb") as f:
+        for i in range(5):
+            f.write(np.array([i, 0, 1, 0.1, 0.1, 0.1], dtype="<f4").tobytes() + bytes([200, 100, 50, 255, 255, 128, 128, 128]))
+    for o in bpy.data.objects:
+        o.select_set(False)
+
+    if not bridge.splats_supported():
+        print("Blender %s has no Gaussian splats: they must refuse cleanly" % bpy.app.version_string)
+        # (An operator that reports an error raises RuntimeError for a script; Blender's UI shows the report.)
+        try:
+            bpy.ops.sculptforge.import_splat(filepath=dot)
+            said = ""
+        except RuntimeError as e:
+            said = str(e)
+        check("5.3" in said, "older Blender: importing a .splat says it needs 5.3 and does nothing (%s)" % said)
+        exchange.write_manifest(exchange.inbox(ROOT), [], "test", [{"name": "Capture", "file": "r99_splats.ply"}])
+        splat_io.write_ply(os.path.join(exchange.inbox(ROOT), "r99_splats.ply"), a)
+        try:
+            bpy.ops.sculptforge.receive()
+            said = ""
+        except RuntimeError as e:
+            said = str(e)
+        check("5.3" in said and "5.3" in bridge.state.message, "older Blender: receiving splats says it needs 5.3 (%s)" % bridge.state.message)
+        bpy.context.view_layer.objects.active = None  # (send also takes the active mesh)
+        check(not bpy.ops.sculptforge.send.poll(), "older Blender: nothing selected, nothing to send, no crash")
+        return
+
+    # Blender's own import reads our PLY with the values we wrote: opacity and scale decoded, SH in its attributes.
+    m = mathutils.Matrix.Translation((1.0, -2.0, 0.5)) @ mathutils.Matrix.Rotation(0.6, 4, (1.0, 2.0, 0.5)) @ mathutils.Matrix.Scale(1.5, 4)
+    obj, replaced = bridge.import_splat_ply(bpy.context, path, "Capture", m)
+    pc = obj.data
+    print("splat attributes:", sorted((x.name, x.data_type, x.domain) for x in pc.attributes if not x.name.startswith(".")))
+    check(bridge.is_splat_object(obj) and not replaced and obj.name == "Capture", "a splat PLY imports as a Gaussian splat object")
+    check(np.allclose(np.array(obj.matrix_world), np.array(m), atol=1e-6), "the object is placed by the matrix")
+    got = bridge.splat_arrays(pc)
+    same_splats(a, got, "Blender's import and the add-on's reading of its attributes agree with the PLY")
+    for name in ("radiance:base", "rotation", "scale"):
+        attr = pc.attributes[name]
+        print("splat attribute %s: %s, element properties %s" % (name, attr.data_type, [x.identifier for x in attr.data[0].bl_rna.properties]))
+    check(not bridge.slow_reads, "the splat attributes are read in bulk, not element by element (%s)" % bridge.slow_reads)
+
+    # To SculptForge and back through the folder: nothing baked, SH degree 3 intact, the placement kept.
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    check(bpy.ops.sculptforge.send() == {"FINISHED"}, "send a splat object: " + bridge.state.message)
+    manifest = exchange.read_manifest(exchange.outbox(ROOT))
+    check([e["name"] for e in manifest.get("splats", [])] == ["Capture"] and not manifest["objects"], "manifest lists the splats")
+    obj.matrix_world = mathutils.Matrix.Identity(4)  # SculptForge's placement must come back to the object
+    sculptforge(["blender_receive", "blender_send"])
+    count = len(bpy.data.objects)
+    check(bpy.ops.sculptforge.receive() == {"FINISHED"}, "receive the splats: " + bridge.state.message)
+    check("Gaussian splats updated" in bridge.state.message, "the splat object is updated in place (%s)" % bridge.state.message)
+    obj = bpy.data.objects["Capture"]
+    check(bridge.is_splat_object(obj) and len([o for o in bpy.data.objects if bridge.is_splat_object(o)]) == 1, "still one splat object")
+    check(np.allclose(np.array(obj.matrix_world), np.array(m), atol=1e-5), "its placement came back (max error %.2g)" %
+          np.abs(np.array(obj.matrix_world) - np.array(m)).max())
+    same_splats(a, bridge.splat_arrays(obj.data), "splats through SculptForge: positions, scales, rotations, opacity, SH")
+    for extra in [o for o in bpy.data.objects if o.name != "Capture" and o.name not in ("Box", "Disc ü", "Suzanne", "Extra", "Head", "Eyes")]:
+        bpy.data.objects.remove(extra)
+
+    # Export (Blender cannot): as stored, and placed by the object.
+    out = os.path.join(ROOT, "out.ply")
+    obj.select_set(True)
+    check(bpy.ops.sculptforge.export_splats(filepath=out, world_space=False) == {"FINISHED"}, "export Gaussian Splats (.ply)")
+    same_splats(a, splat_io.read_ply(out), "exported PLY holds the splats as they are")
+    check(bpy.ops.sculptforge.export_splats(filepath=out, world_space=True) == {"FINISHED"}, "export applying the object transform")
+    placed = splat_io.read_ply(out)
+    world = np.array(m)[:3, :3] @ a.positions.astype(np.float64).T + np.array(m)[:3, 3:4]
+    check(np.abs(placed.positions - world.T).max() < 1e-4 and placed.sh.shape == a.sh.shape, "exported world-space positions; turned splats keep every SH band")
+
+    # Dropping a .splat file: its handler's operator.
+    check(bpy.ops.sculptforge.import_splat(filepath=dot) == {"FINISHED"}, "import a .splat file")
+    dropped = bpy.data.objects.get("capture")
+    check(dropped is not None and bridge.is_splat_object(dropped) and len(dropped.data.attributes["position"].data) == 5, ".splat becomes a splat object")
+    check(dropped is not None and np.allclose(bridge.splat_arrays(dropped.data).positions[3], (3, 0, 1), atol=1e-6), ".splat positions")
+
+
 def main():
     check(bridge.prefs() is not None, "add-on enabled with its preferences")
     # No real SculptForge here: never start one.
@@ -294,6 +399,7 @@ def main():
     sculptforge(["blender_receive", "blender_send"])
     bpy.ops.sculptforge.receive()
     check(not box.modifiers["Bevel"].show_viewport, "the applied modifier is turned off")
+    bridge.prefs().modifiers = "PRESERVE"  # (Apply sends the evaluated mesh without its shape keys: the shape key checks below send live)
 
     # Facial shapes: SculptForge's sculpt layers arrive as shape keys with their names (the 52 ARKit ones).
     sculptforge(["new_head", "face_shapes_generate", "face_weights json={\"jawOpen\":0.25}", "blender_send"])
@@ -311,6 +417,35 @@ def main():
     check(eyes is not None and eyes.data.shape_keys is not None and "eyeLookUpLeft" in eyes.data.shape_keys.key_blocks,
           "Eyes: eyeLook shape keys")
 
+    # And back the other way: Blender's shape keys (an edited jawOpen, a new key with a name that needs care) go to
+    # SculptForge as sculpt layers and come back as the same keys: names, order, values and offsets.
+    if len(keys) == 53:
+        edit = head.data.shape_keys.key_blocks["jawOpen"]
+        co = arr(edit.data, "co", 3)
+        co[:, 2] += 0.001 * np.sin(np.arange(len(co)))
+        edit.data.foreach_set("co", np.ascontiguousarray(co, dtype=np.float32).ravel())
+        extra = head.shape_key_add(name="Brow Up #2 \u00fc", from_mix=False)
+        co2 = arr(keys[0].data, "co", 3)
+        co2[::7, 1] += 0.01
+        extra.data.foreach_set("co", np.ascontiguousarray(co2, dtype=np.float32).ravel())
+        extra.value = 0.4
+        head.data.update()
+        want = [(k.name, k.value, arr(k.data, "co", 3).copy()) for k in head.data.shape_keys.key_blocks]
+        bpy.ops.object.select_all(action="DESELECT")
+        head.select_set(True)
+        bpy.context.view_layer.objects.active = head
+        check(bpy.ops.sculptforge.send() == {"FINISHED"}, "send the head with its shape keys")
+        sculptforge(["blender_receive", "blender_send"])
+        check(bpy.ops.sculptforge.receive() == {"FINISHED"}, "receive the head again: " + bridge.state.message)
+        check("shape key" in bridge.state.message, "the shape keys came back with the mesh: " + bridge.state.message)
+        got = [(k.name, k.value, arr(k.data, "co", 3).copy()) for k in head.data.shape_keys.key_blocks]
+        check([w[0] for w in want] == [g[0] for g in got], "shape keys round trip: the same names in the same order")
+        if len(want) == len(got):
+            check(all(abs(w[1] - g[1]) < 1e-6 for w, g in zip(want, got)), "shape keys round trip: the same values")
+            err = max(np.abs(w[2] - g[2]).max() for w, g in zip(want, got))
+            check(err < 1e-5, "shape keys round trip: points within 1e-5 (%.3g)" % err)
+
+    test_splats()
     test_classic_keys()
     test_vdm_exr()
 

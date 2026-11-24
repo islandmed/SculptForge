@@ -4,9 +4,12 @@
 // #78: per-brush settings (core/BrushSettings.h). Each brush keeps its own size, intensity, falloff, stroke and alpha
 // in the session; Save Brush Settings writes them for the next start; Reset Brush to Default gives the shipped values.
 #include "TestHarness.h"
+#include "GeomInvariants.h"
 
 #include "core/BrushRecipe.h"
+#include "core/BVH.h"
 #include "core/BrushSettings.h"
+#include "core/Primitives.h"
 #include "core/Sculpt.h"
 
 #include <cstdio>
@@ -190,4 +193,131 @@ TEST(brush_recipe_pen_pressure) {
     CHECK(Json::parse(R"({"name":"Old","depth":0.3,"penPressureSize":"sideways"})", j, err));
     const BrushRecipe old = BrushRecipe::fromJson(j);
     CHECK(old.pressureSize == PenPressure::Global && old.pressureStrength == PenPressure::Global);
+}
+
+// Save Brush Settings must hand the next start exactly what was saved: every value bit for bit (a value the file rounds
+// would make the brush feel different after a restart), and a dab with the reloaded settings must move the surface exactly
+// as the dab with the originals did, on a curved mesh.
+TEST(brush_settings_save_load_invariant_same_values_same_dab) {
+    const std::string path = tempPath("sf_brush_settings_invariant.json");
+    std::remove(path.c_str());
+    BrushSettingsStore store;
+    BrushToolSettings s; // awkward values: none of them is a short decimal
+    s.radiusPx = 33.333333f;
+    s.strength = 0.123456789f;
+    s.focal = -0.37294711f;
+    s.rgbIntensity = 0.7071068f;
+    s.sprayScatter = 1.7320508f;
+    s.lazyRadius = 41.2345678f;
+    s.stroke = StrokeType::Spray;
+    s.alphaOptions.angle = 17.123457f;
+    store.store("custom:Round Trip", s);
+    std::string err;
+    CHECK(store.save(path, err) && err.empty());
+    BrushSettingsStore loaded;
+    CHECK(loaded.load(path, err));
+    BrushToolSettings got;
+    CHECK(loaded.savedFor("custom:Round Trip", got));
+    CHECK(got == s); // exact float equality, every field
+    CHECK(got.radiusPx == s.radiusPx && got.strength == s.strength && got.focal == s.focal);
+
+    auto dabbed = [](const BrushToolSettings& b) {
+        Document d;
+        d.mesh = makeIcosphere(5);
+        BVH bvh;
+        bvh.build(d.mesh);
+        Sculptor sculptor;
+        sculptor.beginStroke(d.mesh, "dab");
+        DabParams p;
+        p.center = glm::vec3(0.0f, 0.0f, 1.0f);
+        p.viewDir = glm::vec3(0.0f, 0.0f, -1.0f);
+        p.radius = b.radiusPx * 0.01f;
+        p.strength = b.strength;
+        p.focal = b.focal;
+        sculptor.dab(d.mesh, bvh, BrushType::Clay, p, Symmetry{});
+        return d.mesh.positions;
+    };
+    const auto original = dabbed(s), reloaded = dabbed(got);
+    CHECK(original.size() == reloaded.size());
+    bool same = original.size() == reloaded.size();
+    bool moved = false;
+    const Mesh rest = makeIcosphere(5);
+    for (size_t v = 0; same && v < original.size(); ++v) {
+        same = original[v] == reloaded[v];
+        moved = moved || original[v] != rest.positions[v];
+    }
+    CHECK(same && moved); // identical, and the dab did something
+    std::remove(path.c_str());
+}
+
+TEST(brush_settings_peek_shows_what_a_brush_has_now) {
+    // The brush thumbnails (#208) read a brush's alpha and stroke without switching to it: this session's values, else
+    // the saved ones, else nothing.
+    BrushSettingsStore store;
+    const std::string a = brushSettingsKey("", "Moss"), b = brushSettingsKey("", "Bark");
+    BrushToolSettings out;
+    CHECK(!store.peek(a, out));
+    BrushToolSettings saved;
+    saved.alphaName = "Scales";
+    saved.stroke = StrokeType::DragRect;
+    store.store(a, saved);
+    CHECK(store.peek(a, out) && out == saved);
+    BrushToolSettings live; // a switch away from Bark stores its live values for the session
+    live.alphaName = "Pores";
+    store.switchBrush(b, a, live);
+    CHECK(store.peek(b, out) && out.alphaName == "Pores");
+    BrushToolSettings edited = saved; // the session's values win over the saved ones
+    edited.alphaName = "Rivets";
+    store.switchBrush(a, b, edited);
+    CHECK(store.peek(a, out) && out.alphaName == "Rivets");
+    store.reset(a);
+    CHECK(!store.peek(a, out));
+}
+
+// Geometric invariant (PathStroke::alphaAngle, #208): the angle turns the alpha on the surface and nothing else, on a
+// dense curved mesh. Zero is the stroke as before; a square alpha is the same after a quarter turn (the stamp is 4-fold
+// symmetric); an asymmetric one lands differently after a half turn but adds the same amount of clay, with no spikes,
+// folds or non-finite points.
+namespace {
+
+std::vector<glm::vec3> strokeWith(const char* alpha, float angle, bool setAngle, double* volume) {
+    Document d = geom::denseSphere();
+    BrushAlpha::builtin(alpha, d.brushAlpha);
+    PathStroke st;
+    st.points = {glm::vec3(0.25f, 0.1f, 3.0f), glm::vec3(-0.25f, -0.1f, 3.0f)};
+    st.view = glm::vec3(0.0f, 0.0f, -1.0f);
+    st.radius = 0.3f;
+    st.strength = 0.8f;
+    st.curve = false;
+    if (setAngle) st.alphaAngle = angle;
+    std::string err;
+    CHECK(strokePath(d, nullptr, BrushType::Standard, st, err) > 0);
+    CHECK(geom::nonFinite(d.mesh) == 0);
+    if (volume) *volume = meshVolume(d.mesh);
+    return d.mesh.positions;
+}
+
+float differs(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>& b) {
+    float most = 0.0f;
+    for (size_t i = 0; i < a.size() && i < b.size(); ++i) most = std::max(most, glm::length(a[i] - b[i]));
+    return most;
+}
+
+} // namespace
+
+TEST(path_stroke_alpha_angle_invariant) {
+    const auto plain = strokeWith("Square", 0.0f, false, nullptr);
+    const auto zero = strokeWith("Square", 0.0f, true, nullptr);
+    CHECK(differs(plain, zero) == 0.0f); // (angle 0 is the stroke as it was)
+    const auto quarter = strokeWith("Square", 1.5707963f, true, nullptr);
+    CHECK(differs(zero, quarter) < 0.004f); // 4-fold symmetric alpha: a quarter turn is the same mark
+    double v0 = 0.0, v1 = 0.0;
+    const auto a = strokeWith("Wrinkles", 0.0f, true, &v0);
+    const auto b = strokeWith("Wrinkles", 3.1415927f, true, &v1);
+    CHECK(differs(a, b) > 0.002f);                 // an asymmetric alpha lands differently...
+    CHECK(std::abs(geom::volumeChange(v0, v1)) < 0.002); // ...adds the same clay...
+    Document before = geom::denseSphere();
+    Mesh turned = before.mesh;
+    turned.positions = b;
+    CHECK(geom::flippedFaces(before.mesh.positions, turned) == 0); // ...and tears nothing
 }

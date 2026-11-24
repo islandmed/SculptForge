@@ -1,5 +1,12 @@
 # Face Groups and visibility
 
+![Two sculpted heads](images/shading.jpg)
+
+> **In short:**
+> - Face groups divide a Part's surface into named, coloured regions.
+> - Use them to hide and isolate areas, build masks and split a model into Parts.
+> - **Groups** on the right shelf shows them; **Tool > Face Groups** makes them.
+
 Face Groups (experienced sculptors: Face groups) divide a Part's surface into named regions, shown as flat colours when you turn them on. You use
 them to hide and isolate parts of a model so you can reach what you want to sculpt, to build masks, and to
 split a model into Parts. This chapter covers creating face groups, the <kbd>Ctrl</kbd>+<kbd>Shift</kbd>
@@ -60,13 +67,13 @@ macOS):
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd> + click a face group | Hide that group. |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click the background | Show everything. |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + drag a rectangle on the background, around nothing | Reverse the visibility. |
-| <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + drag | Keep what's inside the rectangle (or lasso), hide the rest. The shape is drawn green. |
-| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd> + drag | Hide what's inside the rectangle (or lasso). The shape is drawn red. |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + drag | Keep what's inside the rectangle (lasso or circle), hide the rest. The shape is drawn green. |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd> + drag | Hide what's inside the rectangle (lasso or circle). The shape is drawn red. |
 
-Whether a drag draws a rectangle or a lasso is set by **Select Rectangle** and **Select Lasso** at the top of
+Whether a drag draws a rectangle, a lasso or a circle is set by **Select Rectangle**, **Select Lasso** and **Select Circle** at the top of
 **Tool > Visibility** (Select Rectangle by default), or, with <kbd>Ctrl</kbd>+<kbd>Shift</kbd> held: the
 left shelf then shows the selection brush, and clicking the brush tile (or pressing <kbd>B</kbd>) or the stroke tile
-picks **Select Rectangle** or **Select Lasso**. With **Select Lasso**, the drag traces a free-hand outline that
+picks **Select Rectangle**, **Select Lasso** or **Select Circle**. With **Select Circle**, the press is the centre and the cursor sets the width and height (let go of <kbd>Shift</kbd> mid-drag for a perfect circle; **Draw from corner** and **Keep round** are under the buttons). With **Select Lasso**, the drag traces a free-hand outline that
 closes back to where you started; drag around a part as if you were drawing round it with a pen. The drag can
 start on the model or on the background.
 
@@ -88,7 +95,7 @@ Open **Tool > Visibility**:
 
 | Control | What it does | Command |
 |---|---|---|
-| **Select Rectangle** / **Select Lasso** | The shape <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + drag draws: a rectangle or a free-hand lasso. | `hide_rect` / `hide_lasso` |
+| **Select Rectangle** / **Select Lasso** / **Select Circle** | The shape <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + drag draws: a rectangle, a free-hand lasso or a circle (sent as a lasso). | `hide_rect` / `hide_lasso` |
 | **Show all** | Show every hidden part again. Available when something is hidden. | `show_all` |
 | **Invert visible** | Hide what is visible and show what is hidden. | `invert_visibility` |
 | **Remove Hidden** | Permanently remove the hidden triangles from the mesh. Undoable. | `delete_hidden` |

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Forge Spheres - SculptForge User Guide</title>
-  <meta name="description" content="Forge Spheres (experienced sculptors: Forge Spheres) block out an organic base mesh from connected spheres: start from one root sphere, grow a torso, a head, limbs, fingers, a tail or branches from it, set the proportions, look at the skin over them, then turn it into a mesh you sculpt as usual. It ">
+  <meta name="description" content="In short:">
   <meta name="theme-color" content="#111114">
   <meta name="color-scheme" content="dark">
   <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon-32.png?v=7">
@@ -13,15 +13,16 @@
   <link rel="canonical" href="https://sculptforge.app/guide/forge-spheres.html">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Forge Spheres - SculptForge User Guide">
-  <meta property="og:description" content="Forge Spheres (experienced sculptors: Forge Spheres) block out an organic base mesh from connected spheres: start from one root sphere, grow a torso, a head, limbs, fingers, a tail or branches from it, set the proportions, look at the skin over them, then turn it into a mesh you sculpt as usual. It ">
+  <meta property="og:description" content="In short:">
   <meta property="og:image" content="https://sculptforge.app/img/social-preview.png?v=5">
   <meta property="og:url" content="https://sculptforge.app/guide/forge-spheres.html">
-  <link rel="stylesheet" href="../style.css?v=35">
-  <script src="../motion.js?v=12" defer></script>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="../style.css?v=44">
+  <script src="../motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
-  <script src="search-index.js?v=54" defer></script>
+  <script src="search-index.js?v=60" defer></script>
 </head>
-<body class="guide-page" data-prev="garments.html" data-next="tube.html">
+<body class="guide-page" data-section="sculpt" data-prev="garments.html" data-next="tube.html">
   <div class="scroll-progress" aria-hidden="true"></div>
   <header class="nav">
     <div class="wrap nav-inner">
@@ -30,10 +31,15 @@
         <a href="../index.html#features">Features</a>
         <a href="../index.html#demos">Demos</a>
         <a href="../brushes.html">Brushes</a>
-        <a href="index.html" aria-current="page">Guide</a>
+        <a href="../guide/index.html" aria-current="page">Guide</a>
+        <a href="../studios.html">For studios</a>
+        <a href="../why.html">About</a>
+        <a href="../labs/index.html">Labs</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
+        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></span>
+        <a class="nav-support" href="../support.html">Support</a>
         <a class="nav-dl" href="../index.html#download">Download</a>
-        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
-        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
       </nav>
     </div>
   </header>
@@ -46,28 +52,56 @@
           <input type="search" id="guide-q" placeholder="Search the guide" aria-label="Search the guide" autocomplete="off">
           <div class="search-results" id="guide-results" hidden></div>
         </div>
-        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html">Your first sculpt in 10 minutes</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="quick-tour.html">Quick tour for experienced sculptors</a></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li></ul><p class="toc-group">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="brush-packs.html">Brush packs</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="linked-duplicates.html">Linked Duplicates</a></li><li><a href="garments.html">Garments: sewing patterns at real size</a></li><li><a href="forge-spheres.html" class="current" aria-current="page">Forge Spheres</a><ul class="toc-sections"><li><a href="#make-a-forge-sphere-part">Make a Forge Sphere Part</a></li><li><a href="#edit-the-spheres">Edit the spheres</a></li><li><a href="#pointer-only">Pointer only</a></li><li><a href="#preview-the-skin">Preview the skin</a></li><li><a href="#make-mesh">Make Mesh</a></li><li><a href="#scripting">Scripting</a></li></ul></li><li><a href="tube.html">Tube: draw in 3D space</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="edges.html">Edges: selecting and creasing edges</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html">Cut: line, lasso, rectangle and polyline</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and Bridge</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li><li><a href="security.html">Security overview for IT reviews</a></li></ul><p class="toc-group">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="discord.html">Show SculptForge on Discord</a></li></ul></nav>
+        <nav class="toc" aria-label="User guide"><a class="toc-home" href="index.html">Contents</a><p class="toc-group" data-section="start">Getting started</p><ul><li><a href="welcome.html">Welcome to SculptForge</a></li><li><a href="first-sculpt.html">Your first sculpt in 10 minutes</a></li><li><a href="whats-new.html">What&#x27;s new</a></li><li><a href="quick-tour.html">Quick tour for experienced sculptors</a></li><li><a href="installing.html">Install SculptForge on Windows, macOS and Linux</a></li><li><a href="interface.html">The interface</a></li><li><a href="navigation.html">Navigating the view</a></li><li><a href="reference-images.html">Reference images</a></li></ul><p class="toc-group" data-section="sculpt">Sculpting</p><ul><li><a href="sculpting.html">Sculpting and brushes</a></li><li><a href="brush-lab.html">Brush Lab and sharing brushes</a></li><li><a href="brush-packs.html">Brush packs</a></li><li><a href="masking.html">Masking</a></li><li><a href="face-groups.html">Face Groups and visibility</a></li><li><a href="selection-sets.html">Selection sets and morph targets</a></li><li><a href="parts.html">Parts</a></li><li><a href="linked-duplicates.html">Linked Duplicates</a></li><li><a href="garments.html">Garments: sewing patterns at real size</a></li><li><a href="forge-spheres.html" class="current" aria-current="page">Forge Spheres</a><ul class="toc-sections"><li><a href="#make-a-forge-sphere-part">Make a Forge Sphere Part</a></li><li><a href="#edit-the-spheres">Edit the spheres</a></li><li><a href="#moving-spheres">Moving spheres</a></li><li><a href="#pointer-only">Pointer only</a></li><li><a href="#preview-the-skin">Preview the skin</a></li><li><a href="#make-mesh">Make Mesh</a></li><li><a href="#scripting">Scripting</a></li></ul></li><li><a href="tube.html">Tube: draw in 3D space</a></li><li><a href="vertex-paint.html">Vertex Paint and materials</a></li><li><a href="texture-painting.html">Texture painting</a></li><li><a href="uv-editor.html">UV Editor</a></li><li><a href="pbr-painting.html">Material painting (PBR)</a></li><li><a href="fill-layers.html">Fill layers, Mesh Maps and Material Recipes</a></li><li><a href="layers.html">Sculpt layers and blend shapes</a></li><li><a href="facial-shapes.html">Facial shapes and live face</a></li><li><a href="subdivision-levels.html">Subdivision levels</a></li><li><a href="edges.html">Edges: selecting and creasing edges</a></li><li><a href="micro-levels.html">Micro levels: hundreds of millions of polygons</a></li><li><a href="dynamic-topology.html">Dynamic topology</a></li><li><a href="timeline.html">Sculpt Timeline and timelapse</a></li><li><a href="gizmo.html">Moving, rotating and posing (Gizmo)</a></li><li><a href="geometry.html">Subdivide, remesh, decimate and LODs</a></li><li><a href="cut.html">Cut: line, lasso, rectangle, circle and polyline</a></li><li><a href="retopology.html">Quad retopology and detail projection</a></li></ul><p class="toc-group" data-section="ai">AI and capture</p><ul><li><a href="generate-3d.html">Image and text to 3D</a></li><li><a href="splats.html">Gaussian splats</a></li><li><a href="scan-to-splat.html">Scan an object into a splat</a></li><li><a href="scan-to-sculptable.html">From scan to sculptable mesh</a></li><li><a href="phone-capture.html">Phone capture and AR</a></li></ul><p class="toc-group" data-section="files">Files and pipelines</p><ul><li><a href="baking.html">Baking normal and displacement maps</a></li><li><a href="exporting.html">Exporting, Unreal and Bridge</a></li><li><a href="render-bridge.html">Render with your renderer</a></li><li><a href="export-presets.html">Export presets</a></li><li><a href="blender.html">Working with Blender</a></li><li><a href="maya.html">Working with Maya</a></li><li><a href="projects.html">Projects, autosave and snapshots</a></li><li><a href="scripting.html">Scripting and automation</a></li><li><a href="python.html">Python scripting</a></li><li><a href="python-package.html">The Python package</a></li><li><a href="packs-and-macros.html">Packs and macros</a></li><li><a href="studios.html">SculptForge for studios</a></li><li><a href="security.html">Security overview for IT reviews</a></li></ul><p class="toc-group" data-section="ref">Reference</p><ul><li><a href="shortcuts.html">Keyboard and mouse</a></li><li><a href="performance.html">Performance and big meshes</a></li><li><a href="troubleshooting.html">Troubleshooting: tablets, display, crashes and FAQ</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="discord.html">Show SculptForge on Discord</a></li><li><a href="forge-deck.html">Forge Deck (prototype)</a></li><li><a href="support.html">Support and membership</a></li></ul></nav>
       </div>
     </div>
     <main class="guide-main" id="top">
       <article class="guide-article">
 <h1 id="forge-spheres">Forge Spheres</h1>
+<figure class="guide-hero"><img src="images/wn-0120-pose.jpg" alt="A posed figure sculpted in SculptForge" width="600" height="340" decoding="async"></figure>
+<aside class="callout callout-short"><p><strong>In short:</strong></p><ul><li>Block out a base mesh from connected spheres: torso, head, limbs, tail.</li><li><strong>Preview</strong> (<kbd>A</kbd>) shows the skin over the spheres.</li><li><strong>Make Mesh</strong> turns the skin into a new Part you sculpt as usual.</li></ul></aside>
 <p>Forge Spheres (experienced sculptors: Forge Spheres) block out an organic base mesh from connected spheres: start from one root sphere, grow a torso, a head, limbs, fingers, a tail or branches from it, set the proportions, look at the skin over them, then turn it into a mesh you sculpt as usual. It is the quickest way to get the structure of a character or creature before any detail.</p>
 <h2 id="make-a-forge-sphere-part">Make a Forge Sphere Part<a class="anchor" href="#make-a-forge-sphere-part" aria-label="Link to this section">#</a></h2>
-<p><strong>Tool &gt; Forge Spheres &gt; New Forge Sphere</strong> adds a Forge Sphere Part holding one root sphere at the centre and makes it active. It sits in the Parts list like any other Part, so you can block out a creature next to a model you already have.</p>
+<p><span class="path"><span>Tool</span><i>&#8250;</i><span>Forge Spheres</span><i>&#8250;</i><span>New Forge Sphere</span></span> adds a Forge Sphere Part holding one root sphere at the centre and makes it active. It sits in the Parts list like any other Part, so you can block out a creature next to a model you already have.</p>
 <p>While a Forge Sphere Part is active, dragging on it edits the spheres instead of sculpting. Dragging the background still navigates. The brush ring is hidden; the sphere under the cursor gets an outline instead.</p>
 <h2 id="edit-the-spheres">Edit the spheres<a class="anchor" href="#edit-the-spheres" aria-label="Link to this section">#</a></h2>
-<p>Pick the mode in <strong>Tool &gt; Forge Spheres</strong>:</p>
-<div class="table-wrap"><table><thead><tr><th>Mode</th><th>On a sphere</th><th>On a link</th></tr></thead><tbody><tr><td><strong>Draw</strong></td><td>Drag to grow a new sphere from it. It starts on the surface where you pressed; how far you drag sets its size (a click makes one half the size of its parent)</td><td>Click to add a joint halfway along the link, and drag to place it</td></tr><tr><td><strong>Move</strong></td><td>Drag to move it across the screen. The links stretch to follow</td><td>Moves the sphere at the end of the link</td></tr><tr><td><strong>Scale</strong></td><td>Drag up or right to make it bigger, down or left to make it smaller</td><td>Scales the sphere at the end of the link</td></tr></tbody></table></div>
+<p><strong>Draw</strong> (the default) does all three without switching modes (#167):</p>
+<ul>
+<li>
+<strong>Click</strong> a sphere to grow a new one from it, half its size, on the surface where you clicked.
+</li>
+<li>
+<strong>Drag</strong> a sphere&#x27;s middle to move it.
+</li>
+<li>
+<strong>Drag its very edge</strong> (a thin rim inside the outline, which thickens when the pointer is on it) to resize it: the edge follows the cursor. A sphere drawn small on screen has no rim, so all of it moves; zoom in or use <strong>Scale</strong> to resize it.
+</li>
+</ul>
+<p>The cursor and a small tag beside it (<em>drag: move</em>, <em>drag: resize</em>) show what a drag will do before you press. The <strong>Move</strong> and <strong>Scale</strong> modes are still there in <span class="path"><span>Tool</span><i>&#8250;</i><span>Forge Spheres</span></span> for when you want one action only:</p>
+<div class="table-wrap"><table><thead><tr><th>Mode</th><th>On a sphere</th><th>On a link</th></tr></thead><tbody><tr><td><strong>Draw</strong></td><td>Click to grow a new sphere; drag the middle to move it, the edge to resize it</td><td>Click to add a joint halfway along the link, and drag to place it</td></tr><tr><td><strong>Move</strong></td><td>Drag to move it across the screen at its depth. The links stretch to follow</td><td>Moves the sphere at the end of the link</td></tr><tr><td><strong>Scale</strong></td><td>Drag up or right to make it bigger, down or left to make it smaller</td><td>Scales the sphere at the end of the link</td></tr></tbody></table></div>
 <p>In every mode, <kbd>Alt</kbd>+click a sphere to delete it together with everything that grows from it. The root sphere (orange) always stays.</p>
 <p><strong>Symmetry</strong> (<kbd>X</kbd>) mirrors every edit: grow an arm on the right and the left one grows with it, move a leg and its twin moves too. A sphere on the centre line stays on it, and a new sphere placed closer to the centre line than its own radius snaps onto it as one sphere instead of two overlapping twins.</p>
+<h2 id="moving-spheres">Moving spheres<a class="anchor" href="#moving-spheres" aria-label="Link to this section">#</a></h2>
+<p>A dragged sphere stays under the pointer at its depth in the view (it doesn&#x27;t drift nearer or farther as it crosses the screen), and follows the pointer as smoothly on a long tail or many fingers as on a few spheres. Three ways to control where it goes, in Draw and Move alike:</p>
+<ul>
+<li>
+Hold <kbd>Shift</kbd> while you drag to swing the sphere around the sphere it grows from: its link keeps its length, so you can aim a limb or bend a tail joint without changing its proportions. Press or let go of Shift in the middle of a drag; the sphere goes on from where it is.
+</li>
+<li>
+<strong>Snap to Surface</strong> (Tool &gt; Forge Spheres): a moved sphere&#x27;s centre lands on the surface of the sphere under the pointer, half sunk in, as a new sphere is. Use it to seat a head or a limb on the body. Off every other sphere, it moves at its depth as usual.
+</li>
+<li>
+<strong>Move Branch</strong> (Tool &gt; Forge Spheres): everything that grows from the moved sphere comes along and keeps its shape: drag a leg and its foot follows, drag the body and the whole figure moves.
+</li>
+</ul>
+<p>With Symmetry on, the twin follows every move live.</p>
 <p>Every drag is one step of the Part&#x27;s undo history, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes back the last sphere you added, moved or scaled.</p>
-<aside class="callout callout-tip"><p><strong>Tip:</strong> build the structure first with few spheres (one per joint), set the proportions with Move and Scale, and add joints on links only where a limb needs to bend or swell.</p></aside>
+<aside class="callout callout-tip"><p><strong>Tip:</strong> build the structure first with few spheres (one per joint), drag them into place and size in Draw, and add joints on links only where a limb needs to bend or swell.</p></aside>
 <h2 id="pointer-only">Pointer only<a class="anchor" href="#pointer-only" aria-label="Link to this section">#</a></h2>
 <p>Everything also works with the pointer alone, without a key held (#8):</p>
 <ul>
 <li>
-<strong>Drag places child</strong>: with it on, a Draw drag on a sphere makes a new sphere half its size and moves it away from its parent as you drag, so one drag places the next joint of a limb. With it off, hold <kbd>Ctrl</kbd> while you drag for the same.
+<strong>Drag places child</strong>: with it on, a Draw drag on a sphere makes a new sphere half its size and moves it away from its parent as you drag (instead of moving the sphere), so one drag places the next joint of a limb. With it off, hold <kbd>Ctrl</kbd> while you drag for the same.
 </li>
 <li>
 <strong>The selected sphere</strong>: the sphere you last clicked or added is outlined in orange. <strong>Delete Selected</strong> deletes it and everything growing from it, <strong>Insert Between</strong> adds a joint halfway to the sphere it grows from, and <strong>Set as Root</strong> makes it the root: the armature keeps its shape and links and grows from there, so the skin doesn&#x27;t change.
@@ -105,7 +139,7 @@ forgesphere_make_mesh resolution=160</code></pre><button class="copy" type="butt
       <p class="guide-meta fine">Also in the app: <strong>Help &gt; User Guide</strong> (<kbd>Shift</kbd>+<kbd>F1</kbd>).
         Found a mistake? <a href="https://github.com/islandmed/SculptForge/edit/main/docs/guide/forge-spheres.md">Edit this page on GitHub</a>.</p>
     </main>
-    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#make-a-forge-sphere-part">Make a Forge Sphere Part</a></li><li><a href="#edit-the-spheres">Edit the spheres</a></li><li><a href="#pointer-only">Pointer only</a></li><li><a href="#preview-the-skin">Preview the skin</a></li><li><a href="#make-mesh">Make Mesh</a></li><li><a href="#scripting">Scripting</a></li></ul></aside>
+    <aside class="on-page" aria-label="On this page"><p>On this page</p><ul><li><a href="#make-a-forge-sphere-part">Make a Forge Sphere Part</a></li><li><a href="#edit-the-spheres">Edit the spheres</a></li><li><a href="#moving-spheres">Moving spheres</a></li><li><a href="#pointer-only">Pointer only</a></li><li><a href="#preview-the-skin">Preview the skin</a></li><li><a href="#make-mesh">Make Mesh</a></li><li><a href="#scripting">Scripting</a></li></ul></aside>
   </div>
   <footer class="footer">
     <div class="wrap footer-grid">
@@ -116,12 +150,14 @@ forgesphere_make_mesh resolution=160</code></pre><button class="copy" type="butt
       </div>
       <div class="links">
         <a href="../performance/">Performance</a>
+        <a href="../labs/index.html">Labs</a>
         <a href="index.html">User guide</a>
         <a href="../supporters.html">Members</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
         <a href="https://github.com/islandmed/SculptForge/issues">Report a problem</a>
         <a href="https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md">AI services &amp; privacy</a>
+        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="../img/social.svg#facebook"/></svg></a></div>
       </div>
       <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners.</p>
     </div>

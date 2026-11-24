@@ -1,0 +1,118 @@
+# Right shelf with the console open, classic layout.
+# The right shelf with the console open (member report, macOS Retina): its layout must not change between frames when
+# nothing is touched. It jittered up and down: folding the view toggles and growing the buttons back fed each other at
+# some heights. Sweeps the UI scale (a 1512x982 logical window on a Retina display, the member's) in small steps; each must settle and hold still.
+pixel_density 200
+run ui_look look=forge layout=classic
+run new_sphere subdivisions=4
+wait 0.5
+key f3
+type "##Command palette" "layer set weight"
+key enter
+expect_value console_open == 1
+ui_scale 100
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 105
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 110
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 115
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 120
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 125
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 130
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 135
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 140
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 145
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 150
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 155
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 160
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 165
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 170
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 175
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 180
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 185
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 190
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 195
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+ui_scale 200
+wait 0.6
+remember right_shelf_changes c
+wait 0.5
+expect_value right_shelf_changes == $c
+shot console-open

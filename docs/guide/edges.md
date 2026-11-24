@@ -1,5 +1,12 @@
 # Edges: selecting and creasing edges
 
+![A detailed sculpture](images/wn-0120-plugins.jpg)
+
+> **In short:**
+> - **Tool > Geometry > Edges** selects edges one by one, as loops, borders or by angle.
+> - Creases on selected edges keep rims and corners sharp when you subdivide.
+> - Edges are picked on the base level (Level 1).
+
 **Tool > Geometry > Edges** selects edges of a Part's base mesh: one by one, as whole edge loops, along open
 borders, or every hard edge at once by the angle between its faces. The selection is what edge creases are set
 on, so a subdivided model keeps a sharp rim, a crisp panel line or a hard corner where you want one.
@@ -73,11 +80,12 @@ sculpted detail along. With no creases subdivision is exactly what it was.
 ### Exporting creases
 
 **File > Export USD / USDZ** writes the creases of the level you export: each creased edge as a two-point crease
-(`creaseIndices`, `creaseLengths`, `creaseSharpnesses`, with the same sharpness, 10 = sharp on every level), and
-sets `subdivisionScheme` to Catmull-Clark (Loop for a mesh of triangles), so other apps subdivide the cage the same
-way. Exporting a higher level writes what is left of the creases on its edges; the top level has none. A plain
-mesh without creases is written as before (`none`). Opening a USD file reads its creases back onto the base, in
-chains or one edge at a time, from any app.
+(`creaseIndices`, `creaseLengths`, `creaseSharpnesses`, with the same sharpness, 10 = sharp on every level), and sets
+`subdivisionScheme` to Catmull-Clark (Loop for a mesh of triangles), so other apps subdivide the cage the same way.
+Exporting a higher level writes what is left of the creases on its edges; the top level has none.
+
+A plain mesh without creases is written as before (`none`). Opening a USD file reads its creases back onto the base,
+in chains or one edge at a time, from any app.
 
 glTF, OBJ, FBX, PLY and STL have no creases: export Level 1 to USD to keep them, or add levels first to bake them into
 the shape.

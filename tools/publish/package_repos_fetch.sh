@@ -6,15 +6,23 @@
 # every download must match it.
 #   tools/publish/package_repos_fetch.sh TAG WEBSITE_DIR [REPO]
 # A release without the metadata (before the signing key exists) leaves the site as it is: exit 0, a note.
+# Downloads retry for minutes (GitHub's release downloads returned 504 for hours on 11-09). PACKAGE_REPOS_KEEP=DIR
+# keeps every asset it used in DIR (and DIR/TAG after a complete run), so a later run can put the same site together
+# from them when GitHub is down: PACKAGE_REPOS_LOCAL=DIR with that TAG runs every check below again.
 set -euo pipefail
 tag=$1 site=$2 repo=${3:-islandmed/SculptForge}
 base="https://github.com/$repo/releases/download/$tag"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-# PACKAGE_REPOS_LOCAL=DIR takes the assets from DIR instead of the release (the test, .github/workflows/repos.yml).
+# PACKAGE_REPOS_LOCAL=DIR takes the assets from DIR instead of the release (the test, .github/workflows/repos.yml; the
+# last good copy when GitHub is down, pages.yml).
+keep=${PACKAGE_REPOS_KEEP:-}
+if [ -n "$keep" ]; then rm -rf "$keep"; mkdir -p "$keep"; fi
 get() {
     if [ -n "${PACKAGE_REPOS_LOCAL:-}" ]; then cp "$PACKAGE_REPOS_LOCAL/$1" "$2"
-    else curl -fsSL --retry 4 --retry-all-errors -o "$2" "$base/$1"; fi
+    else curl -fsSL --connect-timeout 30 --max-time 600 --retry "${PACKAGE_REPOS_RETRIES:-12}" --retry-delay "${PACKAGE_REPOS_RETRY_DELAY:-20}" \
+        --retry-all-errors -o "$2" "$base/$1"; fi
+    if [ -n "$keep" ]; then cp "$2" "$keep/$1"; fi
 }
 
 get SHA256SUMS.txt "$work/SHA256SUMS.txt"
@@ -64,4 +72,5 @@ while read -r path asset; do
     get "$asset" "$site/$path"
     check "$asset" "$site/$path"
 done < "$work/x/FILES.txt"
+if [ -n "$keep" ]; then echo "$tag" > "$keep/TAG"; fi # (only a complete, checked run leaves the marker)
 echo "package_repos_fetch: $tag's apt and dnf repositories in $site/apt and $site/rpm"

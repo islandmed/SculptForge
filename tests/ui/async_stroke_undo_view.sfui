@@ -1,0 +1,53 @@
+# cold
+# gh#184, the view while the next stroke runs: Undo pressed while a stroke drains waits for it, then runs; the next press (held behind
+# it) starts its stroke at once, and the stroke thread owns the mesh, so the frame's sync is skipped (App::syncScene). The GPU must
+# not keep showing the undone stroke until that stroke's first batch is uploaded. (SF_DAB_DELAY_MS slows the stroke thread; ctest
+# sets it with SF_BACKGROUND_DABS: both are read once at startup.)
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=6
+interactive_strokes on
+camera 0 0
+key f
+wait_idle 30
+click "Inflate##brush.inflate"
+brush_size 80
+# An earlier stroke stays, and the view is marked with it.
+stroke 0.30 0.30 0.40 0.70 0.5
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+mark_view
+expect_value view_vs_mark < 0.01
+
+# S, settled: the view differs from the mark; undone, it is the mark again.
+stroke 0.45 0.35 0.70 0.65 0.5
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+print view_vs_mark
+remember view_vs_mark with_s
+expect_value view_vs_mark > 0.02
+key ctrl+z
+wait_idle 30
+wait 0.3
+wait_idle 30
+expect_value view_vs_mark < 0.01
+
+# S again, released and still draining: Undo and a far-away press wait behind it. Once the undo has run (the redo step exists), the
+# far stroke is on the stroke thread: the view meanwhile is the mark's, not S's. The far stroke's own batches reach the GPU as they
+# land (more of them under a loaded machine: 0.039 seen), so the bound is half of S's difference, not a third: S still shown is all of it.
+stroke 0.45 0.35 0.70 0.65 0.5 hold
+wait 0.2
+release
+expect_value stroke_draining == 1
+key ctrl+z
+stroke 0.10 0.12 0.12 0.14 0.5
+wait_value can_redo == 1 30
+expect_value stroke_draining == 1
+print view_vs_mark
+expect_value view_vs_mark < $with_s*0.5
+shot undo-then-stroke-busy

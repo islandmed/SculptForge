@@ -68,10 +68,10 @@ key escape
 key backtick
 expect_value console_open == 0
 
-# Preferences: Config and Interface open (Shift+click keeps both).
+# Preferences: Saving & Layouts and Interface open (Shift+click keeps both).
 click "Edit##menu.edit"
 click "Preferences##section.preferences"
-click "Preferences/Config"
+click "Preferences/Saving & Layouts"
 hold shift
 click "Preferences/Interface"
 hold none
@@ -315,10 +315,14 @@ wait 0.2
 shot guides-with
 click "Wire##view.wire"
 
-# Make sculptable (scan-to-sculptable.md): the built-in test head capture, the review with its face landmarks and
-# loops, and the finished quads with the capture's colours.
-run new_sphere subdivisions=5
-run splat_test_capture kind=head count=200000 floaters=0
+# Make sculptable (scan-to-sculptable.md): splats made from our starter head sculpt (the sculpt then hidden, as with a
+# real capture), the review with its face landmarks
+# and loops (the mouth corners and chin dragged onto the lips and chin, as the panel asks), and the finished quads.
+run new_starter_mesh name=human-head levels=3
+wait_idle 20
+run mesh_to_splats count=1000000
+wait_idle 20
+click "Parts/##eye Human Head"
 camera 0 0
 click "Show mesh"
 wait 0.3
@@ -328,9 +332,16 @@ hover "Make sculptable/More##sculptable"
 wait 0.2
 shot sculptable-panel
 click "Make sculptable/Review##sculptable"
+type "Make sculptable/##sculptdetail" 512
 click "Make sculptable/Make sculptable"
 wait_idle 120
 camera 0 0
+wait 0.2
+drag_landmark 5 -14 30
+wait_idle 20
+drag_landmark 7 0 14
+wait_idle 20
+mouse_move 200 800
 wait 0.2
 shot sculptable-review
 click "Make sculptable/Finish"
@@ -396,6 +407,23 @@ click "Groups##view.facegroups"
 wait 0.2
 shot extract
 click "Groups##view.facegroups"
+
+# Booleans (parts.md): a cube with a sphere biting its corner and a slot through it, both set to Subtract; the view
+# shows the result live and the Parts list the Boolean marks.
+run new_cube
+run part_append type=sphere name=Bolt size=0.5
+run transform translate=-0.75,0.85,0.85
+run part_append type=cube name=Slot size=0.3
+run transform scale=0.4,4,0.4 translate=-2.11,-0.175,0.425
+run part_boolean index=0 mode=add
+run part_boolean name=Bolt mode=subtract
+run part_boolean name=Slot mode=subtract
+run part_select index=0
+camera 30 -25
+key f
+wait_value boolean_preview > 0 30
+wait 0.3
+shot booleans
 
 # Make Symmetric (geometry.md): a head sculpted on one side, then mirrored and welded.
 run new_head

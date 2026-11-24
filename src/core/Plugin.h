@@ -81,7 +81,7 @@ bool pluginWatToWasm(const std::string& wat, std::vector<uint8_t>& out, std::str
 
 // The runtime is wasmtime, linked in when the platform has a build (cmake/Wasmtime.cmake).
 bool pluginRuntimeAvailable();
-std::string pluginRuntimeName(); // "wasmtime 50.0.1", or "" without
+std::string pluginRuntimeName(); // "wasmtime 51.0.0", or "" without
 
 struct PluginLimits {
     uint64_t memoryBytes = 0; // the plugin's memory cap; 0 = 256 MB + 4x the input, at most 4 GB

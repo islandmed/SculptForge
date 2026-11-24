@@ -55,16 +55,28 @@ struct MeshReport {
 MeshReport checkMesh(const Mesh& mesh);
 
 // The mesh with one issue fixed, and how many elements changed in `fixed`:
-//  - NonManifold: each triangle past the first two on such an edge gets its own copy of the edge's points (the
-//    fin comes loose; nothing is deleted)
-//  - Holes: capped as Fill Holes does (a patch per loop, in a face group of its own)
+//  - NonManifold: the edge's triangles stay joined in pairs (the two sides of one sheet, so solids touching along
+//    the edge come apart closed) and the rest get their own copies of its points (a fin comes loose, its edge
+//    open); nothing is deleted
+//  - Holes: capped as Fill Holes does (a patch per loop, in a face group of its own), except where a cap would land
+//    on other triangles or against their winding (the edge of a loose fin or sheet): those stay open
 //  - Duplicate / Degenerate: those triangles are deleted
 //  - ZeroArea: the shortest edge of each is collapsed (its points merged), which removes it and its neighbour
 //  - Flipped: the minority winding of each piece is turned to match the rest; a closed piece wound inside out
-//    is turned the right way out
+//    is turned the right way out (unless it is inside another: a hollow's wall faces in, an eye out)
 //  - Isolated: the unused points are removed
 // Returns false (and leaves `out` alone) when there was nothing to fix.
 bool fixMesh(const Mesh& mesh, MeshIssue issue, Mesh& out, size_t& fixed);
+
+// Fix all: every issue but holes, in passes until a re-check finds none (a fix can make another issue: a collapse
+// can leave a duplicate or a fin, loosening a fin opens holes), at most kMaxFixPasses; a pass that leaves no fewer
+// problems is dropped. `fixed` gets the elements changed per issue and `left` (optional) the re-check of `out`
+// (of `mesh` when nothing changed). Returns false (and leaves `out` alone) when nothing changed.
+inline constexpr int kMaxFixPasses = 6;
+bool fixMeshAll(const Mesh& mesh, Mesh& out, MeshReport& fixed, MeshReport* left = nullptr);
+// What a fix left and why, for the status and the panel ("" when nothing): "2 holes left open (Fix all doesn't cap
+// holes: ...)". `holesSkipped`: Fix all (holes left on purpose) rather than the Holes row's own Fix.
+std::string unfixedSummary(const MeshReport& left, bool holesSkipped);
 
 // weld_points, mesh_check, mesh_fix.
 void registerMeshCheckCommands(CommandRegistry& registry);

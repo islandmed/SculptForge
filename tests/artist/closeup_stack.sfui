@@ -1,0 +1,66 @@
+# Close-up: twenty stacked strokes in one spot on a 5.2M sphere (#194: needles at the tip, stretched stripes on the sides);
+# the same strokes as detail.sfui's overlap block, each brush block measured (closeup.py) and shot close at grazing light.
+run ui_look look=classic layout=classic
+key ctrl+n
+wait 0.2
+camera 0 0
+key f
+key ctrl+d
+key ctrl+d
+key ctrl+d
+wait_idle 180
+camera 0 0
+key f
+wait_idle 30
+print triangles
+run save_obj path=cf_00.obj
+click "Clay##brush.clay"
+brush_size 35
+stroke 0.45 0.45 0.55 0.48 0.3
+stroke 0.46 0.47 0.54 0.44 0.3
+stroke 0.44 0.46 0.56 0.46 0.2
+stroke 0.47 0.43 0.53 0.50 0.2
+brush_size 20
+stroke 0.45 0.45 0.55 0.48 0.15
+stroke 0.46 0.47 0.54 0.44 0.15
+stroke 0.44 0.46 0.56 0.46 0.15
+stroke 0.47 0.43 0.53 0.50 0.15
+brush_size 50
+stroke 0.45 0.45 0.55 0.48 0.5
+stroke 0.46 0.47 0.54 0.44 0.5
+stroke 0.44 0.46 0.56 0.46 0.4
+stroke 0.47 0.43 0.53 0.50 0.4
+wait_idle 30
+run save_obj path=cf_01.obj
+#step 00 01 any Clay x12 stacked
+click "Crease##brush.crease"
+brush_size 15
+stroke 0.45 0.45 0.55 0.48 0.3
+stroke 0.46 0.47 0.54 0.44 0.3
+stroke 0.44 0.46 0.56 0.46 0.3
+stroke 0.47 0.43 0.53 0.50 0.3
+wait_idle 30
+run save_obj path=cf_02.obj
+#step 01 02 any Crease x4 15 px stacked
+click "Inflate##brush.inflate"
+brush_size 25
+stroke 0.48 0.46 0.52 0.47 0.3
+stroke 0.49 0.45 0.51 0.48 0.3
+wait_idle 30
+run save_obj path=cf_03.obj
+#step 02 03 any Inflate x4 25 px stacked
+camera -25 -10
+key f
+wait 0.3
+hover_window 0.97 0.5
+zoom 3
+wait_idle 30
+shot t01-spot-close
+zoom 2.5
+wait_idle 30
+shot t02-spot-closer
+camera 30 5
+key f
+zoom 7
+wait_idle 30
+shot t03-spot-graze

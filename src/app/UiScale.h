@@ -14,7 +14,12 @@ namespace sf {
 // Wayland output) is already covered by the framebuffer scale, so only the rest scales the UI. Windows (per-monitor
 // DPI v2) reports 1.5 / 1 at 150 %, macOS 2 / 2 on Retina.
 inline float automaticUiScale(float displayScale, float pixelDensity) {
-    const float s = displayScale / (pixelDensity > 0.0f ? pixelDensity : 1.0f);
+    float s = displayScale / (pixelDensity > 0.0f ? pixelDensity : 1.0f);
+#ifdef __ANDROID__
+    // Fingers, not a mouse: the desktop layout half again as large, so its rows and buttons are about 30 dp tall
+    // (Android's display scale alone makes them 20 dp). The tablet layout (M2) sizes its own touch targets.
+    s *= 1.5f;
+#endif
     return s > 0.0f && std::isfinite(s) ? s : 1.0f;
 }
 

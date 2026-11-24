@@ -11,14 +11,18 @@
 #include "core/FaceGroups.h"
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
+#include "core/Texture.h"
 #include "core/TextureTransfer.h"
+#include "core/VertexPaint.h"
 #include "io/GltfIO.h"
 #include "io/ObjIO.h"
 #include "io/PlyIO.h"
+#include "core/Utf8Path.h"
 
 #include <stb_image.h>
 
 #include <cctype>
+#include <cmath>
 #include <deque>
 #include <algorithm>
 #include <cstdlib>
@@ -123,6 +127,136 @@ const Mesh& partPlacedMesh(const Document& doc, int i, Mesh& scratch) {
     if (!doc.parts[size_t(i)].moved()) return doc.partMesh(i);
     scratch = placedMesh(doc.partMesh(i), doc.parts[size_t(i)].transform);
     return scratch;
+}
+
+namespace {
+
+// The nearest visible Part along one ray (index, -1 for none), `skip` left out; its hit in scene space. With
+// `hidden` the Parts that are hidden count instead (to tell "nothing there" from "that Part is hidden").
+int nearestPartOnRay(Document& doc, const glm::vec3& origin, const glm::vec3& dir, int skip, RayHit& nearest, bool hidden = false) {
+    int best = -1;
+    for (int i = 0; i < doc.partCount(); ++i) {
+        Part& s = doc.parts[size_t(i)];
+        if (s.visible == hidden || i == skip) continue;
+        // In the Part's own space (a linked copy's transform): the ray goes there, the hit comes back.
+        const glm::mat4 inv = s.moved() ? glm::inverse(s.transform) : glm::mat4(1.0f);
+        const glm::vec3 o = glm::vec3(inv * glm::vec4(origin, 1.0f)), d = glm::mat3(inv) * dir;
+        RayHit hit;
+        if (!doc.partBvh(i).raycast(doc.partMesh(i), o, d, hit)) continue;
+        if (s.moved()) {
+            hit.position = glm::vec3(s.transform * glm::vec4(hit.position, 1.0f));
+            hit.normal = glm::normalize(glm::mat3(s.transform) * hit.normal);
+        }
+        if (best < 0 || hit.t < nearest.t) {
+            best = i;
+            nearest = hit;
+        }
+    }
+    return best;
+}
+
+} // namespace
+
+int pickPartAt(Document& doc, const PartRayFn& rayAt, float x, float y, float tolerance, int active, RayHit* out) {
+    glm::vec3 origin, dir;
+    rayAt(x, y, origin, dir);
+    RayHit exact;
+    const int under = nearestPartOnRay(doc, origin, dir, -1, exact);
+    if (tolerance <= 0.0f || (under >= 0 && under != active)) {
+        if (out && under >= 0) *out = exact;
+        return under;
+    }
+    // Nothing under the pointer, or the Part already being sculpted: look for another Part in front within the
+    // tolerance, on rings around the pointer a quarter of the tolerance apart with the samples as far apart (a Part
+    // a pixel or two wide can't slip between them). The nearer ring wins; a tie goes to the nearer hit.
+    int best = -1;
+    RayHit closeHit;
+    const float step = tolerance * 0.25f;
+    for (int ring = 1; ring <= 4 && best < 0; ++ring) {
+        const float r = step * float(ring);
+        const int samples = std::max(8, int(std::ceil(6.2831853f * r / step)));
+        for (int k = 0; k < samples; ++k) {
+            const float a = 6.2831853f * float(k) / float(samples);
+            rayAt(x + r * std::cos(a), y + r * std::sin(a), origin, dir);
+            RayHit hit;
+            const int p = nearestPartOnRay(doc, origin, dir, active, hit);
+            if (p < 0 || (under >= 0 && hit.t >= exact.t)) continue; // behind what the pointer is on
+            if (best < 0 || hit.t < closeHit.t) {
+                best = p;
+                closeHit = hit;
+            }
+        }
+    }
+    if (best >= 0) {
+        if (out) *out = closeHit;
+        return best;
+    }
+    if (out && under >= 0) *out = exact;
+    return under;
+}
+
+int partEnclosing(Document& doc, const glm::vec3& point, int skip) {
+    // Three rays at right angles (a Part that is open, or a horn beside the point, answers some of them from
+    // outside): the point is inside when every ray meets a surface and the nearest hit faces away from the ray.
+    static const glm::vec3 dirs[3] = {{0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+    int inside = -1;
+    float insideSize = 0.0f;
+    for (int i = 0; i < doc.partCount(); ++i) {
+        const Part& s = doc.parts[size_t(i)];
+        if (!s.visible || i == skip || !doc.partMesh(i).vertexCount()) continue;
+        const glm::mat4 inv = s.moved() ? glm::inverse(s.transform) : glm::mat4(1.0f);
+        const glm::vec3 o = glm::vec3(inv * glm::vec4(point, 1.0f));
+        bool all = true;
+        for (const glm::vec3& d : dirs) {
+            RayHit hit;
+            if (!doc.partBvh(i).raycast(doc.partMesh(i), o, glm::mat3(inv) * d, hit) ||
+                glm::dot(hit.normal, glm::mat3(inv) * d) <= 0.0f) {
+                all = false;
+                break;
+            }
+        }
+        if (!all) continue;
+        const float size = glm::length(doc.partMesh(i).bounds().extent()); // (the innermost of nested Parts)
+        if (inside < 0 || size < insideSize) {
+            inside = i;
+            insideSize = size;
+        }
+    }
+    return inside;
+}
+
+PartColorPick pickPartColor(Document& doc, const PartRayFn& rayAt, float x, float y, const glm::vec3& base) {
+    PartColorPick r;
+    glm::vec3 origin, dir;
+    rayAt(x, y, origin, dir);
+    RayHit hit;
+    const int part = nearestPartOnRay(doc, origin, dir, -1, hit);
+    if (part < 0) {
+        RayHit behind;
+        r.message = nearestPartOnRay(doc, origin, dir, -1, behind, true) >= 0
+                        ? "Nothing to pick: the Part under the pointer is hidden"
+                        : "Nothing to pick: point at a visible Part, then press C";
+        return r;
+    }
+    const Part& p = doc.parts[size_t(part)];
+    if (p.moved()) { // the Part's own space: its triangles and colours live there
+        hit.position = glm::vec3(glm::inverse(p.transform) * glm::vec4(hit.position, 1.0f));
+        hit.normal = glm::normalize(glm::mat3(glm::transpose(p.transform)) * hit.normal);
+    }
+    const Mesh& m = doc.partMesh(part);
+    r.part = part;
+    r.hit = hit;
+    if (paintsTexture(m)) {
+        r.from = PartColorPick::From::Texture;
+        r.colour = sampleTextureAt(m, hit.triangle, hit.position);
+    } else if (m.hasColors()) {
+        r.from = PartColorPick::From::VertexPaint;
+        r.colour = sampleColor(m, hit.triangle, hit.position);
+    } else {
+        r.from = PartColorPick::From::Base;
+        r.colour = base;
+    }
+    return r;
 }
 
 Mesh mergedVisibleMesh(const Document& doc) {
@@ -318,7 +452,7 @@ CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, co
 // Reads the mesh in a model file for insert_mesh (#34): OBJ, PLY or GLB / glTF through the importers, every
 // object in it as one mesh. Nothing but the file itself is read.
 bool loadInsertMesh(const std::string& path, Mesh& out, std::string& error) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = pathToUtf8(std::filesystem::path(std::u8string(path.begin(), path.end())).extension());
     for (char& ch : ext) ch = char(std::tolower(static_cast<unsigned char>(ch)));
     bool ok = false;
     if (ext == ".obj") ok = loadObj(path, out, error);
@@ -340,7 +474,7 @@ bool loadInsertMesh(const std::string& path, Mesh& out, std::string& error) {
 }
 
 std::string lowerExtension(const std::string& path) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = pathToUtf8(std::filesystem::path(std::u8string(path.begin(), path.end())).extension());
     for (char& ch : ext) ch = char(std::tolower(static_cast<unsigned char>(ch)));
     return ext;
 }
@@ -507,9 +641,16 @@ bool normalizedPiece(const Mesh& source, float size, Mesh& out) {
     return true;
 }
 
+// Why the active Part can't take an insert. Subdivision levels are no reason (the piece becomes a Part, below).
+std::string insertBlocker(const Mesh& mesh) {
+    if (!mesh.multires) return dyntopoBlocker(mesh);
+    return mesh.tube.empty() ? std::string() : dyntopoBlocker(mesh);
+}
+
 // Places `prim` (built around the origin, its axis +Y) where insert_primitive / insert_mesh say: on the surface
 // point, +Y along the normal, turned by twist, with mirrored copies for symmetry; merged into the active
-// Part as one new face group, one undo step.
+// Part as one new face group, one undo step. On a mesh with
+// subdivision levels it is a new Part instead.
 CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::string& label) {
     std::vector<SymCopy> mirrors;
     std::string error;
@@ -535,7 +676,8 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
     const glm::vec3 at(float(argNumber(a, "x", 0.0)), float(argNumber(a, "y", 0.0)), float(argNumber(a, "z", 0.0)));
     for (auto& p : prim.positions) p = at + rot * p;
     uint32_t group = 0;
-    for (uint32_t g : doc.mesh.facegroups) group = std::max(group, g);
+    if (!subdivLevelCount(doc.mesh)) // (a levelled mesh's piece is a Part of its own: group 1)
+        for (uint32_t g : doc.mesh.facegroups) group = std::max(group, g);
     prim.facegroups.assign(prim.triangles.size(), group + 1);
     prim.recomputeAllNormals();
     // Symmetry: a copy for each mirror image and radial turn (about the same centre as the brushes'), in the
@@ -560,10 +702,41 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
     for (const SymCopy& m : mirrors)
         for (int i = 0; i < 3; ++i)
             for (int j = 0; j < 3; ++j) radial = radial || (i != j && m.m[i][j] != 0.0f);
+    const size_t tris = prim.triangleCount() * (1 + copies.size());
+    if (subdivLevelCount(doc.mesh)) {
+        // Subdivision levels can't take new faces, and Freeze Levels would drop every level but the one shown: the
+        // piece becomes a Part of its own beside the active one, so no level changes at all. Undo takes it away.
+        std::vector<const Mesh*> pieces{&prim};
+        for (const Mesh& c2 : copies) pieces.push_back(&c2);
+        Mesh piece = mergeMeshes(pieces);
+        const Part& from = doc.activePartInfo();
+        const std::string source = from.name;
+        const bool visible = from.visible;
+        const uint32_t folder = from.folder;
+        const Shading shading = from.shading;
+        const glm::mat4 place = from.transform; // (a moved linked copy: the piece stays where it was placed)
+        const int index = doc.addPart(std::move(piece), doc.uniquePartName(label), false, doc.activePart + 1);
+        Part& added = doc.parts[size_t(index)];
+        added.visible = visible;
+        added.folder = folder;
+        added.shading = shading;
+        added.transform = place;
+        const std::string name = added.name;
+        auto step = std::make_shared<PartStep>();
+        step->id = added.id;
+        step->at = index;
+        UndoRecord r;
+        r.label = "Insert " + label;
+        r.part = std::move(step);
+        doc.undo.push(std::move(r));
+        doc.modified = true;
+        return {true, "Inserted " + (copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + "s") +
+                          " as the new Part " + name + " (" + std::to_string(tris) + " triangles): " + source +
+                          " has subdivision levels, which stay as they are"};
+    }
     std::vector<const Mesh*> parts{&doc.mesh, &prim};
     for (const Mesh& c2 : copies) parts.push_back(&c2);
     Mesh merged = mergeMeshes(parts);
-    const size_t tris = prim.triangleCount() * (1 + copies.size());
     doc.replaceMeshUndoable(std::move(merged), "Insert " + label);
     return {true, "Inserted " + (copies.empty() ? "a " + label : std::to_string(copies.size() + 1) + " " + label + (radial ? "s (radial)" : "s (mirrored)")) +
                       " (" + std::to_string(tris) + " triangles, face group " + std::to_string(group + 1) + ")"};
@@ -586,6 +759,7 @@ void registerPartCommands(CommandRegistry& reg) {
                      if (const int links = doc.linkCount(i); links > 1) out += ", linked x" + std::to_string(links);
                      if (i == doc.activePart) out += ", active";
                      if (!s.visible) out += ", hidden";
+                     if (s.boolean != PartBoolean::None) out += std::string(", Boolean ") + partBooleanName(s.boolean);
                      if (const int f = doc.partFolderIndex(s.folder); f >= 0) out += ", in " + doc.partFolders[size_t(f)].name;
                      out += ")";
                  }
@@ -697,7 +871,7 @@ void registerPartCommands(CommandRegistry& reg) {
              "normal, its centre on the surface, as one new face group; one undoable step.",
              primitiveParams,
              [](Document& doc, const Args& a) -> CommandResult {
-                 const std::string blocked = dyntopoBlocker(doc.mesh);
+                 const std::string blocked = insertBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
                  const std::string type = argString(a, "type", "sphere");
                  const float size = float(std::max(argNumber(a, "size", 0.2), 1e-4));
@@ -725,7 +899,7 @@ void registerPartCommands(CommandRegistry& reg) {
              "along the surface normal, as one new face group; one undoable step.",
              meshParams,
              [](Document& doc, const Args& a) -> CommandResult {
-                 const std::string blocked = dyntopoBlocker(doc.mesh);
+                 const std::string blocked = insertBlocker(doc.mesh);
                  if (!blocked.empty()) return {false, "Can't insert: " + blocked};
                  if (int(a.contains("part")) + int(a.contains("file")) + int(a.contains("set")) != 1)
                      return {false, "Give part=, file= or set="};
@@ -772,10 +946,12 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (i < 0) return notFound(a);
                  Mesh copy = doc.partMesh(i);
                  const Shading shading = doc.parts[size_t(i)].shading;
+                 const PartBoolean boolean = doc.parts[size_t(i)].boolean;
                  const uint32_t folder = doc.parts[size_t(i)].folder;
                  const glm::mat4 place = doc.parts[size_t(i)].transform;
                  const int added = doc.addPart(std::move(copy), doc.parts[size_t(i)].name + " copy", true, i + 1);
                  doc.parts[size_t(added)].shading = shading;
+                 doc.parts[size_t(added)].boolean = boolean; // (a copy of a cutter cuts too)
                  doc.parts[size_t(added)].folder = folder; // (right below it: the folder stays together)
                  doc.parts[size_t(added)].transform = place;
                  return {true, "Duplicated as " + doc.parts[size_t(added)].name};
@@ -950,15 +1126,26 @@ void registerPartCommands(CommandRegistry& reg) {
                  bool othersShown = false;
                  for (int i = 0; i < doc.partCount(); ++i)
                      othersShown |= i != doc.activePart && doc.parts[size_t(i)].visible;
-                 for (int i = 0; i < doc.partCount(); ++i)
-                     doc.parts[size_t(i)].visible = i == doc.activePart || !othersShown;
+                 if (othersShown) { // Solo on (or the active Part changed during Solo: the first memory stays)
+                     for (int i = 0; i < doc.partCount(); ++i) {
+                         Part& s = doc.parts[size_t(i)];
+                         if (s.shownBeforeSolo < 0) s.shownBeforeSolo = s.visible ? 1 : 0;
+                         s.visible = i == doc.activePart;
+                     }
+                 } else { // Solo off: back to what was shown when it began (a Part made since is shown)
+                     for (int i = 0; i < doc.partCount(); ++i) {
+                         Part& s = doc.parts[size_t(i)];
+                         s.visible = i == doc.activePart || s.shownBeforeSolo != 0;
+                         s.shownBeforeSolo = -1;
+                     }
+                 }
                  doc.modified = true;
-                 return {true, othersShown ? "Solo: " + doc.activePartInfo().name : std::string("All Parts shown")};
+                 return {true, othersShown ? "Solo: " + doc.activePartInfo().name : std::string("Back to the Parts shown before Solo")};
              }});
 
     reg.add({"part_show_all", "Show every Part.", {},
              [](Document& doc, const Args&) -> CommandResult {
-                 for (auto& s : doc.parts) s.visible = true;
+                 for (auto& s : doc.parts) s.visible = true, s.shownBeforeSolo = -1;
                  doc.modified = true;
                  return {true, "All Parts shown"};
              }});

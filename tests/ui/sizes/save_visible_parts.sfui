@@ -1,0 +1,19 @@
+# File > Save Visible Parts As... (phoenix on Discord): the menu item is there, and a project saved with one Part hidden
+# opens with the rest. Run at 1440 and 2880 wide by CMake (save_visible_parts_1440 / _2880).
+run new_sphere subdivisions=3 ; part_rename to=Head
+run part_append type=cube ; part_rename to=Body
+run part_visibility index=1 visible=false
+expect_value visible_parts == 1
+
+click "File##menu.file"
+expect "Save Visible Parts As..."
+shot menu
+key escape
+
+run save_visible_parts path=sf_ui_save_visible_parts.sfproj
+expect_value parts == 2
+expect_value visible_parts == 1
+run open path=sf_ui_save_visible_parts.sfproj
+expect_value parts == 1
+expect_value visible_parts == 1
+shot opened

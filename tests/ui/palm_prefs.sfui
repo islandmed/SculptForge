@@ -1,0 +1,28 @@
+# Preferences > Tablet > Ignore fingers while the pen is near: the switch flips the guard, and with it off a finger beside the
+# pen in range sculpts as before (the guard itself: palm_guard.sfui).
+run ui_look look=classic layout=classic        # (Preferences on the palette bar, as tablet.sfui)
+run new_sphere subdivisions=4
+snapshot
+palm_guard off
+click "Preferences##palette.preferences"
+click "Tablet##preferences.tablet"
+expect "Ignore fingers while the pen is near##tablet_palm"
+expect_value tablet_palm_rejection == 0
+click "Ignore fingers while the pen is near##tablet_palm"
+expect_value tablet_palm_rejection == 1
+shot palm_prefs
+key escape                                      # (the panel is a popup: a click outside closes it)
+key f
+camera 0 0
+pen_enter 0.9 0.9
+touch_stroke 0.3 0.45 0.7 0.55
+expect_value moved == 0
+pen_out
+click "Preferences##palette.preferences"
+click "Ignore fingers while the pen is near##tablet_palm"
+expect_value tablet_palm_rejection == 0
+key escape
+pen_enter 0.9 0.9
+touch_stroke 0.3 0.45 0.7 0.55
+expect_value moved_out > 0
+pen_out

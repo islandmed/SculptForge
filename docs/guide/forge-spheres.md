@@ -1,5 +1,12 @@
 # Forge Spheres
 
+![A posed figure sculpted in SculptForge](images/wn-0120-pose.jpg)
+
+> **In short:**
+> - Block out a base mesh from connected spheres: torso, head, limbs, tail.
+> - **Preview** (<kbd>A</kbd>) shows the skin over the spheres.
+> - **Make Mesh** turns the skin into a new Part you sculpt as usual.
+
 Forge Spheres (experienced sculptors: Forge Spheres) block out an organic base mesh from connected spheres: start from one root sphere, grow a torso, a head,
 limbs, fingers, a tail or branches from it, set the proportions, look at the skin over them, then turn it into a
 mesh you sculpt as usual. It is the quickest way to get the structure of a character or creature before any detail.
@@ -15,12 +22,21 @@ still navigates. The brush ring is hidden; the sphere under the cursor gets an o
 
 ## Edit the spheres
 
-Pick the mode in **Tool > Forge Spheres**:
+**Draw** (the default) does all three without switching modes (#167):
+
+- **Click** a sphere to grow a new one from it, half its size, on the surface where you clicked.
+- **Drag** a sphere's middle to move it.
+- **Drag its very edge** (a thin rim inside the outline, which thickens when the pointer is on it) to resize it:
+  the edge follows the cursor. A sphere drawn small on screen has no rim, so all of it moves; zoom in or use
+  **Scale** to resize it.
+
+The cursor and a small tag beside it (*drag: move*, *drag: resize*) show what a drag will do before you press.
+The **Move** and **Scale** modes are still there in **Tool > Forge Spheres** for when you want one action only:
 
 | Mode | On a sphere | On a link |
 |---|---|---|
-| **Draw** | Drag to grow a new sphere from it. It starts on the surface where you pressed; how far you drag sets its size (a click makes one half the size of its parent) | Click to add a joint halfway along the link, and drag to place it |
-| **Move** | Drag to move it across the screen. The links stretch to follow | Moves the sphere at the end of the link |
+| **Draw** | Click to grow a new sphere; drag the middle to move it, the edge to resize it | Click to add a joint halfway along the link, and drag to place it |
+| **Move** | Drag to move it across the screen at its depth. The links stretch to follow | Moves the sphere at the end of the link |
 | **Scale** | Drag up or right to make it bigger, down or left to make it smaller | Scales the sphere at the end of the link |
 
 In every mode, <kbd>Alt</kbd>+click a sphere to delete it together with everything that grows from it. The root
@@ -30,10 +46,27 @@ sphere (orange) always stays.
 leg and its twin moves too. A sphere on the centre line stays on it, and a new sphere placed closer to the centre
 line than its own radius snaps onto it as one sphere instead of two overlapping twins.
 
+## Moving spheres
+
+A dragged sphere stays under the pointer at its depth in the view (it doesn't drift nearer or farther as it
+crosses the screen), and follows the pointer as smoothly on a long tail or many fingers as on a few spheres. Three
+ways to control where it goes, in Draw and Move alike:
+
+- Hold <kbd>Shift</kbd> while you drag to swing the sphere around the sphere it grows from: its link keeps its
+  length, so you can aim a limb or bend a tail joint without changing its proportions. Press or let go of Shift
+  in the middle of a drag; the sphere goes on from where it is.
+- **Snap to Surface** (Tool > Forge Spheres): a moved sphere's centre lands on the surface of the sphere under the
+  pointer, half sunk in, as a new sphere is. Use it to seat a head or a limb on the body. Off every other sphere, it
+  moves at its depth as usual.
+- **Move Branch** (Tool > Forge Spheres): everything that grows from the moved sphere comes along and keeps its
+  shape: drag a leg and its foot follows, drag the body and the whole figure moves.
+
+With Symmetry on, the twin follows every move live.
+
 Every drag is one step of the Part's undo history, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> takes back the last sphere
 you added, moved or scaled.
 
-> **Tip:** build the structure first with few spheres (one per joint), set the proportions with Move and Scale,
+> **Tip:** build the structure first with few spheres (one per joint), drag them into place and size in Draw,
 > and add joints on links only where a limb needs to bend or swell.
 
 ## Pointer only
@@ -41,8 +74,8 @@ you added, moved or scaled.
 Everything also works with the pointer alone, without a key held (#8):
 
 - **Drag places child**: with it on, a Draw drag on a sphere makes a new sphere half its size and moves it away
-  from its parent as you drag, so one drag places the next joint of a limb. With it off, hold <kbd>Ctrl</kbd> while
-  you drag for the same.
+  from its parent as you drag (instead of moving the sphere), so one drag places the next joint of a limb. With it
+  off, hold <kbd>Ctrl</kbd> while you drag for the same.
 - **The selected sphere**: the sphere you last clicked or added is outlined in orange. **Delete Selected** deletes
   it and everything growing from it, **Insert Between** adds a joint halfway to the sphere it grows from, and **Set
   as Root** makes it the root: the armature keeps its shape and links and grows from there, so the skin doesn't

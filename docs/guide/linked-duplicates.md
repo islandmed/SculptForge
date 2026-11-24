@@ -1,5 +1,12 @@
 # Linked Duplicates
 
+![Two lion busts side by side](images/qremesh2-compare.jpg)
+
+> **In short:**
+> - A Linked Duplicate shares its mesh with another Part but sits in its own place.
+> - Sculpt, paint or mask one and every linked copy changes too.
+> - Move, turn and scale each copy on its own; **Make Unique** breaks the link.
+
 A **Linked Duplicate** is a Part that shares its mesh with another Part but sits in its own place: rivets on a
 belt, the four legs of a table, the teeth of a gear, a row of columns. Sculpt, paint or mask any one of them and
 every linked copy changes with it; move, turn or scale each one on its own. A hundred linked copies cost about as

@@ -5,7 +5,7 @@
 which of them the table has no translation for.
 
     tools/i18n/coverage.py              counts and percent per language
-    tools/i18n/coverage.py --missing    also every missing string (es, zh-TW, zh-CN, or --lang es)
+    tools/i18n/coverage.py --missing    also every missing string (es, zh-TW, zh-CN, ja, or --lang es)
     tools/i18n/coverage.py --check      exit 1 unless every language is at 100% (ctest i18n_coverage)
     tools/i18n/coverage.py --json       the strings and what each language lacks, for scripts
     tools/i18n/coverage.py --raw        literals ImGui shows without tr(): not translatable until wrapped in tr()
@@ -37,8 +37,8 @@ SRC = ROOT / "src" / "app"
 KEEP = Path(__file__).resolve().parent / "keep_english.txt"
 RAW_ALLOW = Path(__file__).resolve().parent / "raw_allow.txt"
 LANGS = {"es": SRC / "I18nSpanish.cpp", "zh-TW": SRC / "I18nTraditionalChinese.cpp",
-         "zh-CN": SRC / "I18nSimplifiedChinese.cpp"}
-SKIP_FILES = {"I18n.cpp", "I18nSpanish.cpp", "I18nTraditionalChinese.cpp", "I18nSimplifiedChinese.cpp"}
+         "zh-CN": SRC / "I18nSimplifiedChinese.cpp", "ja": SRC / "I18nJapanese.cpp"}
+SKIP_FILES = {"I18n.cpp", "I18nSpanish.cpp", "I18nTraditionalChinese.cpp", "I18nSimplifiedChinese.cpp", "I18nJapanese.cpp"}
 
 # tr() and trPath() translate their argument; every function or lambda that passes one of its parameters on to them
 # (or to another such function) is found in the sources (wrappers()): ui::Checkbox, ui::HelpText, hint()... A name
@@ -76,6 +76,16 @@ DYNAMIC = {
     "ai/Hyper3D.cpp tiers() labels (App::drawImageTo3D)": [
         "Gen-2.5 Extreme Low (fastest)", "Gen-2.5 Low", "Gen-2.5 Medium", "Gen-2.5 High",
         "Gen-2.5 Extreme High (more credits)"],
+    "ai/Tripo.cpp models() labels (App::drawImageTo3D)": ["Tripo v3.1 (H3.1) - recommended", "Tripo v3.0"],
+    "ai/ImageTo3DService.cpp recommendedModels() notes and ai/SpaceHealth.cpp label() (App::drawRecommendedModels)": [
+        "About 2 minutes and 20 credits a picture (10 for text). Fast and good all-round.",
+        "Sharp, clean shapes with fine detail.",
+        "Clean geometry. Not licensed in the EU, UK or South Korea.",
+        "The most photographic look.",
+        "Shared GPUs with a daily allowance: no key, no account.",
+        "The fastest free one; works from text too.",
+        "The best free detail; needs a free Hugging Face token.",
+        "Switched off", "May be slow to start"],
     "ai/AiPolicy.h kPrivacyLine (PanelAi.cpp)": [
         "Your art is never uploaded or used for training. AI features run only when you use them and can be turned off."],
     "core/RadialMenu.cpp radialButtonLabel": ["None", "Middle mouse button", "Mouse back button", "Mouse forward button",

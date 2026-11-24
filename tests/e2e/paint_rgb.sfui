@@ -1,0 +1,42 @@
+# e2e: paint. Rgb on while sculpting: a stroke with Add AND a stroke with Sub both lay the colour as well as moving the
+# surface (red over the white default: the mean green drops). Colour is one undo step with the stroke.
+run new_sphere subdivisions=5
+camera 0 0
+run set_color color=ff0000
+remember paint_mean_g white_g
+expect_value colored == 0
+click "Clay##brush.clay"
+action draw.rgb
+expect_value checked@draw.rgb == 1
+snapshot
+
+# Add (the default)
+action draw.raise
+stroke 0.3 0.4 0.7 0.4
+expect_value moved > 0
+expect_value paint_mean_g < $white_g-1
+remember paint_mean_g add_g
+key ctrl+z
+expect_value moved == 0
+expect_value paint_mean_g == $white_g
+
+# Sub
+action draw.lower
+stroke 0.3 0.6 0.7 0.6
+expect_value moved > 0
+expect_value paint_mean_g < $white_g-1
+remember paint_mean_g sub_g
+key ctrl+z
+expect_value moved == 0
+expect_value paint_mean_g == $white_g
+
+# Rgb off: the same strokes only sculpt.
+action draw.rgb
+expect_value checked@draw.rgb == 0
+action draw.raise
+stroke 0.3 0.4 0.7 0.4
+expect_value moved > 0
+expect_value paint_mean_g == $white_g
+action draw.lower
+stroke 0.3 0.6 0.7 0.6
+expect_value paint_mean_g == $white_g

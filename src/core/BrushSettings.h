@@ -54,6 +54,9 @@ public:
     BrushToolSettings switchBrush(const std::string& from, const std::string& to, const BrushToolSettings& current);
     // What `key` uses at startup (its saved settings) when it has any.
     bool savedFor(const std::string& key, BrushToolSettings& out) const;
+    // What `key` has now without switching to it: this session's values, else the saved ones (the brush thumbnails
+    // show the alpha and stroke it uses, #208). False for a brush not used yet.
+    bool peek(const std::string& key, BrushToolSettings& out) const;
     // Save Brush Settings: `key` starts with `s` from now on (call save(path) to write the file).
     void store(const std::string& key, const BrushToolSettings& s);
     // Reset Brush to Default: forgets `key`'s session and saved values; returns the shipped ones.

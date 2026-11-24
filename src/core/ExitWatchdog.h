@@ -15,4 +15,9 @@ namespace sf {
 // Nothing else changes: a normal exit before then just ends the thread with the process.
 void armExitWatchdog(int timeoutMs, int code, std::function<void()> onTimeout = {});
 
+// Waits (at most maxMs, polling every pollMs, calling `pump` before each check) while `held()` is true; returns
+// whether it ended. Quitting with Alt+F4 still pressed: the window was gone before the keys came up, so the held
+// F4 (key repeat) or the release reached the desktop behind it, and on some desktops Alt+F4 there is log out (#183).
+bool waitWhileHeld(const std::function<bool()>& held, int maxMs, int pollMs = 10, const std::function<void()>& pump = {});
+
 } // namespace sf

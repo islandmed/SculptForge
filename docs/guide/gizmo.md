@@ -1,5 +1,12 @@
 # Moving, rotating and posing (Gizmo)
 
+![A figure posed with the Gizmo](images/wn-0120-pose.jpg)
+
+> **In short:**
+> - The Gizmo moves, rotates and scales a whole Part, or only its unmasked part.
+> - Use it to place parts, fix proportions and pose a limb from its pivot.
+> - Hold <kbd>Shift</kbd> while dragging to snap.
+
 The Gizmo moves, rotates and scales a whole Part, or only the part of it you haven't masked. Use it to
 place parts (an eye in its socket, a sword in a hand), to fix proportions, and to pose: mask the body, put the
 pivot at the shoulder and swing the arm. It works, with the same keys.
@@ -99,6 +106,8 @@ will move (the Part, or its unmasked part) and follows it when you change the ma
 | Put the pivot on the surface | <kbd>Alt</kbd>+click the model, or **To Surface** then click the model |
 | Type the pivot | The three numbers under the mode buttons in the Gizmo panel |
 | Go back to the centre, with world axes | **Reset** |
+| Put the Part's bounding-box centre on the world origin 0,0,0 | **Center on origin** (one undo step; with **All Parts** every visible Part moves together and keeps its place among the others) |
+| Rest the Part on the floor (lowest point at Y = 0) | **Drop to floor** |
 
 After a drag the gizmo moves (and with **Surface** axes, turns) with what it moved.
 
@@ -110,11 +119,12 @@ for sliding a part along itself, or for twisting a forearm about its own length.
 
 ## Typing exact values
 
-The **Gizmo** panel opens in the corner of the canvas while the gizmo is on. Under the options it has
-**Move** (X, Y, Z), **Rotate** (degrees about X, then Y, then Z) and **Scale** (percent). Type the amounts and
-click **Apply**: the model moves, turns and scales by them about the pivot, along the gizmo's axes, in one undo
-step. **Clear** sets them back to 0 and 100%. The values stay after Apply, so clicking Apply again repeats the
-step (rotate by 15 degrees, again, again).
+The **Gizmo** panel opens in the corner of the canvas while the gizmo is on. Under the options it has **Move** (X, Y,
+Z), **Rotate** (degrees about X, then Y, then Z) and **Scale** (percent). Type the amounts and click **Apply**: the
+model moves, turns and scales by them about the pivot, along the gizmo's axes, in one undo step.
+
+**Clear** sets them back to 0 and 100%. The values stay after Apply, so clicking Apply again repeats the step (rotate
+by 15 degrees, again, again).
 
 ## All Parts
 
@@ -128,13 +138,17 @@ example both eyes. Right-click a folder's header in the Parts list > **Move with
 
 ## What a transform keeps
 
-A transform only changes where the vertices are. Face Groups, quads, UVs, vertex paint, textures, the mask and
-the topology stay as they are. With **Base mesh** active, [sculpt layers](layers.md) move with the surface: the
-base and every layer's offsets are transformed together, so a layer you sculpted on a forearm stays on it after
-posing, and layer sliders keep working. With a sculpt layer active, the transform goes into that layer, like a
-stroke: the base stays, and the layer's weight dials the move in and out (a pose as a blend shape). A layer whose
-weight is 0 can't be transformed into. With [subdivision levels](subdivision-levels.md) you can pose at a low level: the detail of
-the higher levels, sculpt layers included, turns with it when you step back up. Projects save the result, and the gizmo's pivot and options too.
+A transform only changes where the vertices are. Face Groups, quads, UVs, vertex paint, textures, the mask and the
+topology stay as they are. With **Base mesh** active, [sculpt layers](layers.md) move with the surface: the base and
+every layer's offsets are transformed together, so a layer you sculpted on a forearm stays on it after posing, and
+layer sliders keep working.
+
+With a sculpt layer active, the transform goes into that layer, like a stroke: the base stays, and the layer's weight
+dials the move in and out (a pose as a blend shape). A layer whose weight is 0 can't be transformed into. With
+[subdivision levels](subdivision-levels.md) you can pose at a low level: the detail of the higher levels, sculpt
+layers included, turns with it when you step back up.
+
+Projects save the result, and the gizmo's pivot and options too.
 
 ## Scripting
 

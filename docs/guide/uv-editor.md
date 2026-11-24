@@ -1,5 +1,12 @@
 # UV Editor
 
+![UV islands laid out over UDIM tiles](images/hero-udim.jpg)
+
+> **In short:**
+> - Seams, unwrapping, packing (one tile or UDIM), texel density and trim sheets.
+> - Open it with **Tool > Texture Image > UV Editor**, or <kbd>Alt</kbd>+<kbd>U</kbd>.
+> - The model shows a checker, so stretch shows up as you edit.
+
 The UV Editor shows a Part's UVs flat, over the texture's tiles, and gives you everything to make them: seams drawn on
 the model, unwrapping that keeps the surface's shape, packing into one tile or across UDIM tiles, texel density,
 trim sheets, and hand editing of vertices, edges, faces and islands. While you work, the model shows the same
@@ -43,11 +50,13 @@ them; edges along a seam move each side on its own.
 
 ## Moving, rotating and scaling
 
-The selection has a box with handles: drag inside it to move, a corner to scale, the knob above it to rotate.
-Or press <kbd>G</kbd> (move), <kbd>R</kbd> (rotate) or <kbd>S</kbd> (scale) over the view, move the mouse, and
-click (or <kbd>Enter</kbd>) to finish; a right click or <kbd>Esc</kbd> puts it back. During <kbd>G</kbd> and
-<kbd>S</kbd>, <kbd>X</kbd> or <kbd>Y</kbd> locks to one axis; <kbd>Ctrl</kbd> snaps (1/64 of a tile, 15 degrees,
-tenths of the size). The model's stretch colours and checker follow the drag live. Each drag is one undo step.
+The selection has a box with handles: drag inside it to move, a corner to scale, the knob above it to rotate. Or press
+<kbd>G</kbd> (move), <kbd>R</kbd> (rotate) or <kbd>S</kbd> (scale) over the view, move the mouse, and click (or
+<kbd>Enter</kbd>) to finish; a right click or <kbd>Esc</kbd> puts it back. During <kbd>G</kbd> and <kbd>S</kbd>,
+<kbd>X</kbd> or <kbd>Y</kbd> locks to one axis; <kbd>Ctrl</kbd> snaps (1/64 of a tile, 15 degrees, tenths of the
+size).
+
+The model's stretch colours and checker follow the drag live. Each drag is one undo step.
 
 ## Seams
 
@@ -95,12 +104,14 @@ them. **Rotate** also allows quarter turns. SculptForge tries packing by the isl
 and keeps whichever holds them larger.
 
 **Columns** and **Rows** set the grid of UDIM tiles to fill: Columns along u (1001, 1002 and on; ten make a full UDIM
-row) and Rows up v (1011 sits above 1001). **10** Columns x **2** Rows fills 1001-1020; **4** x **3** fills
-1001-1004, 1011-1014 and 1021-1024 and never goes wider. Every island gets the same texel density: more tiles, more
-texels for everything; the view frames the grid after a pack. When the largest island sets the scale, fewer tiles
-than the grid holds get islands, and the status line says how many (Pack at Density fills more). **Pack at Density** instead keeps exactly the target texel density and opens as many tiles as
-it needs, Columns wide and then the next row up. Projects remember their grid; new ones start from the last one you
-used.
+row) and Rows up v (1011 sits above 1001). **10** Columns x **2** Rows fills 1001-1020; **4** x **3** fills 1001-1004,
+1011-1014 and 1021-1024 and never goes wider. Every island gets the same texel density: more tiles, more texels for
+everything; the view frames the grid after a pack.
+
+When the largest island sets the scale, fewer tiles than the grid holds get islands, and the status line says how many
+(Pack at Density fills more). **Pack at Density** instead keeps exactly the target texel density and opens as many
+tiles as it needs, Columns wide and then the next row up. Projects remember their grid; new ones start from the last
+one you used.
 
 Baking writes one set of maps per tile, rows included (`name_normal.1011.png`, see [Baking](baking.md)). Texture
 painting still covers tile 1001 only.
@@ -123,11 +134,12 @@ and the **Density** colours show it on every face: green is the mean, blue fewer
 ## Trim sheets
 
 A trim sheet is a texture made of horizontal strips (a moulding, a belt, a seam of rivets), each repeating left to
-right. In **Trim Sheet**, describe the strips: a count (`4` equal strips), heights from the top (`0.5,0.25,0.25`)
-or v ranges (`0-0.5;0.5-1`); they show over tile 1001 while the section is open. Pick a strip and click **Assign to
-Strip**: the selected islands are turned lengthwise, scaled to the strip's height and lined up along it from the
-left. **Fit width** squeezes or stretches the row to fill the strip exactly; off, it keeps its proportions and may
-run past the right edge, which is fine on a trim that repeats.
+right. In **Trim Sheet**, describe the strips: a count (`4` equal strips), heights from the top (`0.5,0.25,0.25`) or v
+ranges (`0-0.5;0.5-1`); they show over tile 1001 while the section is open.
+
+Pick a strip and click **Assign to Strip**: the selected islands are turned lengthwise, scaled to the strip's height
+and lined up along it from the left. **Fit width** squeezes or stretches the row to fill the strip exactly; off, it
+keeps its proportions and may run past the right edge, which is fine on a trim that repeats.
 
 The texture doesn't move for trims: the islands take on the strip's look.
 

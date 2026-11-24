@@ -1,0 +1,99 @@
+# Forge Spheres in one mode (#167): in Draw, a click on a sphere grows a new one, a drag on its body moves it and a
+# drag on its rim resizes it, with no mode switch; the cursor and a tag say which (forgesphere_hint: 1 move, 2 resize,
+# 3 add). Each drag is one undo step. The Move and Scale buttons still work as before. Symmetry X is on.
+run forgesphere_new radius=1
+run part_visibility index=0 visible=false
+wait 0.3
+click "Forge Spheres##tool.forgespheres"
+expect "Forge Spheres/Draw"
+
+# The hint: body = move, rim = resize, Ctrl = add, Alt = nothing (delete).
+drag_forgesphere 0 body hover
+expect_value forgesphere_hint == 1
+shot hint-move
+drag_forgesphere 0 rim hover
+expect_value forgesphere_hint == 2
+shot hint-resize
+hold ctrl
+drag_forgesphere 0 body hover
+expect_value forgesphere_hint == 3
+hold alt
+drag_forgesphere 0 body hover
+expect_value forgesphere_hint == 0
+hold none
+
+# A click adds an arm (and its twin), selected.
+drag_forgesphere 0 rim 0 0 0.05
+expect_value forgespheres == 3
+expect_value forgesphere_r1 == 0.5
+expect_status "Forge Sphere add"
+expect_value forgesphere_selected == 1
+
+# Drag its body: it moves (the twin mirrors), same count, one undo step.
+remember forgesphere_x1 x
+drag_forgesphere 1 body 90 0
+expect_value forgespheres == 3
+expect_value forgesphere_x1 > $x
+expect_value forgesphere_x2 < $x*-1
+expect_value forgesphere_r1 == 0.5
+expect_status "Forge Sphere move"
+expect_value forgesphere_selected == 1
+shot moved
+key ctrl+z
+expect_value forgesphere_x1 == $x
+key ctrl+shift+z
+expect_value forgesphere_x1 > $x
+remember forgesphere_x1 x
+
+# Drag its rim outward: it grows, staying put; inward: it shrinks. One undo step each.
+drag_forgesphere 1 rim 40 0
+expect_value forgespheres == 3
+expect_value forgesphere_r1 > 0.6
+expect_value forgesphere_x1 == $x
+expect_status "Forge Sphere scale"
+drag_forgesphere 1 rim hover
+expect_value forgesphere_hint == 2
+shot resized
+key ctrl+z
+expect_value forgesphere_r1 == 0.5
+drag_forgesphere 1 rim -25 0
+expect_value forgesphere_r1 < 0.45
+key ctrl+z
+expect_value forgesphere_r1 == 0.5
+
+# A tiny wobble is still a click (adds, does not move).
+drag_forgesphere 1 body 2 1 0.05
+expect_value forgespheres == 5
+expect_value forgesphere_x1 == $x
+key ctrl+z
+expect_value forgespheres == 3
+
+# The mode buttons keep working: Move moves from the rim too; Scale drags up to grow.
+click "Forge Spheres/Move"
+drag_forgesphere 1 rim 40 0
+expect_value forgesphere_x1 > $x
+expect_value forgesphere_r1 == 0.5
+key ctrl+z
+click "Forge Spheres/Scale"
+drag_forgesphere 1 body 0 -60
+expect_value forgesphere_r1 > 0.5
+expect_value forgesphere_x1 == $x
+key ctrl+z
+click "Forge Spheres/Draw"
+
+# The background still navigates.
+remember camera_yaw yaw
+view_drag 0.15 0.8 0.25 0.8
+expect_value camera_yaw != $yaw
+camera 0 0
+wait 0.1
+
+# At 200% the band and the tag scale with the UI.
+ui_scale 200
+wait 0.3
+drag_forgesphere 1 rim hover
+expect_value forgesphere_hint == 2
+shot hint-200
+drag_forgesphere 1 body hover
+expect_value forgesphere_hint == 1
+ui_scale auto

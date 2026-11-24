@@ -13,6 +13,7 @@ wait_idle 60
 expect "Library/Human Head"
 expect "Library/Bust"
 expect "Library/Full Body"
+expect "Library/Human (male, A-pose)"
 expect_not "Library/Sphere"
 shot starter-meshes
 

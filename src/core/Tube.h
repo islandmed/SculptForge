@@ -5,7 +5,9 @@
 // Catmull-Rom through control points, each with its own radius) and a tube is swept along it: rings placed
 // adaptively (closer where the curve bends), oriented by rotation-minimizing frames (double reflection), so the
 // tube never twists. The cross-section is round, square, triangular or a flat ribbon, turned and tapered as asked;
-// the ends are round or flat. A Tube Part keeps its curve in Mesh::tube and its triangles are
+// the ends are round or flat. Rope and Braid are strands (three by default) round the curve (a rope of one strand is a spring; a braid's round strands twist over and under each other), Sleeve is hollow with open ends; Twist
+// and Spin turn the cross-section along the length. A Curve Part is the same data swept as a thin wire (only the guide
+// line): Resample sets its point count exactly, and Tube from curve makes it a tube. A Tube Part keeps its curve in Mesh::tube and its triangles are
 // made from it, so the points can be moved and resized until Bake makes it a plain, sculptable mesh. Merged into
 // the active Part instead, the tube is swept with even edge lengths (rings with as many sides as their size
 // needs), which suits dynamic topology. Every change is one undo step.
@@ -25,6 +27,8 @@ struct CommandResult;
 
 constexpr size_t kTubeMaxPoints = 2000;      // control points per tube
 constexpr size_t kTubeStrokePoints = 500;    // a drawn stroke is simplified to at most this many
+constexpr size_t kTubeMaxTriangles = 2000000; // one tube's sweep: longer edges are used when it would make more
+constexpr int kTubeMaxStrands = 8;           // rope / braid strands
 constexpr uint32_t kTubeBodyGroup = 1;       // face groups: the body, the start cap, the end cap
 constexpr uint32_t kTubeStartCapGroup = 2;   // (the mirror copy adds 3)
 constexpr uint32_t kTubeEndCapGroup = 3;
@@ -47,7 +51,19 @@ std::vector<TubePoint> tubeFromStroke(const std::vector<TubePoint>& samples, flo
 // (at least 2), or earlier when the next would change it by more than `tolerance` radii (0 = no limit).
 std::vector<TubePoint> tubeSimplify(const std::vector<TubePoint>& points, float keep, float tolerance = 0.0f);
 
-// "round", "square", "triangle", "ribbon".
+// Exactly `count` (2..kTubeMaxPoints) points evenly spaced along the smooth curve through `points`, radii blended
+// between them; the first and last stay as they were. Empty for fewer than two distinct points.
+std::vector<TubePoint> tubeResample(const std::vector<TubePoint>& points, size_t count);
+
+// How a braid's round strands lie for a tube of `radius` (its outer reach) with `count` (2..kTubeMaxStrands) strands and Spread
+// `spread` (0..1): each strand has radius `radius`, its centre line winds round the tube's centre line at distance `orbit`,
+// one full turn per `pitch` of length. Spread 0: neighbours touch (a tight rope); 1: they are well apart, the turns long.
+struct BraidLayout {
+    float radius = 0.0f, orbit = 0.0f, pitch = 0.0f;
+};
+BraidLayout braidLayout(int count, float spread, float radius);
+
+// "round", "square", "triangle", "ribbon", "rope", "braid", "sleeve".
 const char* tubeProfileName(TubeShape::Profile p);
 bool parseTubeProfile(const std::string& name, TubeShape::Profile& out);
 
@@ -68,7 +84,7 @@ std::vector<glm::vec3> tubeFrames(const std::vector<TubeSample>& line, const glm
 // The tube as a plain mesh (no Mesh::tube): watertight, face groups as above. `uniform`: every edge near the edge
 // length (triangles; rings get as many sides as their radius needs) for dynamic topology; else rings with the
 // same number of sides, in quads. `edge` <= 0: tubeEdgeLength(shape). Empty when the shape is invalid.
-Mesh tubeSweep(const TubeShape& shape, bool uniform = false, float edge = 0.0f);
+Mesh tubeSweep(const TubeShape& shape, bool uniform = false, float edge = 0.0f, size_t budget = kTubeMaxTriangles);
 // The mesh a Tube Part shows: tubeSweep in quads, carrying `shape` in Mesh::tube. `maxTriangles` > 0: a coarser
 // sweep when the full one would have more (the live preview while a point is dragged: 60 fps on the floor tier).
 Mesh tubeMesh(const TubeShape& shape, size_t maxTriangles = 0);
@@ -88,6 +104,14 @@ bool tubeMatchesMesh(const Mesh& mesh);
 // Replaces the active Tube Part's curve (one undo step labelled `label`).
 CommandResult tubeEdit(Document& doc, TubeShape shape, const std::string& label);
 
+// Repeats the Part `source` along the active Tube or Curve Part's curve as a new Part (one undo step): its longest side
+// lies along the curve, each copy turned `turn` degrees more than the one before about the curve (90: chain links).
+// `spacing`: how far apart the copies' centres are, in lengths of the piece (1: end to end, 0.8: overlapping like
+// chain links); adjusted a little so the copies fill the whole curve. `scale`: the size of the copies.
+constexpr float kRepeatSpacingMin = 0.1f, kRepeatSpacingMax = 4.0f;
+constexpr size_t kRepeatMaxCopies = 5000, kRepeatMaxTriangles = 4000000;
+CommandResult tubeRepeat(Document& doc, int source, float spacing, float turn, float scale, int* made = nullptr);
+
 // "x,y,z,radius" per point, a flat array, plus the options; FromJson gives an empty shape for a bad one.
 Json tubeToJson(const TubeShape& shape);
 TubeShape tubeFromJson(const Json& json);
@@ -95,7 +119,8 @@ TubeShape tubeFromJson(const Json& json);
 // `radius`.
 bool parseTubePoints(const std::string& text, float radius, std::vector<TubePoint>& out, std::string& error);
 
-// tube_new, tube_list, tube_set_point, tube_insert_point, tube_delete_point, tube_set, tube_simplify, tube_bake.
+// tube_new (curve=true: a Curve Part), tube_list, tube_set_point, tube_insert_point, tube_delete_point, tube_set,
+// tube_simplify, tube_resample, tube_from_curve, tube_bake, tube_repeat.
 void registerTubeCommands(CommandRegistry& registry);
 
 } // namespace sf

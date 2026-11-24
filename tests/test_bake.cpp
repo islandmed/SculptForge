@@ -315,6 +315,63 @@ TEST(bake_bumpy_sphere_maps) {
     std::filesystem::remove_all(dir);
 }
 
+// A search distance that is too short leaves holes. The bake reports the share of texels that found nothing and a
+// distance that reaches the surface for them; baking again with it fills the map.
+TEST(bake_short_distance_warns_and_suggests) {
+    const Mesh high = highPoly(6);
+    const Mesh low = lowPoly();
+    BakeSettings st;
+    st.size = 256;
+    st.autoDistance = false;
+    st.front = st.rear = 0.0005f; // x diagonal: far shorter than the bump or the low-poly's facets
+    BakeResult r;
+    std::string err;
+    CHECK(bakeMaps(low, {&high}, st, r, err));
+    std::printf("  short: %s\n", bakeSummary(r).c_str());
+    CHECK(r.missRatio() > 0.05f);
+    CHECK(r.hasSuggestion());
+    CHECK(r.suggestFront >= r.front && r.suggestRear >= r.rear);
+    CHECK(r.suggestFront > r.front * 1.5f || r.suggestRear > r.rear * 1.5f);
+    const std::string summary = bakeSummary(r);
+    CHECK(summary.find("WARNING") != std::string::npos);
+    CHECK(summary.find("front=") != std::string::npos && summary.find("rear=") != std::string::npos);
+    // The suggested distance, as the command's fractions of the model's size, fixes it.
+    st.front = r.suggestFront / r.diagonal;
+    st.rear = r.suggestRear / r.diagonal;
+    BakeResult again;
+    CHECK(bakeMaps(low, {&high}, st, again, err));
+    std::printf("  again: %s\n", bakeSummary(again).c_str());
+    CHECK(again.missRatio() < 0.01f);
+    CHECK(!again.hasSuggestion());
+    CHECK(bakeSummary(again).find("WARNING") == std::string::npos);
+}
+
+// The automatic distance leaves (almost) no holes on different pairs of meshes.
+TEST(bake_auto_distance_leaves_no_holes) {
+    const Mesh high = highPoly(6);
+    Mesh coarse = makeIcosphere(1, 1.0f); // 80 triangles: facets far inside the high-poly
+    Mesh shrunk = lowPoly();              // the whole high-poly lies outside it
+    Mesh grown = lowPoly();               // ... and inside it
+    AutoUvResult uv;
+    std::string err;
+    CHECK(computeAutoUv(coarse.positions, coarse.triangles, 512, uv, err));
+    coarse.uvs = uv.uvs;
+    for (glm::vec3& p : shrunk.positions) p *= 0.85f;
+    for (glm::vec3& p : grown.positions) p *= 1.2f;
+    int n = 0;
+    for (const Mesh* low : {&coarse, &shrunk, &grown}) {
+        BakeSettings st;
+        st.size = 256;
+        st.maps = bakeBit(BakeMap::Normal) | bakeBit(BakeMap::Displacement);
+        BakeResult r;
+        CHECK(bakeMaps(*low, {&high}, st, r, err));
+        std::printf("  auto %d: %.2f%% missed, front %.3f rear %.3f\n", n, 100.0 * r.missRatio(), double(r.front), double(r.rear));
+        CHECK(r.autoDistance && r.missRatio() < 0.01f);
+        CHECK(!r.hasSuggestion());
+        ++n;
+    }
+}
+
 TEST(bake_errors) {
     const Mesh high = highPoly(3);
     Mesh noUv = makeIcosphere(2);

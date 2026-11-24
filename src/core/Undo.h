@@ -11,6 +11,7 @@
 #include "core/TileImage.h"
 
 #include <deque>
+#include <map>
 #include <memory>
 #include <span>
 #include <string>
@@ -126,6 +127,7 @@ struct SelectionSetsUndo {
 // Adding or removing a whole Part (Extract's Accept; core/Document.h). Applied by the undo / redo commands,
 // which see the whole scene: the record itself leaves the mesh alone.
 struct PartStep;
+struct MicroInkStep;
 // The transform and per-vertex weights of a transform step (core/MeshTransform.h), kept on Pose Mesh steps so
 // Figure Pose can replay them at full resolution (core/FigurePose.h).
 struct TransformOp;
@@ -148,6 +150,7 @@ inline constexpr int kActivePaintLayer = -2;
 //  - topology: the slots a dynamic-topology stroke changed (core/Dyntopo.h), applied before the channels
 //  - part: a Part added to the scene (Extract), taken out on undo and put back on redo
 //  - micro: the grid tiles a stroke on a micro level changed, or a whole micro level (core/Micro.h)
+//  - ink: an edit or removal of a stroke a micro level keeps editable (core/MicroHistory.h), applied on its own
 //  - uvs: per triangle corner texture coordinates (restoring a selection set's UVs)
 //  - sets: the Selection Sets list (core/SelectionSets.h)
 //  - creases: per triangle corner edge creases (core/EdgeSelect.h)
@@ -171,11 +174,15 @@ struct UndoRecord {
     std::unique_ptr<TextureTileUndo> textureTiles;
     std::unique_ptr<TextureStackUndo> texture;
     std::unique_ptr<Mesh> mesh;
+    std::unique_ptr<BVH> meshBvh; // with `mesh`: its tree, when the step that made it had one (applying swaps it too)
     std::unique_ptr<SubdivUndo> subdiv;
     std::unique_ptr<TopologyUndo> topology;
     std::shared_ptr<PartStep> part; // (shared: PartStep is defined in core/Document.h)
     std::unique_ptr<UvUndo> uv;           // UVs, seams and pins (UV Editor, core/Uv.h)
-    std::unique_ptr<MicroUndo> micro;     // micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h)
+    // Micro-displacement tiles of a stroke, or a micro level added / removed (core/Micro.h). Shared: a stroke kept
+    // editable (Forge Ink, core/MicroHistory.h) keeps the same tiles in its record, and replaying it rewrites them here.
+    std::shared_ptr<MicroUndo> micro;
+    std::shared_ptr<MicroInkStep> ink;    // an edit or removal of a kept stroke (core/MicroHistory.h)
     UndoChannel<glm::vec2> uvs;           // per corner (index = triangle * 3 + corner)
     std::unique_ptr<SelectionSetsUndo> sets;
     UndoChannel<float> creases;           // per corner, like `uvs`
@@ -183,13 +190,26 @@ struct UndoRecord {
     // Steps pushed together on several Parts' histories (Figure Pose's Apply) share a non-zero id: the undo and
     // redo commands take every Part's top step with that id as one step.
     uint64_t group = 0;
+    // Stamped by UndoStack::push. `seq` orders every step of every Part's history (never reused); `batch` is the id of
+    // the UndoBatchScope the step was pushed in (0 = none): the undo and redo commands take the steps of one batch
+    // together (an AI agent's batch, a checkpoint restore; core/UndoBatch.h).
+    uint64_t seq = 0, batch = 0;
 
     bool empty() const {
         return positions.empty() && mask.empty() && colors.empty() && paintAlpha.empty() && hidden.empty() &&
-               facegroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !part && !micro &&
+               facegroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !part && !micro && !ink &&
+               uvs.empty() && !sets && !uv && creases.empty();
+    }
+    // Only a micro level's tiles or a kept stroke's edit: the base mesh (points, faces, mask...) is untouched.
+    bool microOnly() const {
+        return (micro || ink) && positions.empty() && layerOffsets.empty() && mask.empty() && colors.empty() && paintAlpha.empty() &&
+               hidden.empty() && facegroups.empty() && !mesh && !paint && !textureTiles && !texture && !subdiv && !topology && !part &&
                uvs.empty() && !sets && !uv && creases.empty();
     }
     size_t approxBytes() const;
+    // approxBytes() without the kept tree: what the byte budget counts, so a tree (a fifth of a 10M triangle mesh
+    // step) doesn't push the remesh step it saves a rebuild for out of the history.
+    size_t budgetBytes() const { return approxBytes() - (meshBvh ? meshBvh->memoryBytes() : 0); }
 
     // Convenience snapshots of whole attributes (or of `elements` only), e.g.
     // before "mask all", "invert mask", "fill color" or "hide group".
@@ -215,6 +235,30 @@ struct UndoListener {
     virtual void undoCleared() = 0;
 };
 
+// Where steps are being pushed from: while a scope is open, every step pushed (on any Part's history) carries its id.
+// Ids come from the same counter as step numbers, so they never repeat.
+uint64_t nextUndoSeq();
+class UndoBatchScope {
+public:
+    UndoBatchScope();
+    ~UndoBatchScope();
+    UndoBatchScope(const UndoBatchScope&) = delete;
+    UndoBatchScope& operator=(const UndoBatchScope&) = delete;
+    uint64_t id() const { return id_; }
+private:
+    uint64_t id_, previous_;
+};
+// Bumped whenever a history is cleared (a new scene, an open): marks made before it point at steps that are gone.
+uint64_t undoClearEpoch();
+
+// A place in the whole scene's history (core/UndoBatch.h): for every Part's history (by mesh key) the `seq` of its top
+// applied step (0 = none), plus what the scene looked like then. No copies of the scene: going back is undo.
+struct HistoryMark {
+    uint64_t epoch = 0; // undoClearEpoch() when made
+    uint64_t hash = 0;  // sceneHash() when made
+    std::map<uint32_t, uint64_t> tops;
+};
+
 class Timeline;
 
 class UndoStack {
@@ -231,6 +275,8 @@ public:
     const std::string& undoLabel() const { return undo_.back().label; }
     const std::string& redoLabel() const { return redo_.back().label; }
     size_t undoCount() const { return undo_.size(); }
+    size_t redoCount() const { return redo_.size(); }
+    const UndoRecord* redoStep(size_t back) const { return back < redo_.size() ? &redo_[redo_.size() - 1 - back] : nullptr; }
     // The step the next undo / redo applies (null if none): after undo() the undone step is lastRedo().
     UndoRecord* lastUndo() { return undo_.empty() ? nullptr : &undo_.back(); }
     UndoRecord* lastRedo() { return redo_.empty() ? nullptr : &redo_.back(); }
@@ -243,10 +289,26 @@ public:
     void clear();
     // Bumped by every push, undo and redo (unsaved-changes tracking).
     uint64_t revision() const { return revision_; }
+    // revision() without the pushes, undos and redos of microOnly() steps: changes when the base mesh may have (#184: a
+    // stroke on a micro level re-counted Merge by Distance over every base point, ~300 ms at its end on 2.6M points).
+    uint64_t baseRevision() const { return revision_ - microRevisions_; }
     // Memory the undo steps hold (UndoRecord::approxBytes), as counted against byteBudget.
     size_t undoBytes() const;
 
-    size_t byteBudget = size_t(1) << 30; // 1 GiB
+    // What the history may hold. 0 (the default) follows the computer: undoBudgetBytes (core/MemoryGuard.h), asked on
+    // every push; any other value is fixed (the pose history never drops: max).
+    size_t byteBudget = 0;
+    size_t budget() const; // the figure in force now (Preferences > Performance)
+    // What the budget did since the last call, for the status line: steps dropped, and whether the one step left is
+    // over the budget on its own (a whole-mesh step is kept anyway). Empty = nothing to say.
+    struct Notice {
+        size_t dropped = 0;
+        bool lastStepOver = false;
+        bool any() const { return dropped || lastStepOver; }
+    };
+    Notice takeNotice();
+    size_t droppedTotal() const { return droppedTotal_; }
+    bool lastStepOverBudget() const { return lastStepOver_; }
     std::shared_ptr<UndoListener> listener; // the Sculpt Timeline (core/Timeline.h), if one watches this history
 
 private:
@@ -254,7 +316,9 @@ private:
     void enforceBudget();
 
     std::deque<UndoRecord> undo_, redo_;
-    uint64_t revision_ = 0;
+    uint64_t revision_ = 0, microRevisions_ = 0;
+    size_t droppedPending_ = 0, droppedTotal_ = 0;
+    bool lastStepOver_ = false, overPending_ = false;
 };
 
 } // namespace sf

@@ -7,7 +7,7 @@ website's [benchmarks page](../website/benchmarks/index.html) lists them.
 
 ## Standard scenes (what the website lists)
 
-`sculptforge --benchmark standard-15m` (or `standard-33m`, or `standard` for both; Help > Benchmark offers the
+`sculptforge --benchmark standard-15m` (or `standard-33m`, `standard-100m` (the same head at 104 million triangles; about 16 GB of free memory), or `standard` for 15M + 33M; Help > Benchmark offers the
 same choice) runs the **standard scene**: a procedural head (`makeBenchHead` in `src/core/Benchmark.cpp`: skull,
 brow, eye sockets, nose, cheekbones, jaw, ears and neck as a displacement of a cube-sphere, then divided into
 subdivision levels like the spheres below) of about 15.0 or 33.2 million triangles. It is built from a formula,
@@ -29,7 +29,7 @@ Each run adds `worst_stall_ms` (the longest frame, or lifting the pen if that to
 phase too), `gpu_buffers_mb` (the most the renderer's vertex and index buffers held, an estimate that works on
 every GPU) and, where the driver reports free graphics memory (`GL_NVX_gpu_memory_info`, `GL_ATI_meminfo`),
 `vram_used_mb` (how far it dropped from before the mesh was built; on unified-memory GPUs this is system memory
-and other programs move it). `peak_ram_mb` is as below. The JSON's `settings.scene` names the scene.
+and other programs move it). `peak_ram_mb` is as below. The JSON's `settings.scene` names the scene; `settings.hw_simulate` holds the value of `SF_HW_SIMULATE` when it was set (a simulated hardware tier such as `floor`), so a simulated result says so.
 
 The sphere sweep below is what `sculptforge --benchmark` with no scene name runs.
 
@@ -54,6 +54,10 @@ Per frame, at the moment the frame is handed to the display (just before `SDL_GL
 - `lag_ms`: from the time of the pointer sample the newest drawn dab belongs to (the nearest sample to it) to
   now. The display's scan-out and the compositor add to this on a real screen (about one refresh).
 - `lag_px`: the distance along the stroke path from that sample to the newest sample (where the pointer is).
+- `lag_on_model_ms` / `lag_on_model_px`: the same over the frames whose newest dab reached the surface, and
+  `dabs_off_model`: the dabs that found none. A dab off the model costs nothing, so the quick frames after it pull
+  `lag_ms` down; the stroke path is fitted to the model on screen (at most 2% of it off the model). The website lists
+  only the on-model columns, and no lag for results without `dabs_off_model` (builds before 0.13.11).
 
 Vertical sync is off unless `settings.vsync` is true. Recording the video (`settings.video`) reads every frame
 back through pixel buffers and encodes on another thread; it costs about 1 to 2 ms per frame. The machine is not
@@ -124,6 +128,70 @@ Field notes:
 
 The benchmarks page (`website/benchmarks/index.html`) reads `results.json` and shows one row per mesh size and
 submission: frame time and lag percentiles per phase, hardware, version.
+
+## The scene pack
+
+A public benchmark made to be compared across computers: a download of our own sculpts, one command, one file back.
+
+```
+sculptforge --benchmark-pack bench-pack --out results.json
+```
+
+`bench-pack` is the unpacked folder from the [benchmarks page](../website/benchmarks/index.html) (source: `bench/pack`,
+built by `python3 tools/benchmark/make_pack.py build`). It works the same on Linux, macOS and Windows, uses temporary
+settings (none of your own settings or files are read or changed), writes no video unless you add
+`--benchmark-video FILE`, and takes about 5 minutes (`--benchmark-seconds S` shortens each stroke).
+
+**The pack** is `pack.json` (schema `sculptforge-bench-pack/1`: name, version, `stroke_set`, and the scenes) and the
+sculpt files it names. Each scene is a project, its Parts merged, divided `divide` times (each divide makes four times the
+triangles); the manifest states the triangle count it must come out at and the run refuses a scene that doesn't match, so
+every computer sculpts the same mesh. Version 1 has one sculpt, our generated Creature Head (CC0, `tools/starter`), in three
+sizes:
+
+| Scene | Tier | Triangles | Free memory it needs |
+|---|---|---|---|
+| `creature-floor` | floor | 5.8 million | about 1 GB |
+| `creature-standard` | standard | 23 million | about 3.5 GB |
+| `creature-high` | high | 92 million | about 14 GB |
+
+`creature-floor` is the **floor tier test**: the entry-level size every supported computer should sculpt on, whatever its
+graphics. The tier is a label for what the scene is meant for; every scene runs on every computer that has the memory
+(one that hasn't is left out and named in `skipped`, which is a normal result on a small machine; a scene that
+won't build, or a pack that is damaged or missing, exits with code 1). To see what the entry-level tier does on a bigger
+machine, `SF_HW_SIMULATE=floor sculptforge --benchmark-pack ...` runs with the entry-level budgets; the result says so
+(`settings.hw_simulate`) and is listed as simulated.
+
+**The strokes** (`settings.stroke_set` = `pack/1`) are proof mode's standard ones, on each scene in order: Clay at 25, 60 and
+120 px, Move (80 px), Smooth (60 px), a 240 px Clay brush and an orbit, each stroke 6 seconds of scripted pointer
+samples at 240 a second through the input handlers.
+
+**The result** is a `sculptforge-benchmark/1` file (above) with these additions, written without indentation (it is pasted
+into an issue form, which holds 65,536 characters):
+
+- `hardware`: `cpu`, `logical_cores`, `ram_gb`, `os`, `gpu` (renderer and OpenGL version as one text), `gpu_name` (the
+  renderer), `driver` (the OpenGL version string, which carries the driver release on Mesa and NVIDIA), `framebuffer` and
+  `hw_tier` (the hardware tier SculptForge put the computer in: `Floor`, `Standard`, `High` or `Extreme`). All of it is
+  read by the program; nothing is typed.
+- `settings.scene` = `pack-1`, `settings.stroke_set`, and `settings.pack` = `{name, version, sha256}`; the hash is of
+  `pack.json` followed by each scene's file, in the manifest's order (`make_pack.py hash DIR`). Results of an altered pack
+  are not listed; `bench/pack/hashes.json` holds the published packs' hashes.
+- `runs[]`: one per scene, `label` = the scene id, `tier`, `triangles`, `vertices`, `build_seconds`, `peak_ram_mb`,
+  `gpu_buffers_mb` and `worst_stall_ms` (the slowest frame or pen lift of the whole scene). Each `phases[]` entry has
+  `frame_ms` (p50, p95, p99, max, mean), `fps`, `lag_ms` and `lag_px` for the strokes, and `worst_stall_ms`.
+
+**Listing it.** Open a *Benchmark pack result* issue ([`benchmark_pack_result.yml`](../.github/ISSUE_TEMPLATE/benchmark_pack_result.yml)),
+type a name or handle and a description of the machine, and paste `results.json`. A maintainer runs
+
+```
+gh issue view N --json body -q .body | python3 tools/benchmark/submit.py issue - --issue N
+```
+
+which refuses a file that doesn't validate (wrong schema, a pack that isn't the published one, a scene that failed), a name or
+machine with a link, an address or markup in it, or an unticked consent box; prints the summary and anything implausible for
+a moderator to look at (frame times no display loop reaches, frames that don't match the seconds, simulated hardware); and adds
+a compact entry (hardware, version, per-stroke numbers) to `website/benchmarks/results.json`. The file stores no more than
+the hardware text, the timings and the two lines the submitter typed: no names of people but the one they chose, no addresses,
+no paths. The benchmarks page lists them with sortable columns (hardware, tier, frame times, lag, slowest frame).
 
 ## Benchmark takes (`--benchmark-script`)
 

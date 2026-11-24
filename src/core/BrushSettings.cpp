@@ -1,6 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushSettings.h"
+#include "core/FileReplace.h"
+#include "core/LegacyNames.h"
 #include "core/Precision.h"
 #include "core/Sculpt.h"
 
@@ -52,6 +54,8 @@ Json BrushToolSettings::toJson() const {
     j.set("alpha_follow_stroke", a.followStroke); // (always: the VDM brush's default is on)
     if (a.angle != 0.0f) j.set("alpha_angle", double(a.angle));
     if (a.jitter != 0.0f) j.set("alpha_angle_jitter", double(a.jitter));
+    if (a.scaleJitter != 0.0f) j.set("alpha_scale_jitter", double(a.scaleJitter));
+    if (a.positionJitter != 0.0f) j.set("alpha_position_jitter", double(a.positionJitter));
     if (a.tileX != 1 || a.tileY != 1) {
         j.set("alpha_tile_x", a.tileX);
         j.set("alpha_tile_y", a.tileY);
@@ -80,6 +84,8 @@ void BrushToolSettings::applyJson(const Json& j) {
     a.followStroke = j["alpha_follow_stroke"].asBool(a.followStroke);
     readFloat(j, "alpha_angle", a.angle);
     readFloat(j, "alpha_angle_jitter", a.jitter);
+    readFloat(j, "alpha_scale_jitter", a.scaleJitter);
+    readFloat(j, "alpha_position_jitter", a.positionJitter);
     a.tileX = int(j["alpha_tile_x"].asNumber(a.tileX));
     a.tileY = int(j["alpha_tile_y"].asNumber(a.tileY));
     pressureSize = penPressureFromId(j["pen_pressure_size"].asString(), pressureSize);
@@ -117,6 +123,14 @@ bool BrushSettingsStore::savedFor(const std::string& key, BrushToolSettings& out
     return true;
 }
 
+bool BrushSettingsStore::peek(const std::string& key, BrushToolSettings& out) const {
+    if (const auto it = session_.find(key); it != session_.end()) {
+        out = it->second;
+        return true;
+    }
+    return savedFor(key, out);
+}
+
 void BrushSettingsStore::store(const std::string& key, const BrushToolSettings& s) {
     saved_[key] = s;
     session_[key] = s;
@@ -135,7 +149,7 @@ BrushToolSettings BrushSettingsStore::shipped(const std::string& key) {
         s.alphaOptions.followStroke = true; // ...turned by the drag, as before the VDM's own Angle options (#136)
     }
     for (BrushType t : {BrushType::Move, BrushType::KelvinGrab, BrushType::KelvinTwist, BrushType::KelvinScale,
-                        BrushType::SnakeHook, BrushType::KelvinSnake})
+                        BrushType::Tendril, BrushType::KelvinSnake})
         if (key == brushSettingsKey(brushName(t))) s.pressureSize = PenPressure::Off;
     return s;
 }
@@ -157,9 +171,10 @@ void BrushSettingsStore::applyJson(const Json& j) {
     if (!brushes.isObject()) return;
     for (const auto& [key, value] : brushes.members()) {
         if (!value.isObject()) continue;
-        BrushToolSettings s = shipped(key); // (files before 0.11.1 have no pen pressure: the brush's default)
+        const std::string stored = key.rfind("builtin:", 0) == 0 ? legacy::modernize(key) : key; // (a built-in brush's old name)
+        BrushToolSettings s = shipped(stored); // (files before 0.11.1 have no pen pressure: the brush's default)
         s.applyJson(value);
-        saved_[key] = s;
+        saved_[stored] = s;
     }
 }
 
@@ -174,12 +189,7 @@ bool BrushSettingsStore::save(const std::string& path, std::string& error) const
             return false;
         }
     }
-    std::filesystem::rename(utf8Path(tmp), utf8Path(path), ec);
-    if (ec) {
-        error = "Cannot write " + path + ": " + ec.message();
-        return false;
-    }
-    return true;
+    return replaceFile(utf8Path(tmp), utf8Path(path), error);
 }
 
 bool BrushSettingsStore::load(const std::string& path, std::string& error) {

@@ -29,3 +29,15 @@ build-flatpak/
 /REPORT*.md
 /HANDOFF*.md
 /.design/
+
+# Android (scripts/android-build.sh)
+android/.gradle/
+android/app/build/
+android/local.properties
+# Signing keys and their passwords never enter the repository (scripts/android-sign.sh keeps ours under ~/.config/sculptforge)
+*.jks
+*.keystore
+*.p12
+*.pfx
+android-release.pass
+keystore.properties

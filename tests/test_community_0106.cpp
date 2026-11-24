@@ -193,6 +193,31 @@ TEST(falloff_view_cylinder) {
     CHECK(cylinder == brute);
 }
 
+TEST(cylinder_query_depth_cap_equals_the_filtered_infinite_cylinder) {
+    // #174: the stamp footprint caps the cylinder's depth in the BVH; the set is exactly the infinite cylinder's
+    // vertices within that depth (brute force, on a jittered sphere, many random shapes), and no cap is the old query.
+    Mesh m = makeIcosphere(5);
+    std::mt19937 rng(174);
+    std::uniform_real_distribution<float> jitter(-0.03f, 0.03f), unit(-1.0f, 1.0f), size(0.05f, 0.9f);
+    for (glm::vec3& v : m.positions) v += glm::vec3(jitter(rng), jitter(rng), jitter(rng));
+    BVH bvh;
+    bvh.build(m);
+    std::vector<uint32_t> capped, infinite;
+    for (int i = 0; i < 40; ++i) {
+        const glm::vec3 centre = glm::normalize(glm::vec3(unit(rng), unit(rng), unit(rng) + 0.01f));
+        const glm::vec3 axis = glm::normalize(glm::vec3(unit(rng), unit(rng), unit(rng) + 0.01f));
+        const float radius = size(rng), depth = size(rng);
+        bvh.queryVerticesCylinder(m, centre, axis, radius, capped, depth);
+        bvh.queryVerticesCylinder(m, centre, axis, radius, infinite);
+        std::vector<uint32_t> expected;
+        for (uint32_t v : infinite)
+            if (std::abs(glm::dot(m.positions[v] - centre, axis)) <= depth) expected.push_back(v);
+        std::sort(capped.begin(), capped.end());
+        std::sort(expected.begin(), expected.end());
+        CHECK(capped == expected);
+    }
+}
+
 TEST(falloff_options_in_recipes) {
     BrushRecipe r;
     CHECK(r.toJson()["connectedOnly"].isNull()); // other recipes' files stay as they were

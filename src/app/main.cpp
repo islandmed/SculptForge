@@ -2,18 +2,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/App.h"
 #include "app/NativeDialog.h"
+#include "app/Python.h"
 #include "app/Bench.h"
 #include "app/Calibration.h"
 #include "app/CrashLog.h"
 #include "app/OptimisticBench.h"
+#include "app/StartupSplashWindow.h"
+#include "app/UserData.h"
 #include "app/UiServe.h"
 #include "ai/AiPolicy.h"
+#include "core/BenchPack.h"
 #include "core/Benchmark.h"
+#include "core/DataDir.h"
+#include "core/Utf8Path.h"
 #include "core/ExitWatchdog.h"
 #include "core/Wavelet.h"
 #include "core/FocusDetail.h"
 #include "core/Pack.h"
 #include "core/StudioProfile.h"
+#include "core/ThreadPool.h"
 
 #include <SDL3/SDL_main.h>
 
@@ -22,12 +29,25 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 #ifndef _WIN32
 #include <unistd.h> // execv (--cli)
+#endif
+
+#if defined(_WIN32)
+// Hybrid-graphics laptops (Intel + NVIDIA / AMD): the drivers read these exports when the program loads and then run
+// OpenGL on the discrete card, with no Settings > Graphics entry needed. Preferences > Performance > Graphics card
+// (app/Calibration.cpp: applyCachedGpuChoice) still sets the per-app Windows preference on top of them.
+extern "C" {
+__declspec(dllexport) unsigned long NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
 #endif
 
 namespace {
@@ -42,6 +62,7 @@ void usage() {
         "  --size WxH               Render size (default 1024x1024)\n"
         "  --measure-idle S         Sit idle, print the frames drawn per second over S seconds, exit\n"
         "                           (SF_CONTINUOUS_REDRAW=1 draws every frame, as before 0.9.5)\n"
+        "  --measure-key-nav        Tap and hold each pan / zoom key (default and rebound) in the interactive loop; exit 1 if the view stays\n"
         "  --measure-stroke S[,R]   Draw a fast scripted circle stroke for S seconds (brush radius R px),\n"
         "                           e.g. after --run \"new_sphere\"; print how far the dabs left the circle and the frame times, exit\n"
         "                           (SF_STROKE_IMMEDIATE=1 places every dab at once, as before 0.9.6)\n"
@@ -51,7 +72,8 @@ void usage() {
         "  --facegroups             Render with face group colours\n"
         "  --hide-mesh              Render only the Gaussian splats\n"
         "  --demo NAME              Play a scripted demo (sculpt, image-to-3d, brush-lab, game-ready, splats)\n"
-        "  --record out.mp4         Record the demo offscreen to a video (needs ffmpeg) and exit\n"
+        "  --record out.mp4         Record the demo offscreen to a video (needs ffmpeg) and exit; with --ui-test, a small\n"
+        "                           clip of every frame of the test (bug before/after clips; --fps sets the rate)\n"
         "  --demo-asset FILE        Image or model the demo opens\n"
         "  --demo-output FILE       Save the demo's result (e.g. creature.glb)\n"
         "  --fps N                  Recording frame rate (default 30)\n"
@@ -61,6 +83,7 @@ void usage() {
         "  --ui-record out.mp4      Also record the UI test, every frame in real time with the pointer drawn (needs ffmpeg)\n"
         "  --ui-serve [--threads N] Warm UI test server: one window, then one test per stdin line (tools/test/warm_ui.py)\n"
         "  --fullscreen             Start filling the screen (F11 toggles)\n"
+        "  --reset-layout           Start with the standard layout, every panel back in the main window\n"
         "  --no-ai                  Start with every AI feature off and locked (as SF_AI=off)\n"
         "  --no-packs               Safe mode: start without any installed pack (Library > Packs)\n"
         "  --studio FILE            Start in studio mode with this studio profile (studio.json; docs/studios.md)\n"
@@ -73,11 +96,18 @@ void usage() {
         "  --bench-no-project       Skip the project save / open (it needs twice the memory)\n"
         "  --bench-view             Benchmark only what the viewport costs (uploads, orbit)\n"
         "  --bench-dyntopo          Benchmark dynamic topology strokes (e.g. --bench-sizes 0.25,1,4)\n"
+        "  --bench-dyntopo-uvs      The same on a painted Part (UVs and a texture): what keeping them costs\n"
         "  --bench-micro            Benchmark micro-displacement levels (sizes = micro triangles, e.g. 33,100,300)\n"
         "  --bench-micro-level N    Micro level for --bench-micro (default 4: 256 per base triangle)\n"
         "  --bench-out FILE         Write the benchmark report (Markdown) to FILE\n"
         "  --calibrate              Measure this computer (GPU, CPU, memory; about 2-3 s), print the hardware\n"
         "                           profile as JSON and save it (add --calibrate-quick, --calibrate-no-save)\n"
+        "  --splash-shot out.png    The start-up splash as a PNG (size from --size, default 1440x810) and exit\n"
+        "  --splash-selftest        Open the splash by each way the window system allows, check its picture, exit\n"
+        "  --portable-selftest [V]  Say where this copy keeps its data (portable: a portable.txt or data/ folder beside\n"
+        "                           the program), save V there if given, print what is saved, exit\n"
+        "  --acp-selftest           Windows: check the process code page is UTF-8 (0 = it is), exit\n"
+        "  --python-selftest        Start the Python scripting runtime, run a few lines, exit (0 = it works)\n"
         "  --timelapse out.mp4      Render the opened project's history (saved beside it as .sfhist) as a\n"
         "                           turntable timelapse and exit (--size 3840x2160 for 4K, --fps N)\n"
         "  --timelapse-seconds S    Length of the timelapse (default 20)\n"
@@ -85,17 +115,21 @@ void usage() {
         "                           allows) triangle meshes through the input handlers, with a live HUD; writes a\n"
         "                           JSON result and an MP4 of the run and exits (docs/benchmark.md)\n"
         "  --benchmark standard-15m The standard scene: a 15M triangle head, Clay S/M/L, Move, Smooth and a 240 px\n"
-        "                           brush (standard-33m: 33M; standard: both). The numbers on sculptforge.app/benchmarks\n"
+        "                           brush (standard-33m: 33M; standard-100m: 104M, needs ~16 GB free; standard: 15M + 33M). The numbers on sculptforge.app/benchmarks\n"
         "  --benchmark standard-1b  Experimental Focus Detail: a billion micro triangle head streamed from disk\n"
         "  --benchmark core-200m    Research: a 200 million micro triangle head in memory (open, strokes, orbit)\n"
-        "  --benchmark core-100m    The same at 100 million micro triangles\n"
+        "  --benchmark core-<N>m    The same head at N million micro triangles (core-100m, core-400m, core-800m: 805M, about 4.2 GB of\n"
+        "                           memory and a 0.6 GB scene file, written once; too little of either is a message and exit 1)\n"
         "  --benchmark-file PATH    Open the project PATH, then the same strokes and orbit\n"
+        "  --benchmark-pack DIR     The scene pack (the folder with pack.json, from sculptforge.app/benchmarks): its scenes\n"
+        "                           from the entry level up, the standard strokes on each; add --out results.json (no video\n"
+        "                           unless --benchmark-video)\n"
         "  --benchmark-script T.sfui  Play a take (a UI test script's strokes, orbits, keys and waits) in real time\n"
         "                           with the HUD; writes an MP4 and a per-frame CSV (frame ms, stroke lag) and exits.\n"
         "                           A project to open goes after it: --benchmark-script take.sfui head.sfproj\n"
         "  --focus-detail FILE      Experimental: open a Focus Detail file (.sfdetail)\n"
         "  --benchmark-sizes 5,20   Proof mode mesh sizes in millions of triangles\n"
-        "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here)\n"
+        "  --benchmark-out FILE     Where the JSON result goes (default: sculptforge-benchmark-<time>.json here); --out is the same\n"
         "  --benchmark-video FILE   Where the MP4 goes; --benchmark-no-video records none\n"
         "  --benchmark-vsync        Keep vertical sync on (default off: frame times are not capped)\n"
         "  --benchmark-seconds S    Length of each scripted stroke (default 6)\n"
@@ -122,6 +156,7 @@ void isolateSettings() {
 #else
     setenv("XDG_DATA_HOME", d.c_str(), 1);
     setenv("XDG_CONFIG_HOME", d.c_str(), 1);
+    setenv("SF_USER_DATA_DIR", d.c_str(), 1);   // (a portable copy's data/ folder gives way to it: core/DataDir.h)
     setenv("HOST_XDG_DATA_HOME", d.c_str(), 1); // in a Flatpak, the Blender bridge folder (io/BlenderBridge.h)
     setenv("SF_AI_LIVE_DIR", d.c_str(), 1);     // live mode's socket (link/AiLink.h): never the user's window's
 #if defined(__APPLE__)
@@ -178,6 +213,43 @@ int finishIsolated(int code) {
 
 static bool g_uiServe = false; // --ui-serve: runMain runs once per script in one process
 
+// --portable-selftest [VALUE]: the data folder this run uses (tests/portable_data.cmake starts the real program from a
+// folder with spaces, moves the folder and starts it again), a value kept in it across runs.
+static int portableSelfTest(const char* value) {
+    const sf::DataLocation& loc = sf::dataLocation();
+    const std::string dir = sf::userDataDir();
+    if (dir.empty()) {
+        std::fprintf(stderr, "portable-selftest: no data folder\n");
+        return 1;
+    }
+    const std::filesystem::path file = std::filesystem::path(std::u8string(dir.begin(), dir.end())) / "portable-selftest.txt";
+    if (value && *value) std::ofstream(file, std::ios::binary | std::ios::trunc) << value;
+    std::ifstream in(file, std::ios::binary);
+    const std::string kept((std::istreambuf_iterator<char>(in)), {});
+    std::printf("portable=%d\nread-only=%d\ndata=%s\nvalue=%s\n", loc.portable ? 1 : 0, loc.readOnly ? 1 : 0, dir.c_str(), kept.c_str());
+    return 0;
+}
+
+// A portable copy (a portable.txt or data/ folder beside the program: core/DataDir.h) on a computer that has SculptForge
+// settings of its own: once, before anything reads or writes its data folder, ask whether to copy them in. A copy,
+// never a move, and nothing is written to the computer's own folder. Windowed runs only (the dialog stays out of tests,
+// renders and agents); the answer, either way, is remembered in data/.import-offered.
+static void offerPortableImport() {
+    if (!sf::importAvailable()) return;
+    const int answer = sf::dialogs::choose(
+        "SculptForge (portable)",
+        "This is a portable copy: its settings, brushes and layouts stay in the data folder next to the program.\n\n"
+        "SculptForge found settings on this computer. Copy them into the portable copy? Your installed copy is not changed.",
+        "Import my settings and brushes", "Start fresh", nullptr);
+    if (answer < 0) return; // (no dialog could be shown: ask again on a run that can)
+    if (answer == 1) {
+        std::string summary, error;
+        if (sf::importInstalledData(summary, error)) std::fprintf(stderr, "sculptforge: %s\n", summary.c_str());
+        else std::fprintf(stderr, "sculptforge: import failed: %s\n", error.c_str());
+    }
+    sf::markImportOffered();
+}
+
 // One run of the app: the whole of main, also each script of the warm UI test server (--ui-serve, UiServe.cpp).
 static int runMain(int argc, char** argv) {
     sf::AppOptions options;
@@ -218,6 +290,7 @@ static int runMain(int argc, char** argv) {
         else if (a == "--supersample") options.supersample = std::clamp(std::atoi(next().c_str()), 1, 4);
         else if (a == "--ui-test") options.uiTest = next();
         else if (a == "--fullscreen") options.fullscreen = true;
+        else if (a == "--reset-layout") options.resetLayout = true; // the way out of a layout that cannot be used
         else if (a == "--no-ai") sf::ai::setAiForcedOff(true); // as SF_AI=off (ai/AiPolicy.h)
         else if (a == "--no-packs") sf::setPacksSafeMode(true); // safe mode: no installed pack is loaded
         else if (a == "--studio") studioProfile = next();             // core/StudioProfile.h
@@ -228,12 +301,18 @@ static int runMain(int argc, char** argv) {
         else if (a == "--log-dir") logDir = next();
         else if (a == "--crash-test") crashTest = next();
         else if (a == "--measure-idle") options.measureIdle = std::max(0.5f, float(std::atof(next().c_str())));
+        else if (a == "--measure-key-nav") options.measureKeyNav = true;
         else if (a == "--measure-stroke") {
             const std::string v = next(); // S or S,RADIUS
             options.measureStroke = std::max(0.5f, float(std::atof(v.c_str())));
             if (const size_t comma = v.find(','); comma != std::string::npos)
                 options.measureStrokeRadius = float(std::atof(v.c_str() + comma + 1));
         }
+        else if (a == "--splash-shot") options.splashShotPath = next();
+        else if (a == "--portable-selftest") return portableSelfTest(i + 1 < argc ? argv[i + 1] : nullptr);
+        else if (a == "--splash-selftest") return sf::splash::selfTest(); // (SDL_VIDEO_DRIVER=dummy in the test run)
+        else if (a == "--acp-selftest") return sf::utf8CodePageSelfTest(); // (core/Utf8Path.h: Windows' manifest code page)
+        else if (a == "--python-selftest") return sf::pythonSelfTest(); // (app/Python.h: the shipped Python starts)
         else if (a == "--timelapse") options.timelapsePath = next();
         else if (a == "--timelapse-seconds") options.timelapseSeconds = std::max(2.0f, float(std::atof(next().c_str())));
         else if (a == "--benchmark") {
@@ -242,9 +321,9 @@ static int runMain(int argc, char** argv) {
             if (i + 1 < argc && (std::string(argv[i + 1]).rfind("standard", 0) == 0 || std::string(argv[i + 1]).rfind("core-", 0) == 0)) {
                 options.benchmarkScene = argv[++i];
                 if (options.benchmarkScene != "standard" && options.benchmarkScene != "standard-15m" &&
-                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-1b" &&
-                    options.benchmarkScene != "core-200m" && options.benchmarkScene != "core-100m") {
-                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard, standard-1b, core-100m or core-200m)\n", argv[i]);
+                    options.benchmarkScene != "standard-33m" && options.benchmarkScene != "standard-100m" && options.benchmarkScene != "standard-1b" &&
+                    sf::coreSceneMillions(options.benchmarkScene) == 0) {
+                    std::fprintf(stderr, "Unknown benchmark scene %s (standard-15m, standard-33m, standard-100m, standard, standard-1b, core-100m, core-200m, core-400m, core-800m or core-<N>m)\n", argv[i]);
                     return 1;
                 }
             }
@@ -254,12 +333,16 @@ static int runMain(int argc, char** argv) {
             options.benchmark = true;
             options.benchmarkScene = "file:" + next();
         }
+        else if (a == "--benchmark-pack") { // the downloadable scene pack (docs/benchmark.md "The scene pack")
+            options.benchmark = true;
+            options.benchmarkScene = "pack:" + next();
+        }
         else if (a == "--benchmark-script") { // a take in real time (BenchTake.cpp)
             options.benchmark = true;
             options.benchmarkScript = next();
         }
         else if (a == "--benchmark-sizes") options.benchmarkSizes = next();
-        else if (a == "--benchmark-out") options.benchmarkOut = next();
+        else if (a == "--benchmark-out" || a == "--out") options.benchmarkOut = next();
         else if (a == "--benchmark-video") options.benchmarkVideo = next();
         else if (a == "--benchmark-no-video") options.benchmarkNoVideo = true;
         else if (a == "--benchmark-vsync") options.benchmarkVsync = true;
@@ -274,6 +357,15 @@ static int runMain(int argc, char** argv) {
             return 1;
         }
     }
+    if (!options.splashShotPath.empty()) { // the start-up splash as a picture, to check it by eye
+        std::string error;
+        if (!sf::splash::writeShot(options.splashShotPath, sizeGiven ? options.width : 1440, sizeGiven ? options.height : 810,
+                                   sf::App::splashVersionLine(), error)) {
+            std::fprintf(stderr, "%s\n", error.c_str());
+            return 1;
+        }
+        return 0;
+    }
     g_isolatedDir.clear(); // (the warm server's last script's folder)
     if (automatedRun()) isolateSettings();
     if (bench.run) return finishIsolated(sf::runAppBenchmark(bench));
@@ -281,6 +373,11 @@ static int runMain(int argc, char** argv) {
     if (calibrate) return finishIsolated(sf::runCalibrateCommandLine(calibrateQuick, calibrateSave));
     if (!options.uiTest.empty()) {
         if (!sizeGiven) options.width = 1600, options.height = 960;
+        if (!options.recordPath.empty() && options.uiRecordPath.empty()) { // --ui-test x.sfui --record out.mp4: a bug clip
+            options.uiRecordPath = std::move(options.recordPath);
+            options.recordPath.clear();
+            options.uiRecordClip = true;
+        }
         isolateSettings();
     }
     if (options.benchmarkScene == "standard-1b") { // the asset first (written once, a few seconds), before any window
@@ -294,22 +391,32 @@ static int runMain(int argc, char** argv) {
             return 1;
         }
     }
-    if (options.benchmarkScene == "core-200m" || options.benchmarkScene == "core-100m") { // research: micro triangles in memory, the project written once
+    if (options.benchmarkScene.rfind("pack:", 0) == 0) { // the pack first: a missing or damaged one is a message, not a window
+        sf::BenchPack pack;
         std::string error;
-        if (sf::core200mScenePath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); },
-                                  options.benchmarkScene == "core-100m" ? 100 : 200).empty()) {
-            std::fprintf(stderr, "%s: %s\n", options.benchmarkScene.c_str(), error.c_str());
+        if (!sf::loadBenchPack(options.benchmarkScene.substr(5), pack, error)) {
+            std::fprintf(stderr, "--benchmark-pack: %s\n", error.c_str());
+            return 1;
+        }
+    }
+    if (const int millions = sf::coreSceneMillions(options.benchmarkScene)) { // research: micro triangles in memory, the project written once
+        std::string error;
+        if (sf::core200mScenePath(error, [](const std::string& s) { std::fprintf(stderr, "%s\n", s.c_str()); }, millions).empty()) {
+            std::fprintf(stderr, "%s\n", error.c_str()); // (it names the scene itself: too little memory or disk is a message, not a crash)
             return 1;
         }
     }
     if (options.benchmark && !sizeGiven) options.width = 1920, options.height = 1080;
     if (options.benchmark || !options.timelapsePath.empty()) isolateSettings(); // the user's settings and files untouched
     if (!options.timelapsePath.empty() && !sizeGiven) options.width = 1920, options.height = 1080;
-    if (options.measureIdle > 0.0f || options.measureStroke > 0.0f) isolateSettings(); // a fresh start, no restore prompt, the user's files untouched
+    if (options.measureIdle > 0.0f || options.measureStroke > 0.0f || options.measureKeyNav) isolateSettings(); // a fresh start, no restore prompt, the user's files untouched
     if (!options.recordPath.empty() && options.supersample > 1) { // the app renders large; the video keeps --size
         options.width *= options.supersample;
         options.height *= options.supersample;
     }
+    if (options.renderPath.empty() && options.recordPath.empty() && options.uiTest.empty() && options.timelapsePath.empty() &&
+        !options.benchmark && options.demo.empty() && crashTest.empty() && !automatedRun())
+        offerPortableImport();
     sf::crashlog::start(logDir); // after isolateSettings: a UI test logs into its own folder
     { // studio mode: the network policy, brush shares and packs (after isolateSettings: tests install into their folder)
         const char* base = SDL_GetBasePath();
@@ -319,6 +426,9 @@ static int runMain(int argc, char** argv) {
         if (studio.active) SDL_Log("Studio mode%s: no outside connections", studio.profile.name.empty() ? "" : (" (" + studio.profile.name + ")").c_str());
     }
     if (!crashTest.empty()) crashOnPurpose(crashTest);
+    // The saved thread count before the App exists: its Document builds the built-in stamps on the shared pool, which
+    // takes its size at first use (#184: a count set after that stayed at 16 on a 48-thread machine).
+    if (sf::App::usesProfileThreads(options)) sf::applyCachedThreadCount();
     auto app = std::make_unique<sf::App>();
     if (!app->init(options)) {
         // A double-clicked app that can't start says why (#109: on a laptop it just vanished, not even in the
@@ -326,6 +436,7 @@ static int runMain(int argc, char** argv) {
         const bool interactive = options.renderPath.empty() && options.recordPath.empty() && options.uiTest.empty() &&
                                  options.timelapsePath.empty() && !options.benchmark && options.demo.empty() &&
                                  !automatedRun();
+        app->closeSplash(); // (the message must not sit behind it)
         if (interactive) {
             std::string text = "SculptForge could not start.\n\n" +
                                (app->startError().empty() ? std::string("See the log for details.") : app->startError()) +
@@ -337,6 +448,7 @@ static int runMain(int argc, char** argv) {
         sf::crashlog::stop();
         return 1;
     }
+    SDL_Log("Threads: pool of %d (hardware %u)", sf::ThreadPool::shared().threads(), std::thread::hardware_concurrency()); // (bug reports: #184)
     const auto runStart = std::chrono::steady_clock::now();
     int code = app->run();
     const auto runEnd = std::chrono::steady_clock::now();
@@ -367,7 +479,25 @@ static int execCli(int argc, char** argv) {
 }
 #endif
 
+#ifdef __ANDROID__
+// Android: no HOME or XDG folders, and the working directory is "/". The app's own storage stands in for them, so
+// settings, the log, autosaves and the brush library land where the desktop code already looks (app/UserData.h).
+static void androidEnvironment() {
+    const std::string internal = SDL_GetAndroidInternalStoragePath() ? SDL_GetAndroidInternalStoragePath() : "";
+    if (internal.empty()) return;
+    setenv("HOME", internal.c_str(), 1);
+    setenv("XDG_DATA_HOME", (internal + "/share").c_str(), 1);
+    setenv("XDG_CONFIG_HOME", (internal + "/config").c_str(), 1);
+    if (const char* cache = SDL_GetAndroidCachePath()) setenv("TMPDIR", cache, 1);
+    std::error_code ec;
+    std::filesystem::current_path(sf::dialogs::androidProjectsDir(), ec);
+}
+#endif
+
 int main(int argc, char** argv) {
+#ifdef __ANDROID__
+    androidEnvironment();
+#endif
 #ifndef _WIN32
     if (argc >= 2 && std::string(argv[1]) == "--cli") return execCli(argc, argv);
 #endif

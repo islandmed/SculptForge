@@ -54,10 +54,10 @@ constexpr ImU32 kMarkerLight = IM_COL32(255, 255, 255, 245);  // SV ring and hue
 constexpr ImU32 kMarkerDark = IM_COL32(0, 0, 0, 150);         // their outline, readable on white
 constexpr float kFieldGap = 4.0f;   // one gap between every part of the colour field (square, strip, swatches, Fill)
 constexpr float kHueStripW = 10.0f; // wide enough to read as a control next to the square
-constexpr float kSwatchH = 18.0f;
-constexpr float kRecentH = 12.0f; // the recent colours' rows: thin
+constexpr float kSwatchH = 30.0f;  // the main and second colour: the ones in use, clearly the biggest cells (Fenix: 18 px was too small)
+constexpr float kRecentMin = 20.0f; // a recent colour cell is never smaller than this (logical px); the row wraps instead
 
-const SDL_DialogFileFilter kAlphaFilters[] = {{"Images", "png;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
+const SDL_DialogFileFilter kAlphaFilters[] = {{"Images", "png;exr;jpg;jpeg;bmp;tga;psd;gif"}, {"All files", "*"}};
 
 std::string lower(std::string s) {
     for (auto& c : s)
@@ -106,6 +106,8 @@ struct State {
     // Size / Intensity / Colour intensity / Falloff at the cursor.
     int slider = -1; // PickerUi::Slider, -1 = closed
     bool sliderSmooth = false; // Intensity of the Smooth brush (Shift was held)
+    float* sliderZ = nullptr;  // the Intensity it sets: the main one, Smooth's or the Shift / Ctrl brush's own
+    std::string sliderZName = "Intensity";
     ImVec2 sliderAt{0, 0};  // the cursor when it opened
     ImVec2 sliderPos{0, 0}; // the window's place, fixed once the knob is under sliderAt
     bool sliderPlaced = false;
@@ -113,6 +115,12 @@ struct State {
     int sliderFrame = -1;
     std::string sliderTyped;
     bool sliderWasActive = false;
+    bool sliderFollowed = false; // it has followed the pointer since it opened (it goes on following, back near the start too)
+    // Follow mode (the Blender-style feel): after the key, moving the mouse sideways sets the value live from where it
+    // opened; a click or Enter keeps it, Esc or a right click puts back what it was.
+    bool sliderBaseSet = false;
+    float sliderBase = 0.0f;
+    float* sliderValue = nullptr; // the value being set (the preview reads it), as last drawn
     // Recently used brushes (ids, newest first).
     std::vector<std::string> recent;
     std::string lastActive;
@@ -450,7 +458,7 @@ const char* brushTypeDescription(int type) {
         return "A sharp V-shaped crease with the sides pinched in, for wrinkles and folds.";
     case BrushType::ClayBlock:
         return "Square, flat-topped clay strokes that stack up quickly, for bold blocking.";
-    case BrushType::SnakeHook:
+    case BrushType::Tendril:
         return "Pulls the surface out along the stroke into horns, tentacles and spikes.";
     case BrushType::Trim:
         return "Trim: cuts away everything above a plane, for hard planar surfaces.";
@@ -480,6 +488,9 @@ const char* brushTypeDescription(int type) {
     case BrushType::Cloth:
         return "Moves the surface like fabric: drag to pull it along and it folds where it bunches up; Push presses it "
                "in, Settle lets it sag and drape over other Parts. Mode and fabric in Brush > Cloth; the mask pins it.";
+    case BrushType::SmoothPeaks:
+        return "Smooths only the high points: lowers what sticks out above the surrounding surface and leaves the "
+               "hollows alone. Hold Shift with any brush for the plain smooth.";
     default:
         return "";
     }
@@ -583,6 +594,7 @@ void PickerUi::select(App& app, const BrushItem& item) {
     app.edgesMode_ = false; // picking any brush leaves Edges mode (PanelEdges.cpp)
     switch (item.kind) {
     case BrushItem::Kind::Type:
+        if (app.modifierBrushClick(item.index)) return; // Shift+click: the Shift brush (ModifierBrush.cpp)
         app.brush_ = BrushType(item.index);
         app.doc_.activeBrush = -1;
         app.paintMode_ = false;
@@ -612,12 +624,12 @@ void PickerUi::select(App& app, const BrushItem& item) {
 ImTextureID PickerUi::thumbnail(App& app, const BrushItem& item) {
     switch (item.kind) {
     case BrushItem::Kind::Type:
-        return app.thumbs_.brush(item.index);
+        return app.brushThumbnail(item.index);
     case BrushItem::Kind::Paint:
         return app.thumbs_.brush(kPaintBrush);
     case BrushItem::Kind::Recipe:
         return item.index >= 0 && item.index < int(app.doc_.brushes.size())
-                   ? app.thumbs_.recipe(app.doc_.brushes[size_t(item.index)])
+                   ? app.recipeThumbnail(app.doc_.brushes[size_t(item.index)])
                    : ImTextureID(0);
     case BrushItem::Kind::File:
     case BrushItem::Kind::Guides:
@@ -753,6 +765,8 @@ void drawBrushGrid(App& app, GridMode mode) {
                              : b.kind == BrushItem::Kind::File   ? "Library file - pick to load it"
                              : b.kind == BrushItem::Kind::Guides ? "Tool > Geometry > Quad Remesh"
                                                                  : "Built-in brush";
+        if (b.kind == BrushItem::Kind::Recipe && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+            BrushAlpha::prefetch(app.doc_.brushes[size_t(b.index)].alpha); // (a Creature Skin alpha, made by the click)
         quickInfo(tex, glyph, b.name, b.description, footer);
         ui::HelpText(b.name.c_str(), nullptr, b.description.c_str(), "Brush");
         if (ImGui::BeginPopupContextItem()) {
@@ -765,6 +779,11 @@ void drawBrushGrid(App& app, GridMode mode) {
                 shelf.insert(std::find(shelf.begin(), shelf.end(), "widget.add_brush"), action); // before [+]
                 app.status_ = "Added " + b.name + " to the bottom shelf";
             }
+            // The thumbnail shows the brush's alpha and stroke (#208): made again from the alpha file as it is now.
+            if (b.kind == BrushItem::Kind::Type && ImGui::MenuItem(tr("Regenerate thumbnail")))
+                app.regenerateBrushThumbnail(b.index);
+            if (b.kind == BrushItem::Kind::Recipe && ImGui::MenuItem(tr("Regenerate thumbnail")))
+                app.regenerateRecipeThumbnail(app.doc_.brushes[size_t(b.index)]);
             if (b.kind == BrushItem::Kind::Recipe) {
                 // The same menu as the Brush palette's custom-brush list (PanelBrushLibrary.cpp).
                 if (ImGui::MenuItem(tr("Copy brush code"))) app.copyBrushCode(b.index);
@@ -958,7 +977,8 @@ void drawAlphaGrid(App& app, GridMode mode) {
     std::vector<Entry> entries;
     for (int i = 0; i < int(BrushAlpha::builtins().size()); ++i) {
         const std::string& name = builtinAlpha(i).name;
-        entries.push_back({Entry::Kind::Builtin, name, BrushAlpha::builtinHelp(name), "", "", "Built-in", i});
+        const std::string group = BrushAlpha::builtinGroup(name); // (the Creature Skin set sorts as its own pack)
+        entries.push_back({Entry::Kind::Builtin, name, BrushAlpha::builtinHelp(name), "", group, group.empty() ? "Built-in" : group, i});
     }
     const bool custom = !current.empty() && !current.path.empty();
     if (custom)
@@ -967,7 +987,7 @@ void drawAlphaGrid(App& app, GridMode mode) {
     if (!app.library_.user.empty()) {
         const std::string dir = app.library_.user + "/Alphas";
         if (const auto* list = app.libraryScanner_.get(dir, "alpha", [](const std::string& p) {
-                return isImageFile(p) ? AssetKind::AlphaFile : AssetKind::Folder;
+                return isAlphaImageFile(p) ? AssetKind::AlphaFile : AssetKind::Folder;
             }))
             for (const auto& e : *list)
                 if (e.kind == AssetKind::AlphaFile && !(custom && lower(e.name) == lower(current.name)))
@@ -986,7 +1006,7 @@ void drawAlphaGrid(App& app, GridMode mode) {
         kept.push_back(i);
         // Round is "no alpha": it stays first in every order (the pack order puts it with the built-ins).
         const Entry& e = entries[i];
-        ListSortKey k{e.name, e.kind == Entry::Kind::Builtin ? std::string() : "\x01" + e.group,
+        ListSortKey k{e.name, e.kind == Entry::Kind::Builtin ? e.pack : "\x01" + e.group,
                       recentRank(s.recentAlphas, lower(e.name))};
         if (e.builtin == 0) k.name = std::string(1, '\0');
         keys.push_back(std::move(k));
@@ -1032,8 +1052,16 @@ void drawAlphaGrid(App& app, GridMode mode) {
             else if (e.kind != Entry::Kind::Current)
                 app.runCommand("brush_set_alpha", {{"path", e.path}, {"invert", app.alphaInvert_}});
         }
+        if (e.kind == Entry::Kind::Builtin && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) BrushAlpha::prefetch(e.name);
         quickInfo(tex, glyph, e.name, e.help, e.path);
         ui::HelpText(e.name.c_str(), nullptr, e.help.c_str(), "Alpha");
+        if (ImGui::BeginPopupContextItem(("##alphapoolmenu" + id).c_str())) { // the alpha pool (core/AlphaOptions.h)
+            ImGui::TextDisabled("%s", e.name.c_str());
+            if (ImGui::MenuItem(tr("Add to alpha pool")))
+                app.runCommand("brush_alpha_pool", e.kind == Entry::Kind::Builtin ? Args{{"name", e.name}}
+                                                                                   : Args{{"path", e.path}});
+            ImGui::EndPopup();
+        }
     }
     if (order.empty()) ImGui::TextDisabled(tr("No alpha matches \"%s\""), filter);
     ImGui::Dummy(ImVec2(0, 2));
@@ -1252,6 +1280,8 @@ void PickerUi::sizePopup(App& app, Slider which) {
     // Smooth's own Intensity when Smooth is the brush or Shift is held. Not Shift in the Blender style:
     // there Shift+F is the brush's Strength, as in Blender, and Shift has no smoothing meaning for a key.
     s.sliderSmooth = app.blenderStyle() ? app.brush_ == BrushType::Smooth : app.activeBrush() == BrushType::Smooth;
+    s.sliderZ = app.blenderStyle() ? (s.sliderSmooth ? &app.smoothStrength_ : &app.intensityValue(false)) : &app.heldIntensity();
+    s.sliderZName = app.blenderStyle() ? (s.sliderSmooth ? "Smooth Intensity" : "Intensity") : app.heldIntensityName();
     // The brush cursor's own position (SDL's window coordinates, the brush ring's centre) rather than ImGui's
     // MousePos: on Windows ImGui's comes from the global cursor minus the window position while no button is held,
     // and pen drivers' stray mouse events move it too, so the slider opened away from the cursor (#9).
@@ -1260,6 +1290,28 @@ void PickerUi::sizePopup(App& app, Slider which) {
     s.sliderFrame = ImGui::GetFrameCount();
     s.sliderTyped.clear();
     s.sliderWasActive = false;
+    s.sliderFollowed = false;
+    s.sliderBaseSet = false;
+    s.sliderValue = nullptr;
+}
+
+namespace {
+// Sideways motion that moves a slider: Size one pixel per pixel (the ring's edge follows the pointer), the others
+// half a point (of the shown 0-100) per unscaled pixel, so 200 px cover the range.
+constexpr float kFollowPerPx = 0.5f;
+constexpr float kFollowSlopPx = 2.0f; // less than this is a click on the knob, not a move
+// A hovering pen drifts a few pixels as the tip comes down onto the knob: that is still a press on the knob (gh#184).
+constexpr float kFollowSlopPenPx = 8.0f;
+} // namespace
+
+bool PickerUi::sliderFollowing(const App& app) {
+    const State& s = st();
+    // A pen hovering in range follows too (gh#184: with it left out, holding S and moving a Wacom pen showed the size
+    // standing still until the tip came down). The pen alone moves the pointer then (App::strayMouseMotion): a driver's
+    // stray mouse events don't move the value.
+    const float slop = app.penInProximity_ ? kFollowSlopPenPx * app.uiScale_ : kFollowSlopPx;
+    return s.slider >= 0 && !s.sliderWasActive && s.sliderTyped.empty() &&
+           (s.sliderFollowed || std::fabs(app.mouseX_ - s.sliderAt.x) > slop);
 }
 
 void drawPickers(App& app) {
@@ -1302,7 +1354,7 @@ void drawPickers(App& app) {
         const float gridW = 6 * (64.0f * scale + 6.0f) + 20.0f + ImGui::GetStyle().ScrollbarSize;
         if (s.held != 0) { // Ctrl / Ctrl+Shift held: the mask or selection brushes (Brush and Stroke only)
             if (beginPickerWindow(tr(s.picker == Picker::Brush ? "Brushes##picker" : "Strokes##picker"),
-                                  (s.held == 1 ? 3 : 4) * (64.0f * scale + 6.0f) + 20.0f)) { // Ctrl+Shift: 4 Cut shapes a row
+                                  (s.held == 1 ? 4 : 5) * (64.0f * scale + 6.0f) + 20.0f)) { // Ctrl: 4 mask shapes; Ctrl+Shift: 5 Cut shapes a row
                 const bool strokes = s.picker == Picker::Stroke;
                 pickerTitle(strokes ? ICON_LC_SPLINE : ICON_LC_BRUSH,
                             tr(s.held == 1 ? (strokes ? "Mask stroke (Ctrl)" : "Mask brushes (Ctrl)")
@@ -1368,7 +1420,7 @@ void drawPickers(App& app) {
             float* value;
             float lo, hi, shownScale;
         };
-        float* z = &app.intensityValue(s.sliderSmooth); // (in Paint mode the Colour intensity, #164)
+        float* z = s.sliderZ ? s.sliderZ : &app.intensityValue(s.sliderSmooth); // (in Paint mode the Colour intensity, #164)
         const bool paintZ = app.paintMode_ && !s.sliderSmooth;
         const Def d = which == PickerUi::Slider::DrawSize
                           ? Def{"Size", "S",
@@ -1376,7 +1428,7 @@ void drawPickers(App& app) {
                                 "change it.",
                                 &app.radiusPx_, kMinDrawSizePx, kMaxDrawSizePx, 1.0f}
                       : which == PickerUi::Slider::ZIntensity
-                          ? Def{s.sliderSmooth ? "Smooth Intensity" : "Intensity", "U",
+                          ? Def{s.sliderZName.c_str(), "U",
                                 s.sliderSmooth ? "How strongly Smooth works (it keeps its own value: hold "
                                                  "Shift and press U to set it). Type a number and press Enter."
                                 : paintZ ? "How strongly painting colours the surface (1-100). Drag, or type a number "
@@ -1407,6 +1459,30 @@ void drawPickers(App& app) {
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_AlwaysAutoResize)) {
             const bool first = ImGui::GetFrameCount() < s.sliderFrame + 2; // the S / U / I / O key itself
+            if (!s.sliderBaseSet) {
+                s.sliderBase = *d.value;
+                s.sliderBaseSet = true;
+            }
+            s.sliderValue = d.value;
+            // Follow: the pointer's sideways distance from where it opened sets the value, live. A press on the knob
+            // (before any move) still drags it as before; a click after moving keeps the value (nothing starts a stroke).
+            const bool leftDown = ImGui::GetIO().MouseDown[ImGuiMouseButton_Left];
+            const bool following = PickerUi::sliderFollowing(app);
+            if (following && !first) s.sliderFollowed = true;
+            // The pointer going past the canvas edge (growing a brush at the right side) keeps the value of the edge. A
+            // click on a control there (a shelf tile, a panel button: going for another tool) cancels and goes on to it;
+            // a click on nothing in particular keeps the value, as on the canvas.
+            const CanvasRect canvas = app.canvasRect();
+            const float edgeX = std::clamp(app.mouseX_, canvas.x, canvas.x + canvas.w);
+            const bool overControl = ImGui::IsAnyItemHovered() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+            const bool leftClicked = following && !first && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+            const bool confirmClick = leftClicked && !overControl;
+            if (following && !leftDown && !first) {
+                const float dx = edgeX - s.sliderAt.x;
+                const float delta = which == PickerUi::Slider::DrawSize ? dx : dx / app.uiScale_ * kFollowPerPx / d.shownScale;
+                *d.value = std::clamp(s.sliderBase + delta, d.lo, d.hi);
+            }
+            const float keptValue = *d.value;
             // Typing a number sets it (Enter applies, Esc cancels); dragging the slider works too.
             if (!first) {
                 for (int k = 0; k <= 9; ++k)
@@ -1431,7 +1507,11 @@ void drawPickers(App& app) {
                     }
                     close = true;
                 }
-                if (ImGui::IsKeyPressed(ImGuiKey_Escape)) close = true;
+                if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                    *d.value = s.sliderBase; // Esc cancels: back to what it was
+                    s.sliderTyped.clear();
+                    close = true;
+                }
             }
             ImGui::SetNextItemWidth(w);
             char fmt[64];
@@ -1448,6 +1528,7 @@ void drawPickers(App& app) {
                 if (ImGui::SliderFloat("##cursorvalue", &shown, d.lo * d.shownScale, d.hi * d.shownScale, fmt))
                     *d.value = std::clamp(shown / d.shownScale, d.lo, d.hi);
             }
+            if (confirmClick) *d.value = keptValue; // (the click's own jump on the knob does not count)
             ImGui::LogText("%s %.0f", d.name, double(*d.value * d.shownScale));
             {
                 // The knob's centre as ImGui's slider draws it (2 px padding, GrabMinSize wide; Size is logarithmic).
@@ -1474,6 +1555,16 @@ void drawPickers(App& app) {
             // hovered while its own slider is active, and that used to close the slider as soon as it was dragged, #9.)
             const bool clicked =
                 ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+            if (confirmClick) close = true;
+            if (leftClicked && overControl) {
+                *d.value = s.sliderBase; // a click on another control cancels (and that control gets it)
+                close = true;
+            }
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !first) { // a right click cancels, like Esc
+                *d.value = s.sliderBase;
+                s.sliderTyped.clear();
+                close = true;
+            }
             if (clicked && !first && !dragging && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
                 close = true;
         }
@@ -1486,13 +1577,21 @@ void drawPickers(App& app) {
 
 bool PickerUi::sliderPreview(const App& app, ImVec2& at, Slider& which, float& value) {
     const State& s = st();
-    if (s.slider != int(Slider::DrawSize) && s.slider != int(Slider::FocalShift)) return false;
+    if (s.slider < 0) return false;
     which = Slider(s.slider);
     at = s.sliderAt;
-    value = which == Slider::DrawSize ? app.radiusPx_ : app.focalShift_;
+    const bool intensity = which == Slider::ZIntensity || which == Slider::RgbIntensity;
+    if (intensity) {
+        if (!s.sliderValue) return false; // (the first frame, before the pop-up has drawn)
+        value = *s.sliderValue; // the ring shows it as a disc: 0..1
+    } else {
+        value = which == Slider::DrawSize ? app.radiusPx_ : app.focalShift_;
+    }
     if (!s.sliderTyped.empty() && s.sliderTyped != "-" && s.sliderTyped != ".") {
         const float v = std::strtof(s.sliderTyped.c_str(), nullptr); // as Enter would apply it
-        value = which == Slider::DrawSize ? std::clamp(v, kMinDrawSizePx, kMaxDrawSizePx) : std::clamp(v / 100.0f, -1.0f, 1.0f);
+        value = which == Slider::DrawSize ? std::clamp(v, kMinDrawSizePx, kMaxDrawSizePx)
+                : intensity               ? std::clamp(v > 1.0f ? v / 100.0f : v, 0.01f, 1.0f)
+                                          : std::clamp(v / 100.0f, -1.0f, 1.0f);
     }
     return true;
 }
@@ -1545,7 +1644,10 @@ void swatch(ImDrawList* dl, ImVec2 a, ImVec2 b, ImVec4 colour, float rounding, f
 
 } // namespace
 
-void App::drawColorWidget(float width) {
+// `width`: the column's inside. `fit` (< 1 on a shelf too short for its content, Shell.cpp) shrinks the SV square and
+// the swatch heights, never the cells' widths: they wrap to `width` and keep kRecentMin (a narrow window at 150 % made
+// the cells one per row, full width, and clipped the column).
+void App::drawColorWidget(float width, float fit) {
     const float s = uiScale_;
     const float rounding = 3.0f * s;
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1565,8 +1667,10 @@ void App::drawColorWidget(float width) {
     if (val <= 1e-4f) sat = store->GetFloat(satKey, sat);
 
     const float stripW = kHueStripW * s, gap = kFieldGap * s;
-    const float squareW = width - stripW - gap, squareH = squareW;
+    const float squareW = std::floor((width - stripW - gap) * std::clamp(fit, 0.1f, 1.0f)), squareH = squareW;
+    const float fieldIndent = std::floor((width - (squareW + stripW + gap)) * 0.5f); // a shrunk field stays centred
     bool changed = false;
+    if (fieldIndent > 0.0f) ImGui::Indent(fieldIndent);
 
     // Saturation across, value down.
     const ImVec2 sq = ImGui::GetCursorScreenPos();
@@ -1628,14 +1732,16 @@ void App::drawColorWidget(float width) {
 
     ImGui::PopStyleVar();
     ImGui::PopID();
+    if (fieldIndent > 0.0f) ImGui::Unindent(fieldIndent);
     ImGui::EndGroup();
     ui::HelpText("Colour", "C", "The vertex paint colour (C over the model picks one).", "Left shelf");
 
     // Two swatches main and secondary colour: clicking either swaps them ("Alternate"). Equal halves of
     // the column, main on the left, the same gap as between the square and the strip.
-    const float swH = kSwatchH * s;
+    const float swH = std::max(kRecentMin, kSwatchH * std::clamp(fit, 0.0f, 1.0f)) * s; // (never under the cell minimum)
     const float mainW = std::floor((width - gap) * 0.5f), secondW = width - gap - mainW;
     const glm::vec3 second = linearToSrgb(secondaryColor_);
+    colourCellMin_ = std::min({mainW, secondW, swH}) / s;
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(gap, gap));
     const ImVec2 pa = ImGui::GetCursorScreenPos();
     bool swap = ImGui::InvisibleButton("##primary", ImVec2(mainW, swH));
@@ -1648,13 +1754,17 @@ void App::drawColorWidget(float width) {
            rounding, s, ImGui::IsItemHovered());
     ui::HelpText("Second colour", nullptr, "Click to swap it with the main colour.", "Left shelf");
     if (swap) std::swap(doc_.paintColor, secondaryColor_);
-    // The recent colours (Oslen on Discord): the last ones painted with, newest first, in rows of four (a second row
-    // once there are more than four) across the column's width. Click one to paint with it.
+    // The recent colours (Oslen on Discord): the last ones painted with, newest first, square cells that wrap to the
+    // column's width (as many per row as fit at kRecentMin, stretched to fill it: a wider column gets more per row, never
+    // smaller cells). Click one to paint with it.
     if (!recentColors_.empty()) {
-        constexpr int kCols = 4;
-        const float rw = std::floor((width - gap * float(kCols - 1)) / float(kCols)), rh = kRecentH * s;
-        for (size_t i = 0; i < recentColors_.size(); ++i) {
-            if (i % kCols != 0) ImGui::SameLine();
+        const size_t cols = size_t(std::max(1, int(std::floor((width + gap) / (kRecentMin * s + gap)))));
+        const float rw = std::floor((width - gap * float(cols - 1)) / float(cols)), rh = std::max(kRecentMin * s, std::min(rw, 1.4f * kRecentMin * s));
+        // A shelf too short for its content (fit < 1) shows two rows of them, the newest ones; the rest return on a taller shelf.
+        const size_t shown = fit < 0.999f ? std::min(recentColors_.size(), cols * 2) : recentColors_.size();
+        colourCellMin_ = std::min(colourCellMin_, rw / s);
+        for (size_t i = 0; i < shown; ++i) {
+            if (i % cols != 0) ImGui::SameLine();
             const ImVec2 ra = ImGui::GetCursorScreenPos();
             const std::string id = "##recent" + std::to_string(i);
             const bool use = ImGui::InvisibleButton(id.c_str(), ImVec2(rw, rh));

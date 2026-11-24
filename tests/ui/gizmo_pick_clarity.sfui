@@ -1,0 +1,39 @@
+# Transform gizmo, All mode: a ring seen edge-on and an arrow pointing at the viewer step back (Idea by Fenix on Discord).
+# The front view is where most people start: two rings are bars through the centre that the arrows lie over, so they fade
+# and are not pressed; turned a little the ring picks by its rim, beyond the arrow heads. Shots in the Classic setup and in
+# Streamlined (the 1440 and 2880 runs are in CMakeLists.txt).
+run new_sphere subdivisions=5
+key f
+camera 0 0
+run gizmo_mode mode=all
+expect_value gizmo_mode == 4
+wait 0.3
+shot front-classic
+
+# Front view: the view ring and the arrows are the handles; the arrow along the view direction is a faint marker.
+gizmo_hover rotate_view
+expect_value gizmo_hover == 11
+gizmo_hover move_x
+expect_value gizmo_hover == 1
+gizmo_hover move_y
+expect_value gizmo_hover == 2
+
+# Turned 25 degrees (camera YAW PITCH, in degrees): the X ring is a rim-only ring, picked out past the arrow heads, and lights up there.
+camera 25 0
+wait 0.3
+gizmo_hover rotate_x
+expect_value gizmo_hover == 8
+shot rim-classic
+
+# The same in Streamlined.
+run ui_look look=forge scheme=neutral layout=sculptforge
+camera 0 0
+wait 0.3
+shot front-streamlined
+gizmo_hover rotate_view
+expect_value gizmo_hover == 11
+camera 25 0
+wait 0.3
+gizmo_hover rotate_x
+expect_value gizmo_hover == 8
+shot rim-streamlined

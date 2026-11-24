@@ -1,0 +1,111 @@
+# #180: holding Shift smooths with Smooth's own Intensity, from the first dab, whatever the stroke type, and the
+# Intensity slider keeps showing it while the stroke runs. Main Intensity 80 / Smooth 10 and the reverse: the Shift
+# stroke must move the surface exactly as the Smooth brush picked on the shelf does, never as the main Intensity would.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+input_style classic
+mouse_move 0.5 0.5
+
+# --- Main 80, Smooth 10 ---
+key u
+key 8
+key 0
+key enter
+hold shift
+key u
+key 1
+key 0
+key enter
+hold none
+expect_value z_intensity == 80
+expect_value smooth_intensity == 10
+stroke 0.3 0.5 0.7 0.5
+snapshot
+
+# Dots: Shift stroke, then the Smooth brush's stroke, same path.
+hold shift
+stroke 0.25 0.5 0.75 0.5
+hold none
+remember moved_sum shift_dots
+key ctrl+z
+action brush.smooth
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_sum >= $shift_dots*0.99
+expect_value moved_sum <= $shift_dots*1.01
+key ctrl+z
+action brush.standard
+
+# (Each brush keeps its own stroke type, #78: after picking Smooth the type is set again on it.)
+# Drag Stamp (the stamp took the main Intensity before).
+action stroke.type.drag_stamp
+hold shift
+stroke 0.5 0.5 0.62 0.5
+hold none
+remember moved_sum shift_stamp
+key ctrl+z
+action brush.smooth
+action stroke.type.drag_stamp
+stroke 0.5 0.5 0.62 0.5
+expect_value moved_sum >= $shift_stamp*0.99
+expect_value moved_sum <= $shift_stamp*1.01
+key ctrl+z
+action brush.standard
+
+# Slide Stamp.
+action stroke.type.slide_stamp
+hold shift
+stroke 0.4 0.5 0.6 0.5
+hold none
+remember moved_sum shift_slide
+key ctrl+z
+action brush.smooth
+action stroke.type.slide_stamp
+stroke 0.4 0.5 0.6 0.5
+expect_value moved_sum >= $shift_slide*0.99
+expect_value moved_sum <= $shift_slide*1.01
+key ctrl+z
+action brush.standard
+action stroke.type.dots
+
+# Smooth 10 really is gentler than 80 (so the comparisons above can tell them apart).
+hold shift
+key u
+key 8
+key 0
+key enter
+hold none
+hold shift
+stroke 0.25 0.5 0.75 0.5
+hold none
+expect_value moved_sum > $shift_dots*1.5
+key ctrl+z
+
+# --- Main 10, Smooth 80 (the reverse: Shift smoothing did next to nothing) ---
+mouse_move 0.5 0.5
+key u
+key 1
+key 0
+key enter
+expect_value z_intensity == 10
+expect_value smooth_intensity == 80
+hold shift
+stroke 0.25 0.5 0.75 0.5
+hold none
+remember moved_sum shift_strong
+key ctrl+z
+action brush.smooth
+action stroke.type.dots
+stroke 0.25 0.5 0.75 0.5
+expect_value moved_sum >= $shift_strong*0.99
+expect_value moved_sum <= $shift_strong*1.01
+key ctrl+z
+action brush.standard
+
+# Mid-stroke, the Intensity slider shows Smooth's value (it used to turn back to the main one at the press).
+action stroke.type.dots
+hold shift
+drag_path 0.3 0.5 0.7 0.5 keep
+expect_text Smooth Intensity 80
+release
+hold none
+key ctrl+z

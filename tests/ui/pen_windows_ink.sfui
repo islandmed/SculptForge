@@ -49,13 +49,16 @@ expect_value camera_pan <= $alt_clean*1.02
 expect_value moved == 0
 key f
 
-# The S slider with the pen: it opens at the pen, a pen drag on it changes the size as without stray events, and
-# lifting the pen closes it.
+# The S slider with the pen: it opens at the pen, a pen drag from the knob changes the size as without stray events,
+# and lifting the pen closes it. (Hovering sideways first sets it as the mouse does, size_follow.sfui.)
 pen_hover 0.5 0.5
 remember draw_size s0
 key s
 expect_value size_popup_open == 1
-pen_drag_item "##cursorvalue" 60 0 0.5 0.5 0.4
+pen_press 0.5 0.5 0.4
+pen_sample 0.55 0.5 0.4
+pen_sample 0.6 0.5 0.4
+pen_lift
 expect_value size_popup_open == 0
 remember draw_size size_clean
 expect_value draw_size > $s0
@@ -67,7 +70,13 @@ key enter
 expect_value draw_size == 60
 pen_hover 0.5 0.5
 key s
-pen_drag_item "##cursorvalue" 60 0 0.5 0.5 stray 0.1 0.9 0.4
+snapshot
+pen_press 0.5 0.5 0.4
+pen_sample 0.55 0.5 0.4
+mouse_move 0.1 0.9
+pen_sample 0.6 0.5 0.4
+mouse_move 0.1 0.9
+pen_lift
 expect_value size_popup_open == 0
 expect_value draw_size >= $size_clean-1
 expect_value draw_size <= $size_clean+1

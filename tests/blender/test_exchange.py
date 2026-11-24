@@ -18,6 +18,7 @@ import numpy as np
 # exchange.py alone: the package's __init__ needs bpy.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "addons", "blender", "sculptforge_bridge"))
 import exchange  # noqa: E402
+import splats  # noqa: E402
 
 N = exchange.NO_INDEX
 failures = []
@@ -168,7 +169,160 @@ def test_manifest(tmp):
         pass
 
 
+# ---------------------------------------------------------------------------- Gaussian splats
+
+
+def sample_splats(n=500, degree=3, seed=7):
+    """Splats a capture could hold: values inside the ranges the PLY's logit and log can carry."""
+    rng = np.random.default_rng(seed)
+    q = rng.normal(size=(n, 4))
+    q /= np.linalg.norm(q, axis=1, keepdims=True)
+    sh = rng.normal(scale=0.4, size=(n, (degree + 1) ** 2, 3))
+    return splats.SplatArrays(rng.normal(size=(n, 3)), q, np.exp(rng.uniform(-6, -1, (n, 3))),
+                              rng.uniform(0.02, 0.98, n), sh)
+
+
+def same_splats(a, b, what, atol=2e-5):
+    """Equal splats (a and b in the same order): compared after float32, which the files hold."""
+    ok = len(a) == len(b) and a.sh.shape == b.sh.shape
+    err = {}
+    if ok:
+        # q and -q turn the same way
+        sign = np.sign(np.sum(a.rotations * b.rotations, axis=1, keepdims=True))
+        err = {"positions": np.abs(a.positions - b.positions).max(), "rotations": np.abs(a.rotations - sign * b.rotations).max(),
+               "scales": np.abs(a.scales / b.scales - 1).max(), "opacities": np.abs(a.opacities - b.opacities).max(),
+               "sh": np.abs(a.sh - b.sh).max()}
+        ok = all(v < atol for v in err.values())
+    check(ok, "%s: positions, rotations, scales, opacity and SH agree (%s)" % (
+        what, ", ".join("%s %.2g" % kv for kv in err.items()) if err else "different sizes"))
+
+
+def test_splat_files(tmp):
+    a = sample_splats()
+    path = os.path.join(tmp, "s.ply")
+    splats.write_ply(path, a)
+    header = open(path, "rb").read(4000).split(b"end_header")[0].decode()
+    check("property float f_rest_44" in header and "f_rest_45" not in header, "degree 3: 45 f_rest properties")
+    check(header.index("f_dc_0") < header.index("f_rest_0") < header.index("opacity") < header.index("rot_3"),
+          "standard 3DGS property order")
+    same_splats(a, splats.read_ply(path), "PLY round trip")
+    for degree in (0, 1, 2):
+        b = sample_splats(40, degree, degree)
+        splats.write_ply(path, b)
+        back = splats.read_ply(path)
+        check(back.degree == degree, "SH degree %d kept" % degree)
+        same_splats(b, back, "PLY round trip, degree %d" % degree)
+    # f_rest holds red's coefficients first: coefficient 1 of green is f_rest_15 at degree 3.
+    one = splats.SplatArrays([[0, 0, 0]], [[1, 0, 0, 0]], [[0.1] * 3], [0.5], np.arange(48, dtype=float).reshape(1, 16, 3))
+    splats.write_ply(path, one)
+    raw = open(path, "rb").read()
+    cols = np.frombuffer(raw[raw.index(b"end_header\n") + 11:], dtype="<f4")
+    check(cols[9 + 0] == one.sh[0, 1, 0] and cols[9 + 15] == one.sh[0, 1, 1] and cols[9 + 30] == one.sh[0, 1, 2],
+          "f_rest is channel-major (the k-th coefficient of red, green, blue at k, 15 + k, 30 + k)")
+    check(abs(cols[9 + 45] - 0.0) < 1e-6, "opacity 0.5 is logit 0")
+    # Not splat files: a mesh PLY, ASCII.
+    with open(path, "wb") as f:
+        f.write(b"ply\nformat binary_little_endian 1.0\nelement vertex 1\nproperty float x\nproperty float y\n"
+                b"property float z\nelement face 1\nproperty list uchar int vertex_indices\nend_header\n")
+    try:
+        splats.read_ply(path)
+        check(False, "a mesh PLY is not read as splats")
+    except ValueError:
+        check(True, "a mesh PLY is not read as splats")
+    # The compact .splat format: 32 bytes per splat.
+    rec = bytearray()
+    for i in range(3):
+        rec += np.array([i, 2 * i, -i, 0.1, 0.2, 0.3], dtype="<f4").tobytes() + bytes([255, 128, 0, 200, 255, 128, 128, 128])
+    dot = os.path.join(tmp, "s.splat")
+    open(dot, "wb").write(bytes(rec))
+    d = splats.read_dot_splat(dot)
+    check(len(d) == 3 and np.allclose(d.positions[2], (2, 4, -2)) and np.allclose(d.scales[0], (0.1, 0.2, 0.3)),
+          ".splat: positions and scales")
+    check(np.allclose(d.colors()[0], (1.0, 128 / 255, 0.0), atol=1e-6) and abs(d.opacities[0] - 200 / 255) < 1e-6,
+          ".splat: colour and opacity")
+    check(np.allclose(d.rotations[0], (1, 0, 0, 0)), ".splat: rotation bytes 255,128,128,128 -> identity")
+
+
+def test_splat_bake():
+    a = sample_splats(60, 2, 3)
+    rot = rotation((0.3, 1.0, -0.5), 41.0)
+    m = matrix(rot, (2.0, 2.0, 2.0), (1.0, -2.0, 0.5))
+    b = splats.baked(a, m)
+    check(b.sh.shape == a.sh.shape, "turned splats keep every SH band")
+    # Each splat shows the same colour from the turned camera (direction d before is rot @ d after).
+    d = np.random.default_rng(5).normal(size=(len(a), 3))
+    d /= np.linalg.norm(d, axis=1, keepdims=True)
+    check(np.allclose(splats.eval_sh(b.sh, d @ rot.T), splats.eval_sh(a.sh, d), atol=1e-5), "baked SH: same colour, turned view")
+    back = splats.baked(b, matrix(rot.T, (0.5, 0.5, 0.5), (0, 0, 0)))
+    check(np.allclose(back.sh, a.sh, atol=1e-5), "turned by R then R^-1: the SH come back")
+    check(np.allclose(b.positions, exchange.transform_points(m, a.positions), atol=1e-5), "baked positions")
+    check(np.allclose(b.scales, a.scales * 2.0, atol=1e-6), "baked scale")
+    # The covariance R S S^T R^T of a splat, before and after: the splat is the same ellipsoid, moved.
+    def cov(r_q, scale):
+        w, x, y, z = r_q
+        r = np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                      [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                      [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+        return r @ np.diag(scale ** 2) @ r.T
+    for i in (0, 17, 59):
+        want = (rot * 2.0) @ cov(a.rotations[i], a.scales[i]) @ (rot * 2.0).T
+        check(np.allclose(cov(b.rotations[i], b.scales[i]), want, atol=1e-6), "baked splat %d is the moved ellipsoid" % i)
+    c = splats.baked(a, matrix(np.eye(3), (1, 1, 1), (0, 0, 1)))
+    check(c.sh.shape[1] == 9 and np.array_equal(c.sh, a.sh), "a plain move leaves the SH as they are")
+
+
+def test_splats_through_sculptforge(tmp, cli):
+    root = os.path.join(tmp, "splat-exchange")
+    out = exchange.outbox(root)
+    os.makedirs(out)
+    a = sample_splats(300, 3, 11)
+    m = matrix(rotation((1.0, 2.0, 0.5), 37.0), (1.5, 1.5, 1.5), (0.3, -1.2, 2.0))
+    splats.write_ply(os.path.join(out, "r1_splats.ply"), a)
+    # A mesh and the splats in one send; the older keys are untouched.
+    arrays, _ = object_arrays(grid_with_ngon(), False, 1)
+    exchange.write_bridge(os.path.join(out, "r1_000.Bridge"), "Grid", **arrays)
+    exchange.write_manifest(out, [{"name": "Grid", "file": "r1_000.Bridge"}], "test",
+                            [{"name": "Capture ü", "file": "r1_splats.ply", "matrix_world": m.tolist()}])
+    r = subprocess.run([cli, "-c", 'blender_receive folder="%s"; splat_info; blender_send folder="%s"' % (root, root)],
+                       capture_output=True, text=True)
+    print(r.stdout.strip())
+    check(r.returncode == 0 and "300 Gaussian splats" in r.stdout and "SH degree 3" in r.stdout,
+          "sculptforge-cli received the splats (%s)" % r.stderr.strip())
+    if r.returncode:
+        return
+    manifest = exchange.read_manifest(exchange.inbox(root))
+    check([o["name"] for o in manifest["objects"]] == ["Grid"], "the mesh still comes back")
+    entries = manifest.get("splats", [])
+    check(len(entries) == 1 and entries[0]["name"] == "Capture ü", "the splats come back under their Blender name")
+    if not entries:
+        return
+    back = splats.read_ply(os.path.join(exchange.inbox(root), entries[0]["file"]))
+    same_splats(a, back, "through SculptForge (nothing baked, SH degree 3 intact)")
+    got = np.array(entries[0]["matrix_world"])
+    check(np.abs(got - m).max() < 1e-5, "the object's matrix comes back (max error %.2g)" % np.abs(got - m).max())
+    # No matrix: the splats come back at the origin, upright in Blender's axes.
+    exchange.write_manifest(out, [], "test", [{"name": "Plain", "file": "r2_splats.ply"}])
+    splats.write_ply(os.path.join(out, "r2_splats.ply"), a)
+    r = subprocess.run([cli, "-c", 'blender_receive folder="%s"; blender_send folder="%s"' % (root, root)],
+                       capture_output=True, text=True)
+    check(r.returncode == 0, "splats alone are received (%s)" % (r.stdout + r.stderr).strip())
+    entries = exchange.read_manifest(exchange.inbox(root)).get("splats", [])
+    check(len(entries) == 1 and np.abs(np.array(entries[0]["matrix_world"]) - np.eye(4)).max() < 1e-6,
+          "no matrix in, identity out")
+
+
 # ---------------------------------------------------------------------------- through SculptForge
+
+
+def test_write_read_shapes(tmp):
+    shapes = [("A b", 0.25, np.array([0, 3, 7]), np.array([[0.5, 0, 0], [0, -1.5, 0.25], [1, 2, 3]])),
+              ("Empty", 1.5, np.zeros(0, dtype=np.int64), np.zeros((0, 3))), ("\u00fc", -0.5, np.array([9]), np.array([[1e-4, 0, 0]]))]
+    path = os.path.join(tmp, "x.shapes")
+    exchange.write_shapes(path, 12, shapes)
+    nv, got = exchange.read_shapes(path)
+    check(nv == 12 and [g[0] for g in got] == [s[0] for s in shapes], "write_shapes / read_shapes: names and order")
+    check(all(abs(g[1] - s[1]) < 1e-7 and (g[2] == s[2]).all() and np.abs(g[3] - s[3]).max(initial=0.0) < 1e-7 for g, s in zip(got, shapes)),
+          "write_shapes / read_shapes: weights, indices and offsets")
 
 
 def test_round_trip_through_sculptforge(tmp, cli):
@@ -280,6 +434,66 @@ def test_shapes_through_sculptforge(tmp, cli):
     check(len(eyes) == 1 and eyes[0].get("shapes"), "the Eyes Part has its eyeLook shapes too")
 
 
+def test_shape_keys_through_sculptforge(tmp, cli):
+    """Blender -> SculptForge -> Blender: shape keys written as the add-on writes them (offsets from the Basis, object
+    space, a rotated, scaled, mirrored object) become sculpt layers on receive and come back as the same shapes: names,
+    order, weights and offsets (world space, as SculptForge sends them) within 1e-5; a key that moves nothing stays."""
+    root = os.path.join(tmp, "keys")
+    out = exchange.outbox(root)
+    os.makedirs(out)
+    mesh = grid_with_ngon()
+    nv = len(mesh[0])
+    rng = np.random.default_rng(5)
+    specs = [("Smile", 0.5, 0.05), ("mouthSmileLeft", 0.0, 0.03), ("Brow Up #2 \u00fc", 1.0, 0.08), ("Empty", 0.4, 0.0),
+             ("Overdrive", 1.5, 0.02), ("Negative", -0.5, 0.04)]
+    objects = [("Keyed", matrix(rotation((1.0, 2.0, 0.5), 37.0), (1.5, 0.5, 2.0), (0.3, -1.2, 2.0))),
+               ("Keyed.mirrored", matrix(np.eye(3), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)))]
+    sent = {}
+    entries = []
+    for k, (name, m) in enumerate(objects):
+        mirrored = np.linalg.det(m[:3, :3]) < 0
+        arrays, _ = object_arrays(mesh, mirrored, k + 20)
+        shapes = []
+        for key, weight, size in specs:
+            idx = np.sort(rng.choice(nv, nv // 2, replace=False)) if size else np.zeros(0, dtype=np.int64)
+            off = rng.normal(0.0, size, (len(idx), 3)).astype(np.float32).astype(np.float64)
+            shapes.append((key, weight, idx, off))
+        file, shape_file = "r1_%03d.Bridge" % k, "r1_%03d.shapes" % k
+        exchange.write_bridge(os.path.join(out, file), name, **arrays)
+        exchange.write_shapes(os.path.join(out, shape_file), nv, shapes)
+        entries.append({"name": name, "file": file, "shapes": shape_file, "matrix_world": m.tolist()})
+        sent[name] = (m, shapes)
+    exchange.write_manifest(out, entries, "test")
+    r = subprocess.run([cli, "-c", 'blender_receive folder="%s"; blender_send folder="%s"' % (root, root)],
+                       capture_output=True, text=True)
+    print(r.stdout.strip())
+    check(r.returncode == 0, "sculptforge-cli blender_receive; blender_send with shape keys (%s)" % r.stderr.strip())
+    if r.returncode:
+        return
+    folder = exchange.inbox(root)
+    manifest = exchange.read_manifest(folder)
+    for entry in manifest["objects"]:
+        name = entry["name"]
+        if name not in sent:
+            continue
+        m, shapes = sent[name]
+        check(bool(entry.get("shapes")), "%s: SculptForge sends its layers back as shapes" % name)
+        if not entry.get("shapes"):
+            continue
+        got_nv, got = exchange.read_shapes(os.path.join(folder, entry["shapes"]))
+        check(got_nv == nv, "%s: shapes file vertex count" % name)
+        check([g[0] for g in got] == [s[0] for s in shapes], "%s: the same shape names in the same order" % name)
+        check(all(abs(g[1] - s[1]) < 1e-6 for g, s in zip(got, shapes)), "%s: the same weights (also outside 0..1)" % name)
+        worst = 0.0
+        for g, s in zip(got, shapes):
+            want = np.zeros((nv, 3))
+            want[s[2]] = s[3] @ m[:3, :3].T  # SculptForge sends world-space offsets
+            have = np.zeros((nv, 3))
+            have[g[2]] = g[3]
+            worst = max(worst, float(np.abs(have - want).max()))
+        check(worst < 1e-5, "%s: offsets within 1e-5 (%.3g)" % (name, worst))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cli", help="sculptforge-cli, for the round trip through SculptForge")
@@ -289,9 +503,14 @@ def main():
         test_canonical_and_reverse()
         test_bridge_round_trip(tmp)
         test_manifest(tmp)
+        test_write_read_shapes(tmp)
+        test_splat_files(tmp)
+        test_splat_bake()
         if args.cli:
+            test_splats_through_sculptforge(tmp, args.cli)
             test_round_trip_through_sculptforge(tmp, args.cli)
             test_shapes_through_sculptforge(tmp, args.cli)
+            test_shape_keys_through_sculptforge(tmp, args.cli)
     if failures:
         print("%d check(s) failed" % len(failures))
         return 1

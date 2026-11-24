@@ -1,0 +1,12 @@
+# image_to_3d / text_to_3d run from a command (console, script, an AI tool over MCP) wait on the service on a worker: the
+# window keeps drawing and the result lands when it arrives (owner's report 11-13: a 30-second generation froze the app
+# and it looked dead). service=inflate is the offline generator, so this reaches no network. `run` holds the script until
+# the worker's result is in (App::commandRunning), like the console and an AI tool wait. Shots at 1440 and 2880.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+run image_to_3d path=$SCRIPT_DIR/../../assets/demo/teddy-sketch.png service=inflate remesh=false
+expect_status ready to sculpt
+expect_value triangles > 100
+shot generate-command-done
+run_fails text_to_3d prompt=dragon service=inflate
+expect_value http_requests == 0

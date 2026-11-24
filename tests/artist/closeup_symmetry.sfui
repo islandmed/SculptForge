@@ -1,0 +1,71 @@
+# Close-up: textured and turning-stamp brushes under X symmetry (#197), then radial symmetry (tools/qa/closeup.py judges
+# it; tools/qa/mirror_check.py compares each stroke with its mirrored copy). Strokes on the model's left half only.
+run ui_look look=classic layout=classic
+key ctrl+n
+wait 0.2
+key ctrl+d
+key ctrl+d
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+print symmetry_x
+run save_obj path=cf_00.obj
+run brush_use name="Dragon Scales"
+brush_size 35
+pen_stroke 0.20 0.14 0.42 0.16 0.2 1.0
+stroke 0.30 0.12 0.40 0.17
+run brush_use name="Skin Pores"
+brush_size 35
+pen_stroke 0.20 0.24 0.42 0.26 0.2 1.0
+stroke 0.30 0.22 0.40 0.27
+run brush_use name="Wood Grain"
+brush_size 35
+pen_stroke 0.20 0.34 0.42 0.36 0.2 1.0
+stroke 0.30 0.32 0.40 0.37
+run brush_use name="Woven Cloth"
+brush_size 35
+pen_stroke 0.20 0.44 0.42 0.46 0.2 1.0
+stroke 0.30 0.42 0.40 0.47
+run brush_use name="Stone Carve"
+brush_size 35
+pen_stroke 0.20 0.54 0.42 0.56 0.2 1.0
+stroke 0.30 0.52 0.40 0.57
+run brush_use name="Scale Mail"
+brush_size 35
+pen_stroke 0.20 0.64 0.42 0.66 0.2 1.0
+stroke 0.30 0.62 0.40 0.67
+run brush_use name="Rope Twist"
+brush_size 35
+pen_stroke 0.20 0.74 0.42 0.76 0.2 1.0
+stroke 0.30 0.72 0.40 0.77
+run brush_use name="Knot"
+brush_size 35
+pen_stroke 0.20 0.84 0.42 0.86 0.2 1.0
+stroke 0.30 0.82 0.40 0.87
+wait_idle 30
+run save_obj path=cf_01.obj
+#step 00 01 any X symmetry, 8 textured brushes
+hover_window 0.97 0.5
+shot m01-front
+zoom 2
+wait_idle 30
+shot m02-front-close
+camera 0 0
+key f
+click "X##transform.symmetry_x"
+click "R##transform.symmetry_radial"
+print symmetry_radial
+run brush_use name="Dragon Scales"
+brush_size 35
+pen_stroke 0.45 0.10 0.55 0.12 0.3 1.0
+wait_idle 30
+run save_obj path=cf_02.obj
+#step 01 02 any radial stroke
+camera 0 90
+key f
+hover_window 0.97 0.5
+wait_idle 30
+shot m03-radial-top
+click "R##transform.symmetry_radial"
+click "X##transform.symmetry_x"

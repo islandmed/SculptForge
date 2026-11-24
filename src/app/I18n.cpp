@@ -35,10 +35,12 @@ const Table* tableMap(Language language) {
     static const Table spanish = makeMap(i18n::spanishTable());
     static const Table traditional = makeMap(i18n::traditionalChineseTable());
     static const Table simplified = makeMap(i18n::simplifiedChineseTable());
+    static const Table japanese = makeMap(i18n::japaneseTable());
     switch (language) {
     case Language::Spanish: return &spanish;
     case Language::TraditionalChinese: return &traditional;
     case Language::SimplifiedChinese: return &simplified;
+    case Language::Japanese: return &japanese;
     default: return nullptr;
     }
 }
@@ -115,6 +117,7 @@ const char* languageCode(Language language) {
     case Language::Spanish: return "es";
     case Language::TraditionalChinese: return "zh-TW";
     case Language::SimplifiedChinese: return "zh-CN";
+    case Language::Japanese: return "ja";
     default: return "en";
     }
 }
@@ -123,6 +126,7 @@ Language languageFromCode(std::string_view code) {
     auto is = [&](std::string_view c) { return code == c || (code.size() > c.size() && code.substr(0, c.size()) == c &&
                                                              (code[c.size()] == '-' || code[c.size()] == '_')); };
     if (is("es")) return Language::Spanish;
+    if (is("ja")) return Language::Japanese;
     // Traditional script: zh-TW, zh-HK, zh-MO and zh-Hant-*. Simplified: zh-CN, zh-SG, zh-Hans-* and a bare zh.
     if (is("zh-TW") || is("zh_TW") || is("zh-HK") || is("zh_HK") || is("zh-MO") || is("zh_MO") || is("zh-Hant") ||
         is("zh_Hant"))
@@ -131,17 +135,39 @@ Language languageFromCode(std::string_view code) {
     return Language::English;
 }
 
+Language languageFromOsLocale(std::string_view tag) {
+    // "es_MX.UTF-8@euro" -> "es-mx"; a LANGUAGE-style list ("es:en") -> its first entry.
+    std::string t;
+    for (const char c : tag) {
+        if (c == '.' || c == '@' || c == ':' || c == ',' || c == ';') break;
+        t += c == '_' ? '-' : char((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c);
+    }
+    const size_t dash = t.find('-');
+    const std::string lang = t.substr(0, dash);
+    const std::string rest = dash == std::string::npos ? "" : t.substr(dash);
+    auto has = [&](const char* part) { return rest.find(part) != std::string::npos; };
+    if (lang == "es" || lang == "spa") return Language::Spanish;
+    if (lang == "ja" || lang == "jpn") return Language::Japanese;
+    if (lang == "zh" || lang == "zho" || lang == "chi") {
+        if (has("-hans")) return Language::SimplifiedChinese;
+        if (has("-hant") || has("-tw") || has("-hk") || has("-mo")) return Language::TraditionalChinese;
+        return Language::SimplifiedChinese;
+    }
+    return Language::English;
+}
+
 const char* languageName(Language language) {
     switch (language) {
     case Language::Spanish: return "Español";
     case Language::TraditionalChinese: return "繁體中文";
     case Language::SimplifiedChinese: return "简体中文";
+    case Language::Japanese: return "日本語";
     default: return "English";
     }
 }
 
 bool languageNeedsCjkFont(Language language) {
-    return language == Language::TraditionalChinese || language == Language::SimplifiedChinese;
+    return language == Language::TraditionalChinese || language == Language::SimplifiedChinese || language == Language::Japanese;
 }
 
 namespace i18n {
@@ -151,6 +177,7 @@ std::span<const Entry> table(Language language) {
     case Language::Spanish: return spanishTable();
     case Language::TraditionalChinese: return traditionalChineseTable();
     case Language::SimplifiedChinese: return simplifiedChineseTable();
+    case Language::Japanese: return japaneseTable();
     default: return {};
     }
 }

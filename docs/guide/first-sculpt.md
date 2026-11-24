@@ -1,11 +1,17 @@
 # Your first sculpt in 10 minutes
 
-Never sculpted before? In about ten minutes this lesson turns the default sphere into a cute owl head: ear tufts,
-a heart-shaped face, big amber eyes under stern brows and a little orange beak. It ends with a render you can
-share. You only need the built-in brushes, a mouse (a pen tablet is nicer, but not required) and these twelve
-steps.
-
 ![The finished owl](images/first-sculpt/12-render.jpg)
+
+> **In short:**
+> - Turn the default sphere into an owl head in about ten minutes.
+> - Built-in brushes only; a mouse is enough, a pen tablet is nicer.
+> - Twelve short steps, each with a goal, ending in a render you can share.
+
+Never sculpted before? In about ten minutes this lesson turns the default sphere into a cute owl head: ear tufts, a
+heart-shaped face, big amber eyes under stern brows and a little orange beak.
+
+It ends with a render you can share. You only need the built-in brushes, a mouse (a pen tablet is nicer, but not
+required) and these twelve steps.
 
 The lesson uses the default look: the **SculptForge layout**, with the menus **File, Edit, Sculpt, Paint, Mesh,
 View, Render, Help** along the top, a tool shelf under them, the brushes along the bottom and the **Tool** panel

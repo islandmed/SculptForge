@@ -82,9 +82,30 @@
     only on a fast desktop. This page lists what we're building toward that: what each piece does in plain words,
     how it works for the technically curious, and whether it has shipped.</p>
 
+  <section class="card" id="engine">
+    <h2>The engine, in numbers</h2>
+    <p>SculptForge draws fine detail as tiny triangles stored on top of a lighter base mesh, so a sculpt can hold far
+      more detail than a plain mesh. These are the figures we measure with SculptForge's own benchmark, with the
+      machine named and the steps to repeat each one.</p>
+    <figure style="margin:20px 0">
+      <img src="../media/engine-numbers-805-212.jpg?v=2" width="1600" height="900" loading="lazy" style="width:100%;height:auto;border-radius:8px" alt="805 million triangles of fine detail orbiting at 212 frames a second and 4.2 GB of memory in all (1.6 GB for the app plus 2.6 GB of graphics buffers), measured on an Apple M1 Pro limited to entry-level budgets (simulated), a benchmark scene and not a sculpt">
+    </figure>
+    <ul>
+      <li><strong>212 frames a second</strong> orbiting 805 million micro triangles of fine detail in our benchmark scene (not a sculpt), on an Apple M1 Pro limited to the entry-level tier (simulated), with about 4.2 GB of memory in all: 1.6 GB for the app plus 2.6 GB of graphics buffers, which on integrated graphics such as the M1 Pro are system memory. Median of three runs (211 to 213) on the released 0.13.11.</li>
+      <li><strong>237 frames a second</strong> orbiting the same 805-million-triangle scene on a Windows desktop with an AMD Ryzen 5 5600X and an NVIDIA RTX 3060 (median of 4 runs, range 232 to 239; 0.13.9 as released). The scene uses 3.5 to 3.7 GB of memory and 2.6 GB of video memory, and the first stroke has one stall of about 0.3 seconds.</li>
+      <li><strong>657 frames a second</strong> orbiting the smaller 104-million-triangle benchmark scene on that desktop (an earlier development build).</li>
+      <li><strong>1.2 GB</strong> of memory for the whole application with 201 million triangles of fine detail, on that Windows desktop.</li>
+      <li><strong>30 ms</strong>: 99 frames in 100 were faster than this while sculpting with a 240 px brush on a 33-million-triangle head, entry-level tier (simulated). The slowest single frame in that run was 103 ms.</li>
+    </ul>
+    <p>The weak spot, plainly: big brushes on that dense head are not yet as responsive as we want. The
+      view stays smooth, and we're working on it. Stroke timings are being re-measured. The 805-million figures are from the 0.13.8 build; the others come from a development
+      build made after 0.12.10. The others link to their raw results on <a href="../fast/">How fast?</a>, where you can
+      also send us a result that disagrees with ours; the 805-million results will be added there.</p>
+  </section>
+
   <div class="card">
-    <p><strong>About the numbers.</strong> We're re-measuring everything on scans with sculpted detail, so this page
-      has no figures yet. They'll appear here once they're verified, each with the method and the machine. Until then,
+    <p><strong>About the numbers.</strong> We're re-measuring everything on scans with sculpted detail, so the figures above come
+      from scenes anyone can rebuild, not from scans. Each comes with the method and the machine, and
       <a href="../fast/">How fast?</a> has the machines, the limits we know of and the steps to measure your own computer,
       and the <a href="../benchmarks/">benchmarks page</a> has results you can repeat yourself.</p>
     <p class="small muted">Our low-end tier is <strong>simulated</strong>: the memory, graphics and core budgets of a

@@ -1,0 +1,28 @@
+# The appeal card (Support.h appealDue, PanelSupportCard.cpp): once per app version, from the 2nd start, at startup.
+# Members, Studio builds, update checks off and tests/renders never get it (tests/test_support.cpp). UI tests never open a browser.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+# The first start: the tour owns it.
+member_card appeal starts=1
+wait 0.3
+expect_value appeal_open == 0
+expect_value appeal_pending == 0
+# The second start: the card shows (not mid-stroke), with the brand mark, one line and two buttons.
+member_card appeal starts=2
+wait_idle
+wait 0.3
+expect_value appeal_open == 1
+expect_text SculptForge runs on its members
+expect_text keeps new versions coming every few days
+expect "Become a member##appeal.become"
+expect "Not now##appeal.not_now"
+shot appeal-card
+# Not now: gone, and not again in this version.
+click "Not now##appeal.not_now"
+wait 0.3
+expect_value appeal_open == 0
+member_card appeal starts=3
+wait 0.3
+expect_value appeal_open == 0
+expect_value appeal_pending == 0
+expect_value support_requests == 0

@@ -9,8 +9,10 @@
 // The subset: one "# Title", "##"/"###" headings, paragraphs with **bold**,
 // *italic*, `code`, <kbd>keys</kbd> and [links](target), "- " and "1. " lists
 // (one nesting level), pipe tables, ``` code blocks, "> **Label:** ..."
-// callouts, images on their own line and "---" rules. "<!-- -->" lines are
-// comments.
+// callouts (a "> - item" line adds a bullet to one), images on their own line and "---" rules. "<!-- -->" lines are
+// comments. The guide's own blocks: a ```cards fence (one "[Title](target) | images/x.jpg | blurb" line per card),
+// "<details>" / "<summary>Label</summary>" / "</details>" lines around folded blocks, and the first image before any
+// "##" heading is the chapter's hero. Bold text with " > " in it (**Edit > Preferences > Input**) is a menu path.
 #pragma once
 
 #include <string>
@@ -22,11 +24,17 @@ namespace sf::guide {
 struct Span {
     std::string text;
     bool bold = false, italic = false, code = false, kbd = false;
+    bool path = false;  // a menu path (bold "Edit > Preferences"), drawn as chips
     std::string link; // target when the span is (part of) a link
 };
 using Spans = std::vector<Span>;
 
-enum class BlockKind { Heading, Paragraph, Bullet, Numbered, Code, Table, Image, Callout, Rule };
+enum class BlockKind { Heading, Paragraph, Bullet, Numbered, Code, Table, Image, Callout, Rule, Cards, Details, DetailsEnd };
+
+struct Card {
+    std::string title, target, image;
+    Spans blurb;
+};
 
 struct Block {
     BlockKind kind = BlockKind::Paragraph;
@@ -38,6 +46,10 @@ struct Block {
     std::string lang;    // code block language
     std::string anchor;  // heading slug ("mask-by-cavity")
     std::vector<std::vector<Spans>> rows; // table: rows of cells, row 0 is the header
+    std::vector<Spans> items; // callout: its bullets
+    std::vector<Card> cards;  // card grid
+    bool hero = false;        // image: the chapter's opening picture
+    int end = -1;             // details: the index of its DetailsEnd block
 };
 
 struct Document {

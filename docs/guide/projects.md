@@ -1,5 +1,12 @@
 # Projects, autosave and snapshots
 
+![The Library showing project thumbnails](images/library.jpg)
+
+> **In short:**
+> - A project (`.sfproj`) saves the whole scene in one file.
+> - **File > Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) saves; **File > Open...** (<kbd>Ctrl</kbd>+<kbd>O</kbd>) opens.
+> - Autosave, crash recovery and snapshots keep your work safe.
+
 A SculptForge project (`.sfproj`) saves your whole scene in one file, so you can close the app and carry on exactly
 where you stopped. This chapter covers saving and opening projects, the unsaved-changes prompt, recent files,
 autosave and crash recovery, snapshots, and the Library tabs that show your work.
@@ -26,6 +33,8 @@ them is an export, not a save. See [Exporting](exporting.md).
 - **File > Save** (<kbd>Ctrl</kbd>+<kbd>S</kbd>) saves to the current project. The first time, it asks for a file
   name.
 - **File > Save As...** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>) saves under a new name.
+- **File > Save Visible Parts As...** saves a copy with only the Parts you can see (hidden ones are left out), keeping
+  their materials, layers, folders and the scene's cameras and settings. The open project stays as it is.
 - In the Classic layout, clicking the document name in the title strip also saves.
 
 The bar along the top shows the file name with `*` after it while there are unsaved changes, and so does the window
@@ -59,6 +68,7 @@ the Library's **Tool** tab has a **Starter meshes** folder with a thumbnail of e
 | Human Head | A neutral head and neck with loops round the eyes and mouth, for portraits |
 | Bust | Head, neck, shoulders and upper chest |
 | Full Body | A human figure in A-pose, 167 cm tall |
+| Human (male, A-pose) | An athletic adult man, 180 cm, with UVs: edge loops round the eyes, mouth, shoulders, elbows, knees, fingers and toes. The muscle definition (pecs, abs, obliques, deltoids, quads, calves) is a sculpt layer called **Definition**: turn it down in Layers for a plain body, or step down to the untouched base cage |
 | Hand, Foot, Ear | A left hand (raised, palm to the front), a left foot and ankle, a left ear |
 | Eye | An eyeball 24 mm across, with the cornea and rings of quads round the pupil |
 | Stylised Head | A cartoon head: big cranium and eyes, small nose and jaw |
@@ -70,13 +80,14 @@ Every starter mesh is life size in centimetres, centred, standing on the ground 
 symmetric ones are exactly symmetric, so [X symmetry](sculpting.md) works from the first stroke. The Hand, Foot,
 Ear, Head, Bust and Torso are cut from a body, so they have open edges where they were cut.
 
-A starter mesh opens with subdivision levels (two, or one for the Full Body): block out the big forms at
+A starter mesh opens with subdivision levels (two, or one for the Full Body; the Human opens at about 430 000
+triangles, its definition sculpted on the first level, and takes a third and fourth level for pores and fine detail): block out the big forms at
 **Level 1**, the base cage, and step up for the detail (see [Geometry](geometry.md)). It opens as a new, unsaved
 scene: **Save** asks for a name. Double-click a tile to open it; <kbd>Shift</kbd>+double-click appends its base
 cage as a Part, for example an Eye next to a head.
 
-The human meshes come from the MakeHuman base mesh, which MakeHuman released into the public domain (CC0); the
-others are made by SculptForge's own build script. You may use them for anything, including commercial work.
+The human meshes come from the MakeHuman base mesh and, for the Human (male), its shape targets, which MakeHuman
+released into the public domain (CC0); the others are made by SculptForge's own build script. You may use them for anything, including commercial work.
 
 ## The unsaved-changes prompt
 
@@ -152,8 +163,6 @@ Press <kbd>,</kbd> (comma) to show the Library. The tabs that matter for project
 
 Double-click a tile to open it (you are asked about unsaved changes first). In the **Tool** tab,
 <kbd>Shift</kbd>+double-click a model to append it as a Part instead.
-
-![The Library showing project thumbnails](images/library.jpg)
 
 ## Scripting
 

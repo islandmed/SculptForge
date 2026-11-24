@@ -36,7 +36,8 @@ std::vector<uint32_t> groupsByConnectivity(const Mesh& mesh);
 // One group per UV island: visible triangles joined across edges whose UVs match at both ends (UV Groups).
 // Empty when the mesh has no UVs.
 std::vector<uint32_t> groupsByUvs(const Mesh& mesh);
-// Visible triangles whose average vertex mask is >= 0.5 move to a new group;
+// Visible triangles whose average vertex mask is >= 0.5 move to a new group (on a micro level with its own mask: more
+// than half of the triangle's grid points masked >= 0.5);
 // `changed` (optional) receives how many did.
 std::vector<uint32_t> groupsFromMask(const Mesh& mesh, size_t* changed = nullptr);
 // Every visible triangle joins the lowest group id among them.

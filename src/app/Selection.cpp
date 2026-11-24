@@ -55,17 +55,47 @@ void fillEvenOdd(ImDrawList* dl, const std::vector<ImVec2>& poly, ImU32 color) {
 
 } // namespace
 
+void App::drawCircleShape(ImDrawList* dl, const DragEllipse& e, ImU32 fill, ImU32 line, float width) const {
+    if (!e.valid()) return;
+    std::vector<ImVec2> rim;
+    for (const glm::vec2& p : ellipsePolygon(e, 96)) rim.push_back(ImVec2(p.x, p.y));
+    if ((fill >> IM_COL32_A_SHIFT) != 0) dl->AddConvexPolyFilled(rim.data(), int(rim.size()), fill);
+    dl->AddPolyline(rim.data(), int(rim.size()), line, ImDrawFlags_Closed, width);
+    const float arm = 4.0f * uiScale_; // the centre, so a drag from the centre shows where it is
+    dl->AddLine(ImVec2(e.centre.x - arm, e.centre.y), ImVec2(e.centre.x + arm, e.centre.y), line, 1.0f);
+    dl->AddLine(ImVec2(e.centre.x, e.centre.y - arm), ImVec2(e.centre.x, e.centre.y + arm), line, 1.0f);
+}
+
 void App::beginSelection(float x, float y, SelectTarget target, SelectShape shape) {
     selectTarget_ = target;
     selectShape_ = shape;
     selectPath_.assign(1, ImVec2(x, y));
     selectMoved_ = false;
+    selectSpace_ = false;
+    selectLast_ = ImVec2(x, y);
+    selectCorner_ = circleFromCorner_ != (shape == SelectShape::CutCircle && (inputMods() & SDL_KMOD_ALT) != 0);
+    selectShiftAtPress_ = (inputMods() & SDL_KMOD_SHIFT) != 0;
     drag_ = Drag::Select;
+}
+
+DragEllipse App::selectEllipse() const {
+    const bool shiftChanged = ((inputMods() & SDL_KMOD_SHIFT) != 0) != selectShiftAtPress_;
+    const ImVec2 press = selectPath_.front();
+    return dragEllipse({press.x, press.y}, {mouseX_, mouseY_}, selectCorner_, circleRound_ != shiftChanged);
 }
 
 void App::selectionMove(float x, float y) {
     const ImVec2 start = selectPath_.front();
+    const float dx = x - selectLast_.x, dy = y - selectLast_.y;
+    selectLast_ = ImVec2(x, y);
     if (!selectMoved_ && std::abs(x - start.x) < kClickSlopPx && std::abs(y - start.y) < kClickSlopPx) return;
+    if (selectMoved_ && selectSpace_) { // Space (#214): the cursor is the shape's moving end, so the rest slides with it
+        for (ImVec2& p : selectPath_) {
+            p.x += dx;
+            p.y += dy;
+        }
+        return;
+    }
     selectMoved_ = true;
     if (selectShape_ != SelectShape::Lasso && selectShape_ != SelectShape::CutLasso) return; // a rectangle or line only needs the cursor
     const ImVec2 last = selectPath_.back();
@@ -80,6 +110,7 @@ void App::selectionMouseUp() {
     else
         maskSelectMouseUp();
     selectPath_.clear();
+    selectSpace_ = false;
 }
 
 bool App::runSelection(const char* rectCommand, const char* lassoCommand, Args args) {
@@ -88,9 +119,16 @@ bool App::runSelection(const char* rectCommand, const char* lassoCommand, Args a
     // Window pixels -> normalised device coordinates (y up).
     auto ndc = [&](ImVec2 p) { return glm::vec2((p.x - c.x) / c.w * 2.0f - 1.0f, 1.0f - (p.y - c.y) / c.h * 2.0f); };
     args["view_proj"] = matrixString(partCamera().projection() * partCamera().view());
-    if (selectShape_ == SelectShape::Lasso) {
-        std::vector<ImVec2> path = selectPath_;
-        path.push_back(ImVec2(mouseX_, mouseY_));
+    if (selectShape_ == SelectShape::Lasso || selectShape_ == SelectShape::Circle) {
+        std::vector<ImVec2> path;
+        if (selectShape_ == SelectShape::Circle) { // the ellipse goes through the lasso command as a 128-sided polygon
+            const DragEllipse e = selectEllipse();
+            if (!e.valid()) return false;
+            for (const glm::vec2& p : ellipsePolygon(e)) path.push_back(ImVec2(p.x, p.y));
+        } else {
+            path = selectPath_;
+            path.push_back(ImVec2(mouseX_, mouseY_));
+        }
         if (path.size() < 3) return false;
         std::string points;
         char buf[48];
@@ -134,6 +172,8 @@ void App::drawSelectionOverlay() {
         path.push_back(mouse);
         fillEvenOdd(dl, path, fill);
         dl->AddPolyline(path.data(), int(path.size()), line, ImDrawFlags_Closed, 1.5f);
+    } else if (selectShape_ == SelectShape::Circle) {
+        drawCircleShape(dl, selectEllipse(), fill, line, 1.5f * uiScale_);
     } else {
         const ImVec2 p0(std::fmin(start.x, mouse.x), std::fmin(start.y, mouse.y));
         const ImVec2 p1(std::fmax(start.x, mouse.x), std::fmax(start.y, mouse.y));

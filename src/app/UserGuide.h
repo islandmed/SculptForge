@@ -13,6 +13,7 @@
 #include <imgui.h>
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -32,6 +33,7 @@ public:
     void open(const std::string& target = "");
     void toggle();
     bool isOpen() const { return open_; }
+    bool roleShown() const { return roleShown_; } // drew its Learn edge, strip and surface last frame (UI tests)
     void draw(App& app);
 
     // The chapter that explains a palette path from the Ctrl-help footer ("Tool > Masking" -> "masking.md"),
@@ -83,7 +85,7 @@ private:
     void prepareWhatsNew();
     std::string websiteUrl() const;
 
-    bool open_ = false, loaded_ = false, focusSearch_ = false;
+    bool open_ = false, loaded_ = false, focusSearch_ = false, roleShown_ = false;
     std::string loadError_;
     guide::Book book_;
     Place place_;
@@ -105,6 +107,7 @@ private:
     ImFont* h1_ = nullptr, *h2_ = nullptr, *h3_ = nullptr;
     ImFont* body_ = nullptr, *bodyBold_ = nullptr;
     int linkCounter_ = 0;
+    std::set<int> openDetails_;             // this page's <details> blocks that are open
     whatsnew::Page whatsNew_;               // whats-new.md as versions and groups (built when the guide loads)
     std::map<std::string, bool> expanded_;  // What's New sections open (by anchor): the newest version at first
     bool demoteHeadings_ = false;           // "###" drawn in the reading font (What's New's folded versions)

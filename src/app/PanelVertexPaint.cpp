@@ -11,6 +11,9 @@
 #include "core/LitSphere.h"
 #include "core/VertexPaint.h"
 #include "core/Trash.h"
+#include "core/Parts.h"
+#include "core/Texture.h"
+#include "core/TextureChannels.h"
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -367,6 +370,15 @@ void App::registerPaintUiCommands() {
                        return {true, mode == "gradient" ? std::string("Background: Gradient")
                                                         : "Background: Flat Colour " + colorToHex(srgbToLinear(color))};
                    }});
+    // Unlit view (#168): the base colour alone, for judging vertex and texture paint as stored.
+    commands_.add({"set_unlit",
+                   "Unlit view: every surface shows its base colour (vertex paint, texture, face groups) with no lighting, "
+                   "Lit Sphere or PBR shading. The mask tint and the wireframe still draw. Saved with the project.",
+                   {{"on", ParamSpec::Type::Bool, "true for unlit, false for the shaded view (default: toggle).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       renderSettings_.unlit = argBool(a, "on", !renderSettings_.unlit);
+                       return {true, renderSettings_.unlit ? "Unlit view: on (base colour, no lighting)" : "Unlit view: off"};
+                   }});
     // The scene's shading; Parts can override it (part_shading). Also the preference for new sessions.
     commands_.add({"set_shading",
                    "Viewport shading for every Part that doesn't set its own (part_shading): smooth (the "
@@ -405,12 +417,19 @@ void App::setFlatShading(bool flat) {
 }
 
 const BrushRecipe* App::strokeRecipe() const {
-    return strokeBrush_ == BrushType::Smooth || !strokeSculpt_ || strokeMask_ ? nullptr : activeRecipe();
+    return strokeBrush_ == BrushType::Smooth || strokeSlot_ != ModifierSlot::None || !strokeSculpt_ || strokeMask_ ? nullptr
+                                                                                                               : activeRecipe();
 }
 
 void App::paintAt(const DabParams& dab) {
     DabParams p = dab;
+    if (strokeColourSmooth_) { // Smooth's own Intensity (dabAt put it in p.strength); the shape stays where it is
+        if (texturePainter_.active()) texturePainter_.smoothDab(doc_.mesh, doc_.bvh, p, symmetry_);
+        else if (!paintsTexture(doc_.mesh)) paintSmoothDab(doc_.sculptor, doc_.mesh, doc_.bvh, p, symmetry_);
+        return;
+    }
     p.strength = rgbIntensity_ * dabStrengthScale_; // paint has its own strength (Colour intensity)
+    if (strokeSculpt_) p.invert = false; // Rgb while sculpting lays colour on Sub too (#186); only the Paint brush erases on Alt
     if (texturePainter_.active()) { // the brush material: colour plus the material channels it paints
         BrushMaterial m = doc_.paintMaterial;
         m.color = doc_.paintColor;
@@ -421,10 +440,28 @@ void App::paintAt(const DabParams& dab) {
 
 void App::beginPaintStroke() {
     paintSnapshot_.reset();
-    if (strokePaint_) rememberPaintColor(doc_.paintColor); // (the left shelf's recent colours)
+    if (strokePaint_ && !strokeColourSmooth_) rememberPaintColor(doc_.paintColor); // (the left shelf's recent colours)
     const Mesh& m = doc_.mesh;
+    if (swatchMemo_.active) { // a plain colour picked after a material swatch: the swatch's metal and roughness go
+        const BrushMaterial& now = doc_.paintMaterial;
+        const BrushMaterial& was = swatchMemo_.applied;
+        const bool untouched = now.channels == was.channels && now.roughness == was.roughness && now.metallic == was.metallic;
+        if (untouched && doc_.paintColor != swatchMemo_.color) {
+            doc_.paintMaterial.channels = swatchMemo_.before.channels;
+            doc_.paintMaterial.roughness = swatchMemo_.before.roughness;
+            doc_.paintMaterial.metallic = swatchMemo_.before.metallic;
+            swatchMemo_.active = false;
+        } else if (!untouched) {
+            swatchMemo_.active = false; // edited by hand since: the values are the artist's
+        }
+    }
     if (strokePaint_ && paintsTexture(m)) { // texture painting: tiles go into the stroke's undo step
-        if (!texturePainter_.begin(doc_.mesh, doc_.paintMaterial.channels)) {
+        // Alt on the Base erases every channel (texture_channels, no metal left under the white), not just the brush's.
+        // Shift smooths every channel the brush paints, not only the colour.
+        const bool eraseAll = strokeInvert_ && !strokeSculpt_ && !strokeColourSmooth_ && (doc_.paintMaterial.channels & 1u) &&
+                              m.texture->layers.empty();
+        const uint32_t channels = eraseAll ? ~0u : doc_.paintMaterial.channels;
+        if (!texturePainter_.begin(doc_.mesh, channels)) {
             const PaintTexture& t = *m.texture;
             if (!(doc_.paintMaterial.channels & enabledChannelMask(t)))
                 status_ = "The brush paints no channel this texture has (Color > Material)";
@@ -452,34 +489,40 @@ void App::finishPaintStroke(UndoRecord& record) {
     record.paint = std::move(paintSnapshot_);
 }
 
+// C: the colour under the pointer, from the nearest visible Part (not only the active one): its texture or vertex paint, or
+// for a Part without either the colour the view shows it in (the base colour). Every miss says so in the status bar.
 void App::pickColorUnderCursor() {
     doc_.syncBvh();
-    RayHit hit;
-    if (!pick(mouseX_, mouseY_, hit)) return;
-    if (paintsTexture(doc_.mesh)) {
-        doc_.paintColor = sampleTextureAt(doc_.mesh, hit.triangle, hit.position);
-        if (hasMaterialChannels(*doc_.mesh.texture)) {
-            // C picks every channel: the brush material becomes the texture's material under the cursor, and the
-            // brush then paints all of the texture's channels.
-            BrushMaterial picked = doc_.paintMaterial;
-            sampleMaterialAt(doc_.mesh, hit.triangle, hit.position, picked);
-            doc_.paintMaterial = picked;
-            doc_.paintMaterial.color = doc_.paintColor;
-            char buf[160];
-            std::snprintf(buf, sizeof buf, "Picked the material: %s, roughness %.2f, metallic %.2f (every channel)",
-                          colorToHex(doc_.paintColor).c_str(), double(picked.roughness), double(picked.metallic));
-            status_ = buf;
-            return;
-        }
-        status_ = "Paint colour " + colorToHex(doc_.paintColor) + " (from the texture)";
+    if (!canvasRect().contains(mouseX_, mouseY_)) {
+        toastInViewport("Nothing to pick: point at a Part in the 3D view, then press C");
         return;
     }
-    if (!doc_.mesh.hasColors()) {
-        status_ = "The mesh has no vertex paint to pick from";
+    const PartColorPick pick = pickPartColor(
+        doc_, [this](float px, float py, glm::vec3& o, glm::vec3& d) { canvasRay(px, py, o, d); }, mouseX_, mouseY_,
+        renderSettings_.baseColor);
+    if (pick.part < 0) {
+        toastInViewport(pick.message);
         return;
     }
-    doc_.paintColor = sampleColor(doc_.mesh, hit.triangle, hit.position);
-    status_ = "Paint colour " + colorToHex(doc_.paintColor);
+    const Mesh& mesh = doc_.partMesh(pick.part);
+    doc_.paintColor = pick.colour;
+    if (pick.from == PartColorPick::From::Texture && hasMaterialChannels(*mesh.texture)) {
+        // C picks every channel: the brush material becomes the texture's material under the cursor, and the
+        // brush then paints all of the texture's channels.
+        BrushMaterial picked = doc_.paintMaterial;
+        sampleMaterialAt(mesh, pick.hit.triangle, pick.hit.position, picked);
+        doc_.paintMaterial = picked;
+        doc_.paintMaterial.color = doc_.paintColor;
+        char buf[160];
+        std::snprintf(buf, sizeof buf, "Picked the material: %s, roughness %.2f, metallic %.2f (every channel)",
+                      colorToHex(doc_.paintColor).c_str(), double(picked.roughness), double(picked.metallic));
+        status_ = buf;
+        return;
+    }
+    const char* from = pick.from == PartColorPick::From::Texture ? " (from the texture)"
+                       : pick.from == PartColorPick::From::Base  ? " (the Part's colour: it has no paint)"
+                                                                  : "";
+    status_ = "Paint colour " + colorToHex(doc_.paintColor) + from + (pick.part != doc_.activePart ? ", from " + doc_.parts[size_t(pick.part)].name : "");
 }
 
 // Color palette: the Paint brush (Rgb / Raise), the colour, swatches and fills.
@@ -596,6 +639,13 @@ void App::drawViewportShadingControls() {
     ImGui::Spacing();
     ImGui::TextDisabled("%s", tr("Viewport Shading"));
     ui::Segmented(*this, {"view.shading_lit_sphere", "view.shading_pbr"});
+    bool unlit = renderSettings_.unlit; // (#168: the same as Alt+L; not a default shelf button, the right shelf is full)
+    if (ui::Checkbox("Unlit##unlit", &unlit)) runCommand("set_unlit", {{"on", unlit}});
+    ui::HelpText("Unlit", "Alt+L",
+                 "Unlit view (on): the base colour alone, with no lighting, Lit Sphere or PBR shading, so painted colour "
+                 "reads exactly as stored. Works with vertex paint, texture paint and PBR; the mask and wireframe still "
+                 "draw. Saved with the project.",
+                 "Material > Viewport Shading");
     if (!renderSettings_.pbr()) return;
     RenderSettings& v = renderSettings_;
     const auto& envs = environments();
@@ -648,6 +698,8 @@ void App::drawViewportShadingControls() {
            "Metallic of Parts without a material texture.");
     slider("##Cavity", "cavity", &v.pbrCavity, 0.0f, 1.0f, tr("Cavity %.2f"),
            "How much the sculpt's creases darken, so detail reads under even light. 0 is plain PBR.");
+    ImGui::Spacing();
+    drawViewEffectsControls("pbr");
 }
 
 void App::drawShadingControls() {

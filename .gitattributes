@@ -1,9 +1,12 @@
 # Files that are checksummed or compared byte for byte keep their exact bytes on every platform
-# (no CRLF conversion on Windows checkouts): community brushes and their index, and the website's gallery snapshot.
+# (no CRLF conversion on Windows checkouts): community brushes and their index, the website's gallery snapshot, and the benchmark scene pack (its hash is published).
 *.sfbrush -text
 tools/brush-gallery/repo/** -text
 website/gallery/** -text
 tests/data/** -text
+# UI-test golden files are compared byte for byte with what the app writes (LF): no CRLF on Windows checkouts.
+tests/ui/golden/** -text
+bench/pack/** -text
 # Parallel branches all add lines at the top of these two: keep both sides instead of conflicting (the release
 # coordinator checks the order of the merged result before tagging).
 CHANGELOG.md merge=union

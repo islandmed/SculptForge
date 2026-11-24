@@ -5,6 +5,7 @@
 #include "core/LegacyNames.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace sf {
 
@@ -21,7 +22,7 @@ void readStrings(const Json& j, std::vector<std::string>& out) {
     out.clear();
     for (size_t i = 0; i < j.size(); ++i)
         if (j[i].isString() && !j[i].asString().empty()) {
-            out.push_back(legacy::modernize(j[i].asString()));
+            out.push_back(legacy::modernizeId(j[i].asString())); // (a custom brush's name is the user's text)
         }
 }
 
@@ -84,9 +85,11 @@ Json toJson(const UiLayout& l) {
     j.set("rightTrayOpen", l.rightTrayOpen);
     j.set("leftTrayWidth", double(l.leftTrayWidth));
     j.set("rightTrayWidth", double(l.rightTrayWidth));
+    if (l.leftShelfWidth > 0.0f) j.set("leftShelfWidth", double(l.leftShelfWidth));
     j.set("leftTray", stringArray(l.leftTray));
     j.set("rightTray", stringArray(l.rightTray));
     j.set("openSubpalettes", stringArray(l.openSubpalettes));
+    if (!l.myPanel.empty()) j.set("myPanel", stringArray(l.myPanel));
     j.set("topShelf", stringArray(l.topShelf));
     j.set("leftShelf", stringArray(l.leftShelf));
     j.set("rightShelf", stringArray(l.rightShelf));
@@ -99,11 +102,44 @@ Json toJson(const UiLayout& l) {
     j.set("libraryTab", l.libraryTab);
     j.set("libraryBottom", l.libraryBottom);
     j.set("shelfTiles", double(l.shelfTiles));
+    if (!l.brushIds.empty()) {
+        Json ids = Json::object();
+        for (const auto& [name, id] : l.brushIds) ids.set(name, id);
+        j.set("brushIds", ids);
+    }
     return j;
+}
+
+MyPanelEntry myPanelEntry(const std::string& entry) {
+    MyPanelEntry e;
+    if (entry.rfind("action:", 0) == 0) e.section = false, e.id = entry.substr(7);
+    else if (entry.rfind("section:", 0) == 0) e.section = true, e.id = entry.substr(8);
+    return e;
 }
 
 bool shelfEmpty(const std::vector<std::string>& items) {
     return std::all_of(items.begin(), items.end(), [](const std::string& id) { return id == "sep" || id == "row"; });
+}
+
+UiLayoutPair layoutsFromUiJson(const Json& ui) {
+    UiLayoutPair p;
+    if (!ui.isObject()) return p;
+    if (ui["layout"].isObject()) p.current = ui["layout"];
+    if (ui.has("layoutSaved")) p.saved = ui["layoutSaved"].isObject() ? ui["layoutSaved"] : Json();
+    else p.saved = p.current; // before the autosave: the one layout was the saved one
+    return p;
+}
+
+void layoutsToUiJson(Json& ui, const Json& current, const Json& saved) {
+    if (current.isObject()) ui.set("layout", current);
+    ui.set("layoutSaved", saved.isObject() ? saved : Json());
+}
+
+Json toAutosaveJson(UiLayout l) {
+    l.consoleOpen = false;
+    l.libraryOpen = false;
+    l.customize = false;
+    return toJson(l);
 }
 
 bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
@@ -121,9 +157,21 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     flag("rightTrayOpen", out.rightTrayOpen);
     number("leftTrayWidth", out.leftTrayWidth);
     number("rightTrayWidth", out.rightTrayWidth);
+    number("leftShelfWidth", out.leftShelfWidth);
+    if (!(out.leftShelfWidth >= 0.0f) || !std::isfinite(out.leftShelfWidth)) out.leftShelfWidth = 0.0f;
     readStrings(j["leftTray"], out.leftTray);
     readStrings(j["rightTray"], out.rightTray);
     readStrings(j["openSubpalettes"], out.openSubpalettes);
+    readStrings(j["myPanel"], out.myPanel);
+    // Only well-formed entries, no repeats, at most kMyPanelMax (a hand-edited or shared file).
+    {
+        std::vector<std::string> kept;
+        for (const std::string& e : out.myPanel)
+            if (myPanelEntry(e).valid() && e.size() < 96 && std::find(kept.begin(), kept.end(), e) == kept.end() &&
+                kept.size() < kMyPanelMax)
+                kept.push_back(e);
+        out.myPanel = std::move(kept);
+    }
     readStrings(j["topShelf"], out.topShelf);
     // Version 2 (0.8) added Dynamic and its Detail slider: put them into stored top shelves, before symmetry.
     if (int(j["version"].asNumber(1)) < 2 && j["topShelf"].isArray() &&
@@ -168,8 +216,61 @@ bool fromJson(const Json& j, UiLayout& l, std::string& error, int shellLayout) {
     if (j["libraryTab"].isString()) out.libraryTab = j["libraryTab"].asString();
     flag("libraryBottom", out.libraryBottom);
     out.shelfTiles = std::clamp(int(j["shelfTiles"].asNumber(out.shelfTiles)), 0, 2);
+    if (j["brushIds"].isObject()) // a hand-edited file: short names and ids only, at most 256
+        for (const auto& [name, id] : j["brushIds"].members())
+            if (id.isString() && !id.asString().empty() && id.asString().size() <= 64 && name.size() <= 64 && out.brushIds.size() < 256)
+                out.brushIds[name] = id.asString();
     l = std::move(out);
     return true;
+}
+
+Json panelPlacementsToJson(const std::vector<PanelPlacement>& panels) {
+    Json list = Json::array();
+    for (const PanelPlacement& p : panels) {
+        Json e = Json::object();
+        e.set("id", p.id);
+        e.set("w", double(p.w));
+        e.set("h", double(p.h));
+        if (p.placed) {
+            e.set("x", double(p.x));
+            e.set("y", double(p.y));
+        }
+        list.push(std::move(e));
+    }
+    Json j = Json::object();
+    j.set("version", 1.0);
+    j.set("panels", std::move(list));
+    return j;
+}
+
+std::vector<PanelPlacement> panelPlacementsFromJson(const Json& j) {
+    std::vector<PanelPlacement> out;
+    const Json& list = j["panels"];
+    for (size_t i = 0; i < list.size() && out.size() < 32; ++i) {
+        const Json& e = list[i];
+        if (!e["id"].isString()) continue;
+        PanelPlacement p;
+        p.id = e["id"].asString();
+        if (p.id.empty() || p.id.size() > 64 ||
+            std::any_of(out.begin(), out.end(), [&](const PanelPlacement& q) { return q.id == p.id; }))
+            continue;
+        p.w = std::clamp(int(e["w"].asNumber(p.w)), 160, 16384);
+        p.h = std::clamp(int(e["h"].asNumber(p.h)), 160, 16384);
+        if (e["x"].isNumber() && e["y"].isNumber()) {
+            p.x = std::clamp(int(e["x"].asNumber()), -100000, 100000);
+            p.y = std::clamp(int(e["y"].asNumber()), -100000, 100000);
+            p.placed = true;
+        }
+        out.push_back(std::move(p));
+    }
+    return out;
+}
+
+bool panelOnDisplays(const PanelPlacement& p, const std::vector<DisplayRect>& displays) {
+    if (!p.placed) return false;
+    return std::any_of(displays.begin(), displays.end(), [&](const DisplayRect& r) {
+        return p.x + 100 > r.x && p.x < r.x + r.w - 100 && p.y >= r.y - 10 && p.y < r.y + r.h - 50;
+    });
 }
 
 } // namespace sf

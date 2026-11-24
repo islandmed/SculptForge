@@ -1,0 +1,47 @@
+# Discord #bug-reports (MasterFULL, 0.12.0): in the SculptForge layout Sculpt > Alpha > Stencil lacked Adjust and Tile, which
+# the Classic layout shows. Both draw the Alpha palette with the same code, but the Sculpt menu draws it in a group beside its
+# section list, and a second column placed from the cursor's x landed past the panel's edge. The same section, the same
+# reachable controls, in both layouts (the Stencil open: it is the part with the second column). CMake runs it at 1440 and
+# 2880 px wide (ui_alpha_layouts_1440 / _2880).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+key f
+run brush_set_alpha name=cobblestone
+run stencil_load alpha=true reset=true
+wait 0.1
+expect_value stencil_active == 1
+
+# Classic: Alpha's drop-down.
+click "Alpha##palette.alpha"
+wait 0.3
+expect "Adjust##stencil.adjust"
+expect "Tile##stencil.tile"
+expect "Invert##stencil.invert"
+expect_value past_right:Alpha == 0
+remember_items classic Alpha
+shot classic
+click "Alpha##palette.alpha"
+
+# SculptForge: the Sculpt menu's Alpha section.
+run ui_look look=forge layout=sculptforge
+click "Sculpt##menu.sculpt"
+click "Alpha##section.alpha"
+wait 0.3
+expect "Adjust##stencil.adjust"
+expect "Tile##stencil.tile"
+expect "Invert##stencil.invert"
+expect_value past_right:Alpha == 0
+expect_value offscreen_items == 0
+expect_same_items classic Alpha
+shot sculptforge
+
+# The controls work from there: Adjust turns the handles on, Tile repeats the image.
+click "Adjust##stencil.adjust"
+expect_value stencil_adjust == 1
+click "Adjust##stencil.adjust"
+expect_value stencil_adjust == 0
+click "Tile##stencil.tile"
+expect_value stencil_tile == 1
+click "Tile##stencil.tile"
+expect_value stencil_tile == 0
+key escape

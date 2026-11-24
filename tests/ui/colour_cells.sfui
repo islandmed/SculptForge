@@ -1,0 +1,51 @@
+# The left shelf's colour cells (Fenix, 0.13.8: "the column was too small and narrow to manage the colours"): the main and
+# second colour and the recent colours are at least 20 px at 100 %, the recent ones wrap instead of shrinking, and the
+# column can be dragged wider and keeps that width.
+run ui_look look=classic layout=classic
+ui_scale 100
+run new_sphere subdivisions=4
+wait_idle 5
+expect_value left_shelf_width == 88
+expect_value colour_cell_min >= 20
+shot colours-default
+
+# Eight recent colours: the cells stay at 20 px or more.
+key p
+run set_color color=c81e1e
+stroke 0.40 0.45 0.60 0.45
+run set_color color=1e3cc8
+stroke 0.40 0.50 0.60 0.50
+run set_color color=1ec83c
+stroke 0.40 0.55 0.60 0.55
+run set_color color=1a1a1a
+stroke 0.40 0.60 0.60 0.60
+run set_color color=2b2b2b
+stroke 0.40 0.62 0.60 0.62
+run set_color color=3c3c3c
+stroke 0.40 0.64 0.60 0.64
+run set_color color=4d4d4d
+stroke 0.40 0.66 0.60 0.66
+run set_color color=5e5e5e
+stroke 0.40 0.68 0.60 0.68
+expect_value recent_colors == 8
+wait_idle 5
+expect_value colour_cell_min >= 20
+shot colours-recent
+
+# Drag the column's inner edge: wider, and the cells still >= 20.
+drag_item "##leftshelfgrip" 60 0
+wait_idle 5
+expect_value left_shelf_width >= 140
+expect_value colour_cell_min >= 20
+shot colours-wide
+
+# It never goes past its limit.
+drag_item "##leftshelfgrip" 300 0
+wait_idle 5
+expect_value left_shelf_width <= 168
+expect_value colour_cell_min >= 20
+
+ui_scale 200
+wait_idle 10
+expect_value colour_cell_min >= 20
+shot colours-200

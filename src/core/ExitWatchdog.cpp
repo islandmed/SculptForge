@@ -30,4 +30,14 @@ void armExitWatchdog(int timeoutMs, int code, std::function<void()> onTimeout) {
     }).detach();
 }
 
+bool waitWhileHeld(const std::function<bool()>& held, int maxMs, int pollMs, const std::function<void()>& pump) {
+    const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(maxMs);
+    for (;;) {
+        if (pump) pump();
+        if (!held()) return true;
+        if (std::chrono::steady_clock::now() >= until) return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(pollMs));
+    }
+}
+
 } // namespace sf

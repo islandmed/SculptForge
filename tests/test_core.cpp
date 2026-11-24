@@ -37,6 +37,7 @@
 #include <fstream>
 #include <functional>
 #include <map>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -887,7 +888,7 @@ SplatCloud testCloud(int degree) {
 bool sameRotation(const glm::quat& a, const glm::quat& b, float tol) { return std::abs(std::abs(glm::dot(a, b)) - 1.0f) < tol; }
 
 TEST(splat_ply_and_dot_splat_roundtrip) {
-    for (int degree : {0, 1, 3}) {
+    for (int degree : {0, 1, 2, 3}) {
         SplatCloud c = testCloud(degree);
         const std::string path = tempPath("sculptforge_splats.ply");
         std::string err;
@@ -922,6 +923,75 @@ TEST(splat_ply_and_dot_splat_roundtrip) {
     }
     CHECK(close);
     std::filesystem::remove(path);
+}
+
+// View-dependent colour turns with the splats (owner 11-16): every band 1-3 of the 3DGS basis, any rotation.
+TEST(splat_sh_rotation) {
+    std::mt19937 rng(11);
+    std::uniform_real_distribution<float> u(-1.0f, 1.0f);
+    auto dir = [&] {
+        glm::vec3 d;
+        do d = glm::vec3(u(rng), u(rng), u(rng));
+        while (glm::length(d) < 0.2f);
+        return glm::normalize(d);
+    };
+    for (int degree : {1, 2, 3}) {
+        const int k = (degree + 1) * (degree + 1);
+        std::vector<glm::vec3> a(static_cast<size_t>(k));
+        for (glm::vec3& c : a) c = glm::vec3(u(rng), u(rng), u(rng));
+        float worst = 0.0f, worstBack = 0.0f;
+        for (int t = 0; t < 20; ++t) {
+            const glm::mat3 r = glm::mat3_cast(glm::angleAxis(3.0f * u(rng), dir()));
+            std::vector<glm::vec3> b = a;
+            ShRotation(r, degree).apply(b.data());
+            CHECK(b[0] == a[0]); // the plain colour never changes
+            for (int s = 0; s < 8; ++s) {
+                const glm::vec3 d = dir();
+                worst = std::max(worst, glm::distance(evalSH(b.data(), degree, r * d), evalSH(a.data(), degree, d)));
+            }
+            ShRotation(glm::transpose(r), degree).apply(b.data()); // R then R^-1: the coefficients come back
+            for (int c = 0; c < k; ++c) worstBack = std::max(worstBack, glm::distance(b[size_t(c)], a[size_t(c)]));
+        }
+        std::printf("  SH degree %d: view colour error %.2g, R then R^-1 %.2g\n", degree, double(worst), double(worstBack));
+        CHECK(worst < 1e-5f && worstBack < 1e-5f);
+    }
+    // Baking a turned placement keeps every band: each splat shows the same colour from the turned camera.
+    SplatCloud c = testCloud(3);
+    const glm::mat4 turn = glm::translate(glm::mat4(1.0f), glm::vec3(1, -2, 0.5f)) *
+                           glm::mat4_cast(glm::angleAxis(0.8f, glm::normalize(glm::vec3(0.3f, 1.0f, -0.5f)))) *
+                           glm::scale(glm::mat4(1.0f), glm::vec3(2.0f));
+    SplatCloud baked = c;
+    baked.transform = turn;
+    baked.bakeTransform();
+    CHECK(baked.shDegree == 3 && baked.sh.size() == c.sh.size());
+    const glm::vec3 eye(4.0f, 3.0f, -6.0f), localEye = glm::vec3(glm::inverse(turn) * glm::vec4(eye, 1.0f));
+    float worst = 0.0f;
+    for (size_t i = 0; i < c.size(); ++i) {
+        const glm::vec3 before = evalSH(&c.sh[i * 16], 3, glm::normalize(c.positions[i] - localEye));
+        const glm::vec3 after = evalSH(&baked.sh[i * 16], 3, glm::normalize(baked.positions[i] - eye));
+        worst = std::max(worst, glm::distance(before, after));
+    }
+    CHECK(worst < 1e-4f);
+    // A splat Part turned by R and back by R^-1 (two bakes) has its SH again.
+    SplatCloud there = baked;
+    there.transform = glm::inverse(turn);
+    there.bakeTransform();
+    float back = 0.0f;
+    for (size_t i = 0; i < c.sh.size(); ++i) back = std::max(back, glm::distance(there.sh[i], c.sh[i]));
+    CHECK(back < 1e-4f);
+
+    // Import -> export -> import: the SH floats of a .ply come back bit for bit (no transform: nothing to turn).
+    const std::string a = tempPath("sculptforge_sh_a.ply"), b = tempPath("sculptforge_sh_b.ply");
+    std::string err;
+    CHECK(saveSplatPly(a, c, err));
+    Mesh m;
+    SplatCloud first, second;
+    PlyContent content;
+    CHECK(loadPly(a, m, first, content, err) && first.shDegree == 3 && first.sh == c.sh);
+    CHECK(saveSplatPly(b, first, err));
+    CHECK(loadPly(b, m, second, content, err) && second.shDegree == 3 && second.sh == c.sh);
+    std::filesystem::remove(a);
+    std::filesystem::remove(b);
 }
 
 TEST(ply_mesh_and_point_cloud) {
@@ -1004,7 +1074,7 @@ TEST(usd_roundtrip_mesh_layers_splats) {
         CHECK(loadUsd(path, back, sback, err));
         if (!err.empty()) std::printf("  %s\n", err.c_str());
         CHECK(back.vertexCount() == m.vertexCount() && back.triangleCount() == m.triangleCount());
-        CHECK(back.layers.size() == 2 && back.layers[0].name == "Smile_2" && std::abs(back.layers[0].weight - 0.75f) < 1e-6f);
+        CHECK(back.layers.size() == 2 && back.layers[0].name == "Smile 2" && std::abs(back.layers[0].weight - 0.75f) < 1e-6f);
         bool same = true;
         for (size_t v = 0; v < m.vertexCount(); ++v) {
             same = same && glm::distance(back.base[v], m.base[v]) < 1e-6f;
@@ -1170,8 +1240,8 @@ TEST(mcp_server_protocol) {
                     t["name"].asString().rfind("plugin_", 0) == 0;
     }
     // Every command but installing, removing and switching packs (the user's decision, never an agent's) and the three
-    // plugin commands (plugins run only when the user runs them), plus viewport_image (cli/McpTools.h).
-    CHECK(hasRemesh && schemasOk && !packTools && list["result"]["tools"].size() == reg.all().size() - 4 - 3 + 1);
+    // plugin commands (plugins run only when the user runs them), plus viewport_image and view_closeup (cli/McpTools.h) and batch and checkpoint_save / _restore / _list (cli/McpBatch.h).
+    CHECK(hasRemesh && schemasOk && !packTools && list["result"]["tools"].size() == reg.all().size() - 4 - 3 + 2 + 4);
     CHECK(call(R"({"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"plugin_run","arguments":{"id":"x"}}})").has("error"));
     Json refused = call(R"({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"pack_install","arguments":{"path":"x.sfpack"}}})");
     CHECK(refused.has("error"));
@@ -1349,7 +1419,15 @@ TEST(free_huggingface_models) {
     for (const auto& p : presets) {
         wellFormed = wellFormed && std::string(p.space).rfind("https://", 0) == 0 && !p.steps.empty();
         bool image = false;
-        for (const auto& step : p.steps)
+        for (const auto& step : p.steps) {
+            for (const auto& sl : step.slots) {
+                image = image || std::string(sl.arg) == "$IMG";
+                if (std::string(sl.arg) != "$IMG" && std::string(sl.arg).rfind("$OUT", 0) != 0) {
+                    Json v;
+                    std::string err;
+                    wellFormed = wellFormed && Json::parse(sl.arg, v, err);
+                }
+            }
             for (const auto& a : step.args) {
                 image = image || a == "$IMG";
                 if (a != "$IMG" && a.rfind("$OUT", 0) != 0) {
@@ -1358,6 +1436,7 @@ TEST(free_huggingface_models) {
                     wellFormed = wellFormed && Json::parse(a, v, err); // literal args must be valid JSON
                 }
             }
+        }
         usesImage = usesImage && image;
     }
     CHECK(wellFormed && usesImage);
@@ -1433,13 +1512,43 @@ TEST(free_huggingface_models) {
     std::string png, err;
     CHECK(!ai::prepareImagePng(tempPath("missing_sculptforge.png"), png, err));
 
+    // Recorded Gradio replies (hunyuan3d-2mini-turbo, shape_generation; 11-09): text-only is refused by the Space, and the
+    // model comes back as FileData, a bare URL, or a list.
+    {
+        Json cfg, msg;
+        CHECK(Json::parse(R"({"components":[{"id":21,"type":"file"},{"id":57,"type":"html"}],
+            "dependencies":[{"api_name":"shape_generation","outputs":[21,57]}]})", cfg, err));
+        std::vector<Json> outs;
+        std::string failure;
+        CHECK(Json::parse(R"({"msg":"process_completed","output":{"error":"'Text to 3D is disable. Please enable it by `python gradio_app.py --enable_t23d`.'","duration":10,"visible":true},"success":false})", msg, err));
+        CHECK(!ai::gradioCompleted(msg, outs, failure) && failure.find("switched Text to 3D off") != std::string::npos);
+        const char* shapes[] = {
+            R"({"path":"/tmp/gradio/a/white_mesh.glb","url":"https://x.hf.space/gradio_api/file=/tmp/gradio/a/white_mesh.glb","orig_name":"white_mesh.glb"})",
+            R"("https://x.hf.space/gradio_api/file=/tmp/gradio/a/white_mesh.glb")",
+            R"([{"path":"/tmp/gradio/a/white_mesh.glb","orig_name":"white_mesh.glb"}])",
+            R"({"__type__":"update","value":{"path":"/tmp/gradio/a/white_mesh.glb"}})"};
+        for (const char* shape : shapes) {
+            std::string reply = std::string(R"({"msg":"process_completed","success":true,"output":{"data":[)") + shape + R"(,null]}})";
+            outs.clear();
+            CHECK(Json::parse(reply, msg, err) && ai::gradioCompleted(msg, outs, failure));
+            CHECK(ai::gradioModelUrl(cfg, "shape_generation", outs, "https://x.hf.space").find("white_mesh.glb") != std::string::npos);
+        }
+        for (const char* none : {R"({"msg":"process_completed","success":true,"output":{"data":[null,"<div/>"]}})",
+                                 R"({"msg":"process_completed","success":true,"output":{"data":[]}})"}) {
+            outs.clear();
+            CHECK(Json::parse(none, msg, err) && ai::gradioCompleted(msg, outs, failure));
+            CHECK(ai::gradioModelUrl(cfg, "shape_generation", outs, "https://x.hf.space").empty()); // -> "finished without a model"
+        }
+    }
     // Text to 3D.
     CHECK(!ai::hfTextPresets().empty());
     bool usesPrompt = true;
     for (const auto& p : ai::hfTextPresets()) {
         bool prompt = false;
-        for (const auto& step : p.steps)
+        for (const auto& step : p.steps) {
             for (const auto& a : step.args) prompt = prompt || a == "$PROMPT";
+            for (const auto& sl : step.slots) prompt = prompt || std::string(sl.arg) == "$PROMPT";
+        }
         usesPrompt = usesPrompt && prompt;
     }
     CHECK(usesPrompt);

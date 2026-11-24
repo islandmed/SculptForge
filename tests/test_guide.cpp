@@ -256,6 +256,36 @@ TEST(guide_whats_new_groups) {
     CHECK(next.versions[0].version == "0.10.8" && !next.groups.empty() && next.groups[0].label == "0.10.1 to 0.10.5");
 }
 
+TEST(guide_whats_new_since) {
+    // After an update: the cards of every version newer than the last one seen, newest version first, capped at 8.
+    std::string md = "# What's new\n\nIntro.\n\n";
+    const struct { const char* ver; int cards; } versions[] = {{"0.13.8", 3}, {"0.13.7", 0}, {"0.13.6", 4}, {"0.13.5", 2}, {"0.13.4", 1}};
+    for (const auto& v : versions) {
+        md += std::string("## Version ") + v.ver + "\n\n```features\ndate: 2026-11-01\nhighlight: H" + v.ver + ": line\n";
+        for (int i = 0; i < v.cards; ++i)
+            md += std::string("title: ") + v.ver + " card " + std::to_string(i) + "\nline: One.\naction: look:new\n";
+        md += "```\n\n- A change.\n\n";
+    }
+    const guide::Document doc = parse(md);
+    const whatsnew::Page page = whatsnew::build(doc, "0.13.8");
+    // Last seen 0.13.5: 0.13.6, 0.13.7 and 0.13.8, the newest first, each version's lead card first.
+    const whatsnew::Since s = whatsnew::cardsSince(page, "0.13.5");
+    CHECK(s.versions == std::vector<std::string>({"0.13.8", "0.13.7", "0.13.6"}));
+    CHECK(s.cards.size() == 7 && s.cardVersions.size() == 7 && s.more == 1); // 0.13.7 has no cards: its highlight is "more"
+    CHECK(s.cards.size() == 7 && s.cards[0].title == "0.13.8 card 0" && s.cardVersions[2] == "0.13.8" && s.cardVersions[3] == "0.13.6");
+    // The cap: 2 cards of 7 shown, the other 5 and the cardless version's highlight are "more".
+    const whatsnew::Since capped = whatsnew::cardsSince(page, "0.13.5", 2);
+    CHECK(capped.cards.size() == 2 && capped.more == 6);
+    // A fresh install (nothing seen), the same version or a newer one (a downgrade): the newest version alone.
+    for (const char* seen : {"", "0.13.8", "0.14.0"}) {
+        const whatsnew::Since one = whatsnew::cardsSince(page, seen);
+        CHECK(one.versions == std::vector<std::string>({"0.13.8"}) && one.cards.size() == 3 && one.more == 0);
+    }
+    // Built as 0.13.7 (no cards of its own): since 0.13.5 the cards of 0.13.6 still show.
+    const whatsnew::Since mid = whatsnew::cardsSince(whatsnew::build(doc, "0.13.7"), "0.13.5");
+    CHECK(mid.versions.size() == 2 && mid.cards.size() == 4 && mid.cards[0].title == "0.13.6 card 0");
+}
+
 TEST(guide_whats_new_in_a_beta) {
     // A beta (0.11.0 Beta 1) is built as 0.11.0 (SCULPTFORGE_VERSION; the prerelease is a separate define) while its
     // section still says "date: unreleased": Help > What's New shows that section, and the stable app doesn't.
@@ -267,4 +297,50 @@ TEST(guide_whats_new_in_a_beta) {
     CHECK(!beta.versions.empty() && beta.versions[0].highlights.size() == 1);
     const whatsnew::Page stable = whatsnew::build(doc, "0.10.11");
     CHECK(!stable.versions.empty() && stable.versions[0].version == "0.10.11");
+}
+
+TEST(guide_visual_blocks) {
+    // The chapter's hero (the first image before any "##"), an "In short" callout with bullets, menu paths as chips,
+    // a card grid and a folded <details> section.
+    const guide::Document doc = parse("# Masking\n\nIntro.\n\n![A mask](images/masking.jpg)\n\n> **In short:**\n> - Hold <kbd>Ctrl</kbd>\n"
+                               ">   and drag.\n> - See [Parts](parts.md).\n\nOpen **Edit > Preferences > Input** or **Bold**.\n\n"
+                               "```cards\n[First sculpt](first-sculpt.md) | images/library.jpg | Ten minutes.\n"
+                               "[Install](installing.md) | images/export.jpg | Every platform.\n```\n\n"
+                               "## More\n\n![Later](images/later.jpg)\n\n<details>\n<summary>When the card comes</summary>\n\n"
+                               "Once a week.\n\n- Never mid-stroke.\n\n</details>\n\nAfter.\n");
+    std::vector<const Block*> by;
+    for (const auto& b : doc.blocks) by.push_back(&b);
+    const Block* hero = nullptr;
+    const Block* later = nullptr;
+    const Block* callout = nullptr;
+    const Block* cards = nullptr;
+    const Block* path = nullptr;
+    int details = -1;
+    for (size_t i = 0; i < doc.blocks.size(); ++i) {
+        const Block& b = doc.blocks[i];
+        if (b.kind == BlockKind::Image) (hero ? later : hero) = &b;
+        if (b.kind == BlockKind::Callout) callout = &b;
+        if (b.kind == BlockKind::Cards) cards = &b;
+        if (b.kind == BlockKind::Paragraph && plainText(b).find("Edit") != std::string::npos) path = &b;
+        if (b.kind == BlockKind::Details) details = int(i);
+    }
+    CHECK(hero && hero->hero && later && !later->hero);
+    CHECK(callout && plainText(callout->spans) == "In short:" && callout->items.size() == 2);
+    CHECK(callout && callout->items.size() == 2 && plainText(callout->items[0]) == "Hold Ctrl and drag.");
+    CHECK(path && path->spans.size() == 5 && path->spans[1].path && path->spans[1].text == "Edit > Preferences > Input");
+    CHECK(path && path->spans.size() == 5 && path->spans[3].bold && !path->spans[3].path);
+    CHECK(cards && cards->cards.size() == 2 && cards->cards[0].title == "First sculpt" &&
+          cards->cards[0].target == "first-sculpt.md" && cards->cards[1].image == "images/export.jpg" &&
+          plainText(cards->cards[1].blurb) == "Every platform.");
+    CHECK(details >= 0 && plainText(doc.blocks[size_t(details)].spans) == "When the card comes");
+    const int end = details >= 0 ? doc.blocks[size_t(details)].end : -1;
+    CHECK(end == details + 3 && doc.blocks[size_t(end)].kind == BlockKind::DetailsEnd);
+    CHECK(end > 0 && plainText(doc.blocks.back()) == "After.");
+    int images = 0, parts = 0, cardLinks = 0;
+    for (const auto& r : references(doc)) {
+        images += r.image;
+        parts += r.target == "parts.md";
+        cardLinks += r.target == "installing.md";
+    }
+    CHECK(images == 4 && parts == 1 && cardLinks == 1);
 }

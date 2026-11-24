@@ -20,14 +20,20 @@ namespace sf::dialogs {
 enum class Kind { None, OpenFile, SaveFile, OpenFolder, Message, Url };
 
 void openFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* window, const SDL_DialogFileFilter* filters,
-              int nfilters, const char* defaultLocation, bool allowMany);
+              int nfilters, const char* defaultLocation, bool allowMany, const char* title = nullptr);
 void saveFile(SDL_DialogFileCallback callback, void* userdata, SDL_Window* window, const SDL_DialogFileFilter* filters,
               int nfilters, const char* defaultLocation);
 void openFolder(SDL_DialogFileCallback callback, void* userdata, SDL_Window* window, const char* defaultLocation,
                 bool allowMany);
 bool message(SDL_MessageBoxFlags flags, const char* title, const char* text, SDL_Window* window);
+// A question with two buttons: 1 = `first` (Return), 0 = `second` (Escape or the window's close), -1 = no dialog was
+// shown (suppressed as above, or the platform couldn't).
+int choose(const char* title, const char* text, const char* first, const char* second, SDL_Window* window);
 bool openUrl(const char* url); // false when suppressed (callers say it couldn't open), as SDL_OpenURL
 
+#ifdef __ANDROID__
+std::string androidProjectsDir(); // where projects are saved on Android (NativeDialog.cpp)
+#endif
 bool suppressed();           // no native dialog now (see above)
 void setScripted(bool on);   // a UI test script is running (Demo::loadScript)
 void answerNext(std::string path); // the next suppressed dialog answers PATH ("" = cancel)

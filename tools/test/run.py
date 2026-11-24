@@ -14,7 +14,8 @@
   (marks, the guide, release notes...) hash every tracked file. A test that passed with the same fingerprint on this
   machine is skipped and reported as cached; a pass on the first try is recorded. Never on CI (nothing persists).
 * Flakes: failed tests run once more (ctest --rerun-failed). A pass on the rerun is a flake: logged (`flaky: name`
-  lines, appended to --flaky-log), not cached, and does not fail the run. A test labelled `flaky` that fails twice is
+  lines, appended to --flaky-log), not cached, and does not fail the run. A test in tests/quarantine.txt (owner, date)
+  doesn't block until its date, then blocks again until it is fixed or deleted. A test labelled `flaky` that fails twice is
   reported but never fails the run either (it never blocks a release; fix it or delete it).
 * Budget: a non-nightly test that took longer than --budget seconds (default $SF_TEST_BUDGET or 20; 0 = off) fails
   the run, with the list. Make it wait on events instead of fixed frames, split it, or label it nightly. An
@@ -30,6 +31,7 @@ import os
 import platform
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -52,6 +54,7 @@ READS = {
     "blender_exchange": ["addons/blender", "tests/blender"], "blender_addon_package": ["addons/blender"],
     "maya_shelf_script": ["integrations/maya", "tests/maya"], "link_worker": ["services/link-worker"],
     "release_smoke": ["tests/release_smoke.py", "tests/ui/release_smoke.sfui"],
+    "else_if_chains": ["src"],
 }
 APP_READS = ["assets", "tests/ui/data", "docs/guide"]  # the app loads these at run time (docs/guide: Help)
 UNIT_READS = ["tests/data"]
@@ -71,6 +74,8 @@ def sha_file(path):
         st = os.stat(path)
     except OSError:
         return "missing"
+    if not stat.S_ISREG(st.st_mode):
+        return "special"  # a FIFO/socket/device left in a tree (11-09: a test's leftover pipe blocked open() for a day)
     key = (path, st.st_mtime_ns, st.st_size)
     if key not in memo:
         h = hashlib.sha256()
@@ -87,7 +92,7 @@ def sha_path(path):
         return memo[path]
     if os.path.isdir(path):
         h = hashlib.sha256()
-        for d, dirs, files in sorted(os.walk(path)):
+        for d, dirs, files in os.walk(path):  # lazy: the prune below only works before os.walk descends (sorted(os.walk()) hashed all of build/)
             dirs[:] = sorted(x for x in dirs if x not in (".git", "build", "__pycache__", "node_modules"))
             for f in sorted(files):
                 p = os.path.join(d, f)
@@ -173,6 +178,49 @@ def load_slow_list(path):
     return out
 
 
+def load_quarantine(path):
+    """tests/quarantine.txt: `name | owner | YYYY-MM-DD | task | why [| match]` lines (# comments): a known flake, fixed or
+    deleted by its owner before that date in the named task (a line without a task quarantines nothing). match: text every
+    FAIL line of the failure must hold (`[monkey 1064]`), so another case of the same test still blocks.
+    -> {name: (owner, date, task, match)}"""
+    out = {}
+    try:
+        for line in open(path, encoding="utf-8"):
+            line = line.split("#", 1)[0].strip()
+            parts = [p.strip() for p in line.split("|")]
+            if len(parts) >= 4 and parts[3] and re.fullmatch(r"\d{4}-\d{2}-\d{2}", parts[2]):
+                out[parts[0]] = (parts[1], parts[2], parts[3], parts[5] if len(parts) > 5 else "")
+    except OSError:
+        pass
+    return out
+
+
+def split_failures(failed, labels, quarantine, today, said=None):
+    """-> (blocking, tolerated, notes): a `flaky` label or a quarantine line before its date doesn't block; a quarantine
+    past its date does (fix it or delete it: a test nobody owns doesn't stay), and so does a failure whose FAIL lines
+    aren't all the quarantined case (its match). said: test -> its output; the notes name the failing cases."""
+    blocking, tolerated, notes = [], [], []
+    for n in failed:
+        q = quarantine.get(n)
+        fails = [l.strip() for l in (said or {}).get(n, "").splitlines() if l.lstrip().startswith("FAIL")]
+        cases = (": " + " / ".join(fails[:3]) + (f" (+{len(fails) - 3} more)" if len(fails) > 3 else "")) if fails else ""
+        if q and today <= q[1] and q[3] and not (fails and all(q[3] in l for l in fails)):
+            blocking.append(n)
+            notes.append(f"{n} is quarantined for {q[3]} only, and this failure isn't that case{cases or ' (no FAIL lines)'}")
+        elif q and today <= q[1]:
+            tolerated.append(n)
+            notes.append(f"failed but quarantined until {q[1]} (owner {q[0]}, {q[2]}; does not block): {n}{cases}")
+        elif q:
+            blocking.append(n)
+            notes.append(f"quarantine of {n} ran out {q[1]} (owner {q[0]}, {q[2]}): fix it or delete it")
+        elif "flaky" in labels.get(n, []):
+            tolerated.append(n)
+            notes.append(f"failed but labelled flaky (does not block): {n}")
+        else:
+            blocking.append(n)
+    return blocking, tolerated, notes
+
+
 def parallel_jobs(args):
     """N of ctest's -jN / -j N / --parallel N (1 when absent)."""
     for i, x in enumerate(args):
@@ -199,17 +247,23 @@ def rerun_args(args):
     return keep
 
 
+def alone_args(name, args):
+    """One test again, alone: with the main run's -C (a multi-config build, Windows, says "Not Run" without it)."""
+    return ["-R", f"^{re.escape(name)}$", *rerun_args(args)]
+
+
 def without_nightly(args):
     """The ctest args with nightly tests left out, unless the args pick labels themselves (-L / --label-regex, any
-    label: -L bench means every bench test, nightly ones too). ctest keeps only the last -LE: nightly folds into it."""
+    label: -L bench means every bench test, nightly ones too). ctest keeps only the last -LE: nightly folds into it. The
+    label `nightly` exactly: `nightly_area` tests (a real-model check T0 runs when its area changes) are not left out."""
     if any(x in ("-L", "--label-regex") or x.startswith(("-L=", "--label-regex=")) for x in args):
         return list(args)
     args = list(args)
     le = [i for i, x in enumerate(args) if x in ("-LE", "--label-exclude") and i + 1 < len(args)]
     if le:
-        args[le[-1] + 1] = f"({args[le[-1] + 1]})|nightly"
+        args[le[-1] + 1] = f"({args[le[-1] + 1]})|^nightly$"
     else:
-        args += ["-LE", "nightly"]
+        args += ["-LE", "^nightly$"]
     return args
 
 
@@ -307,6 +361,8 @@ def run_tests(argv=None):
     ap.add_argument("--flaky-log", default="")
     ap.add_argument("--slow-list", default="tests/slow_tests.txt",
                     help="known slow tests (name seconds plan): over budget but within 1.5x their seconds is allowed")
+    ap.add_argument("--quarantine", default="tests/quarantine.txt",
+                    help="known flakes (name | owner | until YYYY-MM-DD | task | why): don't block until that date")
     ap.add_argument("--times", default="", help="write name<TAB>seconds<TAB>result for every test run here")
     ap.add_argument("--threads-per-test", default="", help="'auto': SF_THREADS = cores / ctest -j for each test process")
     ap.add_argument("--junit", default="", help="also keep the first run's JUnit file here (CI: build/ctest.xml)")
@@ -351,7 +407,7 @@ def run_tests(argv=None):
               f"({time.time() - t0:.1f} s to fingerprint)")
     todo = [t["name"] for t in tests if not t["disabled"] and t["name"] not in cached]
     res, inner, gpu_lost, hung = {}, {}, [], {}
-    rc = 0
+    rc, said = 0, {}
     with tempfile.TemporaryDirectory() as tmp:
         if todo:
             run_args = list(args)
@@ -405,8 +461,9 @@ def run_tests(argv=None):
         for n, (s, _) in res.items():
             if s == "pass" and n in prints:
                 open(os.path.join(a.cache, prints[n]), "w").write(f"{n} {time.strftime('%Y-%m-%dT%H:%M:%S')}\n")
-    real = [n for n, (s, _) in res.items() if s == "fail" and "flaky" not in labels.get(n, []) and n not in gpu_lost]
-    tolerated = [n for n, (s, _) in res.items() if s == "fail" and "flaky" in labels.get(n, [])]
+    quarantine = load_quarantine(os.path.join(root, a.quarantine) if not os.path.isabs(a.quarantine) else a.quarantine)
+    real, tolerated, notes = split_failures([n for n, (s, _) in res.items() if s == "fail" and n not in gpu_lost], labels,
+                                            quarantine, time.strftime("%Y-%m-%d"), said)
     # The budget is per test: a ctest entry, or one TEST case inside a sculptforge_tests shard (a shard is many tests).
     slow = sorted(((d, n) for n, (s, d) in res.items() if a.budget > 0 and d > a.budget and s != "skip"
                    and "nightly" not in labels.get(n, []) and not n.startswith("sculptforge_tests")), reverse=True)
@@ -419,8 +476,8 @@ def run_tests(argv=None):
             f.write("".join(f"case:{n}\t{d:.2f}\tpass\n" for n, d in sorted(inner.items())))
     print(f"\n== {len(res)} run, {len(cached)} cached, {len(real)} failed, {sum(s == 'flaky' for s, _ in res.values())} flaky, "
           f"{len(slow)} over the {a.budget:g} s budget; {time.time() - t0:.0f} s")
-    for n in tolerated:
-        print(f"failed but labelled flaky (does not block): {n}")
+    for line in notes:
+        print(line)
     known = load_slow_list(os.path.join(root, a.slow_list) if not os.path.isabs(a.slow_list) else a.slow_list)
     # The list's seconds are the PC's, where the budget is 20 s; a machine with a bigger budget (CI's software
     # OpenGL: 150 s) scales them the same way.
@@ -436,7 +493,7 @@ def run_tests(argv=None):
             for d, n in list(slow):
                 if n.startswith("sculptforge_tests"):
                     continue
-                ctest(build, ["-R", f"^{re.escape(n)}$"], os.path.join(tmp2, "alone.xml"))
+                ctest(build, alone_args(n, args), os.path.join(tmp2, "alone.xml"))
                 s2, d2 = results(os.path.join(tmp2, "alone.xml")).get(n, ("fail", d))
                 limit = 1.5 * known[n] * scale if n in known else a.budget
                 if s2 == "pass" and d2 <= limit:
@@ -465,6 +522,20 @@ deletes it; remove its lines once fixed.
 
 
 def self_test():
+    q = {"a": ("qa", "2026-11-18", "x", ""), "b": ("qa", "2026-11-01", "y", ""), "m": ("qa", "2026-11-18", "t", "[monkey 1064]")}
+    blocking, tolerated, notes = split_failures(["a", "b", "c", "d"], {"d": ["flaky"]}, q, "2026-11-11")
+    assert (blocking, tolerated) == (["b", "c"], ["a", "d"]), (blocking, tolerated)
+    assert "ran out 2026-11-01" in notes[1], notes
+    out = lambda *cases: {"m": "".join(f"FAIL monkey_many.sfui:3: nothing latched [monkey {c}]\n" for c in cases)}
+    assert split_failures(["m"], {}, q, "2026-11-11", out(1064))[:2] == ([], ["m"])
+    b, _, nt = split_failures(["m"], {}, q, "2026-11-11", out(1064, 77))
+    assert b == ["m"] and "[monkey 77]" in nt[0], nt  # another seed still blocks, and is named
+    assert split_failures(["m"], {}, q, "2026-11-11", {})[0] == ["m"]  # no FAIL lines to match: blocks
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+        f.write("# name | owner | until | task | why\nui_x | qa-lean | 2026-11-18 | fix/x | seed 1064 # leak\n"
+                "ui_y | qa | 2026-11-18 |  | no task\nbad line\n")
+    assert load_quarantine(f.name) == {"ui_x": ("qa-lean", "2026-11-18", "fix/x", "")}, load_quarantine(f.name)
+    os.unlink(f.name)
     if ET is None:
         print("run.py self-test: no XML parser in this Python (pyexpat): skipped")
         return 0
@@ -499,13 +570,24 @@ def self_test():
         open(os.path.join(src, "other.md"), "w").write("new")  # an unlisted script test may read any file
         forget()
         assert fingerprint(py, src, d, {}) != g1, "unlisted script tests hash the whole tree"
+        # A test whose command names the source root (public_email) must neither descend into build/ nor block on a FIFO
+        # there (11-09: sorted(os.walk()) pruned too late; a leftover test-tmp pipe hung run.py in open() for a day).
+        if hasattr(os, "mkfifo"):
+            os.makedirs(os.path.join(src, "build", "test-tmp"))
+            os.mkfifo(os.path.join(src, "build", "test-tmp", "pipe.sfdetail"))
+            os.mkfifo(os.path.join(src, "assets", "odd.pipe"))
+            forget()
+            rootcmd = {"name": "walks_root", "command": [sys.executable, os.path.join(src, "t.py"), src], "labels": [], "env": [],
+                       "cwd": os.path.join(src, "build")}
+            fingerprint(rootcmd, src, os.path.join(src, "build"), {})  # (would hang here)
+            os.unlink(os.path.join(src, "assets", "odd.pipe"))
         junit = os.path.join(d, "j.xml")
         open(junit, "w").write('<testsuite><testcase name="a" time="1.5" status="run"/>'
                                '<testcase name="b" time="2" status="fail"><failure message="x"/></testcase></testsuite>')
         assert results(junit) == {"a": ("pass", 1.5), "b": ("fail", 2.0)}
         # Nightly tests stay out unless the args pick labels: any -L (bench tests labelled nightly too, pose-all).
-        assert without_nightly(["-j3"]) == ["-j3", "-LE", "nightly"]
-        assert without_nightly(["-LE", "ui", "-R", "x"]) == ["-LE", "(ui)|nightly", "-R", "x"]
+        assert without_nightly(["-j3"]) == ["-j3", "-LE", "^nightly$"]
+        assert without_nightly(["-LE", "ui", "-R", "x"]) == ["-LE", "(ui)|^nightly$", "-R", "x"]
         assert without_nightly(["-L", "bench", "-j2"]) == ["-L", "bench", "-j2"]
         assert without_nightly(["--label-regex", "nightly"]) == ["--label-regex", "nightly"]
         assert without_nightly(["--label-regex=bench", "-LE", "ui"]) == ["--label-regex=bench", "-LE", "ui"]
@@ -522,6 +604,8 @@ def self_test():
     assert parallel_jobs(["-j10"]) == 10 and parallel_jobs(["-C", "Release", "-j", "4"]) == 4 and parallel_jobs([]) == 1
     assert rerun_args(["-C", "Release", "-j", "4", "-L", "ui"]) == ["-C", "Release", "-j", "4"]
     assert rerun_args(["-j10", "-CRelease", "-R", "x"]) == ["-j10", "-CRelease"] and rerun_args(["-j"]) == ["-j"]
+    assert alone_args("ci_x", ["-C", "Release", "-j4", "-L", "ui"]) == ["-R", "^ci_x$", "-C", "Release", "-j4"]
+    assert alone_args("a.b", []) == ["-R", "^a\\.b$"]
     print("run.py self-test passed")
     return 0
 

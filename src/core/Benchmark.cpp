@@ -5,6 +5,7 @@
 #include "core/BrushRecipe.h"
 #include "core/Commands.h"
 #include "core/Document.h"
+#include "core/MemoryGuard.h"
 #include "core/Micro.h"
 #include "core/FocusDetail.h"
 #include "core/Multires.h"
@@ -254,6 +255,32 @@ Mesh makeCore200mMesh(size_t baseTriangles, int level) {
     return m;
 }
 
+int coreSceneMillions(const std::string& name) {
+    if (name.size() < 7 || name.rfind("core-", 0) != 0 || name.back() != 'm') return 0;
+    const std::string digits = name.substr(5, name.size() - 6);
+    if (digits.empty() || digits.size() > 4 || digits.find_first_not_of("0123456789") != std::string::npos) return 0;
+    const int n = std::atoi(digits.c_str());
+    return n >= 1 && n <= 4000 ? n : 0;
+}
+
+CoreSceneNeed coreSceneNeed(int millions) {
+    CoreSceneNeed n;
+    n.ramBytes = size_t(double(millions) * 1e6 * kCoreBytesPerMicroTriangle);
+    n.diskBytes = size_t(double(millions) * 1e6 * kCoreFileBytesPerMicroTriangle);
+    return n;
+}
+
+std::string coreSceneShortMessage(const std::string& name, int millions, size_t availableRam, size_t availableDisk, bool needDisk) {
+    const CoreSceneNeed need = coreSceneNeed(millions);
+    const MemoryCheck ram = checkMemory(need.ramBytes, availableRam);
+    if (!ram.enough) return benchmarkSkippedMessage(name, ram);
+    const size_t diskMargin = size_t(256) << 20;
+    if (needDisk && availableDisk > 0 && availableDisk < need.diskBytes + diskMargin)
+        return name + " skipped: needs ~" + formatGigabytes(need.diskBytes + diskMargin) + " of free disk space for its scene file (written once), " +
+               formatGigabytes(availableDisk) + " free. Free some space and run again";
+    return {};
+}
+
 std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log, int millions) {
     namespace fs = std::filesystem;
     const fs::path dir = MicroStore::swapFolder();
@@ -261,7 +288,15 @@ std::string core200mScenePath(std::string& error, const std::function<void(const
     fs::create_directories(dir, ec);
     const std::string name = "core-" + std::to_string(millions) + "m";
     const fs::path path = dir / (name + "-v1.sfproj");
-    if (fs::exists(path, ec)) return path.string(); // (renamed into place when whole)
+    const bool exists = fs::exists(path, ec);
+    { // Memory and disk first, a plain message, before anything is written or built (a small machine never gets to an OOM)
+        size_t freeDisk = 0;
+        if (const char* v = std::getenv("SF_AVAILABLE_DISK_MB"); v && *v) freeDisk = size_t(std::atof(v)) << 20; // (tests: a full disk)
+        else if (const fs::space_info si = fs::space(dir, ec); !ec) freeDisk = size_t(si.available);
+        error = coreSceneShortMessage(name, millions, availableMemoryBytes(), freeDisk, !exists);
+        if (!error.empty()) return {};
+    }
+    if (exists) return path.string(); // (renamed into place when whole)
     if (log) log("Writing the " + name + " scene (once): " + path.string());
     Document doc;
     doc.mesh = makeCore200mMesh(size_t(millions) * 1000000 / 1024); // micro level 5: 1,024 micro triangles a base one
@@ -406,6 +441,10 @@ bool parseBenchArg(int argc, char** argv, int& i, BenchCommandLine& cl) {
     } else if (a == "--bench-dyntopo") {
         cl.options.dyntopo = true;
         cl.options.projectRoundTrip = false;
+    } else if (a == "--bench-dyntopo-uvs") {
+        cl.options.dyntopo = true;
+        cl.options.dyntopoUvs = true;
+        cl.options.projectRoundTrip = false;
     } else if (a == "--bench-micro") {
         cl.run = true;
         cl.options.micro = true;
@@ -473,7 +512,7 @@ std::string runDyntopoBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
     const std::vector<Row> rows = {
         {{"Standard, Detail 50%", Kind::Brush, BrushType::Standard}, 0.5f},
         {{"Standard, Detail 100%", Kind::Brush, BrushType::Standard}, 1.0f},
-        {{"Tendril, Detail 50%", Kind::Brush, BrushType::SnakeHook}, 0.5f},
+        {{"Tendril, Detail 50%", Kind::Brush, BrushType::Tendril}, 0.5f},
         {{"Clay Block, Detail 75%", Kind::Brush, BrushType::ClayBlock}, 0.75f},
         {{"Smooth (simplifies), Detail 50%", Kind::Brush, BrushType::Smooth}, 0.5f},
         {{"Standard (large, r 0.4), Detail 50%", Kind::Brush, BrushType::Standard, 0.4f}, 0.5f},
@@ -487,11 +526,21 @@ std::string runDyntopoBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
         doc.mesh.rebuildTopology();
         doc.bvh.build(doc.mesh);
         Mesh& m = doc.mesh;
+        if (o.dyntopoUvs) { // a painted Part: the upper and lower half are two UV islands (planar maps), with a 2K texture
+            m.uvs.resize(m.triangleCount() * 3);
+            for (size_t t = 0; t < m.triangleCount(); ++t) {
+                const glm::uvec3 tri = m.triangles[t];
+                const bool upper = m.positions[tri.x].y + m.positions[tri.y].y + m.positions[tri.z].y > 0.0f;
+                for (int c = 0; c < 3; ++c)
+                    m.uvs[t * 3 + size_t(c)] = glm::vec2(m.positions[tri[c]].x, m.positions[tri[c]].z) * 0.25f + glm::vec2(upper ? 0.25f : 0.75f, 0.5f);
+            }
+            m.texture = makeTexture(2048, 2048);
+        }
         const double nt = double(m.triangleCount()), nv = double(m.vertexCount());
         if (gpu && gpu->upload) gpu->upload(m);
         UploadOrder order;
         order.build(m);
-        md << "### " << millions(nt) << " triangles (" << millions(nv) << " vertices, no subdivision levels)\n\n";
+        md << "### " << millions(nt) << " triangles (" << millions(nv) << " vertices, no subdivision levels" << (o.dyntopoUvs ? ", UVs and a texture" : "") << ")\n\n";
         md << "| Stroke | remesh | kernel | normals | BVH | " << (gpu ? "GPU upload | " : "")
            << "**dab total** | triangles after | stroke end | undo | redo | undo step |\n";
         md << "|---|---:|---:|---:|---:|" << (gpu ? "---:|" : "") << "---:|---:|---:|---:|---:|---:|\n";
@@ -621,6 +670,12 @@ std::string runMicroBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
             if (!o.brushFilter.empty() && b.name.find(o.brushFilter) == std::string::npos) continue;
             log("  " + b.name);
             Sculptor& sc = doc.sculptor;
+            // (SF_KEEP_EDITABLE=1: strokes kept editable, Forge Ink core/MicroHistory.h: what recording costs)
+            static const bool keep = [] {
+                const char* e = std::getenv("SF_KEEP_EDITABLE");
+                return e && e[0] == '1';
+            }();
+            sc.keepEditable = keep;
             sc.beginStroke(m, b.name);
             Symmetry sym;
             MicroStroke& ms = sc.microStroke();

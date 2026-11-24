@@ -8,6 +8,7 @@
 
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
+#include "core/Utf8Path.h"
 
 #include <chrono>
 #include <cmath>
@@ -15,27 +16,28 @@
 
 namespace sf {
 
-void App::openFocusDetail(const std::string& path) {
+bool App::openFocusDetail(const std::string& path) {
     Mesh m;
     std::string error;
     if (!FocusDetail::open(path, m, error)) {
         status_ = "Focus Detail: " + error;
-        return;
+        return false;
     }
     const size_t tris = microTriangleCount(m);
-    doc_.setMesh(std::move(m), std::filesystem::path(path).stem().string());
+    doc_.setMesh(std::move(m), stemUtf8(path));
     frameActivePart();
     char buf[160];
-    std::snprintf(buf, sizeof buf, "Focus Detail (experimental): %.2f billion micro triangles; detail streams in where you look and sculpt",
+    std::snprintf(buf, sizeof buf, "Focus Detail: %.2f billion micro triangles; full detail loads where you look and sculpt",
                   double(tris) / 1e9);
     status_ = buf;
+    return true;
 }
 
-void App::updateFocusDetail() {
+void App::updateFocusDetail(float heightPx) {
     Mesh& m = doc_.mesh;
     if (!m.micro || !m.micro->focus || solverBusy()) return;
     FocusDetail& fd = *m.micro->focus;
-    const float h = float(canvasHeight());
+    const float h = heightPx > 0.0f ? heightPx : float(canvasHeight());
     if (!(h > 0.0f)) return;
     FocusView view;
     view.valid = true;
@@ -43,6 +45,8 @@ void App::updateFocusDetail() {
     view.viewProj = partCamera().projection() * partCamera().view();
     // pixels per world unit at distance 1 (ortho: as a perspective view would at the target's depth)
     view.focalPx = glm::distance(view.eye, partCamera().target) / std::max(partCamera().worldPerPixel(partCamera().target, h), 1e-12f);
+    view.baseRevision = doc_.undo.revision();
+    view.baseMoving = drag_ != Drag::None || doc_.bvhDirty;
     const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     FocusBrush brush;
     RayHit hit;

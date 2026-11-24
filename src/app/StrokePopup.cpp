@@ -30,16 +30,15 @@ constexpr double kStrokePopupTapSeconds = 0.25; // let go sooner without pointin
 struct ModifierLook {
     const char* label;
     const char* glyph;
-    const char* keys; // what it saves holding (the Classic sculpting keys; the latches stand for them in every style)
     const char* help;
 };
 constexpr ModifierLook kModifiers[] = {
-    {"Add", ICON_LC_CIRCLE_PLUS, "", "Brushes add to the surface."},
-    {"Sub", ICON_LC_CIRCLE_MINUS, "Alt", "Brushes subtract from the surface."},
-    {"Smooth", ICON_LC_WAVES, "Shift", "Strokes smooth, as with Shift held, until you pick Smooth again or another brush."},
-    {"Mask", ICON_LC_VENETIAN_MASK, "Ctrl", "Strokes paint the mask, as with Ctrl held, until you pick Mask again or another brush."},
-    {"Select", ICON_LC_LASSO_SELECT, "Ctrl+Shift",
-     "Strokes draw the selection (hide) shape, as with Ctrl+Shift held, until you pick Select again or another brush."},
+    {"Add", ICON_LC_CIRCLE_PLUS, "Brushes add to the surface."},
+    {"Sub", ICON_LC_CIRCLE_MINUS, "Brushes subtract from the surface."},
+    {"Smooth", ICON_LC_WAVES, "Strokes smooth, as with its key held, until you pick Smooth again or another brush."},
+    {"Mask", ICON_LC_VENETIAN_MASK, "Strokes paint the mask, as with its key held, until you pick Mask again or another brush."},
+    {"Select", ICON_LC_LASSO_SELECT,
+     "Strokes draw the selection (hide) shape, as with its keys held, until you pick Select again or another brush."},
 };
 static_assert(std::size(kModifiers) == size_t(kStrokePopupModifiers));
 // The shapes (Discord 11-03): what they latch is in the corner, the shape under the icon.
@@ -53,9 +52,11 @@ constexpr ShapeLook kShapes[] = {
     {"Pen", ICON_LC_PEN_TOOL, "Mask", "Strokes paint the mask (Ctrl erases it), no key held, until you pick it again or another brush."},
     {"Lasso", ICON_LC_LASSO, "Mask", "A drag draws a lasso and masks inside it (Ctrl unmasks), no key held, until you pick it again."},
     {"Rect", ICON_LC_SQUARE_DASHED, "Mask", "A drag draws a rectangle and masks inside it (Ctrl unmasks), no key held, until you pick it again."},
+    {"Circle", ICON_LC_CIRCLE_DASHED, "Mask", "A drag draws a circle from its centre and masks inside it (Ctrl unmasks), no key held, until you pick it again."},
     {"Line", ICON_LC_SLASH, "Cut", "A drag draws a Cut line (Alt: the other side), no key held, until you pick it again. Tool > Cut sets the mode."},
     {"Lasso", ICON_LC_SCISSORS, "Cut", "A drag draws a Cut lasso, no key held, until you pick it again. Tool > Cut sets the mode."},
     {"Rect", ICON_LC_SQUARE_DASHED, "Cut", "A drag draws a Cut rectangle, no key held, until you pick it again. Tool > Cut sets the mode."},
+    {"Circle", ICON_LC_CIRCLE_DASHED, "Cut", "A drag draws a Cut circle from its centre (Alt at the press: from a corner), no key held, until you pick it again. Tool > Cut sets the mode."},
     {"Polyline", ICON_LC_WAYPOINTS, "Cut", "Clicks place a Cut polyline's points (the first point closes it, Enter ends it), no key held."},
 };
 static_assert(std::size(kShapes) == size_t(kStrokePopupShapes));
@@ -88,6 +89,13 @@ void App::registerStrokePopupActions() {
     actions_.add(std::move(a)); // (its key depends on the input style: applyInputStyle in Input.cpp)
 }
 
+// The keys a modifier tile saves holding: the active input style's own (core/StrokePopup.h), not the Classic ones.
+std::string App::strokeModifierKeysText(StrokeModifier m) const {
+    // Blender with Emulate 3 Button Mouse: Alt is the middle button and masks nothing; the Mask brush's key does.
+    if (m == StrokeModifier::Mask && blenderStyle() && uiPrefs_.emulate3Button) return actions_.shortcutText("mask.brush");
+    return strokeModifierKeys(uiPrefs_.inputStyle, m);
+}
+
 StrokeLatch App::strokeLatch() const {
     const StrokeLatchState& l = strokeLatch_;
     if (l.latch == StrokeLatch::None) return StrokeLatch::None;
@@ -109,9 +117,11 @@ App::SelectShape App::selectShapeOf(StrokeShape shape) {
     case StrokeShape::MaskPen: return SelectShape::Pen;
     case StrokeShape::MaskLasso: return SelectShape::Lasso;
     case StrokeShape::MaskRect: return SelectShape::Rect;
+    case StrokeShape::MaskCircle: return SelectShape::Circle;
     case StrokeShape::CutLine: return SelectShape::CutLine;
     case StrokeShape::CutLasso: return SelectShape::CutLasso;
     case StrokeShape::CutRect: return SelectShape::CutRect;
+    case StrokeShape::CutCircle: return SelectShape::CutCircle;
     default: return SelectShape::CutPolyline;
     }
 }
@@ -317,7 +327,8 @@ void App::drawStrokePopup() {
         } else {
             const char* glyph = shape ? kShapes[int(strokePopupShape(item))].glyph : kModifiers[int(mod)].glyph;
             // The keys a modifier stands for, or what a shape does (Mask, Cut), in the corner.
-            const char* corner = shape ? kShapes[int(strokePopupShape(item))].kind : kModifiers[int(mod)].keys;
+            const std::string keys = shape ? std::string() : strokeModifierKeysText(mod);
+            const char* corner = shape ? kShapes[int(strokePopupShape(item))].kind : keys.c_str();
             const float fs = g.tile * 0.42f;
             const ImVec2 gs = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, glyph);
             fg->AddText(ImGui::GetFont(), fs, ImVec2(a.x + (g.tile - gs.x) * 0.5f, a.y + (g.tile - gs.y) * 0.5f + 2.0f * s),

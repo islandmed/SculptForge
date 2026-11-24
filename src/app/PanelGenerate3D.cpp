@@ -10,7 +10,12 @@
 #include "app/App.h"
 #include "app/I18n.h"
 #include "app/Ui.h"
+#include "ai/ImageTo3DService.h"
+#include "ai/SpaceHealth.h"
+#include "ai/Tripo.h"
+#include "app/NativeDialog.h"
 
+#include "core/AuditLog.h"
 #include "core/MeshPreview.h"
 #include "render/GL.h"
 
@@ -27,7 +32,9 @@ constexpr int kPreviewSize = 160;
 constexpr float kSameOutline = 0.02f; // silhouettes closer than this are the same shape
 
 // Services billed per generation on the user's key: one candidate unless the user asks for more.
-bool paidService(const std::string& id) { return id == "fal" || id == "meshy" || id == "hyper3d"; }
+bool paidService(const std::string& id) {
+    return id == "fal" || id == "meshy" || id == "hyper3d" || id == "tripo";
+}
 // Services on the user's own machine or server: one generation at a time (a local GPU runs one model at once).
 bool localService(const std::string& id) { return id == "comfyui" || id == "command"; }
 
@@ -65,7 +72,91 @@ int App::candidateCountForService() const {
     return std::clamp(paidService(svc) ? paidCandidateCount_ : candidateCount_, 1, 3);
 }
 
+std::string App::hfOffReason() const {
+    if (aiSettings_.generatorService != "huggingface") return {};
+    const ai::HfPreset& preset = ai::resolveHfPreset(aiSettings_, textMode_);
+    const ai::health::Entry e = ai::health::of(preset.id);
+    return e.state == ai::health::State::Off ? std::string(tr(ai::health::label(e.state))) + (e.note.empty() ? "" : ": " + e.note)
+                                             : std::string();
+}
+
+void App::drawRecommendedModels() {
+    if (!ImGui::TreeNodeEx(tr("Recommended models"), 0)) return; // (closed: the list is tall; one click opens it, and it stays open)
+    const float scale = uiScale_;
+    ImGui::TextDisabled("%s", tr("Start from an image, then make it yours."));
+    int index = 0;
+    for (const ai::RecommendedModel& m : ai::recommendedModels()) {
+        if (textMode_ && !m.text) continue;
+        ImGui::PushID(index++);
+        const std::string svc = m.service, model = m.model;
+        const bool free = svc == "huggingface";
+        const bool current = aiSettings_.generatorService == svc &&
+                             (model.empty() || (svc == "fal" ? std::string(falModel_) == model
+                                                : svc == "tripo" ? ai::tripo::resolvedModel(aiSettings_.tripoModel) == model
+                                                                 : aiSettings_.hfModel == model));
+        const std::string price = std::string(m.price) == "Free" ? tr("Free") : m.price;
+        std::string health;
+        if (free) {
+            const ai::health::Entry e = ai::health::of(model);
+            if (e.state != ai::health::State::Up)
+                health = std::string(tr(ai::health::label(e.state))) + (e.note.empty() ? "" : ": " + e.note);
+        }
+        const std::string line = health.empty() ? std::string(tr(m.note)) : health; // a free Space's health replaces the note
+        const ImVec2 start = ImGui::GetCursorScreenPos();
+        const float x0 = ImGui::GetCursorPosX(), width = ImGui::GetContentRegionAvail().x;
+        const float wrap = std::max(width - 8 * scale, 40.0f * scale);
+        const float lineH = ImGui::GetTextLineHeightWithSpacing();
+        const float height = lineH + ImGui::CalcTextSize(line.c_str(), nullptr, false, wrap).y + 2 * scale;
+        // One selectable covers the row; the label and the price sit on its first line, the note under them.
+        if (ImGui::Selectable("##rec", current, 0, ImVec2(width, height))) {
+            aiSettings_.generatorService = svc;
+            if (svc == "fal") std::snprintf(falModel_, sizeof falModel_, "%s", m.model);
+            else if (svc == "tripo") aiSettings_.tripoModel = m.model;
+            else if (free) {
+                aiSettings_.hfModel = m.model;
+                aiSettings_.hfModelChosen = true;
+            }
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+            std::string tip = std::string(tr(m.note)) +
+                              (free ? "" : std::string("\n") + tr("Billed to your own account, at the provider's list price (it can change)."));
+            if (!health.empty()) tip += "\n" + health;
+            ImGui::SetTooltip("%s", tip.c_str());
+        }
+        const ImVec2 after = ImGui::GetCursorScreenPos();
+        ImGui::SetCursorScreenPos(ImVec2(start.x + 4 * scale, start.y));
+        ImGui::TextUnformatted(m.label);
+        ImGui::SameLine(x0 + width - ImGui::CalcTextSize(price.c_str()).x - 4 * scale);
+        ImGui::TextDisabled("%s", price.c_str());
+        ImGui::SetCursorScreenPos(ImVec2(start.x + 4 * scale, start.y + lineH));
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap);
+        if (!health.empty()) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.6f, 0.4f, 1.0f));
+        else ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextUnformatted(line.c_str());
+        ImGui::PopStyleColor();
+        ImGui::PopTextWrapPos();
+        ImGui::SetCursorScreenPos(after);
+        ImGui::Dummy(ImVec2(0, 0)); // (an item after moving the cursor: ImGui's boundary check)
+        if (*m.keyUrl) {
+            const bool missing = svc == "tripo" ? aiSettings_.resolvedTripoKey().empty() && !tripoKey_[0]
+                                 : svc == "fal" ? aiSettings_.resolvedFalKey().empty() && !falKey_[0]
+                                                : aiSettings_.resolvedHfToken().empty() && !hfToken_[0];
+            if (missing && ImGui::SmallButton(tr(free ? "Get a free token" : "Get a key"))) sf::dialogs::openUrl(m.keyUrl);
+        }
+        ImGui::Dummy(ImVec2(0, 4 * scale)); // (a gap, so a row's button reads as its own and not the next row's)
+        ImGui::PopID();
+    }
+    ImGui::TextDisabled(tr("List prices as of %s; they may change."), ai::kPricesChecked);
+    ImGui::TreePop();
+}
+
+std::string App::textOffKey() const {
+    if (!textMode_ || aiSettings_.generatorService != "huggingface") return {};
+    return ai::resolveHfPreset(aiSettings_, true).id;
+}
+
 void App::startGenerator() {
+    if (const std::string key = textOffKey(); !key.empty() && textOffPresets_.count(key)) return; // greyed in the panel
     if (pendingGenerator_.valid() || pendingBase_.valid()) return;
     if (textMode_ ? textPrompt_[0] == '\0' : refImagePath_.empty()) return;
     aiSettings_.generatorCommand = generatorCommand_;
@@ -73,6 +164,7 @@ void App::startGenerator() {
     aiSettings_.falModel = falModel_;
     aiSettings_.meshyKey = meshyKey_;
     aiSettings_.hyper3dKey = hyper3dKey_;
+    aiSettings_.tripoKey = tripoKey_;
     aiSettings_.hfToken = hfToken_;
     aiSettings_.comfyUrl = comfyUrl_;
     if (!ai::generateKeyMissing(aiSettings_) &&
@@ -80,6 +172,7 @@ void App::startGenerator() {
         return; // the first-use notice (PanelAiConsent.cpp): nothing sent before Allow
     // With no workflow chosen, ComfyUI runs the bundled one the panel shows (not saved, so updates reach it).
     ai::AiSettings settings = aiSettings_;
+    settings.cutImageBackground = removeBackground_; // "Remove flat background" also cuts a plain backdrop out of the picture first
     const bool hunyuan = settings.generatorService == "huggingface"
                              ? ai::hunyuanModel(ai::resolveHfPreset(settings, textMode_).id)
                              : settings.generatorService == "fal" &&
@@ -88,6 +181,7 @@ void App::startGenerator() {
     if (settings.comfyImageWorkflow.empty()) settings.comfyImageWorkflow = comfyDefaultWorkflow(false);
     if (settings.comfyTextWorkflow.empty()) settings.comfyTextWorkflow = comfyDefaultWorkflow(true);
     clearCandidates();
+    generatorError_.clear();
     const int count = candidateCountForService();
     const std::string stem = [] {
         const auto p = (std::filesystem::temp_directory_path() / ("sculptforge_generated_" + std::to_string(SDL_GetTicksNS()))).u8string();
@@ -152,7 +246,70 @@ void App::startGenerator() {
     }).detach();
 }
 
+CommandResult App::startGenerateCommand(const std::string& name, const Args& args) {
+    if (generateCommand_ || pendingGenerator_.valid()) return {false, "A 3D model is already being generated"};
+    if (std::string why; audit::required() && !audit::writable(&why)) return {false, why}; // (as every AI command)
+    auto g = std::make_unique<GenerateCommandJob>();
+    CommandResult refused;
+    if (!ai::prepareGenerateJob(name, args, aiSettings_, g->job, refused)) return refused;
+    g->name = name;
+    g->args = args;
+    g->start = std::chrono::steady_clock::now();
+    g->revision = doc_.undo.revision();
+    g->progress = std::make_shared<ai::GenerationProgress>();
+    g->progress->setStatus("Starting...");
+    std::promise<ai::GeneratorResult> promise;
+    g->done = promise.get_future();
+    std::thread([promise = std::move(promise), work = g->job.work, progress = g->progress]() mutable {
+        try {
+            promise.set_value(work(progress.get()));
+        } catch (const std::exception& e) { // (a worker's uncaught exception would end the whole app)
+            promise.set_value({false, {}, std::string("Generating failed: ") + e.what()});
+        }
+    }).detach();
+    generateCommand_ = std::move(g);
+    commandResult_.reset();
+    const std::string what = name == "text_to_3d" ? "Text to 3D" : "Image to 3D";
+    return {true, what + ": generating in the background (the window stays usable; the result replaces the scene when it arrives)"};
+}
+
+void App::pollGenerateCommand() {
+    if (!generateCommand_) return;
+    GenerateCommandJob& g = *generateCommand_;
+    if (g.done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        const int secs = int(std::chrono::duration<double>(std::chrono::steady_clock::now() - g.start).count());
+        status_ = std::string(g.name == "text_to_3d" ? "Text to 3D" : "Image to 3D") + ": " + g.progress->status() + " (" +
+                  std::to_string(secs) + " s)";
+        return;
+    }
+    if (jobWaitsForStroke()) return; // (the result lands when the stroke ends)
+    const std::unique_ptr<GenerateCommandJob> job = std::move(generateCommand_);
+    ai::GeneratorResult generated = job->done.get();
+    CommandResult r;
+    if (generated.ok && doc_.undo.revision() != job->revision) {
+        removeDownload(generated); // (open would clear the history: the work done since stays)
+        r = {false, "The scene changed while the model was generating, so it was not opened: run it again"};
+    } else {
+        r = job->job.finish(doc_, generated);
+    }
+    ai::recordGenerateRun(job->name, job->args, r,
+                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - job->start).count());
+    status_ = r.message;
+    commandResult_ = r;
+    console_.print(r.ok ? Console::Kind::Result : Console::Kind::Error, r.message);
+    console_.seenStatus(status_);
+    if (!r.ok) {
+        SDL_Log("%s failed: %s", job->name.c_str(), r.message.c_str());
+        return;
+    }
+    clearLods();
+    playingLayer_ = -1;
+    frameView(sceneBounds());
+    updateTitle();
+}
+
 void App::pollGenerator() {
+    pollGenerateCommand();
     if (!pendingGenerator_.valid() || pendingGenerator_.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
         return;
     candidates_ = pendingGenerator_.get();
@@ -176,7 +333,11 @@ void App::pollGenerator() {
     const std::string noteText = note.empty() ? std::string() : " - " + note;
     if (ready == 0) {
         clearCandidates();
-        status_ = "Image to 3D failed: " + error + noteText;
+        if (error.find("switched Text to 3D off") != std::string::npos)
+            if (const std::string key = textOffKey(); !key.empty()) textOffPresets_.insert(key);
+        generatorError_ = (textMode_ ? "Text to 3D failed: " : "Image to 3D failed: ") + error + noteText;
+        status_ = generatorError_;
+        SDL_Log("%s", generatorError_.c_str());
         return;
     }
     if (candidates_.size() == 1) { // nothing to compare: it lands at once

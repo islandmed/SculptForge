@@ -1,0 +1,66 @@
+# The render bridge (File > Render with..., PanelRenderBridge.cpp, ai/RenderBridge.h): the Render window asks for a
+# render helper first; a helper chosen in the file dialog lists its renderers; Render runs it as its own program and
+# shows the still, kept in the Renders folder; a renderer that fails shows why; a studio policy hides it all and the
+# command refuses. The helper is tests/data/render_bridge/fake_usdrecord (a Python stand-in for OpenUSD's usdrecord).
+run ui_look look=classic layout=classic newer_rows=true        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=3
+env SF_RENDER_BRIDGE_DIR sf_ui_render_jobs
+
+# File > Render with... opens the window, which says what it needs; nothing has run.
+click "File##palette.file"
+expect "Render with... (preview)##file.render_with"
+hold ctrl
+hover "Render with... (preview)##file.render_with"
+expect_help "renderer you have installed"
+hold none
+click "Render with... (preview)##file.render_with"
+expect_value render_bridge_window == 1
+expect_text Renders go through a render helper you already have
+expect "Choose Helper...##render.choose_helper"
+expect_value render_bridge_ready == 0
+run_fails render_bridge
+expect_status "Set up a render helper first"
+shot setup
+
+# The helper, chosen in the file dialog: its renderers are read from its --help.
+dialog_answer ../data/render_bridge/fake_usdrecord
+action render.choose_helper
+wait_value render_bridge_ready == 1 10
+wait_value render_bridge_renderers == 3 30
+expect "Render##render.start"
+expect_value render_bridge_state == 0
+shot ready
+
+# Render: the stand-in writes the still, the window shows it.
+run render_bridge width=240 height=135 renderer=Storm
+wait_value render_bridge_state == 2 30
+wait_value render_bridge_shown == 240 5
+expect_status "Rendered in"
+expect "Open in Image Editor##render.open_editor"
+expect "Save As...##render.save_as"
+shot rendered
+
+# A renderer that fails: the reason and the helper's own last words, no crash, the last still stays.
+run render_bridge renderer=Broken
+wait_value render_bridge_state == 3 30
+expect_text exit code 1
+expect_text Failed to load the Broken render delegate
+expect_value render_bridge_shown == 240
+shot failed
+
+# Stop ends a long render.
+run render_bridge renderer=Slow
+wait_value render_bridge_state == 1 10
+run render_bridge_cancel
+expect_value render_bridge_state == 4
+
+# A studio policy that says never: the menu item, the window and the command are gone.
+run ui_policy json="{\"format\":\"sculptforge-policy\",\"version\":1,\"render\":{\"bridge\":\"never\"}}"
+wait 0.2
+expect_value render_bridge_window == 0
+run_fails render_bridge
+expect_status "policy doesn't allow the render bridge"
+click "File##palette.file"
+expect_not "Render with... (preview)##file.render_with"
+key escape
+run ui_policy json=""

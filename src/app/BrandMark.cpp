@@ -3,6 +3,7 @@
 
 #include "app/BrandMark.h"
 
+#include "app/Support.h"
 #include "core/Image.h"
 #include "render/GL.h"
 
@@ -17,6 +18,8 @@ extern const unsigned char appIconSmall[]; // its small cut, 32 px
 extern const unsigned long long appIconSmall_size;
 extern const unsigned char bustMark[]; // the bust illustration, 256 px
 extern const unsigned long long bustMark_size;
+extern const unsigned char socialIcons[]; // the community icons, 6 x 64 px in a row
+extern const unsigned long long socialIcons_size;
 } // namespace assets
 
 namespace brand {
@@ -73,6 +76,14 @@ void appMark(ImDrawList* dl, ImVec2 at, float size, float alpha) {
 void bust(ImDrawList* dl, ImVec2 at, float size, float alpha) {
     static MarkTexture tex;
     draw(dl, texture(tex, assets::bustMark, assets::bustMark_size), at, size, alpha);
+}
+
+void socialIcon(ImDrawList* dl, int index, ImVec2 at, float size, ImU32 color) {
+    static MarkTexture tex;
+    const unsigned t = texture(tex, assets::socialIcons, assets::socialIcons_size);
+    if (!t || index < 0 || index >= kSocialCount) return;
+    const float u0 = float(index) / float(kSocialCount), u1 = float(index + 1) / float(kSocialCount);
+    dl->AddImage(ImTextureID(uintptr_t(t)), at, ImVec2(at.x + size, at.y + size), ImVec2(u0, 0), ImVec2(u1, 1), color);
 }
 
 void appMarkItem(float size, float alpha) { item(appMark, size, alpha); }

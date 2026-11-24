@@ -42,7 +42,7 @@ bool isMemberAssetUrl(const std::string& url) {
     return url.size() > prefix.size() && url.compare(0, prefix.size(), prefix) == 0 && allDigits(url.substr(prefix.size()));
 }
 
-bool isMemberApiUrl(const std::string& url) { return url == kReleasesUrl || url == kUserUrl || isMemberAssetUrl(url); }
+bool isMemberApiUrl(const std::string& url) { return url == kReleasesUrl || url == kUserUrl || url == kInvitationsApiUrl || isMemberAssetUrl(url); }
 
 std::vector<std::string> headersFor(const std::string& url, const std::string& accessToken) {
     if (!isMemberApiUrl(url) || accessToken.empty()) return {};
@@ -177,6 +177,88 @@ std::string parseLogin(const std::string& json) {
     const bool ok = !login.empty() && login.size() <= 39 &&
                     std::all_of(login.begin(), login.end(), [](char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '-'; });
     return ok ? login : std::string();
+}
+
+} // namespace sf::member
+
+namespace sf::member {
+
+bool hasPendingInvitation(const std::string& json) {
+    Json j;
+    std::string err;
+    if (!Json::parse(json, j, err) || !j.isArray()) return false;
+    for (const Json& inv : j.items())
+        if (inv.isObject() && inv["repository"].isObject() && str(inv["repository"], "full_name") == kRepoFullName) return true;
+    return false;
+}
+
+SignInOutcome runSignIn(const SignInIo& io) {
+    SignInOutcome out;
+    auto fail = [&](const Reply& r, const char* what) {
+        out.result = SignInResult::Failed;
+        out.error = !r.error.empty() ? r.error : std::string(what) + " answered " + std::to_string(r.status);
+        return out;
+    };
+    Reply r = io.post(kDeviceCodeUrl, deviceCodeBody());
+    DeviceCode code;
+    if (r.status != 200 || !parseDeviceCode(r.body, io.now(), code, out.error)) {
+        if (out.error.empty()) return fail(r, "GitHub");
+        return out.result = SignInResult::Failed, out;
+    }
+    if (io.showCode) io.showCode(code);
+    int interval = code.interval;
+    Tokens tokens;
+    while (true) { // GitHub's pace: one poll per interval until the code is entered, refused or has run out
+        if (!io.wait(interval * 1000)) return out.result = SignInResult::Cancelled, out;
+        if (io.now() >= code.expiresAt) return out.result = SignInResult::Expired, out;
+        ++out.polls;
+        r = io.post(kTokenUrl, pollBody(code.deviceCode));
+        if (!r.error.empty() || r.status == 429 || r.status >= 500) continue; // (a dropped connection: the next poll)
+        std::string err;
+        switch (parseTokenReply(r.body, io.now(), tokens, err)) {
+        case TokenReply::Ok: break;
+        case TokenReply::Pending: continue;
+        case TokenReply::SlowDown: interval += 5; continue;
+        case TokenReply::Expired: return out.result = SignInResult::Expired, out;
+        case TokenReply::Denied: return out.result = SignInResult::Declined, out;
+        case TokenReply::Error: return out.result = SignInResult::Failed, out.error = err, out;
+        }
+        break;
+    }
+    // Signed in to GitHub. Who: so every message after this can say it.
+    r = io.get(kUserUrl, tokens.access, 64u << 10);
+    if (r.status == 200) out.login = parseLogin(r.body);
+    // A member is one who can read the member repository's releases.
+    r = io.get(kReleasesUrl, tokens.access, 4u << 20);
+    if (r.status == 200) {
+        out.result = SignInResult::Member;
+        out.tokens = std::move(tokens);
+        return out;
+    }
+    if (r.status == 404 || r.status == 403) { // (GitHub says 404 to an account that can't see a private repository)
+        const Reply inv = io.get(kInvitationsApiUrl, tokens.access, 256u << 10);
+        out.result = inv.status == 200 && hasPendingInvitation(inv.body) ? SignInResult::InvitePending : SignInResult::NoAccess;
+        return out; // (the token is dropped)
+    }
+    return fail(r, "GitHub");
+}
+
+std::string signInMessage(const SignInOutcome& o) {
+    const std::string as = o.login.empty() ? "Signed in" : "Signed in as " + o.login;
+    switch (o.result) {
+    case SignInResult::Member:
+    case SignInResult::Cancelled: return {};
+    case SignInResult::NoAccess:
+        return as + ", but this account isn't on the member list yet. Check the invitation email from "
+               "GitHub, or tell us your GitHub name in #members.";
+    case SignInResult::InvitePending:
+        return as + ". You have an invitation to the member repository that isn't accepted yet: "
+               "accept it on GitHub, then sign in again.";
+    case SignInResult::Declined: return "Sign-in declined on GitHub. Choose Sign in with GitHub to try again.";
+    case SignInResult::Expired: return "The code ran out before it was entered. Choose Sign in with GitHub to get a new one.";
+    case SignInResult::Failed: return "Couldn't sign in: " + o.error + ". Choose Sign in with GitHub to try again.";
+    }
+    return {};
 }
 
 } // namespace sf::member

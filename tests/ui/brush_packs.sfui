@@ -4,7 +4,7 @@
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=6
 key f
-expect_value builtin_pack_brushes == 60
+expect_value builtin_pack_brushes == 87
 expect_value brush_sort == 0
 expect_value alpha_index == 0
 
@@ -26,6 +26,25 @@ wait 0.2
 expect_value alpha_index == 6
 run_fails brush_use name="No Such Brush"
 
+# The Wood pack (Requested by a member): its brushes bring their own wood alphas (Knot is the 25th built-in).
+run brush_use name="Knot"
+wait 0.2
+expect_value alpha_index == 24
+run brush_use name="Plank Seams"
+wait 0.2
+expect_value alpha_follow == 1
+snapshot
+stroke 0.2 0.5 0.8 0.5
+expect_value moved > 50
+
+# The Creature Skin pack (gh#228): a scale brush brings its own 2048 px alpha, turned along the stroke, and sculpts.
+run brush_use name="Snake Skin"
+wait_real 1.5
+expect_value alpha_follow == 1
+snapshot
+stroke 0.2 0.5 0.8 0.5
+expect_value moved > 50
+
 click "Brush##palette.brush"
 expect "Sort: A-Z##brushsort"
 expect_text Brush packs
@@ -43,6 +62,8 @@ expect_text Organic & Skin
 expect_text Cloth & Folds
 expect_text Damage & Wear
 expect_text Ornament
+expect_text Wood
+expect_text Creature Skin
 wait_idle 180
 shot brush_palette_packs
 
@@ -61,6 +82,9 @@ shot alpha_palette_az
 click "Sort: A-Z##alphasort"
 click "Pack##alphasort"
 expect_value alpha_sort == 2
+expect_text Creature Skin
+wait_idle 60
+shot alpha_palette_pack
 click "Alpha##palette.alpha"
 
 # Materials sort A-Z or by recent use.

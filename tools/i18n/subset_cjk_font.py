@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Writes the two Chinese UI fonts, Noto Sans CJK (SIL OFL) cut down to the characters each table uses plus CJK
+"""Writes the three CJK UI fonts, Noto Sans CJK (SIL OFL) cut down to the characters each table uses plus CJK
 punctuation, so the binary carries a few hundred KB, not 16 MB:
   assets/fonts/NotoSansTC-UI.otf  Noto Sans CJK TC, for src/app/I18nTraditionalChinese.cpp (Taiwan glyph shapes)
   assets/fonts/NotoSansSC-UI.otf  Noto Sans CJK SC, for src/app/I18nSimplifiedChinese.cpp (mainland glyph shapes)
+  assets/fonts/NotoSansJP-UI.otf  Noto Sans CJK JP, for src/app/I18nJapanese.cpp (Japanese glyph shapes: kana + kanji)
 
-Run it after changing a table; the test i18n_chinese_table_fits_the_font lists what a font is missing.
+Run it after changing a table; the test i18n_cjk_table_fits_the_font lists what a font is missing.
 
   subset_cjk_font.py [--source NotoSansCJK-Regular.ttc]   (default: the Linux noto-fonts-cjk package's file)
 Needs fontTools (pip install fonttools).
@@ -21,9 +22,10 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 FONTS = [
     ("Noto Sans CJK TC", "src/app/I18nTraditionalChinese.cpp", "assets/fonts/NotoSansTC-UI.otf", "繁體中文"),
     ("Noto Sans CJK SC", "src/app/I18nSimplifiedChinese.cpp", "assets/fonts/NotoSansSC-UI.otf", "简体中文"),
+    ("Noto Sans CJK JP", "src/app/I18nJapanese.cpp", "assets/fonts/NotoSansJP-UI.otf", "日本語"),
 ]
 # Always kept: CJK and full-width punctuation the translations (and future edits) reach for.
-PUNCTUATION = "，。、：；！？（）「」『』《》〈〉【】－～…·—％／＋"
+PUNCTUATION = "，。、：；！？（）「」『』《》〈〉【】－～…·—％／＋〜・ー"
 
 
 def table_characters(table, name):
@@ -37,8 +39,11 @@ def table_characters(table, name):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--source", default="/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc")
+    ap.add_argument("--only", help="write only the font whose file name contains this (e.g. JP)")
     args = ap.parse_args()
     for face, table, out, name in FONTS:
+        if args.only and args.only not in out:
+            continue
         write_subset(args.source, face, table_characters(table, name), ROOT / out)
 
 

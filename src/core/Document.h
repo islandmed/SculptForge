@@ -9,6 +9,7 @@
 #include "core/Json.h"
 #include "core/Mesh.h"
 #include "core/QRemeshGuides.h"
+#include "core/Reference.h"
 #include "core/Sculpt.h"
 #include "core/Splats.h"
 #include "core/Stencil.h"
@@ -28,6 +29,13 @@ namespace sf {
 enum class Shading : uint8_t { Default, Smooth, Flat };
 const char* shadingName(Shading s);           // "default", "smooth", "flat"
 bool parseShading(const std::string& name, Shading& out);
+
+// How a Part takes part in the scene's Boolean (core/MeshBoolean.h, the Parts list's Boolean column): not at all, or
+// added to, subtracted from or intersected with the Parts above it, in list order (the first one taking part is the
+// base). The view shows the result live; Make Boolean Mesh turns it into a Part of its own.
+enum class PartBoolean : uint8_t { None, Add, Subtract, Intersect };
+const char* partBooleanName(PartBoolean b); // "none", "add", "subtract", "intersect"
+bool parsePartBoolean(const std::string& name, PartBoolean& out);
 
 // What a Part is made of: its mesh, attributes, layers and undo history. Shared (reference counted) by the Parts
 // of one link group (Linked Duplicate, #94): sculpting, painting or masking any of them edits this one mesh, and
@@ -54,7 +62,11 @@ struct Part {
     uint32_t id = 0; // stable for the session (renderer slots, UI selection)
     std::string name;
     bool visible = true;
+    // While Solo is on: whether this Part was shown when Solo began (Solo's exit puts it back exactly). -1 = not
+    // remembered (a Part made during Solo, or Solo is off).
+    int8_t shownBeforeSolo = -1;
     Shading shading = Shading::Default; // per-Part override of the scene's shading
+    PartBoolean boolean = PartBoolean::None; // its part in the scene's Boolean
     uint32_t folder = 0;                // the PartFolder it's in (its id), 0 = none
     // Where the mesh is in the scene: world = transform * mesh position. Identity unless the Part is a linked copy
     // moved on its own (or was one: Make Unique keeps it). A similarity (rotation, translation, uniform scale).
@@ -85,6 +97,11 @@ struct PartStep {
     std::unique_ptr<Part> stashed;
     bool isTransform = false;
     glm::mat4 transform{1.0f};
+    // Parts the step hid when it added Part `id` (Make Boolean Mesh hides its sources): undo shows them again, redo
+    // hides them. `returnTo`: when Part `id` is the active one (and no linked copy can take over), undo makes this
+    // Part active before taking it away.
+    std::vector<uint32_t> hid;
+    uint32_t returnTo = 0;
 };
 
 // Extract's preview (core/ExtractMirror.h): Part `id`, made from the mask of Part `source` as it was at
@@ -104,6 +121,7 @@ struct Document {
     Mesh mesh;
     BVH bvh;
     UndoStack undo;
+    std::vector<std::pair<std::string, HistoryMark>> checkpoints; // named places in the history (MCP checkpoint_save)
     Sculptor sculptor;
     std::string path; // empty until saved/loaded
     bool modified = false; // set by edits the undo stack doesn't see (e.g. layer weights)
@@ -114,6 +132,7 @@ struct Document {
     int activeBrush = -1; // index into `brushes`, -1 = use a built-in brush type
     BrushAlpha brushAlpha; // stamp shaping every brush's falloff (empty = round); brush_set_alpha
     Stencil stencil;       // the image over the view the brushes work through (#155; stencil_load, core/Stencil.h)
+    std::vector<ReferenceImage> references; // pictures in the view to sculpt against (reference_add, core/Reference.h)
     glm::vec3 paintColor{0.22f, 0.22f, 0.22f}; // current vertex paint colour (linear RGB; see set_color); a mid grey
     // Material texture painting (core/TextureChannels.h): what the Paint brush lays on the material channels
     // (paint_material; its colour is paintColor), and the channel the view shows on its own (channel_view).
@@ -260,7 +279,14 @@ struct Document {
     void setMesh(Mesh m, std::string name = "Sculpt", BVH* built = nullptr);
     // Replaces the mesh as an undoable topology change. A result without the old mesh's subdivision levels (a
     // remesh, decimate, ...) leaves a `notice` saying the levels were removed; undo brings them back.
-    void replaceMeshUndoable(Mesh m, std::string label);
+    // `keepTree`: the caller vouches that `bvh` is the tree of the mesh being replaced and that this mesh is the one in
+    // `mesh` (not edited since: Forge Spheres drags put the old mesh back under the dragged one's tree). The step then
+    // keeps that tree and undo / redo swap trees instead of building one (seconds at 10M triangles).
+    void replaceMeshUndoable(Mesh m, std::string label, bool keepTree = false);
+    // The same, given a tree already fitted to `m` (a drag that refitted it as it went): no rebuild, so letting go of a
+    // drag on a big mesh doesn't stall a frame.
+    void replaceMeshUndoable(Mesh m, std::string label, BVH tree);
+    void replaceMeshUndoable(Mesh m, std::string label, bool keepTree, BVH* tree); // (both above)
 
     // A note for the status line from the last operation, e.g. that subdivision levels were removed.
     // CommandRegistry::execute adds it to the command's message; other callers take it with takeNotice().

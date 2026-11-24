@@ -175,9 +175,15 @@ void App::drawHardwareTierSection() {
     const TierConfig& tc = hw.tier;
     ImGui::TextUnformatted(tr("Tier"));
     ui::HelpText("Tier", nullptr,
+#if defined(_WIN32) // (Focus Detail streams on Linux and macOS for now: core/FocusDetail.cpp)
+                 "What this computer can carry beyond the essentials: 16K textures and the levels to come switch on "
+                 "by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent "
+                 "anywhere.",
+#else
                  "What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and "
                  "the levels to come switch on by themselves where they fit, never where they don't. Every tier "
                  "sculpts smoothly; nothing is sent anywhere.",
+#endif
                  kPath);
     if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextWrapped("%s", tierSummary(p.detected, tc.hwTier).c_str());
@@ -292,6 +298,9 @@ void App::drawHardwareTierSection() {
         if (tc.compute != saved) dimWrapped(std::string("SF_COMPUTE=") + computeChoiceName(tc.compute) + " (set for this run)");
         for (int i = 0; i < kComputeTaskCount; ++i) {
             const ComputeTaskInfo& info = computeTaskInfo(ComputeTask(i));
+#if defined(_WIN32) // (Focus Detail streams on Linux and macOS for now: core/FocusDetail.cpp)
+            if (info.task == ComputeTask::FocusDecode) continue;
+#endif
             const ComputePath path = resolveCompute(info.task, tc.compute, tc.hwTier, 0.0, 0.0);
             const std::string line = std::string(info.name) + ": " + (path == ComputePath::Gpu ? "GPU" : "CPU") +
                                      (!info.gpuPath ? "  (CPU only for now)" : gpuComputeFailed(info.task) ? "  (GPU failed: CPU)" : "");
@@ -386,6 +395,10 @@ void App::drawTierCard() {
     ImGui::End();
 }
 
+// A modal card over the app (the membership card, What's New) is the one box that answers; the tier card waits under it
+// instead of sitting on top, unable to take a press (Android, ebarranco: Got it did nothing until the card below closed).
+bool App::tierCardCovered() const { return supportCardOpen() || whatsNewOpen(); }
+
 void App::dismissTierCard() {
     if (!hwProfile_ || !hwProfile_->tierCard) return;
     HwProfileUi& hw = *hwProfile_;
@@ -410,7 +423,7 @@ void App::tierCardFromDisk() {
 // on Linux). The press here is ImGui's only (no stroke under the card); the release on the same button puts the
 // card away. Esc and Enter do too, while no text field or pop-up has the keys.
 bool App::tierCardEvent(const SDL_Event& e) {
-    if (!hwProfile_ || !hwProfile_->tierCard || hwProfile_->calibrator) return false;
+    if (!hwProfile_ || !hwProfile_->tierCard || hwProfile_->calibrator || tierCardCovered()) return false;
     if (options_.benchmark || !options_.benchmarkScript.empty() || !options_.demo.empty()) return false; // (not shown)
     HwProfileUi& hw = *hwProfile_;
     const ImGuiIO& io = ImGui::GetIO();

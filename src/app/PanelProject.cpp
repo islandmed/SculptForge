@@ -5,6 +5,7 @@
 // prompt (Save / Don't Save / Cancel) before new, open and quit, File > Open
 // Recent and autosave with crash recovery. Prompts only appear in interactive
 // sessions; --render, --record and demos run straight through.
+#include "ai/SpaceHealth.h"
 #include "app/App.h"
 #include "app/NativeDialog.h"
 #include "app/Support.h"
@@ -32,6 +33,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -52,6 +54,7 @@ std::string utf8(const std::filesystem::path& p) {
     return std::string(s.begin(), s.end());
 }
 std::string autosavePath(const std::string& prefDir) { return prefDir + "autosave.sfproj"; }
+std::string autosavePrevPath(const std::string& prefDir) { return prefDir + "autosave.prev.sfproj"; }
 bool fileExists(const std::string& p) {
     std::error_code ec;
     return std::filesystem::is_regular_file(fsPath(p), ec);
@@ -88,14 +91,40 @@ void SDLCALL onProjectChosen(void* userdata, const char* const* files, int) {
 
 bool App::interactive() const { return options_.renderPath.empty() && options_.recordPath.empty() && !demo_; }
 
+// The Windows installer's "Check for updates once a day" box (bin/installer.json next to the program, written by the
+// installer): applied once per installer run, so a reinstall sets it again and Preferences > Updates stays free in between.
+void App::applyInstallerUpdateChoice() {
+    const char* base = SDL_GetBasePath();
+    if (!base) return;
+    const std::string path = std::string(base) + "installer.json";
+    std::string text;
+    std::error_code ec;
+    {
+        std::ifstream f(fsPath(path), std::ios::binary);
+        if (!f) return;
+        text.assign(std::istreambuf_iterator<char>(f), {});
+    }
+    const auto when = std::filesystem::last_write_time(fsPath(path), ec);
+    if (ec) return;
+    const int64_t stamp = std::chrono::duration_cast<std::chrono::seconds>(when.time_since_epoch()).count();
+    applyInstallerChoice(parseInstallerChoice(text), stamp, installerStamp_, checkUpdates_);
+}
+
 void App::initProject() {
     if (!interactive()) return;
     prefDir_ = userDataDir();
+    setProjectAutosaveFolder(prefDir_); // (its autosave may name a streamed level's file by path: core/Project.h)
     if (prefDir_.empty()) return;
-    std::ifstream f(fsPath(prefDir_ + "project.json"), std::ios::binary);
+    std::string prefsText;
+    bool readable = false;
+    { // (closed before anything is written: on Windows a file held open can't be replaced, "Access is denied")
+        std::ifstream f(fsPath(prefDir_ + "project.json"), std::ios::binary);
+        readable = bool(f);
+        if (f) prefsText.assign(std::istreambuf_iterator<char>(f), {});
+    }
     Json prefs;
     std::string err;
-    const bool hadPrefs = f && Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), prefs, err);
+    const bool hadPrefs = readable && Json::parse(prefsText, prefs, err);
     if (hadPrefs) {
         // An install from before SculptForge-style keys were the default, that never stored its key style: it had
         // the Classic sculpting keys, and keeps them (initActions applies the style).
@@ -109,19 +138,26 @@ void App::initProject() {
         showWhatsNew_ = lastSeen != SCULPTFORGE_VERSION;
         // (the membership card's update moment: a newer version than the last start's)
         updatedThisStart_ = !lastSeen.empty() && compareVersions(SCULPTFORGE_VERSION, lastSeen) > 0;
+        if (updatedThisStart_) whatsNewSince_ = lastSeen; // What's New then shows every version since that one
         checkUpdates_ = prefs["check_updates"].asBool(checkUpdates_);
         updateCheckedAt_ = int64_t(prefs["update_checked_at"].asNumber(0));
+        installerStamp_ = int64_t(prefs["installer_stamp"].asNumber(0));
         if (prefs["update_skipped"].isString()) updateSkipped_ = prefs["update_skipped"].asString();
         memberBuilds_ = prefs["member_builds"].asBool(false); // (the token itself is in the keychain only)
         if (prefs["member_login"].isString()) memberLogin_ = prefs["member_login"].asString().substr(0, 39);
         if (prefs["update_channel"].isString())
             updateChannel_ = prefs["update_channel"].asString() == "preview" ? UpdateChannel::Preview : UpdateChannel::Stable;
         applyUpdatePolicy();
+        featuredLaunch_ = uint64_t(std::clamp(prefs["featured_launch"].asNumber(0), 0.0, 1e12));
+        for (const Json& h : prefs["featured_hidden"].items())
+            if (h.isString() && featuredHidden_.size() < 64) featuredHidden_.push_back(h.asString());
         // The membership cards (Support.h). ("support_card": false, the old switch, and "supporter" from before
         // 0.11.1 are honoured as they were: a member said so.)
         supportCardPrefs_.supporter = prefs["supporter"].asBool(false) || !prefs["support_card"].asBool(true);
         bigMeshTipDone_ = prefs["big_mesh_tip_done"].asBool(false);
         supportCardPrefs_.shownAt = int64_t(prefs["support_card_shown_at"].asNumber(0));
+        supportCardPrefs_.updateOwed = prefs["update_card_owed"].asBool(false);
+        if (prefs["appeal_version"].isString()) supportCardPrefs_.appealVersion = prefs["appeal_version"].asString().substr(0, 40);
         supportCardPrefs_.hiddenUntil = int64_t(prefs["member_card_hidden_until"].asNumber(0));
         if (prefs["member_card_challenge"].isString())
             supportCardPrefs_.challengeSeen = prefs["member_card_challenge"].asString().substr(0, 32);
@@ -156,6 +192,7 @@ void App::initProject() {
         newLookCardDone_ = prefs["new_look_card_done"].asBool(false);
         quickTourDone_ = prefs["quick_tour_done"].asBool(false);
         uiPrefs_.confirmSubdivide = prefs["confirm_subdivide"].asBool(uiPrefs_.confirmSubdivide); // (Don't ask again)
+        uiPrefs_.confirmRemeshLevels = prefs["confirm_remesh_levels"].asBool(uiPrefs_.confirmRemeshLevels);
         recentColors_.clear();
         for (const auto& c : prefs["recent_colors"].items()) {
             if (recentColors_.size() >= kRecentColorsMax || !c.isArray()) break;
@@ -178,17 +215,26 @@ void App::initProject() {
     } else {
         showWelcome_ = options_.uiTest.empty() && options_.demo.empty() && !options_.benchmark; // the first start: no prefs yet
         startInputStyle_ = uiPrefs_.inputStyle; // a new install: SculptForge's keys until the welcome's choice
+        // The OS language, if SculptForge has it (PanelSupport.cpp). Never for a headless display, a test, a demo, a
+        // studio build (its profile sets the language) or a ui.json someone already made.
+        const char* driver = SDL_GetCurrentVideoDriver();
+        const bool noScreen = driver && (std::strcmp(driver, "offscreen") == 0 || std::strcmp(driver, "dummy") == 0);
+        if (showWelcome_ && !noScreen && !uiConfigDeterministic_ && !studioMembership() && !fileExists(uiConfigPath()))
+            offerFirstRunLanguage(osLanguageTag());
         newLookCardDone_ = true; // a new install starts in the new look (or ui.json's): nothing to announce
     }
+    applyInstallerUpdateChoice();
     initSelfUpdate(); // a just-installed version counts its start (PanelUpdate.cpp)
     recentFiles_ = pruneRecentFiles(std::move(recentFiles_), fileExists);
     // (the starts milestone: counted on this computer only, never sent)
     if (!supportCardTestMode()) supportCardPrefs_.starts = std::min(supportCardPrefs_.starts + 1, 100000000);
+    ++featuredLaunch_; // (the featured creator card moves on a start: core/Featured.h)
+    loadFeaturedCache();
     saveProjectPrefs(); // records this version, so What's New shows once
     updateDiscordPresence(); // on if it was left on (PanelIntegrations.cpp)
     // The full membership card on the first start (Support.h); after an update, the small card's moment; then a
     // milestone due (the starts are counted above).
-    if (updatedThisStart_) memberMoment(MemberMoment::Updated);
+    startupUpdateMoment();
     launchSupportCard(!hadPrefs,
                       std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count(),
                       supportCardTestMode());
@@ -201,10 +247,13 @@ void App::initProject() {
         !std::getenv("SF_NO_UPDATE_CHECK") && updateCheckDue(updateCheckedAt_, now))
         startUpdateCheck(false);
 #endif
+    launchAppeal(); // (after the update policy: a studio's update lock counts)
 
     // An autosave newer than the last clean exit means the previous session ended unexpectedly.
     std::error_code ec;
-    const auto autosave = fsPath(autosavePath(prefDir_)), marker = fsPath(prefDir_ + "clean_exit");
+    auto autosave = fsPath(autosavePath(prefDir_));
+    const auto marker = fsPath(prefDir_ + "clean_exit");
+    if (!std::filesystem::is_regular_file(autosave, ec)) autosave = fsPath(autosavePrevPath(prefDir_)); // (the one before a skipped prompt)
     if (std::filesystem::is_regular_file(autosave, ec)) {
         const auto saved = std::filesystem::last_write_time(autosave, ec);
         std::error_code ec2;
@@ -229,7 +278,14 @@ void App::saveProjectPrefs() {
     if (startInputStyle_ >= 0) prefs.set("input_style", startInputStyle_);
     prefs.set("last_seen_version", std::string(SCULPTFORGE_VERSION));
     prefs.set("check_updates", checkUpdates_);
+    prefs.set("installer_stamp", double(installerStamp_));
     prefs.set("update_checked_at", double(updateCheckedAt_));
+    prefs.set("featured_launch", double(featuredLaunch_));
+    if (!featuredHidden_.empty()) {
+        Json hidden = Json::array();
+        for (const std::string& h : featuredHidden_) hidden.push(h);
+        prefs.set("featured_hidden", std::move(hidden));
+    }
     if (!updateSkipped_.empty()) prefs.set("update_skipped", updateSkipped_);
     prefs.set("update_channel", std::string(updateChannel_ == UpdateChannel::Preview ? "preview" : "stable"));
     prefs.set("member_builds", memberBuilds_ && !memberSessionOnly_);
@@ -237,6 +293,8 @@ void App::saveProjectPrefs() {
     prefs.set("supporter", supportCardPrefs_.supporter); // the membership cards (Support.h)
     prefs.set("big_mesh_tip_done", bigMeshTipDone_); // the one big-mesh tip (BigMeshTip.h)
     prefs.set("support_card_shown_at", double(supportCardPrefs_.shownAt));
+    if (!supportCardPrefs_.appealVersion.empty()) prefs.set("appeal_version", supportCardPrefs_.appealVersion);
+    if (supportCardPrefs_.updateOwed) prefs.set("update_card_owed", true);
     prefs.set("member_card_hidden_until", double(supportCardPrefs_.hiddenUntil));
     if (!supportCardPrefs_.challengeSeen.empty()) prefs.set("member_card_challenge", supportCardPrefs_.challengeSeen);
     {
@@ -269,11 +327,15 @@ void App::saveProjectPrefs() {
     prefs.set("new_look_card_done", newLookCardDone_);
     prefs.set("quick_tour_done", quickTourDone_);
     prefs.set("confirm_subdivide", uiPrefs_.confirmSubdivide);
+    prefs.set("confirm_remesh_levels", uiPrefs_.confirmRemeshLevels);
     Json colours = Json::array(); // the left shelf's recent colours, newest first
     for (const glm::vec3& c : recentColors_) colours.push(vec3Json(c));
     prefs.set("recent_colors", std::move(colours));
     std::string err; // (temp file, then rename: a quit that ends mid-write leaves the last one whole)
-    if (!writeJsonAtomic(prefDir_ + "project.json", prefs, err)) SDL_Log("%s", err.c_str());
+    if (!writeJsonAtomic(prefDir_ + "project.json", prefs, err)) {
+        SDL_Log("%s", err.c_str());
+        status_ = "Recent projects couldn't be saved. " + err;
+    }
 }
 
 void App::rememberPaintColor(const glm::vec3& linear) {
@@ -292,6 +354,7 @@ void App::rememberRecent(const std::string& path) {
     std::string full = utf8(std::filesystem::absolute(fsPath(path), ec).lexically_normal());
     if (ec) full = path;
     if (full == utf8(fsPath(autosavePath(prefDir_)).lexically_normal())) return;
+    if (full == utf8(fsPath(autosavePrevPath(prefDir_)).lexically_normal())) return;
     recentFiles_ = addRecentFile(std::move(recentFiles_), full);
     saveProjectPrefs();
 }
@@ -333,18 +396,34 @@ void App::tickProject(float dt) {
     // Edits only `modified` tracks (layer weights, Python setters) leave the revision alone, so
     // while it is set autosave every interval rather than trusting an unchanged revision.
     if (autosaveMinutes_ <= 0 || autosaveTimer_ < float(autosaveMinutes_) * 60.0f || doc_.sculptor.strokeActive() ||
+        drag_ == Drag::Tube || // (a tube point drag shows a coarse preview, not the Part)
         (revision == autosaveRevision_ && !doc_.modified))
         return;
     autosaveTimer_ = 0.0f;
+    autosaveNow();
+}
+
+// The first autosave of a session never replaces the one a session before it left: that one is kept as
+// autosave.prev.sfproj (a crash, then a start whose Restore prompt was skipped or declined, must not cost the work).
+bool App::autosaveNow() {
+    // (UI tests run as a demo script, so interactive() is false there; they set prefDir_ before it and write the file too.)
+    const bool recording = !options_.renderPath.empty() || !options_.recordPath.empty() || (demo_ && options_.uiTest.empty());
+    if (recording || prefDir_.empty() || !doc_.dirty()) return false;
+    const uint64_t revision = doc_.undo.revision() * 1000003u + doc_.splatsVersion;
+    std::error_code ec;
+    if (!autosaveWritten_ && std::filesystem::is_regular_file(fsPath(autosavePath(prefDir_)), ec))
+        std::filesystem::rename(fsPath(autosavePath(prefDir_)), fsPath(autosavePrevPath(prefDir_)), ec);
+    autosaveTimer_ = 0.0f;
     storeProjectSettings();
     std::string err;
-    if (saveProject(autosavePath(prefDir_), doc_, err)) {
-        autosaveRevision_ = revision;
-        autosaveWritten_ = true;
-        SDL_Log("Autosaved to %s", autosavePath(prefDir_).c_str());
-    } else {
+    if (!saveProject(autosavePath(prefDir_), doc_, err, /*autosave*/ true)) {
         status_ = "Autosave failed: " + err;
+        return false;
     }
+    autosaveRevision_ = revision;
+    autosaveWritten_ = true;
+    SDL_Log("Autosaved to %s", autosavePath(prefDir_).c_str());
+    return true;
 }
 
 void App::saveProjectAs(bool forceDialog) {
@@ -355,6 +434,13 @@ void App::saveProjectAs(bool forceDialog) {
     std::string suggestion;
     if (!doc_.path.empty()) suggestion = utf8(fsPath(doc_.path).replace_extension(kProjectExtension));
     sf::dialogs::saveFile(onProjectChosen, &dialogRequests_[int(FileAction::SaveProject)], window_, kProjectFilters, 2,
+                           suggestion.empty() ? nullptr : suggestion.c_str());
+}
+
+void App::saveVisiblePartsAs() {
+    std::string suggestion;
+    if (!doc_.path.empty()) suggestion = utf8(fsPath(doc_.path).replace_extension().concat("-visible").replace_extension(kProjectExtension));
+    sf::dialogs::saveFile(onProjectChosen, &dialogRequests_[int(FileAction::SaveVisibleParts)], window_, kProjectFilters, 2,
                            suggestion.empty() ? nullptr : suggestion.c_str());
 }
 
@@ -415,6 +501,7 @@ void App::storeProjectSettings() {
     render.set("show_splats", renderSettings_.showSplats);
     render.set("splat_opacity", double(renderSettings_.splatOpacity));
     render.set("flat_shading", renderSettings_.flatShading);
+    render.set("unlit", renderSettings_.unlit);
     render.set("backface_culling", renderSettings_.backfaceCulling);
     render.set("background", std::string(renderSettings_.gradientBackground ? "gradient" : "flat"));
     render.set("background_color", vec3Json(renderSettings_.backgroundColor));
@@ -466,6 +553,8 @@ void App::storeProjectSettings() {
     brush.set("front_faces_only", frontFacesOnly_);
     brush.set("connected_only", uiPrefs_.connectedOnly);
     brush.set("view_falloff", uiPrefs_.viewFalloff);
+    brush.set("contact_facing", uiPrefs_.contactFacing);
+    brush.set("facing_angle", double(uiPrefs_.facingAngle));
     brush.set("pressure_strength", pressureStrength_);
     brush.set("pressure_size", pressureSize_);
     brush.set("paint_color", vec3Json(doc_.paintColor));
@@ -555,6 +644,7 @@ void App::applyProjectSettings() {
         readFloat(r, "splat_opacity", renderSettings_.splatOpacity);
         // Projects from before the setting: the preferred shading.
         renderSettings_.flatShading = r["flat_shading"].asBool(uiPrefs_.flatShading);
+        renderSettings_.unlit = r["unlit"].asBool(false); // (projects from before it: shaded)
         renderSettings_.backfaceCulling = r["backface_culling"].asBool(uiPrefs_.backfaceCulling);
         // Viewport shading; projects from before it: Lit Sphere.
         {
@@ -638,6 +728,9 @@ void App::applyProjectSettings() {
         readBool(b, "front_faces_only", frontFacesOnly_);
         readBool(b, "connected_only", uiPrefs_.connectedOnly);
         readBool(b, "view_falloff", uiPrefs_.viewFalloff);
+        readBool(b, "contact_facing", uiPrefs_.contactFacing);
+        readFloat(b, "facing_angle", uiPrefs_.facingAngle);
+        uiPrefs_.facingAngle = std::clamp(uiPrefs_.facingAngle, 30.0f, 180.0f);
         readBool(b, "pressure_strength", pressureStrength_);
         readVec3(b["paint_color"], doc_.paintColor);
         readBool(b, "pressure_size", pressureSize_);
@@ -724,7 +817,7 @@ void App::requestQuit() {
 
 void App::openPathConfirmed(const std::string& path) {
     // Images go to the Image to 3D panel and brushes into the library: no scene change.
-    std::string ext = fsPath(path).extension().string();
+    std::string ext = utf8(fsPath(path).extension());
     for (auto& c : ext) c = char(std::tolower(static_cast<unsigned char>(c)));
     if (capture::isVideoFile(path)) { // a phone video of an object: train a splat from it (PanelSplatTrain.cpp)
         runCommand("splat_train", {{"source", path}});
@@ -756,6 +849,7 @@ void App::drawFileMenuProjectItems() {
     }
     if (ImGui::MenuItem(tr("Save"), "Ctrl+S")) saveProjectAs(false);
     if (ImGui::MenuItem(tr("Save As..."), "Ctrl+Shift+S")) saveProjectAs(true);
+    if (ImGui::MenuItem(tr("Save Visible Parts As..."))) saveVisiblePartsAs();
     ImGui::SetNextItemWidth(120.0f * uiScale_);
     ImGui::SliderInt(tr("Autosave (min)"), &autosaveMinutes_, 0, 60, tr(autosaveMinutes_ ? "%d" : "off"));
     if (ImGui::IsItemDeactivatedAfterEdit()) saveProjectPrefs();
@@ -768,7 +862,11 @@ void App::drawProjectPopups() {
         openUnsavedPopup_ = false;
     }
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(kUnsavedPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ui::PushRole(theme::Role::Danger);
+    const bool unsavedOpen = ImGui::BeginPopupModal(kUnsavedPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (unsavedOpen) {
+        ui::RoleStrip(theme::Role::Danger);
         const std::string name = doc_.path.empty() ? std::string("Untitled") : utf8(fsPath(doc_.path).filename());
         ImGui::Text(tr("Save changes to %s before continuing?"), name.c_str());
         ImGui::TextDisabled("%s", tr("Your changes will be lost if you don't save them."));
@@ -806,12 +904,16 @@ void App::drawProjectPopups() {
         offerRestore_ = false;
     }
     if (showWhatsNew_ && !supportCard_ && !showWelcome_) { // after the membership card, if it showed
-        showWhatsNew();
+        showWhatsNew(whatsNewSince_);
         showWhatsNew_ = false;
     }
     drawUpdateBanner();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(kRestorePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ui::PushRole(theme::Role::Warning);
+    const bool restoreOpen = ImGui::BeginPopupModal(kRestorePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (restoreOpen) {
+        ui::RoleStrip(theme::Role::Warning);
         ImGui::TextUnformatted(tr("SculptForge did not close normally last time."));
         ImGui::TextUnformatted(tr("Restore the autosaved work?"));
         if (crashlog::previousCrashed()) {
@@ -821,7 +923,9 @@ void App::drawProjectPopups() {
         }
         ImGui::Spacing();
         const float w = 110.0f * uiScale_;
-        const std::string autosave = autosavePath(prefDir_);
+        std::error_code existsEc;
+        const std::string autosave = std::filesystem::is_regular_file(fsPath(autosavePath(prefDir_)), existsEc)
+                                         ? autosavePath(prefDir_) : autosavePrevPath(prefDir_);
         if (ImGui::Button(tr("Restore"), ImVec2(w, 0))) {
             ImGui::CloseCurrentPopup();
             runCommand("open_project", {{"path", autosave}});
@@ -835,7 +939,8 @@ void App::drawProjectPopups() {
         if (ImGui::Button(tr("Discard"), ImVec2(w, 0))) {
             ImGui::CloseCurrentPopup();
             std::error_code ec;
-            std::filesystem::remove(fsPath(autosave), ec);
+            std::filesystem::remove(fsPath(autosavePath(prefDir_)), ec);
+            std::filesystem::remove(fsPath(autosavePrevPath(prefDir_)), ec);
         }
         ImGui::EndPopup();
     }
@@ -879,24 +984,16 @@ void App::startUpdateCheck(bool manual) {
     // Member builds only when signed in, never in UI tests (the network) and never in studio mode (its own channel).
     const std::shared_ptr<MemberAuth> member =
         memberBuilds_ && options_.uiTest.empty() && !studioMode().active ? memberAuth_ : nullptr;
-    std::thread([job, source, fallback, channel, member] {
+    // The featured creator card's feed rides along on the public feed only (never a studio's own channel).
+    const bool featuredToo = !studioMode().active && policy::current().updateFeed.empty() && policy::current().updateMirror.empty();
+    const std::string featuredDir = prefDir_;
+    std::thread([job, source, fallback, channel, member, featuredToo, featuredDir] {
         std::string body;
         // A URL or a local file (a studio's mirror on a share; UI tests).
-        auto fetch = [&](const std::string& from) {
-            job->error.clear();
-            if (from.rfind("https://", 0) == 0 || from.rfind("http://", 0) == 0) {
-                ai::HttpResponse r = ai::httpRequest("GET", from, {"Accept: application/json"}, {}, 15);
-                if (r.status == 200) body = r.body;
-                else job->error = r.status ? "the server answered " + std::to_string(r.status) : (r.error.empty() ? "no connection" : r.error);
-            } else {
-                std::ifstream f(fsPath(from), std::ios::binary);
-                if (f) body.assign(std::istreambuf_iterator<char>(f), {});
-                else job->error = "can't read " + from;
-            }
-            return job->error.empty();
-        };
+        auto fetch = [&](const std::string& from) { return readFeedText(from, body, job->error); };
         if (!fetch(source) && !fallback.empty()) fetch(fallback);
         if (job->error.empty()) job->ok = parseUpdateFeed(body, job->info, job->error, channel);
+        if (featuredToo && !featuredDir.empty()) fetchFeatured(*job, source, fallback, featuredDir);
         if (member) checkMemberBuilds(*member, *job); // (PanelUpdate.cpp)
         job->done = true;
     }).detach();
@@ -913,12 +1010,14 @@ void App::pollUpdateCheck() {
     } else if (!job->memberError.empty()) {
         memberStatus_ = "Couldn't check member builds: " + job->memberError;
     }
+    applyFeaturedJob(*job); // (the featured creator card: kept, or gone when the site can't be reached)
     if (!job->ok) {
         updateStatus_ = "Couldn't check for updates: " + job->error;
         if (job->manual) status_ = updateStatus_;
         return;
     }
     const UpdateInfo& u = job->info;
+    ai::health::set(u.spaceHealth); // the free Spaces' health (ai/SpaceHealth.h): from the feed already fetched, no new request
     // The feed's "support" block (the card's honest line): kept until the next check, gone when the feed drops it.
     if (u.support.present || supportCardPrefs_.feed.present) {
         supportCardPrefs_.feed = u.support;
@@ -954,7 +1053,11 @@ void App::drawUpdateBanner() {
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
-    if (ImGui::Begin("##update_banner", nullptr, flags)) {
+    ui::PushRole(theme::Role::New);
+    const bool began = ImGui::Begin("##update_banner", nullptr, flags);
+    ui::PopRole();
+    if (began) {
+        ui::RoleStrip(theme::Role::New);
         // Above the floating panels (a Preferences window open over the canvas's top would hide its buttons), but
         // never over a modal dialog.
         if (!ImGui::GetTopMostPopupModal()) ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
@@ -966,7 +1069,9 @@ void App::drawUpdateBanner() {
         ImGui::SameLine();
         ImGui::TextDisabled(tr("(you have %s)"), appVersionLabel().c_str());
         for (const auto& h : u.highlights) ImGui::BulletText("%s", h.c_str());
-        ImGui::TextDisabled("%s %s", kFreeReleaseNote, tr("Members get betas early.")); // memberships (Support.h)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)); // wrapped: the sentence is long
+        ImGui::TextWrapped("%s %s", kFreeReleaseNote, tr("Members get early builds, like SculptForge for Android today.")); // memberships (Support.h)
+        ImGui::PopStyleColor();
         if (guide_.bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
         bool close = false;
@@ -978,7 +1083,7 @@ void App::drawUpdateBanner() {
                 close = true;
             }
             ImGui::SameLine();
-            if (ImGui::Button(tr("Become a member"))) openSupportPage();
+            if (ImGui::Button(tr("Become a member"))) openSupportPage("update-banner");
             ImGui::SameLine();
             if (ImGui::Button(tr("Later"))) close = true;
             ImGui::SameLine();
@@ -1010,20 +1115,19 @@ void App::drawUpdatesSection() {
     if (checkLocked) ui::ManagedBadge();
     ui::HelpText("Check for updates", nullptr,
                  "Once a day at startup, download a small file from the SculptForge website that names the newest "
-                 "version, and show a banner when there is a newer one. Nothing about you or your computer is sent.",
+                 "version, and show a banner when there is a newer one. The welcome window's Featured creator card "
+                 "comes with it (off with this switch). Nothing about you or your computer is sent.",
                  "Preferences > Updates");
     ImGui::TextUnformatted(tr("Update channel"));
     int channel = updateChannel_ == UpdateChannel::Preview ? 1 : 0;
     ImGui::BeginDisabled(channelLocked);
     bool changed = ImGui::RadioButton((std::string(tr("Stable")) + "##prefs.update_stable").c_str(), &channel, 0);
     ImGui::SameLine();
-    changed |= ImGui::RadioButton((std::string(tr("Preview (betas)")) + "##prefs.update_preview").c_str(), &channel, 1);
+    changed |= ImGui::RadioButton((std::string(tr("Preview (early builds)")) + "##prefs.update_preview").c_str(), &channel, 1);
     ImGui::EndDisabled();
     if (channelLocked) ui::ManagedBadge();
     ui::HelpText("Update channel", nullptr,
-                 "Stable offers only finished releases. Preview also offers the betas the update feed names. Betas "
-                 "are a member perk: members get them from the private members' repository and the #members channel "
-                 "on Discord. When the stable release passes a beta, Preview offers that.",
+                 "Members get early builds here when there are any. Right now this channel gets the same releases as Stable.",
                  "Preferences > Updates");
     if (changed) {
         updateChannel_ = channel ? UpdateChannel::Preview : UpdateChannel::Stable;

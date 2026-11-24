@@ -1,0 +1,41 @@
+# Save Visible Parts As... keeps the materials (Discord #bug-reports): the copy opens with the material channels painted on
+# the visible Parts AND the view's material settings (PBR shading, environment, exposure, Lit Sphere) the scene had when
+# it was saved, exactly as a normal Save As does. Before the fix only Save As stored those view settings, so the copy came
+# back with whatever the last full save had (here: Lit Sphere shading, the default environment).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4 ; part_rename to=Horn
+run uv_auto resolution=1024
+run texture_create size=1024
+run texture_channels enable=roughness,metallic
+run paint_material color=8a1a1a roughness=0.1 metallic=1 channels=base_color,roughness,metallic
+key p
+stroke 0.2 0.5 0.8 0.5
+key escape
+run part_append type=cube ; part_rename to=Body
+run part_visibility index=1 visible=false
+expect_value visible_parts == 1
+expect_value parts == 2
+
+# A full save while the view is on Lit Sphere: the project's stored view settings are Lit Sphere.
+run part_visibility index=1 visible=true
+run save_project path=sf_ui_vis_materials_full.sfproj
+run part_visibility index=1 visible=false
+# The artist then sets up the look: PBR, an environment, exposure; then saves the visible Parts.
+run viewport_shading mode=pbr environment=photo_studio exposure=0.4
+wait_value environment_pending == 0
+expect_value view_pbr == 1
+expect_value environment == 1
+run save_visible_parts path=sf_ui_vis_materials_copy.sfproj
+
+# Back to the defaults, then open the copy: the look and the painted channels are there.
+run viewport_shading mode=lit_sphere
+expect_value view_pbr == 0
+run open path=sf_ui_vis_materials_copy.sfproj
+expect_value parts == 1
+expect_value material_channels == 2
+expect_value view_pbr == 1
+expect_value environment == 1
+wait_value environment_pending == 0
+wait 0.3
+camera 25 10
+shot copy-opened

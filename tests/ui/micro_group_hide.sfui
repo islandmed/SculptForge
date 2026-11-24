@@ -1,0 +1,38 @@
+# Hide / Isolate face group (H / Shift+H) on a micro level: the base triangles get hidden, and the micro level drew
+# them anyway (render/MicroRenderer.cpp read no hidden flags), so nothing seemed to happen. The plain mesh is the control:
+# the same group isolated there draws the same small part of the box.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+camera 0 0
+key f
+wait_idle 30
+# A front cap in its own face group (Mask by Facing, then Group from Mask).
+run mask_by_facing x=0 y=0 z=1 angle=40
+run facegroup_from_mask
+run mask_clear
+wait_idle 30
+render_cell "whole sphere" mode=lit
+run isolate_facegroup group=1
+wait_idle 30
+render_cell "cap isolated, plain mesh" mode=lit max=0.2
+run show_all
+wait_idle 30
+
+# The same on Micro 3.
+run micro_divide level=3
+wait_idle 120
+render_cell "whole sphere, Micro" mode=lit
+run isolate_facegroup group=1
+wait_idle 30
+render_cell "cap isolated, Micro" mode=lit max=0.2
+shot isolated
+key ctrl+z
+wait_idle 30
+render_cell "shown again, Micro" mode=lit
+run hide_facegroup group=1
+wait_idle 30
+render_cell "cap hidden, Micro" mode=lit max=0.33
+shot hidden
+run show_all
+wait_idle 30
+render_cell "shown all, Micro" mode=lit

@@ -32,6 +32,9 @@ enum SpaceMouseAxis { kSmTx, kSmTy, kSmTz, kSmRx, kSmRy, kSmRz, kSmAxes };
 // a SpaceMouse (SpaceNavigator...), any vendor when the name says 3Dconnexion (#104).
 bool isSpaceMouseDevice(uint16_t vendor, uint16_t product, const std::string& name = {});
 
+// A SpaceMouse the system lists but SDL cannot open (3DxWare holds it) is tried again this often (#110).
+constexpr float kSpaceMouseRetrySeconds = 3.0f;
+
 constexpr int kSpaceMouseButtonSlots = 8; // buttons whose action Preferences lists (an Enterprise has 31)
 
 struct SpaceMouseSettings {

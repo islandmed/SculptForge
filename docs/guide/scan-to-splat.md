@@ -1,9 +1,17 @@
 # Scan an object into a splat
 
+![A Gaussian splat of a lion bust](images/splats.jpg)
+
+> **In short:**
+> - Walk around an object with your phone and get a Gaussian splat in the viewport.
+> - Watch it sharpen while it trains; start with **Fast preview**, then **Quality**.
+> - Nothing is uploaded: everything runs on your computer.
+
 Walk around a clay maquette, a prop or a toy with your phone, and SculptForge turns the video or photos into a
 Gaussian splat in the viewport. You watch it sharpen while it trains, and you can orbit around it the whole time.
-From there you can sculpt against it, [make it sculptable](scan-to-sculptable.md), or save
-it for a splat viewer or a game engine. Nothing is uploaded: everything runs on your own computer.
+
+From there you can sculpt against it, [make it sculptable](scan-to-sculptable.md), or save it for a splat viewer or a
+game engine. Nothing is uploaded: everything runs on your own computer.
 
 ## What you need
 

@@ -1,0 +1,87 @@
+# Select Circle (#213): Ctrl+Shift+drag draws a circle or ellipse from its centre, keeps what is inside and hides the rest;
+# Alt hides the inside instead; letting go of Shift mid-drag keeps it round; Keep round and Draw from corner in Tool >
+# Visibility; the Ctrl+Shift brush picker offers it. One undo step per selection.
+run new_sphere subdivisions=5
+input_style classic
+key x
+expect_value symmetry_x == 0
+expect_value hidden == 0
+
+click "Visibility"
+expect_not "Keep round##circle"
+click "Select Circle##select.circle"
+expect_value hide_shape == 7
+expect "Draw from corner##circle"
+expect "Keep round##circle"
+shot select_circle_panel
+
+# Ctrl+Shift+drag from the middle: the inside stays, the rest is hidden.
+hold ctrl+shift
+drag_path 0.5 0.5 0.72 0.64 keep
+expect_value selection_shown == 1
+shot select_circle_drawing
+release
+hold none
+expect_value hidden > 1000
+expect_value can_undo == 1
+remember hidden ellipse_hidden
+shot select_circle_kept
+key ctrl+z
+expect_value hidden == 0
+
+# Alt hides the inside (what it kept before, now hidden): the hidden count flips.
+hold ctrl+shift+alt
+drag_path 0.5 0.5 0.72 0.64
+hold none
+expect_value hidden > 0
+expect_value hidden < $ellipse_hidden
+key ctrl+z
+
+# Shift let go mid-drag keeps it round: a bigger circle, so less is hidden.
+hold ctrl+shift
+drag_path 0.5 0.5 0.72 0.64 keep
+hold ctrl
+shot select_circle_round
+release
+hold none
+expect_value hidden < $ellipse_hidden
+key ctrl+z
+
+# Keep round and Draw from corner.
+click "Keep round##circle"
+hold ctrl+shift
+drag_path 0.5 0.5 0.72 0.64
+hold none
+remember hidden round_hidden
+expect_value hidden < $ellipse_hidden
+key ctrl+z
+click "Keep round##circle"
+click "Draw from corner##circle"
+hold ctrl+shift
+drag_path 0.3 0.3 0.7 0.7
+hold none
+expect_value hidden > 1000
+shot select_circle_corner
+key ctrl+z
+click "Draw from corner##circle"
+expect_value hidden == 0
+
+# A circle around nothing (on the background) reverses nothing when nothing is hidden: the mesh stays whole.
+hold ctrl+shift
+drag_path 1.5 0.5 1.62 0.6
+hold none
+expect_value hidden == 0
+
+# The Ctrl+Shift brush picker lists it.
+hold ctrl+shift
+click "##tile.brush"
+wait 0.1
+expect "Select Circle##held.select.circle"
+hover_window 0.5 0.8
+shot select_circle_brush_picker
+click "Select Lasso##held.select.lasso"
+expect_value hide_shape == 1
+click "##tile.brush"
+click "Select Circle##held.select.circle"
+hold none
+expect_value hide_shape == 7

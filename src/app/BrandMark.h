@@ -18,4 +18,8 @@ void appMarkItem(float size, float alpha = 1.0f); // as an ImGui item at the cur
 void bust(ImDrawList* dl, ImVec2 at, float size, float alpha = 1.0f);
 void bustItem(float size, float alpha = 1.0f); // as an ImGui item at the cursor
 
+// Community icon `index` (0..kSocialCount-1, the order of kSocialLinks in Support.h), `size` px wide at `at`, in `color`
+// (the strip is white; it is tinted). Draws nothing without a texture.
+void socialIcon(ImDrawList* dl, int index, ImVec2 at, float size, ImU32 color);
+
 } // namespace sf::brand

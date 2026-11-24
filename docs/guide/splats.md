@@ -1,11 +1,16 @@
 # Gaussian splats
 
+![A Gaussian splat capture made from the lion, with the mesh hidden and the Splats button on the right shelf](images/splats.jpg)
+
+> **In short:**
+> - Use Gaussian splats as a reference to sculpt against.
+> - **Make sculptable** turns a capture into an animation-ready mesh with its colours.
+> - **Sculpt to splats** turns a sculpt into splats.
+
 Gaussian splats are the format behind phone and photogrammetry captures from apps such as Polycam, Luma,
 Postshot, Scaniverse and KIRI. SculptForge uses them three ways: as a reference to sculpt against, as a source
 for a sculptable, animation-ready mesh with its colours, and as an output when you turn a sculpt into splats. This chapter covers all
 three.
-
-![A Gaussian splat capture made from the lion, with the mesh hidden and the Splats button on the right shelf](images/splats.jpg)
 
 To make a splat yourself from a phone video or photos, see [Scan an object into a splat](scan-to-splat.md).
 
@@ -40,7 +45,9 @@ palette to place them:
 | **Clean floaters** | Removes faint splats and stray outliers around the subject |
 
 The palette also shows the number of splats and their spherical-harmonic degree (for example "1250000 splats
-(SH 3)"), and has:
+(SH 3)"). A capture with SH 1 or more shows its view-dependent colour (the sheen and highlights that change as you
+orbit), as splat viewers do; on the Essential hardware tier they show their plain colour, to keep the view
+smooth. The palette has:
 
 - **Show** and **Show mesh** to show or hide the capture and the sculpt.
 - An **opacity** slider (0.05 to 1) to see the sculpt through the capture.
@@ -74,8 +81,8 @@ file type: PLY (for SuperSplat, Postshot and most tools), glTF (`.glb` with `KHR
 OpenUSD (`.usda` / `.usdz`). The `splat_save` command also writes `.splat`.
 
 Placement you made with **Flip**, **Turn 90** and **Fit** is kept exactly in glTF and USD. PLY has no
-placement, so it is baked into the splats; if the capture was rotated, view-dependent colour (spherical
-harmonics above degree 0) is dropped from the PLY, because it would point the wrong way.
+placement, so it is baked into the splats; the view-dependent colour (spherical harmonics up to degree 3) turns
+with them, so the saved capture looks the same from every side as it does in SculptForge.
 
 When you export USD (**File > Export USD / USDZ...**) with splats loaded, they are included in the same file
 as a `ParticleField3DGaussianSplat` prim next to the meshes.
@@ -83,6 +90,11 @@ as a `ParticleField3DGaussianSplat` prim next to the meshes.
 Projects (`.sfproj`) keep loaded splats and their placement.
 
 **Clear** in **Render > Gaussian Splats** removes the capture.
+
+## Splats with Blender
+
+Splats go to Blender 5.3 and back with one click, view-dependent colour and placement intact: see
+[Splats with Blender](blender.md#splats-with-blender).
 
 ## From scripts
 
@@ -110,6 +122,7 @@ To render only the splats headless, use `sculptforge scan.ply --render scan.png 
 ## See also
 
 - [From scan to sculptable mesh](scan-to-sculptable.md): Make sculptable in detail
+- [Working with Blender](blender.md#splats-with-blender): send splats to Blender 5.3 and back
 - [Image and text to 3D](generate-3d.md): another way to get a base mesh
 - [Subdivide, Remesh, Decimate and LODs](geometry.md): clean up a converted mesh
 - [Exporting](exporting.md): USD and glTF exports that carry splats

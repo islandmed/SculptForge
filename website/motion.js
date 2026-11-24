@@ -72,64 +72,48 @@
     }
   }
 
-  // --- Site menu: when the header links don't fit beside the logo (a narrow window, a tablet or a phone), the
-  // secondary links move into a menu behind a button; Download, Discord and GitHub stay in the bar. Measured, not a fixed
-  // breakpoint, since pages have different links. ---
+  // --- Site menu: the bar keeps Support, Download and the social icons; every other link in the nav moves into a panel
+  // behind the menu button, on every width (one menu, built from the links in the page's own nav, so the two cannot drift).
+  // On a phone the social icons go into the panel too (style.css). Without this script the nav stays a plain row of links. ---
   const siteHeader = document.querySelector(".nav");
   const mainNav = siteHeader?.querySelector("nav");
-  if (siteHeader && mainNav) {
-    const inner = siteHeader.querySelector(".nav-inner"), brand = siteHeader.querySelector(".brand");
-    const items = [...mainNav.querySelectorAll("a:not(.gh):not(.nav-dl)")];
-    const ghs = [...mainNav.querySelectorAll("a.gh")]; // Discord and GitHub
+  const btn = mainNav?.querySelector(".nav-toggle");
+  if (siteHeader && mainNav && btn) {
+    const brand = siteHeader.querySelector(".brand");
     if (!brand.hasAttribute("aria-label")) brand.setAttribute("aria-label", brand.textContent.trim() || "SculptForge");
     const menu = document.createElement("div");
     menu.className = "nav-menu";
     menu.id = "site-menu";
     menu.hidden = true;
-    const list = document.createElement("div");
-    list.className = "wrap";
-    for (const a of items) list.append(a.cloneNode(true));
-    for (const gh of ghs) list.append(Object.assign(gh.cloneNode(true), { className: "menu-gh" }));
-    menu.append(list);
+    const outer = document.createElement("div");
+    outer.className = "wrap";
+    const panel = document.createElement("div");
+    panel.className = "menu-panel";
+    for (const a of mainNav.querySelectorAll(":scope > a:not(.nav-support):not(.nav-dl)")) panel.append(a.cloneNode(true));
+    const social = document.createElement("div");
+    social.className = "menu-social";
+    for (const a of mainNav.querySelectorAll(".nav-social a")) social.append(a.cloneNode(true));
+    panel.append(social);
+    outer.append(panel);
+    menu.append(outer);
     siteHeader.append(menu);
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "nav-toggle";
-    btn.setAttribute("aria-controls", "site-menu");
-    btn.setAttribute("aria-expanded", "false");
-    btn.setAttribute("aria-label", "Menu");
-    btn.innerHTML = "<span></span><span></span><span></span>";
-    mainNav.append(btn);
-    const setOpen = (open) => {
+    const setOpen = (open, refocus) => {
       menu.hidden = !open;
       btn.setAttribute("aria-expanded", String(open));
       siteHeader.classList.toggle("menu-open", open);
+      if (open) panel.querySelector("a")?.focus();
+      else if (refocus) btn.focus();
     };
     btn.addEventListener("click", () => setOpen(menu.hidden));
     menu.addEventListener("click", (e) => { if (e.target.closest("a")) setOpen(false); });
     document.addEventListener("click", (e) => { if (!menu.hidden && !siteHeader.contains(e.target)) setOpen(false); });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !menu.hidden) { setOpen(false); btn.focus(); }
+      if (e.key === "Escape" && !menu.hidden) { e.preventDefault(); setOpen(false, true); }
     });
-    // Compact: the secondary links go into the menu (too wide for the bar, or already hidden by the phone layout
-    // in style.css). Tight: on the narrowest screens Discord and GitHub go too, so Download and the button fit by the logo.
-    // Tiny: below that (the smallest phones) the logo drops its name.
-    const tooWide = () => {
-      const pad = getComputedStyle(inner);
-      const room = inner.clientWidth - parseFloat(pad.paddingLeft) - parseFloat(pad.paddingRight);
-      return brand.offsetWidth + mainNav.offsetWidth + 32 > room;
-    };
-    const fit = () => {
-      siteHeader.classList.remove("compact", "tight", "tiny");
-      const compact = tooWide() || items.some((a) => a.offsetWidth === 0);
-      siteHeader.classList.toggle("compact", compact);
-      siteHeader.classList.toggle("tight", compact && tooWide());
-      siteHeader.classList.toggle("tiny", siteHeader.classList.contains("tight") && tooWide());
-      if (!compact) setOpen(false);
-    };
-    new ResizeObserver(fit).observe(inner);
-    document.fonts?.ready.then(fit);
-    fit();
+    // Tabbing out of the bar and panel closes the panel.
+    siteHeader.addEventListener("focusout", (e) => {
+      if (!menu.hidden && e.relatedTarget && !siteHeader.contains(e.relatedTarget)) setOpen(false);
+    });
   }
 
   // --- Download counts: GoatCounter (loaded beside this script) records which file was downloaded, so the
@@ -144,6 +128,55 @@
     const file = a.href.split("/download/")[1] || "releases page";
     const title = a.innerText.replace(/\s+/g, " ").trim().slice(0, 60);
     window.goatcounter.count({ path: "download: " + file + (campaign ? " [" + campaign + "]" : ""), title, event: true });
+  });
+
+  // --- Memberships per ad: a visit that arrived from a tagged link carries its campaign into Stripe's checkout as
+  // client_reference_id (onboarding reads it back), and the click is a GoatCounter event named for the tier and the
+  // campaign. Current page view only: no cookie, no storage. A visit without a campaign is tagged "site", so the
+  // tag is never empty and organic traffic is told apart from the links we post ourselves. ---
+  const given = (new URLSearchParams(location.search).get("utm_campaign") || "")
+    .toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 200);
+  const ref = given || "site";
+  const buy = 'a[href^="https://buy.stripe.com/"]';
+  const tag = (u) => {
+    if (!ref || !u) return u;
+    const url = new URL(u, location.href);
+    if (url.hostname !== "buy.stripe.com") return u;
+    url.searchParams.set("client_reference_id", ref);
+    return url.href;
+  };
+  // The visit's utm_* also ride along on links to the membership pages, so a home-page ad visitor who clicks
+  // Membership or Studios keeps the tag (the URL is the only place it lives).
+  const utm = [...new URLSearchParams(location.search)].filter(([k]) => /^utm_[a-z]+$/.test(k));
+  const member = 'a[href*="support"], a[href*="studios"]';
+  const carry = (a) => {
+    if (!given || !a.href) return;
+    const url = new URL(a.href, location.href);
+    if (url.origin !== location.origin || !/\/(support|studios)(\.html)?$/.test(url.pathname)) return;
+    utm.forEach(([k, v]) => { if (!url.searchParams.has(k)) url.searchParams.set(k, v.slice(0, 200)); });
+    a.href = url.href;
+  };
+  {
+    document.querySelectorAll(member).forEach(carry);
+    document.querySelectorAll(buy).forEach((a) => {
+      a.href = tag(a.href);
+      if (a.dataset.yearly) a.dataset.yearly = tag(a.dataset.yearly);
+    });
+    // A script that swaps the link later (support.html's monthly/yearly switch) can put an untagged one back: tag it
+    // again as the visitor reaches for it.
+    ["pointerdown", "click", "auxclick", "contextmenu"].forEach((type) => document.addEventListener(type, (e) => {
+      const a = e.target.closest?.(buy);
+      if (a) a.href = tag(a.href);
+      const m = e.target.closest?.(member);
+      if (m) carry(m);
+    }, true));
+  }
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest(buy);
+    if (!a || !window.goatcounter?.count) return;
+    const tier = a.hasAttribute("data-member-link") ? "member" : "studio"; // every other buy link is a Studio plan
+    window.goatcounter.count({ path: "checkout: " + tier + " [" + ref.slice(0, 40) + "]",
+      title: a.innerText.replace(/\s+/g, " ").trim().slice(0, 60), event: true });
   });
 
   if (!guide) return;

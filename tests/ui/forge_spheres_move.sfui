@@ -1,0 +1,128 @@
+# Forge Spheres, moving by hand (a public review: "the move tool is still a bit stiff"): a creature blocked out as one
+# would (body, neck and head, a 40-joint tail, four legs in X symmetry), then moves with pointer moves taken once a
+# frame as the window does. A moved leg stays at its depth in the view and its twin follows live; Shift swings it
+# around its parent with its link keeping its length; Snap to Surface seats the head on the body; a drag on most of
+# a sphere moves it (the resize band is a thin rim). Prints the longest frame of each drag (frame-timed; the bound is
+# loose so a busy machine passes, the printed numbers are the record).
+interactive_strokes on
+run forgesphere_new radius=1
+run part_visibility index=0 visible=false
+run forgesphere_add parent=0 position=0,0.9,1.1 radius=0.45
+run forgesphere_add parent=1 position=0,1.4,1.8 radius=0.5
+run forgesphere_add parent=0 position=0,0.1,-1.3 radius=0.35
+run forgesphere_add parent=3 position=0,0.15,-1.60 radius=0.12
+run forgesphere_add parent=4 position=0,0.16,-1.72 radius=0.12
+run forgesphere_add parent=5 position=0,0.17,-1.84 radius=0.12
+run forgesphere_add parent=6 position=0,0.18,-1.96 radius=0.12
+run forgesphere_add parent=7 position=0,0.19,-2.08 radius=0.12
+run forgesphere_add parent=8 position=0,0.20,-2.20 radius=0.12
+run forgesphere_add parent=9 position=0,0.21,-2.32 radius=0.12
+run forgesphere_add parent=10 position=0,0.22,-2.44 radius=0.12
+run forgesphere_add parent=11 position=0,0.23,-2.56 radius=0.12
+run forgesphere_add parent=12 position=0,0.24,-2.68 radius=0.12
+run forgesphere_add parent=13 position=0,0.25,-2.80 radius=0.12
+run forgesphere_add parent=14 position=0,0.26,-2.92 radius=0.12
+run forgesphere_add parent=15 position=0,0.27,-3.04 radius=0.12
+run forgesphere_add parent=16 position=0,0.28,-3.16 radius=0.12
+run forgesphere_add parent=17 position=0,0.29,-3.28 radius=0.12
+run forgesphere_add parent=18 position=0,0.30,-3.40 radius=0.12
+run forgesphere_add parent=19 position=0,0.31,-3.52 radius=0.12
+run forgesphere_add parent=20 position=0,0.32,-3.64 radius=0.12
+run forgesphere_add parent=21 position=0,0.33,-3.76 radius=0.12
+run forgesphere_add parent=22 position=0,0.34,-3.88 radius=0.12
+run forgesphere_add parent=23 position=0,0.35,-4.00 radius=0.12
+run forgesphere_add parent=24 position=0,0.36,-4.12 radius=0.12
+run forgesphere_add parent=25 position=0,0.37,-4.24 radius=0.12
+run forgesphere_add parent=26 position=0,0.38,-4.36 radius=0.12
+run forgesphere_add parent=27 position=0,0.39,-4.48 radius=0.12
+run forgesphere_add parent=28 position=0,0.40,-4.60 radius=0.12
+run forgesphere_add parent=29 position=0,0.41,-4.72 radius=0.12
+run forgesphere_add parent=30 position=0,0.42,-4.84 radius=0.12
+run forgesphere_add parent=31 position=0,0.43,-4.96 radius=0.12
+run forgesphere_add parent=32 position=0,0.44,-5.08 radius=0.12
+run forgesphere_add parent=33 position=0,0.45,-5.20 radius=0.12
+run forgesphere_add parent=34 position=0,0.46,-5.32 radius=0.12
+run forgesphere_add parent=35 position=0,0.47,-5.44 radius=0.12
+run forgesphere_add parent=36 position=0,0.48,-5.56 radius=0.12
+run forgesphere_add parent=37 position=0,0.49,-5.68 radius=0.12
+run forgesphere_add parent=38 position=0,0.50,-5.80 radius=0.12
+run forgesphere_add parent=39 position=0,0.51,-5.92 radius=0.12
+run forgesphere_add parent=40 position=0,0.52,-6.04 radius=0.12
+run forgesphere_add parent=41 position=0,0.53,-6.16 radius=0.12
+run forgesphere_add parent=42 position=0,0.54,-6.28 radius=0.12
+run forgesphere_add parent=0 position=0.7,-1.0,0.6 radius=0.3 symmetry=x
+run forgesphere_add parent=44 position=0.75,-1.8,0.7 radius=0.2 symmetry=x
+run forgesphere_add parent=0 position=0.7,-1.0,-0.6 radius=0.3 symmetry=x
+run forgesphere_add parent=48 position=0.75,-1.8,-0.7 radius=0.2 symmetry=x
+expect_value forgespheres == 52
+wait 0.3
+click "Forge Spheres##tool.forgespheres"
+click "Forge Spheres/Move"
+camera 35 10
+key f
+wait 0.3
+expect_value forgesphere_x44 > 0.5
+expect_value forgesphere_x45 < -0.5
+
+# A plain move: the front leg goes right and up, at its depth; its twin mirrors it live.
+remember forgesphere_depth44 depth
+remember forgesphere_x44 x
+remember longest_frame_ms reset
+drag_forgesphere 44 body 120 -60 0.6
+print longest_frame_ms
+expect_value forgesphere_x44 > $x
+expect_value forgesphere_depth44 > $depth-1
+expect_value forgesphere_depth44 < $depth+1
+remember forgesphere_x44 moved
+expect_value forgesphere_x45 < 0
+expect_status "Forge Sphere move"
+shot forge-spheres-move-plain
+key ctrl+z
+expect_value forgesphere_x44 < $moved
+
+# Shift: the hind foot swings around the hind leg; the link keeps its length.
+remember forgesphere_len50 len
+hold shift
+drag_forgesphere 50 body 90 70 0.6
+hold none
+expect_value forgesphere_len50 > $len-1
+expect_value forgesphere_len50 < $len+1
+expect_value forgesphere_out50 > 0
+shot forge-spheres-move-keep-length
+key ctrl+z
+
+# Move Branch: the front leg carries its foot along (the link keeps its length).
+click "Forge Spheres/Move Branch"
+remember forgesphere_len46 foot
+remember forgesphere_x46 footx
+drag_forgesphere 44 body 100 0 0.5
+expect_value forgesphere_x46 > $footx
+expect_value forgesphere_len46 > $foot-1
+expect_value forgesphere_len46 < $foot+1
+click "Forge Spheres/Move Branch"
+key ctrl+z
+
+# The tail's tip on the long chain: the longest frame stays short.
+remember longest_frame_ms reset
+drag_forgesphere 43 body -100 40 0.6 events=16
+print longest_frame_ms
+expect_value longest_frame_ms < 250
+key ctrl+z
+
+# Snap to Surface: the head, dragged onto the body, sits with its centre on the body's surface.
+click "Forge Spheres/Snap to Surface"
+expect_value forgesphere_snap == 1
+drag_forgesphere 2 body 60 70 0.6
+expect_value forgesphere_surface2 < 5
+expect_value forgesphere_x2 == 0
+shot forge-spheres-move-snap
+click "Forge Spheres/Snap to Surface"
+expect_value forgesphere_snap == 0
+key ctrl+z
+
+# Draw: a press a little inside a sphere's outline moves it (the resize band is only the rim).
+click "Forge Spheres/Draw"
+drag_forgesphere 44 body hover
+expect_value forgesphere_hint == 1
+drag_forgesphere 44 rim hover
+expect_value forgesphere_hint == 2

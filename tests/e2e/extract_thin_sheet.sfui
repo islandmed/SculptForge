@@ -1,0 +1,39 @@
+# e2e: Extract, wide Clay and Flatten on the thin sheet. Hidden spikes (Big Play on Discord, Extract's default shell):
+# a wide Clay or Flatten dab pulls the far layer up through the near one, so the sheet's volume falls instead of rising.
+# xfail: hidden-spikes Clay / Flatten on a thin Extract sheet (fix/hidden-spikes, Sculpt.cpp dropFarSide)
+run new_sphere subdivisions=5
+run mask_rect y0=0.3
+expect_value masked > 0
+camera 25 25
+key f
+click "Extract/Make Shell"
+expect_value extract_preview == 1
+click "Extract/Accept"
+expect_value extract_preview == 0
+expect_value parts == 2
+run mask_clear
+run part_select index=1
+expect_value open_edges == 0
+expect_value groups == 3
+remember solid_volume sheet
+remember triangles tris
+expect_value solid_volume > 0
+snapshot
+brush_size 120
+
+click "Clay##brush.clay"
+stroke 0.3 0.4 0.7 0.5
+stroke 0.3 0.5 0.7 0.6
+expect_value solid_volume >= $sheet*0.999
+expect_value open_edges == 0
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved == 0
+
+click "Flatten##brush.flatten"
+stroke 0.3 0.45 0.7 0.45
+expect_value solid_volume >= $sheet*0.999
+expect_mesh_valid
+key ctrl+z
+expect_value moved == 0

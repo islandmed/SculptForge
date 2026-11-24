@@ -28,8 +28,14 @@ public:
     ThreadPool(const ThreadPool&) = delete;
     ThreadPool& operator=(const ThreadPool&) = delete;
 
-    // The pool brushes use: one thread per hardware thread (up to 16), the caller included.
+    // The pool brushes use, the caller included: the count set below (the hardware profile's, a user's override up to
+    // every hardware thread), else one thread per hardware thread up to 16 (kDefaultMaxThreads).
     static ThreadPool& shared();
+    static constexpr int kDefaultMaxThreads = 16;
+    static constexpr int kMaxThreads = 256;
+    // The size shared() takes: `requested` (setSharedThreadCount) or `env` (SF_THREADS) when > 0, else the hardware
+    // threads up to kDefaultMaxThreads. Pure, for tests.
+    static int sharedSizeFor(int requested, int env, unsigned hardware);
     // Threads for shared() (the hardware profile's, core/HardwareProfile.h), honoured if called before its first
     // use; 0 = automatic. Returns false when the pool already exists (the count applies at the next start).
     static bool setSharedThreadCount(int threads);
@@ -68,6 +74,33 @@ private:
     std::atomic<bool> serial_{false};
 };
 
+// While one is alive, poolFor on this thread runs inline: background work (a stroke's undo packing after the
+// release) that must never hold the pool the frame's dabs use.
+struct PoolInline {
+    PoolInline() { ++depth(); }
+    ~PoolInline() { --depth(); }
+    PoolInline(const PoolInline&) = delete;
+    PoolInline& operator=(const PoolInline&) = delete;
+    static int& depth() {
+        thread_local int d = 0;
+        return d;
+    }
+};
+
+// While one is alive, the calling thread runs at a lower priority than the frame's (a stroke's undo packing after the
+// release, #184: at the same priority it slowed the next frames' pool work up to 5x on the floor tier); the old
+// priority comes back after (std::async may run on a pooled thread). Best effort: nothing if the system refuses.
+class LowerThreadPriority {
+public:
+    LowerThreadPriority();
+    ~LowerThreadPriority();
+    LowerThreadPriority(const LowerThreadPriority&) = delete;
+    LowerThreadPriority& operator=(const LowerThreadPriority&) = delete;
+private:
+    int old_ = 0;
+    bool set_ = false;
+};
+
 // Calls fn(begin, end) for the blocks [b * block, min(n, (b + 1) * block)) of [0, n) on the shared pool.
 // Each block is one call, so per-block partial results indexed by begin / block are deterministic. Fewer than
 // `minBlocks` blocks run inline, in order (waking threads would cost more than the work).
@@ -76,7 +109,7 @@ void poolFor(size_t n, F&& fn, size_t block = 4096, size_t minBlocks = 4) {
     if (n == 0) return;
     block = std::max<size_t>(block, 1);
     const size_t blocks = (n + block - 1) / block;
-    if (blocks < std::max<size_t>(minBlocks, 2)) {
+    if (blocks < std::max<size_t>(minBlocks, 2) || PoolInline::depth() > 0) {
         for (size_t b = 0; b < blocks; ++b) fn(b * block, std::min(n, (b + 1) * block));
         return;
     }

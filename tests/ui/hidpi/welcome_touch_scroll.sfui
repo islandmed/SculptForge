@@ -1,0 +1,30 @@
+# The welcome on a landscape phone (Hameron, Pixel): the window is shorter than its content, so a finger scrolls it, from a
+# button too (a swipe that starts on one scrolls and doesn't press it), and Close stays at the bottom the whole time.
+# CMake runs this at 2400x1080 (about 420 dpi, UI scale 300 %).
+ui_scale 300
+safe_area 118 63 118 63
+run new_sphere subdivisions=3
+key f3
+type "##Command palette" "welcome"
+key enter
+wait_idle 10
+expect_value welcome_open == 1
+expect_value welcome_scroll_px > 100
+expect_value welcome_scrolled_px == 0
+expect_value welcome_close_hidden_px == 0
+shot welcome-scroll-top
+# Swipe up from a button (Quick tour is near the top): the content moves, nothing is pressed.
+touch_drag_at 0.5 0.45 0.5 0.2
+wait_idle 10
+expect_value welcome_scrolled_px > 100
+expect_value quick_tour_open == 0
+expect_value welcome_open == 1
+expect_value welcome_close_hidden_px == 0
+shot welcome-scroll-down
+# Swipe back down.
+touch_drag_at 0.5 0.2 0.5 0.7
+wait_idle 10
+expect_value welcome_scrolled_px == 0
+# A tap on a body button still presses it.
+touch_tap "Maya##welcome.from"
+expect_value input_style == 3

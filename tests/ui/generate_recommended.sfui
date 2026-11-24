@@ -1,0 +1,42 @@
+# Generate 3D > Recommended models: each row shows what a generation costs and a line on its quality, a paid one a
+# "Get a key" button; Tripo (direct, your key) is a service of its own that stays off until a key is
+# added; a free Space the update feed reports switched off (ui_space_health stands in for the feed here) says so, is greyed out in
+# the Model list and Generate still runs the first Space that is up. Nothing is generated (no key, no network).
+# CMake runs it at 1440x900 and 2880x1800 (the review sizes).
+run ui_look look=classic layout=classic        # written for the Classic look
+drop ../../assets/demo/teddy-sketch.png
+wait_for "Generate 3D" 5
+expect_text Recommended models
+click "Generate 3D/Recommended models"
+wait 0.2
+expect_text Tripo v3.1
+expect_text $0.20
+expect_text Get a key
+shot generate-recommended
+click "Generate 3D/Recommended models"   # closed again: the list is tall and pushes the service list down
+wait 0.2
+
+# The feed says the default free model is switched off and TRELLIS.2 is slow to start.
+run ui_space_health spaces="hunyuan3d-2.1=off:Switched off by its author;trellis-2=slow:Asleep: the first run wakes it"
+wait 0.2
+click "Generate 3D/##service"
+click "Hugging Face - free models"
+wait 0.2
+expect_text Switched off
+expect_text Switched off by its author
+shot generate-space-off
+click "Generate 3D/Model"
+expect_text May be slow to start
+click "Hunyuan3D 2 mini Turbo (Tencent) - free, fastest"
+wait 0.2
+expect_text Hunyuan3D 2 mini Turbo (Tencent) - free, fastest
+
+click "Generate 3D/##service"
+expect_text Tripo (direct) - paid, your key
+click "Tripo (direct) - paid, your key"
+wait 0.2
+expect_text Off until you add your own key from your Tripo account
+expect_text Sends your image or description to Tripo (openapi.tripo3d.ai)
+click "Generate 3D/Generate 3D model"
+wait 0.5
+expect_status Add your Tripo API key

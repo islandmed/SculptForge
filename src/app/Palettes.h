@@ -20,6 +20,9 @@ struct Section {
     ~Section();
     Section(const Section&) = delete;
     Section& operator=(const Section&) = delete;
+
+private:
+    bool capture_ = false; // the section My Panel is drawing: nothing after it is drawn (App::drawMyPanelSection)
 };
 
 // The palette bodies' quiet controls: check marks in the text colour, not the accent (the accent marks the

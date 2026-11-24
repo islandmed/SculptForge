@@ -141,7 +141,7 @@ size_t paintDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams&
         stencil.copy = m;
         static thread_local ConnectedScratch connected;
         brushRegion(mesh, bvh, center, viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), p.connectedOnly, p.viewFalloff,
-                    verts, connected);
+                    verts, connected, useAlpha && p.stampFootprint);
         if (useStencil) stencil.setSpacing(center, viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), verts.size());
         for (uint32_t v : verts) {
             if (p.frontFacesOnly && v < mesh.normals.size() && glm::dot(mesh.normals[v], viewDir) > 0.0f) continue;
@@ -162,6 +162,87 @@ size_t paintDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams&
             ++changed;
         }
         sculptor.timings.vertices += verts.size();
+    }
+    sculptor.timings.kernelMs += lapMs(clock);
+    ++sculptor.timings.dabs;
+    return changed;
+}
+
+size_t paintSmoothDab(Sculptor& sculptor, Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry sym) {
+    if (!sculptor.strokeActive() || mesh.vertexCount() == 0 || p.radius <= 0.0f || !mesh.hasColors()) return 0;
+    const int layerIndex = mesh.paintLayers.empty() ? -1 : mesh.activePaintLayer;
+    if (!paintLayerEditable(mesh, layerIndex)) return 0;
+    PaintLayer* layer = layerIndex >= 0 ? &mesh.paintLayers[size_t(layerIndex)] : nullptr;
+    // What painting writes: the colours (or Base), or the layer's colour with its coverage.
+    std::vector<glm::vec3>& colors = !layer ? (mesh.paintLayers.empty() ? mesh.colors : mesh.paintBase) : layer->color;
+    const float s = std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f);
+    const bool useAlpha = p.alpha && !p.alpha->empty();
+    static thread_local std::vector<uint32_t> verts;
+    struct Result {
+        uint32_t v;
+        glm::vec3 color;
+        float alpha;
+    };
+    static thread_local std::vector<Result> results;
+    auto clock = std::chrono::steady_clock::now();
+    size_t changed = 0;
+    for (const SymCopy& m : Sculptor::copies(sym)) {
+        const glm::vec3 center = m.point(p.center), viewDir = m.dir(p.viewDir);
+        glm::vec3 aUp = m.dir(p.alphaUp);
+        aUp -= viewDir * glm::dot(aUp, viewDir);
+        aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
+        const glm::vec3 aRight = glm::cross(aUp, -viewDir);
+        static thread_local ConnectedScratch connected;
+        brushRegion(mesh, bvh, center, viewDir, p.radius * (useAlpha ? kAlphaReach : 1.0f), p.connectedOnly, p.viewFalloff,
+                    verts, connected, useAlpha && p.stampFootprint);
+        // Pass 1: every new colour from the colours before the dab. Pass 2: write them.
+        results.clear();
+        for (uint32_t v : verts) {
+            if (p.frontFacesOnly && v < mesh.normals.size() && glm::dot(mesh.normals[v], viewDir) > 0.0f) continue;
+            const glm::vec3 o = mesh.positions[v] - center;
+            const float f = useAlpha ? p.alpha->stamp(glm::dot(o, aRight) / p.radius, glm::dot(o, aUp) / p.radius, p.focal)
+                                     : brushFalloff(brushDistance(mesh.positions[v], center, viewDir, p.viewFalloff), p.radius, p.focal);
+            const float w = std::clamp(f * s * vertexInfluence(mesh, v), 0.0f, 1.0f);
+            if (w <= 0.0f) continue;
+            const auto ring = mesh.neighbors(v);
+            if (ring.empty()) continue;
+            glm::vec3 sum(0.0f);
+            float alphaSum = 0.0f;
+            for (uint32_t n : ring) {
+                if (layer) { // coverage-weighted: a transparent neighbour has no colour to lend
+                    sum += layer->color[n] * layer->alpha[n];
+                    alphaSum += layer->alpha[n];
+                } else {
+                    sum += colors[n];
+                }
+            }
+            if (!layer) {
+                results.push_back({v, glm::mix(colors[v], sum / float(ring.size()), w), 1.0f});
+                continue;
+            }
+            // A layer: its coverage smooths too; where the vertex has none yet its own colour means nothing, so it
+            // takes the neighbours'.
+            const glm::vec3 avg = alphaSum > 1e-6f ? sum / alphaSum : colors[v];
+            const float own = layer->alpha[v];
+            results.push_back({v, own > 1e-6f ? glm::mix(colors[v], avg, w) : avg,
+                               glm::mix(own, alphaSum / float(ring.size()), w)});
+        }
+        for (const Result& r : results) {
+            sculptor.recordColor(mesh, r.v);
+            colors[r.v] = r.color;
+            if (layer) {
+                layer->alpha[r.v] = r.alpha;
+                mesh.colors[r.v] = compositePaintVertex(mesh, r.v);
+            }
+            mesh.markDirty(r.v);
+            ++changed;
+        }
+        sculptor.timings.vertices += verts.size();
+    }
+    if (changed && !layer) { // Several colours now: a later subdivision takes the difference
+        Mesh::PaintTarget& pt = mesh.paintTarget;
+        if (pt.settled || pt.state == 0) pt = {glm::vec3(1.0f), 2, false};
+        else pt.state = 2;
     }
     sculptor.timings.kernelMs += lapMs(clock);
     ++sculptor.timings.dabs;

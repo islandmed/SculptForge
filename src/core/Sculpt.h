@@ -8,12 +8,14 @@
 #include "core/Dyntopo.h"
 #include "core/IndexBits.h"
 #include "core/Kelvinlet.h"
+#include "core/MicroHistory.h"
 #include "core/Mesh.h"
 #include "core/Stencil.h"
 #include "core/Symmetry.h"
 #include "core/Undo.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <limits>
 #include <functional>
@@ -32,7 +34,7 @@ enum class BrushType {
     Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch,
     SharpCrease, // sharp V-crease with the sides pinched toward the stroke
     ClayBlock, // square-ish, flat-topped clay
-    SnakeHook,   // pulls the region along the stroke (strokeDelta), tapering
+    Tendril,     // pulls the region along the stroke (strokeDelta), tapering
     Trim,        // Plane Trim: a plane cuts away everything above it
     Layer,       // raises to one fixed height per stroke (overlaps never stack)
     Nudge,       // slides the surface sideways along the stroke
@@ -41,10 +43,11 @@ enum class BrushType {
     KelvinGrab,  // elastic move: drags the surface like clay, bulging with Squash (Poisson's ratio)
     KelvinTwist, // turns the surface around the view axis, fading smoothly
     KelvinScale, // pinches (or swells) the surface toward the centre
-    KelvinSnake, // multi-scale elastic SnakeHook: pulls tapering horns out along the stroke
+    KelvinSnake, // multi-scale elastic Tendril: pulls tapering horns out along the stroke
     DetailClone, // stamps the VDM brush's map along the stroke, each stamp turned to follow it (Kelvinlet.cpp)
     Morph,       // pulls the surface toward the Part's morph target, a selection set's shape (core/SelectionSets.h)
     Cloth,       // simulates the surface under the stroke as fabric: drags fold, gravity drapes (core/Cloth.h)
+    SmoothPeaks, // Smooth that only lowers the points above the local average along their normal; hollows stay
     Count
 };
 
@@ -70,7 +73,7 @@ struct DabParams {
     float pressure = 1.0f;              // tablet pressure, 0..1
     bool invert = false;
     bool frontFacesOnly = false;
-    glm::vec3 strokeDelta{0.0f}; // world-space movement since the previous dab (recipe, SnakeHook, Nudge, Sharp Crease)
+    glm::vec3 strokeDelta{0.0f}; // world-space movement since the previous dab (recipe, Tendril, Nudge, Sharp Crease)
     const BrushAlpha* alpha = nullptr;   // stamp shaping the falloff (null/empty = round)
     glm::vec3 alphaUp{0.0f, 1.0f, 0.0f}; // world direction of the alpha's top edge (screen up, or rotated)
     float focal = 0.0f;                  // classic Falloff, -1..1 (brushFalloff; alphaFalloff with an alpha)
@@ -87,12 +90,27 @@ struct DabParams {
     // on screen, so the brush reaches through the model along the view as a cylinder.
     bool connectedOnly = false;
     bool viewFalloff = false;
+    // Contact facing: the surface under the cursor decides what moves. The falloff is measured along the surface (the
+    // Connected only flood's edge paths, Sculptor::keepFacing), so what the brush reaches only round a fold (the far wall
+    // of a narrow slot) stays put while the rim under the cursor follows smoothly; and each vertex's weight fades with the
+    // angle between its normal and the contact normal (the averaged normal right under the cursor): full up to half of
+    // `facingAngle` (degrees), none from `facingAngle` on (the back of a thin part). Not on Move (it grabs what it reaches).
+    bool contactFacing = false;
+    float facingAngle = 180.0f;
+    // A stamp (Drag Stamp, Slide Stamp: one big dab per drag step) with an alpha also takes the visible surface under
+    // its footprint on the view plane, which a surface curving away puts outside the dab's sphere (#174). Not on the
+    // many-dab alpha brushes (Dots, Spray), which keep the sphere: a dab there is per-frame hot.
+    bool stampFootprint = false;
     // The direction of the ray that picked `center` (zero: viewDir), so a fused batch (Sculptor::beginBatch) can
     // find where that ray meets the surface the batch's earlier dabs left.
     glm::vec3 pickDir{0.0f};
     glm::vec3 pickNormal{0.0f}; // the surface's normal there (zero: unknown)
     // The Stencil (#155, core/Stencil.h): each vertex also takes the image at the place it shows on screen.
     StencilView stencil;
+    // Screen pixels per world unit at the centre as the dab was placed (0: unknown, scripts). Adaptive Detail tiles
+    // (core/MicroTiles.h) cap how fine a dab may store with it; a Forge Ink dab record keeps it (MicroDab::pxPerUnit)
+    // so that choice replays the same.
+    float pxPerUnit = 0.0f;
 };
 
 // Local symmetry's centre for a Part: the middle of its bounding box (in parallel).
@@ -135,19 +153,89 @@ inline float brushDistance(const struct DabParams& p, const glm::vec3& x) {
 // Scratch for keepConnected (a stamp per vertex, so nothing is cleared between dabs).
 struct ConnectedScratch {
     std::vector<uint32_t> stamp, queue;
+    std::vector<float> dist; // (`surface`: per vertex, valid where stamped reached)
     uint32_t epoch = 0;
 };
 // Connected only: keeps the vertices of `verts` (in increasing order) that the vertex of `verts` nearest `seed`
-// reaches through edges between vertices of `verts`; the order stays.
-void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch);
+// reaches through edges between vertices of `verts`; the order stays. `surface` (Contact facing): also each kept
+// vertex's distance from `seed` along the surface (the flood's edge paths, each vertex relaxed from the neighbours
+// reached before it: an upper bound within a few percent of the geodesic on an even mesh), in the kept order.
+void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch,
+                   std::vector<float>* surface = nullptr);
+// Contact facing, right after keepConnected over `all` (its list before the call): stamps the vertices of `all` the
+// flood didn't reach that lie on a piece closed within `all` (none of its vertices has an edge leaving it: an eyeball
+// modelled on its own, inside the flood's sphere) with the returned value, which differs from `reached` (the flood's
+// stamp, returned too). The others it left (a piece running out of the sphere, maybe joined round a deep fold) keep
+// neither.
+struct PieceStamps {
+    uint32_t reached = 0, closed = 0;
+};
+PieceStamps markClosedPieces(const Mesh& mesh, std::span<const uint32_t> all, ConnectedScratch& scratch);
 // The vertices a dab may touch with the falloff options: brushVertices, or the cylinder along `viewDir`
-// (viewFalloff), then keepConnected from `center` (connectedOnly).
+// (viewFalloff), then keepConnected from `center` (connectedOnly). `footprint` (an alpha stamp, #174): also the
+// surface facing the viewer under the stamp's footprint on the view plane, which a surface curving away reaches
+// further than `radius` in space (the sphere alone left gaps in a big stamp on a head).
 void brushRegion(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, const glm::vec3& viewDir, float radius,
-                 bool connectedOnly, bool viewFalloff, std::vector<uint32_t>& out, ConnectedScratch& scratch);
+                 bool connectedOnly, bool viewFalloff, std::vector<uint32_t>& out, ConnectedScratch& scratch,
+                 bool footprint = false);
 // Along the normal (from the discussions: Move, Tendril, Elastic Tendril and Elastic Grab with Alt): the
 // falloff-weighted average normal of the visible surface within `radius` of `center`, unit length (zero when
 // there is no surface there).
 glm::vec3 brushAreaNormal(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, float focal = 0.0f);
+// Contact facing (DabParams::contactFacing): the contact normal, the falloff-weighted average normal of the region's
+// vertices within a quarter of `radius` of `center` that face within kContactCone of `hint` (the picked triangle's normal,
+// else against the view): it smooths the picked normal's noise, and neither the far wall of a narrow gap nor the rim a
+// cursor near it reaches tilts it. `hint` when none does.
+constexpr float kContactCone = 0.9f; // (cosine: 26 degrees)
+glm::vec3 contactNormal(const Mesh& mesh, std::span<const uint32_t> verts, const glm::vec3& center, float radius,
+                        const glm::vec3& hint);
+// The hint contactNormal starts from: the picked normal, else against the view.
+inline glm::vec3 contactHint(const DabParams& p) {
+    return glm::dot(p.pickNormal, p.pickNormal) > 1e-12f ? p.pickNormal : -p.viewDir;
+}
+// The weight of a vertex with normal `n` against the contact normal: 1 up to half of `angleDeg`, 0 from it on, a
+// smoothstep in the cosine between.
+// Contact facing's cut by the depth of the fold (the far wall of a slot, down one wall, across the floor and up the other):
+// the share of the falloff in space a vertex keeps from its `detour`, how much longer the way along the surface (the
+// flood's edge paths, less an edge or two of their zigzag near the centre: `edge`) is than the straight line, in brush
+// radii. Up to kDetourKeep radii all of it, none from kDetourCut on, a smoothstep between: a slot deeper than the brush
+// (detours from about 3.2 radii) keeps its far wall, while an eyeball under its lids (joined to them round the lid's
+// margin, detours up to about 2 radii on the starter head) moves with them, as without the option. One rule for every
+// vertex, so the cut has no border of its own.
+constexpr float kDetourKeep = 2.3f, kDetourCut = 3.1f;
+// (the flood that measures it, past the brush: what it doesn't reach lies more than 2 (kDetourFlood - 1) radii round)
+constexpr float kDetourFlood = 2.6f;
+// The detour in brush radii (the way along the surface less the straight line and an edge or two of the flood's zigzag).
+inline float detourRadii(float inSpace, float along, float edge, float radius) {
+    return std::max(0.0f, along - inSpace - 2.0f * edge) / radius;
+}
+inline float detourShare(float detour) {
+    const float t = std::clamp((detour - kDetourKeep) / (kDetourCut - kDetourKeep), 0.0f, 1.0f);
+    return 1.0f - t * t * (3.0f - 2.0f * t);
+}
+// How much of the Facing angle's fade (facingWeight) a vertex takes, by its detour: none up to kGateKeep radii round (a
+// lid's inner skin, just round its margin from the outer one: faded, the margin stretches into a bright sliver), all
+// from kGateFull on (the back of a thin part, round its edge). With no detour known (a region past the flood's cap), all.
+constexpr float kGateKeep = 0.75f, kGateFull = 1.5f;
+inline float facingGate(float detour) {
+    const float t = std::clamp((detour - kGateKeep) / (kGateFull - kGateKeep), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+// A vertex's Contact facing weight from its facingWeight, its detour and the cosine of its normal against the contact
+// normal. Past kGateKeep radii round, surface turned away from the contact (across or against it: the far wall of a slot
+// less deep than kDetourKeep) is cut as well, all of it from 60 degrees on, none within 30: an eyeball under its lids
+// faces as they do and moves with them.
+inline float contactWeight(float facing, float detour, float cosine) {
+    const float t = std::clamp((cosine - 0.5f) / 0.366f, 0.0f, 1.0f);
+    const float turned = 1.0f - t * t * (3.0f - 2.0f * t);
+    return (1.0f - (1.0f - facing) * facingGate(detour)) * (1.0f - turned * facingGate(detour)) * detourShare(detour);
+}
+inline float facingWeight(const glm::vec3& n, const glm::vec3& contact, float angleDeg) {
+    const float a = glm::radians(std::clamp(angleDeg, 10.0f, 180.0f));
+    const float lo = std::cos(a), hi = std::cos(0.5f * a);
+    const float t = std::clamp((glm::dot(n, contact) - lo) / (hi - lo), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
 // The parameter s of the point point + s * dir (dir unit length) nearest the ray origin + t * rayDir: where a
 // cursor ray says a grab sliding along the line should be. False when the line is within `minSine` (the sine of
 // the angle between them) of parallel to the ray, so the cursor can't say where along it.
@@ -168,6 +256,10 @@ float brushFalloff(float dist, float radius, float focal = 0.0f);
 float focalRingFraction(float focal);
 // An alpha's stamp covers the square around the brush circle: its corners are radius x sqrt 2 out.
 constexpr float kAlphaReach = 1.4143f;
+// A recipe's surface pattern on a micro level (BrushRecipe::Pattern `pattern`, 0..1 times the tip) for copy `m` of a dab of
+// `radius`: each copy reads it at its source dab's point. The live stroke and Forge Ink's replay (core/MicroHistory.h) both
+// build it here, so a replay can't drift.
+std::function<float(const glm::vec3&)> microPatternTexture(int pattern, float scale, float amount, float radius, const SymCopy& m);
 // Falloff on an alpha brush (#60): the alpha is multiplied by this round falloff, which reaches
 // the stamp's corners (radius x kAlphaReach). -1 is 1 everywhere (the alpha shows hard to its edges), 0 the
 // smoothstep (soft, rounding a square alpha's corners), +1 a narrow soft point (the alpha mostly gone).
@@ -207,9 +299,14 @@ public:
     // Move brush: capture the region once, then drag it by world deltas.
     void beginGrab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym);
     void grab(Mesh& mesh, BVH& bvh, const glm::vec3& delta); // grabMove, then grabFinish
-    // The two halves: the positions (each pointer sample), then the normals and the BVH of what moved (once a
-    // frame: they depend only on where the vertices ended up, so the mesh is the same, bit for bit).
+    // The two halves: the positions (each pointer sample: each vertex from its start by the whole move so far), then
+    // the normals and the BVH of what moved (once a frame: they depend only on where the vertices ended up, so the
+    // mesh is the same, bit for bit).
     void grabMove(Mesh& mesh, const glm::vec3& delta);
+    // grabMove with each delta in turn, the region moved once: the same bits as one call per delta (a frame's
+    // pointer samples, App::flushGrab).
+    void grabMoves(Mesh& mesh, std::span<const glm::vec3> deltas);
+    size_t grabVertices() const { return grabAll_.size(); } // the Move grab's region (every vertex once)
     void grabFinish(Mesh& mesh, BVH& bvh);
 
     // Brushes that change mask or vertex paint call these before writing
@@ -256,6 +353,9 @@ public:
     void flushKelvinletFar(Mesh& mesh, BVH& bvh, bool all);
     // The last kelvinletStep found more vertices than kelvinlet.vertexBudget (the app then moves less per frame).
     bool kelvinletOverBudget() const { return kelvinOverBudget_; }
+    // A Kelvin brush skipped a step this stroke because a mask is near on a micro level (see Sculptor::kelvinNearMask); the
+    // app tells the artist once. Set from the solver thread too.
+    bool kelvinMaskBlocked() const { return kelvinMaskBlocked_.v.load(std::memory_order_relaxed); }
 
     // Cloth brush (core/Cloth.h, ClothBrush.cpp): the settings (Brush > Cloth) and the surfaces it collides with,
     // which the app sets for the stroke (the other visible Parts; null = none).
@@ -285,10 +385,18 @@ public:
     // endStroke). Brushes whose offset depends on more than the vertex's place (Smooth, Layer, Morph) and the
     // remesher always take the exact path, and so do regions below the threshold (small brushes are unchanged).
     bool adaptiveDabs = false;
+    // This stroke's dabs dropped because a brush computed a non-finite offset (displaceAll; gh#229); the app logs it.
+    size_t nonFiniteDabs = 0;
     // The same adaptive path (sampled plane, normals from the brush's own derivative, exact ones behind the brush and
     // at the end) without fused batches: on by default (perf plan item 2: the normals were half of a big brush's
     // time). Fused batches stay with adaptiveDabs (Fast Big Brushes, Experimental).
     bool analyticNormals = true;
+    // A recipe's Drag (Palette Knife) carries the shape and leaves the vertices spread as they were (slideBack, #198). Off: the
+    // vertices themselves travel with the stroke (0.13.x and before; the invariant tests compare the two shapes).
+    // SF_DRAG_SLIDE=0: off (A/B).
+    bool dragSlide = dragSlideDefault();
+    // Dabs whose drag moved the vertices with the clay after all (slideBack could not put them all back; the tests count them).
+    size_t dragSlideFallbacks = 0;
     static constexpr size_t kAdaptiveMinVertices = 150'000;
     static constexpr size_t kAreaSamples = 65'536;
     // Whether adaptive dabs moved leaves whose exact normals are still to come, and catching up with up to
@@ -316,6 +424,16 @@ public:
     bool draftActive() const { return draft_; }
     bool draftPending() const { return draft_ && !draftLeaves_.empty(); }
     void flushDraft(Mesh& mesh, const BVH& bvh);
+
+    // Forge Ink (core/MicroHistory.h; Preferences > Performance > Keep Strokes Editable): when set before beginStroke,
+    // a stroke on a micro level records each dab as it is placed and stays editable after it ends (its undo tiles
+    // are the undo step endStroke returns, shared). Strokes the history can't replay (base moves, Stencil) bake
+    // what they reach. Off: a stroke is exactly as before, and bakes what it meets of an earlier kept one.
+    bool keepEditable = false;
+    // The kept stroke the last endStroke recorded (its id in the Part's microHistory), or 0.
+    uint32_t lastKeptStroke() const { return inkLast_; }
+    // How many kept strokes the last endStroke fixed in place (it moved the base under them, or wrote over them unkept).
+    size_t lastFixedStrokes() const { return inkFixed_; }
 
     // Micro level timings (findMs, kernelMs, stitchMs, points) of the current stroke (core/Micro.h).
     const MicroStroke& microStroke() const { return micro_; }
@@ -356,7 +474,39 @@ private:
     std::vector<glm::vec3> morphMapped_;
     bool morphFits_ = false;
     void dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p);
-    void dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p);
+    // `copy`: the symmetry copy's index (Lock plane keeps one plane per copy).
+    void dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const DabParams& p, size_t copy, const SymCopy& m);
+    // Lock plane (BrushRecipe::planeLock): each symmetry copy's plane (normal, point) from the stroke's first dab.
+    std::vector<std::pair<glm::vec3, glm::vec3>> lockedPlanes_;
+    // Crisp edge on a locked plane: how far toward it each vertex has gone this stroke (0..1; crispStamp_ = the
+    // stroke that wrote it), so overlapping dabs take the strongest pull instead of compounding theirs (which would
+    // wear the edge's band down to a cliff), as the Layer brush does with its height.
+    std::vector<uint32_t> crispStamp_; // (the stroke id's low 32 bits, as layerStamp_: 12 bytes a vertex in all)
+    std::vector<float> crispDone_;
+    std::vector<float> crispFacing_; // (the vertex normal's dot with the plane's, when the stroke found it)
+    // A pinching recipe: where each vertex stood when this stroke first reached it (pinchStamp_ = the stroke that wrote it), so the
+    // stroke's laps over one line don't keep squeezing the walls: the sideways pull is bounded against that start (Sculpt.cpp, kPinchReach).
+    std::vector<uint32_t> pinchStamp_;
+    std::vector<glm::vec3> pinchStart_;
+    std::vector<uint32_t> pinchDabStamp_; // (the dab that worked out pinchTaper_: every copy of a symmetry's dab shares it)
+    std::vector<float> pinchTaper_;
+    uint32_t pinchDab_ = 0;
+public:
+    // The bytes a pinching recipe's stroke holds (0 between strokes: endStroke frees them).
+    size_t pinchStateBytes() const {
+        return pinchStamp_.capacity() * sizeof(uint32_t) + pinchStart_.capacity() * sizeof(glm::vec3) + pinchDabStamp_.capacity() * sizeof(uint32_t) +
+               pinchTaper_.capacity() * sizeof(float);
+    }
+
+private:
+    std::vector<uint32_t> crispMovedVerts_; // (a crisp dab's moves, compacted)
+    std::vector<glm::vec3> crispMoved_;
+    std::vector<uint32_t> crispSlideVerts_; // (its relax's)
+    std::vector<glm::vec3> crispSlide_;
+    std::vector<uint8_t> crispKeep_; // (a locked cut's region: the points not under its plane)
+    std::vector<uint32_t> crispRefit_; // (both: the BVH leaves to refit are theirs)
+    std::vector<SymCopy> crispCopies_; // (this dab's symmetry copies and their centres: a vertex is cut by the nearest one's)
+    std::vector<glm::vec3> crispCopyCenters_;
     // The Vdm brush (defined in Vdm.cpp); `handedness` -1 for a mirrored pass, so the stamp mirrors exactly.
     void dabVdmSingle(Mesh& mesh, BVH& bvh, const DabParams& p, float handedness);
     // Kelvinlet.cpp: the Kelvinlet brushes and Detail Clone.
@@ -378,19 +528,55 @@ private:
     void gatherKelvinletFar(const std::function<glm::vec3(const glm::vec3&)>& displacement, const glm::vec3& a,
                             const glm::vec3& ab, float radius, const glm::vec3& mid, float reach);
     void applyKelvinletFarGroup(Mesh& mesh, BVH& bvh, int group);
+    struct Flag { // (an atomic that copies: the Sculptor moves with its Document)
+        std::atomic<bool> v{false};
+        Flag() = default;
+        Flag(const Flag& o) : v(o.v.load()) {}
+        Flag& operator=(const Flag& o) { return v.store(o.v.load()), *this; }
+    };
+    Flag kelvinMaskBlocked_;
+    // The Kelvin brushes move the base cage, which can't hold a mask finer than its triangles: on a micro level with a mask
+    // near `center` they skip the step (sets kelvinMaskBlocked_).
+    bool kelvinNearMask(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius);
     bool kelvinOverBudget_ = false;  // the last kelvinletStep's region held more than kelvinlet.vertexBudget vertices
     uint64_t kelvinStroke_ = 0;
     size_t kelvinLastVerts_ = 0;     // the last move's region: its vertex count and reach (the next one's prediction)
     float kelvinLastCut_ = 0.0f;
     uint64_t snakeStroke_ = 0;
     float snakeTravel_ = 0.0f;
-    void finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock);
+    // `moved`: only those vertices moved (their rings' normals are updated, not the whole region's leaves).
+    // `refitOnly`: only those vertices moved at all (the BVH refits their leaves, not every leaf the query found).
+    void finishDab(Mesh& mesh, BVH& bvh, std::chrono::steady_clock::time_point clock,
+                   const std::vector<uint32_t>* moved = nullptr, const std::vector<uint32_t>* refitOnly = nullptr);
     void updateDabNormals(Mesh& mesh, const BVH& bvh);
     void touch(Mesh& mesh, uint32_t v);
     // The one place brushes move vertices: scales `d` by vertexInfluence().
     void displace(Mesh& mesh, uint32_t v, const glm::vec3& d);
     void displaceAll(Mesh& mesh, std::span<const uint32_t> verts, std::span<const glm::vec3> d, bool influence = true,
                      const float* given = nullptr); // given: each vertex's influence (0 = not moved)
+    // A micro level's mask as the base cage sees it. Moving a base vertex shifts the grid points of the triangles
+    // around it (their corners) and, through the corners' normals, those of the ring beyond; so a base vertex is as
+    // free as the freest grid point within two rings leaves it: 1 - the largest mask in the triangles touching it or
+    // its neighbours. Every brush that moves the cage (Move, the Kelvinlets, Tendril, Vdm...) goes through
+    // displaceAll, which scales by it: a fully masked grid point holds still, bit for bit. Computed on demand, kept
+    // for the stroke (no stroke that moves vertices edits the mask).
+    void cageFreeFor(const Mesh& mesh, std::span<const uint32_t> verts);
+    std::vector<float> cageFree_;     // per base vertex: -1 = not computed yet
+    std::vector<int16_t> cageTriMax_; // per base triangle: the largest grid mask, -1 = not computed yet
+
+    // The drag brushes (Sculpt.cpp, limitFolds / relaxDrag): `d`, the offsets of verts_, scaled down where they would turn a
+    // triangle over or squash it to a sliver; and the vertices slid back toward the middle of their neighbours after the dab.
+    void limitFolds(const Mesh& mesh, std::vector<glm::vec3>& d);
+    void relaxDrag(Mesh& mesh, const std::vector<float>& weight, float lambda, int rounds);
+    // A recipe's Drag (dragSlide): every copy's drag of the dab (slideVerts_ / slideTo_, dragPart_ per region vertex), made after
+    // their planes by slideBack, which puts each vertex back on the dragged surface over where the drag found it (slideOld_).
+    void slideBack(Mesh& mesh, BVH& bvh);
+    static bool dragSlideDefault();
+    std::vector<uint32_t> slideVerts_, slideSlot_;
+    std::vector<glm::vec3> slideOld_, slideTo_, dragPart_;
+    std::vector<uint32_t> foldSlot_;
+    std::vector<float> foldScale_;
+    std::vector<glm::vec3> foldD_;
 
     // Dynamic topology: remeshes before a dab, and keeps the stroke's per-vertex state in step with it.
     void remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym, float scale, float reach);
@@ -401,6 +587,19 @@ private:
     // Micro-displacement levels (core/Micro.h): strokes on a mesh with one go to its grid instead.
     MicroStroke micro_;
     Mesh* microMesh_ = nullptr;
+    // Forge Ink: this stroke's dab records and header (keepEditable), and whether it can still be kept.
+    bool inkKeep_ = false, inkOk_ = true, inkHead_ = false;
+    float inkStep_ = 0.0f; // the grid's step as the stroke began
+    MicroInk ink_;
+    const BrushAlpha* inkAlphaFrom_ = nullptr;
+    std::vector<MicroDab> inkDabs_;
+    uint32_t inkLast_ = 0;
+    size_t inkFixed_ = 0;
+    Mesh* inkMesh_ = nullptr; // the micro mesh this stroke touched (whatever path it took)
+    std::shared_ptr<const BrushAlpha> inkAlpha_; // the last alpha snapshot (strokes with the same alpha share it)
+    void inkHeader(bool maskBrush, const BrushAlpha* alpha, int pattern, float patternScale, float patternAmount);
+    void inkDab(MicroDab d);
+    void inkFinish(Mesh& mesh);
     // This stroke's dabs on a micro level go to the base vertices (-1: not decided yet; microBaseDab).
     int microBase_ = -1;
     bool microBaseDab(const Mesh& mesh, BrushType type, const DabParams& p);
@@ -452,6 +651,7 @@ private:
     const BVH* lazyBvh_ = nullptr;
     std::vector<uint32_t> curvatureStamp_;
     bool adaptiveDab_ = false; // the dab dabSingle is placing takes the adaptive path
+    bool earlyNormals_ = false; // dab(): this copy's normals go ahead (analytically) for the next mirror copy that meets it
     // Fused batches: the dabs waiting, and the last unmirrored region's size and radius (whether the next dab
     // is big enough to wait), and the place a batch's vertices are kept while it is applied.
     struct PendingDab {
@@ -476,6 +676,14 @@ private:
     std::vector<glm::vec3> shrunk_;
     std::vector<std::pair<uint32_t, uint32_t>> shrunkIndex_;
     std::vector<float> weights_, influence_;
+    // Contact facing (DabParams::contactFacing): each of verts_'s weight (the angle gate times the falloff along the surface
+    // over the one in space, `reach` radii); keepFacing fills it and drops the vertices at 0.
+    std::vector<float> facing_, surface_;
+    std::vector<uint32_t> facingVerts_, wideVerts_; // (the floods' vertices; the wide one's, before it)
+    static constexpr size_t kSurfaceMax = size_t(1) << 21; // (the surface distance's flood: about 15 ms a dab there)
+    bool keepFacing(const Mesh& mesh, const BVH& bvh, const DabParams& p, float reach);
+    // ... on a micro level: copy `m`'s contact hint (contactHint) into `d` (kept for Forge Ink's replays) and the grid's stroke.
+    void microFacing(const DabParams& p, const SymCopy& m, MicroDab& d);
     std::vector<uint8_t> firstTouch_;
     std::vector<uint32_t> blockFirst_;
     // Move brush: each mirror's vertices and weights (grabMirrors_: where each mirror's run ends, and its
@@ -484,6 +692,14 @@ private:
     std::vector<float> grabWeights_;
     std::vector<std::pair<size_t, glm::mat3>> grabMirrors_;
     std::vector<uint32_t> grabAll_, grabLeaves_;
+    // ... where each was at the first move (and its layer target), its influence then, whether this is its first
+    // run (a vertex near a mirror plane is in two), and the whole move so far (grabMove).
+    std::vector<glm::vec3> grabStart_, grabStartTarget_;
+    std::vector<float> grabInfluence_;
+    std::vector<uint8_t> grabFirst_;
+    glm::vec3 grabTotal_{0.0f};
+    bool grabCaptured_ = false;
+    void captureGrab(Mesh& mesh);
 
     // Layer brush: per-stroke height already applied to each vertex.
     void prepareLayer(const Mesh& mesh, float height);

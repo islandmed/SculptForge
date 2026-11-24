@@ -10,10 +10,12 @@ wait_idle 20
 expect_text "SculptForge 99.0.0 is available"
 expect_text "bug-fix and security releases go out to everyone the same day"
 expect "Become a member"
-expect_text "Members get betas early."
+expect_text "Members get early builds, like SculptForge for Android today."
 expect_text "Twice as fast"
 expect "Download"
 shot update-banner
+click "Become a member"
+expect_status https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=update-banner
 click "Skip this version"
 expect_not "Skip this version"
 
@@ -41,7 +43,7 @@ click "Stable##prefs.update_stable"
 click "Check for updates##help.check_updates"
 wait_idle 20
 expect_status "is the newest version"
-click "Preview (betas)##prefs.update_preview"
+click "Preview (early builds)##prefs.update_preview"
 shot update-channel
 click "Check for updates##help.check_updates"
 wait_idle 20

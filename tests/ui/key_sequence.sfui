@@ -1,0 +1,76 @@
+# Two keys in a row (Requested by Artizmo on Discord): Preferences > Hotkeys has a button beside each key that takes
+# two different keys one after the other ("F7 then F8"); the first key still works alone if it is bound; a sequence
+# someone else holds asks first; the same key twice is refused.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+expect_value wireframe == 0
+expect_value shortcut_conflicts == 0
+expect_value shortcut_conflict_open == 0
+
+# --- Assign: the button beside the key, then two different keys ---
+click "Preferences##palette.preferences"
+click "Hotkeys##preferences.hotkeys"
+type "##hotkeys_filter" "Wireframe"
+wait 0.5   # the box resizes to the filtered list; click only once it has settled
+click "##hkseq.view.wireframe"
+shot sequence_waiting_first
+key f7
+shot sequence_waiting_second
+# The same key twice is refused and the box keeps waiting for a different one.
+key f7
+expect_value shortcut_conflict_open == 0
+key f8
+expect_value shortcut_conflict_open == 0
+shot sequence_assigned
+
+type "##hotkeys_filter" "Zoom in"
+wait 0.5
+
+# --- Zoom in also gets F7 alone (a sequence's first key is no conflict) ---
+click "Numpad Plus##hk.view.zoom_in"
+key f7
+expect_value shortcut_conflict_open == 0
+
+# --- A sequence someone else holds asks first; Cancel leaves both as they were ---
+type "##hotkeys_filter" "Opposite"
+wait 0.5
+click "##hkseq.view.opposite"
+key f7
+key f8
+expect_value shortcut_conflict_open == 1
+expect_value shortcut_popup_overlaps_anchor == 0
+shot sequence_conflict
+click "Cancel##shortcut_cancel"
+expect_value shortcut_conflict_open == 0
+expect_value shortcut_conflicts == 0
+click "Preferences##palette.preferences"
+wait 0.5
+
+# --- Use: F7 then F8 toggles Wireframe; F8 after a pause does nothing ---
+key f
+remember camera_distance d0
+key f7
+wait 0.1
+key f8
+wait 0.8
+expect_value wireframe == 1
+expect_value camera_distance == $d0
+key f7
+wait 1.0
+key f8
+wait 0.1
+expect_value wireframe == 1
+
+# --- The first key keeps working alone: F7 (Zoom in's key too) zooms once the half second is up. The F7 above did it already. ---
+key f
+remember camera_distance d0
+key f7
+wait 0.2
+expect_value camera_distance == $d0
+wait 0.8
+expect_value camera_distance < $d0
+key f7
+wait 0.1
+key f8
+wait 0.8
+expect_value wireframe == 0

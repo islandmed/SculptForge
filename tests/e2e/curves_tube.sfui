@@ -1,0 +1,52 @@
+# e2e: curves and tubes. Draw a tube out from the model, shape it with its modifiers (cross-section, taper, flat ends),
+# bake it: the result is a closed, valid mesh with volume, undo and redo move between tube and baked mesh.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+camera 0 0
+wait 0.3
+click "Tube##tool.tube"
+click "Tube/Draw Tube"
+expect_value tube_draw == 1
+drag_path 0.3 0.4 0.55 0.2 0.8 0.45 1.05 0.25 1.3 0.5 keep S=1.2
+release
+wait 0.2
+expect_value tube_parts == 1
+expect_value parts == 2
+run part_select index=1
+expect_value triangles > 100
+expect_value solid_volume > 0
+remember triangles round_tris
+remember solid_volume round_volume
+
+# Modifiers: each is one undo step and changes the mesh.
+click "Tube/Square"
+expect_value tube_profile == 1
+expect_value solid_volume > 0
+expect_mesh_valid
+click "Tube/Circle"
+expect_value tube_profile == 0
+drag_item "Tube/##tubetaper1" 400 0
+wait 0.2
+expect_value tube_taper_end > 0.5
+expect_value solid_volume < $round_volume
+expect_mesh_valid
+click "Tube/Flat"
+expect_status "Tube settings"
+expect_mesh_valid
+
+# Bake: a plain mesh, still closed, still has its volume.
+click "Tube/Bake"
+expect_value tube_parts == 0
+expect_value parts == 2
+expect_value open_edges == 0
+expect_value solid_volume > 0
+expect_mesh_valid
+remember solid_volume baked_volume
+expect_value triangles > 100
+
+# Undo gives the tube back (a live tube Part), redo bakes it again.
+key ctrl+z
+expect_value tube_parts == 1
+key ctrl+shift+z
+expect_value tube_parts == 0
+expect_value solid_volume == $baked_volume

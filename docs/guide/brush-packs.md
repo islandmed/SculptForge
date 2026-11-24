@@ -1,6 +1,13 @@
 # Brush packs
 
-SculptForge comes with sixty ready-tuned brushes in six packs, on top of the built-in brushes. Each one is a
+![The brush Library](images/brush-library.jpg)
+
+> **In short:**
+> - Eighty-seven ready-tuned brushes in eight packs, on top of the built-in brushes.
+> - Find them under **Sculpt > Brush**, after Built-in and Custom.
+> - Each one is a recipe: use it as it is, or open it in Brush Lab.
+
+SculptForge comes with eighty-seven ready-tuned brushes in eight packs, on top of the built-in brushes. Each one is a
 brush recipe (see [Brush Lab](brush-lab.md)) with its own alpha where it needs one, so you can use them as they are,
 or open one in Brush Lab and make your own version. Every brush, alpha and preview here is made by SculptForge itself:
 the recipe engine, procedural alphas and the same clay-ball thumbnails as the brush picker.
@@ -52,6 +59,7 @@ Crisp planes, panel lines, bevels, rivets and bolts for props, armour and machin
 |---|---|---|
 | **Panel Groove** | Cuts a clean, narrow groove for panel gaps and seams. |  |
 | **Flat Plane** | Presses a perfectly flat face with a hard edge, for machined surfaces. | Square |
+| **Crisp Flatten** | Flattens to the plane the stroke starts on with a clean, sharp edge, for hard planes and bevels. |  |
 | **Bevel Scrape** | Scrapes high points into a bevel along an edge, for chamfers. |  |
 | **Raised Plate** | Builds a flat, square-edged plate on the surface, for armour and hull panels. | Square |
 | **Rivet Row** | Stamps rows of round rivet heads along the stroke. | Rivets |
@@ -60,6 +68,20 @@ Crisp planes, panel lines, bevels, rivets and bolts for props, armour and machin
 | **Vent Slots** | Cuts parallel slots like a vent grille; drag across the slots. | Wrinkles |
 | **Grid Studs** | An even grid of small studs, for grip textures and tread plates. | Dot Grid |
 | **Hard Cut** | Cuts the surface flat below the stroke, for sharp silhouettes and clean cuts. | Square |
+
+**Crisp Flatten** (thanks _tfx on Discord) cuts hard-surface planes with a clean boundary instead of the soft fade of
+Flatten and Trim. The plane is taken where the stroke starts and held for the whole stroke, so you can drag across a
+curved form and leave one flat facet; start the next stroke on another side for the next facet, and where two meet you
+get a crisp bevel. It only cuts: everything above the plane comes down to it and nothing below it is ever raised, so
+it never adds clay (use Flatten when you want dips filled).
+
+Where two planes cross, the crease is as straight as the mesh allows (about a polygon wide); for razor-sharp
+crossings, subdivide first or turn on Dynamic topology. The edge is hard with a thin smoothed band (about two or three
+polygons), so it reads as a clean line at any resolution; subdivide or use [Dynamic topology](dynamic-topology.md) for
+a sharper one. It works with symmetry, masks and Dynamic topology.
+
+In Brush Lab, **Lock plane** off makes the plane follow the surface instead, and **Crisp edge** off gives the soft
+edge back.
 
 ## Organic & Skin
 
@@ -137,8 +159,63 @@ Beads, ropes, filigree, studs and carved patterns for jewellery, trims and decor
 | **Gem Setting** | A raised round setting with a crisp rim, for cabochons and gem seats. |  |
 | **Dot Texture** | Fine even dots, for stippling, punched leather and decorative fields. | Dot Grid |
 
+## Wood
+
+Weathered grain, splinters, cracks, knots, end-grain rings and plank seams for old timber. Requested by Hameron.
+
+![The Wood brushes](images/brush-packs/wood.jpg)
+
+| Brush | What it does | Alpha |
+|---|---|---|
+| **Weathered Planks** | Long worn grain lines with the soft wood eaten away between; drag along the grain. | Weathered Grain |
+| **Raised Grain** | Hard late-wood lines standing proud of the surface, as on sandblasted or driftwood boards. | Weathered Grain |
+| **Splinters** | A fan of sharp, torn splinters standing up from the surface, for broken planks. | Splinters |
+| **Wood Chaff** | Scattered shavings and chips of torn fibre, for splintered ends and chopped wood. | Splinters |
+| **Grain Cracks** | Narrow forked splits that run along the grain, for dried and checked timber. | Grain Cracks |
+| **Check Split** | One deep, pinched split along the stroke, for dried beams. |  |
+| **Knot** | Stamps a round knot with the grain bending around it; click once. | Knot |
+| **End Rings** | Stamps the rings and radial checks of a sawn log end; click once. | End Rings |
+| **Plank Seams** | Two boards meeting at a seam with grain and nail dimples, for floors and doors; drag along the seam. | Plank Seams |
+| **Board Gap** | A clean, narrow gap between two boards with softened edges. |  |
+
+The six wood alphas (**Sculpt > Alpha**) are made in code like the others and work with any brush: Weathered Grain,
+Splinters, Grain Cracks, Knot, End Rings and Plank Seams.
+
+![The six wood alphas](images/brush-packs/wood/alphas.png)
+
+## Creature Skin
+
+High-resolution hide wrinkles, scales, skin and nose pores and fine skin, for close-up creature detail on [micro
+levels](micro-levels.md). Each brush stamps its own 2048-pixel [Creature Skin alpha](sculpting.md#creature-skin-alphas),
+tuned so one stroke reads at micro level 3 or 4. The scale and plate brushes step a whole number of rows per dab, so a
+straight stroke lays row on row; the pore and grain brushes turn each dab so no repeat shows. Requested by @RodTDai.
+
+| Brush | What it does | Alpha |
+|---|---|---|
+| **Elephant Hide** | Thick hide with a deep net of creases, for elephants, rhinos and old skin. | Elephant Hide |
+| **Hide Folds** | Rings of heavy folds across the stroke, for trunks, necks and joints; drag along the limb. | Hide Folds |
+| **Dinosaur Hide** | Pebbled hide with feature scales and wandering folds, for dinosaurs and beasts. | Dinosaur Hide |
+| **Snake Skin** | Keeled diamond scales in overlapping rows; draw from head to tail. | Snake Scales |
+| **Overlap Scales** | Rounded overlapping scales with growth rings, for fish and dragons; draw head to tail. | Overlap Scales |
+| **Pebble Scales** | Small domed scales with larger rosettes, for lizards, geckos and crocodile flanks. | Pebble Scales |
+| **Scute Plates** | Rows of square keeled plates, for crocodile backs and armoured tails; drag along the spine. | Scute Plates |
+| **Pores Fine** | Dense, tiny pores over fine skin texture, for cheeks and close-ups. | Pores Fine |
+| **Pores Clustered** | Pores of two sizes gathered in patches, for natural, uneven skin. | Pores Clustered |
+| **Pores Stretched** | Pores drawn out across the stroke with stretch lines, for foreheads and necks. | Pores Stretched |
+| **Nose Pores Open** | Large, deep pores with small ones between, for the nose and chin. | Nose Pores Open |
+| **Nose Pores Dense** | Close-packed round pores, for the tip and wings of the nose. | Nose Pores Dense |
+| **Nose Pores Furrowed** | Pores joined by fine furrows, for weathered noses and cheeks. | Nose Pores Furrowed |
+| **Skin Crosshatch** | Fine furrows crossing in a diamond net, for the backs of hands and aged skin. | Skin Crosshatch |
+| **Skin Fine Lines** | Fine wrinkle lines across the stroke that break and merge, for eye corners and knuckles. | Skin Fine Lines |
+| **Skin Micro Grain** | A soft stipple of tiny bumps, the last pass of skin texture. | Skin Micro Grain |
+
+For finer detail than a brush gives at your size, raise **Sculpt > Alpha > Tile**: the alphas repeat without a seam.
+Pressure sets the depth, as with the other skin brushes. At micro level 3 the scale, plate and fold brushes (the ones
+that follow the stroke) are faint below half pressure on flat areas: press harder there, or work at micro level 4,
+where every brush in the pack stays crisp.
+
 ## New alphas
 
 Six procedural alphas came with the packs and work with any brush (**Sculpt > Alpha**): **Cobblestone**,
-**Leather Grain**, **Hex Plates**, **Knit**, **Bolt** and **Chips**. **Sculpt > Alpha** lists every alpha A-Z (Round, the
+**Leather Grain**, **Hex Plates**, **Knit**, **Bolt** and **Chips**; the Wood pack adds six more (above). **Sculpt > Alpha** lists every alpha A-Z (Round, the
 plain tip, first), has a filter field, and **Sort** for the most recently used first or by pack.

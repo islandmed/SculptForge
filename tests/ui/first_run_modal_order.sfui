@@ -1,0 +1,32 @@
+# cold
+# First-run boxes, one at a time (Android, ebarranco: the "Tuned for your machine" box sat on top but took no input until the
+# membership window under it was closed). The membership card waits in a queue while the tier card is up; the tier card
+# answers its first press; then the membership card opens (a modal over the tier card hides it: App::tierCardCovered).
+# CMake sets SF_HW_PROFILE_IN_TESTS=1, SF_NO_CALIBRATION=1 and SF_HW_SIMULATE=high: the tier card shows at once.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+wait 0.5
+expect_value tier_card == 1
+expect_text Tuned for your machine
+
+# Both pending: the first start's membership card waits; the tier card is the one on top.
+support_card first_run
+wait 0.3
+expect_value support_card_open == 0
+expect_text Tuned for your machine
+shot both_pending
+
+# The first tap on Got it answers (a press and release, as a finger or pen tap arrives).
+click "Got it"
+wait 0.3
+expect_value tier_card == 0
+expect_no_text Tuned for your machine
+
+# ...and then the membership card opens, on its own.
+wait 0.5
+expect_value support_card_open == 1
+expect_text SCULPTFORGE MEMBERSHIP
+shot membership_after
+key escape
+wait 0.5
+expect_value support_card_open == 0

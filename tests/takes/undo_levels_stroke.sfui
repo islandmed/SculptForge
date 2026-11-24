@@ -1,0 +1,28 @@
+# Undo / redo of strokes on a dense mesh with Divide levels (sculptforge --benchmark-script; #181): the CSV's frame_ms at
+# each key is the undo's cost with the GPU upload. 21k triangles divided 3 times = 1.4M; SF_TAKE_DIVIDES adds none here.
+run new_sphere triangles=82000
+run subdiv_divide
+run subdiv_divide
+run subdiv_divide
+camera 0 0
+wait 3
+stroke 0.3 0.4 0.7 0.6 0.8
+wait 0.7
+stroke 0.3 0.6 0.7 0.4 0.8
+wait 0.7
+stroke 0.4 0.3 0.6 0.7 0.8
+wait 0.7
+key ctrl+z
+wait 0.8
+key ctrl+z
+wait 0.8
+key ctrl+shift+z
+wait 0.8
+key ctrl+shift+z
+wait 0.8
+key ctrl+z
+wait 0.8
+key ctrl+z
+wait 0.8
+key ctrl+z
+wait 0.8

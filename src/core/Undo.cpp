@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Undo.h"
 
+#include "core/MemoryGuard.h"
+
 #include "core/MeshTransform.h"
+#include "core/MicroHistory.h"
 #include "core/SelectionSets.h"
 
 #include <algorithm>
+#include <atomic>
 #include <utility>
 
 namespace sf {
@@ -15,7 +19,7 @@ size_t UndoRecord::approxBytes() const {
                    facegroups.bytes() + (paint ? paint->bytes() : 0) +
                    (textureTiles ? textureTiles->bytes() : 0) + (texture ? texture->bytes() : 0) +
                    (subdiv ? subdiv->bytes() : 0) + (topology ? topology->bytes() : 0) +
-                   (micro ? micro->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0) +
+                   (micro ? micro->bytes() : 0) + (ink ? ink->bytes() : 0) + uvs.bytes() + (sets ? sets->bytes() : 0) + (uv ? uv->bytes() : 0) +
                    creases.bytes() + (transformOp ? transformOp->bytes() : 0);
     for (const auto& l : layerOffsets) bytes += l.bytes();
     if (mesh)
@@ -25,6 +29,7 @@ size_t UndoRecord::approxBytes() const {
                  mesh->mask.size() * sizeof(float) + mesh->colors.size() * sizeof(glm::vec3) +
                  mesh->facegroups.size() * sizeof(uint32_t) + mesh->hidden.size() + mesh->uvs.size() * sizeof(glm::vec2) +
                  mesh->quadPartners.size() * sizeof(uint32_t) + mesh->creases.size() * sizeof(float);
+    if (meshBvh) bytes += meshBvh->memoryBytes();
     if (mesh) {
         bytes += mesh->paintBase.size() * sizeof(glm::vec3);
         for (const auto& l : mesh->paintLayers) bytes += l.color.size() * sizeof(glm::vec3) + l.alpha.size() * sizeof(float);
@@ -144,8 +149,20 @@ UndoRecord UndoRecord::captureFaceGroups(const Mesh& mesh, std::string label, st
     return r;
 }
 
+namespace {
+std::atomic<uint64_t> gSeq{0}, gBatch{0}, gClearEpoch{0};
+} // namespace
+
+uint64_t nextUndoSeq() { return ++gSeq; }
+uint64_t undoClearEpoch() { return gClearEpoch.load(); }
+UndoBatchScope::UndoBatchScope() : id_(nextUndoSeq()), previous_(gBatch.exchange(id_)) {}
+UndoBatchScope::~UndoBatchScope() { gBatch = previous_; }
+
 void UndoStack::push(UndoRecord record) {
     if (record.empty()) return;
+    record.seq = nextUndoSeq();
+    record.batch = gBatch.load();
+    microRevisions_ += record.microOnly();
     undo_.push_back(std::move(record));
     if (listener) listener->undoPushed(undo_.back(), redo_);
     redo_.clear();
@@ -159,12 +176,18 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         applySubdivUndo(*r.subdiv, mesh, bvh);
         return;
     }
+    if (r.ink) { // (replays strokes on the micro level: the base doesn't move)
+        r.ink->swapWith(mesh, bvh);
+        return;
+    }
     if (r.micro) r.micro->swapWith(mesh); // (the base doesn't move: no BVH work)
     if (r.sets) std::swap(mesh.selectionSets, r.sets->list);
     if (r.mesh) {
         std::swap(*r.mesh, mesh);
         mesh.topologyDirty = true;
-        bvh.build(mesh);
+        // The tree of the mesh that goes comes along: a rebuild is seconds at 10M triangles.
+        if (r.meshBvh && r.meshBvh->nodeCount()) bvh.swapTree(*r.meshBvh);
+        else bvh.build(mesh);
         return;
     }
     if (r.topology) {
@@ -178,7 +201,8 @@ void UndoStack::apply(UndoRecord& r, Mesh& mesh, BVH& bvh) {
         if (!restored.empty() && !mesh.layers.empty()) mesh.evaluate(restored);
         if (!restored.empty() && !mesh.paintLayers.empty()) compositePaint(mesh, restored);
         mesh.recomputeAllNormals();
-        bvh.build(mesh);
+        // The slots it changed leave, join or refit in the tree (a stroke's few thousand, not the whole mesh).
+        bvh.syncTopologyChange(mesh, r.topology->triangleSlots, r.topology->vertexSlots);
     }
     if (!r.positions.empty()) {
         r.positions.swapWithUnique(mesh.layerTarget(r.layer));
@@ -287,6 +311,7 @@ bool UndoStack::undo(Mesh& mesh, BVH& bvh) {
     redo_.push_back(std::move(r));
     if (listener) listener->undoApplied(redo_.back(), mesh, true);
     ++revision_;
+    microRevisions_ += redo_.back().microOnly();
     return true;
 }
 
@@ -299,10 +324,12 @@ bool UndoStack::redo(Mesh& mesh, BVH& bvh) {
     undo_.push_back(std::move(r));
     if (listener) listener->undoApplied(undo_.back(), mesh, false);
     ++revision_;
+    microRevisions_ += undo_.back().microOnly();
     return true;
 }
 
 void UndoStack::clear() {
+    ++gClearEpoch;
     undo_.clear();
     redo_.clear();
     if (listener) listener->undoCleared();
@@ -314,14 +341,30 @@ size_t UndoStack::undoBytes() const {
     return total;
 }
 
+size_t UndoStack::budget() const { return byteBudget ? byteBudget : undoBudgetBytes(undoBytes()); }
+
+UndoStack::Notice UndoStack::takeNotice() {
+    Notice n{droppedPending_, overPending_};
+    droppedPending_ = 0;
+    overPending_ = false;
+    return n;
+}
+
 void UndoStack::enforceBudget() {
     size_t total = 0;
-    for (const auto& r : undo_) total += r.approxBytes();
-    while (undo_.size() > 1 && total > byteBudget) {
-        total -= undo_.front().approxBytes();
+    for (const auto& r : undo_) total += r.budgetBytes();
+    const size_t limit = byteBudget ? byteBudget : undoBudgetBytes(total);
+    const size_t before = droppedPending_;
+    while (undo_.size() > 1 && total > limit) {
+        total -= undo_.front().budgetBytes();
         undo_.pop_front();
+        ++droppedPending_;
+        ++droppedTotal_;
         if (listener) listener->undoDroppedOldest();
     }
+    const bool over = undo_.size() == 1 && total > limit;
+    if (over && (!lastStepOver_ || droppedPending_ != before)) overPending_ = true;
+    lastStepOver_ = over;
 }
 
 } // namespace sf

@@ -1,0 +1,102 @@
+# A Gizmo drag of a whole Part (no mask, nothing hidden) is drawn by one matrix: the vertices stay and nothing is sent to
+# the graphics card until the release, which moves them once (dense meshes: a 7M Voxel Remesh dragged at a few frames a
+# second). The released surface is the one the per-frame path leaves (SF_GIZMO_GPU=0), for a move, a turn and an even
+# scale or an axis scale; a masked Part moves the vertices each frame as before.
+run new_sphere subdivisions=5 ; transform scale=3,0.7,0.7 pivot=origin
+key f
+orbit -70 -45
+
+# Move: mid-drag, one matrix and no vertex sends; the release sends them once.
+key w
+snapshot
+gizmo_drag move_view 60 -40 0.5 keep
+expect_value gizmo_gpu == 1
+expect_value moved == 0
+remember part_vertex_syncs syncs
+wait 0.2
+expect_value part_vertex_syncs == $syncs
+release
+wait 0.1
+expect_value part_vertex_syncs > $syncs
+expect_value gizmo_gpu == 0
+expect_status Gizmo Move
+remember moved_sum gpuMoveSum
+remember moved_max gpuMoveMax
+remember center_x gpuMoveX
+expect_value moved_max > 0.1
+key ctrl+z
+expect_value moved == 0
+
+# Rotate and even scale the same way.
+key r
+snapshot
+gizmo_drag rotate_view 0 -80 0.5
+expect_status Gizmo Rotate
+remember moved_sum gpuTurnSum
+remember moved_max gpuTurnMax
+key ctrl+z
+key e
+snapshot
+gizmo_drag scale_uniform 40 -40 0.5
+expect_status Gizmo Scale
+remember moved_sum gpuScaleSum
+key ctrl+z
+# An axis scale too (the renderer corrects the shading of the stretched normals): one matrix, no vertex sends, and
+# the release bakes the same surface the per-frame path leaves.
+gizmo_drag scale_x 60 0 0.5 keep
+expect_value gizmo_gpu == 1
+expect_value moved == 0
+remember part_vertex_syncs axisSyncs
+wait 0.2
+expect_value part_vertex_syncs == $axisSyncs
+release
+expect_value gizmo_gpu == 0
+expect_status Gizmo Scale
+remember moved_sum gpuAxisSum
+remember moved_max gpuAxisMax
+expect_value moved_max > 0.1
+key ctrl+z
+expect_value moved == 0
+
+# The same drags with the per-frame path leave the same surfaces.
+env SF_GIZMO_GPU 0
+key w
+snapshot
+gizmo_drag move_view 60 -40 0.5 keep
+expect_value gizmo_gpu == 0
+expect_value moved > 1000
+release
+expect_value moved_sum == $gpuMoveSum
+expect_value moved_max == $gpuMoveMax
+expect_value center_x == $gpuMoveX
+key ctrl+z
+key r
+snapshot
+gizmo_drag rotate_view 0 -80 0.5
+expect_value moved_sum == $gpuTurnSum
+expect_value moved_max == $gpuTurnMax
+key ctrl+z
+key e
+snapshot
+gizmo_drag scale_uniform 40 -40 0.5
+expect_value moved_sum == $gpuScaleSum
+key ctrl+z
+gizmo_drag scale_x 60 0 0.5 keep
+expect_value gizmo_gpu == 0
+expect_value moved > 1000
+release
+expect_value moved_sum == $gpuAxisSum
+expect_value moved_max == $gpuAxisMax
+key ctrl+z
+env SF_GIZMO_GPU 1
+
+# A masked Part moves only its unmasked part: the vertices move each frame.
+run mask_rect x0=-1 y0=-1 x1=0 y1=1
+key w
+gizmo_drag move_view 60 -40 0.5 keep
+expect_value gizmo_gpu == 0
+expect_value moved > 100
+release
+expect_value moved_masked == 0
+key ctrl+z
+run mask_clear

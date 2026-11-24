@@ -19,6 +19,7 @@
 #include <future>
 #include <map>
 #include <memory>
+#include <set>
 
 // ---------------------------------------------------------------------------
 // Dear ImGui test-engine hooks: record where every labelled item was drawn.
@@ -51,6 +52,13 @@ struct ItemTable {
     std::map<ImGuiID, std::string> pastRight;
     // Controls whose label didn't fit them this frame, with the scopes open then.
     std::vector<std::pair<std::string, std::vector<std::string>>> clipped;
+    // Every labelled item drawn inside a pushScope this frame, by its full label ("Adjust##stencil.adjust").
+    struct Labelled {
+        std::string text;
+        Placed placed;
+        std::vector<std::string> scopes;
+    };
+    std::vector<Labelled> labelled;
 };
 ItemTable& items() {
     static ItemTable t;
@@ -111,6 +119,7 @@ void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* lab
         for (const auto& scope : items().scopes) items().byLabel[scope + "/" + key] = it->second;
     };
     add(text);
+    if (!items().scopes.empty()) items().labelled.push_back({text, it->second, items().scopes});
     if (const size_t hash = text.find("##"); hash != std::string::npos && hash > 0) add(text.substr(0, hash));
     // Labels that start with an icon (ICON_LC_*: UTF-8 private-use characters, U+E000-U+F8FF) are also found
     // by their words: "AI Brush" for "<sparkles> AI Brush".
@@ -156,6 +165,7 @@ void Demo::beginFrame() {
     items().offscreen.clear();
     items().pastRight.clear();
     items().clipped.clear();
+    items().labelled.clear();
     items().frame.clear();
     items().scopes.clear();
 }
@@ -192,6 +202,25 @@ std::vector<std::string> Demo::pastRightEdge(const std::string& window) {
     return out;
 }
 
+std::vector<std::string> Demo::scopeItems(const std::string& scope) {
+    std::set<std::string> out;
+    for (const auto& item : items().labelled) {
+        if (std::find(item.scopes.begin(), item.scopes.end(), scope) == item.scopes.end()) continue;
+        const float x = item.placed.rect.GetCenter().x; // (a control pushed past its panel's side can't be reached)
+        if (x >= item.placed.clip.Min.x && x <= item.placed.clip.Max.x) out.insert(item.text);
+    }
+    return {out.begin(), out.end()};
+}
+
+std::vector<std::string> Demo::scopeItemsInOrder(const std::string& scope) {
+    std::vector<std::string> out;
+    for (const auto& item : items().labelled)
+        if (std::find(item.scopes.begin(), item.scopes.end(), scope) != item.scopes.end() &&
+            std::find(out.begin(), out.end(), item.text) == out.end())
+            out.push_back(item.text);
+    return out;
+}
+
 void Demo::noteClippedLabel(const std::string& label) { items().clipped.push_back({label.substr(0, label.find("##")), items().scopes}); }
 
 std::vector<std::string> Demo::clippedLabels(const std::string& scope) {
@@ -202,9 +231,10 @@ std::vector<std::string> Demo::clippedLabels(const std::string& scope) {
     return out;
 }
 
-bool Demo::findItem(const std::string& label, ImVec2& center, bool* visible, ImVec4* clipOut) const {
+bool Demo::findItem(const std::string& label, ImVec2& center, bool* visible, ImVec4* clipOut, ImVec4* rectOut) const {
     auto found = [&](const Placed& p) {
         center = p.rect.GetCenter();
+        if (rectOut) *rectOut = ImVec4(p.rect.Min.x, p.rect.Min.y, p.rect.Max.x, p.rect.Max.y);
         if (visible) *visible = p.clip.Contains(center);
         if (clipOut) *clipOut = ImVec4(p.clip.Min.x, p.clip.Min.y, p.clip.Max.x, p.clip.Max.y);
         return true;
@@ -255,6 +285,11 @@ void Demo::update(float dt) {
         const auto now = std::chrono::steady_clock::now();
         if (lastFrame_.time_since_epoch().count() != 0)
             longestFrameMs_ = std::max(longestFrameMs_, std::chrono::duration<double, std::milli>(now - lastFrame_).count());
+        // SF_UI_FRAME_LOG=1 (with SF_UI_PROFILE=1): one log line per frame, "uiframe LINE MS", for percentile tables.
+        static const bool frameLog = std::getenv("SF_UI_FRAME_LOG") != nullptr;
+        if (frameLog && lastFrame_.time_since_epoch().count() != 0)
+            SDL_Log("uiframe %d %.2f", step_ < stepLines_.size() ? stepLines_[step_] : -1,
+                    std::chrono::duration<double, std::milli>(now - lastFrame_).count());
         lastFrame_ = now;
     }
     if (!stepLines_.empty()) { // SF_UI_PROFILE: the frame just drawn belongs to the step that was running
@@ -293,8 +328,8 @@ void Demo::mouseMotion(float x, float y, SDL_MouseID which) {
     e.motion.which = which;
     e.motion.x = x;
     e.motion.y = y;
-    e.motion.xrel = x - mouse_.x;
-    e.motion.yrel = y - mouse_.y;
+    e.motion.xrel = mouseSteps_ || which == SDL_PEN_MOUSEID ? x - mouse_.x : 0.0f;
+    e.motion.yrel = mouseSteps_ || which == SDL_PEN_MOUSEID ? y - mouse_.y : 0.0f;
     e.motion.state = buttonDown_ ? SDL_BUTTON_LMASK : 0;
     mouse_ = ImVec2(x, y);
     app_.handleEvent(e);
@@ -533,6 +568,7 @@ void Demo::orbit(float dx, float dy, float seconds) {
             e.button.x = at->x;
             e.button.y = at->y;
             app_.handleEvent(e);
+            if (down) app_.orbitPivotPicked_ = true; // a scripted orbit turns about the target, wherever the cursor is
         };
         if (t == 0.0f) {
             const CanvasRect r = app_.canvasRect();

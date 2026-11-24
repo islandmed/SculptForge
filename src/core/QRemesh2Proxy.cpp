@@ -79,6 +79,7 @@ struct ProxyBuilder::Impl {
     const SegmentBVH* features;
     std::unordered_set<uint64_t> sharp;
     bool groups;
+    std::function<bool()> cancelled;
 
     std::vector<vec3> P;
     std::vector<glm::uvec3> T;
@@ -90,7 +91,8 @@ struct ProxyBuilder::Impl {
     float reach = 1.0f;
 
     explicit Impl(const ProxySource& s)
-        : src(*s.mesh), surface(s.surface), features(s.features), sharp(s.sharp), groups(s.keepGroups) {
+        : src(*s.mesh), surface(s.surface), features(s.features), sharp(s.sharp), groups(s.keepGroups),
+          cancelled(s.cancelled) {
         P = src.P;
         T = src.T;
         G = src.group;
@@ -332,6 +334,7 @@ struct ProxyBuilder::Impl {
         std::vector<uint32_t> ra, rb, scratch, moved;
         std::vector<uint8_t> touched(P.size(), 0);
         for (int pass = 0; pass < 60; ++pass) {
+            if (cancelled && cancelled()) return;
             std::vector<Cand> c = edges(0.0f, 0.8f * edge, false);
             if (c.empty()) break;
             std::sort(c.begin(), c.end(), [](const Cand& x, const Cand& y) {
@@ -339,7 +342,9 @@ struct ProxyBuilder::Impl {
             });
             std::fill(touched.begin(), touched.end(), 0);
             size_t done = 0;
+            size_t seen = 0;
             for (const Cand& e : c) {
+                if ((++seen & 8191) == 0 && cancelled && cancelled()) return;
                 if (deadV[e.a] || deadV[e.b] || touched[e.a] || touched[e.b]) continue;
                 const uint32_t s = collapseEdge(e.a, e.b, 1.25f * edge, ra, rb, scratch);
                 if (s == kNone) continue;
@@ -564,6 +569,7 @@ struct ProxyBuilder::Impl {
         for (size_t v = 0; v < P.size(); ++v) Lt[v] = edge * (v < rel.size() ? rel[v] : 1.0f);
         StageClock clock("proxy");
         for (int it = 0; it < iterations; ++it) {
+            if (cancelled && cancelled()) return;
             splitLong();
             clock.lap("split");
             collapseShort();
@@ -628,40 +634,51 @@ qr::WorkMesh preDecimate(const ProxySource& source, float edge, std::unordered_s
     };
     std::vector<Part> parts(ranges.size());
     std::vector<vec3> P = m.P;
-    parallelJobs(ranges.size(), [&](size_t k) {
-        {
-            qr::WorkMesh local;
-            std::unordered_map<uint32_t, uint32_t> l;
-            std::vector<uint32_t> g;
-            auto id = [&](uint32_t v) {
-                auto [it, inserted] = l.try_emplace(v, uint32_t(g.size()));
-                if (inserted) g.push_back(v), local.P.push_back(m.P[v]);
-                return it->second;
-            };
-            for (size_t i = ranges[k].first; i < ranges[k].second; ++i) {
-                const uint32_t t = order[i];
-                local.T.push_back({id(m.T[t].x), id(m.T[t].y), id(m.T[t].z)});
-                local.group.push_back(m.group.empty() ? 0u : m.group[t]);
+    // The blocks go in rounds of one per thread, Cancel asked between rounds (on this thread: the callback isn't
+    // called from the workers).
+    const size_t round = std::max<size_t>(1, size_t(std::max(1u, std::thread::hardware_concurrency())));
+    for (size_t first = 0; first < ranges.size(); first += round) {
+        if (source.cancelled && source.cancelled()) return {};
+        parallelJobs(std::min(round, ranges.size() - first), [&, first](size_t j) {
+            const size_t k = first + j;
+            {
+                qr::WorkMesh local;
+                std::unordered_map<uint32_t, uint32_t> l;
+                std::vector<uint32_t> g;
+                auto id = [&](uint32_t v) {
+                    auto [it, inserted] = l.try_emplace(v, uint32_t(g.size()));
+                    if (inserted) g.push_back(v), local.P.push_back(m.P[v]);
+                    return it->second;
+                };
+                for (size_t i = ranges[k].first; i < ranges[k].second; ++i) {
+                    const uint32_t t = order[i];
+                    local.T.push_back({id(m.T[t].x), id(m.T[t].y), id(m.T[t].z)});
+                    local.group.push_back(m.group.empty() ? 0u : m.group[t]);
+                }
+                ProxySource ls = source;
+                ls.mesh = &local;
+                ls.cancelled = {};
+                ls.sharp.clear();
+                for (uint64_t key : source.sharp) {
+                    const auto a = l.find(uint32_t(key >> 32)), b = l.find(uint32_t(key & 0xffffffffu));
+                    if (a != l.end() && b != l.end()) ls.sharp.insert(edgeKey(a->second, b->second));
+                }
+                ProxyBuilder::Impl impl(ls);
+                impl.locked.assign(local.P.size(), 0);
+                for (size_t v = 0; v < g.size(); ++v)
+                    impl.locked[v] = shared[g[v]];
+                impl.decimate(edge);
+                Part& out = parts[k];
+                out.g = g;
+                out.P = impl.P;
+                for (uint32_t t = 0; t < impl.T.size(); ++t)
+                    if (!impl.deadT[t])
+                        out.T.push_back({g[impl.T[t].x], g[impl.T[t].y], g[impl.T[t].z]}), out.G.push_back(impl.G[t]);
+                for (uint64_t key : impl.sharp)
+                    out.sharp.push_back(edgeKey(g[uint32_t(key >> 32)], g[uint32_t(key & 0xffffffffu)]));
             }
-            ProxySource ls = source;
-            ls.mesh = &local;
-            ls.sharp.clear();
-            for (uint64_t key : source.sharp) {
-                const auto a = l.find(uint32_t(key >> 32)), b = l.find(uint32_t(key & 0xffffffffu));
-                if (a != l.end() && b != l.end()) ls.sharp.insert(edgeKey(a->second, b->second));
-            }
-            ProxyBuilder::Impl impl(ls);
-            impl.locked.assign(local.P.size(), 0);
-            for (size_t v = 0; v < g.size(); ++v) impl.locked[v] = shared[g[v]];
-            impl.decimate(edge);
-            Part& out = parts[k];
-            out.g = g;
-            out.P = impl.P;
-            for (uint32_t t = 0; t < impl.T.size(); ++t)
-                if (!impl.deadT[t]) out.T.push_back({g[impl.T[t].x], g[impl.T[t].y], g[impl.T[t].z]}), out.G.push_back(impl.G[t]);
-            for (uint64_t key : impl.sharp) out.sharp.push_back(edgeKey(g[uint32_t(key >> 32)], g[uint32_t(key & 0xffffffffu)]));
-        }
-    });
+        });
+    }
     // Merge (surviving vertices keep their global ids, moved by midpoint collapses), then compact.
     qr::WorkMesh merged;
     std::vector<uint32_t> remap(nv, kNone);

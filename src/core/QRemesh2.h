@@ -77,6 +77,9 @@ struct ProxySource {
     const SegmentBVH* features = nullptr;   // the source's feature lines (to keep feature vertices on them)
     std::unordered_set<uint64_t> sharp;     // hard-edge source edges (vertex pairs) that must stay
     bool keepGroups = false;
+    // Cancel (gh#226): asked on the calling thread between passes; true stops the build early (the caller checks it
+    // again and drops the unfinished proxy). Empty: never.
+    std::function<bool()> cancelled;
 };
 
 // Dense sculpts: the piece cut into spatial blocks, each decimated towards `edge` on its own thread (vertices shared
@@ -149,6 +152,8 @@ struct GridMap {
 
 // Seamless map with the u / v gradients following the field at 1 / size, singularities and feature lines on the
 // integer lattice (greedy rounding), so the lattice is a quad mesh. Combs `field` (match is 0 off the cut).
-bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& out, const std::function<bool()>& cancelled);
+// progress (optional): 0..1 through the solve, for the bar (the first solve, then the rounding rounds).
+bool solveGridMap(const Proxy& p, const Frames& f, CrossField& field, GridMap& out,
+                  const std::function<bool()>& cancelled, const std::function<void(float)>& progress = {});
 
 } // namespace sf::qr2

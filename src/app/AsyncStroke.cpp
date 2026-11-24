@@ -12,6 +12,8 @@
 #include "app/AsyncStroke.h"
 
 #include "core/Micro.h"
+#include "core/HardwareProfile.h"
+#include "core/MemoryGuard.h"
 #include "core/PerfTrace.h"
 #include "core/Sculpt.h"
 #include "core/TierConfig.h"
@@ -83,8 +85,10 @@ void App::StrokeSolver::loop() {
         }
         probe.clear();
         radiusProbe.clear();
+        hitProbe.clear();
         double spent = 0.0;
         const SculptTimings before = app.doc_.sculptor.timings;
+        view.lastHitSeen = false;
         app.dabView_ = &view;
         if (finalize) { // a draft stroke's end: every normal and cavity term it touched
             const auto t0 = std::chrono::steady_clock::now();
@@ -94,7 +98,7 @@ void App::StrokeSolver::loop() {
         app.doc_.sculptor.beginBatch(); // (a big brush's dabs go through the vertices together: core/SculptBatch.cpp)
         for (const PathDab& d : batch) {
             const auto t0 = std::chrono::steady_clock::now();
-            app.dabAt(d.x, d.y, d.pressure);
+            app.dabAt(d.x, d.y, d.pressure, d.stamp);
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
         {
@@ -160,6 +164,26 @@ bool App::fastBigBrushes() const {
     return env >= 0 ? env == 1 : uiPrefs_.fastBigBrushes;
 }
 
+bool App::keepStrokesEditable() {
+    static const int env = [] {
+        const char* v = std::getenv("SF_KEEP_EDITABLE");
+        return v && *v ? (*v == '0' ? 0 : 1) : -1;
+    }();
+    if (!(env >= 0 ? env == 1 : uiPrefs_.keepStrokesEditable)) return false;
+    // (the history's own memory is small: dabs and hashes; the tiles are the undo history's, inside its budget. What
+    // it guards is the replay's working set on a machine that is already short.)
+    constexpr size_t kGB = size_t(1) << 30;
+    const size_t total = totalMemoryBytes(), avail = availableMemoryBytesCached();
+    const bool low = (simulatedFloorTier() && total > 0 && total < 8 * kGB) || (avail > 0 && avail < kGB);
+    if (low) {
+        if (!inkGuardSaid_) status_ = "Strokes aren't kept editable for now: memory is low (they sculpt as usual)";
+        inkGuardSaid_ = true;
+        return false;
+    }
+    inkGuardSaid_ = false;
+    return true;
+}
+
 bool App::draftStrokes() const {
     static const int env = [] {
         const char* v = std::getenv("SF_DRAFT_STROKE");
@@ -192,17 +216,47 @@ bool App::previewStrokes() const {
 }
 
 bool App::asyncStrokeAllowed() const {
-    // Sculpt strokes of queued dabs only: Move, Snake Hook and the drag strokes work in strokeTo itself; painting,
+    // Sculpt strokes of queued dabs only: Move, Tendril and the drag strokes work in strokeTo itself; painting,
     // masking and dynamic topology (which changes the layout the renderer packs for) stay in the frame loop.
     const bool recipe = strokeRecipe() != nullptr;
     return interactiveStrokes_ && (predictiveStrokes() || backgroundDabs()) && strokeSculpt_ && !strokePaint_ && !strokeMask_ &&
            !doc_.sculptor.dyntopo.enabled && previewLod_ < 0 && !faceTakePlaying_ &&
            !doc_.mesh.micro && // (a micro level is sculpted and drawn by core/MicroSculpt and the MicroRenderer)
-           (recipe || (strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::SnakeHook)) &&
+           (recipe || (strokeBrush_ != BrushType::Move && strokeBrush_ != BrushType::Tendril)) &&
            strokeType_ != StrokeType::DragRect && strokeType_ != StrokeType::DragDot;
 }
 
 bool App::solverBusy() const { return solver_ && solver_->busy(); }
+
+bool App::strokeDraining() const { return asyncStroke_ && strokeFinishing_ && drag_ != Drag::Stroke; }
+
+void App::runDrainQueue() {
+    std::vector<std::pair<std::string, Args>> queued;
+    queued.swap(drainQueue_); // (each runs once; one that queues again waits for the next stroke's end)
+    for (const auto& [name, args] : queued) {
+        if (name == kHeldPress) replayHeldPointer();
+        else runCommand(name, args);
+    }
+}
+
+void App::replayHeldPointer() {
+    std::vector<HeldPointer> held;
+    held.swap(heldPointer_);
+    holdingPointer_ = false;
+    for (const HeldPointer& h : held) {
+        pointerEventNs_ = h.ns; // (the pen predictor's sample times: when they happened)
+        if (h.kind == HeldPointer::Down) onMouseDown(h.x, h.y, h.button);
+        else if (h.kind == HeldPointer::Move) onMouseMove(h.x, h.y, h.dx, h.dy, h.fromPen);
+        else onMouseUp();
+    }
+    pointerEventNs_ = 0;
+}
+
+std::string App::drainStatus() const {
+    std::string s = "Finishing stroke: ";
+    for (size_t i = 0; i < drainQueue_.size(); ++i) s += (i ? ", " : "") + (drainQueue_[i].first == kHeldPress ? std::string("next stroke") : drainQueue_[i].first);
+    return s + " queued (Esc cancels)";
+}
 
 void App::solverWait() {
     if (!solver_) return;
@@ -246,9 +300,11 @@ void App::commitSolverBatch() {
     }
     if (strokeProbe_) strokeProbe_->insert(strokeProbe_->end(), s.probe.begin(), s.probe.end());
     if (strokeRadiusProbe_) strokeRadiusProbe_->insert(strokeRadiusProbe_->end(), s.radiusProbe.begin(), s.radiusProbe.end());
+    if (strokeHitProbe_) strokeHitProbe_->insert(strokeHitProbe_->end(), s.hitProbe.begin(), s.hitProbe.end());
     if (s.prepSeconds > 0.0) prepSeconds_ = prepSeconds_ > 0.0 ? prepSeconds_ * 0.7 + s.prepSeconds * 0.3 : s.prepSeconds;
     if (!s.batch.empty()) {
         lastDabScreen_ = glm::vec2(s.batch.back().x, s.batch.back().y);
+        if (s.view.lastHitSeen) noteStrokePoint(s.view.lastHit);
         if (s.dabSeconds > 0.0) dabSeconds_ = dabSeconds_ > 0.0 ? dabSeconds_ * 0.8 + s.dabSeconds * 0.2 : s.dabSeconds;
         // The fused batch size, toward kFusedBatchSeconds of work: scaled by how far this batch was from it (down at once, up
         // at most 2x a batch, kept fractional so it climbs back from 1 where fusing pays). It settles where a batch costs
@@ -306,6 +362,7 @@ void App::pumpStroke() {
         s.view.canvas = canvasRect();
         s.view.probe = nullptr;
         s.view.radiusProbe = nullptr;
+        s.view.hitProbe = nullptr;
         s.view.settings = dabSettings();
         s.uploadId = doc_.meshKey(doc_.activePart);
         renderer_.setPersistentUpload(uiPrefs_.fastUpload);
@@ -316,7 +373,11 @@ void App::pumpStroke() {
     }
     if (dabQueue_.empty()) {
         if (strokeFinishing_) {
+            static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
+            const auto t0 = std::chrono::steady_clock::now();
             finishStrokeNow(); // released, and every dab is on the GPU
+            drainNextFrame_ = !drainQueue_.empty(); // then what a shortcut asked for meanwhile, in order, next frame
+            if (log) SDL_Log("stroke end: %.1f ms", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
             return;
         }
         // The pen rests (no dabs for a tenth of a second): the exact normals behind the brush (Fast Big Brushes)
@@ -330,6 +391,7 @@ void App::pumpStroke() {
         s.view.canvas = canvasRect();
         s.view.probe = nullptr;
         s.view.radiusProbe = nullptr;
+        s.view.hitProbe = nullptr;
         s.view.settings = dabSettings();
         s.uploadId = doc_.meshKey(doc_.activePart);
         renderer_.bindStrokeUpload(s.uploadId, s.upload);
@@ -359,6 +421,7 @@ void App::pumpStroke() {
     s.view.canvas = canvasRect();
     s.view.probe = strokeProbe_ ? &s.probe : nullptr;
     s.view.radiusProbe = strokeProbe_ ? &s.radiusProbe : nullptr;
+    s.view.hitProbe = strokeHitProbe_ ? &s.hitProbe : nullptr;
     s.view.settings = dabSettings();
     s.uploadId = doc_.activePartInfo().id;
     renderer_.setPersistentUpload(uiPrefs_.fastUpload);
@@ -380,12 +443,21 @@ void App::pumpStroke() {
     }
 }
 
-bool App::liveMoveEnabled() const {
+bool App::liveMoveEnabled(size_t region) const {
     static const int env = [] {
         const char* v = std::getenv("SF_LIVE_MOVE");
         return v && *v ? (*v == '0' ? 0 : 1) : -1;
     }();
-    return env >= 0 ? env == 1 : uiPrefs_.liveMove;
+    // Big grabs on dense meshes always (floor tier, a 3.5M triangle Voxel Remesh: a 240 px Move otherwise trails the pen
+    // by over 100 ms, a whole-head one by 400 ms; a 60 px one keeps up on the CPU, which then draws the mesh coarse).
+    // The preference turns it on for every mesh and grab.
+    auto number = [](const char* name, size_t fallback) { // (UI tests: a small sphere)
+        const char* v = std::getenv(name);
+        return v && *v ? size_t(std::max(1LL, std::atoll(v))) : fallback;
+    };
+    if (env >= 0) return env == 1;
+    return uiPrefs_.liveMove || (doc_.mesh.vertexCount() >= number("SF_LIVE_MOVE_VERTICES", kLiveMoveAutoVertices) &&
+                                 region >= number("SF_LIVE_MOVE_REGION", kLiveMoveAutoRegion));
 }
 
 void App::commitLiveMove() {
@@ -419,11 +491,15 @@ void App::finishStrokeNow() {
     doc_.sculptor.timings = {};
     perf_.strokeSyncMs = 0.0;
     perf_.strokeFrames = 0;
+    if (const size_t bad = doc_.sculptor.nonFiniteDabs) // (gh#229: the dabs were dropped, the mesh is as it was)
+        SDL_Log("stroke: %zu dabs of %s dropped: the brush computed a non-finite offset (pressure %.3f)", bad,
+                brushLabel(strokeBrush_), double(strokePressure()));
     UndoRecord r = doc_.sculptor.endStroke();
     if (traceStroke) tracePerfStroke(r.label);
     finishPaintStroke(r);
-    if (r.topology && !r.topology->uvs.empty())
-        status_ = "Dynamic topology removed the UVs of the remeshed Part (Undo brings them back)";
+    if (const size_t fixed = doc_.sculptor.lastFixedStrokes())
+        status_ = fixed == 1 ? "1 editable stroke under this one is now fixed in place"
+                             : std::to_string(fixed) + " editable strokes under this one are now fixed in place";
     strokeEndedForRemesh(r); // Tool > Remesh > Remesh after each stroke (#121): stretched enough to remesh?
     if (!r.empty()) {
         doc_.undo.push(std::move(r));
@@ -437,7 +513,7 @@ App::DabSettings App::dabSettings() const {
     st.radiusPx = radiusPx_;
     st.worldRadius = worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : 0.0f;
     st.pressureCurve = strokeCurve_;
-    st.strength = precisionActive_ ? precisionIntensity_ : strength_; // Shift+Alt mid-stroke (Precision.cpp)
+    st.strength = precisionActive_ ? precisionIntensity_ : strokeStrength(); // Shift+Alt mid-stroke (Precision.cpp)
     st.smoothStrength = smoothStrength_;
     st.smoothKeepVolume = smoothKeepVolume_ != strokeAltSmooth_;
     st.smoothGroupBorders = smoothGroupBorders_;
@@ -451,6 +527,8 @@ App::DabSettings App::dabSettings() const {
     st.frontFacesOnly = frontFacesOnly_;
     st.connectedOnly = uiPrefs_.connectedOnly;
     st.viewFalloff = uiPrefs_.viewFalloff;
+    st.contactFacing = uiPrefs_.contactFacing;
+    st.facingAngle = uiPrefs_.facingAngle;
     st.mask = strokeMask_;
     st.paint = strokePaint_;
     st.sculpt = strokeSculpt_;
@@ -461,6 +539,7 @@ App::DabSettings App::dabSettings() const {
     // A predictive stroke works from its own copies of the recipe and alpha (made when it began).
     st.recipe = asyncStroke_ ? strokeRecipe_.get() : strokeRecipe();
     st.alpha = asyncStroke_ ? strokeAlpha_.get() : &doc_.brushAlpha; // (null: round)
+    st.pool = alphaPool_;
     st.stencil = doc_.stencil;
     st.vdmOwner = doc_.brushVdm;
     st.vdm = st.vdmOwner.get();
@@ -472,6 +551,12 @@ bool App::pickWith(const DabView& view, float x, float y, RayHit& hit) const {
     glm::vec3 origin, dir;
     view.camera.screenRay(x - view.canvas.x, y - view.canvas.y, view.canvas.w, view.canvas.h, origin, dir);
     return frontRaycast(origin, dir, hit);
+}
+
+double App::pointerEventSeconds() const {
+    // SDL stamps events with SDL_GetTicksNS's clock; one in the future (a clock skew) counts as now.
+    const Uint64 now = SDL_GetTicksNS();
+    return double(pointerEventNs_ && pointerEventNs_ <= now ? pointerEventNs_ : now) * 1e-9;
 }
 
 glm::vec2 App::predictedPointer() const {
@@ -589,10 +674,11 @@ void App::buildGhost() {
         d.radius = (worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : radiusPx_ * cam.worldPerPixel(d.center, c.h)) *
                    (pressureSizeOn() ? std::max(sd.pressure, 0.05f) : 1.0f);
         d.normal = n;
-        d.strength = std::clamp((strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strength_), 0.0f, 1.0f) *
+        d.strength = std::clamp(strokeIntensity(), 0.0f, 1.0f) *
                      std::clamp(pressureStrengthOn() ? sd.pressure : 1.0f, 0.0f, 1.0f);
         d.areaCenter = d.center - n * depth;
         d.weight = sd.weight;
+        d.up = screenUpVector(lastDabAngle_); // (the square tip of Clay Block turns with the dabs' angle)
         base.push_back(d);
     }
     for (uint32_t m = 0; m < mirrors.size(); ++m)
@@ -601,6 +687,7 @@ void App::buildGhost() {
             d.center = mirrors[m].point(b.center);
             d.normal = mirrors[m].dir(b.normal);
             d.areaCenter = mirrors[m].point(b.areaCenter);
+            d.up = mirrors[m].dir(b.up);
             d.mirror = m;
             g.dabs.push_back(d);
         }

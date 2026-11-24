@@ -6,7 +6,10 @@
 
 #include "ai/Http.h"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
+#include <optional>
 #include <random>
 
 namespace sf::ai {
@@ -27,9 +30,85 @@ bool isFileData(const Json& v) { return v.isObject() && (v["path"].isString() ||
 // Gradio may wrap returned values as {"__type__": "update", "value": ...}.
 const Json& unwrap(const Json& v) { return v.isObject() && v["value"].isObject() ? v["value"] : v; }
 
+bool modelName(std::string s) {
+    s = s.substr(0, s.find('?'));
+    for (char& c : s) c = char(std::tolower(static_cast<unsigned char>(c)));
+    for (const char* ext : {".glb", ".gltf", ".obj", ".ply"})
+        if (s.ends_with(ext)) return true;
+    return false;
+}
+
+// The first file in a returned value of any shape: a FileData object, a bare path or URL string to a model, a list of
+// either, or a component update wrapping them.
+bool firstFile(const Json& v, bool anyFile, Json& found, int depth = 0) {
+    if (depth > 4) return false;
+    if (v.isString()) {
+        const std::string& str = v.asString();
+        if (!modelName(str) || (str.rfind("http", 0) != 0 && str.rfind('/', 0) != 0)) return false;
+        found = Json::object();
+        found.set(str.rfind("http", 0) == 0 ? "url" : "path", str);
+        return true;
+    }
+    if (isFileData(v)) {
+        const std::string name = v["url"].isString() ? v["url"].asString() : v["path"].asString();
+        if (!anyFile && !modelName(v["orig_name"].isString() ? v["orig_name"].asString() : name) && !modelName(name)) return false;
+        found = v;
+        return true;
+    }
+    if (v.isArray()) {
+        for (const auto& item : v.items())
+            if (firstFile(item, anyFile, found, depth + 1)) return true;
+    } else if (v.isObject() && v.has("value")) {
+        return firstFile(v["value"], anyFile, found, depth + 1);
+    }
+    return false;
+}
+
 } // namespace
 
+bool gradioCompleted(const Json& m, std::vector<Json>& outputs, std::string& error) {
+    if (m["success"].asBool(false)) {
+        outputs = m["output"]["data"].items();
+        return true;
+    }
+    const Json& o = m["output"];
+    error = friendlyGradioError(o["error"].isString() ? o["error"].asString()
+                                : m["title"].isString() ? m["title"].asString()
+                                                        : std::string("The Space reported an error"));
+    return false;
+}
+
+std::string gradioModelUrl(const Json& config, const std::string& apiName, const std::vector<Json>& outputs,
+                           const std::string& base) {
+    auto urlOf = [&](const Json& file) {
+        if (file["url"].isString() && !file["url"].asString().empty()) return file["url"].asString();
+        return base + "/file=" + file["path"].asString();
+    };
+    const Json& deps = config["dependencies"];
+    const Json* dep = nullptr;
+    for (size_t i = 0; i < deps.size(); ++i)
+        if (deps[i]["api_name"].asString() == apiName) dep = &deps[i];
+    auto typeOf = [&](double id) {
+        for (const auto& c : config["components"].items())
+            if (c["id"].asNumber() == id) return c["type"].asString();
+        return std::string();
+    };
+    Json found;
+    // 3D model outputs first, then file outputs, then anything that holds a model file.
+    for (int pass = 0; pass < 3; ++pass)
+        for (size_t i = 0; i < outputs.size(); ++i) {
+            const std::string type = dep && i < (*dep)["outputs"].size() ? typeOf((*dep)["outputs"][i].asNumber()) : std::string();
+            const bool modelType = type == "model3d" || type == "litmodel3d";
+            if (pass == 0 && !modelType) continue;
+            if (pass == 1 && type != "file") continue;
+            if (firstFile(outputs[i], pass < 2, found)) return urlOf(found);
+        }
+    return {};
+}
+
 std::string friendlyGradioError(const std::string& raw) {
+    if (raw.find("Text to 3D is disable") != std::string::npos)
+        return "This free Hugging Face Space has switched Text to 3D off. Use Image to 3D (or another provider) for now.";
     if (raw.find("ZeroGPU") != std::string::npos || raw.find("GPU quota") != std::string::npos)
         return "Hugging Face's free GPU time is used up for now. Add a free Hugging Face token "
                "(huggingface.co/settings/tokens) for a bigger daily allowance, wait for it to refill, or pick another model. (" +
@@ -38,6 +117,78 @@ std::string friendlyGradioError(const std::string& raw) {
         return "The Hugging Face Space is asleep or restarting - try again in a minute, or pick another model. (" +
                raw.substr(0, 160) + ")";
     return raw;
+}
+
+bool gradioSpaceUnavailable(const std::string& e) {
+    for (const char* k : {"Cannot reach", "Space is unavailable", "asleep or restarting", "isn't answering", "closed the connection",
+                          "Connection lost", "Could not join the queue", "(it may have changed)"})
+        if (e.find(k) != std::string::npos) return true;
+    return false;
+}
+
+bool gradioBuildInputs(const Json& config, const std::string& apiName, const std::vector<Json>& userArgs,
+                       const std::vector<GradioSlot>& slots, Json& data, int& fnIndex, std::string& error) {
+    const Json& deps = config["dependencies"];
+    const Json* dep = nullptr;
+    for (size_t i = 0; i < deps.size(); ++i)
+        if (deps[i]["api_name"].asString() == apiName) {
+            dep = &deps[i];
+            fnIndex = deps[i]["id"].isNumber() ? int(deps[i]["id"].asNumber()) : int(i);
+            break;
+        }
+    if (!dep) {
+        error = "This Space has no '" + apiName + "' endpoint (it may have changed)";
+        return false;
+    }
+    auto component = [&](double id) -> const Json* {
+        for (const auto& c : config["components"].items())
+            if (c["id"].asNumber() == id) return &c;
+        return nullptr;
+    };
+    auto lower = [](std::string t) {
+        for (char& c : t) c = char(std::tolower(static_cast<unsigned char>(c)));
+        return t;
+    };
+    const auto& inputs = (*dep)["inputs"].items();
+    std::vector<const Json*> comps;
+    for (const auto& id : inputs) comps.push_back(component(id.asNumber()));
+    auto typeOf = [&](size_t i) { return comps[i] ? (*comps[i])["type"].asString() : std::string(); };
+
+    // Slots first: by label, else by type, each input claimed once.
+    std::vector<const Json*> claimed(inputs.size(), nullptr);
+    std::vector<const GradioSlot*> owner(inputs.size(), nullptr);
+    for (const auto& slot : slots) {
+        size_t found = inputs.size();
+        for (int pass = 0; pass < 2 && found == inputs.size(); ++pass)
+            for (size_t i = 0; i < inputs.size(); ++i) {
+                if (owner[i] || typeOf(i) == "state") continue;
+                const bool hit = pass == 0 ? comps[i] && !slot.label.empty() &&
+                                                 lower((*comps[i])["props"]["label"].asString()) == lower(slot.label)
+                                           : !slot.type.empty() && typeOf(i) == slot.type;
+                if (hit) {
+                    found = i;
+                    break;
+                }
+            }
+        if (found == inputs.size() && slot.optional) continue;
+        if (found == inputs.size()) {
+            error = "This Space has no '" + (slot.label.empty() ? slot.type : slot.label) + "' input on '" + apiName + "' (it may have changed)";
+            return false;
+        }
+        owner[found] = &slot;
+    }
+
+    data = Json::array();
+    size_t next = 0;
+    for (size_t i = 0; i < inputs.size(); ++i) {
+        const std::string type = typeOf(i);
+        const Json fallback = comps[i] ? (*comps[i])["props"]["value"] : Json();
+        if (type == "state") data.push(fallback); // hidden from the public API; the server keeps it per session
+        else if (owner[i]) data.push(owner[i]->value);
+        else if (next < userArgs.size()) data.push(userArgs[next++]);
+        else data.push(fallback);
+    }
+    return true;
 }
 
 std::vector<std::string> GradioClient::headers(bool json) const {
@@ -100,36 +251,11 @@ std::string GradioClient::fileUrl(const Json& value) const {
 }
 
 bool GradioClient::call(const std::string& apiName, const std::vector<Json>& userArgs, std::vector<Json>& outputs,
-                        std::string& error, const std::function<void(const std::string&)>& onStatus) {
-    // Find the endpoint and build the full input list.
-    const Json& deps = config_["dependencies"];
-    const Json* dep = nullptr;
+                        std::string& error, const std::function<void(const std::string&)>& onStatus,
+                        const std::vector<GradioSlot>& slots, const std::function<bool()>& cancelled) {
+    Json data;
     int fnIndex = -1;
-    for (size_t i = 0; i < deps.size(); ++i)
-        if (deps[i]["api_name"].asString() == apiName) {
-            dep = &deps[i];
-            fnIndex = deps[i]["id"].isNumber() ? int(deps[i]["id"].asNumber()) : int(i);
-            break;
-        }
-    if (!dep) {
-        error = "This Space has no '" + apiName + "' endpoint (it may have changed)";
-        return false;
-    }
-    auto component = [&](double id) -> const Json* {
-        for (const auto& c : config_["components"].items())
-            if (c["id"].asNumber() == id) return &c;
-        return nullptr;
-    };
-    Json data = Json::array();
-    size_t next = 0;
-    for (const auto& id : (*dep)["inputs"].items()) {
-        const Json* c = component(id.asNumber());
-        const std::string type = c ? (*c)["type"].asString() : std::string();
-        const Json fallback = c ? (*c)["props"]["value"] : Json();
-        if (type == "state") data.push(fallback); // hidden from the public API; the server keeps it per session
-        else if (next < userArgs.size()) data.push(userArgs[next++]);
-        else data.push(fallback);
-    }
+    if (!gradioBuildInputs(config_, apiName, userArgs, slots, data, fnIndex, error)) return false;
 
     Json join = Json::object();
     join.set("data", data);
@@ -148,12 +274,18 @@ bool GradioClient::call(const std::string& apiName, const std::vector<Json>& use
 
     // Read server-sent events until our event completes.
     std::string buffer;
-    bool done = false, ok = false;
+    bool done = false, ok = false, gaveUp = false, stopped = false;
+    const auto joinedAt = std::chrono::steady_clock::now();
+    std::optional<std::chrono::steady_clock::time_point> started;
     auto h = headers(false);
     h.push_back("Accept: text/event-stream");
     HttpResponse s = httpRequestStream(
         "GET", root_ + prefix_ + "/queue/data?session_hash=" + sessionHash_, h, {}, 900, [&](const char* d, size_t n) {
             buffer.append(d, n);
+            // (the Space's heartbeat arrives every 15 s, so the connection never looks stalled: the clock is ours)
+            if (cancelled && cancelled()) return stopped = true, false;
+            if (std::chrono::steady_clock::now() - (started ? *started : joinedAt) > std::chrono::seconds(started ? kRunSeconds : kStartSeconds))
+                return gaveUp = true, false;
             size_t eol;
             while ((eol = buffer.find('\n')) != std::string::npos) {
                 std::string line = buffer.substr(0, eol);
@@ -166,8 +298,9 @@ bool GradioClient::call(const std::string& apiName, const std::vector<Json>& use
                 if (msg == "estimation" && onStatus) {
                     const int rank = int(m["rank"].asNumber(0));
                     onStatus(rank > 0 ? "In the free queue: " + std::to_string(rank) + " ahead of you" : "Starting...");
-                } else if (msg == "process_starts" && onStatus) {
-                    onStatus("Generating on " + root_.substr(root_.find("//") + 2) + "...");
+                } else if (msg == "process_starts") {
+                    started = std::chrono::steady_clock::now();
+                    if (onStatus) onStatus("Generating on " + root_.substr(root_.find("//") + 2) + "...");
                 } else if (msg == "progress" && onStatus) {
                     const Json& p = m["progress_data"][0];
                     if (p.isObject()) {
@@ -178,15 +311,7 @@ bool GradioClient::call(const std::string& apiName, const std::vector<Json>& use
                     }
                 } else if (msg == "process_completed") {
                     done = true;
-                    ok = m["success"].asBool(false);
-                    if (ok) {
-                        outputs = m["output"]["data"].items();
-                    } else {
-                        const Json& o = m["output"];
-                        error = friendlyGradioError(o["error"].isString() ? o["error"].asString()
-                                                    : m["title"].isString() ? m["title"].asString()
-                                                                            : std::string("The Space reported an error"));
-                    }
+                    ok = gradioCompleted(m, outputs, error);
                     return false; // stop reading
                 } else if (msg == "close_stream") {
                     return false;
@@ -194,6 +319,15 @@ bool GradioClient::call(const std::string& apiName, const std::vector<Json>& use
             }
             return true;
         });
+    if (stopped) {
+        error = "Cancelled";
+        return false;
+    }
+    if (gaveUp) {
+        error = root_.substr(root_.find("//") + 2) + " isn't answering (" + (started ? "no result" : "still queued") + " after " +
+                std::to_string((started ? kRunSeconds : kStartSeconds) / 60) + " minutes)";
+        return false;
+    }
     if (!done) {
         error = friendlyGradioError(s.error.empty() ? "The Space closed the connection without a result" : "Connection lost: " + s.error);
         return false;
@@ -201,19 +335,7 @@ bool GradioClient::call(const std::string& apiName, const std::vector<Json>& use
     if (!ok) return false;
 
     // Remember the first 3D model (or file) output.
-    lastModelUrl_.clear();
-    const Json& outs = (*dep)["outputs"];
-    for (int pass = 0; pass < 2 && lastModelUrl_.empty(); ++pass)
-        for (size_t i = 0; i < outputs.size() && i < outs.size(); ++i) {
-            const Json* c = component(outs[i].asNumber());
-            const std::string type = c ? (*c)["type"].asString() : std::string();
-            const bool modelType = type == "model3d" || type == "litmodel3d";
-            if ((pass == 0 && modelType) || (pass == 1 && type == "file"))
-                if (isFileData(unwrap(outputs[i]))) {
-                    lastModelUrl_ = fileUrl(outputs[i]);
-                    break;
-                }
-        }
+    lastModelUrl_ = gradioModelUrl(config_, apiName, outputs, root_ + prefix_);
     return true;
 }
 

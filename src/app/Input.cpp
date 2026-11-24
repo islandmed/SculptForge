@@ -18,6 +18,7 @@
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/FaceGroups.h"
+#include "core/Micro.h"
 
 #include <IconsLucide.h>
 
@@ -30,6 +31,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <tuple>
 
 namespace sf {
 
@@ -40,6 +42,8 @@ constexpr double kQuickMenuTapSeconds = 0.25; // Space released sooner: a tap, t
 bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; } // as App.cpp
 
 bool anyMasked(const Mesh& mesh) {
+    if (mesh.micro && std::any_of(mesh.micro->mask.begin(), mesh.micro->mask.end(), [](uint8_t m) { return m > 0; }))
+        return true; // (a micro level's own mask: Ctrl+W groups from it, core/FaceGroups.cpp groupsFromMask)
     return std::any_of(mesh.mask.begin(), mesh.mask.end(), [](float m) { return m > 0.0f; });
 }
 
@@ -336,10 +340,23 @@ void App::registerViewActions() {
     add("view.opposite", "Opposite side", "Numpad 9", "Look at the model from the other side.", [this] {
         camera_.setOrientation(camera_.orientation() * glm::angleAxis(glm::pi<float>(), glm::vec3(0, 1, 0)));
     });
-    add("view.zoom_in", "Zoom in", "Numpad Plus", "Move the view closer.", [this] { camera_.zoom(1.0f); });
-    add("view.zoom_out", "Zoom out", "Numpad Minus", "Move the view back.", [this] { camera_.zoom(-1.0f); });
+    add("view.zoom_in", "Zoom in", "Numpad Plus", "Move the view closer.", [this] { keyNavStep("view.zoom_in"); });
+    add("view.zoom_out", "Zoom out", "Numpad Minus", "Move the view back.", [this] { keyNavStep("view.zoom_out"); });
+    // Pan and zoom by key (Artizmo on Discord): holding the key glides, easing in and out (updateKeyNav, Speed in
+    // Preferences > Input). Zoom in and out above hold the same way.
+    for (const auto& [id, label, key, text] : {std::tuple{"view.pan_left", "Pan left", "Ctrl+Numpad 4",
+                                                          "Slide the view left. Hold the key to keep moving; Speed is in Preferences > Input."},
+                                                std::tuple{"view.pan_right", "Pan right", "Ctrl+Numpad 6",
+                                                           "Slide the view right. Hold the key to keep moving; Speed is in Preferences > Input."},
+                                                std::tuple{"view.pan_up", "Pan up", "Ctrl+Numpad 8",
+                                                           "Slide the view up. Hold the key to keep moving; Speed is in Preferences > Input."},
+                                                std::tuple{"view.pan_down", "Pan down", "Ctrl+Numpad 2",
+                                                           "Slide the view down. Hold the key to keep moving; Speed is in Preferences > Input."}})
+        add(id, label, key, text, [this, id = std::string(id)] { keyNavStep(id); });
     add("view.frame_selected", "Frame Part", "Numpad .", "Fit the active Part in the view (Blender: View Selected; "
         "Maya keys: Alt+F).", [this] { frameActivePart(); });
+    add("view.frame_last_stroke", "Frame last stroke", "", "Move in on where you last sculpted (no key by default: bind one "
+        "in Preferences > Hotkeys). The view keeps its angle; Frame fits the whole model.", [this] { frameLastStroke(); });
     add("view.reset", "Reset view", "", "Back to the view a new model opens with: from the front, in perspective, "
         "the whole model in view (Maya keys: Alt+H).", [this] { resetView(); });
     // Saved views (from a review: "custom cam views, like Blender"): named cameras, kept with the project.
@@ -427,7 +444,7 @@ void App::applyInputStyle() {
     static const std::pair<BrushType, const char*> kBlenderBrushes[] = {
         {BrushType::Standard, "V"}, {BrushType::Smooth, "S"},        {BrushType::Pinch, "P"},
         {BrushType::Inflate, "I"},  {BrushType::Move, "G"},          {BrushType::Flatten, "Shift+T"},
-        {BrushType::ClayBlock, "C"}, {BrushType::Crease, "Shift+C"}, {BrushType::SnakeHook, "K"},
+        {BrushType::ClayBlock, "C"}, {BrushType::Crease, "Shift+C"}, {BrushType::Tendril, "K"},
     };
     for (int i = 0; i < int(BrushType::Count); ++i) {
         std::string key = sf && i < 10 ? (i < 9 ? std::to_string(i + 1) : "0") : "";
@@ -452,6 +469,114 @@ void App::viewAxis(float yawDegrees, float pitchDegrees) {
     }
 }
 
+// A press of a pan or zoom key only notes the press: it counts as held for kKeyNavTapSeconds at least, so a tap (down and
+// up inside one frame) still glides the view a little; updateKeyNav does the moving.
+void App::keyNavStep(const std::string& id) { keyNavTap_[id] = kKeyNavTapSeconds; }
+
+// Once a frame, in the app's own loop and the UI test runner's (a first key of a two-key shortcut that waited its
+// half second out runs alone; the registry counts the frames' time, a hitch counts as 0.1 s at most).
+void App::tickKeySequence(float dt) {
+    actions_.setSequenceWindow(uiPrefs_.twoKeyWindow);
+    actions_.tick(std::min(dt, 0.1f));
+}
+
+// Once a frame: each pan and zoom key that is down (whatever chord it is bound to, in every key style) eases up to its
+// speed over kKeyNavEaseSeconds and back down after its release, moving the view by speed * time: smooth, the same
+// distance at any frame rate, and nothing to do with the OS's key repeat.
+void App::updateKeyNav(float dt) {
+    const bool blocked = ImGui::GetIO().WantCaptureKeyboard || !capturingShortcut_.empty() || shortcutConflictOpen();
+    // (a hitch of a frame is not a jump of the view; and the frame a press wakes the idle loop with has waited since the
+    // last one: it counts as one 60 Hz frame)
+    dt = std::min(dt, keyNavMoving_ ? 0.1f : 1.0f / 60.0f);
+    keyNavMoving_ = false;
+    float px = 0.0f, py = 0.0f, zoom = 0.0f;
+    bool any = false;
+    for (const char* id : {"view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down", "view.zoom_in", "view.zoom_out"}) {
+        float& tap = keyNavTap_[id];
+        bool on = tap > 0.0f && !blocked;
+        tap = blocked ? 0.0f : std::max(0.0f, tap - dt);
+        if (!blocked)
+            for (const Chord& c : parseChords(actions_.shortcutText(id)))
+                for (const auto& [key, mods] : keysDown_) { // (key events, not the keyboard state: focus loss clears them)
+                    const bool ctrl = mods & (SDL_KMOD_CTRL | SDL_KMOD_GUI), shift = mods & SDL_KMOD_SHIFT, alt = mods & SDL_KMOD_ALT;
+                    if (key == c.key && c.ctrl == ctrl && c.shift == shift && c.alt == alt) on = true;
+                }
+        const float seconds = keyNavEase_[id].advance(on, dt);
+        float x, y, z;
+        if (seconds <= 0.0f || !keyNavMotion(actions_.find(id), x, y, z)) continue;
+        px += x * seconds, py += y * seconds, zoom += z * seconds;
+        any = true;
+    }
+    if (!any) return;
+    const float k = std::clamp(uiPrefs_.keyNavSpeed, 0.1f, 5.0f);
+    if (px != 0.0f || py != 0.0f) camera_.pan(px * k, py * k, canvasHeight());
+    if (zoom != 0.0f) camera_.zoom(zoom * k);
+    keyNavMoving_ = true;
+    regrabAfterViewMove();
+}
+
+// --measure-key-nav (ui_key_nav_loop): in the interactive frame loop, tap and hold each pan and zoom action on its default
+// key and again rebound, and check the view moved (a hold: while the key is still down too). The UI test runner has a
+// frame loop of its own, so only this catches a loop that never calls updateKeyNav (0.12.5: no pan or zoom key worked).
+int App::measureKeyNavStep(bool& draw) {
+    static const char* const kIds[] = {"view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down", "view.zoom_in", "view.zoom_out"};
+    static const char* const kRebound[] = {"J", "L", "I", "K", "P", "O"};
+    KeyNavProbe& p = keyNavProbe_;
+    const double now = double(SDL_GetTicksNS()) * 1e-9;
+    const int total = 4 * 6;
+    const auto moved = [&] {
+        return glm::length(camera_.target - p.target) > 1e-5f || std::abs(camera_.distance - p.distance) > 1e-4f * p.distance;
+    };
+    const auto send = [&](bool down) {
+        const auto chords = parseChords(actions_.shortcutText(kIds[p.caseIndex % 6]));
+        if (chords.empty()) return;
+        SDL_Event e{};
+        e.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+        e.key.windowID = SDL_GetWindowID(window_);
+        e.key.key = chords[0].key;
+        e.key.scancode = SDL_GetScancodeFromKey(chords[0].key, nullptr);
+        e.key.mod = down ? SDL_Keymod((chords[0].ctrl ? SDL_KMOD_LCTRL : 0) | (chords[0].shift ? SDL_KMOD_LSHIFT : 0) |
+                                      (chords[0].alt ? SDL_KMOD_LALT : 0))
+                         : SDL_KMOD_NONE;
+        e.key.down = down;
+        handleEvent(e);
+        draw = true; // (as the loop does for an event)
+        activeUntil_ = std::max(activeUntil_, now + 0.75);
+    };
+    const bool hold = (p.caseIndex / 6) % 2 == 1;
+    if (p.stage == 0) {
+        if (p.caseIndex == 2 * 6 && !p.rebound) { // the second half: other keys
+            p.rebound = true;
+            for (int i = 0; i < 6; ++i) actions_.assignShortcut(kIds[i], kRebound[i]);
+        }
+        p.target = camera_.target;
+        p.distance = camera_.distance;
+        p.movedWhileHeld = false;
+        send(true);
+        if (!hold) send(false); // a tap: down and up inside one pass of the loop
+        p.stage = hold ? 1 : 2;
+        p.stageAt = now;
+    } else if (p.stage == 1) {
+        if (now - p.stageAt >= 0.3 && moved()) p.movedWhileHeld = true;
+        if (now - p.stageAt >= 0.4) {
+            send(false);
+            p.stage = 2;
+            p.stageAt = now;
+        }
+    } else if (now - p.stageAt >= 0.6) {
+        const bool ok = moved() && (!hold || p.movedWhileHeld);
+        std::printf("KeyNav: %-14s %s %-7s %s\n", kIds[p.caseIndex % 6], hold ? "hold" : "tap ", p.rebound ? "rebound" : "default",
+                    ok ? "moved the view" : hold && moved() ? "STOOD STILL while held" : "STAYED PUT");
+        p.failures += ok ? 0 : 1;
+        p.stage = 0;
+        if (++p.caseIndex == total) {
+            std::printf("KeyNav: %s\n", p.failures ? "FAILED" : "OK");
+            return p.failures ? 1 : 0;
+        }
+    }
+    return -1;
+}
+
 void App::viewOrbitStep(float yawDegrees, float pitchDegrees) {
     // Yaw about the world's up axis, pitch about the view's own right axis (Blender's numpad orbit).
     camera_.setOrientation(glm::angleAxis(glm::radians(yawDegrees), glm::vec3(0, 1, 0)) * camera_.orientation() *
@@ -462,10 +587,60 @@ void App::viewOrbitStep(float yawDegrees, float pitchDegrees) {
     }
 }
 
+void App::frameKeyPress() {
+    const Uint64 now = clickClockNs();
+    const Uint64 window = Uint64(uiPrefs_.frameDoubleTapMs) * 1000000ull;
+    const bool twice = lastFrameKeyNs_ != 0 && now - lastFrameKeyNs_ < window;
+    lastFrameKeyNs_ = twice ? 0 : now;
+    if (!classicStyle() || window == 0 || doc_.partCount() < 2 || twice) frameView(sceneBounds());
+    else frameActivePart();
+}
+
 void App::frameActivePart() {
     const AABB b = doc_.partBounds(doc_.activePart); // (where it is: a moved linked copy, #94)
     if (b.valid()) frameView(b);
     else frameView(sceneBounds());
+    noteViewInsideAnotherPart();
+}
+
+// A Part inside another (an eye in its socket): Frame puts the camera a few eye-widths away, which is inside the
+// head, and the view fills with the head's inner wall (its back faces, lit from outside: a dark slab). The brush still
+// works on the active Part there; the Part around it only needs to go out of the way.
+void App::noteViewInsideAnotherPart() {
+    if (doc_.partCount() < 2) return;
+    const int around = partEnclosing(doc_, camera_.position(), doc_.activePart);
+    if (around < 0) return;
+    status_ = "Inside " + doc_.parts[size_t(around)].name + ": Solo " + doc_.activePartInfo().name + " to see it";
+}
+
+// A press that started no stroke because the pointer is over another Part, not the one being sculpted (brushes work
+// on the active Part only; the press orbits instead). Said once per press, so "the pen can't sculpt" has an answer.
+void App::notePressOnAnotherPart(float x, float y) {
+    if (doc_.partCount() < 2 || !doc_.activePartInfo().visible) return;
+    const int other = pickPart(x, y);
+    if (other < 0 || other == doc_.activePart) return;
+    const uint64_t key = uint64_t(doc_.activePartInfo().id) << 32 | doc_.parts[size_t(other)].id;
+    const Uint64 now = clickClockNs();
+    if (key == pressHintKey_ && pressHintNs_ != 0 && now - pressHintNs_ < 30000000000ull) return;
+    pressHintKey_ = key;
+    pressHintNs_ = now;
+    status_ = doc_.parts[size_t(other)].name + " is in front: Alt+Q selects it";
+}
+
+// Close in on the last stroke's place (the view's angle stays): a box round it a tenth the size of its Part.
+void App::frameLastStroke() {
+    const auto p = lastStrokePoint();
+    if (!p) {
+        status_ = "No stroke to frame yet";
+        return;
+    }
+    const AABB part = doc_.partBounds(lastStrokePart_);
+    const float r = std::max(glm::length(part.extent()) * 0.05f, 1e-4f);
+    AABB box;
+    box.expand(*p - glm::vec3(r));
+    box.expand(*p + glm::vec3(r));
+    frameView(box);
+    status_ = "Framed the last stroke";
 }
 
 SDL_Keymod App::blenderMods(SDL_Keymod keyboard) const {
@@ -571,6 +746,15 @@ void App::drawInputSection() {
         if (ImGui::Checkbox(tr("Emulate Numpad"), &emulate)) uiPrefs_.emulateNumpad = emulate;
         ui::HelpAction(*this, "input.emulate_numpad");
     }
+    if (classicStyle()) {
+        float tap = float(uiPrefs_.frameDoubleTapMs);
+        ImGui::SetNextItemWidth(160.0f * uiScale_);
+        if (ui::SliderInside("##input.frame_tap", &tap, 0.0f, 1000.0f, tr("Frame double-tap %.0f ms")))
+            uiPrefs_.frameDoubleTapMs = int(tap);
+        ui::HelpText("Frame double-tap", nullptr,
+                     "With several Parts, F frames the active Part and F twice within this time frames the whole "
+                     "scene. 0: F always frames the whole scene.", "");
+    }
     bool rightClickMenu = uiPrefs_.rightClickQuickMenu;
     if (ui::Checkbox("Right click opens the Quick Menu##input.right_click_menu", &rightClickMenu))
         uiPrefs_.rightClickQuickMenu = rightClickMenu;
@@ -599,6 +783,30 @@ void App::drawInputSection() {
     }
     ui::Checkbox("Invert zoom##input.invert_zoom", &uiPrefs_.invertZoom);
     ui::HelpText("Invert zoom", nullptr, "Turn zoom drags around (the mouse wheel stays as it is).", "Preferences > Input");
+    ui::Checkbox("Invert twist##input.invert_twist", &uiPrefs_.invertTwist);
+    ui::HelpText("Invert twist", nullptr,
+                 "Roll the view against your fingers when you twist two fingers on a touch screen or trackpad. Off: the "
+                 "view rolls with them. A rotation lock (Turntable, X or Z axis) ignores the twist.",
+                 "Preferences > Input");
+    {
+        ImGui::TextDisabled("%s", tr("Two-key window"));
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        ImGui::SliderFloat("##input.two_key_window", &uiPrefs_.twoKeyWindow, kKeySequenceMin, kKeySequenceMax, "%.2f s");
+        ui::HelpText("Two-key window", nullptr,
+                     "How long the second key of a two-key shortcut (\"C then V\") has after the first, whether you press "
+                     "the two together (either one first) or tap them in a row. A key that is part of a two-key shortcut "
+                     "runs its own action once this time is up; every other key runs at once.",
+                     "Preferences > Input");
+    }
+    {
+        ImGui::TextDisabled("%s", tr("Pan and zoom key speed"));
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        ImGui::SliderFloat("##input.key_nav_speed", &uiPrefs_.keyNavSpeed, 0.1f, 5.0f, "%.1fx", ImGuiSliderFlags_Logarithmic);
+        ui::HelpText("Pan and zoom key speed", nullptr,
+                     "How fast the view moves while a Pan or Zoom key is held (Ctrl+Numpad 4, 6, 8 and 2 pan; Numpad Plus "
+                     "and Minus zoom; rebind them in Hotkeys). 1x is a screen in about two seconds.",
+                     "Preferences > Input");
+    }
     ui::Checkbox("Wheel zooms toward the pointer##input.wheel_to_pointer", &uiPrefs_.wheelZoomToPointer);
     ui::HelpText("Wheel zooms toward the pointer", nullptr,
                  "The mouse wheel zooms toward the point of the model under the pointer, which stays under it, instead "
@@ -616,6 +824,19 @@ void App::drawInputSection() {
                      "(Alt; Ctrl in the Blender and Maya styles), the surface moves along the average normal under the "
                      "brush instead of across the screen, so it pulls straight out of the surface or pushes straight "
                      "in. Always: every stroke of those brushes does; Never: the key does nothing for them.",
+                     "Preferences > Input");
+    }
+    {
+        ImGui::TextDisabled("%s", tr("Slide Stamp rotates with"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1);
+        const std::string keys = std::string(tr("Shift")) + '\0' + tr("Ctrl") + '\0' + tr("Alt") + '\0' + tr("Off") + '\0';
+        ImGui::Combo("##input.slide_rotate", &uiPrefs_.slideRotateKey, keys.c_str());
+        ui::HelpText("Slide Stamp rotates with", nullptr,
+                     "With the Slide Stamp stroke, hold this key after the stroke has begun and the stamp stays where it is while "
+                     "its alpha turns toward the cursor; let go and it slides on with that turn. Held at the press it keeps its own "
+                     "meaning (Shift smooths, Ctrl masks, Alt inverts). The turn belongs to that stroke: the brush's Angle is not "
+                     "changed. Off: the key does nothing here.",
                      "Preferences > Input");
     }
     bool airStrokes = uiPrefs_.airStrokes;
@@ -638,6 +859,24 @@ void App::drawInputSection() {
                  "stays upright, as in Blender or Maya. X axis, Z axis: it turns about that world axis only "
                  "(View > Orbit lock).",
                  "Preferences > Input");
+    ui::Checkbox("Orbit around the pointer##input.orbit_at_pointer", &uiPrefs_.orbitAtPointer);
+    ui::HelpText("Orbit around the pointer", nullptr,
+                 "A rotation that starts over the model turns the view about the point under the pointer, and later "
+                 "zooms work at that depth. Started over the background, it turns about the middle of the view while that is "
+                 "on the model; when it is on empty space, it turns about where you last sculpted (if that is in view) "
+                 "or the middle of the model, so the model stays put. In every key style.",
+                 "Preferences > Input");
+    {
+        ImGui::TextDisabled("%s", tr("Mouse orbit speed"));
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        ImGui::SliderFloat("##input.mouse_orbit_speed", &uiPrefs_.mouseOrbitSpeed, kMouseOrbitSpeedMin, kMouseOrbitSpeedMax,
+                           "%.2fx", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
+        ui::HelpText("Mouse orbit speed", nullptr,
+                     "How far the view turns for each pixel a mouse or trackpad rotation drag moves, in every key style. 1x "
+                     "is the usual turn; lower it if the view spins too fast. The pen has its own View speed in "
+                     "Preferences > Tablet.",
+                     "Preferences > Input");
+    }
     drawRadialMenusSection(); // RadialMenu.cpp
     drawSpaceMouseSection();  // SpaceMouse.cpp
 }
@@ -666,17 +905,22 @@ void App::drawCursorSection() {
 }
 
 void App::drawZIntensitySlider(const char* id) {
-    const bool smooth = activeBrush() == BrushType::Smooth && drag_ != Drag::Stroke;
-    float& value = intensityValue(smooth);
+    // The stroke's own brush while one runs: the press must not turn the readout back to the main Intensity (#180).
+    const bool smooth = (drag_ == Drag::Stroke ? strokeBrush_ : activeBrush()) == BrushType::Smooth;
+    float& value = heldIntensity(); // the main one, Smooth's own, or the Shift / Ctrl brush's own (ModifierBrush.cpp)
+    const std::string name = heldIntensityName();
     float shown = value * 100.0f;
-    if (ui::SliderInside(id, &shown, 1.0f, 100.0f, smooth ? "Smooth Intensity %.0f" : "Intensity %.0f"))
+    if (ui::SliderInside(id, &shown, 1.0f, 100.0f, (name + " %.0f").c_str()))
         value = std::clamp(shown / 100.0f, 0.01f, 1.0f);
-    ui::HelpText(smooth ? "Smooth Intensity" : "Intensity", "U",
-                 smooth       ? "How strongly Smooth works. Smooth keeps its own value: hold Shift to see and "
-                                "set it. Ctrl+click to type."
+    ui::HelpText(name.c_str(), "U",
+                 smooth ? "How strongly Smooth works. Smooth keeps its own value: hold Shift to see and "
+                          "set it. Ctrl+click to type."
+                 : name != "Intensity"
+                     ? "How strongly the Shift / Ctrl brush works. It keeps its own value: hold its key to see and set it. "
+                       "Ctrl+click to type."
                  : paintMode_ ? "How strongly painting colours the surface (1-100); Ctrl+click to type."
-                              : "How strongly each dab changes the surface (1-100). Holding Shift shows Smooth's own value. "
-                                "Ctrl+click to type.",
+                              : "How strongly each dab changes the surface (1-100). Holding Shift shows the Shift brush's own "
+                                "value. Ctrl+click to type.",
                  "Draw");
 }
 
@@ -740,7 +984,7 @@ void App::openQuickMenu() {
 
 void App::rightClickRelease() {
     const bool click = rightClick_.pending;
-    rightClick_.pending = false;
+    rightClick_.pending = rightClick_.down = false;
     if (zsMenu_.armed) { // on a Forge Sphere: its menu instead (PanelForge Spheres.cpp)
         zsMenu_.armed = false;
         zsMenu_.open = click;
@@ -806,10 +1050,11 @@ void App::drawQuickMenu() {
         if (ui::SliderInside("##qm_focal", &focal, -100.0f, 100.0f, "Falloff %.0f")) focalShift_ = focal / 100.0f;
         ui::HelpText("Falloff", "O", "Below 0: a broad, hard tip. Above 0: a soft point.", "Quick Menu");
         const bool smooth = activeBrush() == BrushType::Smooth;
-        float& zValue = intensityValue(smooth);
+        float& zValue = heldIntensity(); // (Smooth's or the Shift / Ctrl brush's own while its key is held)
+        const std::string zName = heldIntensityName() + " %.0f";
         float z = zValue * 100.0f;
         ImGui::SetNextItemWidth(sw);
-        if (ui::SliderInside("##qm_z", &z, 1.0f, 100.0f, smooth ? "Smooth Intensity %.0f" : "Intensity %.0f"))
+        if (ui::SliderInside("##qm_z", &z, 1.0f, 100.0f, zName.c_str()))
             zValue = z / 100.0f;
         ui::HelpText("Intensity", "U",
                      paintMode_ && !smooth ? "How strongly painting colours the surface." : "How strongly the brush changes the surface.",

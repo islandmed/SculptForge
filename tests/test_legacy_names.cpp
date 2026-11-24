@@ -5,11 +5,16 @@
 // words are spelled only in docs/legal/trademarks.md, so these tests take them from there.
 #include "TestHarness.h"
 
+#include "app/UiLayout.h"
+#include "core/BrushLibrary.h"
+#include "core/BrushSettings.h"
 #include "core/Commands.h"
 #include "core/LegacyNames.h"
 #include "core/Sculpt.h"
 
+#include <algorithm>
 #include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <map>
@@ -18,6 +23,7 @@
 #include <string>
 
 using namespace sf;
+namespace fs = std::filesystem;
 
 namespace {
 
@@ -101,6 +107,36 @@ TEST(legacy_names_read_old_files_and_scripts) {
     CHECK(!missing.ok && missing.message.find(capitalised(old.at("classic"))) != std::string::npos);
 }
 
+// Tendril's old name: the brush by name, its command id and radial/shelf ids, and the built-in brush's saved settings
+// (the file older versions wrote) all still load.
+TEST(legacy_tendril_old_name_still_loads) {
+    const auto words = oldWords();
+    const auto it = words.find("tendril");
+    CHECK(it != words.end());
+    if (it == words.end()) return;
+    const std::string old = it->second;
+    BrushType t = BrushType::Standard;
+    CHECK(brushFromName(old, t) && t == BrushType::Tendril);
+    t = BrushType::Standard;
+    CHECK(brushFromName(capitalised(old), t) && t == BrushType::Tendril);
+    CHECK(legacy::modernizeId("brush." + old) == "brush.tendril");
+    CHECK(legacy::modernize("builtin:" + capitalised(old)) == "builtin:Tendril");
+    // A custom brush called after the old name keeps its name and key.
+    CHECK(legacy::modernizeId("brush.recipe." + capitalised(old)) == "brush.recipe." + capitalised(old));
+
+    Json j;
+    std::string err;
+    CHECK(Json::parse(R"({"brushes":{"builtin:)" + capitalised(old) + R"(":{"draw_size":77},"custom:)" + capitalised(old) +
+                          R"(":{"draw_size":55}}})",
+                      j, err));
+    BrushSettingsStore store;
+    store.applyJson(j);
+    BrushToolSettings s;
+    CHECK(store.savedFor("builtin:Tendril", s) && s.radiusPx == 77.0f);
+    CHECK(store.savedFor("custom:" + capitalised(old), s) && s.radiusPx == 55.0f);
+    CHECK(!store.savedFor("builtin:" + capitalised(old), s));
+}
+
 // Whole names (kNames): the old name, in any case, is today's; the word alone, or inside another name (a user's own
 // brush), stays as it is.
 TEST(legacy_whole_names_match_the_trademarks_table) {
@@ -156,4 +192,86 @@ TEST(legacy_extract_arguments) {
     const size_t today = quads("triangle_corners", "triangle_border");
     CHECK(quads(was["triangle_corners"], was["triangle_border"]) == today);
     CHECK(quads("no_corners", "no_border") > today); // (names it doesn't know: the rim stays quads)
+}
+
+// A custom brush's name is the user's own text: a brush called after an old word (the first of the table, in a made-up
+// name) keeps its shelf slot and its key. The layout loader used to rewrite it to today's spelling, so the slot looked for
+// a name no brush file has and showed "missing" with the file still in the library.
+TEST(legacy_names_leave_custom_brush_names_alone) {
+    const auto old = oldWords();
+    if (!old.count("classic")) {
+        CHECK(false);
+        return;
+    }
+    const std::string name = "Polish - " + capitalised(old.at("classic")) + " Soft"; // made up
+    const std::string today = "Polish - Classic Soft";
+    CHECK(legacy::modernize(name) == today); // the rewrite itself is right for SculptForge's own words
+    for (const std::string prefix : {"brush.recipe.", "recipe:", "brush.file.", "file:"}) {
+        CHECK(legacy::modernizeId(prefix + name) == prefix + name);
+        CHECK(legacy::modernizeId(prefix + "Plain") == prefix + "Plain");
+    }
+    CHECK(legacy::modernizeId("brush." + old.at("sharpcrease")) == "brush.sharpcrease"); // ids still map
+    CHECK(legacy::modernizeId("brush.recipe.Stone Carve") == "brush.recipe.Stone Carve");
+
+    // The layout file: the shelf item and the slot's learned id keep the typed name.
+    UiLayout l = standardLayout();
+    l.bottomShelf.push_back("brush.recipe." + name);
+    l.bottomShelf.push_back("recipe:" + name);
+    l.brushIds[name] = "0123456789abcdef";
+    Json ui = Json::object();
+    ui.set("layout", toJson(l));
+    ui = legacy::modernizeKeys(ui); // what App::readUiConfig does to the whole file
+    UiLayout back;
+    std::string err;
+    CHECK(fromJson(ui["layout"], back, err));
+    CHECK(std::find(back.bottomShelf.begin(), back.bottomShelf.end(), "brush.recipe." + name) != back.bottomShelf.end());
+    CHECK(std::find(back.bottomShelf.begin(), back.bottomShelf.end(), "recipe:" + name) != back.bottomShelf.end());
+    CHECK(back.brushIds.count(name) == 1 && back.brushIds[name] == "0123456789abcdef");
+}
+
+// The slot of a brush called after an old word, end to end: install, put on the shelf, save and read the layout, restart.
+// A slot a version that rewrote the name already saved (today's spelling, no id) still finds the brush and then follows it.
+TEST(brush_slot_of_a_brush_named_after_an_old_word_survives_restart) {
+    const auto old = oldWords();
+    if (!old.count("classic")) {
+        CHECK(false);
+        return;
+    }
+    const std::string name = "Polish - " + capitalised(old.at("classic")) + " Soft";
+    const fs::path root = fs::temp_directory_path() / "sculptforge_oldword_slot";
+    fs::remove_all(root);
+    BrushLibraryPaths paths;
+    paths.userDir = (root / "user").string();
+    Document doc;
+    loadBrushLibrary(doc, paths);
+    BrushRecipe r;
+    r.name = name;
+    std::string err, note;
+    const int made = installBrush(doc, r, err, false, paths);
+    CHECK(err.empty() && made >= 0 && !doc.brushes[size_t(made)].id.empty());
+    const std::string id = doc.brushes[size_t(made)].id;
+
+    // Shelf and ids written, read back the way the app reads ui.json, the library loaded again.
+    UiLayout l = standardLayout();
+    l.bottomShelf.push_back("brush.recipe." + name);
+    l.brushIds[name] = id;
+    Json ui = legacy::modernizeKeys(toJson(l));
+    UiLayout back;
+    CHECK(fromJson(ui, back, err));
+    Document restarted;
+    loadBrushLibrary(restarted, paths);
+    const std::string item = back.bottomShelf.back();
+    const std::string slotName = item.substr(std::string("brush.recipe.").size());
+    CHECK(slotName == name);
+    const int found = findBrushForSlot(restarted, slotName, back.brushIds.count(slotName) ? back.brushIds[slotName] : "");
+    CHECK(found >= 0 && restarted.brushes[size_t(found)].name == name);
+
+    // A slot with no id (never found since it was made) in today's spelling: found by the file's name through the rewrite.
+    CHECK(findBrushForSlot(restarted, "Polish - Classic Soft", "") >= 0);
+    CHECK(relinkBrush(restarted, "Polish - Classic Soft", "", note, paths) >= 0);
+    Document cold; // not loaded yet: the library is searched
+    CHECK(relinkBrush(cold, "Polish - Classic Soft", "", note, paths) >= 0);
+    CHECK(relinkBrush(cold, "Polish - Other Soft", "", note, paths) < 0); // a different brush is never taken for it
+    CHECK(describeMissingSlot(cold, "Polish - Other Soft", "").find("Polish - Other Soft") != std::string::npos);
+    fs::remove_all(root);
 }

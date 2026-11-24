@@ -9,11 +9,14 @@
 
 #include "app/AssetLibrary.h"
 #include "app/BrushPreview.h"
+#include "core/Image.h"
+#include "core/Primitives.h"
 #include "core/Sculpt.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 
 using namespace sf;
 
@@ -84,8 +87,216 @@ TEST(brush_previews) {
         if (t != kPaintBrush) CHECK(s.lift > 0.01f); // every brush leaves a mark
     }
     // Tendril and Elastic Tendril pull a horn well past the silhouette, as a drag in the viewport does.
-    for (BrushType t : {BrushType::SnakeHook, BrushType::KelvinSnake}) {
+    for (BrushType t : {BrushType::Tendril, BrushType::KelvinSnake}) {
         const auto mesh = sculptBrushPreview(nullptr, int(t));
         CHECK(mesh && measure(*mesh).reach >= 0.25f);
+    }
+}
+
+// #208: a brush's thumbnail shows its alpha pressed into the ball in the brush's own stroke type, so brushes that
+// differ only by alpha tell apart at a glance.
+namespace {
+
+// How far apart two previews are (they share the ball's topology): the summed distance between their vertices.
+float apart(const Mesh& a, const Mesh& b) {
+    if (a.positions.size() != b.positions.size()) return 1e9f;
+    float sum = 0.0f;
+    for (size_t i = 0; i < a.positions.size(); ++i) sum += glm::length(a.positions[i] - b.positions[i]);
+    return sum;
+}
+
+std::unique_ptr<Mesh> withLook(const BrushRecipe* recipe, int type, const BrushToolSettings& s) {
+    AlphaLook look;
+    if (!makeAlphaLook(s, look)) return nullptr;
+    return sculptBrushPreview(recipe, type, &look);
+}
+
+BrushToolSettings settingsWith(const char* alpha, StrokeType stroke = StrokeType::Dots) {
+    BrushToolSettings s;
+    s.alphaName = alpha;
+    s.stroke = stroke;
+    return s;
+}
+
+} // namespace
+
+TEST(brush_preview_alpha_in_every_stroke_type) {
+    BrushRecipe recipe;
+    recipe.name = "Alpha Test";
+    const auto plain = sculptBrushPreview(&recipe, 0);
+    CHECK(plain != nullptr);
+    std::vector<std::unique_ptr<Mesh>> seen;
+    for (int st = 0; st < int(StrokeType::Count); ++st) {
+        for (const char* alpha : {"Scales", "Rivets", "Cracks"}) {
+            const auto mesh = withLook(&recipe, 0, settingsWith(alpha, StrokeType(st)));
+            CHECK(mesh != nullptr);
+            if (!mesh) continue;
+            const PreviewShape s = measure(*mesh);
+            if (std::getenv("SF_BRUSH_PREVIEW_METRICS"))
+                std::printf("  %-10s %-8s lift %.3f reach %.3f degenerate %d folded %d\n", strokeTypeName(StrokeType(st)), alpha,
+                            s.lift, s.reach, s.degenerate, s.folded);
+            CHECK(s.degenerate == 0);
+            CHECK(s.folded == 0);
+            CHECK(s.lift > 0.01f); // it leaves a mark...
+            CHECK(s.lift < 0.45f); // ...and no spike through the ball
+            CHECK(apart(*mesh, *plain) > 0.5f); // not the brush's plain thumbnail
+        }
+    }
+}
+
+TEST(brush_preview_alpha_differs_by_alpha_stroke_angle_and_tile) {
+    BrushRecipe recipe;
+    recipe.name = "Alpha Test";
+    const auto scales = withLook(&recipe, 0, settingsWith("Scales"));
+    const auto rivets = withLook(&recipe, 0, settingsWith("Rivets"));
+    CHECK(scales && rivets && apart(*scales, *rivets) > 0.5f);
+    // The stroke type: Dots, Drag Stamp, Drag Dot and Spray each leave their own mark with the same alpha.
+    std::vector<std::unique_ptr<Mesh>> byStroke;
+    for (StrokeType st : {StrokeType::Dots, StrokeType::DragRect, StrokeType::DragDot, StrokeType::Spray})
+        byStroke.push_back(withLook(&recipe, 0, settingsWith("Wrinkles", st)));
+    for (size_t i = 0; i < byStroke.size(); ++i)
+        for (size_t j = i + 1; j < byStroke.size(); ++j)
+            CHECK(byStroke[i] && byStroke[j] && apart(*byStroke[i], *byStroke[j]) > 0.5f);
+    // Angle turns a stamp; Tile repeats the alpha inside it.
+    BrushToolSettings stamp = settingsWith("Wrinkles", StrokeType::DragRect);
+    const auto upright = withLook(&recipe, 0, stamp);
+    stamp.alphaOptions.angle = 90.0f;
+    const auto turned = withLook(&recipe, 0, stamp);
+    CHECK(upright && turned && apart(*upright, *turned) > 0.5f);
+    stamp.alphaOptions.angle = 0.0f;
+    stamp.alphaOptions.tileX = stamp.alphaOptions.tileY = 3;
+    const auto tiled = withLook(&recipe, 0, stamp);
+    CHECK(upright && tiled && apart(*upright, *tiled) > 0.5f);
+}
+
+TEST(brush_preview_drag_stamp_lands_in_the_middle) {
+    // Drag Stamp presses one stamp: a symmetric alpha's mark is centred on the front of the ball and stays inside the
+    // stamp's square (radius 0.55 x kAlphaReach), not smeared along an S.
+    BrushRecipe recipe;
+    recipe.name = "Alpha Test";
+    const auto mesh = withLook(&recipe, 0, settingsWith("Square", StrokeType::DragRect));
+    CHECK(mesh != nullptr);
+    if (!mesh) return;
+    Mesh ball = makeIcosphere(kBallDetail, kBallRadius);
+    glm::vec2 sum(0.0f);
+    float weight = 0.0f, farthest = 0.0f;
+    for (size_t i = 0; i < mesh->positions.size() && i < ball.positions.size(); ++i) {
+        const float moved = glm::length(mesh->positions[i] - ball.positions[i]);
+        if (moved < 1e-4f) continue;
+        sum += glm::vec2(ball.positions[i]) * moved;
+        weight += moved;
+        farthest = std::max(farthest, glm::length(glm::vec2(ball.positions[i])));
+    }
+    CHECK(weight > 0.0f);
+    if (weight > 0.0f) {
+        const glm::vec2 centre = sum / weight;
+        CHECK(std::abs(centre.x) < 0.05f && std::abs(centre.y) < 0.05f);
+    }
+    CHECK(farthest < 0.55f * 1.4143f + 0.05f);
+}
+
+TEST(brush_preview_alpha_from_file_and_missing_file) {
+    // An alpha image (the user's own library): its preview is the stamp of that image, and a file that went away
+    // gives no look (the plain thumbnail), never a crash.
+    const std::string dir = (std::filesystem::temp_directory_path() / "sf-preview-alpha-test").string();
+    std::filesystem::create_directories(dir);
+    Image img;
+    img.width = img.height = 64;
+    img.rgba.assign(size_t(64) * 64 * 4, 255);
+    for (int y = 0; y < 64; ++y)
+        for (int x = 0; x < 64; ++x) {
+            uint8_t* p = &img.rgba[(size_t(y) * 64 + size_t(x)) * 4];
+            p[0] = p[1] = p[2] = (x / 8 + y / 8) % 2 ? 255 : 20; // a checker
+        }
+    const std::string path = dir + "/checker.png";
+    std::string err;
+    CHECK(img.savePng(path, err));
+    BrushToolSettings s;
+    s.alphaName = "checker";
+    s.alphaPath = path;
+    s.stroke = StrokeType::DragRect;
+    CHECK(hasAlphaLook(s));
+    BrushRecipe recipe;
+    recipe.name = "Alpha Test";
+    const auto mesh = withLook(&recipe, 0, s);
+    CHECK(mesh != nullptr);
+    if (mesh) {
+        const PreviewShape shape = measure(*mesh);
+        CHECK(shape.lift > 0.01f && shape.degenerate == 0 && shape.folded == 0);
+    }
+    s.alphaInvert = true; // inverted: the other squares are high
+    const auto inverted = withLook(&recipe, 0, s);
+    CHECK(mesh && inverted && apart(*mesh, *inverted) > 0.5f);
+    s.alphaPath = dir + "/gone.png";
+    AlphaLook look;
+    CHECK(!makeAlphaLook(s, look));
+    std::filesystem::remove_all(dir);
+}
+
+TEST(brush_preview_alpha_only_where_it_applies) {
+    // Round (or none) is no alpha; a built-in brush that takes the alpha shows it, one that ignores it (Smooth, Move)
+    // keeps its own mark.
+    CHECK(!hasAlphaLook(BrushToolSettings()));
+    CHECK(!hasAlphaLook(settingsWith("none")));
+    CHECK(hasAlphaLook(settingsWith("Pores")));
+    for (BrushType t : {BrushType::Smooth, BrushType::Move, BrushType::Tendril, BrushType::KelvinGrab}) {
+        CHECK(!brushTakesAlpha(t));
+        const auto plain = sculptBrushPreview(nullptr, int(t));
+        const auto with = withLook(nullptr, int(t), settingsWith("Pores"));
+        CHECK(plain && with && apart(*plain, *with) < 1e-6f);
+    }
+    for (BrushType t : {BrushType::Standard, BrushType::Clay, BrushType::Inflate}) {
+        CHECK(brushTakesAlpha(t));
+        const auto plain = sculptBrushPreview(nullptr, int(t));
+        const auto with = withLook(nullptr, int(t), settingsWith("Pores", StrokeType::DragRect));
+        CHECK(plain && with && apart(*plain, *with) > 0.5f);
+        if (with) {
+            const PreviewShape s = measure(*with);
+            CHECK(s.degenerate == 0 && s.folded == 0 && s.lift < 0.45f);
+        }
+    }
+}
+
+// "Brush thumbnails break after selection": a preview is a pure function of its brush. Every shelf brush (built-in and
+// library recipe) rendered twice, with every other brush's preview (alpha looks included) rendered in between,
+// comes out vertex for vertex the same.
+TEST(brush_previews_do_not_change_after_other_brushes_render) {
+    std::vector<int> brushes;
+    for (int t = 0; t < int(BrushType::Count); ++t)
+        if (BrushType(t) != BrushType::Morph) brushes.push_back(t);
+    brushes.push_back(kPaintBrush);
+    BrushRecipe scales;
+    scales.name = "Scales Cut";
+    scales.alpha = "scales";
+    BrushRecipe plane;
+    plane.name = "Flat Plane";
+    plane.crispEdge = true;
+    plane.plane = BrushRecipe::Plane::Flatten;
+    const std::vector<const BrushRecipe*> recipes = {&scales, &plane};
+
+    std::vector<std::unique_ptr<Mesh>> before;
+    for (int t : brushes) before.push_back(sculptBrushPreview(nullptr, t));
+    for (const BrushRecipe* r : recipes) before.push_back(sculptBrushPreview(r, 0));
+
+    // Everything else a click can ask for in between: each brush with an alpha look, and the recipes with theirs.
+    for (const char* alpha : {"scales", "pores", "cracks"})
+        for (int t : brushes) {
+            if (t == kPaintBrush) continue;
+            AlphaLook look;
+            if (makeAlphaLook(settingsWith(alpha, StrokeType::DragRect), look))
+                sculptBrushPreview(nullptr, t, brushTakesAlpha(BrushType(t)) ? &look : nullptr);
+        }
+    for (const BrushRecipe* r : recipes) withLook(r, 0, settingsWith("rivets", StrokeType::Spray));
+
+    size_t i = 0;
+    for (int t : brushes) {
+        const auto again = sculptBrushPreview(nullptr, t);
+        CHECK(again && before[i] && apart(*again, *before[i]) == 0.0f);
+        ++i;
+    }
+    for (const BrushRecipe* r : recipes) {
+        const auto again = sculptBrushPreview(r, 0);
+        CHECK(again && before[i] && apart(*again, *before[i]) == 0.0f);
+        ++i;
     }
 }

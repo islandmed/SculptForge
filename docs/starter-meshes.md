@@ -2,8 +2,8 @@
 
 The starter meshes (File > New from Starter Mesh, Library > Tool > Starter meshes, `new_starter_mesh`;
 src/core/StarterMeshes.h) are the base cages in `assets/starter/*.sfproj.z`: SculptForge projects, zlib-compressed,
-embedded in the program. They open with subdivision levels added (Divide), so the files stay small (0.8 MB for the
-set; the budget is 15 MB, checked by `starter_meshes_set_and_budget`).
+embedded in the program. They open with subdivision levels added (Divide), so the files stay small (3.5 MB for the
+set, 2.6 of it the Human (male)'s sculpted level; the budget is 15 MB, checked by `starter_meshes_set_and_budget`).
 
 **Licensing rule:** only meshes made by our own scripts, or CC0 / public-domain sources recorded here with URL,
 licence and date. Never another app's assets or output, nothing scraped.
@@ -15,6 +15,7 @@ licence and date. Never another app's assets or output, nothing scraped.
 | Human Head | MakeHuman hm08 base mesh | CC0 1.0 | The body above the neck |
 | Bust | MakeHuman hm08 base mesh | CC0 1.0 | Above the mid chest; arms cut a third of the way down the upper arm |
 | Full Body | MakeHuman hm08 base mesh | CC0 1.0 | The whole "body" group (helpers and joints dropped), A-pose |
+| Human (male, A-pose) | Base mesh derived from MakeHuman (CC0): hm08 base mesh + its shape targets | CC0 1.0 | The "body" group with UVs, reshaped by 53 MakeHuman targets (`HUMAN_MALE_TARGETS`: the male young macro mix and lean max-muscle targets, pectorals, a gentle V and deltoids, then measure, torso, hip, neck, head and limb targets solved, each capped at 0.5 so the surface stays smooth, so that 27 silhouette landmarks of the front view as fractions of height match the owner's reference: 22 within 1%, none over 1.7%), then our own pose fixes (the arm a straight line at 53 degrees below horizontal, forearms swung into the frontal plane about the elbow, each leg sheared straight toward the midline so the feet sit under the hips, forearms turned so the palms face the thighs, fingers together and curled gently, the thumb turned in) and a relax pass (Laplacian smoothing at the armpits, hips and inner thighs), scaled to 180 cm, made exactly mirror-symmetric; then `tools/starter/human_male_sculpt.py`: 36 of our own brush strokes (Crease and Inflate, mirrored in X, placed from the figure's joints) carve the pec shelf, sternum and linea alba, three rows of abs, obliques and serratus, clavicles, deltoids, biceps and forearms, quads, knees and calves on subdivision level 1, in a sculpt layer called Definition that ships in the project |
 | Hand | MakeHuman hm08 base mesh | CC0 1.0 | The left hand past the wrist, stood up (fingers +Y, palm +Z) |
 | Foot | MakeHuman hm08 base mesh | CC0 1.0 | The left foot below 9 cm over the ankle |
 | Ear | MakeHuman hm08 base mesh | CC0 1.0 | The left ear and the skin round it (its rim relaxed into an even curve), turned to face +Z |
@@ -29,7 +30,9 @@ SHA-256 `8e761e6624b8f54536409135d1636da63b32486a90d4897f84e121d144f6fb4c`, down
 verified that day: the file's header says "This asset was explicitly released as CC0 in september 2020", and the
 repository's [LICENSE.md](https://github.com/makehumancommunity/makehuman/blob/master/LICENSE.md) (section C:
 "The base mesh and proxies ... have been released under CC0 1.0 Universal", full text in LICENSE.ASSETS.md). Only
-the mesh is used; MakeHuman's AGPL code is not. Credited in THIRD_PARTY_NOTICES.md.
+the mesh and its shape targets (`tools/starter/makehuman-targets.sha256`: 53 `.target` files under
+`makehuman/data/targets` at the same commit, each pinned by SHA-256; section C of the licence names "targets and
+modifiers" as CC0 too) are used; MakeHuman's AGPL code is not. Credited in THIRD_PARTY_NOTICES.md.
 
 ## Conventions
 
@@ -45,7 +48,8 @@ and `tests/ui/starter_meshes.sfui` opens one from the Library.
 
     tools/starter/build.sh build/sculptforge-cli
 
-downloads base.obj at the pinned commit, checks its SHA-256, runs `tools/starter/build_starter_meshes.py`
-(deterministic), saves each OBJ as a project with sculptforge-cli and compresses it into assets/starter. A new mesh
+downloads base.obj and the Human (male)'s target files at the pinned commit, checks their SHA-256, runs
+`tools/starter/build_starter_meshes.py` (deterministic) and, for the Human (male), `human_male_sculpt.py` + sculptforge-cli for
+its definition layer (deterministic too: the same binary gives the same bytes), saves each OBJ as a project with sculptforge-cli and compresses it into assets/starter. A new mesh
 also needs its line in `starterMeshes()` (src/core/StarterMeshes.cpp) and in the `embed_files` list in
 CMakeLists.txt.

@@ -1,11 +1,18 @@
 # From scan to sculptable mesh
 
+![A sculptable head with its face landmarks](images/face-landmarks.jpg)
+
+> **In short:**
+> - **Make sculptable** turns a splat capture into a clean, watertight Part.
+> - Quad topology at your budget, with loops round the eyes and mouth for heads.
+> - The capture's colours come across as vertex paint or a texture.
+
 A Gaussian-splat capture looks great but you can't sculpt, rig or animate it. **Make sculptable** turns it into
 a clean Part you can: a watertight surface with the floaters and background gone, quad topology at the
 polygon budget you choose, edge loops round the eyes and mouth when the capture is a head, and the capture's
 colours as vertex paint or a texture. One click, in the background, with the splats kept next to the result.
 
-![A test head capture, the review of its face landmarks and loops, and the finished quads with its colours](images/make-sculptable.jpg)
+![Splats made from one of our sculpted heads, the review of its face landmarks and loops, and the finished quads](images/make-sculptable.jpg)
 
 ## One click
 
@@ -84,11 +91,12 @@ blue dots and the guide loops as orange lines.
 
 ## The crop box
 
-Captures usually include the ground, a table or the room. **Make sculptable** keeps only the largest solid
-piece, which drops floaters, but a table the subject stands on is joined to it. Click **Crop Box**: a yellow box
-appears round the capture with a handle on each face. Drag a handle to move that face (drag the bottom one up to
-cut the table away), then **Make sculptable**: only the splats inside the box count. The box shows while the
-splats are shown; click **Crop Box** again to turn it off.
+Captures usually include the ground, a table or the room. **Make sculptable** keeps only the largest solid piece,
+which drops floaters, but a table the subject stands on is joined to it. Click **Crop Box**: a yellow box appears
+round the capture with a handle on each face.
+
+Drag a handle to move that face (drag the bottom one up to cut the table away), then **Make sculptable**: only the
+splats inside the box count. The box shows while the splats are shown; click **Crop Box** again to turn it off.
 
 ## What happens inside
 

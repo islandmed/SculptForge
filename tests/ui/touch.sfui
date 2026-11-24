@@ -24,8 +24,33 @@ expect_value camera_distance > $d1*1.8
 key f
 camera 0 0
 touch_pinch 0.5 0.5 1 45 0 0
+expect_value camera_roll > 35
+expect_value camera_roll < 55
+# Invert twist (Preferences > Input) flips it; off again after.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+click "Invert twist##input.invert_twist"
+expect_value invert_twist == 1
+click "Preferences##palette.preferences"
+mouse_move 0.5 0.5
+wait 0.2
+camera 0 0
+touch_pinch 0.5 0.5 1 45 0 0
 expect_value camera_roll < -35
-expect_value camera_roll > -55
+click "Preferences##palette.preferences"
+click "Invert twist##input.invert_twist"
+expect_value invert_twist == 0
+click "Preferences##palette.preferences"
+mouse_move 0.5 0.5
+wait 0.2
+# Turntable (and any rotation lock): the twist does nothing, and a pinch alongside it still zooms.
+run orbit_lock axis=y
+camera 0 0
+remember camera_distance d4
+touch_pinch 0.5 0.5 2 45 0 0
+expect_value camera_roll == 0
+expect_value camera_distance < $d4*0.55
+run orbit_lock axis=free
 # A pinch whose fingers turn a little (5 degrees) doesn't roll the view.
 camera 0 0
 touch_pinch 0.5 0.5 1.5 5 0 0
@@ -66,7 +91,7 @@ touch_pinch 0.5 0.5 2 0 0 0 trackpad
 expect_value camera_distance < $d3*0.55
 camera 0 0
 touch_pinch 0.5 0.5 1 -45 0 0 trackpad
-expect_value camera_roll > 35
+expect_value camera_roll < -35
 expect_value moved == 0
 expect_value touch_fingers == 0
 shot touch_after

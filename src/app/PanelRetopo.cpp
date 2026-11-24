@@ -11,18 +11,25 @@
 #include "app/Palettes.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "app/Theme.h"
 
+#include "core/HardwareProfile.h"
 #include "core/KeepMasked.h"
+#include "core/MemoryGuard.h"
 #include "core/QuickRemesh.h"
 #include "core/TextureTransfer.h"
 #include "core/Voxel.h"
 
 #include <IconsLucide.h>
+#include <imgui_internal.h>
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
+#include <new>
 #include <thread>
+#include <utility>
 
 namespace sf {
 
@@ -119,6 +126,7 @@ std::vector<uint8_t> keptForRemesh(const Mesh& mesh, bool keepMasked, bool& allM
 void App::startQRemesh() {
     if (qremesh_ || doc_.mesh.triangleCount() == 0) return;
     if (!unhideAllows("Quad Remesh", [this] { startQRemesh(); })) return; // #163
+    if (!levelsAllow("Quad Remesh", [this] { startQRemesh(); })) return;  // #173
     if (doc_.sculptor.strokeActive()) endStroke();
     bool allMasked = false;
     std::vector<uint8_t> keep = keptForRemesh(doc_.mesh, retopo_.keepMasked, allMasked);
@@ -192,17 +200,258 @@ void App::startQRemesh() {
               " quads...";
 }
 
+const VoxelRemeshEstimate& App::voxelEstimate() {
+    VoxelEstimateCache& c = voxelEstimate_;
+    const uint32_t part = doc_.activePartInfo().id;
+    const uint64_t revision = doc_.undo.revision();
+    const size_t triangles = doc_.mesh.triangleCount();
+    // The area once per change of the Part (not per dab while a dynamic-topology stroke adds triangles).
+    const bool stale = c.part != part || c.revision != revision || c.triangles != triangles;
+    if (stale && !(doc_.sculptor.strokeActive() && c.part == part)) {
+        c.part = part, c.revision = revision, c.triangles = triangles;
+        c.area = surfaceArea(doc_.mesh);
+        c.resolution = 0;
+    }
+    if (c.resolution != voxelResolution_) {
+        c.resolution = voxelResolution_;
+        c.estimate = estimateVoxelRemesh(doc_.mesh, voxelResolution_, c.area);
+    }
+    return c.estimate;
+}
+
+// Customize Shelves, Ctrl+Alt: a slider is drawn inert (beginShelfGrab) and a button over it takes the press (endShelfGrab), so
+// it can be dragged onto a shelf as `item` instead of moving its value or the palette under it. The press is taken by hand
+// (as Shell.cpp's grab): over the inert slider it would otherwise fall through to the palette's window move, and the drag
+// source (which needs an active item) never began.
+bool App::beginShelfGrab() {
+    const bool grab = layout_.customize && ui::CtrlHeld() && ui::AltHeld();
+    if (grab) ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    return grab;
+}
+
+void App::endShelfGrab(const char* buttonId, const char* item, const char* title) {
+    ImGui::PopItemFlag();
+    const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+    ImGui::SetCursorScreenPos(lo);
+    ImGui::InvisibleButton(buttonId, ImVec2(std::max(hi.x - lo.x, 1.0f), std::max(hi.y - lo.y, 1.0f)));
+    ImGuiContext& g = *ImGui::GetCurrentContext();
+    if (ImGui::IsMouseClicked(0) && ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(lo, hi) && g.ActiveId == 0) {
+        ImGui::SetActiveID(ImGui::GetItemID(), ImGui::GetCurrentWindow());
+        g.ActiveIdMouseButton = 0;
+    }
+    ui::UiItemDragSource(*this, item, title);
+}
+
+void App::drawGuideStrength(bool compact) {
+    if (!compact) ImGui::SetNextItemWidth(-1);
+    const bool grab = !compact && beginShelfGrab();
+    ui::SliderInside(compact ? "##qcurves.shelf" : "##qcurves", &curvesStrength_, 0.0f, 100.0f, "Guide Strength %.0f");
+    if (grab) endShelfGrab("##qcurvesgrab", "widget.guide_strength", "Guide Strength");
+}
+
+void App::drawTargetQuads(bool compact) {
+    if (!compact) ImGui::SetNextItemWidth(-1);
+    const bool grab = !compact && beginShelfGrab();
+    tray::SliderInt(compact ? "##qtarget.shelf" : "##qtarget", &retopo_.target, 100, 200000, "Target Quads %d", ImGuiSliderFlags_Logarithmic);
+    if (grab) endShelfGrab("##qtargetgrab", "widget.target_quads", "Target Quads");
+}
+
+void App::drawVoxelResolution(bool compact) {
+    voxelResolution_ = std::clamp(voxelResolution_, kVoxelResolutionMin, kVoxelResolutionMax);
+    // Two thirds of the travel for 32-512 (the everyday range keeps its precision), a sixth each for 528-2048 and
+    // 2112-4096. Ctrl+click or a double-click types a number.
+    if (!compact) ImGui::SetNextItemWidth(-1);
+    const bool grab = !compact && beginShelfGrab();
+    float t = voxelSliderFromResolution(voxelResolution_);
+    std::string label = tr("Resolution %d");
+    if (const size_t at = label.find("%d"); at != std::string::npos) label.replace(at, 2, std::to_string(voxelResolution_));
+    const int before = voxelResolution_;
+    if (ui::SliderInside("##voxres", &t, 0.0f, 1.0f, label.c_str(), ImGuiSliderFlags_NoInput)) voxelResolution_ = voxelResolutionFromSlider(t);
+    if (grab) {
+        endShelfGrab("##voxresgrab", "widget.voxel_resolution", "Voxel Resolution");
+    } else if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        // Ctrl+click or a double-click types a number, like every slider (the first click of a double-click moved it:
+        // that one is put back).
+        static int beforeClick = 0;
+        const bool dbl = ImGui::GetIO().MouseClickedCount[0] == 2;
+        if (!ui::CtrlHeld() && !dbl) {
+            beforeClick = before;
+        } else {
+            voxelResolution_ = ui::CtrlHeld() ? before : beforeClick; // (a Ctrl+click doesn't move it)
+            ImGui::ClearActiveID();
+            voxelResolutionTyped_ = voxelResolution_;
+            ImGui::OpenPopup("##voxrestype");
+        }
+    }
+    ui::HelpText("Resolution", nullptr,
+                 "Voxels across the model, 32 to 4096: higher keeps more detail and makes more triangles (about 4x "
+                 "for each doubling). The line under it estimates the result. Above 512 a remesh can make tens of "
+                 "millions of triangles and take minutes; it asks once first. If it needs more than the free memory it "
+                 "asks every time (swap makes it slow), and it won't start if the computer can't hold it at all. "
+                 "Ctrl+click to type a value.",
+                 "Tool > Remesh");
+    if (ImGui::BeginPopup("##voxrestype")) {
+        ImGui::SetNextItemWidth(120.0f * uiScale_);
+        if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+        ImGui::InputInt(tr("Resolution##voxrestype"), &voxelResolutionTyped_, 0, 0);
+        if (ImGui::IsItemDeactivatedAfterEdit() || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            voxelResolution_ = std::clamp(voxelResolutionTyped_, kVoxelResolutionMin, kVoxelResolutionMax);
+            ImGui::CloseCurrentPopup();
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            ImGui::CloseCurrentPopup(); // Esc cancels in one press (the field's own Esc only ends the typing)
+        }
+        ImGui::EndPopup();
+    }
+    if (voxelResolution_ <= kVoxelDenseMax) voxelHighResOk_ = false; // (asks again on the next trip above 512)
+    if (compact || doc_.mesh.triangleCount() == 0) return;
+    const VoxelRemeshEstimate& e = voxelEstimate();
+    const std::string tris = formatTriangles(e.triangles);
+    char line[256];
+    bool fits = true;
+    MemoryTier tier = MemoryTier::Fits;
+    const MemoryLimits limits = memoryLimits();
+    tier = classifyMemory(e.bytes, limits);
+    fits = tier == MemoryTier::Fits;
+    if (fits && voxelResolution_ <= kVoxelDenseMax) // (the everyday range: memory only when it is a problem)
+        std::snprintf(line, sizeof line, tr("About %s triangles"), tris.c_str());
+    else if (fits)
+        std::snprintf(line, sizeof line, tr("About %s triangles, ~%s of memory"), tris.c_str(), memoryText(e.bytes).c_str());
+    else
+        std::snprintf(line, sizeof line, tier == MemoryTier::NeedsSwap ? tr("About %s triangles, needs ~%s, %s free (may use swap)")
+                                                                       : tr("About %s triangles, needs ~%s, %s free"),
+                      tris.c_str(), memoryText(e.bytes).c_str(), memoryText(limits.available).c_str());
+    if (smallFont()) ImGui::PushFont(smallFont());
+    ImGui::PushStyleColor(ImGuiCol_Text, fits ? theme::textDim : tier == MemoryTier::NeedsSwap ? theme::brand : theme::danger);
+    ImGui::TextWrapped("%s", line); // (the swap and red lines are long: wrap, never clip at the panel edge)
+    ImGui::PopStyleColor();
+    if (smallFont()) ImGui::PopFont();
+    ui::HelpText("Estimate", nullptr,
+                 "About how many triangles Voxel Remesh makes at this Resolution, from the Part's surface area (fine "
+                 "detail smaller than a voxel counts, so a dense scan comes out lower). Above 512 also the memory the "
+                 "remesh needs; in orange when that is more than is free now but could run on swap (slow), in red when the "
+                 "computer can't hold it at all.",
+                 "Tool > Remesh");
+}
+
+void App::drawVoxelHighResConfirm() {
+    if (!voxelHighResConfirm_.open) return;
+    const float s = uiScale_;
+    const bool swap = voxelHighResConfirm_.swap;
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + vp->WorkSize.y * 0.5f),
+                            ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    bool open = true;
+    if (!ImGui::Begin(swap ? tr("Remesh may use swap") : tr("High resolution remesh"), &open,
+                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::End();
+        if (!open) voxelHighResConfirm_ = {};
+        return;
+    }
+    const VoxelRemeshEstimate& e = voxelEstimate();
+    const MemoryCheck c = checkMemory(e.bytes);
+    ImGui::PushTextWrapPos(460 * s);
+    if (swap) {
+        char what[512];
+        std::snprintf(what, sizeof what, tr("Voxel Remesh at resolution %d makes about %s triangles."), voxelResolution_,
+                      formatTriangles(e.triangles).c_str());
+        ImGui::Text("%s", what);
+        char need[256];
+        std::snprintf(need, sizeof need, tr("This needs about %s; %s is free. It may use swap and be slow."), memoryText(e.bytes).c_str(),
+                      memoryText(c.availableBytes).c_str());
+        ImGui::TextColored(theme::brand, "%s", need);
+        const std::string limit = "Limit used: " + memoryCeilingText(memoryLimits());
+        if (smallFont()) ImGui::PushFont(smallFont());
+        ImGui::TextColored(theme::textDim, "%s", limit.c_str());
+        if (smallFont()) ImGui::PopFont();
+        ImGui::TextWrapped("%s", tr("Your work is saved to the recovery copy first. Cancel in Tool > Remesh stops it and the Part "
+                                    "stays as it is. This asks every time. A lower Resolution is lighter."));
+    } else {
+        char what[512];
+        std::snprintf(what, sizeof what, tr("Voxel Remesh at resolution %d makes about %s triangles and needs about %s of memory (%s free)."),
+                      voxelResolution_, formatTriangles(e.triangles).c_str(), memoryText(e.bytes).c_str(), memoryText(c.availableBytes).c_str());
+        ImGui::Text("%s", what);
+        ImGui::TextWrapped("%s", tr("It can take a few minutes; Cancel in Tool > Remesh stops it and the Part stays as it is. "
+                                    "This won't ask again until the Resolution goes back to 512 or less."));
+        // Only for a heavy result: tens of millions of triangles, or most of the free memory.
+        if (e.triangles > 10'000'000 || (c.availableBytes > 0 && e.bytes > c.availableBytes / 2))
+            ImGui::TextWrapped("%s", tr("Sculpting that many triangles needs a fast computer: Decimate or a lower Resolution makes it lighter."));
+    }
+    ImGui::PopTextWrapPos();
+    bool go = false;
+    if (swap) {
+        if (ImGui::Button(tr("Proceed anyway##voxelswap"), ImVec2(160 * s, 0))) go = true;
+        ImGui::SameLine();
+        if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere(); // Cancel is the default: Enter and Escape cancel too
+        if (ImGui::Button(tr("Cancel##voxelswap"), ImVec2(120 * s, 0)) || (!ImGui::IsWindowAppearing() && ImGui::IsKeyPressed(ImGuiKey_Enter)) ||
+            ImGui::IsKeyPressed(ImGuiKey_Escape))
+            open = false;
+    } else {
+        if (ImGui::Button(tr("Remesh##voxelhighres"), ImVec2(140 * s, 0))) go = true;
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel##voxelhighres"), ImVec2(120 * s, 0))) open = false;
+    }
+    ImGui::End();
+    if (go) {
+        const RemeshTrigger trigger = voxelHighResConfirm_.trigger;
+        voxelHighResConfirm_ = {};
+        if (swap) voxelSwapOk_ = true; // (this one run only: the next remesh asks again)
+        else voxelHighResOk_ = true;
+        startVoxelRemesh(trigger);
+        voxelSwapOk_ = false; // (in case it stopped before the check)
+    } else if (!open) {
+        voxelHighResConfirm_ = {};
+        status_ = "Voxel Remesh cancelled";
+    }
+}
+
 void App::startVoxelRemesh(RemeshTrigger trigger) {
     if (voxelRemesh_) return;
     // #163: the button asks on a partly hidden Part (Quick Remesh and Remesh after each stroke just go).
     if (!unhideAllows("Voxel Remesh", [this, trigger] { startVoxelRemesh(trigger); }, trigger != RemeshTrigger::Button))
         return;
+    voxelResolution_ = std::clamp(voxelResolution_, kVoxelResolutionMin, kVoxelResolutionMax);
+    if (!levelsAllow("Voxel Remesh", [this, trigger] { startVoxelRemesh(trigger); }, trigger != RemeshTrigger::Button)) return;
     Args args{{"resolution", double(voxelResolution_)}};
     if (voxelKeepMasked_) args["keep_masked"] = true;
-    if (!memoryAllows("remesh", args, [this, trigger] { startVoxelRemesh(trigger); })) return;
+    bool allowSwap = false;
+    {
+        // ONE estimate (core/Voxel.h) and ONE dialog for every Resolution. Past the free memory it asks every time (it may
+        // use swap and be slow), and past RAM + the most swap it won't start at all (it would take the whole computer
+        // down). Only above 512 does a remesh that fits ask once first (tens of millions of triangles, minutes).
+        const VoxelRemeshEstimate& e = voxelEstimate();
+        const MemoryLimits limits = memoryLimits();
+        const MemoryTier tier = classifyMemory(e.bytes, limits);
+        if (tier == MemoryTier::TooBig) {
+            status_ = voxelRemeshTooBigMessage(doc_.mesh, voxelResolution_, limits);
+            lastCommandOk_ = false;
+            return;
+        }
+        if (tier == MemoryTier::NeedsSwap) {
+            if (!std::exchange(voxelSwapOk_, false)) {
+                voxelHighResConfirm_ = {true, trigger, true};
+                status_ = memorySwapMessage(e.bytes, limits.available) + " Proceed or cancel in the dialog";
+                return;
+            }
+            allowSwap = true;
+        } else if (voxelResolution_ <= kVoxelDenseMax) {
+            voxelHighResOk_ = false;
+        } else if (!voxelHighResOk_) {
+            voxelHighResConfirm_ = {true, trigger, false};
+            status_ = "Voxel Remesh at " + std::to_string(voxelResolution_) + ": about " + formatTriangles(e.triangles) +
+                      " triangles. Remesh or cancel in the dialog";
+            return;
+        }
+    }
     // Always in the background with progress, so the UI never freezes (keeping a texture adds Auto UV of the
     // result, seconds to minutes); the result lands as the remesh command's would (pollVoxelRemesh).
     if (doc_.sculptor.strokeActive()) endStroke();
+    if (allowSwap && interactive() && !prefDir_.empty() && doc_.dirty()) { // (the crash recovery path: Restore on the next start)
+        if (!autosaveNow()) { // (sets status_ "Autosave failed: ...")
+            status_ = "Voxel Remesh not started: the recovery copy couldn't be saved first (" + status_ + "). Save the project, then try again";
+            lastCommandOk_ = false;
+            return;
+        }
+    }
     auto job = std::make_unique<VoxelRemeshJob>();
     job->trigger = trigger;
     job->revision = doc_.undo.revision();
@@ -213,7 +462,7 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     job->note = std::make_shared<std::string>();
     job->part = doc_.activePartInfo().id;
     job->triangles = doc_.mesh.triangleCount();
-    job->resolution = std::clamp(voxelResolution_, 32, 512);
+    job->resolution = voxelResolution_;
     bool allMasked = false;
     std::vector<uint8_t> keep = keptForRemesh(doc_.mesh, voxelKeepMasked_, allMasked);
     if (allMasked) {
@@ -222,35 +471,51 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     }
     job->keepMasked = !keep.empty();
     job->keepTexture = keepTexture_;
+    job->allowSwap = allowSwap;
     const bool texture = hasTexture(doc_.mesh) && keepTexture_;
     std::promise<bool> promise;
     job->done = promise.get_future();
-    std::thread([promise = std::move(promise), source = std::make_shared<Mesh>(doc_.mesh), res = job->resolution,
+    std::shared_ptr<Mesh> source;
+    try {
+        source = std::make_shared<Mesh>(doc_.mesh);
+    } catch (const std::bad_alloc&) { // not even a copy of the Part fits: nothing started, the Part is as it was
+        status_ = "Voxel Remesh not started: out of memory. Close other apps or lower the Resolution";
+        lastCommandOk_ = false;
+        return;
+    }
+    std::thread([promise = std::move(promise), source = std::move(source), res = job->resolution, allowSwap,
                  progress = job->progress, cancel = job->cancel, result = job->result, error = job->error,
                  note = job->note, keep = std::move(keep), texture, keepTexture = keepTexture_]() mutable {
-        progress->store(0.02f);
-        const float remeshShare = texture ? 0.13f : 0.9f; // the rest: Keep Masked, then the texture's Auto UV
-        *result = voxelRemesh(*source, res, error.get(), [&](float f) {
-            progress->store(0.02f + remeshShare * f);
-            return !cancel->load();
-        });
-        bool ok = result->triangleCount() > 0;
-        if (ok && !keep.empty()) { // Keep Masked: the masked part goes back in, joined to the new surface
-            Mesh stitched;
-            std::string keepNote;
-            ok = stitchKeptTriangles(*source, keep, *result, stitched, *error, &keepNote);
-            if (ok) *result = std::move(stitched);
-            else *error = "Remesh (Keep Masked): " + *error;
-            if (ok && !keepNote.empty()) *note = "; Keep masked: " + keepNote;
-        }
-        progress->store(texture ? 0.15f : 0.98f);
-        if (ok) *note = carryTextureNote(*source, *result, keepTexture, [&](float f) {
-            progress->store(0.15f + 0.85f * f);
-            return !cancel->load();
-        }) + *note;
-        if (ok && cancel->load()) {
+        bool ok = false;
+        try {
+            progress->store(0.02f);
+            const float remeshShare = texture ? 0.13f : 0.9f; // the rest: Keep Masked, then the texture's Auto UV
+            *result = voxelRemesh(*source, res, error.get(), [&](float f) {
+                progress->store(0.02f + remeshShare * f);
+                return !cancel->load();
+            }, allowSwap);
+            ok = result->triangleCount() > 0;
+            if (ok && !keep.empty()) { // Keep Masked: the masked part goes back in, joined to the new surface
+                Mesh stitched;
+                std::string keepNote;
+                ok = stitchKeptTriangles(*source, keep, *result, stitched, *error, &keepNote);
+                if (ok) *result = std::move(stitched);
+                else *error = "Remesh (Keep Masked): " + *error;
+                if (ok && !keepNote.empty()) *note = "; Keep masked: " + keepNote;
+            }
+            progress->store(texture ? 0.15f : 0.98f);
+            if (ok) *note = carryTextureNote(*source, *result, keepTexture, [&](float f) {
+                progress->store(0.15f + 0.85f * f);
+                return !cancel->load();
+            }) + *note;
+            if (ok && cancel->load()) {
+                ok = false;
+                *error = "Voxel Remesh cancelled";
+            }
+        } catch (const std::bad_alloc&) { // ran out of memory midway: no half mesh, the Part stays as it was
             ok = false;
-            *error = "Voxel Remesh cancelled";
+            *result = Mesh();
+            *error = "Voxel Remesh ran out of memory; the Part is unchanged. Close other apps or lower the Resolution";
         }
         promise.set_value(ok);
     }).detach();
@@ -298,7 +563,13 @@ void App::pollVoxelRemesh() {
         return;
     }
     const JobPart part(*this, index);
-    doc_.replaceMeshUndoable(std::move(*job->result), "Remesh"); // as the remesh command
+    try {
+        doc_.replaceMeshUndoable(std::move(*job->result), "Remesh", true); // as the remesh command
+    } catch (const std::bad_alloc&) { // (replaceMeshUndoable put the Part back)
+        status_ = "Voxel Remesh ran out of memory landing the result; the Part is unchanged. Close other apps or lower the Resolution";
+        lastCommandOk_ = false;
+        return;
+    }
     CommandResult r{true, std::string(job->trigger == RemeshTrigger::Quick         ? "Quick Remesh: remeshed"
                                       : job->trigger == RemeshTrigger::AfterStroke ? "Remeshed after the stroke"
                                                                                    : "Remeshed") +
@@ -344,11 +615,31 @@ void App::strokeEndedForRemesh(const UndoRecord& stroke) {
     if (!uiPrefs_.remeshAfterStroke || stroke.positions.empty() || stroke.layer >= 0 || stroke.topology || stroke.mesh ||
         stroke.micro || stroke.subdiv)
         return;
-    // Not where a remesh would throw work away unasked: subdivision levels, sculpt layers, a painted texture.
-    if (doc_.mesh.multires || !doc_.mesh.layers.empty() || (hasTexture(doc_.mesh) && keepTexture_)) return;
+    // Not where a remesh would throw work away unasked: subdivision levels, sculpt layers, a painted texture. A stroke that
+    // would have remeshed says so once per Part and reason, or the checkbox looks broken.
+    const int reason = doc_.mesh.multires ? 0 : !doc_.mesh.layers.empty() ? 1 : (hasTexture(doc_.mesh) && keepTexture_) ? 2 : -1;
     const StrokeStretch s = strokeStretch(doc_.mesh, stroke.positions.indices, stroke.positions.values);
+    if (reason >= 0) {
+        if (stretchWantsRemesh(s) && remeshSkipNoted_.insert({doc_.activePartInfo().id, reason}).second)
+            toastInViewport(remeshSkippedNote(reason)); // (also the status line, which elides a note this long)
+        return;
+    }
     lastStrokeStretched_ = s.stretched;
     if (stretchWantsRemesh(s)) autoRemeshDue_ = true; // pollVoxelRemesh starts it once nothing is in the way
+}
+
+// "Remesh after each stroke" passed over this Part: why, and the way out (Quick Remesh's key, else the Remesh button).
+std::string App::remeshSkippedNote(int reason) {
+    const char* const why[] = {
+        tr("Remesh after each stroke: skipped, this Part has subdivision levels (a remesh would remove them). %s"),
+        tr("Remesh after each stroke: skipped, this Part has sculpt layers (a remesh would remove them). %s"),
+        tr("Remesh after each stroke: skipped, this Part has a painted texture (carrying it over takes a while). %s")};
+    const std::string key = uiPrefs_.quickRemesh ? actions_.shortcutText("geometry.quick_remesh") : std::string();
+    char way[160], line[512];
+    if (key.empty()) std::snprintf(way, sizeof way, "%s", tr("Tool > Remesh > Remesh remeshes it anyway."));
+    else std::snprintf(way, sizeof way, tr("%s remeshes it anyway."), key.c_str());
+    std::snprintf(line, sizeof line, why[reason], way);
+    return line;
 }
 
 void App::quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down) {
@@ -442,7 +733,13 @@ void App::drawQRemeshContents() {
         ui::HelpText("Quad Remesh", nullptr, "Remeshing in the background. The result replaces the Part when it's done.",
                      kQRemeshPath);
         ImGui::SameLine();
-        if (ImGui::Button(tr("Cancel"), ImVec2(-1, 0))) qremesh_->cancel->store(true);
+        if (ImGui::Button(tr("Cancel"), ImVec2(-1, 0))) {
+            // At once on any machine (gh#226): the job is let go here; its thread stops at its next Cancel check (a
+            // second or two on a slow one, in the longest steps) and its result, which nothing holds now, is dropped.
+            qremesh_->cancel->store(true);
+            qremesh_.reset();
+            status_ = "Quad Remesh cancelled";
+        }
         ui::HelpText("Cancel", nullptr, "Stop Quad Remesh; the Part stays as it is.", kQRemeshPath);
     } else {
         ui::ActionButton(*this, "geometry.qremesh", ImVec2(half, 0));
@@ -461,8 +758,7 @@ void App::drawQRemeshContents() {
                      "become exact edge loops. Legacy: the method of SculptForge 0.9 (more poles, a split look).",
                      kQRemeshPath);
     }
-    ImGui::SetNextItemWidth(-1);
-    tray::SliderInt("##qtarget", &retopo_.target, 100, 200000, "Target Quads %d", ImGuiSliderFlags_Logarithmic);
+    drawTargetQuads();
     ui::HelpText("Target Quads", nullptr,
                  "About how many quads Quad Remesh makes (Ctrl+click to type a number). 50% / 100% / 200% set it from "
                  "the Part's current polygon count.",
@@ -570,7 +866,7 @@ void App::drawQRemeshGuideControls() {
     ImGui::SameLine();
     ui::ActionButton(*this, "geometry.qremesh_guides_clear", ImVec2(-1, 0));
     ImGui::SetNextItemWidth(-1);
-    ui::SliderInside("##qcurves", &curvesStrength_, 0.0f, 100.0f, "Guide Strength %.0f");
+    drawGuideStrength();
     ui::HelpText("Guide Strength", nullptr,
                  "How far around each guide curve the edge flow follows it: 0 = only the edge loop on the curve, 100 = "
                  "about six quads to each side. The loop on the curve is always made.",

@@ -31,7 +31,7 @@ expect_value welcome_open == 1
 hover_window 0.99 0.99
 wait 0.2
 shot welcome
-click "Sculpted before? Take the quick tour##welcome.tour"
+click "Quick tour##welcome.tour"
 expect_value welcome_open == 0
 expect_value quick_tour_open == 1
 expect_value quick_tour_slide == 1
@@ -169,12 +169,13 @@ click "Next##quicktour.aside"
 # 10. Last: memberships, friendly. See memberships opens the page (the status bar in tests); Maybe later closes.
 expect_value quick_tour_slide == 10
 expect_text SculptForge stays free
-expect_text betas and early builds
+expect_text early builds, like SculptForge for Android today
 expect_no_text "Show me"
 shot tour-10
 remember support_requests s0
 click "See memberships##quicktour"
 expect_value support_requests == $s0+1
+expect_status https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=quick-tour
 click "Maybe later##quicktour"
 expect_value quick_tour_open == 0
 

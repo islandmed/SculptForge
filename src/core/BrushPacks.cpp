@@ -24,6 +24,8 @@ const PackInfo kPacks[] = {
     {"Cloth & Folds", "Folds, seams, stitches, weave and knit for clothing and soft goods."},
     {"Damage & Wear", "Cracks, chips, dents, scratches and erosion for weathered stone, wood and metal."},
     {"Ornament", "Beads, ropes, filigree, studs and carved patterns for jewellery, trims and decoration."},
+    {"Wood", "Weathered grain, splinters, cracks, knots, end-grain rings and plank seams for old timber."},
+    {"Creature Skin", "High-resolution hide wrinkles, scales, skin and nose pores and fine skin, for close-up creature detail."},
 };
 
 // Adds brushes to `out` for one pack: b("Name", "One line.", [](BrushRecipe& r) { ... }).
@@ -88,6 +90,10 @@ void hardSurface(PackBuilder b) {
         r.depth = 0.0f; r.plane = Plane::Flatten; r.planeAmount = 1.0f; r.hardness = 0.95f; r.alpha = "Square";
         r.spacing = 0.06f;
     });
+    b("Crisp Flatten", "Flattens to the plane the stroke starts on with a clean, sharp edge, for hard planes and bevels.",
+      [](BrushRecipe& r) {
+          r.depth = 0.0f; r.plane = Plane::Flatten; r.planeAmount = 1.0f; r.planeLock = true; r.crispEdge = true;
+      });
     b("Bevel Scrape", "Scrapes high points into a bevel along an edge, for chamfers.", [](BrushRecipe& r) {
         r.depth = -0.05f; r.plane = Plane::Scrape; r.planeAmount = 1.0f; r.hardness = 0.7f; r.pinch = 0.0f;
         r.spacing = 0.06f;
@@ -271,6 +277,113 @@ void ornament(PackBuilder b) {
     });
 }
 
+void wood(PackBuilder b) {
+    b("Weathered Planks", "Long worn grain lines with the soft wood eaten away between, for old boards; drag along the grain.",
+      [](BrushRecipe& r) {
+          r.depth = -0.5f; r.alpha = "Weathered Grain"; r.alphaFollow = true; r.spacing = 0.4f; r.frontFacesOnly = true;
+      });
+    b("Raised Grain", "Hard late-wood lines standing proud of the surface, as on sandblasted or driftwood boards.",
+      [](BrushRecipe& r) {
+          r.depth = 0.4f; r.alpha = "Weathered Grain"; r.alphaFollow = true; r.spacing = 0.4f; r.smooth = 0.05f;
+          r.frontFacesOnly = true;
+      });
+    b("Splinters", "A fan of sharp, torn splinters standing up from the surface, for broken planks.", [](BrushRecipe& r) {
+        r.depth = 0.6f; r.alpha = "Splinters"; r.alphaFollow = true; r.hardness = 0.8f; r.spacing = 0.9f;
+        r.jitter = 0.2f; r.frontFacesOnly = true;
+    });
+    b("Wood Chaff", "Scattered shavings and chips of torn fibre, for splintered ends and chopped wood.",
+      [](BrushRecipe& r) {
+          r.depth = 0.3f; r.alpha = "Splinters"; r.hardness = 0.7f; r.spacing = 0.35f; r.jitter = 0.7f;
+          r.alphaJitter = 180.0f; r.frontFacesOnly = true;
+      });
+    b("Grain Cracks", "Narrow forked splits that run along the grain, for dried and checked timber.", [](BrushRecipe& r) {
+        r.depth = -0.7f; r.alpha = "Grain Cracks"; r.alphaFollow = true; r.spacing = 0.55f; r.jitter = 0.15f;
+        r.frontFacesOnly = true;
+    });
+    b("Check Split", "One deep, pinched split along the stroke, for dried beams.", [](BrushRecipe& r) {
+        r.depth = -0.55f; r.pinch = 0.45f; r.tipSharpness = 0.5f; r.hardness = 0.2f; r.jitter = 0.1f; r.spacing = 0.07f;
+    });
+    b("Knot", "Stamps a round knot with the grain bending around it; click once.", [](BrushRecipe& r) {
+        r.depth = 0.85f; r.alpha = "Knot"; r.hardness = 0.8f; r.spacing = 1.8f; r.jitter = 0.0f; r.alphaJitter = 25.0f;
+        r.frontFacesOnly = true;
+    });
+    b("End Rings", "Stamps the rings and radial checks of a sawn log end; click once.", [](BrushRecipe& r) {
+        r.depth = -0.8f; r.alpha = "End Rings"; r.hardness = 0.85f; r.spacing = 2.0f; r.alphaJitter = 180.0f;
+        r.frontFacesOnly = true;
+    });
+    b("Plank Seams", "Two boards meeting at a seam with grain and nail dimples, for floors and doors; drag along the seam.",
+      [](BrushRecipe& r) {
+          r.depth = 0.55f; r.alpha = "Plank Seams"; r.alphaFollow = true; r.hardness = 0.9f; r.spacing = 0.3f;
+          r.frontFacesOnly = true;
+      });
+    b("Board Gap", "A clean, narrow gap between two boards with softened edges.", [](BrushRecipe& r) {
+        r.depth = -0.35f; r.pinch = 0.2f; r.hardness = 0.4f; r.tipSharpness = 0.3f; r.smooth = 0.15f; r.spacing = 0.07f;
+        r.frontFacesOnly = true;
+    });
+}
+
+// Tuned for micro levels 3-4 (gh#228): a turn per dab on the patterns without a direction (no repeats show), Follow
+// stroke on the ones with one. The scales and plates step a whole number of their rows per dab (spacing is in radii;
+// the alpha spans two: Snake Scales repeats every 2/7 of it, so 6/7 lands each dab's scales on the last one's).
+void creatureSkin(PackBuilder b) {
+    b("Elephant Hide", "Thick hide with a deep net of creases, for elephants, rhinos and old skin.", [](BrushRecipe& r) {
+        r.depth = 0.45f; r.alpha = "Elephant Hide"; r.spacing = 0.7f; r.alphaJitter = 25.0f; r.frontFacesOnly = true;
+    });
+    b("Hide Folds", "Rings of heavy folds across the stroke, for trunks, necks and joints; drag along the limb.",
+      [](BrushRecipe& r) {
+          r.depth = 0.5f; r.alpha = "Hide Folds"; r.alphaFollow = true; r.spacing = 0.6f; r.frontFacesOnly = true;
+      });
+    b("Dinosaur Hide", "Pebbled hide with feature scales and wandering folds, for dinosaurs and beasts.", [](BrushRecipe& r) {
+        r.depth = 0.45f; r.alpha = "Dinosaur Hide"; r.spacing = 0.65f; r.alphaJitter = 180.0f; r.frontFacesOnly = true;
+    });
+    b("Snake Skin", "Keeled diamond scales in overlapping rows; draw from head to tail.", [](BrushRecipe& r) {
+        r.depth = 0.5f; r.alpha = "Snake Scales"; r.alphaFollow = true; r.spacing = 6.0f / 7.0f; r.frontFacesOnly = true;
+    });
+    b("Overlap Scales", "Rounded overlapping scales with growth rings, for fish and dragons; draw head to tail.",
+      [](BrushRecipe& r) {
+          r.depth = 0.5f; r.alpha = "Overlap Scales"; r.alphaFollow = true; r.spacing = 1.0f; r.frontFacesOnly = true;
+      });
+    b("Pebble Scales", "Small domed scales with larger rosettes, for lizards, geckos and crocodile flanks.", [](BrushRecipe& r) {
+        r.depth = 0.45f; r.alpha = "Pebble Scales"; r.spacing = 0.7f; r.alphaJitter = 180.0f; r.frontFacesOnly = true;
+    });
+    b("Scute Plates", "Rows of square keeled plates, for crocodile backs and armoured tails; drag along the spine.",
+      [](BrushRecipe& r) {
+          r.depth = 0.55f; r.alpha = "Scute Plates"; r.alphaFollow = true; r.spacing = 6.0f / 7.0f; r.frontFacesOnly = true;
+      });
+    b("Pores Fine", "Dense, tiny pores over fine skin texture, for cheeks and close-ups.", [](BrushRecipe& r) {
+        r.depth = -0.4f; r.alpha = "Pores Fine"; r.spacing = 0.6f; r.jitter = 0.2f; r.alphaJitter = 180.0f;
+        r.frontFacesOnly = true;
+    });
+    b("Pores Clustered", "Pores of two sizes gathered in patches, for natural, uneven skin.", [](BrushRecipe& r) {
+        r.depth = -0.45f; r.alpha = "Pores Clustered"; r.spacing = 0.6f; r.jitter = 0.2f; r.alphaJitter = 180.0f;
+        r.frontFacesOnly = true;
+    });
+    b("Pores Stretched", "Pores drawn out across the stroke with stretch lines, for foreheads and necks.", [](BrushRecipe& r) {
+        r.depth = -0.4f; r.alpha = "Pores Stretched"; r.alphaFollow = true; r.spacing = 0.6f; r.frontFacesOnly = true;
+    });
+    b("Nose Pores Open", "Large, deep pores with small ones between, for the nose and chin.", [](BrushRecipe& r) {
+        r.depth = -0.55f; r.alpha = "Nose Pores Open"; r.spacing = 0.65f; r.alphaJitter = 180.0f; r.frontFacesOnly = true;
+    });
+    b("Nose Pores Dense", "Close-packed round pores, for the tip and wings of the nose.", [](BrushRecipe& r) {
+        r.depth = -0.5f; r.alpha = "Nose Pores Dense"; r.spacing = 0.65f; r.alphaJitter = 180.0f; r.frontFacesOnly = true;
+    });
+    b("Nose Pores Furrowed", "Pores joined by fine furrows, for weathered noses and cheeks.", [](BrushRecipe& r) {
+        r.depth = -0.5f; r.alpha = "Nose Pores Furrowed"; r.spacing = 0.65f; r.alphaJitter = 180.0f;
+        r.frontFacesOnly = true;
+    });
+    b("Skin Crosshatch", "Fine furrows crossing in a diamond net, for the backs of hands and aged skin.", [](BrushRecipe& r) {
+        r.depth = -0.35f; r.alpha = "Skin Crosshatch"; r.spacing = 0.65f; r.alphaJitter = 20.0f; r.frontFacesOnly = true;
+    });
+    b("Skin Fine Lines", "Fine wrinkle lines across the stroke that break and merge, for eye corners and knuckles.",
+      [](BrushRecipe& r) {
+          r.depth = -0.35f; r.alpha = "Skin Fine Lines"; r.alphaFollow = true; r.spacing = 0.6f; r.frontFacesOnly = true;
+      });
+    b("Skin Micro Grain", "A soft stipple of tiny bumps, the last pass of skin texture.", [](BrushRecipe& r) {
+        r.depth = 0.25f; r.alpha = "Skin Micro Grain"; r.spacing = 0.6f; r.jitter = 0.2f; r.alphaJitter = 180.0f;
+        r.frontFacesOnly = true;
+    });
+}
+
 } // namespace
 
 const std::vector<std::string>& builtinBrushPacks() {
@@ -290,13 +403,15 @@ std::string builtinBrushPackHelp(const std::string& pack) {
 
 std::vector<BrushRecipe> builtinPackRecipes() {
     std::vector<BrushRecipe> out;
-    out.reserve(60);
+    out.reserve(90);
     clayAndForm({out, kPacks[0].name});
     hardSurface({out, kPacks[1].name});
     organicAndSkin({out, kPacks[2].name});
     clothAndFolds({out, kPacks[3].name});
     damageAndWear({out, kPacks[4].name});
     ornament({out, kPacks[5].name});
+    wood({out, kPacks[6].name});
+    creatureSkin({out, kPacks[7].name});
     return out;
 }
 

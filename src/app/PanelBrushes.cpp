@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Brush options panel (stroke type, lazy mouse, spray, alpha) and the
-// stroke handling of the SnakeHook brush and the DragRect stroke.
+// stroke handling of the Tendril brush and the DragRect stroke.
 #include "app/Theme.h"
 #include "app/App.h"
 #include "app/I18n.h"
@@ -113,6 +113,19 @@ void App::drawAlphaOptions(bool vdm) {
         ImGui::Dummy(ImVec2(0, 2.0f * uiScale_));
         return;
     }
+    ImGui::SetNextItemWidth(-1);
+    ui::SliderInside("##alpha_scale_jitter", &o.scaleJitter, 0.0f, 90.0f, "Scale jitter %.0f%%");
+    ui::HelpText("Scale jitter", nullptr,
+                 "Make each dab bigger or smaller by a random amount, up to this many percent either way: wood grain, "
+                 "pores and chips that are never the same size twice.",
+                 where);
+    ImGui::SetNextItemWidth(-1);
+    ui::SliderInside("##alpha_position_jitter", &o.positionJitter, 0.0f, 100.0f, "Position jitter %.0f%%");
+    ui::HelpText("Position jitter", nullptr,
+                 "Move each dab off the cursor by a random amount, up to this many percent of the brush radius, so "
+                 "a line of stamps does not sit in a tidy row.",
+                 where);
+    drawAlphaPool();
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ImGui::SetNextItemWidth(half);
     float tileX = float(o.tileX), tileY = float(o.tileY);
@@ -126,9 +139,31 @@ void App::drawAlphaOptions(bool vdm) {
     ImGui::Dummy(ImVec2(0, 2.0f * uiScale_));
 }
 
-// SnakeHook: pull the region under the click along with the cursor, like Move,
+// The alpha pool (core/AlphaOptions.h): the alphas each dab draws from at random. Filled from the Library (right-click
+// an alpha, or a folder of scans) or brush_alpha_pool.
+void App::drawAlphaPool() {
+    if (!alphaPool_ || alphaPool_->empty()) {
+        ImGui::TextDisabled("%s", tr("Alpha pool: empty"));
+        ui::HelpText("Alpha pool", nullptr,
+                     "Right-click an alpha in the Library or the alpha list and pick Add to alpha pool, or right-click "
+                     "a folder of images and pick Use folder as alpha pool. Then every dab takes one of them at "
+                     "random, so scanned planks or pores never repeat. Tile does not apply to pool alphas.",
+                     "Alpha");
+        return;
+    }
+    const std::string label = tr("Alpha pool") + std::string(": ") + std::to_string(alphaPool_->size());
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::SameLine();
+    if (ImGui::SmallButton(tr("Clear##alphapool"))) runCommand("brush_alpha_pool", {{"clear", true}});
+    ui::HelpText("Alpha pool", nullptr,
+                 "Each dab and each Drag Stamp takes one of these alphas at random, ahead of the brush's own alpha. "
+                 "Clear puts the brush's own alpha back. Kept until you quit.",
+                 "Alpha");
+}
+
+// Tendril: pull the region under the click along with the cursor, like Move,
 // but re-centred on the pulled tip every step so it can be dragged out into horns.
-void App::snakeHookTo(float x, float y) {
+void App::tendrilTo(float x, float y) {
     const float h = canvasHeight();
     glm::vec3 origin, dir;
     partRay(x, y, origin, dir);
@@ -148,6 +183,8 @@ void App::snakeHookTo(float x, float y) {
     p.focal = focalShift_;
     p.connectedOnly = uiPrefs_.connectedOnly;
     p.viewFalloff = uiPrefs_.viewFalloff;
+    p.contactFacing = uiPrefs_.contactFacing;
+    p.facingAngle = uiPrefs_.facingAngle;
     p.alpha = &doc_.brushAlpha;
     p.alphaUp = screenUpVector(0.0f);
     // Small steps keep the tip under the cursor and the pulled surface even.
@@ -156,14 +193,14 @@ void App::snakeHookTo(float x, float y) {
     p.strokeDelta = delta / float(steps);
     for (int i = 0; i < steps; ++i) {
         p.center = grabLast_;
-        doc_.sculptor.dab(doc_.mesh, doc_.bvh, strokeBrush_, p, symmetry_); // SnakeHook or KelvinSnake
+        doc_.sculptor.dab(doc_.mesh, doc_.bvh, strokeBrush_, p, symmetry_); // Tendril or KelvinSnake
         grabLast_ += p.strokeDelta;
     }
 }
 
 // DragRect: undo the previous stamp and press a new one sized and rotated by the drag (without remeshing:
 // restoreStroke puts positions back, not topology).
-void App::dragRectTo(float x, float y) {
+void App::dragRectTo(float x, float y, bool commit) {
     doc_.sculptor.restoreStroke(doc_.mesh, doc_.bvh);
     const glm::vec2 drag = glm::vec2(x, y) - dragAnchor_;
     const float len = glm::length(drag);
@@ -175,14 +212,19 @@ void App::dragRectTo(float x, float y) {
     p.center = dragAnchorHit_;
     p.viewDir = partCamera().forward();
     p.radius = len * partCamera().worldPerPixel(dragAnchorHit_, canvasHeight());
-    p.strength = strength_;
+    p.strength = strokeIntensity();
     p.pressure = pressureStrengthOn() ? pressure : 1.0f;
     p.invert = strokeInvert_;
     p.frontFacesOnly = frontFacesOnly_;
     p.connectedOnly = uiPrefs_.connectedOnly;
     p.viewFalloff = uiPrefs_.viewFalloff;
+    p.contactFacing = uiPrefs_.contactFacing;
+    p.facingAngle = uiPrefs_.facingAngle;
     p.focal = focalShift_;
-    p.alpha = &doc_.brushAlpha;
+    p.alpha = stampAlpha_ ? stampAlpha_.get() : &doc_.brushAlpha;
+    p.stampFootprint = commit; // (the moves before the release keep the sphere: the live preview stays cheap)
+    stampCursor_ = glm::vec2(x, y);
+    stampPlaced_ = true;
     // The stamp's top follows the drag (a VDM's only with Follow stroke direction, #136), turned by Angle and jitter.
     const bool follow = strokeBrush_ != BrushType::Vdm || alphaOptions_.followStroke;
     const float a = alphaStampAngle(alphaOptions_, follow, drag, stampJitter_);

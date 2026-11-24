@@ -1,0 +1,36 @@
+name: CI status
+
+# Writes one line per finished run of CI, T0, Packages and Release to status.tsv on the ci-status branch (tools/ci/ci_status.sh), so
+# the maintainers' scripts learn "run N finished: conclusion" with `git fetch origin ci-status` instead of polling the REST API
+# (5000 calls an hour for every agent together; 11-11 it ran out and blocked a release). Its own workflow because it needs
+# contents: write on ONE branch (ci-status), which T0 must never have (tools/release/check_workflows.py). It checks out nothing
+# from the run it reports on: only the default branch's tools/ci, and the run's name, branch and SHA come in as environment variables.
+
+on:
+  workflow_run:
+    workflows: [CI, T0, Packages, Release]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    name: Record the finished run
+    # Only this repository's own runs: a fork's pull request can start CI, and its runs must not push real rows out of the 500 kept.
+    if: github.repository == 'islandmed/SculptForge' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: tools/ci
+          persist-credentials: false
+      - env:
+          CI_STATUS_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: tools/ci/ci_status.sh

@@ -1,21 +1,34 @@
 {
   "limit": 100,
-  "taken": 8,
+  "taken": 17,
   "names": [
     "Richard Throgmorton (MakIt3D)",
-    "Hameron (FXiT)",
+    "Hameron",
     "macklorange",
-    "hmh426",
-    "Lex"
+    "Hong's Art Lab (hmh426)",
+    "Artizmo",
+    "ebarranco",
+    "Rand_gogh",
+    "TETSUYA",
+    "Arvind Sond",
+    "fxrtst"
   ],
   "members": [
     "Richard Throgmorton (MakIt3D)",
     "macklorange",
     "hmh426",
     "Lex",
-    "Hameron (FXiT)"
+    "Hameron",
+    "Artizmo",
+    "Derrick J Archuleta",
+    "Hong's Art Lab (hmh426)",
+    "ebarranco",
+    "Rand_gogh",
+    "TETSUYA",
+    "fxrtst",
+    "Arvind Sond"
   ],
-  "active": 8,
+  "active": 17,
   "studios": 0,
-  "updated": "2026-11-09T16:38"
+  "updated": "2026-11-23T13:03"
 }

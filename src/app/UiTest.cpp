@@ -14,6 +14,7 @@
 //                            snapped onto the sculpt like stroke), e.g. to show the brush cursor
 //   hover_window X Y [S]     the same to window fractions (anywhere, e.g. the background)
 //   type LABEL TEXT          click a text field and type into it
+//   type_here TEXT           type over the text field that is open now (a slider's typed value, after a double-click), no click
 //   radial_import FILE       import a radial menu file (from the shots folder if radial_export wrote it there,
 //                            otherwise relative to the script), as Import... would
 //   radial_export N FILE     export radial menu N (1-based) to FILE in the shots folder, as Export... would
@@ -26,10 +27,14 @@
 //   stroke U0 V0 U1 V1 [S]   brush stroke across the model (fractions of its on-screen bounds)
 //   view_drag X0 Y0 X1 Y1 [S]  left-drag in the viewport at window fractions, gliding there first like stroke (same
 //                            point twice = a click)
+//   drag_frames X0 Y0 X1 Y1 N NAME  left-drag at window fractions in N steps, a shot NAME-0..NAME-N along the way
 //   drag X0 Y0 X1 Y1 [S] [release]  left-drag in window fractions (rectangle hide, sliders...); release:
 //                            let go of the held modifiers halfway (Alt-drag, release Alt to zoom)
 //   drag_item LABEL DX DY [S] [keep] left-drag from the item by DX DY pixels (scrubbing, dragging a tile out);
 //                            keep: leave the button down (a check mid-drag), then `release`
+//   drag_item_to LABEL TARGET [S] [keep]  left-drag from the item onto the centre of another item (Customize Shelves + Ctrl+Alt held:
+//                            drop a palette widget or button on a shelf)
+//   drag_shelf_items N       Customize Shelves + Ctrl+Alt held: drag every action off the shelves; each must come off (at least N)
 //   wheel_item LABEL X Y      the mouse wheel over the item: X sideways (a trackpad swipe), Y up/down
 //   drag_path U0 V0 U1 V1 ... [keep] [S=seconds]   left-drag through the points (fractions of the model's
 //                            on-screen bounds; outside 0..1 is the background) with the held modifiers: a lasso,
@@ -42,8 +47,8 @@
 //                            keep: leave the button down (a shot mid-drag), then `release`
 //   gizmo_hover HANDLE       move the mouse onto a Transform gizmo handle (it lights up, for screenshots)
 //   stroke_popup_item ITEM [click] [S]  glide onto an item of the open stroke popup (dots drag_stamp slide_stamp spray
-//                            lazy add sub smooth mask select mask_pen mask_lasso mask_rect cut_line cut_lasso cut_rect
-//                            cut_polyline, or outside: just right of the panel); click: press and let go;
+//                            lazy add sub smooth mask select mask_pen mask_lasso mask_rect mask_circle cut_line cut_lasso
+//                            cut_rect cut_circle cut_polyline, or outside: just right of the panel); click: press and let go;
 //                            pen: with the pen, hovering (its tip taps for click)
 //   drag_landmark N DX DY [S] left-drag Make sculptable's face landmark N (0-7, FaceLandmarks order) by DX DY pixels
 //   orbit DX DY              right-drag on the background, in pixels (with the held modifiers)
@@ -52,9 +57,12 @@
 //   axis_drag DX DY          left-drag from a spot on the axis gizmo's disc clear of its ends, by DX DY unscaled pixels
 //   axis_hover +x|...|-z|disc  rest the pointer on that end of the axis gizmo, or on its disc clear of the ends
 //   button_drag middle|right X0 Y0 X1 Y1 [S]  drag with that button in window fractions (with the held modifiers)
+//   set_shortcut ACTION KEYS rebind an action as Preferences > Hotkeys does (the key's other action loses it), e.g. set_shortcut view.pan_left J
 //   expect_shortcut ACTION KEYS  the action's effective keys, e.g. expect_shortcut view.front Numpad 1
+//   expect_popup_keys sub|smooth|mask|select KEYS  the keys the stroke popup's tile shows, e.g. expect_popup_keys sub Ctrl
 //   camera YAW PITCH         set the view's angles in degrees (0 0 = the front view), e.g. for guide screenshots
 //   brush_size PX            set Size (the brush radius, screen pixels)
+//   reset_sliders            Size, Intensity, Colour intensity and Falloff back to their defaults
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
 //   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
@@ -66,7 +74,8 @@
 //                            tier card is shown again unless the saved hardware profile put it away
 //   env NAME VALUE           set an environment variable; $SCRIPT_DIR is the script's folder
 //   generator_stub SHAPE...  Generate 3D answers from a stub instead of any service (never the network): candidate
-//                            N (A first) gets the Nth shape (cycling): sphere cube torus capsule cone, or fail; off = the services
+//                            N (A first) gets the Nth shape (cycling): sphere cube torus capsule cone, or fail, textoff, nomodel (the free Spaces' real refusal / empty answers); off = the services
+//   key_nav_speed X          the pan and zoom key speed (Preferences > Input), 0.1 to 5
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
@@ -74,12 +83,18 @@
 //                            Bridge file stored with the fixture header gets the format's bytes back (the
 //                            repository never holds them, docs/legal/trademarks.md)
 //   support_card first_run [test_mode]   the full membership card's launch decision (Support.h)
+//   member_card appeal starts=N      the appeal card's startup check (once per version, from the 2nd start)
+//   member_card update_appeal starts=N   the same start after an update: the update moment, then the appeal check
+//   member_card restart              the next start: the update moment (owed since the appeal) and the appeal check again
 //   member_card MOMENT [days=N] [sculpt_seconds=S]   a good moment for the small membership card (sculpted, render,
 //                            updated, challenge, none); member_sign_in ok|fail ends the GitHub sign-in it started
 //   wait SECONDS / wait_idle [TIMEOUT] (AI requests, thumbnails, update checks and other background jobs) / wait_for LABEL [TIMEOUT]
 //   wait_value NAME OP N [TIMEOUT]  wait (real time, default 30 s) until expect_value NAME OP N would pass
 //   expect LABEL / expect_not LABEL
 //   expect_text TEXT / expect_no_text TEXT   any text drawn this frame contains TEXT
+//   expect_clear POPUP ANCHOR                the POPUP item's box does not overlap the ANCHOR item's (popups must not cover what opened them)
+//   remember_items NAME SCOPE / expect_same_items NAME SCOPE   the items reachable in the panel SCOPE (its name in the
+//                            bar: Alpha, Brush...), kept as NAME, and later the same list: one section in two layouts
 //   expect_status TEXT       the status bar message contains TEXT
 //   expect_help TEXT         the Ctrl-hover help box shown this frame contains TEXT (hold ctrl, then hover)
 //   clipboard TEXT           put TEXT on the clipboard (to test pasting, e.g. a brush code)
@@ -88,25 +103,37 @@
 //                            hold alt to select it); U V: fractions of its on-screen bounds; N clicks in a row
 //                            (3 = a triple-click; 0 = only point at it, e.g. for a key that acts under the cursor)
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
-//                            can_undo, dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
-//                            flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
+//                            can_undo, newer_menu_rows (1 while the menu rows added after 0.13.0 show), level_switches (the Level slider's switches), typing (1 while a slider's number is typed), dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
+//                            detached_panels (in windows of their own), flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
 //                            background_r / background_g / background_b (the flat colour, 0-255), part_shading (0 Scene, 1 Smooth, 2 Flat),
 //                            custom_lit spheres (Lit Spheres loaded from images), material_custom (1 when the view uses
 //                            one), lit sphere_files (images in the library's Lit Spheres folder),
 //                            support_requests (times Support SculptForge was clicked; never opens a browser in tests),
 //                            whats_new_open, whats_new_cards, whats_new_tries (What's New and its Try it clicks),
+//                            whats_new_more (improvements past its cards), whats_new_scrolled (1 once its cards scrolled),
 //                            whats_new_contents / whats_new_expanded (its guide chapter: contents entries, open sections),
 //                            custom_brush_active (a custom brush is the active one),
 //                            member_card_open / member_card_pending / member_card_verifying / member_signed_in /
 //                            supporter (the membership cards, Support.h),
-//                            welcome_open (the first-run welcome shown), new_look_card_open (the one-time
+//                            featured_shown / featured_watch_requests (the welcome's featured creator card has an entry; Watch clicks),
+//                            model_screen_x / model_screen_y (px of the scene's centre from the canvas's top-left),
+//                            last_stroke_x / last_stroke_y (window px of where the last stroke landed; -1: none),
+//                            last_stroke_off_centre_px (the same from the free area's middle; -1: none),
+//                            model_side_clear (px between the model's projected box and the 3D view's nearer side, < 0: cut off),
+//                            welcome_open (the first-run welcome shown), welcome_outside_px (how far its window sticks out of
+//                            the screen, 0: inside; a phone screen cut its X and Close off), welcome_overflow_px (how far its
+//                            content runs past its right edge), new_look_card_open (the one-time
 //                            "SculptForge has a new look" card),
 //                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
 //                            index, -1 none), high_detail_part (its hidden copy's index, -1 none, -2 shown),
 //                            subdiv_levels (the active Part's, 0 none),
+//                            brush_looks (different alpha + stroke looks the brush thumbnails were asked for, #208),
+//                            thumbnails_regenerated (brush thumbnails remade by right-click > Regenerate thumbnail),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
 //                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
 //                            centre's x in the scene),
+//                            boolean_preview (triangles of the Boolean result the view shows in place of its Parts, 0
+//                            none), boolean_parts (shown Parts with a Boolean),
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
 //                            volume with its open borders capped),
@@ -114,12 +141,20 @@
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
 //                            console_open, command_palette_open, customize, shelves_visible,
-//                            right_tray_open, left_tray_open, right_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), timeline_overlaps (the timeline header's pieces over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), clipped_labels / clipped_labels@SCOPE (controls whose label is wider than they are, e.g. @Extract), hscroll_windows (shown vertical windows wider inside than out), hscrolled_windows (shown windows scrolled sideways), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
+//                            right_tray_open, left_tray_open, right_tray_shown / left_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), timeline_overlaps (the timeline header's pieces over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), clipped_labels / clipped_labels@SCOPE (controls whose label is wider than they are, e.g. @Extract), hscroll_windows (shown vertical windows wider inside than out), hscrolled_windows (shown windows scrolled sideways), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
+//                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
+//                            micro_pending_coarse (Focus Detail: tiles whose coarse shading still waits for a frame),
+//                            micro_pending_shading (a micro level without Focus Detail: patches whose shading still waits),
+//                            micro_widen_deferrals (live strokes' range widens shown a frame late, MicroRenderer::sync),
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
-//                            moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
-//                            selection_shown (1 while a rectangle / lasso selection is drawn), symmetry_x,
+//                            moved_raised (the most a vertex rose along its snapshot normal), moved_raised_plane (along the
+//                            last stroke's plane or its X mirror, the lesser: a plane cut lays undercuts in the plane), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
+//                            micro_moved (micro grid points whose height changed since `snapshot`), micro_masked / micro_mask_soft, micro_step
+//                            (micro grid points masked at least half / partly),
+//                            selection_shown (1 while a rectangle / lasso selection is drawn), selection_x0 / selection_y0 (its first point, window px)
+//                            and selection_w / selection_h (from there to the cursor), symmetry_x,
 //                            symmetry_radial (the radial copies, 0 off), radial_axis (0 X, 1 Y, 2 Z), symmetry_local,
 //                            symmetry_copies (copies every stroke makes), cursor_copies (brush cursors drawn),
 //                            symmetry_pivot_x (local symmetry's centre), timeline_top (1: the strip at the top),
@@ -141,7 +176,11 @@
 //                            smooth_group_borders (Brush > Smooth face group borders only, #81),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            moved_off_stencil (moved vertices that showed off the Stencil's image), stencil_active,
-//                            stencil_adjust, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
+//                            stencil_adjust, stencil_tile, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
+//                            reference_count, reference_selected, reference_adjust, reference_gpu_kb, reference_x /
+//                            reference_y / reference_height / reference_stretch / reference_origin_x..z (x1000, the
+//                            selected one), reference_scene, reference_has_image, reference_facing (x1000),
+//                            reference_render_r (a 64 px render's mean red: what renders show),
 //                            pen_pressure (raw), brush_pressure (after the curve; 1 for the mouse),
 //                            stroke_sample_pressure (the last stroke sample's, as its dabs got it),
 //                            pen_lost_samples (pressure samples that lost their value), pen_axes_after_motion,
@@ -150,16 +189,20 @@
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
 //                            surface_cursor (1 when the brush ring last drawn lay on the surface, #25),
 //                            size_ring_preview / size_ring_px (the ring the S / O pop-up shows where it opened, #138),
+//                            front_faces_tag (1 while the brush cursor carries the "Front faces only" tag),
 //                            cursor_ring (1 when the last brush cursor drawn had its ring; 0: the dot only, #88),
 //                            hide_ring_while_stroking (Preferences > Cursor, 1 on),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
-//                            saved_views (View > Views), mask_darkness (0-100),
+//                            saved_views (View > Views), mask_darkness (0-100), mask_colour_custom (1: a picked Mask colour),
 //                            camera_yaw / camera_pitch / camera_roll (degrees),
 //                            camera_up (the view's up vector . world Y), camera_aligned (1 when looking along a world
 //                            axis), camera_distance, camera_pan (target offset);
 //                            N may be $NAME or $NAME*K for a value kept by `remember`
 //                            paint_layers (paint layers above Base), active_paint_layer (-1 = Base),
-//                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255)
+//                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255),
+//                            paint_rough (how uneven the vertex paint is: the mean distance, sRGB 0-255, between a vertex's colour
+//                            and its neighbours' average; Shift with the Paint brush lowers it),
+//                            brush_color_r / brush_color_g / brush_color_b (the brush's colour, sRGB 0-255: what C picks)
 //                            uvs (1 when the Part has UVs), texture_size (0 = no texture), paint_texture (1 when
 //                            painting goes into the texture), paint_mode (1: the Paint brush, colour only),
 //                            texture_layers, active_texture_layer,
@@ -167,20 +210,22 @@
 //                            texture_mean_r / texture_mean_g / texture_mean_b (mean composite, sRGB 0-255),
 //                            material_channels (material channels on the texture, base colour not counted),
 //                            channel_view (0 = colour, else the solo channel: 1 roughness ... 7 opacity),
-//                            brush_channels (bit mask of what the brush paints), roughness_painted (texels whose
+//                            brush_channels (bit mask of what the brush paints), roughness_painted / metallic_painted (texels whose
 //                            roughness differs from the default), shown_mean_r (mean red the viewport is sent),
 //                            layer_channel_<id> (1 when the active texture layer has channel <id> on, e.g. roughness)
 //                            auto_uv_running, qremesh_running (QRemesh working in the background),
 //                            longest_frame_ms (the longest real time between two frames since the last read; resets),
 //                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
-//                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched,
+//                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched, remesh_skip_notes,
+//                            guide_strength (Guide Strength), retopo_target (Target Quads), guide_strength_on_shelves / target_quads_on_shelves / level_on_shelves, voxel_resolution, voxel_resolution_on_shelves (shelf slots holding its slider), voxel_triangle_estimate (the line under it), voxel_highres_confirm (1 while
+//                            the above-512 confirmation is open),
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
 //                            quads (quad pairs in the active Part), quad_percent (quads among its polygons)
-//                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect), hide_shape (1 SelectLasso, 2 SelectRect)
+//                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect, 7 MaskCircle), hide_shape (1 SelectLasso, 2 SelectRect, 7 SelectCircle, 8 CutCircle)
 //                            subdiv_level (the current subdivision level, 1 = base; 0 without levels), sdiv_levels (0 = none)
 //                            antialiasing (Preferences > Performance: 1, 2, 4, 8), view_samples (what the interactive
-//                            view draws with now: 1 while Fast Navigation moves a big scene), multithreading (1 on),
+//                            view draws with now: 1 while Fast Navigation moves a big scene), multithreading (1 on), threads (the shared pool's size), profile_threads (the saved profile's, for the next start),
 //                            last_stroke_dabs (dabs of the last finished stroke)
 //                            xray (1 on), view_resolution (percent), light_yaw / light_pitch (degrees),
 //                            light_intensity, light_ambient, render_aspect (Save Render's shape: 0 view, 1 1:1, 2 16:9,
@@ -192,7 +237,7 @@
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
 //                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
-//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, lazy_mouse (the Lazy Stroke type),
+//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, sculpt_mods (the held keys as sculpting reads them: Shift 1, Ctrl 2, Alt 4), lazy_mouse (the Lazy Stroke type),
 //                            steady_stroke (Steady Stroke on, any type), steady_lag (px from the pointer to the brush on
 //                            its string), steady_catch_up, world_size, world_radius_mm, draw_size_exact (px, unrounded),
 //                            precision_active (Shift+Alt mid-stroke), precision_lag (px from the pointer to the brush),
@@ -202,7 +247,8 @@
 //                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
 //                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable, orbit_lock (0 free, 1 Y, 2 X, 3 Z),
 //                            camera_ortho, checked@ACTION (1 when the toggle shows on), size_slider_ring (a Size slider's ring: 1 while it drags, then fading),
-//                            right_column_clipped (right shelf items past its bottom), mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
+//                            right_column_clipped (right shelf items past its bottom), right_shelf_changes (frames that folded,
+//                            unfolded or resized it; steady = no change), right_shelf_folded, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
 //                            index, -1 for a custom brush or Paint), last_dab_x / last_dab_y (window pixels), paint_r, recent_colors (the left shelf's recent paint colours)
 //                            gizmo_mode (0 Draw, 1 Move, 2 Scale, 3 Rotate, 4 All), gizmo_hover (handle under the cursor,
@@ -219,11 +265,17 @@
 //                            phone_captures (captures received), phone_face_frames, phone_face_fps, phone_recording,
 //                            phone_take_frames, phone_ar_version (AR models published), phone_ar_busy
 //                            brush_sort / alpha_sort / material_sort / library_sort (0 A-Z, 1 Recent, 2 Pack),
-//                            builtin_pack_brushes (built-in brush-pack brushes loaded), alpha_index (0 Round, -1 an image)
+//                            builtin_pack_brushes (built-in brush-pack brushes loaded), alpha_index (0 Round, -1 an image),
+//                            alpha_pool_size, alpha_scale_jitter, alpha_position_jitter (the alpha pool and jitter, Alpha palette)
 //   (mesh values are the active Part's)
 //   snapshot                 remember the active mesh's vertices (for the moved* values)
+//   interactive_strokes on|off   strokes as the window runs them: dabs queued and placed per frame, on the stroke thread for big
+//                            meshes (SF_BACKGROUND_DABS=1 forces it; set before the app starts, they are read once); off by default
+//                            (a UI test otherwise places a stroke's dabs at once). Values: stroke_async, stroke_draining, background_dabs
 //   remember VALUE NAME      keep VALUE's current value as $NAME
 //   run_fails COMMAND ...    run a command that must be refused (bad arguments)
+//   python_startup           run the Run at start-up scripts again, as at a launch (app/Python.h)
+//   python_startup append TEXT  the same, adding the line TEXT to each script between its check and its run
 //   print VALUE              write VALUE's current value to the log (benchmarks: frame_ms)
 //   shot NAME                save a screenshot NAME.png (to --ui-out)
 //   expect_guide FILE        the User Guide shows FILE ("masking.md", "index.md")
@@ -231,6 +283,10 @@
 //                            maybe_action, click_exit, snapshot_start, undo_all, expect_restored, expect_mesh_valid,
 //                            mode_matrix [known=FILE] [ID...], monkey SEED STEPS [COUNT]
 //   dump_shortcuts NAME      write every default shortcut as a Markdown table to --ui-out/NAME
+//   dump_ui NAME [GOLDEN]    write the interface as JSON to --ui-out/NAME: the palette bar and each palette's menu rows in drawing
+//                            order (the label##id of each), the shelves, the trays with their panels open or collapsed, the colour
+//                            cells, and the Preferences > Interface values. With GOLDEN (relative to the script) the dump must equal
+//                            that file: a Classic default that moved fails; SF_UI_GOLDEN_UPDATE=1 rewrites it (on purpose, reviewed)
 //   action ID                run a registry action as its key, shelf tile or the command palette would
 //   dialog_answer PATH|cancel   what the next file or folder dialog answers (none ever opens from a script:
 //                            NativeDialog.h; PATH relative to the script); values dialogs_requested (dialogs and URLs
@@ -245,6 +301,8 @@
 //   phone_face NAME=W ... [frames=N]   N face messages (default 5) with these ARKit weights
 //   phone_request METHOD PATH STATUS [BODY]   any request with the session token; fails unless the answer has
 //                            STATUS (e.g. phone_request POST /api/ar 200 {"scope":"part","size":20})
+//   deck_message ok|refused JSON   one message from the Forge Deck page, as its WebRTC channel delivers it (hello, ping,
+//                            or ONE command); fails unless the desktop accepts (ok) or refuses (refused) it
 // A scripted AI tool for live mode (PanelAiLink.cpp), over the real local socket / pipe (link/AiLink.h):
 //   ai_client connect        connect to this window's live-mode endpoint (Preferences > AI > Let AI tools ...)
 //   ai_client send JSON      send one message as is (a hello, a code, a tools/call)
@@ -264,7 +322,13 @@
 //                            (a short one is a tap with a little jitter); stray: as for pen_drag; lost: SDL drops
 //                            the pen while it touches (out of proximity without lifting, then sdl_pen_mouse stuck
 //                            and a new pen id, as SDL 3.2 on Windows after WM_POINTERCAPTURECHANGED)
-//   pen_button N down|up     side button N (1 lower, 2 upper, 3 third) with SDL 3.4's synthesized click
+//   pen_button N down|up [at X Y]   side button N (1 lower, 2 upper, 3 third) with SDL 3.4's synthesized click;
+//                            at: the event carries that position (window fractions) instead of the pen's, as a
+//                            stale one does (SDL keeps the last motion's position per pen, 0 0 before the first)
+//   pen_move X Y [S]         the same to a point of the window (fractions): a fixed path, whatever the view does
+//   view_trace on|off|check RATIO   on: note the camera's yaw and pitch at every pen_move sample; check: fail unless the view's step
+//                            per sample is smooth (no sample's step below 1/RATIO or above RATIO times the median, no step
+//                            against its neighbours' direction), ends excluded; off stops (the samples stay for check)
 //   pen_hover U V [S]        move the hovering pen to a point on the model (drags the view while a
 //                            button mapped to rotate / pan / right-click is held)
 //   pen_drag X0 Y0 X1 Y1 [stray X Y] [S]   pen tip drag from X0 Y0 to X1 Y1 (window fractions, like drag), e.g.
@@ -290,15 +354,22 @@
 //                            touching pen on Windows, #95; the app makes its own)
 //   pen_lost                 SDL drops the pen while it touches (WM_POINTERCAPTURECHANGED): it leaves proximity
 //                            without lifting, and SDL's pen mouse events stop (sdl_pen_mouse stuck)
-//   pen_stream ink|huion     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own
-//                            beside the pen's, a press at each touch whose release never comes
+//   mouse_steps on|off       off: the mouse's motion carries its position only, no steps of its own (xrel, yrel 0: a
+//                            warped or relative pointer)
+//   pen_stream ink|huion|kde|kde_pointer|kde_stalled|kde_sparse|right_after|right_first|right_late     ink: the pen's events (and SDL's); huion: the driver also sends mouse events of its own; kde: the pen's lower / upper button is also a right / middle click of the compositor's pointer, which moves with the pen
+//                            beside the pen's, a press at each touch whose release never comes; right_after / right_first: the
+//                            driver also clicks the right mouse button for a pen side button, after / before the pen's own event
+//                            (right_late: with the pen's first motion after it)
 //   window_focus 1|0         the window gains or loses keyboard focus; mouse_leave: the pointer leaves the window
 //                            (another screen); values: focus_frames (1 while focus keeps it drawing), wants_frames (1
 //                            while anything keeps the idle loop drawing: input, a job, an animation),
-//                            pen_mouse_down, ui_left_down (the panels hold the left button), soft_cursor
+//                            pen_buttons / pen_nav_button / view_dragging (side buttons held, the one driving a view drag, a view drag on), pen_mouse_down, ui_left_down (the panels hold the left button), soft_cursor
 //   wheel U V STEPS          the mouse wheel over the model point U V, STEPS notches (positive zooms in)
 //   mouse_move U V           a plain mouse (not the pen) moves to a point on the model, e.g. the stray mouse
 //                            events Windows Ink sends beside the pen's
+//   click_here [right]       click where the mouse is (the press and the release, no move)
+//   mouse_by DX DY           the mouse moves by DX DY pixels from where it is (no button): the S / U pop-up follows it
+//   expect_value size_ring_value (the preview's value: Size px, Falloff -1..1, Intensity 0..1)
 //
 // Touch (Touch.cpp): fingers as SDL sends them, each step a frame.
 //   touch_pinch U V SCALE TWIST DX DY [trackpad] [late]   two fingers about a point on the model, 120 px apart, over
@@ -306,7 +377,16 @@
 //                            midpoint moves DX DY pixels. Touch screen (SDL's mouse events for the first finger too)
 //                            or trackpad; late: the first finger lands alone and drags 40 px first (a stroke starts)
 //   touch_stroke U0 V0 U1 V1 one finger on the touch screen from one point on the model to another (sculpts)
-//   expect_value touch_fingers (fingers down now)
+//   touch_tap "label"        one finger taps an item as it is on screen (no wheel, no scrolling: a finger can't scroll a
+//                            window that doesn't drag-scroll; fails when the item is not visible)
+//   touch_tap_at X Y         the same at window fractions (0..1): a tap outside a window, on the canvas
+//   touch_drag_at X0 Y0 X1 Y1  one finger lands at window fractions and swipes to the others over 0.4 s (scrolls a window)
+//   touch_tap_welcome_x      a tap on the welcome window's title-bar X
+//   android_back             Android's Back button (SDLK_AC_BACK) down and up
+//   safe_area L T R B        window px the system covers (camera cut-out, bars, gesture area); `safe_area off` clears them
+//   expect_value touch_fingers (fingers down now), welcome_close_hidden_px / welcome_x_hidden_px (how far the welcome's
+//                            Close button / X sit outside the visible part of the window or the safe area, 0: whole),
+//                            welcome_scrolled_px (how far its body is scrolled), welcome_scroll_px (content below the fold: Close is only reachable by scrolling when > 0)
 //
 // Simulated 3Dconnexion SpaceMouse: an SDL virtual joystick with a SpaceMouse Compact's USB ids (256F:C635), six
 // axes and two buttons, found and opened by the app as a real one would be (SpaceMouse.cpp, hot-plug included).
@@ -322,6 +402,7 @@
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view),
 //                            spacemouse_echo (1 while a mouse wheel would be dropped as the driver's echo)
+//   start_view               the camera as a fresh start has it, then the first frame's fit into the view (a phone's narrow one)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
 //                            content scale changes, with SDL's event (Windows DPI, another monitor); pixel_density PERCENT: the window's pixel density (Retina; expect_value font_density, glyph_texels: x100); logical_width W: the display scale that makes the window W logical px wide (#105)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
@@ -330,13 +411,15 @@
 //                            font_atlas_kpx (the font atlas texture, thousands of pixels)
 //   expect_value model_top_clear / model_bottom_clear (px between the model's projected bounding box and the bands
 //                            framing keeps it clear of: the open Library, the Sculpt Timeline strip; < 0: under one),
-//                            camera_shift_y (the lens shift framing set, x1000; + up), left_column_clipped (left shelf
+//                            camera_shift_y (the lens shift framing set, x1000; + up), left_shelf_width + colour_cell_min (logical px: the left column, its smallest colour cell), left_column_clipped (left shelf
 //                            items past its visible bottom)
 //   expect_value weld_preview_points (Merge by Distance's orange dots drawn this frame: only while its distance is
 //                            dragged or hovered, fading out after)
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
+#include "app/Python.h"
 #include "ai/Http.h"
+#include "ai/GradioClient.h"
 #include "ai/ImageTo3DService.h"
 
 #ifndef SDL_PEN_INPUT_IN_PROXIMITY
@@ -345,6 +428,7 @@
 #include "app/Demo.h"
 #include "app/NativeDialog.h"
 #include "app/HwProfileUi.h"
+#include "app/I18n.h"
 #include "app/Shell.h"
 #include "app/Ui.h"
 #include "app/UserGlyphs.h"
@@ -352,8 +436,10 @@
 #include "core/BrushLibrary.h"
 #include "core/CloseHoles.h"
 #include "core/ListSort.h"
+#include "core/Micro.h"
 #include "core/LitSphere.h"
 #include "core/Multires.h"
+#include "core/MicroTiles.h"
 #include "core/PerfTrace.h"
 #include "core/Primitives.h"
 #include "core/Script.h"
@@ -368,6 +454,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <cstring>
 #include <utility>
 #include <thread>
 #include <mutex>
@@ -385,11 +472,21 @@
 #include <set>
 #include <sstream>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace sf {
 
 namespace {
+// mark_view / view_vs_mark: the 3D view as the GPU holds it now (no sync: what the user would see this frame), 480 x 270.
+std::vector<uint8_t> gViewMark;
+bool renderLiveView(App& app, std::vector<uint8_t>& out, const Camera& camera, const RenderSettings& settings, Renderer& renderer) {
+    (void)app;
+    Camera cam = camera;
+    cam.aspect = 480.0f / 270.0f;
+    std::string error;
+    return renderer.renderToImage(cam, 480, 270, settings, out, error);
+}
 
 // copy: Bridge files under `dst` stored with the fixture header and name prefix get the format's own bytes back.
 void restoreBridgeFixtures(const std::filesystem::path& dst) {
@@ -586,6 +683,13 @@ void Demo::detachVirtualSpaceMouse() {
 double Demo::query(const std::string& name, bool& known) const {
     const Mesh& m = app_.doc_.mesh;
     known = true;
+    if (name == "mypanel_entries") return double(app_.layout_.myPanel.size()); // My Panel (PanelMyPanel.cpp)
+    if (name == "mypanel_floating") return app_.myPanelFloating_ ? 1.0 : 0.0;
+    if (name.rfind("mypanel_at@", 0) == 0) { // mypanel_at@action:geometry.subdivide: its place in My Panel (0 first), -1 not in it
+        const auto& list = app_.layout_.myPanel;
+        const auto it = std::find(list.begin(), list.end(), name.substr(11));
+        return it == list.end() ? -1.0 : double(it - list.begin());
+    }
     if (name.rfind("checked@", 0) == 0) { // checked@ACTION: 1 when that toggle shows on (lit), 0 off, -1 no such action
         const Action* a = app_.actions_.find(name.substr(8));
         return !a ? -1.0 : a->checked && a->checked() ? 1.0 : 0.0;
@@ -634,6 +738,14 @@ double Demo::query(const std::string& name, bool& known) const {
         return sum / double((bx - ax) * (by - ay));
     }
     if (name == "triangles") return double(m.triangleCount());
+    // Adaptive Detail tiles (core/MicroTiles.h): tiles alive on the active Part's Micro level; delta pages on the GPU.
+    if (name == "micro_step") return m.micro ? double(m.micro->step) : -1.0; // (the grid's height unit: grows when a stroke widens it)
+    if (name == "micro_tiles") return m.micro && m.micro->tiles ? double(m.micro->tiles->alive()) : 0.0;
+    if (name == "micro_tile_pages") return double(app_.renderer_.microTilePages());
+    if (name == "micro_widen_deferrals") return double(app_.renderer_.microWidenDeferrals()); // (a stroke's range widen shown a frame late)
+    if (name == "micro_pending_coarse") return double(app_.renderer_.microPendingCoarse()); // (Focus Detail: tiles whose coarse shading waits for a frame)
+    if (name == "micro_pending_shading") return double(app_.renderer_.microPendingShading()); // (without Focus Detail: pending + stale patches)
+    if (name == "full_uploads") return double(app_.renderer_.fullUploads());
     if (name == "vertices") return double(m.vertexCount());
     if (name == "layers") return double(m.layers.size());
     if (name == "brushes") return double(app_.doc_.brushes.size());
@@ -647,14 +759,30 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const glm::vec3& c : m.colors) sum += double(linearToSrgb(c)[k]);
         return 255.0 * sum / double(m.colors.size());
     }
+    if (name == "paint_rough") {
+        if (!m.hasColors()) return 0.0;
+        double sum = 0.0;
+        for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+            const auto ring = m.neighbors(v);
+            if (ring.empty()) continue;
+            glm::vec3 avg(0.0f);
+            for (uint32_t u : ring) avg += linearToSrgb(m.colors[u]);
+            sum += double(glm::distance(linearToSrgb(m.colors[v]), avg / float(ring.size())));
+        }
+        return 255.0 * sum / double(m.vertexCount());
+    }
+    if (name == "brush_color_r" || name == "brush_color_g" || name == "brush_color_b")
+        return std::round(255.0f * linearToSrgb(app_.doc_.paintColor)[name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2]);
     if (name == "uvs") return m.hasUvs() ? 1.0 : 0.0;
     if (name == "subdiv_level") return subdivLevelCount(m) ? double(subdivCurrentLevel(m) + 1) : 0.0;
     if (name == "sdiv_levels") return double(subdivLevelCount(m));
     if (name == "antialiasing") return double(app_.uiPrefs_.antialiasing);
     if (name == "view_samples") return double(app_.perf_.samplesWanted);
     if (name == "multithreading") return ThreadPool::shared().serial() ? 0.0 : 1.0;
+    if (name == "threads") return double(ThreadPool::shared().threads()); // the shared pool's size now (workers + the caller)
     if (name == "predictive_strokes") return app_.predictiveStrokes() ? 1.0 : 0.0;
     if (name == "live_move") return app_.liveMoveEnabled() ? 1.0 : 0.0;
+    if (name == "keep_strokes_editable") return app_.uiPrefs_.keepStrokesEditable ? 1.0 : 0.0;
     if (name == "background_preview") return app_.uiPrefs_.backgroundPreview ? 1.0 : 0.0;
     if (name == "fast_upload") return app_.uiPrefs_.fastUpload ? 1.0 : 0.0;
     if (name == "live_move_active") return app_.liveMove_.active ? 1.0 : 0.0; // (a Move drag drawn by the GPU)
@@ -677,12 +805,22 @@ double Demo::query(const std::string& name, bool& known) const {
     if (const double v = app_.garmentTestValue(name); !std::isnan(v)) return v;
     if (const double v = app_.pbrTestValue(name); !std::isnan(v)) return v; // material_channels, channel_view, ...
     if (const double v = app_.splatTrainTestValue(name); !std::isnan(v)) return v; // splat_training, ...
+    if (const double v = app_.renderBridgeTestValue(name); !std::isnan(v)) return v; // render_bridge_state, ...
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
     if (name == "qremesh_running") return app_.qremesh_ ? 1.0 : 0.0;
     if (name == "voxel_remesh_running") return app_.voxelRemesh_ ? 1.0 : 0.0;
+    if (name == "voxel_resolution") return double(app_.voxelResolution_);
+    if (name == "retopo_target") return double(app_.retopo_.target);
+    if (name == "guide_strength") return double(app_.curvesStrength_);
+    if (name == "sdiv_slider") return double(app_.sdivSlider_);
+    if (name == "voxel_triangle_estimate") return double(app_.voxelEstimate().triangles);
+    if (name == "voxel_highres_confirm") return app_.voxelHighResConfirm_.open && !app_.voxelHighResConfirm_.swap ? 1.0 : 0.0;
+    if (name == "voxel_swap_confirm") return app_.voxelHighResConfirm_.open && app_.voxelHighResConfirm_.swap ? 1.0 : 0.0;
+    if (name == "autosave_written") return app_.autosaveWritten_ ? 1.0 : 0.0;
     if (name == "quick_remesh") return app_.uiPrefs_.quickRemesh ? 1.0 : 0.0;
     if (name == "remesh_after_stroke") return app_.uiPrefs_.remeshAfterStroke ? 1.0 : 0.0;
     if (name == "stroke_stretched") return double(app_.lastStrokeStretched_);
+    if (name == "remesh_skip_notes") return double(app_.remeshSkipNoted_.size()); // Remesh after each stroke told why (once per Part and reason)
     if (name == "qremesh_guides") return double(app_.doc_.qremeshGuides.size());
     if (name == "selection_sets") return m.selectionSets ? double(m.selectionSets->sets.size()) : 0.0;
     if (name == "morph_target") return m.selectionSets && !m.selectionSets->morphTarget.empty() ? 1.0 : 0.0;
@@ -711,7 +849,22 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "tube_selected") return double(app_.tubeSelection());
     if (name == "tube_first_radius_x1000" || name == "tube_last_radius_x1000") // the active Tube Part's ends
         return m.tube.empty() ? -1.0 : 1000.0 * (name[5] == 'f' ? m.tube.points.front() : m.tube.points.back()).radius;
-    if (name == "tube_profile") return double(int(m.tube.profile)); // 0 round, 1 square, 2 triangle, 3 ribbon
+    if (name == "tube_profile") return double(int(m.tube.profile)); // 0 round, 1 square, 2 triangle, 3 ribbon, 4 rope, 5 braid, 6 sleeve
+    if (name == "tube_curve") return m.tube.curve ? 1.0 : 0.0; // the active Part is a Curve Part
+    if (name == "tube_twist") return double(m.tube.twist);
+    if (name == "tube_strands") return double(m.tube.strands);
+    if (name == "tube_roll") return double(m.tube.roll);
+    if (name == "tube_spin") return double(m.tube.spin);
+    if (name == "tube_spread") return double(m.tube.spread);
+    if (name == "tube_slider_order") { // 1 when Tool > Tube's Turn, Twist, Spin, Strands and Spread sliders sit in that order, top to bottom (as in 0.12.10)
+        ImVec2 at[5];
+        const char* const items[5] = {"Tube/##tuberoll", "Tube/##tubetwist", "Tube/##tubespin", "Tube/##tubestrands", "Tube/##tubespread"};
+        for (int i = 0; i < 5; ++i)
+            if (!findItem(items[i], at[i])) return 0.0;
+        for (int i = 1; i < 5; ++i)
+            if (!(at[i - 1].y < at[i].y)) return 0.0;
+        return 1.0;
+    }
     if (name == "tube_taper_end") return double(m.tube.taperEnd);
     if (name == "tube_parts") {
         int n = 0;
@@ -721,17 +874,42 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "forgesphere_selected") return double(app_.forgesphereSelection());
     if (name == "forgesphere_menu") return app_.zsMenuShown_ ? 1.0 : 0.0;
     if (name == "forgesphere_place_child") return app_.forgespherePlaceChild_ ? 1.0 : 0.0;
+    if (name == "forgesphere_hint") return double(app_.forgesphereHint_); // what a Draw drag would do: 0 -, 1 move, 2 resize, 3 add
     if (name.rfind("forgesphere_out", 0) == 0) { // forgesphere_out2: how far sphere 2 is from its parent, in the parent's radii
         const size_t i = size_t(std::atoi(name.c_str() + 15));
         if (i == 0 || i >= m.forgespheres.size()) return -1.0;
         const ForgeSphere& p = m.forgespheres[size_t(m.forgespheres[i].parent)];
         return double(glm::distance(m.forgespheres[i].center, p.center) / p.radius);
     }
+    if (name.rfind("forgesphere_len", 0) == 0) { // forgesphere_len2: sphere 2's link length (to its parent), x1000
+        const size_t i = size_t(std::atoi(name.c_str() + 15));
+        if (i == 0 || i >= m.forgespheres.size()) return -1.0;
+        return 1000.0 * double(glm::distance(m.forgespheres[i].center, m.forgespheres[size_t(m.forgespheres[i].parent)].center));
+    }
+    if (name.rfind("forgesphere_depth", 0) == 0) { // forgesphere_depth2: sphere 2's depth in the view, x1000
+        const size_t i = size_t(std::atoi(name.c_str() + 17));
+        if (i >= m.forgespheres.size()) return -1.0;
+        const Camera c = app_.partCamera();
+        return 1000.0 * double(glm::dot(m.forgespheres[i].center - c.position(), glm::normalize(c.forward())));
+    }
+    if (name == "forgesphere_snap") return app_.forgesphereSnap_ ? 1.0 : 0.0;
+    if (name.rfind("forgesphere_surface", 0) == 0) { // forgesphere_surface2: sphere 2's centre's gap to the nearest other sphere's surface, x1000
+        const size_t i = size_t(std::atoi(name.c_str() + 19));
+        if (i >= m.forgespheres.size()) return -1.0;
+        double best = 1e9;
+        for (size_t j = 0; j < m.forgespheres.size(); ++j)
+            if (j != i)
+                best = std::min(best, std::abs(double(glm::distance(m.forgespheres[i].center, m.forgespheres[j].center)) -
+                                               double(m.forgespheres[j].radius)));
+        return 1000.0 * best;
+    }
     if (name == "forgesphere_root_x") return m.forgespheres.empty() ? 0.0 : double(m.forgespheres[0].center.x);
     if (name == "connected_only") return app_.uiPrefs_.connectedOnly ? 1.0 : 0.0;
     if (name == "view_falloff") return app_.uiPrefs_.viewFalloff ? 1.0 : 0.0;
+    if (name == "contact_facing") return app_.uiPrefs_.contactFacing ? 1.0 : 0.0;
     if (name == "smooth_remesh") return std::round(app_.doc_.sculptor.dyntopo.smoothRemesh * 100.0f);
     if (name == "invert_zoom") return app_.uiPrefs_.invertZoom ? 1.0 : 0.0;
+    if (name == "invert_twist") return app_.uiPrefs_.invertTwist ? 1.0 : 0.0;
     if (name == "maya_zoom_horizontal") return app_.uiPrefs_.mayaZoomHorizontal ? 1.0 : 0.0;
     if (name == "maya_live") return app_.uiPrefs_.mayaLive ? 1.0 : 0.0;
     if (name == "maya_live_sends") return double(app_.mayaLiveSends_);
@@ -740,6 +918,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "maya_link_connected") return app_.mayaLink_ && app_.mayaLink_->connected() ? 1.0 : 0.0;
     if (name == "maya_link_streams") return double(app_.mayaLinkStreams_);
     if (name == "wheel_to_pointer") return app_.uiPrefs_.wheelZoomToPointer ? 1.0 : 0.0;
+    if (name == "orbit_at_pointer") return app_.uiPrefs_.orbitAtPointer ? 1.0 : 0.0;
+    if (name == "mouse_orbit_speed") return std::round(double(app_.uiPrefs_.mouseOrbitSpeed) * 100.0);
     if (name == "along_normal") return double(app_.uiPrefs_.alongNormal);
     if (name == "stroke_along_normal") return app_.strokeAlongNormal_ ? 1.0 : 0.0;
     if (name.rfind("forgesphere_x", 0) == 0 || name.rfind("forgesphere_r", 0) == 0) { // forgesphere_x2, forgesphere_r2: sphere 2's x / radius
@@ -750,6 +930,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quads") return double(m.quadCount());
     if (name == "quad_percent")
         return m.triangleCount() ? 100.0 * double(m.quadCount()) / double(m.triangleCount() - m.quadCount()) : 0.0;
+    if (name == "texture_changed") { // texels that differ from the `snapshot`
+        if (!hasTexture(m) || baseTexels_.size() != m.texture->pixels.size()) return -1.0;
+        const std::vector<uint8_t>& px = m.texture->pixels;
+        double n = 0.0;
+        for (size_t i = 0; i < px.size(); i += 4) n += std::memcmp(&px[i], &baseTexels_[i], 4) != 0 ? 1.0 : 0.0;
+        return n;
+    }
     if (name == "texture_painted" || name.rfind("texture_mean_", 0) == 0) {
         if (!hasTexture(m)) return 0.0;
         const std::vector<uint8_t>& px = m.texture->pixels;
@@ -768,6 +955,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "smooth_group_borders") return app_.smoothGroupBorders_ ? 1.0 : 0.0;
     if (name == "stroke_keep_volume") return app_.dabSettings().smoothKeepVolume ? 1.0 : 0.0; // (Smooth's dabs)
     if (name == "smooth_intensity") return std::round(app_.smoothStrength_ * 100.0f);
+    // the Shift / Ctrl brushes (ModifierBrush.cpp): BrushType numbers, -1 the default; the stroke's brush and slot
+    if (name == "shift_brush") return double(app_.uiPrefs_.modifierBrushes.shift);
+    if (name == "ctrl_brush") return double(app_.uiPrefs_.modifierBrushes.ctrl);
+    if (name == "shift_intensity") return std::round(app_.uiPrefs_.modifierBrushes.shiftIntensity * 100.0f);
+    if (name == "stroke_brush") return double(int(app_.strokeBrush_));
+    if (name == "stroke_slot") return double(int(app_.strokeSlot_));
+    if (name == "main_brush") return double(int(app_.brush_));
     if (name == "rgb_intensity") return std::round(app_.rgbIntensity_ * 100.0f);
     if (name == "focal_shift") return std::round(app_.focalShift_ * 100.0f);
     if (name == "draw_size") return std::round(app_.radiusPx_);
@@ -780,6 +974,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "share_brush_size") return app_.brushSettingsStore().shareSizeIntensity ? 1.0 : 0.0;
     if (name == "alpha_follow") return app_.alphaOptions_.followStroke ? 1.0 : 0.0; // alpha options (#76)
     if (name == "alpha_angle") return std::round(app_.alphaOptions_.angle);
+    if (name == "slide_turned") return app_.slideTurn_.turned() ? 1.0 : 0.0; // Slide Stamp: the alpha turned with the rotate key (#175)
+    if (name == "slide_turn") return std::round(glm::degrees(app_.slideTurn_.angle())); // its turn, degrees
     if (name == "alpha_jitter") return std::round(app_.alphaOptions_.jitter);
     if (name == "recipe_alpha_angle" || name == "recipe_alpha_jitter" || name == "recipe_alpha_follow") { // its .sfbrush's (#136)
         const BrushRecipe* r = app_.activeRecipe();
@@ -806,6 +1002,9 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "alpha_tile_x") return double(app_.doc_.brushAlpha.tileX);
     if (name == "alpha_tile_y") return double(app_.doc_.brushAlpha.tileY);
+    if (name == "alpha_pool_size") return app_.alphaPool_ ? double(app_.alphaPool_->size()) : 0.0;
+    if (name == "alpha_scale_jitter") return double(app_.alphaOptions_.scaleJitter);
+    if (name == "alpha_position_jitter") return double(app_.alphaOptions_.positionJitter);
     if (name == "last_dab_angle") { // degrees, -180..180: the alpha's turn on the last dab
         const float d = std::remainder(glm::degrees(app_.lastDabAngle_), 360.0f);
         return std::round(d);
@@ -813,6 +1012,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quickmenu_open") return app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "right_click_menu") return app_.uiPrefs_.rightClickQuickMenu ? 1.0 : 0.0;
     if (name == "space_camera") return app_.uiPrefs_.spaceCamera ? 1.0 : 0.0;
+    if (name == "look_popup_colors") return app_.uiPrefs_.look.rolePopups ? 1.0 : 0.0; // 1 by role, 0 plain
+    if (name == "style_popup_role_edge") return theme::rolePopups ? 1.0 : 0.0;           // what the theme draws
     if (name == "look_outline_opacity") return double(std::lround(app_.uiPrefs_.look.outlineOpacity * 100.0f)); // percent
     if (name == "look_outlines") return double(app_.uiPrefs_.look.outlines); // 0 off, 1 subtle, 2 on
     if (name == "look_neutral") return app_.uiPrefs_.look.scheme == "neutral" ? 1.0 : 0.0; // Forge Terminal's Neutral colours
@@ -831,6 +1032,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_popup_picked") return double(app_.strokePopup_.picked); // -1: none yet
     if (name == "stroke_latch") return double(int(app_.strokeLatch())); // 0 none, 1 Smooth, 2 Mask, 3 Select
     if (name == "invert_toggle") return app_.invertToggle_ ? 1.0 : 0.0;
+    if (name == "sculpt_mods") { // the held keys as the sculpting reads them (the classic meanings): Shift 1 + Ctrl 2 + Alt 4
+        const SDL_Keymod k = app_.keyMods();
+        return double(((k & SDL_KMOD_SHIFT) ? 1 : 0) + ((k & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) ? 2 : 0) + ((k & SDL_KMOD_ALT) ? 4 : 0));
+    }
     if (name == "radial_menu") return double(app_.radial_.menu); // -1: none open
     if (name == "radial_held") return app_.radial_.menu >= 0 && app_.radial_.hold != App::RadialHold::None ? 1.0 : 0.0;
     if (name == "radial_hover") return double(app_.radial_.hover);
@@ -886,6 +1091,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_continuous") return app_.strokeContinuous_ ? 1.0 : 0.0; // Continuous (#31)
     if (name == "vdms") return double(app_.doc_.vdms.size());
     if (double gv = 0.0; app_.gradientUiValue(name, gv)) return gv; // gradient_armed, gradient_placed (LineGradient.cpp)
+    if (double rv = 0.0; app_.referenceUiValue(name, rv)) return rv; // reference_count, reference_x x1000, ... (ReferenceImages.cpp)
     if (double sv = 0.0; app_.stencilUiValue(name, sv)) return sv; // stencil_active, stencil_x / y / size x1000 (StencilOverlay.cpp)
     if (double cv = 0.0; app_.clothUiValue(name, cv)) return cv; // cloth_* (PanelCloth.cpp)
     if (double kv = 0.0; app_.kelvinUiValue(name, kv)) return kv; // capture_*, kelvin_* (PanelKelvinlet.cpp)
@@ -905,7 +1111,32 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "mask_brush") return app_.maskBrushActive() ? 1.0 : 0.0;
     if (name == "brush_sets") return double(app_.brushSets().size()); // brush sets in the library (#143)
     if (name == "brush_set_active") return double(app_.matchingBrushSet()); // the set the bottom shelf is, -1 none
+    if (name == "ui_drag_payload") { // 1 while a shelf-item drag (Customize Shelves) is in flight
+        const ImGuiPayload* p = ImGui::GetDragDropPayload();
+        return p && p->IsDataType(ui::kUiItemPayload) ? 1.0 : 0.0;
+    }
+    if (name == "shelf_drop_accepted") return app_.shelfDrag_.accepted ? 1.0 : 0.0; // the last drag landed on a shelf
+    if (name == "voxel_resolution_on_shelves") { // slots holding the Voxel Resolution slider (Customize Shelves)
+        double n = 0;
+        for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+            n += double(std::count(list->begin(), list->end(), "widget.voxel_resolution"));
+        return n;
+    }
+    for (const char* w : {"guide_strength", "target_quads", "level"}) { // slots holding that slider (Customize Shelves)
+        if (name != std::string(w) + "_on_shelves") continue;
+        double n = 0;
+        for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+            n += double(std::count(list->begin(), list->end(), std::string("widget.") + w));
+        return n;
+    }
     if (name == "bottom_shelf_items") return double(app_.layout_.bottomShelf.size());
+    if (name == "shortcut_conflict_open") return app_.shortcutConflictOpen() ? 1.0 : 0.0; // the Replace / Cancel popup
+    if (name == "shortcut_popup_overlaps_anchor") { // the popup over the button it belongs to (queue 14: popups clear their anchor)
+        const ImVec4 p = app_.shortcutPopupRect_, a = app_.shortcutAnchor_;
+        if (p.z <= p.x || a.z <= a.x) return -1.0; // no popup, or no anchor known
+        return p.x < a.z && a.x < p.z && p.y < a.w && a.y < p.w ? 1.0 : 0.0;
+    }
+    if (name == "key_nav_speed") return std::round(double(app_.uiPrefs_.keyNavSpeed) * 100.0);
     if (name == "shortcut_conflicts") { // keys that two actions claim (only the first would ever run)
         int conflicts = 0;
         std::vector<Chord> seen;
@@ -919,8 +1150,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "ai_link_state") return double(app_.aiLinkStateValue()); // live mode (PanelAiLink.cpp)
     if (name == "ai_client_lines") return g_aiClient ? double(g_aiClient->count()) : 0.0;
     if (name == "undo_ai") return app_.doc_.undo.canUndo() && app_.doc_.undo.undoLabel().rfind("AI: ", 0) == 0 ? 1.0 : 0.0;
-    if (name == "mask_shape") return double(int(app_.maskShape_)); // 0 MaskPen, 1 MaskLasso, 2 MaskRect
-    if (name == "hide_shape") return double(int(app_.hideShape_)); // 1 SelectLasso, 2 SelectRect
+    if (name == "mask_shape") return double(int(app_.maskShape_)); // 0 MaskPen, 1 MaskLasso, 2 MaskRect, 7 MaskCircle
+    if (name == "hide_shape") return double(int(app_.hideShape_)); // 1 SelectLasso, 2 SelectRect, 7 SelectCircle, 8 CutCircle
     if (name.rfind("phone_", 0) == 0) {
         const bool on = app_.phone_ && app_.phone_->running();
         const link::PhoneLinkStatus st = on ? app_.phone_->status() : link::PhoneLinkStatus{};
@@ -935,9 +1166,22 @@ double Demo::query(const std::string& name, bool& known) const {
         if (name == "phone_ar_version") return double(st.arVersion);
         if (name == "phone_ar_busy") return st.arBusy || app_.phoneBusy() ? 1.0 : 0.0;
     }
+    if (name.rfind("deck_", 0) == 0) { // Forge Deck prototype (PanelDeck.cpp)
+        const link::DeckStatus ds = app_.phone_ && app_.phone_->running() ? app_.phone_->deckStatus() : link::DeckStatus{};
+        if (name == "deck_on") return app_.showDeck_ && ds.enabled ? 1.0 : 0.0;
+        if (name == "deck_window") return app_.showDeck_ ? 1.0 : 0.0;
+        if (name == "deck_connected") return ds.connected ? 1.0 : 0.0;
+        if (name == "deck_qr") return app_.deckQr_.size > 0 ? 1.0 : 0.0; // the pairing code is drawn
+        if (name == "deck_accepted") return double(ds.accepted);
+        if (name == "deck_refused") return double(ds.refused);
+        if (name == "deck_symmetry_x") return app_.symmetry_.x ? 1.0 : 0.0;
+        if (name == "deck_size_position") return std::round(link::deckPxToSize(app_.radiusPx_) * 100.0f); // the strip's number
+        if (name == "deck_intensity") return std::round(app_.strength_ * 100.0f);
+    }
     if (name == "dynamic") return app_.doc_.sculptor.dyntopo.enabled ? 1.0 : 0.0;
     if (name == "dynamic_detail") return std::round(app_.doc_.sculptor.dyntopo.detail * 100.0f);
     if (name == "saved_views") return double(app_.savedViews_.size());
+    if (name == "mask_colour_custom") return app_.renderSettings_.maskColorCustom ? 1.0 : 0.0;
     if (name == "mask_darkness") return std::round(app_.renderSettings_.maskDarkness * 100.0f);
     if (name == "brush_type") return app_.doc_.activeBrush >= 0 || app_.paintMode_ ? -1.0 : double(int(app_.brush_));
     if (name == "dab_scene_error_px") { // the last dab's centre, placed in the scene and shown by the view, to the cursor
@@ -967,12 +1211,18 @@ double Demo::query(const std::string& name, bool& known) const {
                : name == "timeline_cursor" ? double(t->cursor())
                                            : double(t->branches().size());
     }
+    if (name == "newer_menu_rows") return app_.newerMenuRows() ? 1.0 : 0.0; // File > Render with... and the two Preferences rows shown
+    if (name == "level_switches") return double(app_.sdivSwitches_); // subdiv_level runs from the Level slider
+    if (name == "undo_steps") return double(app_.doc_.undo.undoCount());
     if (name == "can_undo") return app_.doc_.undo.canUndo() ? 1.0 : 0.0;
+    if (name == "can_redo") return app_.doc_.undo.canRedo() ? 1.0 : 0.0;
+    if (name == "typing") return GImGui->TempInputId != 0 && GImGui->TempInputId == GImGui->ActiveId ? 1.0 : 0.0; // a slider's number is being typed
     if (name == "dirty") return app_.doc_.dirty() ? 1.0 : 0.0;
     if (name == "splats") return double(app_.doc_.splats.size());
     if (name == "show_facegroups") return app_.renderSettings_.showFaceGroups ? 1.0 : 0.0;
     if (name == "show_mask") return app_.renderSettings_.showMask ? 1.0 : 0.0;
     if (name == "show_mesh") return app_.renderSettings_.showMesh ? 1.0 : 0.0;
+    if (name == "key_sequence_waiting") return app_.actions_.sequenceWaiting() ? 1.0 : 0.0; // a first key waiting for its second
     if (name == "wireframe") return app_.renderSettings_.wireframe ? 1.0 : 0.0;
     if (name == "custom_litspheres") {
         int n = 0;
@@ -1000,6 +1250,7 @@ double Demo::query(const std::string& name, bool& known) const {
         }
         return double(n);
     }
+    if (name == "unlit") return app_.renderSettings_.unlit ? 1.0 : 0.0;
     if (name == "flat_shading") return app_.renderSettings_.flatShading ? 1.0 : 0.0;
     if (name == "gradient_background") return app_.renderSettings_.gradientBackground ? 1.0 : 0.0;
     if (name == "background_r" || name == "background_g" || name == "background_b") // 0-255, display values
@@ -1013,7 +1264,49 @@ double Demo::query(const std::string& name, bool& known) const {
         const std::string p = app_.uiConfigPath();
         return !p.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
     }
+    if (name == "ui_prev_file") { // ui.json's copy from before this session's first write (Config.cpp writeJsonAtomic)
+        std::error_code ec;
+        const std::string p = app_.configDir_ + "ui.prev.json";
+        return !app_.configDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
+    }
+    if (name == "ui_prev_file") { // ui.json's copy from before this session's first write (Config.cpp backUpUiConfigOnce)
+        std::error_code ec;
+        const std::string p = app_.configDir_ + "ui.prev.json";
+        return !app_.configDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
+    }
+    if (name == "ui_prev2_file") { // the copy before ui.prev.json (Config.cpp backUpUiConfigOnce)
+        std::error_code ec;
+        const std::string p = app_.configDir_ + "ui.prev2.json";
+        return !app_.configDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
+    }
+    if (name == "layout_autosaved") return app_.layoutKey() == app_.layoutSavedKey_ ? 1.0 : 0.0; // ui.json holds the layout in use
+    if (name == "autosave_file" || name == "autosave_prev_file") { // the project autosave in the settings folder (PanelProject.cpp)
+        std::error_code ec;
+        const std::string p = app_.prefDir_ + (name == "autosave_file" ? "autosave.sfproj" : "autosave.prev.sfproj");
+        return !app_.prefDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
+    }
     if (name == "console_open") return app_.layout_.consoleOpen ? 1.0 : 0.0;
+    // Python scripting (app/Python.h): python_loads counts host loads (opening files must leave it 0).
+    if (name == "python_loads") return app_.python_ ? app_.python_->loads() : 0.0;
+    if (name == "python_loaded") return app_.python_ && app_.python_->loaded() ? 1.0 : 0.0;
+    if (name == "python_enabled") return app_.python().enabled() ? 1.0 : 0.0;
+    // Scripts from SCULPTFORGE_SCRIPT_PATH (tests/ui/python_script_path.sfui): how many are listed from the Scripts folder
+    // and from the path; whether Run at start-up refuses every one of the path's.
+    if (name == "python_scripts_listed") return double(app_.python().scripts().size());
+    if (name == "python_path_scripts") return double(app_.python().pathScripts().size());
+    if (name == "python_path_startup_refused") {
+        PythonScripting& py = app_.python();
+        bool all = true;
+        for (const std::string& p : py.pathScripts()) all = !py.setRunAtStartup(p, true) && !py.runsAtStartup(p) && all;
+        return all ? 1.0 : 0.0;
+    }
+    if (name.rfind("shelf_has_", 0) == 0) { // how many shelf slots hold the item (shelf_has_widget.color)
+        const std::string id = name.substr(10);
+        int n = 0;
+        for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+            n += int(std::count(list->begin(), list->end(), id));
+        return n;
+    }
     if (name == "command_palette_open") return app_.palette_.isOpen() ? 1.0 : 0.0;
     if (name == "customize") return app_.layout_.customize ? 1.0 : 0.0;
     if (name == "shelves_visible") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
@@ -1026,6 +1319,7 @@ double Demo::query(const std::string& name, bool& known) const {
         const int k = std::atoi(name.c_str() + 12);
         return k >= 0 && k < 4 && r[k]->w > 0.0f && r[k]->h > 0.0f ? 1.0 : 0.0;
     }
+    if (name == "left_tray_shown") return app_.shell_.leftTray.w > 0.0f ? 1.0 : 0.0;
     if (name == "right_tray_shown") return app_.shell_.rightTray.w > 0.0f ? 1.0 : 0.0; // drawn, not just set open (#107)
     if (name == "menu_rect_changes") { // times the open task menu moved or resized since the last read (a jitter is many)
         const int n = app_.menuRectChanges_;
@@ -1083,9 +1377,12 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "library_open") return app_.libraryBrowser_.open() ? 1.0 : 0.0;
     if (name == "guide_open") return app_.guide_.isOpen() ? 1.0 : 0.0;
+    if (name == "guide_role_edge") return app_.guide_.roleShown() ? 1.0 : 0.0; // the guide window drew its Learn edge + strip
     if (name == "guide_hits") return double(app_.guide_.searchHits());
     const Document& doc = app_.doc_;
     if (name == "parts") return double(doc.partCount());
+    if (name == "social_requests") return double(app_.socialRequests_); // Welcome icon row clicks
+    if (name == "last_social") return double(app_.lastSocial_);
     if (name == "discord_requests") return double(app_.discordRequests_); // Join the community on Discord clicks
     if (name == "support_requests") return double(app_.supportPageRequests_); // Support SculptForge clicks
     if (name == "ai_enabled") return ai::aiEnabled() ? 1.0 : 0.0; // Preferences > AI (PanelAi.cpp)
@@ -1100,7 +1397,35 @@ double Demo::query(const std::string& name, bool& known) const {
         return i < 0 ? -1.0 : app_.doc_.parts[size_t(i)].visible ? -2.0 : double(i);
     }
     if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
+    if (name == "language_bar_open") return app_.languageBar_ ? 1.0 : 0.0; // the first start's "SculptForge is in..." note
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
+    if (name == "welcome_close_hidden_px" || name == "welcome_x_hidden_px" || name == "welcome_scroll_px" || name == "welcome_scrolled_px") {
+        const ImGuiWindow* w = ImGui::FindWindowByName("Welcome to SculptForge##welcome");
+        if (!w || !w->WasActive) return -1.0;
+        if (name == "welcome_scroll_px") return std::ceil(double(std::max(w->ScrollMax.y, app_.welcomeScrollMax_)) - 0.5);
+        if (name == "welcome_scrolled_px") return std::ceil(double(app_.welcomeScrollY_) - 0.5);
+        const bool close = name == "welcome_close_hidden_px";
+        const ImVec4 r = close ? app_.welcomeCloseRect_ : app_.welcomeXRect_;
+        const CanvasRect safe = app_.safeRect();
+        // (the Close button sits in the scrolling part: its visible part is the window's inner rect; the X is the title bar's)
+        const float x0 = std::max(safe.x, close ? w->InnerRect.Min.x : w->Pos.x), y0 = std::max(safe.y, close ? w->InnerRect.Min.y : w->Pos.y);
+        const float x1 = std::min(safe.x + safe.w, close ? w->InnerRect.Max.x : w->Pos.x + w->Size.x);
+        const float y1 = std::min(safe.y + safe.h, close ? w->InnerRect.Max.y : w->Pos.y + w->Size.y);
+        const double out = std::max({double(x0 - r.x), double(y0 - r.y), double(r.z - x1), double(r.w - y1), 0.0});
+        return std::ceil(out - 0.5);
+    }
+    if (name == "welcome_outside_px" || name == "welcome_overflow_px") {
+        const ImGuiWindow* w = ImGui::FindWindowByName("Welcome to SculptForge##welcome");
+        if (!w || !w->WasActive) return -1.0;
+        if (name == "welcome_overflow_px") // content wider than the window: a button cut off at its right edge
+            return std::ceil(std::max(double(w->ContentSize.x + 2.0f * w->WindowPadding.x - w->InnerRect.GetWidth()), 0.0) - 0.5);
+        const ImVec2 screen = ImGui::GetIO().DisplaySize;
+        const double out = std::max({double(-w->Pos.x), double(-w->Pos.y), double(w->Pos.x + w->Size.x - screen.x),
+                                     double(w->Pos.y + w->Size.y - screen.y), 0.0});
+        return std::ceil(out - 0.5); // (rounding noise)
+    }
+    if (name == "featured_shown") return app_.featuredCard() ? 1.0 : 0.0;       // the welcome's featured creator card has an entry
+    if (name == "featured_watch_requests") return double(app_.featuredWatchRequests_);
     // Help > Quick tour (QuickTour.cpp): open, the slide (1-based), waiting aside after Show me, the one offer.
     if (name == "quick_tour_open") return app_.quickTourOpen_ ? 1.0 : 0.0;
     if (name == "quick_tour_slide") return double(app_.quickTourSlide_ + 1);
@@ -1108,6 +1433,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "quick_tour_offer") return app_.quickTourOffer_ ? 1.0 : 0.0;
     if (name == "quick_tour_done") return app_.quickTourDone_ ? 1.0 : 0.0;
     if (name == "dropdown_open") return app_.dropdown_.empty() ? 0.0 : 1.0;
+    if (name == "popups_open") return double(ImGui::GetCurrentContext()->OpenPopupStack.Size); // context menus and combos open
     if (name == "new_look_card_open") return app_.newLookCard_ ? 1.0 : 0.0; // "SculptForge has a new look" (0.10.7)
     if (name == "support_card_open") return app_.supportCardOpen() ? 1.0 : 0.0; // the support card at launch
     // The one big-mesh tip (BigMeshTip.h): open now, shown once (project.json), Preferences > Performance open.
@@ -1121,6 +1447,8 @@ double Demo::query(const std::string& name, bool& known) const {
     // entries (versions in full, then groups) and its open sections.
     if (name == "whats_new_open") return app_.whatsNewOpen() ? 1.0 : 0.0;
     if (name == "whats_new_cards") return app_.whatsNewVersion() ? double(app_.whatsNewVersion()->cards.size()) : 0.0;
+    if (name == "whats_new_scrolled") return app_.whatsNewScrolled() ? 1.0 : 0.0;
+    if (name == "whats_new_more") return double(app_.whatsNewMore());
     if (name == "whats_new_tries") return double(app_.whatsNewTries_);
     if (name == "whats_new_contents") return double(app_.guide_.whatsNewContents().size());
     if (name == "whats_new_expanded") return double(app_.guide_.whatsNewExpanded());
@@ -1128,6 +1456,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "supporter") return app_.supportCardPrefs_.supporter ? 1.0 : 0.0;
     // The small membership card (Support.h): open (1), the sign-in running from it, member builds signed in.
     if (name == "member_card_open") return app_.memberCard_ != MemberMoment::None ? 1.0 : 0.0;
+    if (name == "appeal_open") return app_.appealOpen_ ? 1.0 : 0.0;
+    if (name == "update_card_owed") return app_.supportCardPrefs_.updateOwed ? 1.0 : 0.0;
+    if (name == "appeal_pending") return app_.appealPending_ ? 1.0 : 0.0;
     if (name == "member_card_pending") return app_.memberMomentPending_ != MemberMoment::None ? 1.0 : 0.0;
     if (name == "member_card_verifying") return app_.memberVerifying_ ? 1.0 : 0.0;
     if (name == "member_card_not_now") return double(app_.supportCardPrefs_.notNow);
@@ -1139,8 +1470,16 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const auto& [id, tex] : app_.partThumbs_) n += tex ? 1.0 : 0.0;
         return n;
     }
+    if (name == "brush_looks") return double(app_.thumbs_.looksRequested()); // alpha looks the brush thumbnails were asked for (#208)
+    if (name == "brush_builtin_looks") return double(app_.thumbs_.builtinLooksRequested()); // (built-in brushes that show an alpha)
+    if (name == "thumbnails_regenerated") return double(app_.thumbs_.regenerated());
     if (name == "active_part") return double(doc.activePart);
     if (name == "extract_preview") return doc.extractPreviewCurrent() ? 1.0 : 0.0;
+    if (name == "boolean_preview") {
+        const Mesh* r = app_.booleanPreviewMesh();
+        return r ? double(r->triangleCount()) : 0.0;
+    }
+    if (name == "boolean_parts") return double(booleanPartIndices(doc).size());
     if (name == "open_edges") {
         std::map<std::pair<uint32_t, uint32_t>, int> edges;
         for (const auto& t : m.triangles)
@@ -1192,12 +1531,29 @@ double Demo::query(const std::string& name, bool& known) const {
         for (float v : m.mask) n += v > 0.5f;
         return double(n);
     }
+    if (name == "micro_moved") { // micro grid points whose height changed since `snapshot` (-1: no micro level or snapshot)
+        if (!m.micro || baseMicro_.size() != m.micro->disp.size()) return -1.0;
+        size_t n = 0;
+        const int16_t* d = m.micro->disp.data();
+        for (size_t i = 0; i < baseMicro_.size(); ++i) n += d[i] != baseMicro_[i];
+        return double(n);
+    }
+    if (name == "micro_masked" || name == "micro_mask_soft") { // micro grid points masked (>= half) / partly masked
+        if (!m.micro) return -1.0;
+        size_t n = 0;
+        for (uint8_t v : m.micro->mask) n += name == "micro_masked" ? v >= 128 : v > 2 && v < 253;
+        return double(n);
+    }
     if (name == "mask_soft") { // vertices partly masked (a blurred edge)
         size_t n = 0;
         for (float v : m.mask) n += v > 0.01f && v < 0.99f;
         return double(n);
     }
     if (name == "selection_shown") return app_.drag_ == App::Drag::Select && app_.selectMoved_ ? 1.0 : 0.0;
+    if (name == "selection_x0") return app_.selectPath_.empty() ? 0.0 : double(app_.selectPath_.front().x); // the shape's first point
+    if (name == "selection_y0") return app_.selectPath_.empty() ? 0.0 : double(app_.selectPath_.front().y);
+    if (name == "selection_w") return app_.selectPath_.empty() ? 0.0 : double(app_.mouseX_ - app_.selectPath_.front().x); // to the cursor
+    if (name == "selection_h") return app_.selectPath_.empty() ? 0.0 : double(app_.mouseY_ - app_.selectPath_.front().y);
     if (name == "symmetry_x") return app_.symmetry_.x ? 1.0 : 0.0;
     // Radial and local symmetry (#63): the count while radial is on (0 off), its axis (0 X, 1 Y, 2 Z), local (1 on),
     // the copies every stroke makes, the brush cursors drawn last frame, the local centre.
@@ -1219,6 +1575,7 @@ double Demo::query(const std::string& name, bool& known) const {
     // The style's minimum window height in unscaled px (32): switching looks must not scale it again each time.
     if (name == "ui_scale") return std::round(double(app_.uiScale_) * 100.0); // percent, as built now (#87)
     if (name == "glyphs_missing") return double(glyphs::missingLastFrame()); // drawn as "?" in the last frame
+    if (name == "info_font_px") return double(app_.infoFontPx_); // the title strip's Verts / Tris / Part readout (12 px, or 15 for CJK)
     if (name == "glyphs_merged") return double(glyphs::mergedCount());       // typed characters taken from other fonts
     if (name == "font_atlas_kpx") { // the font atlas texture, thousands of pixels (its size: memory, upload time)
         const ImFontAtlas* a = ImGui::GetIO().Fonts;
@@ -1260,8 +1617,58 @@ double Demo::query(const std::string& name, bool& known) const {
         }
         return name == "model_top_clear" ? double(top - (c.y + area.y * c.h)) : double(c.y + area.w * c.h - bottom);
     }
+    // Where the scene's bounding-box centre is on the screen, px from the canvas's top-left (the view turned about the
+    // pointer: how far it swings).
+    if (name == "model_screen_x" || name == "model_screen_y") {
+        const auto c = app_.canvasRect();
+        const AABB b = app_.sceneBounds();
+        if (!b.valid()) return -1e9;
+        const glm::vec4 h = app_.camera_.projection() * app_.camera_.view() * glm::vec4(b.center(), 1.0f);
+        if (h.w <= 0.0f) return -1e9;
+        return name == "model_screen_x" ? double((h.x / h.w * 0.5f + 0.5f) * c.w) : double((1.0f - h.y / h.w) * 0.5f * c.h);
+    }
+    // How far the last stroke's place is from the middle of the free canvas area (what Frame last stroke centres it on),
+    // px; -1 when there is no stroke to frame.
+    if (name == "last_stroke_x" || name == "last_stroke_y") { // window px; -1 when there is none
+        const auto p = app_.lastStrokePoint();
+        const ImVec2 s = p ? project(*p) : ImVec2(-1.0f, -1.0f);
+        return double(name == "last_stroke_x" ? s.x : s.y);
+    }
+    if (name == "last_stroke_off_centre_px") {
+        const auto p = app_.lastStrokePoint();
+        if (!p) return -1.0;
+        const auto c = app_.canvasRect();
+        const glm::vec4 area = app_.freeCanvasArea();
+        const glm::vec4 h = app_.camera_.projection() * app_.camera_.view() * glm::vec4(*p, 1.0f);
+        if (h.w <= 0.0f) return 1e9;
+        const glm::vec2 at(c.x + (h.x / h.w * 0.5f + 0.5f) * c.w, c.y + (1.0f - h.y / h.w) * 0.5f * c.h);
+        const glm::vec2 mid(c.x + (area.x + area.z) * 0.5f * c.w, c.y + (area.y + area.w) * 0.5f * c.h);
+        return double(glm::distance(at, mid));
+    }
+    // The model's projected bounding box against the 3D view's sides, px: >= 0 when it fits across (a phone held upright
+    // showed the middle of a model wider than the view: "nothing visible").
+    if (name == "model_side_clear") {
+        const auto c = app_.canvasRect();
+        const AABB b = app_.sceneBounds();
+        if (!b.valid()) return -1e9;
+        const glm::mat4 vp = app_.camera_.projection() * app_.camera_.view();
+        float left = 1e9f, right = -1e9f;
+        for (int k = 0; k < 8; ++k) {
+            const glm::vec3 p((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z);
+            const glm::vec4 h = vp * glm::vec4(p, 1.0f);
+            if (h.w <= 0.0f) return -1e9;
+            const float x = c.x + (h.x / h.w * 0.5f + 0.5f) * c.w;
+            left = std::min(left, x);
+            right = std::max(right, x);
+        }
+        return double(std::min(left - c.x, c.x + c.w - right));
+    }
     // Items of the left shelf (the brush tiles, the colour picker) past its visible bottom in the last frame.
+    if (name == "left_shelf_width") return std::round(double(app_.shell_.leftShelf.w / app_.uiScale_)); // logical px
+    if (name == "colour_cell_min") return std::floor(double(app_.colourCellMin_) + 0.5); // the shelf's smallest colour cell, logical px
     if (name == "left_column_clipped") return double(app_.shelfClipped_[kShelfLeft]);
+    if (name == "right_shelf_changes") return double(app_.rightShelfChanges_);
+    if (name == "right_shelf_folded") return app_.rightShelfFolded_ ? 1.0 : 0.0;
     if (name == "right_column_clipped") return double(app_.shelfClipped_[kShelfRight]); // (the wheel scrolls to them)
     if (name == "size_slider_ring") return double(app_.sizeSliderRingAlpha_); // a Size slider's ring: 1 dragging, fading after
     if (name == "timeline_y" || name == "axis_gizmo_y") {
@@ -1278,12 +1685,36 @@ double Demo::query(const std::string& name, bool& known) const {
         for (uint8_t h : m.hidden) n += h != 0;
         return double(n);
     }
+    if (name == "moved_raised") { // the most any vertex rose along its snapshot normal since `snapshot` (0 = nothing added)
+        if (basePositions_.size() != m.vertexCount() || baseNormals_.size() != basePositions_.size()) return -1.0;
+        double up = 0.0;
+        for (size_t v = 0; v < basePositions_.size(); ++v)
+            up = std::max(up, double(glm::dot(m.positions[v] - basePositions_[v], baseNormals_[v])));
+        return up;
+    }
+    if (name == "moved_raised_plane") { // the most any vertex rose along the last dab's plane (or its X mirror image, the lesser)
+        const auto& f = app_.doc_.sculptor.lastFrame;
+        if (basePositions_.size() != m.vertexCount() || !f.valid) return -1.0;
+        const glm::vec3 n = f.normal, mirrored(-n.x, n.y, n.z);
+        double up = 0.0;
+        for (size_t v = 0; v < basePositions_.size(); ++v) {
+            const glm::vec3 d = m.positions[v] - basePositions_[v];
+            up = std::max(up, double(std::min(glm::dot(d, n), glm::dot(d, mirrored))));
+        }
+        return up;
+    }
     if (name == "moved_masked") { // masked vertices (mask >= 0.5) that moved since `snapshot`
         if (basePositions_.size() != m.vertexCount()) return -1.0;
         double count = 0.0;
         for (size_t v = 0; v < basePositions_.size(); ++v)
             count += m.maskAt(uint32_t(v)) >= 0.5f && glm::length(m.positions[v] - basePositions_[v]) > 1e-6f ? 1.0 : 0.0;
         return count;
+    }
+    if (name == "moved_exact") { // vertices whose position differs in any bit from the `snapshot`
+        if (basePositions_.size() != m.vertexCount()) return -1.0;
+        return double(m.vertexCount() - size_t(std::count_if(basePositions_.begin(), basePositions_.end(), [&](const glm::vec3& b) {
+            return std::memcmp(&b, &m.positions[size_t(&b - basePositions_.data())], sizeof(glm::vec3)) == 0;
+        })));
     }
     if (name == "moved" || name == "moved_max" || name == "moved_sum" || name == "moved_out") {
         if (basePositions_.size() != m.vertexCount()) return -1.0; // no snapshot, or the topology changed
@@ -1335,7 +1766,13 @@ double Demo::query(const std::string& name, bool& known) const {
         for (std::string row; std::getline(in, row);) n += row.find(what) != std::string::npos ? 1.0 : 0.0;
         return n;
     }
+    if (name == "startup_splash_pref") return app_.uiPrefs_.startupSplash ? 1.0 : 0.0; // Preferences > Interface
+    if (name == "startup_splash_enabled") return app_.splashEnabled_ ? 1.0 : 0.0;      // (never in a test: StartupSplash.h)
+    if (name == "gl_context_current") return app_.glContext_ && SDL_GL_GetCurrentContext() == app_.glContext_ && gl::GetString(GL_VERSION) ? 1.0 : 0.0;
+    if (name == "startup_splash_open") return app_.splash_ ? 1.0 : 0.0;
+    if (name == "main_window_hidden") return app_.mainWindowHidden_ ? 1.0 : 0.0;
     if (name == "backface_culling") return app_.renderSettings_.backfaceCulling ? 1.0 : 0.0;
+    if (name == "detached_panels") return double(app_.panelWindows_.size()); // in windows of their own (PanelWindows.cpp)
     if (name == "floor_grid") return app_.renderSettings_.floorGrid ? 1.0 : 0.0;
     if (name == "floor_height") return double(app_.renderSettings_.floorHeight); // (the visible Parts' lowest point)
     if (name == "floor_grid_drawn") { // the 3D view drawn once more now: 1 if it drew the floor grid
@@ -1343,6 +1780,9 @@ double Demo::query(const std::string& name, bool& known) const {
         return app_.renderer_.floorGridDrawn() ? 1.0 : 0.0;
     }
     if (name == "xray") return app_.renderSettings_.xray ? 1.0 : 0.0;
+    if (name == "view_ao") return app_.renderSettings_.ambientOcclusion ? 1.0 : 0.0;
+    if (name == "view_shadows") return app_.renderSettings_.shadows ? 1.0 : 0.0;
+    if (name == "occlusion_on") return app_.renderer_.occlusionWanted(app_.renderSettings_) ? 1.0 : 0.0; // shadows or AO shade the view
     if (name == "view_resolution") return double(app_.uiPrefs_.viewResolution);
     if (name == "light_yaw") return double(app_.renderSettings_.lightYaw);
     if (name == "light_pitch") return double(app_.renderSettings_.lightPitch);
@@ -1354,6 +1794,36 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.lastDrawnTriangles());
     }
+    if (name == "view_stale") {
+        // gh#184: the view as the GPU holds it after the edits so far, against the same mesh sent up whole again: the
+        // mean per-pixel difference (0-255) of the two renders. Stale GPU data (an undone stroke still drawn) shows here.
+        const int w = 480, h = 270;
+        Camera cam = app_.camera_;
+        cam.aspect = float(w) / float(h);
+        std::vector<uint8_t> now, whole;
+        std::string error;
+        app_.syncScene();
+        if (!app_.renderer_.renderToImage(cam, w, h, app_.renderSettings_, now, error)) return -1.0;
+        app_.displayedMesh().topologyDirty = true; // (a full upload)
+        app_.syncScene();
+        if (!app_.renderer_.renderToImage(cam, w, h, app_.renderSettings_, whole, error) || whole.size() != now.size()) return -1.0;
+        uint64_t sum = 0;
+        for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(whole[i])));
+        return double(sum) / double(std::max<size_t>(1, now.size()));
+    }
+    if (name == "view_vs_mark") { // the view as the GPU holds it now (not synced first) against mark_view's: mean pixel difference 0-255
+        std::vector<uint8_t> now;
+        if (gViewMark.empty() || !renderLiveView(app_, now, app_.camera_, app_.renderSettings_, app_.renderer_) || now.size() != gViewMark.size())
+            return -1.0;
+        uint64_t sum = 0;
+        for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(gViewMark[i])));
+        return double(sum) / double(std::max<size_t>(1, now.size()));
+    }
+    // Strokes on the stroke thread (interactive_strokes on; AsyncStroke.cpp): the stroke now running places its dabs there,
+    // and the last one is still being placed (draining) or the thread is busy.
+    if (name == "stroke_async") return app_.asyncStroke_ ? 1.0 : 0.0;
+    if (name == "stroke_draining") return app_.strokeDraining() || app_.solverBusy() ? 1.0 : 0.0;
+    if (name == "background_dabs") return app_.backgroundDabs() ? 1.0 : 0.0;
     if (name == "coarse_clusters") { // the 3D view drawn once more now: the clusters it drew at a coarse level
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.coarseDrawnClusters());
@@ -1389,11 +1859,41 @@ double Demo::query(const std::string& name, bool& known) const {
         }
         return worst;
     }
+    if (name == "timelapse_micro_change" || name == "timelapse_micro_stale") {
+        // Strokes on a Micro level in the timelapse (member bug, 0.13.9: "recorded nothing inside the micro"). The frame
+        // after step 1 (the script's Micro level, no stroke yet) and at the last step, as renderTimelapseFrame draws
+        // them (static camera, 320x180):
+        // _change = mean per-pixel difference (0-255) between the two (the strokes must show);
+        // _stale = the last step's frame against the same frame with the whole level sent up again (0 = nothing missed).
+        Timeline* t = Timeline::of(app_.doc_.undo);
+        if (!t || t->cursor() == 0) return -1.0;
+        const size_t last = t->cursor();
+        Camera cam = app_.camera_;
+        cam.frame(app_.sceneBounds());
+        cam.pitch = app_.camera_.pitch;
+        cam.distance *= 0.72f;
+        cam.aspect = 320.0f / 180.0f;
+        std::vector<uint8_t> first, end, whole;
+        std::string err;
+        if (!t->seek(app_.doc_, 1, &err) || !app_.renderTimelapseFrame(cam, 320, 180, first, err)) return -2.0;
+        if (!t->seek(app_.doc_, last, &err) || !app_.renderTimelapseFrame(cam, 320, 180, end, err)) return -3.0;
+        app_.displayedMesh().topologyDirty = true; // (a full upload)
+        if (!app_.renderTimelapseFrame(cam, 320, 180, whole, err) || whole.size() != end.size() || first.size() != end.size())
+            return -4.0;
+        const std::vector<uint8_t>& other = name == "timelapse_micro_change" ? first : whole;
+        uint64_t sum = 0;
+        for (size_t i = 0; i < end.size(); ++i) sum += uint64_t(std::abs(int(end[i]) - int(other[i])));
+        return double(sum) / double(std::max<size_t>(1, end.size()));
+    }
     if (name == "stroke_programs") return double(app_.renderer_.strokePrograms()); // compiled before any stroke (warmed)
     if (name == "render_patch_errors") { // the 3D view drawn once more now: dynamic-topology patch triangles wrong on the GPU
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.patchErrors(app_.doc_.parts[size_t(app_.doc_.activePart)].id, app_.displayedMesh()));
     }
+    if (name == "part_full_uploads") return double(app_.renderer_.fullUploads(app_.doc_.parts[size_t(app_.doc_.activePart)].id));
+    if (name == "part_vertex_syncs") return double(app_.renderer_.vertexSyncs(app_.doc_.parts[size_t(app_.doc_.activePart)].id));
+    if (name == "gizmo_gpu") // a Gizmo drag drawn by one matrix (App::gizmoDrawnTransform)
+        return double(std::count(app_.gizmo_.gpu.begin(), app_.gizmo_.gpu.end(), uint8_t(1)));
     if (name == "render_patches") return double(app_.renderer_.patchCount(app_.doc_.parts[size_t(app_.doc_.activePart)].id));
     if (name == "coarse_pending") return double(app_.renderer_.coarsePendingClusters()); // edited, levels not updated yet
     if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel
@@ -1403,6 +1903,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "wants_frames") return app_.wantsFrames(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "focus_frames") return app_.focusKeepsDrawing(double(SDL_GetTicksNS()) * 1e-9) ? 1.0 : 0.0;
     if (name == "pen_mouse_down") return app_.penMouseDown_ ? 1.0 : 0.0;
+    if (name == "pen_buttons") return double(app_.penButtons_);                       // the side buttons the app holds (bit per button)
+    if (name == "pen_nav_button") return double(app_.penNavButton_);                  // the button driving a view drag (0: none)
+    if (name == "view_dragging") return app_.drag_ == App::Drag::Orbit || app_.drag_ == App::Drag::Pan || app_.drag_ == App::Drag::Zoom ? 1.0 : 0.0;
     if (name == "tier_card") return app_.hwProfile_ && app_.hwProfile_->tierCard ? 1.0 : 0.0; // the first-run card is up
     if (name == "tier_card_saved") { // the saved profile puts it away on this machine (what the next start reads)
         HardwareProfile saved;
@@ -1411,15 +1914,23 @@ double Demo::query(const std::string& name, bool& known) const {
                    ? 1.0
                    : 0.0;
     }
+    if (name == "profile_threads") { // the saved profile's thread count: what the next start's pool gets (0 = no profile)
+        HardwareProfile saved;
+        return loadHardwareProfile(hardwareProfilePath(), saved) ? double(saved.settings.threads) : 0.0;
+    }
     if (name == "ui_left_down") return ImGui::IsMouseDown(ImGuiMouseButton_Left) ? 1.0 : 0.0;
     if (name == "soft_cursor") return app_.penSoftCursor() ? 1.0 : 0.0; // Mouse mode: the app draws the arrow
     if (name == "ui_mouse_x") return ImGui::GetIO().MousePos.x; // where the panels see the pointer
     if (name == "ui_mouse_y") return ImGui::GetIO().MousePos.y;
     if (name == "cursor_x") return app_.mouseX_;
     if (name == "cursor_y") return app_.mouseY_;
+    if (name == "pen_x") return penAt_.x; // where the pen last was (window px): the brush ring is there (#216)
+    if (name == "pen_y") return penAt_.y;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
     if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
     if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
+    if (name == "size_ring_value") return std::round(double(app_.sizeRingPreviewValue_) * 100.0) / 100.0;
+    if (name == "front_faces_tag") return app_.frontFacesTagShown_ ? 1.0 : 0.0;
     if (name == "cursor_ring") return app_.ringShown_ ? 1.0 : 0.0;
     if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
     if (name == "cursor_follows_surface") return app_.uiPrefs_.cursorFollowsSurface ? 1.0 : 0.0;
@@ -1432,6 +1943,8 @@ double Demo::query(const std::string& name, bool& known) const {
         return std::max({f.x, f.y, f.z}) > 0.99999f ? 1.0 : 0.0;
     }
     if (name == "touch_fingers") return double(app_.touch_.fingers());
+    if (name == "tablet_palm_rejection") return app_.uiPrefs_.tablet.palmRejection ? 1.0 : 0.0;
+    if (name == "palm_guard") return app_.palmGuard() ? 1.0 : 0.0;
     if (name == "spacemouse_connected") return app_.spaceMouse_ ? 1.0 : 0.0;
     if (name == "spacemouse_moving") return app_.spaceMouseMoving() ? 1.0 : 0.0;
     if (name == "spacemouse_echo") { // a mouse's wheel turned now would be taken for the driver's echo
@@ -1449,6 +1962,7 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "dialogs_requested") return double(dialogs::requested());
     if (name == "dialog_kind") return double(int(dialogs::lastKind()));
+    if (name == "render_coverage") return queryRender(name, known); // (UiTestRender.cpp)
     return queryModes(name, known); // latched, sculpted ... (UiTestModes.cpp); sets known
 }
 
@@ -1583,6 +2097,157 @@ void Demo::testKey(int line, const std::string& combo, int phase) {
     wait(0.1f);
 }
 
+// Step verb -> its case in parseStep's switch. (A 147-link else-if chain reached MSVC's block-nesting limit, C1061;
+// a table + switch has no depth, and a new step is a name here, an enumerator and a case.)
+enum class StepVerb { None,
+    SafeArea, AndroidBack, TouchDragAt, TouchTap,
+    Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
+    AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
+    DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
+    Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
+    AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
+    PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
+    GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
+    WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
+    Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, DumpUi, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
+    PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
+    PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
+    SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
+    SpacemouseEcho, PenRest, ViewTrace, Shot,
+};
+static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
+    static const std::unordered_map<std::string_view, StepVerb> verbs = {
+        {"safe_area", StepVerb::SafeArea},
+        {"android_back", StepVerb::AndroidBack},
+        {"touch_drag_at", StepVerb::TouchDragAt},
+        {"touch_tap", StepVerb::TouchTap}, {"touch_tap_at", StepVerb::TouchTap}, {"touch_tap_welcome_x", StepVerb::TouchTap},
+        {"click", StepVerb::Click}, {"double_click", StepVerb::Click}, {"right_click", StepVerb::Click},
+        {"jump_click", StepVerb::JumpClick},
+        {"tier_card", StepVerb::TierCard},
+        {"hover", StepVerb::Hover},
+        {"hover_model", StepVerb::HoverModel}, {"hover_window", StepVerb::HoverModel},
+        {"type", StepVerb::Type}, {"type_here", StepVerb::TypeHere},
+        {"key", StepVerb::Key},
+        {"key_down", StepVerb::KeyDown}, {"key_up", StepVerb::KeyDown},
+        {"hold", StepVerb::Hold},
+        {"stroke", StepVerb::Stroke},
+        {"view_drag", StepVerb::ViewDrag},
+        {"drag_frames", StepVerb::DragFrames},
+        {"axis_click", StepVerb::AxisClick},
+        {"axis_drag", StepVerb::AxisDrag}, {"axis_hover", StepVerb::AxisDrag},
+        {"view_figure_click", StepVerb::ViewFigureClick},
+        {"click_part", StepVerb::ClickPart},
+        {"drag", StepVerb::Drag},
+        {"button_drag", StepVerb::ButtonDrag},
+        {"action", StepVerb::Action},
+        {"set_shortcut", StepVerb::SetShortcut},
+        {"expect_shortcut", StepVerb::ExpectShortcut},
+        {"expect_popup_keys", StepVerb::ExpectPopupKeys},
+        {"drag_tube_point", StepVerb::DragTubePoint},
+        {"drag_forgesphere", StepVerb::DragForgesphere},
+        {"drag_landmark", StepVerb::DragLandmark},
+        {"gizmo_drag", StepVerb::GizmoDrag}, {"gizmo_hover", StepVerb::GizmoDrag},
+        {"stroke_popup_item", StepVerb::StrokePopupItem},
+        {"drag_item", StepVerb::DragItem},
+        {"drag_to", StepVerb::DragTo},
+        {"drag_shelf_items", StepVerb::DragShelfItems},
+        {"drag_path", StepVerb::DragPath},
+        {"release", StepVerb::Release},
+        {"orbit", StepVerb::Orbit},
+        {"camera", StepVerb::Camera},
+        {"zoom", StepVerb::Zoom},
+        {"camera_distance", StepVerb::CameraDistance},
+        {"brush_size", StepVerb::BrushSize},
+        {"reset_sliders", StepVerb::ResetSliders},
+        {"look", StepVerb::Look},
+        {"drop", StepVerb::Drop},
+        {"drop_library", StepVerb::DropLibrary},
+        {"choose_file", StepVerb::ChooseFile},
+        {"dialog_answer", StepVerb::DialogAnswer},
+        {"answer_dialog", StepVerb::AnswerDialog},
+        {"radial_import", StepVerb::RadialImport}, {"radial_export", StepVerb::RadialImport},
+        {"copy", StepVerb::Copy},
+        {"ai_client", StepVerb::AiClient}, {"deck_message", StepVerb::DeckMessage},
+        {"phone_upload", StepVerb::PhoneUpload}, {"phone_face", StepVerb::PhoneUpload}, {"phone_request", StepVerb::PhoneUpload},
+        {"ui_scale", StepVerb::UiScale},
+        {"display_scale", StepVerb::DisplayScale},
+        {"pixel_density", StepVerb::PixelDensity},
+        {"logical_width", StepVerb::LogicalWidth},
+        {"palm_guard", StepVerb::PalmGuard},
+        {"classic_keys", StepVerb::ClassicKeys},
+        {"quick_tour_offers", StepVerb::QuickTourOffers},
+        {"key_nav_speed", StepVerb::KeyNavSpeed},
+        {"mouse_orbit_speed", StepVerb::MouseOrbitSpeed},
+        {"two_key_window", StepVerb::TwoKeyWindow},
+        {"input_style", StepVerb::InputStyle},
+        {"restart", StepVerb::Restart},
+        {"generator_stub", StepVerb::GeneratorStub},
+        {"env", StepVerb::Env},
+        {"run", StepVerb::Run},
+        {"run_fails", StepVerb::RunFails}, {"python_startup", StepVerb::PythonStartup},
+        {"first_run_language", StepVerb::FirstRunLanguage},
+        {"support_card", StepVerb::SupportCard},
+        {"member_card", StepVerb::MemberCard},
+        {"member_sign_in", StepVerb::MemberSignIn},
+        {"wait", StepVerb::Wait},
+        {"wait_real", StepVerb::WaitReal},
+        {"wait_idle", StepVerb::WaitIdle},
+        {"wait_for", StepVerb::WaitFor},
+        {"expect", StepVerb::Expect}, {"expect_not", StepVerb::Expect},
+        {"expect_clear", StepVerb::ExpectClear},
+        {"expect_text", StepVerb::ExpectText}, {"expect_no_text", StepVerb::ExpectText},
+        {"remember_items", StepVerb::RememberItems}, {"expect_same_items", StepVerb::RememberItems},
+        {"expect_title", StepVerb::ExpectTitle},
+        {"expect_status", StepVerb::ExpectStatus},
+        {"expect_help", StepVerb::ExpectHelp},
+        {"clipboard", StepVerb::Clipboard},
+        {"expect_clipboard", StepVerb::ExpectClipboard},
+        {"expect_value", StepVerb::ExpectValue},
+        {"wait_value", StepVerb::WaitValue},
+        {"expect_guide", StepVerb::ExpectGuide},
+        {"dump_shortcuts", StepVerb::DumpShortcuts},
+        {"dump_ui", StepVerb::DumpUi},
+        {"snapshot", StepVerb::Snapshot},
+        {"interactive_strokes", StepVerb::InteractiveStrokes},
+        {"mark_view", StepVerb::MarkView},
+        {"print", StepVerb::Print},
+        {"remember", StepVerb::Remember},
+        {"pen_stroke", StepVerb::PenStroke},
+        {"pen_drag_item", StepVerb::PenDragItem},
+        {"pen_tap", StepVerb::PenTap},
+        {"pen_button", StepVerb::PenButton},
+        {"pen_hover", StepVerb::PenHover}, {"pen_move", StepVerb::PenMove},
+        {"pen_enter", StepVerb::PenEnter},
+        {"pen_drag", StepVerb::PenDrag},
+        {"pen_pressure", StepVerb::PenPressure},
+        {"sdl_pen_mouse", StepVerb::SdlPenMouse},
+        {"pen_lost", StepVerb::PenLost},
+        {"pen_stream", StepVerb::PenStream}, {"mouse_steps", StepVerb::MouseSteps},
+        {"window_focus", StepVerb::WindowFocus},
+        {"mouse_leave", StepVerb::MouseLeave},
+        {"wheel", StepVerb::Wheel},
+        {"wheel_item", StepVerb::WheelItem},
+        {"mouse_move", StepVerb::MouseMove},
+        {"click_here", StepVerb::ClickHere},
+        {"mouse_by", StepVerb::MouseBy},
+        {"touch_pinch", StepVerb::TouchPinch}, {"touch_stroke", StepVerb::TouchPinch},
+        {"spacemouse", StepVerb::Spacemouse}, {"spacemouse_hold", StepVerb::Spacemouse},
+        {"spacemouse_button", StepVerb::SpacemouseButton},
+        {"spacemouse_unplug", StepVerb::SpacemouseUnplug},
+        {"tablet_plug", StepVerb::TabletPlug},
+        {"tablet_unplug", StepVerb::TabletUnplug},
+        {"pen_new", StepVerb::PenNew},
+        {"pen_out", StepVerb::PenOut},
+        {"pen_press", StepVerb::PenPress},
+        {"pen_sample", StepVerb::PenSample},
+        {"pen_lift", StepVerb::PenLift},
+        {"spacemouse_echo", StepVerb::SpacemouseEcho},
+        {"pen_rest", StepVerb::PenRest}, {"view_trace", StepVerb::ViewTrace},
+        {"shot", StepVerb::Shot},
+    };
+    return verbs;
+}
+
 bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& error) {
     const std::string& verb = w[0];
     auto need = [&](size_t n) {
@@ -1611,10 +2276,130 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         return stray;
     };
 
-    if (verb == "click" || verb == "double_click" || verb == "right_click") {
+    const auto found = stepVerbs().find(verb);
+    switch (found == stepVerbs().end() ? StepVerb::None : found->second) {
+    case StepVerb::SafeArea: {
+        if (!need(1)) return false;
+        const bool off = w[1] == "off";
+        if (!off && !need(4)) return false;
+        run([this, off, l = num(1, 0), t = num(2, 0), r = num(3, 0), b = num(4, 0)] {
+            app_.safeInsetsTest_ = !off;
+            app_.safeInsetsTestValue_ = off ? App::SafeInsets{} : App::SafeInsets{l, t, r, b};
+        });
+        wait(0.2f);
+        return true;
+    }
+    case StepVerb::AndroidBack: {
+        run([this] {
+            for (const bool down : {true, false}) {
+                SDL_Event e{};
+                e.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+                e.key.windowID = SDL_GetWindowID(app_.window_);
+                e.key.key = SDLK_AC_BACK;
+                e.key.scancode = SDL_SCANCODE_AC_BACK;
+                e.key.down = down;
+                app_.handleEvent(e);
+            }
+        });
+        wait(0.2f);
+        return true;
+    }
+    case StepVerb::TouchDragAt: {
+        if (!need(4)) return false;
+        const ImVec2 a(num(1, 0.5f), num(2, 0.5f)), b(num(3, 0.5f), num(4, 0.5f));
+        steps_.push_back([this, a, b](float t) {
+            const ImVec2 screen = ImGui::GetIO().DisplaySize;
+            const float k = std::min(t / 0.4f, 1.0f);
+            const ImVec2 p((a.x + (b.x - a.x) * k) * screen.x, (a.y + (b.y - a.y) * k) * screen.y);
+            auto finger = [&](SDL_EventType type) {
+                SDL_Event e{};
+                e.type = type;
+                e.tfinger.touchID = App::kUiTestTouchScreen;
+                e.tfinger.fingerID = 1;
+                e.tfinger.x = p.x / screen.x;
+                e.tfinger.y = p.y / screen.y;
+                e.tfinger.pressure = type == SDL_EVENT_FINGER_UP ? 0.0f : 1.0f;
+                e.tfinger.windowID = SDL_GetWindowID(app_.window_);
+                app_.handleEvent(e);
+            };
+            mouseMotion(p.x, p.y, SDL_TOUCH_MOUSEID);
+            if (t == 0.0f) {
+                mouseButton(true, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+                finger(SDL_EVENT_FINGER_DOWN);
+                return false;
+            }
+            finger(SDL_EVENT_FINGER_MOTION);
+            if (t < 0.4f) return false;
+            mouseButton(false, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+            finger(SDL_EVENT_FINGER_UP);
+            return true;
+        });
+        wait(0.2f);
+        return true;
+    }
+    case StepVerb::TouchTap: {
+        // One finger taps: SDL's mouse events for it (motion, press), the finger event, a few frames, then the lift.
+        if (!need(verb == "touch_tap" ? 1 : verb == "touch_tap_at" ? 2 : 0)) return false;
+        const std::string label = verb == "touch_tap" ? w[1] : std::string();
+        const bool atFraction = verb == "touch_tap_at", onX = verb == "touch_tap_welcome_x";
+        const float fx = atFraction ? num(1, 0.5f) : 0.0f, fy = atFraction ? num(2, 0.5f) : 0.0f;
+        auto at = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, label, atFraction, onX, fx, fy, at](float t) {
+            ImVec2 to;
+            if (atFraction) {
+                to = ImVec2(fx * ImGui::GetIO().DisplaySize.x, fy * ImGui::GetIO().DisplaySize.y);
+            } else if (onX) {
+                const ImVec4 r = app_.welcomeXRect_;
+                if (r.z <= r.x) {
+                    if (t > 1.0f) fail(line, "touch_tap_welcome_x: no welcome window");
+                    return t > 1.0f;
+                }
+                to = ImVec2((r.x + r.z) * 0.5f, (r.y + r.w) * 0.5f);
+            } else {
+                bool visible = false;
+                if (!findItem(label, to, &visible)) {
+                    if (t > 3.0f) fail(line, notFound(label));
+                    return t > 3.0f;
+                }
+                if (!visible) {
+                    if (t > 0.5f) fail(line, "\"" + label + "\" is not visible (off screen or scrolled out of view): a finger can't reach it");
+                    return t > 0.5f;
+                }
+            }
+            *at = to;
+            mouseMotion(to.x, to.y, SDL_TOUCH_MOUSEID);
+            mouseButton(true, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+            return true;
+        });
+        auto finger = [this, at](SDL_EventType type) {
+            int ww = 1, wh = 1;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            SDL_Event e{};
+            e.type = type;
+            e.tfinger.touchID = App::kUiTestTouchScreen;
+            e.tfinger.fingerID = 1;
+            e.tfinger.x = at->x / float(ww);
+            e.tfinger.y = at->y / float(wh);
+            e.tfinger.pressure = type == SDL_EVENT_FINGER_UP ? 0.0f : 1.0f;
+            e.tfinger.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        };
+        run([finger] { finger(SDL_EVENT_FINGER_DOWN); });
+        wait(0.12f); // (a tap's few frames)
+        steps_.push_back([this, finger](float) {
+            mouseButton(false, SDL_BUTTON_LEFT, SDL_TOUCH_MOUSEID);
+            finger(SDL_EVENT_FINGER_UP);
+            return true;
+        });
+        wait(0.2f);
+        return true;
+    }
+    case StepVerb::Click: {
         if (!need(1)) return false;
         testClick(line, w[1], verb == "right_click" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT, verb == "double_click");
-    } else if (verb == "jump_click") {
+        break;
+    }
+    case StepVerb::JumpClick: {
         if (!need(1)) return false;
         const std::string label = w[1];
         steps_.push_back([this, line, label](float t) {
@@ -1630,7 +2415,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return t > 3.0f;
         });
         wait(0.1f);
-    } else if (verb == "tier_card") {
+        break;
+    }
+    case StepVerb::TierCard: {
         if (!need(1)) return false;
         if (w[1] != "new") {
             error = "tier_card takes new";
@@ -1644,7 +2431,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.hwProfile_->tierCard = true;
         });
         wait(0.1f);
-    } else if (verb == "hover") {
+        break;
+    }
+    case StepVerb::Hover: {
         if (!need(1)) return false;
         const std::string label = w[1];
         steps_.push_back([this, line, label](float t) {
@@ -1671,7 +2460,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return t > 3.0f;
         });
         wait(0.6f); // tooltips appear after a short delay
-    } else if (verb == "hover_model" || verb == "hover_window") {
+        break;
+    }
+    case StepVerb::HoverModel: {
         if (!need(2)) return false;
         const std::string us = w[1], vs = w[2]; // fractions, or remembered values ($u) as drag takes them
         const float seconds = num(3, 0.3f);
@@ -1691,7 +2482,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return t >= seconds;
         });
         wait(0.05f);
-    } else if (verb == "type") {
+        break;
+    }
+    case StepVerb::Type: {
         if (!need(2)) return false;
         testClick(line, w[1], SDL_BUTTON_LEFT, false);
         auto text = std::make_shared<std::string>(restOf(lineText_, 2));
@@ -1706,20 +2499,43 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return true;
         });
         wait(0.1f);
-    } else if (verb == "key") {
+        break;
+    }
+    case StepVerb::TypeHere: {
+        if (!need(1)) return false;
+        auto text = std::make_shared<std::string>(restOf(lineText_, 1));
+        steps_.push_back([this, text](float) {
+            testKeyNow(SDLK_A, SDL_KMOD_LCTRL);
+            SDL_Event e{};
+            e.type = SDL_EVENT_TEXT_INPUT;
+            e.text.windowID = SDL_GetWindowID(app_.window_);
+            e.text.text = text->c_str();
+            app_.handleEvent(e);
+            return true;
+        });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::Key: {
         if (!need(1)) return false;
         testKey(line, w[1]);
-    } else if (verb == "key_down" || verb == "key_up") { // a key held down over the next steps, then let go
+        break;
+    }
+    case StepVerb::KeyDown: { // a key held down over the next steps, then let go
         if (!need(1)) return false;
         testKey(line, w[1], verb == "key_down" ? 1 : 2);
-    } else if (verb == "hold") {
+        break;
+    }
+    case StepVerb::Hold: {
         if (!need(1)) return false;
         const SDL_Keymod mods = w[1] == "none" ? SDL_KMOD_NONE : parseMods(w[1]);
         run([this, mods] {
             held_ = mods;
             SDL_SetModState(mods);
         });
-    } else if (verb == "stroke") {
+        break;
+    }
+    case StepVerb::Stroke: {
         if (!need(4)) return false;
         // stroke u0 v0 u1 v1 [seconds] [hold]: hold keeps the button down at the end (the release verb lets go)
         const float u0 = num(1, 0), v0 = num(2, 0), u1 = num(3, 0), v1 = num(4, 0), seconds = num(5, 0.6f);
@@ -1732,7 +2548,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         }, seconds, false, hold);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
-    } else if (verb == "view_drag") {
+        break;
+    }
+    case StepVerb::ViewDrag: {
         // view_drag x0 y0 x1 y1 [seconds]: press, drag and release at window fractions, gliding there first like
         // stroke (so the panels have let go of the mouse); the same point twice is a click.
         if (!need(4)) return false;
@@ -1744,7 +2562,42 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         }, seconds);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
-    } else if (verb == "axis_click") {
+        break;
+    }
+    case StepVerb::DragFrames: {
+        // drag_frames x0 y0 x1 y1 N NAME: a left drag at window fractions in N even steps, a screenshot NAME-0 (pressed,
+        // not moved yet) to NAME-N after each step; the button goes up after the last. For a drag's frames as reviewers see them.
+        if (!need(6)) return false;
+        const float x0 = num(1, 0), y0 = num(2, 0), x1 = num(3, 0), y1 = num(4, 0);
+        const int n = std::clamp(int(num(5, 6)), 1, 30);
+        const std::string name = w[6];
+        auto at = [this](float x, float y) {
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            return ImVec2(x * float(ww), y * float(wh));
+        };
+        auto shoot = [this](const std::string& file) {
+            steps_.push_back([this, file](float t) {
+                if (t == 0.0f) return false; // a settled frame
+                if (!shotDir_.empty()) shotRequest_ = shotDir_ + "/" + file + ".png";
+                return true;
+            });
+            wait(0.05f);
+        };
+        run([this, at, x0, y0] { const ImVec2 p = at(x0, y0); mouseMotion(p.x, p.y); });
+        wait(0.1f);
+        run([this] { SDL_SetModState(held_); mouseButton(true, SDL_BUTTON_LEFT); });
+        shoot(name + "-0");
+        for (int k = 1; k <= n; ++k) {
+            const float u = float(k) / float(n);
+            run([this, at, x = x0 + (x1 - x0) * u, y = y0 + (y1 - y0) * u] { const ImVec2 p = at(x, y); mouseMotion(p.x, p.y); });
+            shoot(name + "-" + std::to_string(k));
+        }
+        run([this] { mouseButton(false, SDL_BUTTON_LEFT); SDL_SetModState(held_); });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::AxisClick: {
         // axis_click +x|-x|+y|-y|+z|-z: click that end of the axis gizmo (Draw > Camera > Axes, #43)
         if (!need(1)) return false;
         static const char* const names[6] = {"+x", "+y", "+z", "-x", "-y", "-z"};
@@ -1762,7 +2615,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         stroke([at](float) { return *at; }, 0.2f);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
-    } else if (verb == "axis_drag" || verb == "axis_hover") {
+        break;
+    }
+    case StepVerb::AxisDrag: {
         // axis_drag DX DY: a left-drag starting on the gizmo's disc where no end is (it orbits the view);
         // axis_hover END|disc: the pointer resting on an end or the disc (the hover look, for shots)
         if (!need(verb == "axis_drag" ? 2 : 1)) return false;
@@ -1810,7 +2665,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             run([this] { SDL_SetModState(held_); });
             wait(0.1f);
         }
-    } else if (verb == "view_figure_click") {
+        break;
+    }
+    case StepVerb::ViewFigureClick: {
         // view_figure_click [DX DY]: click the View Figure (Draw > Camera), DX DY its radii from the centre
         const float dx = num(1, 0.0f), dy = num(2, 0.0f);
         auto at = std::make_shared<ImVec2>();
@@ -1821,7 +2678,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         stroke([at](float) { return *at; }, 0.2f);
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
-    } else if (verb == "click_part") {
+        break;
+    }
+    case StepVerb::ClickPart: {
         if (!need(1)) return false;
         const std::string name = w[1];
         const float u = num(2, 0.5f), v = num(3, 0.5f);
@@ -1897,7 +2756,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return true;
         });
         wait(0.1f);
-    } else if (verb == "drag") {
+        break;
+    }
+    case StepVerb::Drag: {
         if (!need(4)) return false;
         // X0 Y0 X1 Y1: window fractions, or remembered values ($u, $u-0.01: at any window size and UI scale).
         const std::vector<std::string> at(w.begin() + 1, w.begin() + 5);
@@ -1928,7 +2789,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         });
         wait(0.1f);
-    } else if (verb == "button_drag") { // button_drag middle|right X0 Y0 X1 Y1 [S]: navigation drags
+        break;
+    }
+    case StepVerb::ButtonDrag: { // button_drag middle|right X0 Y0 X1 Y1 [S]: navigation drags
         if (!need(5)) return false;
         const int button = w[1] == "middle" ? SDL_BUTTON_MIDDLE : w[1] == "right" ? SDL_BUTTON_RIGHT : 0;
         if (!button) {
@@ -1958,7 +2821,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return true;
         });
         wait(0.1f);
-    } else if (verb == "action") { // action ID: run it as its menu item or shortcut would (ui.palette.tool: the
+        break;
+    }
+    case StepVerb::Action: { // action ID: run it as its menu item or shortcut would (ui.palette.tool: the
         // palette in its tray, or its drop-down where the window is too narrow for the tray)
         if (!need(1)) return false;
         run([this, line, id = w[1]] {
@@ -1967,7 +2832,18 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             else a->run();
         });
         wait(0.2f);
-    } else if (verb == "expect_shortcut") { // expect_shortcut ACTION KEYS: the action's keys (none: no key)
+        break;
+    }
+    case StepVerb::SetShortcut: { // set_shortcut ACTION KEYS
+        if (!need(2)) return false;
+        const std::string id = w[1], keys = restOf(lineText_, 2);
+        run([this, line, id, keys] {
+            if (!app_.actions_.find(id)) fail(line, "no action " + id);
+            else app_.actions_.assignShortcut(id, keys);
+        });
+        break;
+    }
+    case StepVerb::ExpectShortcut: { // expect_shortcut ACTION KEYS: the action's keys (none: no key)
         if (!need(1)) return false;
         const std::string id = w[1], want = restOf(lineText_, 2);
         run([this, line, id, want] {
@@ -1975,7 +2851,22 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (!app_.actions_.find(id)) fail(line, "no action " + id);
             else if (got != want) fail(line, id + " has \"" + got + "\", expected \"" + want + "\"");
         });
-    } else if (verb == "drag_tube_point") {
+        break;
+    }
+    case StepVerb::ExpectPopupKeys: { // expect_popup_keys sub|smooth|mask|select KEYS: what the stroke popup's tile shows
+        if (!need(2)) return false;
+        const std::string which = w[1], want = restOf(lineText_, 2);
+        run([this, line, which, want] {
+            const StrokeModifier m = which == "sub" ? StrokeModifier::Sub : which == "smooth" ? StrokeModifier::Smooth
+                                   : which == "mask" ? StrokeModifier::Mask : which == "select" ? StrokeModifier::Select
+                                                                                                : StrokeModifier::Count;
+            if (m == StrokeModifier::Count) return fail(line, "expect_popup_keys takes sub, smooth, mask or select");
+            const std::string got = app_.strokeModifierKeysText(m);
+            if (got != want) fail(line, "the " + which + " tile shows \"" + got + "\", expected \"" + want + "\"");
+        });
+        break;
+    }
+    case StepVerb::DragTubePoint: {
         // drag_tube_point K DX DY [seconds] [keep]: press on control point K of the active Tube Part (else the first
         // visible one; Tube, PanelTube.cpp) and drag it DX, DY pixels; 0 0 is a click. keep: the button stays down
         // (release lets go).
@@ -2008,7 +2899,67 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             }
             return false;
         });
-    } else if (verb == "drag_landmark") {
+        break;
+    }
+    case StepVerb::DragForgesphere: {
+        // drag_forgesphere K body|rim|link DX DY [seconds] [right]: press on Forge Sphere K's body (its centre), just
+        // inside its outline (the rim band Draw resizes with, #167) or on its link to its parent (halfway across the
+        // gap between the surfaces), and drag DX, DY pixels; 0 0 is a click; "right" uses the right button. "hover"
+        // in place of DX DY rests the pointer there (the hint, for shots). events=N sends N pointer moves a frame along
+        // the way, as a fast mouse or pen does (default 1).
+        if (!need(3)) return false;
+        const int index = int(num(1, 0));
+        const bool rim = w[2] == "rim", onLink = w[2] == "link", hoverOnly = w[3] == "hover";
+        const float dx = hoverOnly ? 0.0f : num(3, 0), dy = hoverOnly ? 0.0f : num(4, 0), seconds = num(5, 0.4f);
+        const Uint8 button = w.size() > 6 && w[6] == "right" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+        int events = 1;
+        for (size_t k = 4; k < w.size(); ++k)
+            if (w[k].rfind("events=", 0) == 0) events = std::clamp(std::atoi(w[k].c_str() + 7), 1, 64);
+        auto start = std::make_shared<ImVec2>();
+        auto pressed = std::make_shared<bool>(false);
+        auto lastU = std::make_shared<float>(0.0f);
+        steps_.push_back([this, line, index, rim, onLink, hoverOnly, dx, dy, seconds, button, events, start, pressed,
+                          lastU](float t) {
+            if (t == 0.0f) {
+                const std::vector<ForgeSphere>& zs = app_.doc_.mesh.forgespheres;
+                ImVec2 c;
+                const bool valid = index >= 0 && size_t(index) < zs.size() && (!onLink || index > 0);
+                glm::vec3 at = valid ? zs[size_t(index)].center : glm::vec3(0.0f);
+                if (valid && onLink) { // halfway across the gap between the two spheres' surfaces
+                    const ForgeSphere &z = zs[size_t(index)], &p = zs[size_t(z.parent)];
+                    const float d = glm::distance(z.center, p.center);
+                    if (d > 1e-6f) at = p.center + (z.center - p.center) / d * (p.radius + 0.5f * (d - p.radius - z.radius));
+                }
+                const float wpp = valid ? app_.worldPerPixel(at) : 0.0f;
+                if (wpp <= 0.0f || !app_.partProject(at, c)) {
+                    fail(line, "forge sphere " + std::to_string(index) + " is not on screen");
+                    return true;
+                }
+                const float r = zs[size_t(index)].radius / wpp;
+                *start = ImVec2(c.x + (rim ? r - std::min(0.12f * r, 5.0f * app_.uiScale_) : 0.0f), c.y);
+                mouseMotion(start->x, start->y);
+                return hoverOnly;
+            }
+            if (!*pressed) { // (the first frame after the hover, however late; buttonDown_ follows the left only)
+                mouseButton(true, button);
+                *pressed = true;
+            }
+            const float u = std::min(t / seconds, 1.0f);
+            for (int e = 1; e <= events; ++e) {
+                const float v = *lastU + (u - *lastU) * float(e) / float(events);
+                mouseMotion(start->x + dx * v, start->y + dy * v);
+            }
+            *lastU = u;
+            if (t >= seconds) {
+                mouseButton(false, button);
+                return true;
+            }
+            return false;
+        });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::DragLandmark: {
         if (!need(3)) return false;
         const int index = int(num(1, 0));
         const float dx = num(2, 0), dy = num(3, 0), seconds = num(4, 0.4f);
@@ -2032,7 +2983,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         });
         wait(0.1f);
-    } else if (verb == "gizmo_drag" || verb == "gizmo_hover") {
+        break;
+    }
+    case StepVerb::GizmoDrag: {
         static const char* kHandles[] = {"move_x",    "move_y",   "move_z",   "plane_yz",    "plane_xz",
                                          "plane_xy",  "move_view", "rotate_x", "rotate_y",   "rotate_z",
                                          "rotate_view", "scale_x", "scale_y",  "scale_z",     "scale_uniform"};
@@ -2073,12 +3026,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             });
         }
         wait(0.1f);
-    } else if (verb == "stroke_popup_item") {
+        break;
+    }
+    case StepVerb::StrokePopupItem: {
         if (!need(1)) return false;
         static const char* kItems[] = {"dots",      "drag_stamp", "slide_stamp", "spray",    "lazy",
                                        "add",       "sub",        "smooth",      "mask",     "select",
-                                       "mask_pen",  "mask_lasso", "mask_rect",   "cut_line", "cut_lasso",
-                                       "cut_rect",  "cut_polyline"};
+                                       "mask_pen",  "mask_lasso", "mask_rect",   "mask_circle", "cut_line",
+                                       "cut_lasso", "cut_rect",   "cut_circle",  "cut_polyline"};
         static_assert(std::size(kItems) == size_t(kStrokePopupItems));
         int item = w[1] == "outside" ? -2 : -1;
         for (int i = 0; i < int(std::size(kItems)); ++i)
@@ -2127,7 +3082,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             });
         }
         wait(0.1f);
-    } else if (verb == "drag_item") {
+        break;
+    }
+    case StepVerb::DragItem: {
         if (!need(3)) return false;
         const std::string label = w[1];
         const bool keep = w.back() == "keep"; // leave the button down (a check mid-drag), then `release`
@@ -2153,7 +3110,122 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         });
         wait(0.1f);
-    } else if (verb == "drag_path") {
+        break;
+    }
+    case StepVerb::DragTo: {
+        // drag_to "from" "to" [dx dy] [seconds]: press on one item, glide to the middle of another (plus an offset) and
+        // let go: a drag and drop between two panels (My Panel).
+        if (!need(2)) return false;
+        const std::string from = w[1], to = w[2];
+        const float dx = num(3, 0), dy = num(4, 0), seconds = num(5, 0.5f);
+        auto a = std::make_shared<ImVec2>(), b = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, from, a](float t) {
+            if (findItem(from, *a)) {
+                mouseMotion(a->x, a->y);
+                return true;
+            }
+            if (t > 3.0f) fail(line, notFound(from));
+            return t > 3.0f;
+        });
+        steps_.push_back([this, line, to, b](float t) {
+            if (findItem(to, *b)) return true;
+            if (t > 3.0f) fail(line, notFound(to));
+            return t > 3.0f;
+        });
+        steps_.push_back([this, a, b, dx, dy, seconds](float t) {
+            if (t == 0.0f) return false;
+            if (!buttonDown_) mouseButton(true, SDL_BUTTON_LEFT);
+            const float u = std::min(t / seconds, 1.0f);
+            mouseMotion(a->x + (b->x + dx - a->x) * u, a->y + (b->y + dy - a->y) * u);
+            if (t >= seconds + 0.1f) {
+                mouseButton(false, SDL_BUTTON_LEFT);
+                return true;
+            }
+            return false;
+        });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::DragShelfItems: {
+        // Every action on the shelves (Customize Shelves, Ctrl+Alt held): drag it out onto the canvas; it must come off its
+        // shelf (item 45: one button had no drag source). Expects at least N dragged.
+        if (!need(1)) return false;
+        const int atLeast = int(num(1, 1));
+        struct Run { std::vector<std::pair<std::string, std::string>> todo; size_t done = 0; int dragged = 0, before = 0; ImVec2 from{}; std::string why, press; };
+        auto uses = [this](const std::string& id) { // how many shelf slots hold it (Paint is on two shelves)
+            int n = 0;
+            for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+                n += int(std::count(list->begin(), list->end(), id));
+            return n;
+        };
+        auto st = std::make_shared<Run>();
+        steps_.push_back([this, line, st, atLeast, uses](float t) {
+            constexpr float kSlot = 1.0f;
+            if (t == 0.0f) {
+                for (const auto* list : {&app_.layout_.topShelf, &app_.layout_.leftShelf, &app_.layout_.rightShelf, &app_.layout_.bottomShelf})
+                    for (const std::string& id : *list)
+                        if (const Action* a = app_.actions().find(id == "brush.paint" ? std::string("draw.paint") : id))
+                            st->todo.push_back({id, std::string(trAction(a->id, a->label)) + "##" + a->id});
+                        else if (id.rfind("widget.", 0) == 0) st->todo.push_back({id, "##grab." + id}); // (sliders, tiles, colour: Shell.cpp's grab button)
+                // (One label, two slots, e.g. Paint on the top and bottom shelves: the test can't tell which it grabbed.)
+                std::map<std::string, int> seen;
+                for (const auto& it : st->todo) ++seen[it.second];
+                st->todo.erase(std::remove_if(st->todo.begin(), st->todo.end(), [&](const auto& it) { return seen[it.second] > 1; }),
+                               st->todo.end());
+                return false;
+            }
+            const size_t i = size_t(t / kSlot);
+            if (i >= st->todo.size()) {
+                if (buttonDown_) mouseButton(false, SDL_BUTTON_LEFT);
+                if (st->dragged < atLeast) fail(line, "only " + std::to_string(st->dragged) + " shelf items dragged");
+                return true;
+            }
+            const float local = t - float(i) * kSlot;
+            if (i > st->done) { // the previous slot ended
+                st->done = i;
+            }
+            const auto& [id, label] = st->todo[i];
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            if (local < 0.1f) {
+                if (!findItem(label, st->from)) { // (an action may be off a scrolled shelf; a widget must be there)
+                    if (label[0] == '#' && local > 0.08f) fail(line, "widget \"" + id + "\" has no drag handle in Customize Shelves");
+                    return false;
+                }
+                st->before = uses(id);
+                mouseMotion(st->from.x, st->from.y);
+            } else if (local < 0.6f) {
+                if (st->from.x == 0.0f && st->from.y == 0.0f) return false;
+                if (!buttonDown_) mouseButton(true, SDL_BUTTON_LEFT);
+                if (local < 0.2f && buttonDown_) { // the press just landed: who took it
+                    ImGuiContext& g = *ImGui::GetCurrentContext();
+                    st->press = std::string("press: hovered window ") + (g.HoveredWindow ? g.HoveredWindow->Name : "none") + ", hovered id " +
+                                std::to_string(g.HoveredId) + (g.HoveredIdIsDisabled ? " (disabled)" : "") + ", active id " +
+                                std::to_string(g.ActiveId) + " in " + (g.ActiveIdWindow ? g.ActiveIdWindow->Name : "none") +
+                                (g.ActiveIdWindow && g.ActiveId == g.ActiveIdWindow->MoveId ? " (window move)" : "") + (g.TempInputId == g.ActiveId ? " (typed input)" : "") +
+                                " ctrl " + (g.IO.KeyCtrl ? "yes" : "no") + "; ";
+                }
+                const float u = (local - 0.1f) / 0.4f;
+                mouseMotion(st->from.x + (float(ww) * 0.5f - st->from.x) * u, st->from.y + (float(wh) * 0.5f - st->from.y) * u);
+            } else if (local < 0.8f) {
+                if (buttonDown_) {
+                    ImGuiContext& g = *ImGui::GetCurrentContext();
+                    st->why = std::string("drag active ") + (g.DragDropActive ? "yes" : "no") + ", active id " + std::to_string(g.ActiveId) +
+                              ", hovered id " + std::to_string(g.HoveredId) + ", mouse " + std::to_string(int(g.IO.MousePos.x)) + "," +
+                              std::to_string(int(g.IO.MousePos.y)) + " from " + std::to_string(int(st->from.x)) + "," + std::to_string(int(st->from.y));
+                    mouseButton(false, SDL_BUTTON_LEFT);
+                }
+            } else if (local < 0.95f && st->from.x != 0.0f) {
+                if (uses(id) >= st->before) fail(line, "\"" + id + "\" would not move: still on its shelf after Ctrl+Alt+drag (" + st->press + st->why + ")");
+                else ++st->dragged;
+                st->from = ImVec2(0, 0);
+            }
+            return false;
+        });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::DragPath: {
         // Points first, then the optional words: "keep" and "S=seconds".
         std::vector<glm::vec2> uv;
         bool keep = false;
@@ -2207,16 +3279,22 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return true;
         });
         wait(0.1f);
-    } else if (verb == "release") {
+        break;
+    }
+    case StepVerb::Release: {
         run([this] {
             SDL_SetModState(held_);
             if (buttonDown_) mouseButton(false, SDL_BUTTON_LEFT);
         });
         wait(0.1f);
-    } else if (verb == "orbit") {
+        break;
+    }
+    case StepVerb::Orbit: {
         if (!need(2)) return false;
         orbit(num(1, 0), num(2, 0), 0.4f);
-    } else if (verb == "camera") {
+        break;
+    }
+    case StepVerb::Camera: {
         if (!need(2)) return false;
         run([this, yaw = num(1, 0), pitch = num(2, 0)] {
             app_.camera_.yaw = glm::radians(float(yaw));
@@ -2224,29 +3302,51 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.camera_.roll = 0.0f;
         });
         wait(0.1f);
-    } else if (verb == "zoom") { // zoom FACTOR: the camera's distance divided by FACTOR
+        break;
+    }
+    case StepVerb::Zoom: { // zoom FACTOR: the camera's distance divided by FACTOR
         if (!need(1)) return false;
         run([this, f = num(1, 1)] { app_.camera_.distance /= std::max(float(f), 1e-3f); });
         wait(0.1f);
-    } else if (verb == "camera_distance") { // camera_distance D: the camera this far from its target (extreme zoom)
+        break;
+    }
+    case StepVerb::CameraDistance: { // camera_distance D: the camera this far from its target (extreme zoom)
         if (!need(1)) return false;
         run([this, d = num(1, 4)] { app_.camera_.distance = std::max(float(d), 1e-4f); });
         wait(0.1f);
-    } else if (verb == "brush_size") { // brush_size PX: Size (the brush radius in screen pixels), as the S slider
+        break;
+    }
+    case StepVerb::BrushSize: { // brush_size PX: Size (the brush radius in screen pixels), as the S slider
         if (!need(1)) return false;
         run([this, px = num(1, 50)] { app_.radiusPx_ = std::clamp(float(px), 2.0f, 800.0f); });
         wait(0.05f);
-    } else if (verb == "look") { // look X Y Z: the camera turns about (and looks at) this point
+        break;
+    }
+    case StepVerb::ResetSliders: { // Size, Intensities and Falloff back to the defaults (a case that clicked a S / U pop-up kept its value)
+        run([this] {
+            app_.radiusPx_ = 60.0f;
+            app_.strength_ = app_.smoothStrength_ = 0.5f;
+            app_.rgbIntensity_ = 1.0f;
+            app_.focalShift_ = 0.0f;
+        });
+        wait(0.05f);
+        break;
+    }
+    case StepVerb::Look: { // look X Y Z: the camera turns about (and looks at) this point
         if (!need(3)) return false;
         run([this, x = num(1, 0), y = num(2, 0), z = num(3, 0)] { app_.camera_.target = glm::vec3(float(x), float(y), float(z)); });
         wait(0.1f);
-    } else if (verb == "drop") {
+        break;
+    }
+    case StepVerb::Drop: {
         if (!need(1)) return false;
         auto file = std::filesystem::path(std::u8string(w[1].begin(), w[1].end()));
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
         const auto u8 = file.lexically_normal().u8string();
         run([this, path = std::string(u8.begin(), u8.end())] { app_.openPathConfirmed(path); });
-    } else if (verb == "drop_library") { // drop_library FILE: the file dropped on the middle of the Library strip
+        break;
+    }
+    case StepVerb::DropLibrary: { // drop_library FILE: the file dropped on the middle of the Library strip
         if (!need(1)) return false;
         auto file = std::filesystem::path(std::u8string(w[1].begin(), w[1].end()));
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
@@ -2261,15 +3361,19 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             e.drop.data = path.c_str();
             app_.handleEvent(e);
         });
-    } else if (verb == "choose_file" && w.size() > 2 && w[1] == "maya_folder") {
-        // choose_file maya_folder <folder>: what File > Maya > Exchange folder's dialog would answer (relative to the
-        // working directory, like copy's destination).
-        run([this, to = w[2]] {
-            const std::string d = expandLibrary(to);
-            const auto u8 = std::filesystem::absolute(std::filesystem::path(std::u8string(d.begin(), d.end()))).lexically_normal().u8string();
-            app_.setMayaFolder(std::string(u8.begin(), u8.end()));
-        });
-    } else if (verb == "choose_file") { // choose_file insert|insert_set|append <path>: what a native dialog would answer
+        break;
+    }
+    case StepVerb::ChooseFile: { // choose_file insert|insert_set|append <path>: what a native dialog would answer
+        if (w.size() > 2 && w[1] == "maya_folder") {
+            // choose_file maya_folder <folder>: what File > Maya > Exchange folder's dialog would answer (relative to the
+            // working directory, like copy's destination).
+            run([this, to = w[2]] {
+                const std::string d = expandLibrary(to);
+                const auto u8 = std::filesystem::absolute(std::filesystem::path(std::u8string(d.begin(), d.end()))).lexically_normal().u8string();
+                app_.setMayaFolder(std::string(u8.begin(), u8.end()));
+            });
+            break;
+        }
         if (!need(2)) return false;
         App::FileAction action;
         if (w[1] == "insert") action = App::FileAction::InsertMesh;
@@ -2283,17 +3387,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
         const auto u8 = file.lexically_normal().u8string();
         run([this, action, path = std::string(u8.begin(), u8.end())] { app_.queueFile(action, path); });
-    } else if (verb == "action") {
-        if (!need(1)) return false;
-        run([this, line, id = w[1]] {
-            const Action* a = app_.actions_.find(id);
-            if (!a || !a->run) return fail(line, "no action " + id);
-            if (a->enabled && !a->enabled()) return fail(line, "action " + id + " is disabled now");
-            app_.actions_.touch(id);
-            a->run();
-        });
-        wait(0.1f);
-    } else if (verb == "dialog_answer") {
+        break;
+    }
+    case StepVerb::DialogAnswer: {
         if (!need(1)) return false;
         std::string path;
         if (w[1] != "cancel") {
@@ -2304,7 +3400,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             path.assign(u8.begin(), u8.end());
         }
         run([path] { dialogs::answerNext(path); });
-    } else if (verb == "answer_dialog") {
+        break;
+    }
+    case StepVerb::AnswerDialog: {
         // answer_dialog PATH | cancel: what the open pack or macro file dialog (Install Pack, New Pack's Save Pack,
         // a macro's "?") answers. PATH is relative to the script; a file that doesn't exist beside it (a save) lands
         // in the shots folder.
@@ -2324,7 +3422,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             path.assign(u8.begin(), u8.end());
         }
         run([this, path] { app_.packDialogAnswered(path); });
-    } else if (verb == "radial_import" || verb == "radial_export") {
+        break;
+    }
+    case StepVerb::RadialImport: {
         // radial_import FILE (relative to the script) / radial_export N FILE (in the shots folder): what the file
         // dialogs of Preferences > Input > Radial Menus do with the path the user picked.
         const bool import = verb == "radial_import";
@@ -2344,7 +3444,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const bool ok = import ? app_.importRadialMenu(path) : app_.exportRadialMenu(menu, path);
             if (!ok) fail(line, std::string(import ? "radial_import" : "radial_export") + " failed: " + app_.status_);
         });
-    } else if (verb == "copy") {
+        break;
+    }
+    case StepVerb::Copy: {
         if (!need(2)) return false;
         namespace fs = std::filesystem;
         fs::path src(std::u8string(w[1].begin(), w[1].end()));
@@ -2358,7 +3460,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (ec) SDL_Log("copy %s: %s", src.string().c_str(), ec.message().c_str());
             restoreBridgeFixtures(dst);
         });
-    } else if (verb == "ai_client") {
+        break;
+    }
+    case StepVerb::AiClient: {
         if (!need(1)) return false;
         const std::string what = w[1];
         if (what == "connect") {
@@ -2405,7 +3509,24 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             error = "ai_client connect | send JSON | expect TEXT [S] | close";
             return false;
         }
-    } else if (verb == "phone_upload" || verb == "phone_face" || verb == "phone_request") {
+        break;
+    }
+    case StepVerb::DeckMessage: {
+        if (!need(2)) return false;
+        const std::string expected = w[1];
+        const std::string body = restOf(lineText_, 2);
+        run([this, line, expected, body] {
+            if (!app_.phone_ || !app_.phone_->running()) {
+                fail(line, "the phone link isn't running (turn the Forge Deck on first)");
+                return;
+            }
+            std::string err;
+            const bool ok = app_.phone_->receiveDeckMessage(body, "WebRTC", err);
+            if (ok != (expected == "ok")) fail(line, std::string("the Deck ") + (ok ? "accepted" : "refused (" + err + ")") + " " + body);
+        });
+        break;
+    }
+    case StepVerb::PhoneUpload: {
         if (!need(verb == "phone_request" ? 3 : verb == "phone_upload" ? 2 : 1)) return false;
         std::vector<std::string> args(w.begin() + 1, w.end());
         const std::string body = verb == "phone_request" ? restOf(lineText_, 4) : std::string();
@@ -2498,7 +3619,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             r = call("POST", "/api/capture/" + capture + "/finish", "");
             if (r.status != 200) fail(line, "finish refused: " + std::to_string(r.status) + " " + r.body + r.error);
         });
-    } else if (verb == "ui_scale") { // ui_scale 175 | auto: as Preferences > Interface > UI scale picks it (#87)
+        break;
+    }
+    case StepVerb::UiScale: { // ui_scale 175 | auto: as Preferences > Interface > UI scale picks it (#87)
         if (!need(1)) return false;
         const float v = w[1] == "auto" ? 0.0f : num(1, 100) / 100.0f;
         run([this, v] {
@@ -2506,7 +3629,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.requestUiScale();
         });
         wait(0.2f);
-    } else if (verb == "display_scale") {
+        break;
+    }
+    case StepVerb::DisplayScale: {
         // display_scale 150: the window's display now reports this content scale and SDL says so
         // (SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: Windows' per-monitor DPI, a move to a monitor at another scale)
         if (!need(1)) return false;
@@ -2518,7 +3643,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.2f);
-    } else if (verb == "pixel_density") {
+        break;
+    }
+    case StepVerb::PixelDensity: {
         // pixel_density 200: the window's pixel density (macOS Retina, a scaled Wayland output), as SDL reports it with
         // its display-scale event; the framebuffer here stays 1x, so only the font atlas shows it (font_density)
         if (!need(1)) return false;
@@ -2530,7 +3657,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.2f);
-    } else if (verb == "logical_width") {
+        break;
+    }
+    case StepVerb::LogicalWidth: {
         // logical_width 1280: the display reports the scale that makes the window this many logical px wide, as a
         // Windows laptop at 150-200 % does (#105: 2560x1600 at 200 % is 1280x800)
         if (!need(1)) return false;
@@ -2544,12 +3673,42 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.2f);
-    } else if (verb == "classic_keys") { // the Classic sculpting keys (style 0), as Preferences > Input sets them
+        break;
+    }
+    case StepVerb::PalmGuard: { // palm_guard on|off [hold s [silent s]]: fingers are ignored while the pen is near (Android's default)
+        if (!need(1)) return false;
+        run([this, on = w[1] != "off", hold = num(2, PalmGuard::kAfterPen), silent = num(3, PalmGuard::kSilent)] {
+            app_.uiPrefs_.tablet.palmRejection = on;
+            app_.palm_.afterPen = hold;
+            app_.palm_.silent = silent;
+        });
+        break;
+    }
+    case StepVerb::ClassicKeys: { // the Classic sculpting keys (style 0), as Preferences > Input sets them
         run([this] { app_.setInputStyle(0); });
-    } else if (verb == "quick_tour_offers") {
+        break;
+    }
+    case StepVerb::QuickTourOffers: {
         // quick_tour_offers: UI tests leave out the quick tour's one offer (it would sit over their clicks)
         run([this] { app_.quickTourOffersInTests_ = true; });
-    } else if (verb == "input_style") {
+        break;
+    }
+    case StepVerb::KeyNavSpeed: { // key_nav_speed X: Preferences > Input's pan and zoom key speed (0.1 to 5)
+        if (!need(1)) return false;
+        run([this, v = num(1, 1.0f)] { app_.uiPrefs_.keyNavSpeed = std::clamp(v, 0.1f, 5.0f); });
+        break;
+    }
+    case StepVerb::MouseOrbitSpeed: { // mouse_orbit_speed X: Preferences > Input's mouse orbit speed (0.1 to 2)
+        if (!need(1)) return false;
+        run([this, v = num(1, 1.0f)] { app_.uiPrefs_.mouseOrbitSpeed = clampMouseOrbitSpeed(v); });
+        break;
+    }
+    case StepVerb::TwoKeyWindow: { // two_key_window X: Preferences > Input's two-key window (seconds)
+        if (!need(1)) return false;
+        run([this, v = num(1, 0.4f)] { app_.uiPrefs_.twoKeyWindow = v; });
+        break;
+    }
+    case StepVerb::InputStyle: {
         // input_style classic|sculptforge|blender|maya: as Preferences > Input sets it (scripts written for one style)
         if (!need(1)) return false;
         const std::string n = w[1];
@@ -2559,7 +3718,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         }
         run([this, style] { app_.setInputStyle(style); });
-    } else if (verb == "restart") {
+        break;
+    }
+    case StepVerb::Restart: {
         // restart [FILE]: as quitting and starting again, for the preferences (#117): what waits is saved, everything
         // goes back to the defaults, then ui.json is read as at the start. FILE (beside the script) replaces ui.json
         // first: a start with an older version's settings.
@@ -2574,12 +3735,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.restartPrefsForTest(from);
             app_.tierCardFromDisk();
         });
-    } else if (verb == "generator_stub") {
+        break;
+    }
+    case StepVerb::GeneratorStub: {
         if (!need(1)) return false;
         std::vector<std::string> shapes(w.begin() + 1, w.end());
         for (const std::string& shape : shapes)
             if (shape != "off" && shape != "sphere" && shape != "cube" && shape != "torus" && shape != "capsule" &&
-                shape != "cone" && shape != "fail") {
+                shape != "cone" && shape != "fail" && shape != "textoff" && shape != "nomodel") {
                 error = "unknown generator_stub shape '" + shape + "'";
                 return false;
             }
@@ -2588,6 +3751,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             ai::setGeneratorStubForTests([shapes](int candidate, const std::string& stem) {
                 const std::string& shape = shapes[size_t(candidate) % shapes.size()];
                 ai::GeneratorResult r;
+                if (shape == "textoff" || shape == "nomodel") { // the real wording of a Space refusing / returning nothing
+                    r.error = shape == "textoff" ? "Hunyuan3D 2 mini Turbo (Tencent) - free, fast: " +
+                                                       ai::friendlyGradioError("'Text to 3D is disable. Please enable it by `python gradio_app.py --enable_t23d`.'")
+                                                 : "Hunyuan3D 2 (Tencent) - free finished without a model: try again or another provider";
+                    return r;
+                }
                 if (shape == "fail") {
                     r.error = "The stub service said no";
                     return r;
@@ -2602,7 +3771,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 return r;
             });
         });
-    } else if (verb == "env") {
+        break;
+    }
+    case StepVerb::Env: {
         if (!need(2)) return false;
         std::string value = restOf(lineText_, 2);
         for (size_t at = value.find("$SCRIPT_DIR"); at != std::string::npos; at = value.find("$SCRIPT_DIR", at))
@@ -2615,7 +3786,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             setenv(name.c_str(), value.c_str(), 1);
 #endif
         });
-    } else if (verb == "run") {
+        break;
+    }
+    case StepVerb::Run: {
         if (!need(1)) return false;
         std::vector<ScriptStatement> statements;
         std::string text = restOf(lineText_, 1);
@@ -2662,10 +3835,31 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             }
             return true;
         });
-    } else if (verb == "run_fails") { // run_fails COMMAND ARGS...: the command must be refused
+        break;
+    }
+    case StepVerb::PythonStartup: { // python_startup [append TEXT]: TEXT is added to each script after its check
+        const std::string append = w.size() > 2 && w[1] == "append" ? restOf(lineText_, 2) + "\n" : std::string();
+        run([this, append] {
+            PythonScripting& py = app_.python();
+            if (!append.empty())
+                py.afterStartupCheck = [append](const std::string& path) {
+                    const std::filesystem::path p(std::u8string(path.begin(), path.end()));
+                    std::ofstream(p, std::ios::binary | std::ios::app) << append;
+                };
+            py.runStartupScripts(true);
+            py.afterStartupCheck = nullptr;
+        });
+        break;
+    }
+    case StepVerb::RunFails: { // run_fails COMMAND ARGS...: the command must be refused ($SCRIPT_DIR as for run)
         if (!need(1)) return false;
         std::vector<ScriptStatement> statements;
-        if (!parseScript(restOf(lineText_, 1), statements, error)) return false;
+        std::string text = restOf(lineText_, 1);
+        for (size_t at = text.find("$SCRIPT_DIR"); at != std::string::npos; at = text.find("$SCRIPT_DIR", at)) {
+            text.replace(at, 11, scriptDir_);
+            at += scriptDir_.size();
+        }
+        if (!parseScript(text, statements, error)) return false;
         run([this, line, statements] {
             for (const auto& st : statements) {
                 app_.runCommand(st.command, st.args);
@@ -2675,7 +3869,23 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 }
             }
         });
-    } else if (verb == "support_card") {
+        break;
+    }
+    case StepVerb::FirstRunLanguage: {
+        // The first start's language decision (App::offerFirstRunLanguage) for an OS language tag: `os=es-MX`.
+        // UI tests never detect by themselves.
+        std::string os;
+        for (size_t i = 1; i < w.size(); ++i) {
+            if (w[i].rfind("os=", 0) == 0) os = w[i].substr(3);
+            else {
+                error = "first_run_language: unknown option '" + w[i] + "'";
+                return false;
+            }
+        }
+        run([this, os] { app_.offerFirstRunLanguage(os); });
+        break;
+    }
+    case StepVerb::SupportCard: {
         // The launch decision for the full membership card (Support.h), as a start would make it: `first_run` and
         // `test_mode` (how every UI test, render and CI run starts: never shown).
         bool firstRun = false, testMode = false;
@@ -2687,8 +3897,13 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 return false;
             }
         }
-        run([this, firstRun, testMode] { app_.launchSupportCard(firstRun, app_.memberClock(), testMode); });
-    } else if (verb == "member_card") {
+        run([this, firstRun, testMode] {
+            app_.launchSupportCard(firstRun, app_.memberClock(), testMode);
+            app_.tickSupportCardQueue(); // (a start's next frame: it opens now unless a first-run box is up)
+        });
+        break;
+    }
+    case StepVerb::MemberCard: {
         // A good moment for the small membership card (Support.h): sculpted | render | updated | challenge |
         // milestone | none, with `days=N` (the clock N days on from the test's start), `sculpt_seconds=S` (this
         // session's stroke time so far: the next frame decides the sculpting moment), and the milestones' counts
@@ -2697,7 +3912,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         static const std::pair<const char*, MemberMoment> kMoments[] = {
             {"sculpted", MemberMoment::Sculpted}, {"render", MemberMoment::SavedRender},
             {"updated", MemberMoment::Updated}, {"challenge", MemberMoment::Challenge}, {"none", MemberMoment::None},
-            {"milestone", MemberMoment::None}};
+            {"milestone", MemberMoment::None}, {"appeal", MemberMoment::None}, {"restart", MemberMoment::None},
+            {"update_appeal", MemberMoment::None}};
         MemberMoment moment = MemberMoment::None;
         bool known = false;
         for (const auto& [n, m] : kMoments)
@@ -2706,7 +3922,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             error = "member_card: unknown moment '" + w[1] + "'";
             return false;
         }
-        const bool milestone = w[1] == "milestone";
+        const bool milestone = w[1] == "milestone", appeal = w[1] == "appeal", restart = w[1] == "restart", updateAppeal = w[1] == "update_appeal"; // (appeal: the startup check, at `starts=N`; restart: the next start)
         double days = -1.0, sculpt = -1.0, hours = -1.0;
         int starts = -1, saves = -1;
         for (size_t i = 2; i < w.size(); ++i) {
@@ -2720,7 +3936,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 return false;
             }
         }
-        run([this, moment, days, sculpt, milestone, hours, starts, saves] {
+        run([this, moment, days, sculpt, milestone, appeal, restart, updateAppeal, hours, starts, saves] {
             app_.memberCardTestMode_ = true;
             if (days >= 0.0) app_.memberClockOffset_ = int64_t(days * 86400.0);
             if (sculpt >= 0.0) app_.sessionSculptSeconds_ = sculpt;
@@ -2728,29 +3944,62 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (starts >= 0) app_.supportCardPrefs_.starts = starts;
             if (saves >= 0) app_.supportCardPrefs_.saves = saves;
             if (moment == MemberMoment::Challenge) app_.challengeTitle_ = "Creatures";
-            if (milestone) app_.memberMilestoneCheck();
+            if (restart) { // the next start: the appeal card is gone (its version is recorded), the update moment and the appeal check run again
+                app_.appealOpen_ = app_.appealPending_ = false;
+                app_.memberCard_ = MemberMoment::None;
+                app_.updatedThisStart_ = false;
+                app_.startupUpdateMoment();
+                app_.launchAppeal();
+            } else if (updateAppeal) { // a start after an update with the appeal due: the update moment, then the appeal (as at startup)
+                app_.memberMoment(MemberMoment::Updated);
+                app_.launchAppeal();
+            } else if (appeal) app_.launchAppeal();
+            else if (milestone) app_.memberMilestoneCheck();
             else app_.memberMoment(moment);
         });
-    } else if (verb == "member_sign_in") {
+        break;
+    }
+    case StepVerb::MemberSignIn: {
         // Ends the GitHub sign-in that is running (UI tests never reach GitHub): `ok` (the account can read the
-        // member repository) or `fail` (no access, declined, the code ran out).
+        // member repository), `fail`/`noaccess` (signed in, not on the member list), `pending` (an invitation waits),
+        // `declined` or `expired`.
         if (!need(1)) return false;
-        const bool ok = w[1] == "ok";
-        if (!ok && w[1] != "fail") {
-            error = "member_sign_in: ok or fail";
+        member::SignInResult result;
+        if (w[1] == "ok") result = member::SignInResult::Member;
+        else if (w[1] == "fail" || w[1] == "noaccess") result = member::SignInResult::NoAccess;
+        else if (w[1] == "pending") result = member::SignInResult::InvitePending;
+        else if (w[1] == "declined") result = member::SignInResult::Declined;
+        else if (w[1] == "expired") result = member::SignInResult::Expired;
+        else {
+            error = "member_sign_in: ok, noaccess, pending, declined or expired";
             return false;
         }
-        run([this, line, ok] {
+        run([this, line, result] {
             if (!app_.memberSignIn_) {
                 fail(line, "member_sign_in: no sign-in is running");
                 return;
             }
-            app_.finishMemberSignInForTest(ok);
+            app_.finishMemberSignInForTest(result);
         });
-    } else if (verb == "wait") {
+        break;
+    }
+    case StepVerb::Wait: {
         if (!need(1)) return false;
         wait(num(1, 0));
-    } else if (verb == "wait_idle") {
+        break;
+    }
+    case StepVerb::WaitReal: { // wait_real S: S seconds of the clock (the app's timers run on it; "wait" is frame time)
+        if (!need(1)) return false;
+        const Uint64 ns = Uint64(num(1, 0) * 1e9f);
+        auto from = std::make_shared<Uint64>(0);
+        steps_.push_back([from, ns](float t) {
+            if (t == 0.0f) *from = SDL_GetTicksNS();
+            SDL_Delay(5);
+            return SDL_GetTicksNS() - *from >= ns;
+        });
+        break;
+    }
+    case StepVerb::WaitIdle: {
         const float timeout = num(1, 120.0f);
         // Idle for several frames in a row: work is often only requested by the frame after an input (a
         // double-clicked Library folder is listed when the strip next draws), and a single idle frame in
@@ -2766,7 +4015,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return t > timeout;
         });
         wait(0.2f); // let the app pick up the results
-    } else if (verb == "wait_for") {
+        break;
+    }
+    case StepVerb::WaitFor: {
         if (!need(1)) return false;
         const std::string label = w[1];
         const float timeout = num(2, 10.0f);
@@ -2777,7 +4028,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (t > timeout) fail(line, "\"" + label + "\" did not appear within " + number(timeout) + " s");
             return t > timeout;
         });
-    } else if (verb == "expect" || verb == "expect_not") {
+        break;
+    }
+    case StepVerb::Expect: {
         if (!need(1)) return false;
         const std::string label = w[1];
         const bool want = verb == "expect";
@@ -2789,7 +4042,24 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 fail(line, want ? "expected UI item \"" + label + "\"" : "UI item \"" + label + "\" should not be shown");
             return true;
         });
-    } else if (verb == "expect_text" || verb == "expect_no_text") {
+        break;
+    }
+    case StepVerb::ExpectClear: { // expect_clear POPUP_ITEM ANCHOR_ITEM: the popup's box doesn't cover the anchor
+        if (!need(2)) return false;
+        const std::string popup = w[1], anchor = w[2];
+        steps_.push_back([this, line, popup, anchor](float t) {
+            if (t == 0.0f) return false;
+            ImVec2 c;
+            ImVec4 a, p;
+            if (!findItem(anchor, c, nullptr, nullptr, &a)) fail(line, "no UI item \"" + anchor + "\"");
+            else if (!findItem(popup, c, nullptr, nullptr, &p)) fail(line, "no UI item \"" + popup + "\"");
+            else if (p.x < a.z && a.x < p.z && p.y < a.w && a.y < p.w)
+                fail(line, "\"" + popup + "\" covers \"" + anchor + "\"");
+            return true;
+        });
+        break;
+    }
+    case StepVerb::ExpectText: {
         if (!need(1)) return false;
         const std::string text = withVersion(restOf(lineText_, 1), App::appShownVersion().text());
         const bool want = verb == "expect_text";
@@ -2799,7 +4069,41 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 fail(line, want ? "no text \"" + text + "\" on screen" : "text \"" + text + "\" is on screen");
             return true;
         });
-    } else if (verb == "expect_title") { // the OS window title contains the text ({version}: the version as shown)
+        break;
+    }
+    case StepVerb::RememberItems: {
+        // remember_items NAME SCOPE: the items a person can reach in the panel SCOPE ("Alpha") now, kept as NAME.
+        // expect_same_items NAME SCOPE: the panel shows exactly those (the same section in another layout).
+        if (!need(2)) return false;
+        const std::string name = w[1], scope = w[2];
+        const bool keep = verb == "remember_items";
+        steps_.push_back([this, line, name, scope, keep](float t) {
+            if (t == 0.0f) return false; // the frame drawn after the previous step
+            const std::vector<std::string> now = Demo::scopeItems(scope);
+            if (keep) {
+                if (now.empty()) fail(line, "no items drawn in \"" + scope + "\" to remember");
+                rememberedItems_[name] = now;
+                SDL_Log("remember_items %s = %zu items in %s", name.c_str(), now.size(), scope.c_str());
+                return true;
+            }
+            const auto it = rememberedItems_.find(name);
+            if (it == rememberedItems_.end()) {
+                fail(line, "remember_items " + name + " came first?");
+                return true;
+            }
+            std::string missing, extra;
+            for (const std::string& s : it->second)
+                if (!std::binary_search(now.begin(), now.end(), s)) missing += (missing.empty() ? "" : ", ") + s;
+            for (const std::string& s : now)
+                if (!std::binary_search(it->second.begin(), it->second.end(), s)) extra += (extra.empty() ? "" : ", ") + s;
+            if (!missing.empty() || !extra.empty())
+                fail(line, "\"" + scope + "\" differs from " + name + (missing.empty() ? "" : "; missing here: " + missing) +
+                               (extra.empty() ? "" : "; only here: " + extra));
+            return true;
+        });
+        break;
+    }
+    case StepVerb::ExpectTitle: { // the OS window title contains the text ({version}: the version as shown)
         if (!need(1)) return false;
         const std::string text = withVersion(restOf(lineText_, 1), App::appShownVersion().text());
         steps_.push_back([this, line, text](float t) {
@@ -2809,7 +4113,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (have.find(text) == std::string::npos) fail(line, "window title is \"" + have + "\", expected \"" + text + "\"");
             return true;
         });
-    } else if (verb == "expect_status") {
+        break;
+    }
+    case StepVerb::ExpectStatus: {
         if (!need(1)) return false;
         const std::string text = restOf(lineText_, 1);
         // Polls: some statuses come from a worker (Generate 3D's refusals), which a slow runner reports late.
@@ -2819,7 +4125,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (t > 5.0f) fail(line, "status is \"" + app_.status_ + "\", expected it to contain \"" + text + "\"");
             return t > 5.0f;
         });
-    } else if (verb == "expect_help") {
+        break;
+    }
+    case StepVerb::ExpectHelp: {
         if (!need(1)) return false;
         const std::string text = restOf(lineText_, 1);
         steps_.push_back([this, line, text](float t) {
@@ -2830,13 +4138,17 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 fail(line, "the Ctrl-help box says \"" + shown.substr(0, 120) + "\", expected \"" + text + "\"");
             return true;
         });
-    } else if (verb == "clipboard") {
+        break;
+    }
+    case StepVerb::Clipboard: {
         if (!need(1)) return false;
         const std::string text = restOf(lineText_, 1);
         run([this, line, text] {
             if (!SDL_SetClipboardText(text.c_str())) fail(line, std::string("can't set the clipboard: ") + SDL_GetError());
         });
-    } else if (verb == "expect_clipboard") {
+        break;
+    }
+    case StepVerb::ExpectClipboard: {
         if (!need(1)) return false;
         const std::string text = restOf(lineText_, 1);
         run([this, line, text] {
@@ -2846,7 +4158,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (have.find(text) == std::string::npos)
                 fail(line, "clipboard is \"" + have.substr(0, 80) + "\", expected it to contain \"" + text + "\"");
         });
-    } else if (verb == "expect_value") {
+        break;
+    }
+    case StepVerb::ExpectValue: {
         if (!need(3)) return false;
         bool known = false;
         query(w[1], known);
@@ -2863,7 +4177,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const double v = query(name, k);
             if (!compare(v, op, want)) fail(line, name + " is " + number(v) + ", expected " + op + " " + number(want) + " (" + wantText + ")");
         });
-    } else if (verb == "wait_value") { // wait (in real time) until a value holds, e.g. a background job's progress
+        break;
+    }
+    case StepVerb::WaitValue: { // wait (in real time) until a value holds, e.g. a background job's progress
         if (!need(3)) return false;
         bool known = false;
         query(w[1], known);
@@ -2882,7 +4198,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             if (t > timeout) fail(line, name + " is " + number(v) + ", still not " + op + " " + number(want) + " after " + number(timeout) + " s");
             return t > timeout;
         });
-    } else if (verb == "expect_guide") {
+        break;
+    }
+    case StepVerb::ExpectGuide: {
         if (!need(1)) return false;
         const std::string file = w[1];
         steps_.push_back([this, line, file](float t) {
@@ -2891,7 +4209,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 fail(line, "the User Guide shows " + app_.guide_.currentFile() + ", expected " + file);
             return true;
         });
-    } else if (verb == "dump_shortcuts") {
+        break;
+    }
+    case StepVerb::DumpShortcuts: {
         if (!need(1)) return false;
         const std::string name = w[1];
         run([this, line, name] {
@@ -2899,12 +4219,154 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             f << shortcutsMarkdown();
             if (!f) fail(line, "can't write " + name + " in " + shotDir_);
         });
-    } else if (verb == "snapshot") {
+        break;
+    }
+    case StepVerb::DumpUi: {
+        if (!need(1)) return false;
+        const std::string name = w[1], golden = w.size() > 2 ? w[2] : std::string();
+        // One palette's drop-down per two frames, then the shelves and preferences as they are.
+        auto st = std::make_shared<std::pair<size_t, int>>(0, 0);
+        auto order = std::make_shared<std::vector<std::string>>();
+        auto menus = std::make_shared<Json>(Json::object());
+        steps_.push_back([this, line, name, golden, st, order, menus](float t) {
+            if (order->empty()) {
+                int count = 0;
+                const PaletteDef* list = palettes(count);
+                std::vector<std::string> first, rest, last;
+                for (int i = 0; i < count; ++i) { // the bar's order (Shell.cpp drawPaletteBar)
+                    const std::string id = list[i].id;
+                    if (id == "mypanel" && app_.layout_.myPanel.empty()) continue;
+                    if (app_.uiPrefs_.alphabeticalPalettes) rest.push_back(id);
+                    else if (id == "file" || id == "edit") first.insert(first.begin() + (id == "file" ? 0 : first.size()), id); // File, then Edit
+                    else if (id == "help") last.push_back(id);
+                    else rest.push_back(id);
+                }
+                for (const auto* v : {&first, &rest, &last}) order->insert(order->end(), v->begin(), v->end());
+                st->second = -1;
+            }
+            if (st->first < order->size()) {
+                const std::string& id = (*order)[st->first];
+                if (st->second < 0) { // open its drop-down
+                    app_.dropdown_ = id;
+                    app_.openDropdown_ = true;
+                    st->second = 0;
+                    return false;
+                }
+                if (++st->second < 3) return false;
+                const PaletteDef* def = findPalette(id);
+                // The menu-like palettes only (the brush, alpha and material lists change with every pack and brush): rows in drawing
+                // order without the drop-down's own buttons; a count in a label ("Undo Level 2") is not pinned.
+                if (id == "file" || id == "edit" || id == "preferences" || id == "script") {
+                    Json rows = Json::array();
+                    for (std::string item : Demo::scopeItemsInOrder(def->name)) {
+                        if (item.empty() || item.rfind("##", 0) == 0 || item == "Integrations##preferences.integrations") continue; // (chrome; a platform's)
+                        for (size_t at = item.find("Level "); at != std::string::npos; at = item.find("Level ", at + 1)) {
+                            size_t end = at + 6;
+                            while (end < item.size() && std::isdigit(static_cast<unsigned char>(item[end]))) ++end;
+                            if (end > at + 6) item.replace(at + 6, end - at - 6, "N");
+                        }
+                        rows.push(Json(item));
+                    }
+                    menus->set(id, std::move(rows));
+                }
+                app_.dropdown_.clear();
+                st->first++;
+                st->second = -1;
+                return false;
+            }
+            Json out = Json::object();
+            out.set("layout", std::string(app_.sculptForgeLayout() ? "sculptforge" : "classic"));
+            Json bar = Json::array();
+            for (const std::string& id : *order) bar.push(Json(id));
+            out.set("palette_bar", std::move(bar));
+            out.set("menus", *menus);
+            auto strings = [](const std::vector<std::string>& v) {
+                Json a = Json::array();
+                for (const std::string& s : v) a.push(Json(s));
+                return a;
+            };
+            const UiLayout& l = app_.layout_;
+            Json shelves = Json::object();
+            shelves.set("top", strings(l.topShelf));
+            shelves.set("left", strings(l.leftShelf));
+            shelves.set("right", strings(l.rightShelf));
+            shelves.set("bottom", strings(l.bottomShelf));
+            shelves.set("left_width", double(std::round(app_.shell_.leftShelf.w / app_.uiScale_)));
+            out.set("shelves", std::move(shelves));
+            Json trays = Json::object();
+            trays.set("left", strings(l.leftTray));
+            trays.set("right", strings(l.rightTray));
+            trays.set("left_open", l.leftTrayOpen);
+            trays.set("right_open", l.rightTrayOpen);
+            trays.set("open_subpalettes", strings(l.openSubpalettes));
+            trays.set("collapsed", strings(app_.collapsedPalettes_));
+            out.set("trays", std::move(trays));
+            Json cells = Json::object();
+            cells.set("colour_cell_min", double(std::floor(double(app_.colourCellMin_) + 0.5)));
+            out.set("colour_cells", std::move(cells));
+            out.set("preferences", toJson(app_.uiPrefs_));
+            const std::string text = out.dump(true) + "\n";
+            const std::filesystem::path dir(std::u8string(shotDir_.begin(), shotDir_.end()));
+            std::filesystem::create_directories(dir);
+            std::ofstream f(dir / name, std::ios::binary);
+            f << text;
+            f.close();
+            if (!f) fail(line, "can't write " + name + " in " + shotDir_);
+            if (golden.empty()) return true;
+            std::filesystem::path file(std::u8string(golden.begin(), golden.end()));
+            if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
+            if (const char* update = std::getenv("SF_UI_GOLDEN_UPDATE"); update && *update == '1') {
+                std::filesystem::create_directories(file.parent_path());
+                std::ofstream g(file, std::ios::binary);
+                g << text;
+                return true;
+            }
+            std::ifstream in(file, std::ios::binary);
+            const std::string want((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            if (!in.is_open()) {
+                fail(line, "no golden " + file.string() + " (SF_UI_GOLDEN_UPDATE=1 writes it)");
+            } else if (want != text) {
+                // The first differing line, so the report says what moved.
+                std::istringstream a(want), b(text);
+                std::string la, lb;
+                int n = 0;
+                while (true) {
+                    const bool ga = bool(std::getline(a, la)), gb = bool(std::getline(b, lb));
+                    ++n;
+                    if (!ga && !gb) break;
+                    if (!ga || !gb || la != lb) {
+                        fail(line, "the interface differs from " + file.filename().string() + " at line " + std::to_string(n) + ": wanted `" +
+                                       (ga ? la : "(end)") + "`, have `" + (gb ? lb : "(end)") + "` (a Classic default moved; if on purpose: SF_UI_GOLDEN_UPDATE=1, review the diff)");
+                        break;
+                    }
+                }
+            }
+            return true;
+        });
+        break;
+    }
+    case StepVerb::Snapshot: {
         run([this] {
             basePositions_ = app_.doc_.mesh.positions;
             baseNormals_ = app_.doc_.mesh.normals;
+            baseTexels_ = hasTexture(app_.doc_.mesh) ? app_.doc_.mesh.texture->pixels : std::vector<uint8_t>{};
+            baseMicro_ = app_.doc_.mesh.micro ? app_.doc_.mesh.micro->disp.toVector() : std::vector<int16_t>{};
         });
-    } else if (verb == "print") { // print NAME: writes a value to the log (benchmarks: frame_ms, ...)
+        break;
+    }
+    case StepVerb::InteractiveStrokes: { // interactive_strokes on|off: strokes run as in the window (queued dabs; the stroke thread on big meshes)
+        if (!need(1)) return false;
+        const bool on = w[1] != "off";
+        run([this, on] { app_.interactiveStrokes_ = on; });
+        break;
+    }
+    case StepVerb::MarkView: { // mark_view: remember the view as the GPU holds it now, for view_vs_mark
+        run([this] {
+            if (!renderLiveView(app_, gViewMark, app_.camera_, app_.renderSettings_, app_.renderer_)) gViewMark.clear();
+        });
+        break;
+    }
+    case StepVerb::Print: { // print NAME: writes a value to the log (benchmarks: frame_ms, ...)
         if (!need(1)) return false;
         bool known = false;
         query(w[1], known);
@@ -2918,7 +4380,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             std::printf("%s = %g\n", name.c_str(), v);
             std::fflush(stdout);
         });
-    } else if (verb == "remember") {
+        break;
+    }
+    case StepVerb::Remember: {
         if (!need(2)) return false;
         bool known = false;
         query(w[1], known);
@@ -2931,7 +4395,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             remembered_[as] = query(name, k);
             SDL_Log("remember %s = %s", as.c_str(), number(remembered_[as]).c_str());
         });
-    } else if (verb == "pen_stroke") {
+        break;
+    }
+    case StepVerb::PenStroke: {
         if (!need(6)) return false;
         const float u0 = num(1, 0), v0 = num(2, 0), u1 = num(3, 0), v1 = num(4, 0), p0 = num(5, 1), p1 = num(6, 1);
         bool eraser = false, leave = false, tail = false;
@@ -2948,7 +4414,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return ImVec2(ends->first.x + (ends->second.x - ends->first.x) * u, ends->first.y + (ends->second.y - ends->first.y) * u);
         }, p0, p1, eraser, leave, seconds, {}, tail);
         wait(0.1f);
-    } else if (verb == "pen_drag_item") {
+        break;
+    }
+    case StepVerb::PenDragItem: {
         if (!need(5)) return false;
         const std::string label = w[1];
         const float dx = num(2, 0), dy = num(3, 0), p0 = num(4, 1), p1 = num(5, 1);
@@ -2968,7 +4436,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             ++testPen_;
         });
         wait(0.1f);
-    } else if (verb == "pen_tap") {
+        break;
+    }
+    case StepVerb::PenTap: {
         // pen_tap LABEL [enter]: a quick tap on the item, down and up within one frame (a pen's tap is often shorter
         // than a frame at 240 samples a second); enter: the pen only now comes into range there, no hover before it.
         if (!need(1)) return false;
@@ -2990,19 +4460,28 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             penPressure(0.0f);
         });
         wait(0.1f);
-    } else if (verb == "pen_button") {
+        break;
+    }
+    case StepVerb::PenButton: {
         if (!need(2)) return false;
         const int button = int(num(1, 1));
         if (w[2] != "down" && w[2] != "up") {
             error = "pen_button needs down or up";
             return false;
         }
-        run([this, button, down = w[2] == "down"] {
+        const bool stale = w.size() >= 6 && w[3] == "at";
+        const float sx = stale ? num(4, 0.0f) : 0.0f, sy = stale ? num(5, 0.0f) : 0.0f;
+        run([this, button, down = w[2] == "down", stale, sx, sy] {
             if (!penIn_) penProximity(true);
-            penButtonEvent(button, down);
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            const ImVec2 at(sx * float(ww), sy * float(wh));
+            penButtonEvent(button, down, stale ? &at : nullptr);
         });
         wait(0.05f);
-    } else if (verb == "pen_hover") {
+        break;
+    }
+    case StepVerb::PenHover: {
         if (!need(2)) return false;
         const float u = num(1, 0.5f), v = num(2, 0.5f), seconds = num(3, 0.4f);
         auto from = std::make_shared<ImVec2>();
@@ -3018,7 +4497,29 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return t >= seconds;
         });
         wait(0.05f);
-    } else if (verb == "pen_enter") {
+        break;
+    }
+    case StepVerb::PenMove: { // the hovering pen to a point of the window (not of the model, which turns under it)
+        if (!need(2)) return false;
+        const float x = num(1, 0.5f), y = num(2, 0.5f), seconds = num(3, 0.4f);
+        auto from = std::make_shared<ImVec2>();
+        auto to = std::make_shared<ImVec2>();
+        steps_.push_back([this, from, to, x, y, seconds](float t) {
+            if (t == 0.0f) {
+                *from = penIn_ ? penAt_ : mouse_;
+                if (!penIn_) penProximity(true);
+                int ww = 0, wh = 0;
+                SDL_GetWindowSize(app_.window_, &ww, &wh);
+                *to = ImVec2(x * float(ww), y * float(wh));
+            }
+            const float k = std::min(t / seconds, 1.0f);
+            penMove(from->x + (to->x - from->x) * k, from->y + (to->y - from->y) * k);
+            return t >= seconds;
+        });
+        wait(0.05f);
+        break;
+    }
+    case StepVerb::PenEnter: {
         // The pen comes into range at u, v straight away (put down elsewhere on the tablet, no hover there).
         if (!need(2)) return false;
         run([this, u = num(1, 0.5f), v = num(2, 0.5f)] {
@@ -3028,7 +4529,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             penMove(p.x, p.y);
         });
         wait(0.05f);
-    } else if (verb == "pen_drag") {
+        break;
+    }
+    case StepVerb::PenDrag: {
         if (!need(4)) return false;
         const float x0 = num(1, 0), y0 = num(2, 0), x1 = num(3, 0), y1 = num(4, 0);
         float seconds = 0.4f;
@@ -3043,26 +4546,46 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return ImVec2(ends->first.x + (ends->second.x - ends->first.x) * u, ends->first.y + (ends->second.y - ends->first.y) * u);
         }, 0.5f, 0.5f, false, false, seconds, strayEvent);
         wait(0.1f);
-    } else if (verb == "pen_pressure") {
+        break;
+    }
+    case StepVerb::PenPressure: {
         if (!need(1)) return false;
         run([this, p = num(1, 0)] {
             if (!penIn_) penProximity(true);
             penPressure(p);
         });
-    } else if (verb == "sdl_pen_mouse") {
+        break;
+    }
+    case StepVerb::SdlPenMouse: {
         if (!need(1)) return false;
         run([this, on = w[1] != "stuck"] { sdlPenMouse_ = on; });
-    } else if (verb == "pen_lost") {
+        break;
+    }
+    case StepVerb::PenLost: {
         run([this] {
             penProximity(false); // no pen up: SDL's "touching" flag stays set
             sdlPenMouse_ = false;
             ++testPen_; // SDL adds it again at its next proximity, with a new id
         });
         wait(0.05f);
-    } else if (verb == "pen_stream") {
+        break;
+    }
+    case StepVerb::MouseSteps: { // mouse_steps on|off
         if (!need(1)) return false;
-        run([this, huion = w[1] == "huion"] { huionStream_ = huion; });
-    } else if (verb == "window_focus") {
+        run([this, on = w[1] != "off"] { mouseSteps_ = on; });
+        break;
+    }
+    case StepVerb::PenStream: {
+        if (!need(1)) return false;
+        run([this, mode = w[1]] {
+            huionStream_ = mode == "huion";
+            kdeStream_ = mode == "kde" ? 1 : mode == "kde_pointer" ? 2 : mode == "kde_stalled" ? 3 : mode == "kde_sparse" ? 4 : 0;
+            kdeStall_ = kdeTick_ = 0;
+            driverRight_ = mode == "right_after" ? 1 : mode == "right_first" ? 2 : mode == "right_late" ? 3 : 0;
+        });
+        break;
+    }
+    case StepVerb::WindowFocus: {
         if (!need(1)) return false;
         run([this, in = num(1, 1) != 0.0f] {
             SDL_Event e{};
@@ -3070,7 +4593,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             e.window.windowID = SDL_GetWindowID(app_.window_);
             app_.handleEvent(e);
         });
-    } else if (verb == "mouse_leave") {
+        break;
+    }
+    case StepVerb::MouseLeave: {
         run([this] {
             SDL_Event e{};
             e.type = SDL_EVENT_WINDOW_MOUSE_LEAVE;
@@ -3078,7 +4603,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.05f);
-    } else if (verb == "wheel") { // wheel U V STEPS: the mouse wheel over the model point U V (+ zooms in)
+        break;
+    }
+    case StepVerb::Wheel: { // wheel U V STEPS: the mouse wheel over the model point U V (+ zooms in)
         if (!need(3)) return false;
         auto at = std::make_shared<ImVec2>();
         run([this, at, u = num(1, 0.5f), v = num(2, 0.5f)] {
@@ -3097,7 +4624,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.05f);
-    } else if (verb == "wheel_item") { // wheel_item LABEL X Y: the wheel over a UI item; X is sideways (a trackpad swipe)
+        break;
+    }
+    case StepVerb::WheelItem: { // wheel_item LABEL X Y: the wheel over a UI item; X is sideways (a trackpad swipe)
         if (!need(3)) return false;
         const std::string label = w[1];
         auto at = std::make_shared<ImVec2>();
@@ -3121,14 +4650,33 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.handleEvent(e);
         });
         wait(0.1f);
-    } else if (verb == "mouse_move") {
+        break;
+    }
+    case StepVerb::MouseMove: {
         if (!need(2)) return false;
         run([this, u = num(1, 0.5f), v = num(2, 0.5f)] {
             const ImVec2 p = onModel(u, v);
             mouseMotion(p.x, p.y);
         });
         wait(0.05f);
-    } else if (verb == "touch_pinch" || verb == "touch_stroke") {
+        break;
+    }
+    case StepVerb::ClickHere: {
+        const int button = w.size() > 1 && w[1] == "right" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+        run([this, button] {
+            mouseButton(true, button);
+            mouseButton(false, button);
+        });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::MouseBy: {
+        if (!need(2)) return false;
+        run([this, dx = num(1, 0.0f), dy = num(2, 0.0f)] { mouseMotion(app_.mouseX_ + dx, app_.mouseY_ + dy); });
+        wait(0.05f);
+        break;
+    }
+    case StepVerb::TouchPinch: {
         // Fingers as SDL sends them, on a touch screen with the mouse events SDL makes from the first finger (before
         // that finger's own event), or on a trackpad (no mouse events; the pointer rests over the model).
         if (!need(verb == "touch_pinch" ? 6 : 4)) return false;
@@ -3214,7 +4762,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return true;
         });
         wait(0.15f);
-    } else if (verb == "spacemouse" || verb == "spacemouse_hold") {
+        break;
+    }
+    case StepVerb::Spacemouse: {
         if (!need(6)) return false;
         std::array<float, 6> v{};
         for (size_t i = 0; i < 6; ++i) v[i] = std::clamp(num(i + 1, 0), -1.0f, 1.0f);
@@ -3244,7 +4794,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             });
             wait(0.1f); // the view settles (the axes read back as centred)
         }
-    } else if (verb == "spacemouse_button") {
+        break;
+    }
+    case StepVerb::SpacemouseButton: {
         if (!need(1)) return false;
         const int button = int(num(1, 1)) - 1;
         steps_.push_back([this, line, button](float t) {
@@ -3262,10 +4814,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         wait(0.05f);
         run([this, button] { SDL_SetJoystickVirtualButton(virtualSpaceMouseHandle_, button, false); });
         wait(0.1f);
-    } else if (verb == "spacemouse_unplug") {
+        break;
+    }
+    case StepVerb::SpacemouseUnplug: {
         run([this] { detachVirtualSpaceMouse(); });
         wait(0.1f);
-    } else if (verb == "tablet_plug") {
+        break;
+    }
+    case StepVerb::TabletPlug: {
         // A tablet plugged in while the app runs: its mouse device appears (NAME as SDL reports it; a generic one,
         // as on Windows or with Wacom Bridge, counts once its pen comes into range), and its pen has a new id.
         const std::string name = w.size() > 1 ? restOf(lineText_, 1) : std::string("HID-compliant mouse");
@@ -3276,20 +4832,28 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             app_.tabletNote(app_.tabletHotplug_.mouseAdded(testTabletMouse_, name), name);
         });
         wait(0.05f);
-    } else if (verb == "tablet_unplug") {
+        break;
+    }
+    case StepVerb::TabletUnplug: {
         run([this] { app_.tabletNote(app_.tabletHotplug_.mouseRemoved(testTabletMouse_), {}); });
         wait(0.05f);
-    } else if (verb == "pen_new") {
+        break;
+    }
+    case StepVerb::PenNew: {
         // A pen with an id not seen before and no device event (a Wacom Bridge session reconnecting, the eraser
         // end on Wayland).
         run([this] {
             if (penIn_) penProximity(false);
             ++testPen_;
         });
-    } else if (verb == "pen_out") {
+        break;
+    }
+    case StepVerb::PenOut: {
         run([this] { penProximity(false); });
         wait(0.05f);
-    } else if (verb == "pen_press") {
+        break;
+    }
+    case StepVerb::PenPress: {
         if (!need(2)) return false;
         const float u = num(1, 0.5f), v = num(2, 0.5f), pressure = num(3, 0.5f);
         run([this, u, v] {
@@ -3304,7 +4868,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             penPressed_ = true;
         });
         wait(0.1f);
-    } else if (verb == "pen_sample") {
+        break;
+    }
+    case StepVerb::PenSample: {
         // One pen sample while touching, as SDL sends it (Wayland's tablet frame, X11, Windows Ink): the motion
         // to u, v, then its pressure.
         if (!need(3)) return false;
@@ -3314,7 +4880,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             penPressure(pressure);
         });
         wait(0.05f);
-    } else if (verb == "pen_lift") {
+        break;
+    }
+    case StepVerb::PenLift: {
         run([this] {
             penPressed_ = false;
             if (!penDown_) return;
@@ -3322,14 +4890,34 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             penPressure(0.0f);
         });
         wait(0.1f);
-    } else if (verb == "spacemouse_echo") {
+        break;
+    }
+    case StepVerb::SpacemouseEcho: {
         if (!need(1)) return false;
         run([this, mode = w[1]] {
             spaceMouseEcho_ = mode == "on";
             spaceMouseScrollEcho_ = mode == "scroll";
             scrollMomentumLeft_ = 0.0f;
         });
-    } else if (verb == "pen_rest") {
+        break;
+    }
+    case StepVerb::ViewTrace: {
+        if (!need(1)) return false;
+        const std::string mode = w[1];
+        const float ratio = num(2, 3.0f);
+        run([this, mode, ratio, line] {
+            if (mode == "on") {
+                viewTrace_ = true;
+                viewTraceData_.clear();
+            } else if (mode == "off") {
+                viewTrace_ = false;
+            } else {
+                checkViewTrace(line, ratio);
+            }
+        });
+        break;
+    }
+    case StepVerb::PenRest: {
         if (!need(1)) return false;
         run([this, on = w[1] != "off"] {
             if (on && !penIn_) penProximity(true);
@@ -3337,7 +4925,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             penResting_ = on;
         });
         wait(0.05f);
-    } else if (verb == "shot") {
+        break;
+    }
+    case StepVerb::Shot: {
         if (!need(1)) return false;
         const std::string name = w[1];
         steps_.push_back([this, name](float t) {
@@ -3346,7 +4936,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return true;
         });
         wait(0.05f);
-    } else {
+        break;
+    }
+    default: {
         bool handled = false;
         if (!parseModeStep(line, w, error, handled)) return false;
         if (!handled) {
@@ -3354,6 +4946,63 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         }
     }
+    }
+    return true;
+}
+
+// drag_item_to LABEL TARGET [S] [keep]: its own function (a parseStep case would do as well; it predates the verb table).
+bool Demo::parseDragItemTo(int line, const std::vector<std::string>& w, std::string& error) {
+    if (w.size() < 3) {
+        error = "'drag_item_to' needs 2 arguments";
+        return false;
+    }
+    const std::string label = w[1], target = w[2];
+    const bool keep = w.back() == "keep"; // leave the button down, then `release`
+    const float seconds = w.size() > 3 && w[3] != "keep" ? std::strtof(w[3].c_str(), nullptr) : 0.6f;
+    auto from = std::make_shared<ImVec2>(), to = std::make_shared<ImVec2>();
+    auto press = std::make_shared<std::string>();
+    steps_.push_back([this, line, label, from](float t) {
+        if (findItem(label, *from)) {
+            mouseMotion(from->x, from->y);
+            return true;
+        }
+        if (t > 3.0f) fail(line, notFound(label));
+        return t > 3.0f;
+    });
+    wait(0.15f); // hover first, as a person does
+    steps_.push_back([this, line, label, target, to, from, seconds, keep, press](float t) {
+        if (t == 0.0f) {
+            if (!findItem(target, *to)) {
+                fail(line, notFound(target));
+                return true;
+            }
+            return false;
+        }
+        if (!buttonDown_ && t < seconds) mouseButton(true, SDL_BUTTON_LEFT);
+        if (press->empty() && buttonDown_) { // the press just landed: who took it
+            ImGuiContext& g = *ImGui::GetCurrentContext();
+            *press = std::string("press: hovered window ") + (g.HoveredWindow ? g.HoveredWindow->Name : "none") + ", hovered id " +
+                     std::to_string(g.HoveredId) + (g.HoveredIdIsDisabled ? " (disabled)" : "") + ", active id " +
+                     std::to_string(g.ActiveId) + " in " + (g.ActiveIdWindow ? g.ActiveIdWindow->Name : "none") +
+                     (g.ActiveIdWindow && g.ActiveId == g.ActiveIdWindow->MoveId ? " (window move)" : "") +
+                     " ctrl " + (g.IO.KeyCtrl ? "yes" : "no") + " alt " + (g.IO.KeyAlt ? "yes" : "no") + "; ";
+        }
+        const float u = std::min(t / seconds, 1.0f);
+        mouseMotion(from->x + (to->x - from->x) * u, from->y + (to->y - from->y) * u);
+        if (t >= seconds) {
+            const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+            if (!payload || !payload->IsDataType(ui::kUiItemPayload)) {
+                ImGuiContext& g = *ImGui::GetCurrentContext();
+                fail(line, "no drag began from \"" + label + "\": " + *press + "drag active " + (g.DragDropActive ? "yes" : "no") +
+                               ", active id " + std::to_string(g.ActiveId) + ", mouse " + std::to_string(int(g.IO.MousePos.x)) + "," +
+                               std::to_string(int(g.IO.MousePos.y)) + " from " + std::to_string(int(from->x)) + "," + std::to_string(int(from->y)));
+            }
+            if (!keep) mouseButton(false, SDL_BUTTON_LEFT);
+            return true;
+        }
+        return false;
+    });
+    wait(0.2f);
     return true;
 }
 
@@ -3414,6 +5063,45 @@ void Demo::penProximity(bool in) {
     app_.handleEvent(e);
 }
 
+// view_trace check (steps in degrees of yaw, pitch and 1/100 units of the target): a steady pen drag turns the view by about the same each sample. A skip is a sample whose step is far
+// below its neighbours' (the view waited, then caught up) or above them, or one against their direction (#216).
+static float traceDot(const Demo::TraceSample& a, const Demo::TraceSample& b) {
+    float d = 0.0f;
+    for (size_t k = 0; k < a.size(); ++k) d += a[k] * b[k];
+    return d;
+}
+static float traceLength(const Demo::TraceSample& a) { return std::sqrt(traceDot(a, a)); }
+
+void Demo::checkViewTrace(int line, float ratio) {
+    const auto& d = viewTraceData_;
+    if (d.size() < 8) return fail(line, "view_trace: only " + std::to_string(d.size()) + " samples");
+    std::vector<Demo::TraceSample> step;
+    for (size_t i = 1; i < d.size(); ++i) {
+        Demo::TraceSample t;
+        for (size_t k = 0; k < t.size(); ++k) t[k] = d[i][k] - d[i - 1][k];
+        for (size_t k = 0; k < 2; ++k) t[k] = t[k] - 360.0f * std::round(t[k] / 360.0f); // (the angles wrap)
+        step.push_back(t);
+    }
+    step.erase(step.begin(), step.begin() + 3); // (the press and the first samples settle)
+    step.pop_back();
+    std::vector<float> len;
+    for (const auto& s : step) len.push_back(traceLength(s));
+    std::vector<float> sorted = len;
+    std::sort(sorted.begin(), sorted.end());
+    const float med = sorted[sorted.size() / 2];
+    if (med < 0.01f) return fail(line, "view_trace: the view moved in fewer than half the samples (median step " + std::to_string(med) + "): it waits, then catches up");
+    for (size_t i = 0; i < step.size(); ++i) {
+        const bool against = i > 0 && traceDot(step[i], step[i - 1]) < 0.0f;
+        if (len[i] < med / ratio || len[i] > med * ratio || against)
+            return fail(line, "view_trace: sample " + std::to_string(i) + " moved the view " + std::to_string(len[i]) + (against ? " against the one before" : "") +
+                                  " (median " + std::to_string(med) + "; steps " + [&] {
+                                      std::string all;
+                                      for (size_t k = 0; k < len.size() && k < 16; ++k) all += (k ? " " : "") + std::to_string(int(len[k] * 10.0f) / 10.0f).substr(0, 5);
+                                      return all;
+                                  }() + ")");
+    }
+}
+
 void Demo::penMove(float x, float y) {
     SDL_Event e{};
     e.type = SDL_EVENT_PEN_MOTION;
@@ -3425,7 +5113,18 @@ void Demo::penMove(float x, float y) {
     penAt_ = ImVec2(x, y);
     app_.handleEvent(e);
     if (sdlPenMouse_) mouseMotion(x, y, SDL_PEN_MOUSEID); // SDL moves the mouse with a touching or hovering pen
-    if (huionStream_) mouseMotion(x, y, kDriverMouse);    // ... and the driver moves it too
+    // ... and the driver moves it too (kde_stalled: its pointer sends one move after a button, then no more: #216)
+    // (kde_sparse: its pointer reports every third pen sample only, as a compositor that sends the pointer once a frame does)
+    if (huionStream_ || (kdeStream_ != 0 && (kdeStream_ != 3 || !(penState_ & (SDL_PEN_INPUT_BUTTON_1 | SDL_PEN_INPUT_BUTTON_2)) || kdeStall_-- > 0) &&
+                        (kdeStream_ != 4 || ++kdeTick_ % 3 == 0)))
+        mouseMotion(x, y, kDriverMouse);
+    if (viewTrace_) app_.flushPenMotion(); // (the frame's end does it before the view is drawn: what the frame shows)
+    if (viewTrace_) viewTraceData_.push_back({glm::degrees(app_.camera_.yaw), glm::degrees(app_.camera_.pitch), app_.camera_.target.x * 100.0f, app_.camera_.target.y * 100.0f, app_.camera_.target.z * 100.0f}); // (view_trace)
+    if (lateRight_ && penState_ != 0) { // pen_stream right_late: the driver's right press, after the pen's first motion
+        lateRight_ = false;
+        mouseButton(true, SDL_BUTTON_RIGHT, kDriverMouse);
+        driverRightHeld_ = true;
+    }
 }
 
 void Demo::penRestNoise() {
@@ -3522,7 +5221,7 @@ void Demo::penTouch(bool down, bool eraser) {
     if (huionStream_ && down) mouseButton(true, SDL_BUTTON_LEFT, kDriverMouse); // its release never comes
 }
 
-void Demo::penButtonEvent(int button, bool down) {
+void Demo::penButtonEvent(int button, bool down, const ImVec2* at) {
     const SDL_PenInputFlags bit = SDL_PenInputFlags(1u << button);
     penState_ = down ? (penState_ | bit) : (penState_ & ~bit);
     SDL_Event e{};
@@ -3530,11 +5229,31 @@ void Demo::penButtonEvent(int button, bool down) {
     e.pbutton.windowID = SDL_GetWindowID(app_.window_);
     e.pbutton.which = testPen_;
     e.pbutton.pen_state = penState_;
-    e.pbutton.x = penAt_.x;
-    e.pbutton.y = penAt_.y;
+    e.pbutton.x = at ? at->x : penAt_.x;
+    e.pbutton.y = at ? at->y : penAt_.y;
     e.pbutton.button = Uint8(button);
     e.pbutton.down = down;
+    // KDE maps the barrel buttons to mouse buttons in the compositor: the tablet protocol's button event, then the pointer's
+    // click, at the pointer (where the pen is).
+    static const int kKdeMouse[] = {0, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE};
+    if (kdeStream_ != 0 && button >= 1 && button <= 2) {
+        if (kdeStream_ == 1) app_.handleEvent(e);
+        kdeStall_ = down ? 1 : 0;
+        mouseButton(down, kKdeMouse[button], kDriverMouse);
+        return;
+    }
+    if (driverRight_ == 2 && button >= 1 && button < 5) mouseButton(down, SDL_BUTTON_RIGHT, kDriverMouse);
     app_.handleEvent(e);
+    if (driverRight_ == 1 && button >= 1 && button < 5) mouseButton(down, SDL_BUTTON_RIGHT, kDriverMouse);
+    if (driverRight_ == 3 && button >= 1 && button < 5) { // its press comes with the pen's first motion, its release with the pen's
+        if (down) lateRight_ = true;
+        else if (!lateRight_) mouseButton(false, SDL_BUTTON_RIGHT, kDriverMouse);
+        else lateRight_ = false; // (never pressed: a tap)
+        if (!down && driverRightHeld_) {
+            driverRightHeld_ = false;
+            mouseButton(false, SDL_BUTTON_RIGHT, kDriverMouse);
+        }
+    }
     // SDL 3.4 also clicks a mouse button for it (1: right, 2: middle ...); the app must ignore that.
     static const int kMouse[] = {SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE, SDL_BUTTON_X1, SDL_BUTTON_X2};
     if (sdlPenMouse_ && button >= 1 && button < 5) mouseButton(down, kMouse[button], SDL_PEN_MOUSEID);
@@ -3655,19 +5374,19 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
         lineText_ = line;
         if (take_) { // a benchmark take: only what a person does in real time
             const std::string& verb = words[0];
-            static const std::set<std::string> skipped = {"shot", "snapshot", "remember", "print", "dump_shortcuts"};
+            static const std::set<std::string> skipped = {"shot", "snapshot", "remember", "remember_items", "print", "dump_shortcuts", "dump_ui"};
             if (skipped.count(verb) || verb.rfind("expect", 0) == 0) {
                 SDL_Log("%s:%d: '%s' skipped (a take checks and shoots nothing)", scriptName_.c_str(), n, verb.c_str());
                 continue;
             }
             static const std::set<std::string> allowed = {
-                "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "key", "key_down",
-                "key_up", "hold", "stroke", "view_drag", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
+                "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "type_here", "key", "key_down",
+                "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
-                "drag_item", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "look",
-                "run", "wait", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover",
-                "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move",
-                "touch_stroke", "touch_pinch", "classic_keys", "input_style"};
+                "drag_item", "drag_to", "drag_item_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
+                "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover", "pen_move",
+                "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
+                "touch_stroke", "touch_pinch", "touch_tap", "touch_tap_at", "touch_drag_at", "touch_tap_welcome_x", "android_back", "safe_area", "palm_guard", "classic_keys", "input_style"};
             if (!allowed.count(verb)) {
                 error = scriptName_ + ":" + std::to_string(n) + ": '" + verb +
                         "' can't be used in a benchmark take (only input, the camera and waits play in real time)";

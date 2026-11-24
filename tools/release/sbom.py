@@ -28,7 +28,7 @@ PIN_NAMES = {"glm": "GLM", "SDL3": "SDL 3", "SDL3_linux": "SDL 3", "imgui": "Dea
                                                       "windows_x86_64")}}
 LICENSES = {"MIT License": "MIT", "zlib License": "Zlib", "BSD 3-Clause License": "BSD-3-Clause",
             "Apache License 2.0": "Apache-2.0", "Mozilla Public License 2.0": "MPL-2.0",
-            "SIL Open Font License 1.1": "OFL-1.1", "CC0 1.0 (public domain)": "CC0-1.0", "BSD-style": "BSD-3-Clause"}
+            "SIL Open Font License 1.1": "OFL-1.1", "Python Software Foundation License 2.0": "PSF-2.0", "CC0 1.0 (public domain)": "CC0-1.0", "BSD-style": "BSD-3-Clause"}
 
 
 def pins():

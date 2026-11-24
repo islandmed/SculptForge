@@ -1,0 +1,23 @@
+# Append > Insert on the model on a mesh with subdivision levels: no Freeze Levels needed. The piece becomes a Part
+# beside the mesh, every level keeps its detail, one undo takes the Part away.
+run new_sphere subdivisions=4
+run subdiv_divide
+run subdiv_divide
+key f
+remember triangles base
+expect_value parts == 1
+
+click "Parts/Append"
+hover "Insert on the model"
+click "Cylinder##insert"
+expect_status Insert Cylinder
+stroke 0.78 0.45 0.9 0.45
+expect_status has subdivision levels, which stay as they are
+expect_value parts == 2
+expect_value triangles == $base
+wait 0.3
+shot insert_levels
+key ctrl+z
+expect_value parts == 1
+expect_value triangles == $base
+key escape

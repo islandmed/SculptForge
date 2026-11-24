@@ -138,6 +138,17 @@ bool parseUpdateFeed(const std::string& json, UpdateInfo& out, std::string& erro
         }
         f.memberRequests = count(support["member_requests_this_release"]);
     }
+    const Json& spaces = j["ai3d"]["spaces"];
+    if (spaces.isObject())
+        for (const auto& [id, v] : spaces.members()) {
+            if (info.spaceHealth.size() >= 16) break;
+            const bool idOk = !id.empty() && id.size() <= 40 && std::all_of(id.begin(), id.end(), [](char c) {
+                return std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '.';
+            });
+            const std::string state = v["state"].isString() ? v["state"].asString() : std::string();
+            if (!idOk || (state != "up" && state != "slow" && state != "off")) continue;
+            info.spaceHealth.push_back({id, state, v["note"].isString() ? feedText(v["note"].asString(), 96) : std::string()});
+        }
     out = std::move(info);
     return true;
 }
@@ -170,6 +181,23 @@ ShownVersion shownVersion(const std::string& version, const std::string& prerele
     ShownVersion v{version, prerelease};
     if (!devCommit.empty()) v.tag += (v.tag.empty() ? "dev " : " dev ") + devCommit.substr(0, 7);
     return v;
+}
+
+InstallerChoice parseInstallerChoice(const std::string& json) {
+    InstallerChoice c;
+    Json j;
+    std::string err;
+    if (!Json::parse(json, j, err) || !j.isObject() || !j["check_updates"].isBool()) return c;
+    c.present = true;
+    c.checkUpdates = j["check_updates"].asBool(true);
+    return c;
+}
+
+bool applyInstallerChoice(const InstallerChoice& choice, int64_t stamp, int64_t& appliedStamp, bool& checkUpdates) {
+    if (!choice.present || stamp <= 0 || stamp == appliedStamp) return false;
+    appliedStamp = stamp;
+    checkUpdates = choice.checkUpdates;
+    return true;
 }
 
 } // namespace sf

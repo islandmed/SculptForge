@@ -33,6 +33,7 @@ void App::touchEvent(const SDL_Event& e) {
 #if SDL_VERSION_ATLEAST(3, 4, 0)
     if (e.type == SDL_EVENT_PINCH_BEGIN || e.type == SDL_EVENT_PINCH_UPDATE || e.type == SDL_EVENT_PINCH_END) {
         touchNativePinch_ = true;
+        if (e.type == SDL_EVENT_PINCH_BEGIN) ++penDiag_.pinches;
         if (e.type == SDL_EVENT_PINCH_UPDATE && !ImGui::GetIO().WantCaptureMouse &&
             canvasRect().contains(mouseX_, mouseY_)) {
             camera_.zoom(pinchZoomSteps(e.pinch.scale));
@@ -48,8 +49,28 @@ void App::touchEvent(const SDL_Event& e) {
         ++penDiag_.penTouchEvents;
         return;
     }
+    if (e.type == SDL_EVENT_FINGER_DOWN) ++penDiag_.fingers;
+    if (e.type == SDL_EVENT_FINGER_DOWN && palmGuard()) { // a palm (palmGuard): never part of a gesture
+        // ... unless it's a trackpad's: that is never a palm (pen in one hand, trackpad in the other)
+        const SDL_TouchDeviceType t = f.touchID == kUiTestTrackpad ? SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE
+                                                                  : SDL_GetTouchDeviceType(f.touchID);
+        if (t != SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE && t != SDL_TOUCH_DEVICE_INDIRECT_RELATIVE) return;
+    }
+    if (e.type == SDL_EVENT_FINGER_DOWN && touch_.fingers() > 0) {
+        // A finger SDL no longer has down (its lift was lost) isn't one: it would keep this touch a gesture, and a
+        // gesture's touches never reach the canvas or the panels. (Scripted touches have no device to ask.)
+        int n = 0;
+        if (SDL_Finger** live = SDL_GetTouchFingers(f.touchID, &n)) {
+            std::vector<uint64_t> ids{uint64_t(f.fingerID)};
+            for (int i = 0; i < n; ++i) ids.push_back(uint64_t(live[i]->id));
+            SDL_free(live);
+            touch_.retain(ids);
+            if (touch_.fingers() == 0) touchReset();
+        }
+    }
     if (e.type == SDL_EVENT_FINGER_UP || e.type == SDL_EVENT_FINGER_CANCELED) {
         touch_.up(f.fingerID);
+        if (e.type == SDL_EVENT_FINGER_CANCELED) touchPalm_ = false; // (no mouse release comes for it)
         if (touch_.fingers() == 0) {
             touchTwisting_ = touchPinching_ = false;
             touchTwistSum_ = touchZoomSum_ = 0.0f;
@@ -105,23 +126,57 @@ void App::touchApply(const TwoFingerStep& step) {
     }
     // A twist rolls the view once it is clearly meant (a pinch's fingers turn a little on their own): then the
     // whole twist so far, so the view stays under the fingers.
-    touchTwistSum_ += step.angle;
+    // A rotation lock (Turntable, X or Z axis) keeps the view upright about its axis: a twist would tilt it, so it
+    // is ignored (one finger's orbit stays turntable yaw).
+    const bool locked = forceTurntable_ || uiPrefs_.orbitLock != 0;
     float roll = 0.0f;
-    if (touchTwisting_) roll = step.angle;
-    else if (std::abs(touchTwistSum_) > kTouchTwistStart) {
-        touchTwisting_ = true;
-        roll = touchTwistSum_;
+    if (!locked) {
+        touchTwistSum_ += step.angle;
+        if (touchTwisting_) roll = step.angle;
+        else if (std::abs(touchTwistSum_) > kTouchTwistStart) {
+            touchTwisting_ = true;
+            roll = touchTwistSum_;
+        }
     }
     if (roll != 0.0f) {
         if (autoOrtho_) { // an axis view turned: back to perspective, as when orbiting with the mouse
             camera_.ortho = false;
             autoOrtho_ = false;
         }
-        // Clockwise on screen (y down) turns the model clockwise, as the SpaceMouse's roll does.
-        camera_.setOrientation(camera_.orientation() * glm::angleAxis(-roll, glm::vec3(0, 0, 1)));
+        // The fingers turn clockwise on screen (y down, step.angle > 0): the camera turns counterclockwise about its
+        // view axis, so the model follows them clockwise (Invert twist: the other way).
+        camera_.setOrientation(camera_.orientation() * glm::angleAxis(uiPrefs_.invertTwist ? -roll : roll, glm::vec3(0, 0, 1)));
         orbitStarted_ = false;
     }
     if (!touchDirect_ && (touchTwisting_ || std::abs(touchZoomSum_) > kTouchPinchStart)) touchPinching_ = true;
+}
+
+// Fingers that were down when the window lost focus, rotated or resized never report their lift here.
+void App::touchReset() {
+    touch_.clear();
+    touchTwisting_ = touchPinching_ = false;
+    touchTwistSum_ = touchZoomSum_ = 0.0f;
+    touchSwallowMouse_ = false;
+    touchPalm_ = false;
+    touchPress_.held = false;
+}
+
+bool App::palmGuard() const {
+    return uiPrefs_.tablet.palmRejection && palm_.active(double(SDL_GetTicksNS()) * 1e-9);
+}
+
+// A palm's touch: its mouse events never reach the canvas or the UI (App::dispatchEvent asks first), press to release.
+bool App::palmMouseEvent(const SDL_Event& e) {
+    if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.which == SDL_TOUCH_MOUSEID && palmGuard()) touchPalm_ = true;
+    if (touchPalm_ && (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_MOTION ||
+                       e.type == SDL_EVENT_MOUSE_BUTTON_UP)) {
+        const SDL_MouseID which = e.type == SDL_EVENT_MOUSE_MOTION ? e.motion.which : e.button.which;
+        if (which == SDL_TOUCH_MOUSEID) {
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) touchPalm_ = false;
+            return true;
+        }
+    }
+    return false;
 }
 
 bool App::touchMouseEvent(const SDL_Event& e) {

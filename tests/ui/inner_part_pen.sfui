@@ -1,0 +1,38 @@
+# A Part inside another Part (an eyeball in its socket), sculpted from behind it: the camera ends up inside the head.
+# The brush works on the active Part only, whatever is in front of it; Frame Part says when the view is inside another
+# Part; and a press that lands on the other Part says why nothing was sculpted instead of silently orbiting (the pen
+# "can't sculpt" report). The scene: a closed head Part 7 units across, with an eye Part wholly inside it near the front.
+run open path=$SCRIPT_DIR/../data/inner_eye.obj
+expect_value parts == 2
+run part_select index=1
+expect_value active_part == 1
+camera 180 0
+action view.frame_selected
+wait 0.6
+expect_status Inside Head: Solo Eye to see it
+shot inner-frame
+
+# The eye under the pointer is reached through the head, and only the eye changes.
+snapshot
+stroke 0.45 0.5 0.55 0.5
+expect_value moved > 0
+expect_value edited_parts == 1
+shot inner-stroke
+key ctrl+z
+expect_value edited_parts == 0
+
+# Beside the eye the pointer is on the head's inner wall: the eye is not sculpted, and the status says why.
+snapshot
+view_drag 0.15 0.6 0.18 0.6
+expect_status Head is in front: Alt+Q selects it
+expect_value moved == 0
+expect_value edited_parts == 0
+shot inner-wall
+
+# Solo shows the eye from outside the head; Frame then has nothing to say.
+run part_select index=0
+run part_select index=1
+click "Solo"
+action view.frame_selected
+wait 0.3
+expect_value visible_parts == 1

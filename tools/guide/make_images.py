@@ -55,6 +55,7 @@ CROPS = {
     "splats": ("splats", (300, 90, 1280, 865), 980),
     "user-guide": ("user-guide", (138, 108, 1180, 842), 1042),
     "extract": ("extract", (380, 140, 1000, 740), 620),
+    "booleans": ("booleans", (380, 46, 1600, 900), 960),
     "make-sculptable-panel": ("sculptable-panel", (1276, 500, 1600, 960), 324),
     "qremesh": ("qremesh", (0, 0, 1600, 960), MAX_WIDTH),
 }
@@ -62,14 +63,6 @@ CROPS = {
 # What's New feature pictures (tools/guide/whats_new_shots.sfui): name: (screenshot, crop with the 600:340 shape), saved
 # at exactly 600x340 (--whats-new).
 WHATS_NEW = {
-    "wn-new-look": ("wn-new-look", (0, 30, 1340, 789)),
-    "wn-wayland": ("wn-wayland", (0, 0, 600, 340)),
-    "wn-memberships": ("wn-memberships", (117, 90, 1483, 864)),
-    "wn-full-alpha": ("wn-full-alpha", (300, 290, 1020, 698)),
-    "wn-benchmark": ("wn-benchmark", (500, 190, 1100, 530)),
-    "wn-whats-new": ("wn-whats-new", (170, 120, 1430, 834)),
-    "wn-starter-meshes": ("wn-starter-meshes", (108, 145, 1212, 770)),
-    "wn-brush-settings": ("wn-brush-settings", (160, 145, 880, 553)),
     "wn-stencil": ("wn-stencil", (220, 244, 1138, 764)),
     "wn-stencil-overlay": ("wn-stencil-overlay", (220, 244, 1138, 764)),
 }
@@ -226,7 +219,7 @@ def qremesh_guides(shots: pathlib.Path):
 
 
 def make_sculptable(shots: pathlib.Path):
-    box = (455, 240, 865, 770)
+    box = (455, 215, 865, 745)
     names = [("sculptable-capture", "Splat capture"), ("sculptable-review", "Review: landmarks and loops"),
              ("sculptable-result", "Sculptable quads")]
     panels = [Image.open(shots / f"{n}.png").convert("RGB").crop(box) for n, _ in names]
@@ -278,14 +271,6 @@ def first_sculpt(shots: pathlib.Path) -> list:
                 raise SystemExit(f"no Save Render output under {shots}/library")
             render = Image.open(renders[-1]).convert("RGB")  # Save Render: twice the canvas size
             w, h = render.size
-            # What's New's card (600x340): the model's middle at the card's shape, downsampled from the 2x render.
-            ch = h * 72 // 100
-            cw = ch * WN_SIZE[0] // WN_SIZE[1]
-            card = render.crop(((w - cw) // 2, h * 13 // 100, (w + cw) // 2, h * 13 // 100 + ch))
-            card = card.resize(WN_SIZE, Image.LANCZOS)
-            card_path = OUT / "wn-first-sculpt.jpg"
-            card.save(card_path, "JPEG", quality=88, optimize=True, progressive=True)
-            made.append(card_path)
             img = render.crop((w * 27 // 100, h * 10 // 100, w * 73 // 100, h * 90 // 100))
         else:
             img = Image.open(shots / f"{name}.png").convert("RGB").crop(box)

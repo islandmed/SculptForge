@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "cli/McpAttach.h"
 
+#include "cli/McpServer.h"
 #include "cli/McpTools.h"
+#include "core/Commands.h"
+#include "core/ManagedPolicy.h"
 #include "core/Json.h"
 #include "link/AiLink.h"
 #include "link/AiLinkSession.h"
@@ -43,6 +46,21 @@ Json tool(const std::string& name, const std::string& description, Json properti
     return t;
 }
 
+} // namespace
+
+Json mcpAppToolList(const CommandRegistry& registry) {
+    Json tools = Json::array();
+    const Json commands = mcpToolList(registry), live = mcpLiveTools(); // (named: items() must not outlive its Json)
+    for (const Json& t : commands.items()) // (leaves out what a studio's policy doesn't allow; the window tools below
+                                           // replace its viewport_image and view_closeup)
+        if (!link::AiLinkPolicy::hidden(t["name"].asString()) && !mcpIsLiveTool(t["name"].asString())) tools.push(t);
+    for (const Json& t : live.items())
+        if (policy::mcpToolAllowed(t["name"].asString(), {})) tools.push(t);
+    return tools;
+}
+
+namespace {
+
 Json connectTool() {
     Json code = Json::object();
     code.set("type", "string");
@@ -63,7 +81,8 @@ Json disconnectTool() {
 
 class Attach {
 public:
-    Attach(std::ostream& out, std::string endpoint) : out_(out), endpoint_(std::move(endpoint)) {}
+    Attach(std::ostream& out, std::string endpoint, const CommandRegistry* registry)
+        : out_(out), endpoint_(std::move(endpoint)), registry_(registry) {}
 
     void message(const std::string& line) {
         Json msg;
@@ -99,6 +118,14 @@ private:
 
     void listChanged() { send(R"({"jsonrpc":"2.0","method":"notifications/tools/list_changed"})"); }
 
+    // A pairing approved inside live_connect changes the tool list: tell the client once the call's own reply is out,
+    // so it never refreshes tools while that call still looks pending.
+    void flushListChanged() {
+        if (!listChangedPending_) return;
+        listChangedPending_ = false;
+        listChanged();
+    }
+
     void dropConnection() {
         const bool was = paired_;
         conn_.close();
@@ -124,10 +151,13 @@ private:
         r.set("instructions",
               "Live mode: you sculpt in the SculptForge window the user has open, and they watch. Call live_connect "
               "first; the user approves in SculptForge. Then work in small steps and look after each one: "
-              "viewport_image shows what the user sees, view_turntable shows the model from all sides, view_set turns "
-              "the camera. Every step lands in the undo history (labelled AI), so the user can step back. Some actions "
-              "ask the user first (files outside the project folder, overwrites, scripts, network); if they decline, "
-              "don't retry, ask them.");
+              "viewport_image shows what the user sees, view_turntable shows the model from all sides, view_closeup "
+              "shows one spot up close, view_set turns the camera. Every step lands in the undo history (labelled "
+              "AI), so the user can step back. Some actions ask the user first (files outside the project folder, "
+              "overwrites, scripts, network); if they decline, don't retry, ask them. " +
+                  std::string(kMcpSculptWorkflow) +
+                  " stroke_screen's radius is a fraction of the view's height: zoom in (view_set zoom=3 or more) "
+                  "before small detail strokes, or use stroke with scene-unit radii.");
         send(result(id, std::move(r)));
     }
 
@@ -149,7 +179,7 @@ private:
     std::string pairingOutcome(const Json& msg) {
         if (msg["paired"].asBool()) {
             paired_ = true;
-            listChanged();
+            listChangedPending_ = true;
             return {};
         }
         if (msg.has("paired")) {
@@ -161,9 +191,12 @@ private:
     }
 
     void toolsList(const Json& id, const Json& msg) {
-        if (!paired_) {
+        if (!paired_) { // the whole set already: clients that never ask again must not be left with live_connect alone
             Json tools = Json::array();
             tools.push(connectTool());
+            const Json offered = registry_ ? mcpAppToolList(*registry_) : mcpLiveTools();
+            for (const Json& t : offered.items()) tools.push(t);
+            tools.push(disconnectTool());
             Json r = Json::object();
             r.set("tools", tools);
             return send(result(id, std::move(r)));
@@ -180,13 +213,18 @@ private:
 
     void toolsCall(const Json& id, const Json& msg) {
         const std::string name = msg["params"]["name"].asString();
-        if (name == "live_connect") return send(AiLinkSession::contentReply(id, textContent(connect(msg["params"]["arguments"]["code"].asString())), !paired_));
+        if (name == "live_connect") {
+            // connect() first: isError reads the state it leaves (argument evaluation order is unspecified).
+            const std::string text = connect(msg["params"]["arguments"]["code"].asString());
+            send(AiLinkSession::contentReply(id, textContent(text), !paired_));
+            return flushListChanged();
+        }
         if (name == "live_disconnect") {
             dropConnection();
             return send(AiLinkSession::resultReply(id, true, "Disconnected from SculptForge"));
         }
         if (!paired_)
-            return send(AiLinkSession::resultReply(id, false, "Not connected to SculptForge: call live_connect first."));
+            return send(AiLinkSession::resultReply(id, false, "Not connected to SculptForge yet: call live_connect (SculptForge must be open)"));
         Json reply;
         if (forward(id, msg, reply)) send(reply.dump());
     }
@@ -257,20 +295,21 @@ private:
     }
 
     static std::string connectedText() {
-        return "Connected to SculptForge. Its tools are now listed (call tools/list again if you don't see them): start "
-               "with scene_overview and viewport_image.";
+        return "Connected to SculptForge. Its tools work now: start with scene_overview and viewport_image.";
     }
 
     std::ostream& out_;
     std::string endpoint_, client_;
+    const CommandRegistry* registry_;
     link::AiLinkConn conn_;
     bool paired_ = false;
+    bool listChangedPending_ = false;
 };
 
 } // namespace
 
-int runMcpAttach(std::istream& in, std::ostream& out, const std::string& endpoint) {
-    Attach attach(out, endpoint);
+int runMcpAttach(std::istream& in, std::ostream& out, const std::string& endpoint, const CommandRegistry* registry) {
+    Attach attach(out, endpoint, registry);
     std::string line;
     while (std::getline(in, line)) {
         if (line.find_first_not_of(" \t\r") == std::string::npos) continue;

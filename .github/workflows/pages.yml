@@ -63,10 +63,47 @@ jobs:
       # The apt and dnf repositories (sculptforge.app/apt and /rpm): the latest published release's signed metadata
       # and its .deb and .rpm files, each checked against that release's SHA256SUMS.txt (docs/design/package-repos.md).
       # Nothing until a release carries the metadata (it needs the REPO_SIGNING_KEY secret).
+      # GitHub's release downloads returned 504 for hours on 11-09 and no site-only change could deploy: the downloads
+      # retry for minutes, and when they still fail the last good assets (kept in the Actions cache after each release's
+      # fresh fetch) are put together by the very same script, so the signature and every checksum are checked again.
+      # Without a kept copy the deploy still fails: a site without /apt and /rpm would break every apt and dnf user.
+      - name: Package repositories (the last good assets)
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .package-repos
+          key: package-repos-restore-only # (never saved under this name: the newest package-repos-<tag> is restored)
+          restore-keys: package-repos-
       - name: Package repositories
+        id: repos
         env:
           GH_TOKEN: ${{ github.token }}
-        run: tools/publish/package_repos_fetch.sh "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q .tag_name)" website
+        run: |
+          tag=""
+          for _ in 1 2 3 4 5 6; do
+            tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q .tag_name 2>/dev/null) && [ -n "$tag" ] && break
+            tag=""; sleep 20
+          done
+          if [ -n "$tag" ] && PACKAGE_REPOS_KEEP=.package-repos-fresh timeout 25m tools/publish/package_repos_fetch.sh "$tag" website; then
+            # (a release without repositories leaves no TAG: nothing to keep)
+            if [ -f .package-repos-fresh/TAG ] && [ "$(cat .package-repos-fresh/TAG)" != "$(cat .package-repos/TAG 2>/dev/null)" ]; then
+              rm -rf .package-repos && mv .package-repos-fresh .package-repos
+              echo "save=$(cat .package-repos/TAG)" >> "$GITHUB_OUTPUT"
+            fi
+          elif [ -f .package-repos/TAG ]; then
+            kept=$(cat .package-repos/TAG)
+            echo "::warning::GitHub's release downloads failed: the apt and dnf repositories are the last good ones, $kept's (the rest of the site goes out)"
+            rm -rf website/apt website/rpm
+            PACKAGE_REPOS_LOCAL=.package-repos tools/publish/package_repos_fetch.sh "$kept" website
+          else
+            echo "::error::GitHub's release downloads failed and no earlier good copy of the apt and dnf repositories is kept: not deploying a site without them"
+            exit 1
+          fi
+      - name: Package repositories (keep this release's assets)
+        if: steps.repos.outputs.save != '' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: .package-repos
+          key: package-repos-${{ steps.repos.outputs.save }}
       # The credits page always matches docs/supporters.txt on main.
       - name: Supporters page
         run: python3 tools/guide/build_site.py --supporters

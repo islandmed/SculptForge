@@ -40,7 +40,7 @@ opens the download page (no download or install from the app: that would be new 
 
 **Members.** Since 0.11.1 betas are a member perk (maintainer decision, November 2026): `X.Y.Z-beta.N` is published only in the
 private sculptforge-insiders repository and posted in #members (docs/releasing.md, "Betas"); the update feed's Preview
-channel is no longer written for betas. Public wording: members get betas and early builds; from SculptForge 1.0,
+channel is no longer written for betas. Public wording: members get betas and early builds; from SculptForge 2027,
 each release about two weeks early.
 
 ## 2. Feature flags

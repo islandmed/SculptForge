@@ -1,0 +1,127 @@
+# Pan and zoom keys (Artizmo on Discord, 0.12.4 actions): a TAP (down and up inside one frame) and a HOLD of each of the six
+# actions move the view, on the default keys and rebound ones, in the Classic and the SculptForge key styles. The ctest
+# key_nav_loops covers the other half: the app's own frame loop calls updateKeyNav (this runner's loop is a different one).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+
+# Each pass: name of the style, then the six actions' keys.
+input_style classic
+camera 0 0
+key f
+remember camera_pan p0
+key ctrl+numpad6
+expect_value camera_pan != $p0
+camera 0 0
+key f
+remember camera_distance d0
+key numpadplus
+expect_value camera_distance < $d0
+key numpadminus
+key numpadminus
+expect_value camera_distance > $d0
+
+# Hold: every pan action moves, then stops after the release.
+camera 0 0
+key f
+remember camera_pan p0
+key_down ctrl+numpad4
+wait 0.4
+key_up ctrl+numpad4
+wait 0.3
+expect_value camera_pan != $p0
+camera 0 0
+key f
+remember camera_pan p0
+key_down ctrl+numpad8
+wait 0.4
+key_up ctrl+numpad8
+wait 0.3
+expect_value camera_pan != $p0
+camera 0 0
+key f
+remember camera_pan p0
+key_down ctrl+numpad2
+wait 0.4
+key_up ctrl+numpad2
+wait 0.3
+expect_value camera_pan != $p0
+key f
+remember camera_distance d0
+key_down numpadplus
+wait 0.4
+key_up numpadplus
+wait 0.3
+expect_value camera_distance < $d0
+key_down numpadminus
+wait 0.8
+key_up numpadminus
+wait 0.3
+expect_value camera_distance > $d0
+
+# Rebound to other keys (old keys stop; the new ones tap and hold).
+set_shortcut view.pan_left J
+set_shortcut view.pan_right L
+set_shortcut view.pan_up I
+set_shortcut view.pan_down K
+set_shortcut view.zoom_in P
+set_shortcut view.zoom_out O
+camera 0 0
+key f
+remember camera_pan p0
+key ctrl+numpad6
+wait 0.3
+expect_value camera_pan == $p0
+key l
+expect_value camera_pan != $p0
+camera 0 0
+key f
+remember camera_pan p0
+key j
+expect_value camera_pan != $p0
+camera 0 0
+key f
+remember camera_pan p0
+key i
+expect_value camera_pan != $p0
+camera 0 0
+key f
+remember camera_pan p0
+key k
+expect_value camera_pan != $p0
+camera 0 0
+key f
+remember camera_pan p0
+key_down l
+wait 0.4
+key_up l
+wait 0.3
+expect_value camera_pan != $p0
+key f
+remember camera_distance d0
+key p
+expect_value camera_distance < $d0
+key o
+key o
+expect_value camera_distance > $d0
+key f
+remember camera_distance d0
+key_down p
+wait 0.4
+key_up p
+wait 0.3
+expect_value camera_distance < $d0
+
+# The SculptForge key style.
+input_style sculptforge
+camera 0 0
+key f
+remember camera_pan p0
+key l
+expect_value camera_pan != $p0
+key f
+remember camera_distance d0
+key_down p
+wait 0.4
+key_up p
+wait 0.3
+expect_value camera_distance < $d0

@@ -30,6 +30,7 @@ namespace sf {
 struct PathDab {
     float x = 0.0f, y = 0.0f; // screen pixels
     float pressure = 1.0f;
+    bool stamp = false; // the first dab of a stroke: a stamp's, which takes the footprint (DabParams::stampFootprint)
 };
 
 class StrokePath {

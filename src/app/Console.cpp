@@ -3,8 +3,10 @@
 #include "app/Console.h"
 
 #include "app/App.h"
+#include "app/Python.h"
 #include "app/Ui.h"
 #include "core/Script.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 #include <imgui_internal.h>
@@ -209,7 +211,38 @@ void Console::printHelp(App& app, const std::string& topic) {
         print(Kind::Info, "  " + p.name + "=<" + typeName(p.type) + ">" + (p.required ? " (required)" : "") + "  " + p.description);
 }
 
+void Console::setPythonMode(App& app, bool on) {
+    if (on == pythonMode_) return;
+    if (pythonMore_) app.python().cancelLine();
+    pythonMore_ = false;
+    pythonMode_ = on;
+    if (on) {
+        print(Kind::Info, "Python: sf is the sculptforge module, doc the open scene. sf.run('remesh', resolution=200) runs a "
+                          "command; each line you enter is one undo step. help(sf) lists the API.");
+        if (!app.python().enabled() || !app.python().allowed())
+            print(Kind::Error, "Python scripts are off: turn them on in Preferences > Scripts");
+    }
+    focusInput();
+}
+
+// One line of Python, as Python's own prompt takes it: a line that opens a block (if, for, def...) waits for the
+// rest, ended by an empty line. Leading spaces are kept (they are the block's indentation).
+void Console::runPythonLine(App& app, const std::string& raw) {
+    std::string line = raw;
+    while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
+    if (!trim(line).empty()) addHistory(line);
+    else historyPos_ = -1;
+    print(Kind::Info, std::string(pythonMore_ ? "... " : ">>> ") + line);
+    session_.push_back("# python: " + line); // (the session script keeps it, as a comment: it isn't a statement)
+    const PythonScripting::Result r = app.python().runLine(line);
+    pythonMore_ = r == PythonScripting::Result::More;
+}
+
 void Console::runLine(App& app, const std::string& raw) {
+    if (pythonMode_) {
+        runPythonLine(app, raw);
+        return;
+    }
     const std::string line = trim(raw);
     addHistory(line);
     if (line.empty()) return;
@@ -257,6 +290,11 @@ void Console::runStatements(App& app, std::vector<ScriptStatement> statements, s
 }
 
 void Console::update(App& app) {
+    if (!startupChecked_) { // Run at start-up scripts (app/Python.h), once the first frame is up; none: nothing loads
+        startupChecked_ = true;
+        app.python().runStartupScripts();
+    }
+    if (app.python_ && app.python_->loaded()) app.python_->drainOutput(); // what a script's threads printed
     if (!resume_ || app.commandRunning()) return;
     Resume r = std::move(*resume_);
     resume_.reset();
@@ -268,6 +306,14 @@ void Console::update(App& app) {
 }
 
 void Console::runFile(App& app, const std::string& path) {
+    {
+        std::string ext = pathToUtf8(fsPath(path).extension());
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        if (ext == ".py") {
+            app.runPythonFile(path);
+            return;
+        }
+    }
     std::ifstream f(fsPath(path), std::ios::binary);
     if (!f) {
         print(Kind::Error, "Run script   -> Cannot read " + path);
@@ -280,7 +326,7 @@ void Console::runFile(App& app, const std::string& path) {
         print(Kind::Error, "Run script " + path + "   -> " + err);
         return;
     }
-    print(Kind::Info, "Running " + fsPath(path).filename().string() + " (" + std::to_string(statements.size()) + " statements)");
+    print(Kind::Info, "Running " + fileNameUtf8(path) + " (" + std::to_string(statements.size()) + " statements)");
     runStatements(app, std::move(statements), 0, true);
 }
 
@@ -289,7 +335,40 @@ void Console::queueScriptFile(std::string path) {
     pendingFiles_.push_back(std::move(path));
 }
 
+// Tab in Python mode: the name before the cursor (with its dots), from the console's names.
+void Console::completePython(App& app, ImGuiInputTextCallbackData* data) {
+    const std::string text(data->Buf, size_t(data->CursorPos));
+    size_t start = text.size();
+    while (start > 0 && (std::isalnum(static_cast<unsigned char>(text[start - 1])) || text[start - 1] == '_' || text[start - 1] == '.')) --start;
+    const std::string prefix = text.substr(start);
+    if (prefix.empty()) { // Tab at the start of a line indents
+        data->InsertChars(data->CursorPos, "    ");
+        return;
+    }
+    std::vector<std::string> candidates = app.python().complete(prefix);
+    if (candidates.empty()) return;
+    const std::string common = candidates.size() == 1 ? candidates[0] : commonPrefix(candidates);
+    if (common.size() > prefix.size()) {
+        data->DeleteChars(int(start), int(prefix.size()));
+        data->InsertChars(int(start), common.c_str());
+        lastTab_.clear();
+        return;
+    }
+    const std::string now(data->Buf, size_t(data->BufTextLen));
+    if (lastTab_ == now) {
+        for (auto& c : candidates) c = c.substr(c.find_last_of('.') == std::string::npos ? 0 : c.find_last_of('.') + 1);
+        for (const auto& l : columns(candidates)) print(Kind::Info, l);
+        lastTab_.clear();
+    } else {
+        lastTab_ = now;
+    }
+}
+
 void Console::complete(App& app, ImGuiInputTextCallbackData* data) {
+    if (pythonMode_) {
+        if (app.python().loaded()) completePython(app, data);
+        return;
+    }
     const std::string text(data->Buf, size_t(data->CursorPos));
     const size_t stmtStart = text.find_last_of(';') == std::string::npos ? 0 : text.find_last_of(';') + 1;
     const std::string stmt = text.substr(stmtStart);
@@ -429,6 +508,28 @@ void Console::draw(App& app, const CanvasRect& rect) {
         const float y = origin.y + (headerH - bs) * 0.5f;
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f * s);
+        // Commands | Python: what the input line runs.
+        {
+            const char* labels[2] = {tr("Commands"), "Python"};
+            float segW[2];
+            for (int i = 0; i < 2; ++i) segW[i] = ImGui::CalcTextSize(labels[i]).x + 14.0f * s;
+            float sx = x - 10.0f * s - segW[0] - segW[1];
+            for (int i = 0; i < 2; ++i) {
+                const bool on = (i == 1) == pythonMode_;
+                ImGui::SetCursorScreenPos(ImVec2(sx, y));
+                ImGui::PushStyleColor(ImGuiCol_Button, on ? ImGui::ColorConvertU32ToFloat4(ui::color::accent) : ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_Text, on ? ImVec4(0.07f, 0.07f, 0.08f, 1.0f) : ImGui::ColorConvertU32ToFloat4(ui::color::textDim));
+                if (ImGui::Button((std::string(labels[i]) + "##console_mode" + std::to_string(i)).c_str(), ImVec2(segW[i], bs)))
+                    setPythonMode(app, i == 1);
+                ImGui::PopStyleColor(2);
+                ui::HelpText(i ? "Python" : "Commands", nullptr,
+                             i ? "The input line runs Python: sf is the sculptforge module, doc the open scene. Turn Python "
+                                 "scripts on in Preferences > Scripts. Only run code you trust."
+                               : "The input line runs commands, one per line or separated by ';'.",
+                             "Script");
+                sx += segW[i];
+            }
+        }
         for (const char* id : {"script.run_file", "script.copy_session", "script.clear_console"}) {
             ImGui::SetCursorScreenPos(ImVec2(x, y));
             ui::ActionButton(app, id, ImVec2(bs, bs), ui::Look::Icon);
@@ -488,9 +589,11 @@ void Console::draw(App& app, const CanvasRect& rect) {
     const ImVec2 inputPos(origin.x, origin.y + rect.h - inputH);
     dl->AddLine(inputPos, ImVec2(inputPos.x + w, inputPos.y), IM_COL32(0x2a, 0x2a, 0x2e, 0xff));
     const float fy = inputPos.y + (inputH - ImGui::GetFrameHeight()) * 0.5f;
-    dl->AddText(ImVec2(origin.x + 10.0f * s, fy + ImGui::GetStyle().FramePadding.y), ui::color::accent, ">");
-    ImGui::SetCursorScreenPos(ImVec2(origin.x + 22.0f * s, fy));
-    ImGui::SetNextItemWidth(w - 32.0f * s);
+    const char* prompt = !pythonMode_ ? ">" : pythonMore_ ? "..." : ">>>";
+    dl->AddText(ImVec2(origin.x + 10.0f * s, fy + ImGui::GetStyle().FramePadding.y), ui::color::accent, prompt);
+    const float promptW = std::max(12.0f * s, ImGui::CalcTextSize(prompt).x + 6.0f * s);
+    ImGui::SetCursorScreenPos(ImVec2(origin.x + 10.0f * s + promptW, fy));
+    ImGui::SetNextItemWidth(w - 20.0f * s - promptW);
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1, 1, 1, 0.03f));
     ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1, 1, 1, 0.04f));
@@ -501,7 +604,9 @@ void Console::draw(App& app, const CanvasRect& rect) {
     const ImGuiInputTextFlags inputFlags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion |
                                            ImGuiInputTextFlags_CallbackHistory | ImGuiInputTextFlags_CallbackCharFilter |
                                            ImGuiInputTextFlags_CallbackAlways;
-    const bool entered = ImGui::InputTextWithHint("##console", tr("help, or a command such as  remesh resolution=200"), input_,
+    const char* inputHint = pythonMode_ ? tr("Python, such as  sf.run('remesh', resolution=200)   or   print(doc.parts)")
+                                        : tr("help, or a command such as  remesh resolution=200");
+    const bool entered = ImGui::InputTextWithHint("##console", inputHint, input_,
                                                   sizeof input_, inputFlags, &Console::inputCallback, this);
     ImGui::PopStyleColor(3);
     ImGui::PopFont();

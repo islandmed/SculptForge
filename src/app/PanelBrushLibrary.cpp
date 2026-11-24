@@ -8,6 +8,7 @@
 #include "app/App.h"
 #include "app/NativeDialog.h"
 #include "app/I18n.h"
+#include "app/Ui.h"
 
 #include "app/Pickers.h"
 #include "core/BrushLibrary.h"
@@ -339,7 +340,11 @@ void App::drawBrushLibraryPopups() {
     }
 
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(kDeletePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ui::PushRole(theme::Role::Danger);
+    const bool deleteOpen = ImGui::BeginPopupModal(kDeletePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ui::PopRole();
+    if (deleteOpen) {
+        ui::RoleStrip(theme::Role::Danger);
         if (index >= 0) {
             const BrushRecipe& b = doc_.brushes[size_t(index)];
             ImGui::Text(tr("Delete '%s' from your brush library?"), b.name.c_str());

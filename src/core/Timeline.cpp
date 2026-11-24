@@ -5,7 +5,9 @@
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/IndexBits.h"
+#include "core/MicroTiles.h"
 #include "core/ThreadPool.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
 #include <chrono>
@@ -65,7 +67,7 @@ Timeline::Kind Timeline::classify(const UndoRecord& r) {
 bool Timeline::fastShape(const UndoRecord& r) {
     return !r.positions.empty() && r.layer == -1 && r.layerOffsets.empty() && r.mask.empty() && r.colors.empty() &&
            r.paintAlpha.empty() && !r.paint && r.hidden.empty() && r.facegroups.empty() && !r.textureTiles &&
-           !r.texture && !r.mesh && !r.subdiv && !r.topology && !r.part && !r.uv;
+           !r.texture && !r.mesh && !r.subdiv && !r.topology && !r.part && !r.uv && !r.micro && !r.ink; // (Micro tiles: walked)
 }
 
 void Timeline::reset() {
@@ -423,6 +425,7 @@ void Timeline::walkTo(Document& doc, size_t index) {
             ++lastSeek_.batched;
         } else {
             flushBatch(doc);
+            doc.syncBvh();
             if (!s.undo(mesh, doc.bvh)) break;
             if (UndoRecord* u = s.lastRedo(); u && u->part) doc.applyPartStep(*u->part);
             ++lastSeek_.walked;
@@ -442,6 +445,7 @@ void Timeline::walkTo(Document& doc, size_t index) {
             ++lastSeek_.batched;
         } else {
             flushBatch(doc);
+            doc.syncBvh();
             if (!s.redo(mesh, doc.bvh)) break;
             if (UndoRecord* u = s.lastUndo(); u && u->part) doc.applyPartStep(*u->part);
             ++lastSeek_.walked;
@@ -698,7 +702,7 @@ namespace {
 
 constexpr char kMagic[8] = {'S', 'F', 'H', 'I', 'S', 'T', '1', '\0'};
 constexpr char kSidecarMagic[8] = {'S', 'F', 'H', 'I', 'S', 'T', 'S', '\0'};
-constexpr uint32_t kVersion = 1;
+constexpr uint32_t kVersion = 2; // 2: a stroke's Micro tiles go with it (1: none)
 
 struct Writer {
     std::vector<uint8_t>& out;
@@ -759,7 +763,65 @@ struct Reader {
 
 bool savable(const UndoRecord& r) {
     return !r.mesh && !r.subdiv && !r.topology && !r.part && !r.texture && !r.textureTiles && !r.paint && !r.uv &&
-           r.layerOffsets.empty() && r.layer == -1 && r.paintLayer == -1 && r.paintAlpha.empty();
+           r.layerOffsets.empty() && r.layer == -1 && r.paintLayer == -1 && r.paintAlpha.empty() &&
+           !r.ink && !(r.micro && r.micro->swapWhole); // (a Micro level added or removed, a Forge Ink edit: not kept)
+}
+
+// A stroke's Micro tiles (core/Micro.h, MicroUndo): what the step swaps on the Micro level, as the stack holds it.
+void writeMicro(Writer& w, const MicroUndo* u) {
+    w.pod(uint8_t(u != nullptr));
+    if (!u) return;
+    const_cast<MicroUndo*>(u)->settle(); // (a stroke's journal still packing: waited for; the step itself doesn't change)
+    w.pod(u->step);
+    w.pod(u->samples);
+    w.pod(uint8_t(u->journal));
+    w.pod(uint8_t(u->applied));
+    w.pod(uint8_t(u->maskAdded));
+    w.pod(uint8_t(u->tilesApplied));
+    w.vec(u->tris);
+    w.vec(u->disp);
+    w.vec(u->keys);
+    w.vec(u->packed);
+    w.vec(u->firsts);
+    w.vec(u->mask);
+    w.vec(u->tileKeys);
+    w.vec(u->tileBorn);
+    w.vec(u->tileFirsts);
+    w.vec(u->tilePacked);
+}
+
+// Reads it back, checked against the level it will be applied to (`mm`: the document's), so a damaged or foreign
+// file can't index outside it. False: damaged.
+bool readMicro(Reader& rd, std::shared_ptr<MicroUndo>& out, const MicroMesh* mm) {
+    if (rd.pod<uint8_t>() == 0) return rd.ok;
+    auto u = std::make_shared<MicroUndo>();
+    u->step = rd.pod<float>();
+    u->samples = rd.pod<uint32_t>();
+    u->journal = rd.pod<uint8_t>() != 0;
+    u->applied = rd.pod<uint8_t>() != 0;
+    u->maskAdded = rd.pod<uint8_t>() != 0;
+    u->tilesApplied = rd.pod<uint8_t>() != 0;
+    rd.vec(u->tris);
+    rd.vec(u->disp);
+    rd.vec(u->keys);
+    rd.vec(u->packed);
+    rd.vec(u->firsts);
+    rd.vec(u->mask);
+    rd.vec(u->tileKeys);
+    rd.vec(u->tileBorn);
+    rd.vec(u->tileFirsts);
+    rd.vec(u->tilePacked);
+    if (!rd.ok || !mm || !(u->step > 0.0f) || !std::isfinite(u->step) || u->samples != mm->samples) return false;
+    const size_t S = u->samples, n = u->tris.size();
+    for (uint32_t t : u->tris)
+        if (t >= mm->baseTriangles) return false;
+    if (u->journal ? u->firsts.size() != n || !u->disp.empty() : !u->disp.empty() && u->disp.size() != n * S) return false;
+    if (!u->mask.empty() && u->mask.size() != n * S) return false;
+    if (u->tileBorn.size() != u->tileKeys.size() || u->tileFirsts.size() != u->tileKeys.size()) return false;
+    for (uint64_t k : u->tileKeys)
+        if (MicroTiles::keyTri(k) >= mm->baseTriangles) return false;
+    out = std::move(u);
+    return true;
 }
 
 template <class T>
@@ -867,6 +929,7 @@ bool Timeline::save(std::vector<uint8_t>& out, const Mesh& mesh, std::string* er
         w.pod(uint8_t(n.fast));
         if (n.fast) w.vec(n.other);
         w.vec(n.retuneDelta);
+        writeMicro(w, r.micro.get());
     }
     return true;
 }
@@ -878,7 +941,8 @@ bool Timeline::load(Document& doc, const std::vector<uint8_t>& in, std::string* 
     };
     if (in.size() < 8 || std::memcmp(in.data(), kMagic, 8) != 0) return fail("Not a SculptForge history");
     Reader rd{in.data() + 8, in.data() + in.size()};
-    if (rd.pod<uint32_t>() != kVersion) return fail("This history was saved by a newer SculptForge");
+    const uint32_t version = rd.pod<uint32_t>();
+    if (!rd.ok || version < 1 || version > kVersion) return fail("This history was saved by a newer SculptForge");
     const Mesh& mesh = doc.mesh;
     const uint64_t verts = rd.pod<uint64_t>(), tris = rd.pod<uint64_t>(), print = rd.pod<uint64_t>();
     if (!rd.ok || verts != mesh.vertexCount() || tris != mesh.triangleCount() || print != meshFingerprint(mesh))
@@ -911,6 +975,7 @@ bool Timeline::load(Document& doc, const std::vector<uint8_t>& in, std::string* 
         n.fast = rd.pod<uint8_t>() != 0;
         if (n.fast) rd.vec(n.other);
         rd.vec(n.retuneDelta);
+        if (version >= 2) good = readMicro(rd, r->micro, mesh.micro.get()) && good;
         good = good && rd.ok && channelInRange(r->positions, verts) && channelInRange(r->mask, verts) &&
                channelInRange(r->colors, verts) && channelInRange(r->hidden, tris) && channelInRange(r->facegroups, tris) &&
                (!n.fast || n.other.size() == r->positions.indices.size()) &&
@@ -967,7 +1032,7 @@ bool saveHistorySidecar(Document& doc, const std::string& projectPath, std::stri
     const std::string path = historySidecarPath(projectPath);
     std::error_code ec;
     if (saved == 0) {
-        std::filesystem::remove(path, ec); // a history from before would no longer match
+        std::filesystem::remove(pathFromUtf8(path), ec); // a history from before would no longer match
         return true;
     }
     w.pod(kVersion);
@@ -975,14 +1040,14 @@ bool saveHistorySidecar(Document& doc, const std::string& projectPath, std::stri
     file.insert(file.end(), body.begin(), body.end());
     const std::string tmp = path + ".tmp";
     {
-        std::ofstream f(std::filesystem::path(tmp), std::ios::binary | std::ios::trunc);
+        std::ofstream f(pathFromUtf8(tmp), std::ios::binary | std::ios::trunc);
         f.write(reinterpret_cast<const char*>(file.data()), std::streamsize(file.size()));
         if (!f) {
             if (error) *error = "Couldn't write " + tmp;
             return false;
         }
     }
-    std::filesystem::rename(tmp, path, ec);
+    std::filesystem::rename(pathFromUtf8(tmp), pathFromUtf8(path), ec);
     if (ec) {
         if (error) *error = "Couldn't write " + path + ": " + ec.message();
         return false;
@@ -992,7 +1057,7 @@ bool saveHistorySidecar(Document& doc, const std::string& projectPath, std::stri
 
 int loadHistorySidecar(Document& doc, const std::string& projectPath, std::string* error) {
     const std::string path = historySidecarPath(projectPath);
-    std::ifstream f(std::filesystem::path(path), std::ios::binary);
+    std::ifstream f(pathFromUtf8(path), std::ios::binary);
     if (!f) return 0;
     std::vector<uint8_t> file((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     if (file.size() < 16 || std::memcmp(file.data(), kSidecarMagic, 8) != 0) {
@@ -1000,7 +1065,7 @@ int loadHistorySidecar(Document& doc, const std::string& projectPath, std::strin
         return 0;
     }
     Reader rd{file.data() + 8, file.data() + file.size()};
-    if (rd.pod<uint32_t>() != kVersion) {
+    if (const uint32_t v = rd.pod<uint32_t>(); v < 1 || v > kVersion) {
         if (error) *error = path + " was saved by a newer SculptForge";
         return 0;
     }

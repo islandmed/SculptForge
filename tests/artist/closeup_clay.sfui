@@ -1,0 +1,96 @@
+# Close-up: Clay on a dense curved form (tools/qa/closeup.py runs it and judges it; not a ctest case).
+# A build brush must only add (nothing sinks below where the stroke found it), lay a smooth stroke with no dab rings
+# or stair-steps, and leave clean falloff edges at every size, speed, pressure and where strokes overlap. Each step
+# saves the mesh (cf_NN.obj) for the judge; the shots are the close-up sheet.
+run ui_look look=classic layout=classic
+key ctrl+n
+wait 0.2
+key ctrl+d
+key ctrl+d
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+print triangles
+run save_obj path=cf_00.obj
+click "Clay##brush.clay"
+
+# 1 one stroke, medium size
+brush_size 50
+stroke 0.38 0.40 0.58 0.38
+wait_idle 30
+run save_obj path=cf_01.obj
+#step 00 01 build single
+shot c01-single
+# 2 a big long pull over the curve
+brush_size 90
+drag_path 0.35 0.55 0.45 0.60 0.55 0.62 0.65 0.58 S=1.2
+wait_idle 30
+run save_obj path=cf_02.obj
+#step 01 02 build long pull
+shot c02-long
+# 3 crossing both (two facet edges meet)
+brush_size 60
+stroke 0.50 0.30 0.52 0.68
+wait_idle 30
+run save_obj path=cf_03.obj
+#step 02 03 build crossing
+shot c03-cross
+# 4 pen, light to heavy
+brush_size 40
+pen_stroke 0.36 0.70 0.64 0.72 0.1 1.0
+wait_idle 30
+run save_obj path=cf_04.obj
+#step 03 04 build pen light-heavy
+shot c04-pen
+# 5 a fast flick
+brush_size 50
+stroke 0.62 0.35 0.68 0.50 0.12
+wait_idle 30
+run save_obj path=cf_05.obj
+#step 04 05 build fast flick
+shot c05-flick
+# 6 the first stroke stacked twice more
+brush_size 50
+stroke 0.38 0.40 0.58 0.38
+stroke 0.38 0.40 0.58 0.38
+wait_idle 30
+run save_obj path=cf_06.obj
+#step 05 06 build stacked x2
+shot c06-stacked
+
+# Close-ups: front, and two grazing angles that show lips, spikes and steps.
+hover_window 0.97 0.5
+zoom 2.5
+wait_idle 30
+shot c10-close-front
+camera 55 5
+wait_idle 30
+shot c11-close-graze-side
+camera 0 60
+wait_idle 30
+shot c12-close-graze-top
+camera -35 -15
+wait_idle 30
+shot c13-close-graze-low
+
+# A face: cheek and brow mass (symmetry on); Clay lowers peaks it passes over (a plane brush), so no direction bar.
+run new_starter_mesh name=human-head levels=3
+camera 0 0
+key f
+wait_idle 30
+run save_obj path=cf_20.obj
+click "Clay##brush.clay"
+brush_size 45
+stroke 0.36 0.52 0.40 0.62
+stroke 0.38 0.36 0.46 0.37
+pen_stroke 0.34 0.58 0.42 0.70 0.3 1.0
+wait_idle 30
+run save_obj path=cf_21.obj
+#step 20 21 any face mass (Clay flattens peaks like the nose bridge by design: no direction bar here)
+hover_window 0.97 0.5
+shot c20-face
+camera 40 5
+zoom 2
+wait_idle 30
+shot c21-face-graze

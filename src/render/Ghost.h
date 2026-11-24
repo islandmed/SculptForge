@@ -24,7 +24,7 @@
 
 namespace sf {
 
-// The brush kernels the preview can draw (the rest show no ghost: Smooth, Layer, Nudge, Move, Snake Hook,
+// The brush kernels the preview can draw (the rest show no ghost: Smooth, Layer, Nudge, Move, Tendril,
 // VDM, recipes, masking, painting).
 enum class GhostKind : int32_t { None = 0, Standard, Inflate, Clay, ClayBlock, Flatten, Crease, Pinch, SharpCrease, Trim,
     // Live Move (SF_LIVE_MOVE=1, app/App.cpp): the Move brush's whole drag. Each dab is one mirror's grab: `normal`
@@ -39,6 +39,7 @@ struct GhostDab {
     float strength = 0.0f;  // strength x pressure, 0..1
     glm::vec3 areaCenter{0.0f}; // the brush's area centre (plane brushes), estimated
     float weight = 1.0f;        // < 1: a provisional dab at the predicted head, shown in part
+    glm::vec3 up{0.0f};         // Clay Block: the square tip's top edge in the world (DabParams::alphaUp); zero: a round tip
     uint32_t mirror = 0;        // symmetry pass (0: the dab itself); the shader bounds each pass's dabs together
 };
 

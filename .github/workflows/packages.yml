@@ -20,13 +20,21 @@ name: Packages
 # dispatches): never from a tag (a release that calls this builds from main's cache and writes nothing) and
 # never from a pull request (this workflow doesn't run on pull requests). See ci.yml for ccache.
 # Runners: repository variables SF_RUNNER_* (Settings > Secrets and variables > Actions > Variables) name other
-# runners for these build-and-test jobs; unset, they are GitHub's standard ones. No job here gets a secret.
+# runners for these build-and-test jobs; unset, they are GitHub's standard ones. No job here gets a secret except
+# Windows x64, and that one only the SignPath token, only in the two signing steps, only with the repository variable
+# SIGNING=signpath on a run for staging or a tag (docs/releasing.md "Windows code signing"; the rules are
+# tools/release/check_workflows.py). Everything else about signing is in that job.
 
 on:
   push:
     branches: [main, staging] # staging: the merge queue's batch, the release's packages (built once, promoted unchanged)
     # No paths: job reuse skips the builds when nothing that goes into the packages changed (tools/release/build_inputs.txt).
   workflow_dispatch:
+    inputs:
+      sign_test:
+        description: Sign this run's Windows packages with SignPath's TEST policy (self-signed cert; never promotable, never for release)
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       ref:
@@ -37,6 +45,9 @@ on:
         description: Release tag, e.g. v1.2.3 (names the AppImage and the VFX tarballs)
         type: string
         required: true
+    secrets:
+      SIGNPATH_API_TOKEN: # release.yml's --rebuild passes it on; used only by job windows, only with SIGNING=signpath
+        required: false
 
 permissions:
   contents: read
@@ -122,7 +133,7 @@ jobs:
         run: echo "TAG=${{ inputs.tag }}" | sed "s/^TAG=$/TAG=v$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)/; s/^\(TAG=v[0-9.]*\)-.*/\1/" >> "$GITHUB_ENV"
       - run: |
           sudo ./packaging/linux/install-build-deps.sh
-          sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
+          sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends ccache xvfb libgl1-mesa-dri
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
       - name: Downloads (cmake/Fetch.cmake's archives and pinned tools, kept by hash by tools/ci/fetch.sh)
@@ -139,8 +150,11 @@ jobs:
       - name: Build
         run: |
           ccache -z # (ccache -s below: this run's hits, not the restored cache's lifetime)
+          # Python scripting in the app: CPython 3.13 shipped in lib/sculptforge/python (tools/ci/python-runtime.sh).
+          pyrt=$(SF_DEPS_CACHE=.deps tools/ci/python-runtime.sh linux "$RUNNER_TEMP/pyrt")
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_MOLD=OFF
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_MOLD=OFF \
+            -DSCULPTFORGE_APP_PYTHON=ON -DSCULPTFORGE_PYTHON_RUNTIME="$pyrt"
           cmake --build build --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
@@ -164,6 +178,9 @@ jobs:
           # AppImageUpdate and similar tools can update it from the newest GitHub release (the .zsync file). The
           # AppDir's root gets PNG icons (AppImage managers cannot use the SVG), and appimagetool checks it (#17).
           SF_APPIMAGE_TOOLS=.deps/appimage packaging/linux/build-appimage.sh AppDir "${TAG#v}" ${{ matrix.ld }} build
+      - name: Python scripting starts from the installed files (app/Python.h)
+        # (and no fallback to a Python home baked in at build time: only the runtime the package ships)
+        run: tools/ci/python-selftest.sh AppDir/usr/bin/sculptforge AppDir "$RUNNER_TEMP/pyrt/python"
       - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
         run: python3 tools/release/build_mcpb.py --cli build/sculptforge-cli --version auto --platform linux --out "build/SculptForge-{version}-linux-${{ matrix.arch }}.mcpb"
       - uses: actions/upload-artifact@v7
@@ -205,7 +222,7 @@ jobs:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.REF }}' }
       - name: flatpak and flatpak-builder
-        run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder xvfb
+        run: sudo ./packaging/linux/apt-retry.sh update && sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends flatpak flatpak-builder elfutils xvfb
       - name: The manifest's sources (flatpak-builder's downloads, checked by their sha256 in the manifest)
         uses: actions/cache@v5
         with:
@@ -251,7 +268,10 @@ jobs:
       id-token: write
       attestations: write
     runs-on: ${{ matrix.os }}
-    container: ${{ matrix.image }}
+    container:
+      image: ${{ matrix.image }}
+      # 11-17: rockylinux:9 was republished without PATH in its config; a step's GITHUB_PATH then left PATH without /usr/bin ("sh" not found).
+      env: { PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" }
     strategy:
       fail-fast: false
       matrix:
@@ -311,7 +331,8 @@ jobs:
           ccache -z
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_MOLD=OFF \
-            -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PYTHON313" -DSCULPTFORGE_PYTHON_INSTALL_DIR=lib/sculptforge/python
+            -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PYTHON313" -DSCULPTFORGE_PYTHON_INSTALL_DIR=lib/sculptforge/python \
+            -DSCULPTFORGE_PYTHON_RUNTIME=/opt/python
           cmake --build build --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
@@ -323,6 +344,8 @@ jobs:
         run: |
           # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
           ctest --test-dir build --output-on-failure -LE ui -j 4
+          DESTDIR=$PWD/stage cmake --install build # the shipped Python starts on its own files, no build-time fallback:
+          tools/ci/python-selftest.sh stage/usr/bin/sculptforge stage /opt/python
           cd build
           cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=SculptForge-${TAG#v}-linux-${{ matrix.arch }}-${{ matrix.suffix }}
           if [ "${{ matrix.generators }}" = "RPM;TGZ" ]; then cpack -G RPM; fi
@@ -372,9 +395,12 @@ jobs:
       - name: Build
         run: |
           ccache -z
+          # Python scripting in the app: a universal CPython 3.13 in the bundle (tools/ci/python-runtime.sh).
+          pyrt=$(SF_DEPS_CACHE=.deps tools/ci/python-runtime.sh macos "$RUNNER_TEMP/pyrt")
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DSCULPTFORGE_APP_PYTHON=ON -DSCULPTFORGE_PYTHON_RUNTIME="$pyrt"
           cmake --build build --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
@@ -384,7 +410,10 @@ jobs:
           key: ccache-pkg-macos.${{ github.sha }}
       - name: Test
         # UI tests need a display; they run under Xvfb in the Linux jobs above and in CI.
-        run: ctest --test-dir build --output-on-failure -LE ui -j 4
+        run: |
+          ctest --test-dir build --output-on-failure -LE ui -j 4
+          cmake --install build --prefix stage # the shipped Python starts on its own files, no build-time fallback:
+          tools/ci/python-selftest.sh stage/SculptForge.app/Contents/MacOS/SculptForge stage "$RUNNER_TEMP/pyrt/python"
       - name: Package (signed ad-hoc inside CPack, see cmake/MacSign.cmake)
         # hdiutil sometimes fails with "Resource busy" on the runner (a disk image still attached): up to 3 tries.
         run: |
@@ -418,7 +447,21 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+      actions: read # SignPath's connector reads this run and its uploaded artifact (only used with SIGNING=signpath)
     runs-on: ${{ vars.SF_RUNNER_WIN || 'windows-2022' }}
+    env:
+      # Code signing (SignPath Foundation). Off unless the repository variable SIGNING is `signpath`; then the exes are
+      # signed before the installer and .zip are made and the installer after. Each release-policy request waits for the
+      # maintainer's approval in SignPath at most SIGNPATH_TIMEOUT seconds (default 1800; scripts/release.sh wakes the
+      # approver): not approved in time, denied or failed, that part ships unsigned as before signing existed, and the
+      # notice says so (never a stuck release). A signature SignPath returned that doesn't verify still fails the job.
+      # Only runs for staging and release tags sign (what a release promotes or builds): main and a dispatch from another
+      # branch build unsigned, so no approval is asked for a run that is never released.
+      # SIGN_TEST: a maintainer's workflow_dispatch with sign_test signs with the TEST policy instead (self-signed
+      # test certificate; the packages say "test-signed (not for release)" and can't be promoted).
+      SIGN_TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_test == true }}
+      SIGN: ${{ (vars.SIGNING == 'signpath' && (github.ref == 'refs/heads/staging' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) }}
+      SIGN_POLICY: ${{ (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) && (vars.SIGNPATH_TEST_POLICY_SLUG || 'test-signing') || vars.SIGNPATH_SIGNING_POLICY_SLUG }}
     steps:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.REF }}' }
@@ -452,11 +495,15 @@ jobs:
           restore-keys: |
             ccache-pkg-windows.
             ccache-ci-windows.
+      - name: Python runtime (CPython 3.13 for Python scripting in the app, tools/ci/python-runtime.sh)
+        shell: bash
+        run: echo "SF_PYRT=$(SF_DEPS_CACHE=.deps tools/ci/python-runtime.sh windows "$(cygpath -m "$RUNNER_TEMP")/pyrt")" >> "$GITHUB_ENV"
       - name: Build (Visual Studio generator; ccache as cl.exe, one compiler per file)
         run: |
           ccache -z
           cmake -S . -B build -DSCULPTFORGE_USE_SYSTEM_SDL=OFF `
-            -DCMAKE_VS_GLOBALS="CLToolExe=cl.exe;CLToolPath=${{ env.SF_CCACHE_CL }};TrackFileAccess=false;UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true"
+            -DCMAKE_VS_GLOBALS="CLToolExe=cl.exe;CLToolPath=${{ env.SF_CCACHE_CL }};TrackFileAccess=false;UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true" `
+            -DSCULPTFORGE_APP_PYTHON=ON -DSCULPTFORGE_PYTHON_RUNTIME="$env:SF_PYRT"
           cmake --build build --config Release --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
@@ -467,10 +514,187 @@ jobs:
       - name: Test
         # UI tests need a display; they run in CI with Mesa's software OpenGL.
         run: ctest --test-dir build -C Release --output-on-failure -LE ui -j 4
+      - name: Product name and version in the exes (what SignPath's artifact configuration enforces)
+        shell: pwsh
+        run: ./tools/ci/check_pe_metadata.ps1 -Path build\Release\sculptforge.exe, build\Release\sculptforge-cli.exe, build\Release\sculptforge_pyhost.dll
+      - name: Python scripting starts from the installed files (app/Python.h)
+        shell: pwsh
+        run: |
+          cmake --install build --config Release --prefix stage
+          # Only the package's own files: the runtime it was built from moved away, no PYTHONHOME/PYTHONPATH
+          # (tools/ci/python-selftest.sh does the same on Linux and macOS).
+          Move-Item $env:SF_PYRT "$env:SF_PYRT.away"
+          Remove-Item Env:PYTHONHOME, Env:PYTHONPATH -ErrorAction SilentlyContinue
+          try {
+            # (a windowed exe: Start-Process waits for it and gives its exit code)
+            $p = Start-Process -FilePath stage\bin\sculptforge.exe -ArgumentList '--python-selftest' -Wait -PassThru -NoNewWindow `
+                 -RedirectStandardOutput selftest.out -RedirectStandardError selftest.err
+          } finally { Move-Item "$env:SF_PYRT.away" $env:SF_PYRT }
+          Get-Content selftest.out, selftest.err
+          if ($p.ExitCode -ne 0) { throw "python selftest failed ($($p.ExitCode))" }
+          if (-not (Select-String -Path selftest.out -Pattern "python fallback home: none" -Quiet)) {
+            throw "a package must not fall back to a build-time Python home" }
+      - name: Signing - settings present
+        if: env.SIGN == 'true'
+        shell: pwsh
+        env:
+          ORG: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          PROJECT: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          POLICY: ${{ env.SIGN_POLICY }}
+        run: |
+          foreach ($n in 'ORG', 'PROJECT', 'POLICY') {
+            if (-not (Get-Item "env:$n").Value) { throw "SIGNING=signpath but the variable for $n (SIGNPATH_ORGANIZATION_ID / SIGNPATH_PROJECT_SLUG / SIGNPATH_SIGNING_POLICY_SLUG; the test policy needs none) is empty" }
+          }
+      - name: Signing - the exes and DLLs we built, for SignPath
+        if: env.SIGN == 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory signing\binaries | Out-Null
+          Copy-Item build\Release\sculptforge.exe, build\Release\sculptforge-cli.exe signing\binaries
+          # (not the Python runtime's DLLs, python3*.dll: not ours to sign; they ship as python-build-standalone built them)
+          Copy-Item build\Release\*.dll signing\binaries -Exclude python3*.dll -ErrorAction SilentlyContinue
+      - name: Signing - upload the unsigned binaries
+        if: env.SIGN == 'true'
+        id: sign-binaries-in
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signing-binaries-unsigned # not windows*: job sums and release.yml take windows* for packages
+          path: signing/binaries/*
+          retention-days: 1
+      - name: Signing - SignPath signs the binaries
+        if: env.SIGN == 'true'
+        id: sign-binaries
+        continue-on-error: ${{ env.SIGN_TEST != 'true' }} # not approved in time: the unsigned exes ship (the test dry run fails instead)
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGN_POLICY }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_CONFIG_BINARIES || 'binaries' }}
+          github-artifact-id: ${{ steps.sign-binaries-in.outputs.artifact-id }}
+          wait-for-completion-timeout-in-seconds: ${{ vars.SIGNPATH_TIMEOUT || '1800' }} # the release policy waits for an approval
+          output-artifact-directory: signing/binaries-signed
+          parameters: "${{ vars.SIGNPATH_PARAMS == '1' && format('version: {0}', toJSON(env.SF_VERSION)) || '' }}" # the artifact configurations declare `version` only with SignPath's OSS plan (docs/releasing.md); the trial has no parameters
+      - name: Signing - signed binaries replace the built ones (the installer and .zip take them), checked
+        if: env.SIGN == 'true' && steps.sign-binaries.outcome == 'success'
+        shell: pwsh
+        run: |
+          foreach ($f in Get-ChildItem signing\binaries -File) {
+            $s = Join-Path signing\binaries-signed $f.Name
+            if (-not (Test-Path $s)) { throw "SignPath returned no $($f.Name)" }
+            Copy-Item $s (Join-Path build\Release $f.Name) -Force
+          }
+          ./tools/ci/verify_signed.ps1 -Test:($env:SIGN_TEST -eq 'true') -Path (Get-ChildItem signing\binaries -File | ForEach-Object { Join-Path build\Release $_.Name })
+          build\Release\sculptforge-cli.exe --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "the signed sculptforge-cli.exe does not start" }
       - name: Package
         run: cd build && cpack -C Release -G "NSIS;ZIP"
+      - name: Product name and version in the installer
+        shell: pwsh
+        run: ./tools/ci/check_pe_metadata.ps1 -Path (Get-ChildItem build\SculptForge-*-windows-*.exe).FullName
+      - name: Installer - the update-check page is in; a silent install writes the default and the uninstaller removes it
+        shell: pwsh
+        run: |
+          if (-not (Select-String -Path build\_CPack_Packages\win64\NSIS\project.nsi -Pattern 'Page custom SfUpdatePage' -Quiet)) { throw 'the installer has no update-check page (CPACK_NSIS_PAGE_COMPONENTS, CMakeLists.txt)' }
+          $dir = Join-Path $env:RUNNER_TEMP 'sf-installed'
+          $p = Start-Process (Get-ChildItem build\SculptForge-*-windows-*.exe).FullName -ArgumentList '/S', "/D=$dir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "silent install exited $($p.ExitCode)" }
+          $j = Get-Content "$dir\bin\installer.json" -Raw | ConvertFrom-Json
+          if ($j.check_updates -ne $true) { throw "installer.json after a silent install: $($j | ConvertTo-Json -Compress) (want check_updates true)" }
+          if (Test-Path "$dir\bin\portable.txt") { throw 'the installer wrote bin\portable.txt: an install must stay per-user' }
+          $u = Start-Process "$dir\Uninstall.exe" -ArgumentList '/S', "_?=$dir" -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "silent uninstall exited $($u.ExitCode)" }
+          if (Test-Path "$dir\bin\installer.json") { throw 'the uninstaller left bin\installer.json behind' }
+      - name: Portable marker (portable.txt beside the zip's sculptforge.exe, so its data stays in its own folder; the installer is untouched)
+        shell: pwsh
+        run: |
+          python tools/release/add_portable_marker.py (Get-Item build\SculptForge-*-windows-*.zip).FullName
+          if ($LASTEXITCODE -ne 0) { throw "cannot add portable.txt to the .zip" }
+          python -c "import sys,zipfile; n=zipfile.ZipFile(sys.argv[1]).namelist(); sys.exit(0 if any(x.endswith('/bin/portable.txt') for x in n) else 1)" (Get-Item build\SculptForge-*-windows-*.zip).FullName
+          if ($LASTEXITCODE -ne 0) { throw "the .zip has no bin/portable.txt" }
+      - name: Signing - the installer, for SignPath
+        if: env.SIGN == 'true' && steps.sign-binaries.outcome == 'success'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory signing\installer | Out-Null
+          Copy-Item build\SculptForge-*-windows-*.exe signing\installer
+      - name: Signing - upload the unsigned installer
+        if: env.SIGN == 'true' && steps.sign-binaries.outcome == 'success'
+        id: sign-installer-in
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signing-installer-unsigned
+          path: signing/installer/*
+          retention-days: 1
+      - name: Signing - SignPath signs the installer
+        if: env.SIGN == 'true' && steps.sign-binaries.outcome == 'success'
+        id: sign-installer
+        continue-on-error: ${{ env.SIGN_TEST != 'true' }} # not approved in time: the unsigned installer ships
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGN_POLICY }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_CONFIG_INSTALLER || 'installer' }}
+          github-artifact-id: ${{ steps.sign-installer-in.outputs.artifact-id }}
+          wait-for-completion-timeout-in-seconds: ${{ vars.SIGNPATH_TIMEOUT || '1800' }}
+          output-artifact-directory: signing/installer-signed
+          parameters: "${{ vars.SIGNPATH_PARAMS == '1' && format('version: {0}', toJSON(env.SF_VERSION)) || '' }}" # the artifact configurations declare `version` only with SignPath's OSS plan (docs/releasing.md); the trial has no parameters
+      - name: Signing - signed installer replaces the built one, checked
+        if: env.SIGN == 'true' && steps.sign-installer.outcome == 'success'
+        shell: pwsh
+        run: |
+          foreach ($f in Get-ChildItem signing\installer -File) {
+            $s = Join-Path signing\installer-signed $f.Name
+            if (-not (Test-Path $s)) { throw "SignPath returned no $($f.Name)" }
+            Copy-Item $s (Join-Path build $f.Name) -Force
+          }
+          ./tools/ci/verify_signed.ps1 -Test:($env:SIGN_TEST -eq 'true') -Path (Get-ChildItem build\SculptForge-*-windows-*.exe).FullName
       - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
         run: python tools/release/build_mcpb.py --cli build/Release/sculptforge-cli.exe --version auto --platform win32 --out "build/SculptForge-{version}-windows-x86_64.mcpb"
+      - name: Signing - the .zip and .mcpb carry the signed exes and DLLs
+        if: env.SIGN == 'true' && steps.sign-binaries.outcome == 'success'
+        shell: pwsh
+        run: |
+          # every .exe, and the DLLs we built (the ones sent to SignPath); the Python and MSVC runtime DLLs ship as their makers
+          # signed them (or didn't) and never go to SignPath under our subscription
+          $ours = (Get-ChildItem signing\binaries -File).Name
+          foreach ($pkg in 'zip', 'mcpb') {
+            $dir = Join-Path $env:RUNNER_TEMP "check-$pkg"
+            python -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" (Get-Item "build\SculptForge-*.$pkg").FullName $dir
+            if ($LASTEXITCODE -ne 0) { throw "cannot unpack the .$pkg" }
+            ./tools/ci/verify_signed.ps1 -Test:($env:SIGN_TEST -eq 'true') -Path (Get-ChildItem $dir -Recurse -File | Where-Object { $_.Extension -eq '.exe' -or $ours -contains $_.Name }).FullName
+          }
+      - name: Windows signing state (job summary and notice; release.sh --stage prints it)
+        shell: pwsh
+        env:
+          SIGNING_VAR: ${{ vars.SIGNING }}
+          REF_NAME: ${{ github.ref }}
+          BINARIES: ${{ steps.sign-binaries.outcome }}
+          INSTALLER: ${{ steps.sign-installer.outcome }}
+          WAIT: ${{ vars.SIGNPATH_TIMEOUT || '1800' }}
+        run: |
+          $why = "SignPath request not approved within $([int]$env:WAIT / 60) min, denied or failed (see the Signing steps)"
+          if ($env:SIGN_TEST -eq 'true') {
+            $subject = (Get-AuthenticodeSignature (Get-Item build\SculptForge-*-windows-*.exe).FullName).SignerCertificate.Subject
+            $line = "Windows: test-signed (not for release; SignPath test policy, $subject)"
+          } elseif ($env:SIGN -eq 'true' -and $env:BINARIES -ne 'success') {
+            $line = "Windows: unsigned ($why)"
+          } elseif ($env:SIGN -eq 'true' -and $env:INSTALLER -ne 'success') {
+            $subject = (Get-AuthenticodeSignature build\Release\sculptforge.exe).SignerCertificate.Subject
+            $line = "Windows: partly signed (exes signed by SignPath, $subject; installer unsigned: $why)"
+          } elseif ($env:SIGN -eq 'true') {
+            $subject = (Get-AuthenticodeSignature (Get-Item build\SculptForge-*-windows-*.exe).FullName).SignerCertificate.Subject
+            $line = "Windows: signed (SignPath, $subject)"
+          } elseif ($env:SIGNING_VAR -eq 'signpath') {
+            $line = "Windows: unsigned (SIGNING=signpath ignored on $env:REF_NAME: only staging and tags sign)"
+          } else {
+            $line = 'Windows: unsigned (SIGNING off)'
+          }
+          $line >> $env:GITHUB_STEP_SUMMARY
+          Write-Host "::notice title=Windows signing::$line"
       - uses: actions/upload-artifact@v7
         with:
           name: windows
@@ -488,6 +712,80 @@ jobs:
 
   # The SHA-256 of every package this run built, as an artifact of its own: release.yml publishes these files only if
   # each one still has exactly this checksum and its attestation (tools/release/verify_staged.py).
+  wheels:
+    # The Python package (pip install sculptforge; pyproject.toml, docs/guide/python-package.md): the engine only, for
+    # CPython 3.12-3.14, each wheel installed in a clean environment and tested there (tests/python) by cibuildwheel.
+    # release.yml's job pypi publishes these files (Trusted Publishing, from tags). New in 0.13.8: a red wheel never
+    # holds the app's release (continue-on-error; job pypi then publishes nothing).
+    name: Python wheels ${{ matrix.name }}
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.run-id == '' }}
+    continue-on-error: true
+    permissions: # the attestation: a signed statement of what this run built
+      contents: read
+      id-token: write
+      attestations: write
+    runs-on: ${{ matrix.os }}
+    # About 2x the normal time of each (11-19/20: Linux 13 min, macOS 27, Windows 39-45), so a hang fails fast; on
+    # 11-20 the macOS job hung 2 of 2 times in pytest under Rosetta (x86_64) until the 120 minute cut.
+    timeout-minutes: ${{ matrix.minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux x86_64, id: linux-x86_64, os: ubuntu-24.04, minutes: 30 }
+          - { name: Linux aarch64, id: linux-aarch64, os: ubuntu-24.04-arm, minutes: 30 }
+          - { name: macOS universal2, id: macos, os: macos-15, minutes: 45 }
+          - { name: Windows x64, id: windows, os: windows-2022, minutes: 90 }
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: '${{ env.REF }}', persist-credentials: false }
+      - uses: actions/cache@v5
+        with:
+          path: .deps
+          key: deps-${{ github.job }}-${{ matrix.id }}-${{ hashFiles('cmake/Fetch.cmake') }}
+          restore-keys: deps-${{ github.job }}-${{ matrix.id }}-
+      - uses: pypa/cibuildwheel@f9b966cfadf4109556cadc5bb39ddb72d0ce664e # v4.3.5 (settings: pyproject.toml)
+        with:
+          output-dir: wheelhouse
+      - name: Wheels are named for this version and these platforms
+        shell: bash
+        run: |
+          v=$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          ls -l wheelhouse
+          n=$(ls wheelhouse/sculptforge-$v-cp31[234]-*.whl | wc -l | tr -d " ") # (BSD wc pads with spaces)
+          [ "$n" = 3 ] || { echo "::error::expected 3 wheels of sculptforge $v, found $n"; exit 1; }
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: wheelhouse/*.whl
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pywheels-${{ matrix.id }}
+          path: wheelhouse/*.whl
+          retention-days: 14
+
+  wheel-sums:
+    name: Record wheel checksums
+    needs: wheels
+    if: ${{ !cancelled() && needs.wheels.result == 'success' }}
+    continue-on-error: true # (as job wheels: an incomplete set records nothing, and job pypi publishes nothing)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+          pattern: 'pywheels-*'
+      - run: |
+          n=$(ls dist/*.whl | wc -l | tr -d " ")
+          [ "$n" = 12 ] || { echo "::error::expected 12 wheels (4 platforms x 3 Pythons), found $n"; exit 1; }
+          cd dist && sha256sum * > ../SHA256SUMS.wheels.txt && cat ../SHA256SUMS.wheels.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: staged-sums-wheels
+          path: SHA256SUMS.wheels.txt
+          retention-days: 14
+
   sums:
     name: Record checksums
     needs: [linux, flatpak, vfx, macos, windows]

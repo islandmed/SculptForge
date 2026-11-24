@@ -1,0 +1,19 @@
+# Undo and redo of a stroke re-send only the vertices it changed (#181): a command used to reset the renderer's
+# "what is shown" and so cost a full upload of the mesh (half a second at 6M triangles, 45 ms at 2M).
+run new_sphere subdivisions=5
+run subdiv_divide
+camera 0 0
+wait_idle 15
+click "Clay##brush.clay"
+stroke 0.3 0.4 0.7 0.6
+wait_idle 15
+remember full_uploads uploaded
+key ctrl+z
+wait_idle 15
+expect_value full_uploads == $uploaded
+key ctrl+shift+z
+wait_idle 15
+expect_value full_uploads == $uploaded
+key ctrl+z
+wait_idle 15
+expect_value full_uploads == $uploaded

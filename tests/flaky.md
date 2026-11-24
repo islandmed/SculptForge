@@ -13,6 +13,7 @@ deletes it; remove its lines once fixed.
 | 2026-11-06 | ui_stroke_background_preview | laptop (heavy.sh, -j3) | ed1b0099 |
 | 2026-11-06 | ui_stroke_persistent_upload | laptop (heavy.sh, -j3) | ed1b0099 |
 | 2026-11-06 | ui_idle_redraw | Linux aarch64, -j3 | bf383ffe |
+| 2026-11-11 | ui_monkey_many seed 1064 (passes alone on main and the branch: latent cross-seed leak, quarantined to 11-18 in tests/quarantine.txt, task fix/monkey-cross-seed-leak) | CI (quick-panel branch) | - |
 
 ## Owned
 

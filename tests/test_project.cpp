@@ -295,6 +295,38 @@ TEST(project_version_handling) {
     std::filesystem::remove(path);
 }
 
+// A project with an empty Part list (the scene settings, lights and views, no models) opens as an empty scene.
+TEST(project_empty_part_list_loads_and_round_trips) {
+    Document doc = makeDoc(makeIcosphere(1));
+    doc.projectSettings.set("future_feature", "kept");
+    const std::string path = tempPath("sf_project_no_parts.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    CHECK(editManifest(path, [](Json& j) { j.set("parts", Json::array()); }));
+    Document back = makeDoc(makePlane(4));
+    CHECK(loadProject(path, back, err));
+    CHECK(back.partCount() == 1 && back.mesh.triangleCount() == 0 && back.mesh.positions.empty());
+    CHECK(back.projectSettings["future_feature"].asString() == "kept");
+    CHECK(!back.dirty());
+
+    // Saved again, it comes back the same.
+    const std::string again = tempPath("sf_project_no_parts_again.sfproj");
+    CHECK(saveProject(again, back, err));
+    Document twice;
+    CHECK(loadProject(again, twice, err));
+    CHECK(twice.partCount() == 1 && twice.mesh.triangleCount() == 0);
+    CHECK(twice.projectSettings["future_feature"].asString() == "kept");
+
+    // A Part list that is missing or not a list is still refused.
+    CHECK(editManifest(path, [](Json& j) { j.set("parts", "none"); }));
+    Document keep = makeDoc(makePlane(4));
+    err.clear();
+    CHECK(!loadProject(path, keep, err) && !err.empty());
+    CHECK(keep.mesh.triangleCount() == makePlane(4).triangleCount());
+    std::filesystem::remove(path);
+    std::filesystem::remove(again);
+}
+
 TEST(project_dirty_tracking) {
     CommandRegistry reg;
     Document doc;
@@ -374,6 +406,44 @@ TEST(project_save_adds_extension_to_any_other_extension) {
     std::filesystem::remove(doc.path);
 }
 
+TEST(project_save_visible_parts_keeps_only_shown_parts) {
+    CommandRegistry reg;
+    Document doc = makeDoc(makeIcosphere(1));
+    doc.parts[0].name = "Body";
+    doc.addPart(makeIcosphere(1), "Hidden");
+    doc.addPart(makeIcosphere(2), "Head");
+    const int copy = doc.linkedDuplicate(2, glm::vec3(1, 0, 0)); // a linked copy of Head, after it
+    CHECK(copy >= 0);
+    const uint32_t folder = doc.addPartFolder("Face");
+    doc.setPartFolder(doc.findPart("Head"), folder);
+    doc.parts[size_t(doc.findPart("Hidden"))].visible = false;
+    doc.activePart = doc.findPart("Hidden"); // the active Part is hidden: the copy opens on the first Part
+
+    const std::string path = tempPath("sf_project_visible.sfproj");
+    std::filesystem::remove(path);
+    const int partsBefore = doc.partCount();
+    CommandResult r = reg.execute(doc, "save_visible_parts", {{"path", path}});
+    CHECK(r.ok && std::filesystem::exists(path));
+    CHECK(doc.path.empty() && doc.partCount() == partsBefore && doc.parts[size_t(doc.findPart("Hidden"))].data); // untouched
+
+    Document back;
+    std::string err;
+    CHECK(loadProject(path, back, err));
+    CHECK(back.partCount() == partsBefore - 1 && back.findPart("Hidden") < 0 && back.findPart("Body") >= 0);
+    const int head = back.findPart("Head");
+    CHECK(head >= 0 && back.partFolders.size() == 1 && back.partFolderIndex(back.parts[size_t(head)].folder) >= 0);
+    int linked = 0; // the copy still shares Head's mesh
+    for (int i = 0; i < back.partCount(); ++i)
+        if (i != head && back.parts[size_t(i)].data == back.parts[size_t(head)].data) ++linked;
+    CHECK(linked == 1 && back.activePart == 0);
+
+    // Nothing visible: nothing to write, and no file made.
+    std::filesystem::remove(path);
+    for (Part& p : doc.parts) p.visible = false;
+    CHECK(!reg.execute(doc, "save_visible_parts", {{"path", path}}).ok && !std::filesystem::exists(path));
+    CHECK(!reg.execute(doc, "save_visible_parts").ok); // a path is required
+}
+
 namespace {
 
 // A plane with planar UVs and a 512 texture (texture tests have their own helpers; this one is enough here).
@@ -392,6 +462,59 @@ Document texturedDoc() {
 }
 
 } // namespace
+
+// Save Visible Parts As keeps what a full save keeps for each visible Part: texture with its material channels (roughness,
+// metallic...), vertex colour, shading, transform. Compared field by field against the full save, reloaded.
+TEST(project_save_visible_parts_keeps_every_part_material_field_of_the_full_save) {
+    CommandRegistry reg;
+    Document doc = makeDoc(makeIcosphere(1));
+    doc.parts[0].name = "Hidden";
+    Mesh horn = makeIcosphere(2);
+    horn.colors.assign(horn.vertexCount(), glm::vec3(0.8f, 0.1f, 0.1f)); // plain vertex colour
+    horn.colors[3] = glm::vec3(0.2f, 0.9f, 0.4f);
+    horn.uvs.assign(horn.triangleCount() * 3, glm::vec2(0.5f));
+    for (size_t i = 0; i < horn.uvs.size(); ++i) horn.uvs[i] = glm::vec2(float(i % 7) / 7.0f, float(i % 11) / 11.0f);
+    horn.texture = makeTexture(512, 512);
+    horn.paintToTexture = true;
+    PaintTexture& t = *horn.texture;
+    for (Channel c : {Channel::Roughness, Channel::Metallic}) setChannelEnabled(t, c, true);
+    const float shiny[1] = {0.1f}, metal[1] = {1.0f};
+    for (int y = 40; y < 120; ++y)
+        for (int x = 60; x < 140; ++x) {
+            t.channels[size_t(Channel::Roughness)].base.setValues(x, y, shiny);
+            t.channels[size_t(Channel::Metallic)].base.setValues(x, y, metal);
+        }
+    doc.addPart(std::move(horn), "Horn");
+    doc.parts[size_t(doc.findPart("Horn"))].shading = Shading::Flat;
+    doc.parts[size_t(doc.findPart("Hidden"))].visible = false;
+
+    const std::string full = tempPath("sf_project_vis_full.sfproj"), vis = tempPath("sf_project_vis_copy.sfproj");
+    std::string err;
+    CHECK(saveProject(full, doc, err));
+    CHECK(reg.execute(doc, "save_visible_parts", {{"path", vis}}).ok);
+    Document a, b;
+    CHECK(loadProject(full, a, err) && loadProject(vis, b, err));
+    const int ia = a.findPart("Horn"), ib = b.findPart("Horn");
+    CHECK(ia >= 0 && ib >= 0 && b.findPart("Hidden") < 0);
+    if (ia >= 0 && ib >= 0) {
+        const Part& pa = a.parts[size_t(ia)];
+        const Part& pb = b.parts[size_t(ib)];
+        const Mesh& ma = a.partMesh(ia);
+        const Mesh& mb = b.partMesh(ib);
+        CHECK(pb.shading == Shading::Flat && pb.shading == pa.shading && pb.visible == pa.visible);
+        CHECK(mb.hasColors() && mb.colors == ma.colors);
+        CHECK(mb.texture && ma.texture && hasMaterialChannels(*mb.texture));
+        if (mb.texture && ma.texture) {
+            CHECK(enabledChannelMask(*mb.texture) == enabledChannelMask(*ma.texture));
+            CHECK(mb.paintToTexture == ma.paintToTexture);
+            for (Channel c : {Channel::Roughness, Channel::Metallic})
+                CHECK(mb.texture->channels[size_t(c)].base.sameTexels(ma.texture->channels[size_t(c)].base));
+            CHECK(channelImage(*mb.texture, Channel::Roughness).sameTexels(channelImage(*ma.texture, Channel::Roughness)));
+        }
+    }
+    std::filesystem::remove(full);
+    std::filesystem::remove(vis);
+}
 
 TEST(project_texture_without_material_channels_writes_format_6) {
     Document doc = texturedDoc();

@@ -1,5 +1,12 @@
 # Keyboard and mouse
 
+![Turning the view around a sculpted head](images/hero-view-keys.jpg)
+
+> **In short:**
+> - Every default shortcut and mouse gesture; <kbd>F1</kbd> shows the same list in the app.
+> - Four key styles: SculptForge (default), Classic, Blender and Maya.
+> - Hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click a button to reassign its key.
+
 This chapter is the reference for every default keyboard shortcut and mouse gesture in SculptForge. Inside the
 app, <kbd>F1</kbd> opens the same list as the Controls window, showing your own keys if you've changed any.
 
@@ -14,8 +21,36 @@ your saved style is kept.
 Every key below can be reassigned: hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click a button, then press the new
 key, or use **Edit > Preferences > Hotkeys**. Your changes save themselves. See [Customizing the interface](interface.md#customizing-the-interface).
 
-On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>. Single-letter shortcuts don't fire
-while you type in a text field.
+### Two keys in a row
+
+An action can also take two different keys one after the other, like <kbd>A</kbd> then <kbd>S</kbd>, which gives you
+many more keys to bind. In **Edit > Preferences > Hotkeys** click the small **>>** button at the right of the action's
+key, then press the first key and the second.
+
+The sequence is added to the action's other keys, and a sequence another action already uses asks first (Replace /
+Cancel), like any key. <kbd>Backspace</kbd> in that box removes the action's two-key shortcuts and leaves its single
+keys.
+
+- Press the two keys together (either one first) or one after the other. The second must come within the **Two-key
+  window** (**Edit > Preferences > Input**, 0.35 to 1 second, 0.4 by default) of the first; when both are down together
+  only the two-key shortcut runs, not the keys' own actions.
+- It has to be a different key: the same key twice is not a sequence.
+- A key that is part of a two-key shortcut and is also bound on its own still works: it waits that window and runs by
+  itself when its partner does not come. A key with no shortcut of its own does nothing alone. Keys that are in no
+  two-key shortcut run at once. The wait is the Two-key window, so keys you press alone all day answer a little late when they
+  are part of a two-key shortcut: pick other keys for those, or set the window to its shortest.
+- Either key can carry <kbd>Ctrl</kbd>, <kbd>Shift</kbd> or <kbd>Alt</kbd>.
+
+On macOS, <kbd>Cmd</kbd> works wherever a shortcut says <kbd>Ctrl</kbd>, and <kbd>Option</kbd> wherever it says
+<kbd>Alt</kbd>. Single-letter shortcuts don't fire while you type in a text field.
+
+Running the Windows version on a Mac through CrossOver or Wine? Their Mac driver sends <kbd>Cmd</kbd> as
+<kbd>Alt</kbd> and leaves <kbd>Option</kbd> unused. The macOS version needs none of this.
+
+To keep the Windows one, open the bottle's Registry Editor and, under `HKEY_CURRENT_USER\Software\Wine\Mac Driver`,
+add the strings `LeftOptionIsAlt` and `RightOptionIsAlt` set to `y` (Option becomes Alt), and `LeftCommandIsCtrl` and
+`RightCommandIsCtrl` set to `y` (Cmd becomes Ctrl). Restart SculptForge. The setting belongs to the bottle, so a new
+bottle needs it again.
 
 ## Keyboard shortcuts
 
@@ -66,6 +101,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
+| My Panel | <kbd>F4</kbd> | Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own. |
 | Redo | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> or <kbd>Ctrl</kbd>+<kbd>Y</kbd> | Redo the last undone action. |
 | Undo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Undo the last action. |
 
@@ -125,6 +161,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 |---|---|---|
 | Fullscreen | <kbd>F11</kbd> | Fill the screen with SculptForge (again: back to a window). |
 | Mask | <kbd>Ctrl</kbd>+<kbd>H</kbd> | Show or hide the mask (masked areas drawn darker). Hiding it keeps the mask: masked areas stay protected from brushes until you clear it. |
+| Unlit | <kbd>Alt</kbd>+<kbd>L</kbd> | Unlit view (on): the base colour alone, with no lighting, Lit Sphere or PBR shading, so painted colour reads exactly as stored. Works with vertex paint, texture paint and PBR; the mask and wireframe still draw. Saved with the project. |
 | Wireframe | <kbd>Shift</kbd>+<kbd>F</kbd> | Show the mesh's polygons (quads and triangles) over the surface. |
 
 ### Script
@@ -165,7 +202,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Back view | <kbd>Ctrl</kbd>+<kbd>Numpad 1</kbd> | Look at the model from behind (orthographic). |
 | Bottom view | <kbd>Ctrl</kbd>+<kbd>Numpad 7</kbd> | Look up at the model from below (orthographic). |
 | Draw | <kbd>Q</kbd> | Draw mode: brushes sculpt and paint (leaves the Gizmo). |
-| Frame | <kbd>F</kbd> | Fit the whole model in the view. |
+| Frame | <kbd>F</kbd> | Fit the whole model in the view. Classic sculpting keys, with several Parts: F frames the active Part, F twice quickly frames the whole scene. |
 | Frame Part | <kbd>Numpad .</kbd> | Fit the active Part in the view (Blender: View Selected; Maya keys: Alt+F). |
 | Front view | <kbd>Numpad 1</kbd> | Look at the model from the front (orthographic). |
 | Left view | <kbd>Ctrl</kbd>+<kbd>Numpad 3</kbd> | Look at the model's left side (orthographic). |
@@ -176,6 +213,10 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Orbit right | <kbd>Numpad 6</kbd> | Turn the view 15 degrees to the right around the model. |
 | Orbit up | <kbd>Numpad 8</kbd> | Turn the view 15 degrees up over the model. |
 | Orthographic | <kbd>Numpad 5</kbd> | Switch between a perspective and an orthographic view (no foreshortening: sizes don't shrink with depth). |
+| Pan down | <kbd>Ctrl</kbd>+<kbd>Numpad 2</kbd> | Slide the view down. Hold the key to keep moving; Speed is in Preferences > Input. |
+| Pan left | <kbd>Ctrl</kbd>+<kbd>Numpad 4</kbd> | Slide the view left. Hold the key to keep moving; Speed is in Preferences > Input. |
+| Pan right | <kbd>Ctrl</kbd>+<kbd>Numpad 6</kbd> | Slide the view right. Hold the key to keep moving; Speed is in Preferences > Input. |
+| Pan up | <kbd>Ctrl</kbd>+<kbd>Numpad 8</kbd> | Slide the view up. Hold the key to keep moving; Speed is in Preferences > Input. |
 | Restore View | <kbd>Numpad 0</kbd> | Go back to the view saved or restored last (View > Views). |
 | Right view | <kbd>Numpad 3</kbd> | Look at the model's right side (orthographic). |
 | Rotate | <kbd>R</kbd> | Gizmo, Rotate: drag a ring to turn about that axis, the outer ring to turn in the view. Mask the body and put the pivot at a joint to pose a limb. Shift snaps to 15 degrees. R again: back to Draw. |
@@ -223,11 +264,11 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Blur / sharpen the mask | <kbd>Ctrl</kbd>+click / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click the model |
 | Invert the mask | <kbd>Ctrl</kbd>+click the background |
 | Clear the mask | <kbd>Ctrl</kbd>+drag on the background with something masked (with **Mask Pen**), or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> |
-| Mask inside a lasso or rectangle | <kbd>Ctrl</kbd>+drag with **Lasso Mask** or **Rectangle Mask** picked in **Tool > Masking** (add <kbd>Alt</kbd>: unmask) |
+| Mask inside a lasso, rectangle or circle | <kbd>Ctrl</kbd>+drag with **Lasso Mask**, **Rectangle Mask** or **Circle Mask** picked in **Tool > Masking** (add <kbd>Alt</kbd>: unmask) |
 | Isolate a face group | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click it (again: invert the visibility; with something hidden already: hide it) |
 | Hide a face group | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Alt</kbd>+click it |
 | Show everything | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click the background |
-| Hide outside a rectangle or lasso | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag (add <kbd>Alt</kbd>: hide inside); **Select Rectangle** or **Select Lasso** in **Tool > Visibility** |
+| Hide outside a rectangle, lasso or circle | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+drag (add <kbd>Alt</kbd>: hide inside); **Select Rectangle**, **Select Lasso** or **Select Circle** in **Tool > Visibility** |
 | Select a Part | <kbd>Alt</kbd>+click it in the view (<kbd>Shift</kbd>+<kbd>Alt</kbd>+click, or a triple-click on another Part: select and frame it) |
 | Sculpt the Part under the cursor | <kbd>Alt</kbd>+<kbd>Q</kbd> (every input style; the view stays put) |
 | Move, scale or rotate with the Gizmo | <kbd>W</kbd>, <kbd>E</kbd> or <kbd>R</kbd>, then drag a handle; hold <kbd>Shift</kbd> to snap (15 degrees, the grid, 10%) |
@@ -325,6 +366,9 @@ long as <kbd>Alt</kbd> is the only key held:
 The roll needs <kbd>Alt</kbd> first: press <kbd>Ctrl</kbd> first (or both together) and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>
 masks as before, on the model, and clears the mask beside it.
 
+**Edit > Preferences > Input > Orbit around the pointer** (on for new installs, every style) turns the view about the point
+of the model under the pointer when a rotation starts over it; over the background, about the middle of the view.
+
 **Edit > Preferences > Input > Wheel zooms toward the pointer** (#134) keeps the point of the model under the pointer
 where it is while the wheel zooms; beside the model it zooms toward the pointer at the model's depth. Choosing the Maya
 style turns it on and the other styles turn it off (they zoom toward the middle of the view); the box changes it in
@@ -366,23 +410,26 @@ change in the Blender style:
 | Wireframe | <kbd>Shift</kbd>+<kbd>Z</kbd> |
 
 Choosing the Blender style also sets **Rotation** to **Turntable**, as Blender orbits; change it back under
-**Edit > Preferences > Input** if you like. Blender's face sets are SculptForge's face groups, and its brushes map to the
-nearest SculptForge brush. **Symmetry X**, **Paint** and the material picker have no key in the Blender style
-(they are on the shelves); give them one with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click. Laptops without a numpad:
-turn on **Edit > Preferences > Input > Emulate Numpad** and the number row works as the numpad.
+**Edit > Preferences > Input** if you like. Blender's face sets are SculptForge's face groups, and its brushes map to
+the nearest SculptForge brush.
+
+**Symmetry X**, **Paint** and the material picker have no key in the Blender style (they are on the shelves); give
+them one with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click. Laptops without a numpad: turn on
+**Edit > Preferences > Input > Emulate Numpad** and the number row works as the numpad.
 
 The numpad views (<kbd>Numpad 1</kbd>, <kbd>3</kbd>, <kbd>7</kbd>, <kbd>5</kbd> ...) work in every style.
 
 ### Your own Blender keymap
 
-If you changed Blender's keys, export them in Blender (**Edit > Preferences > Keymap**, the **Export...** button
-next to the keymap name) and in SculptForge choose **Import Blender keymap...** under **Edit > Preferences > Input** or
-at the top of the Controls window. SculptForge switches to the Blender style and takes, from the file's 3D View
-and Sculpt keymaps, the keys of every action it has an equivalent for: the views, the brushes above, the radius
-and strength, the mask, hiding, subdivision levels, undo and redo. Mouse buttons and keys for things
-SculptForge doesn't have are left alone; the status bar says how many keys it took. The file is read as text and
-never run. The keys save themselves; **Reset Layout and Shortcuts**
-goes back to the defaults.
+If you changed Blender's keys, export them in Blender (**Edit > Preferences > Keymap**, the **Export...** button next
+to the keymap name) and in SculptForge choose **Import Blender keymap...** under **Edit > Preferences > Input** or at
+the top of the Controls window. SculptForge switches to the Blender style and takes, from the file's 3D View and
+Sculpt keymaps, the keys of every action it has an equivalent for: the views, the brushes above, the radius and
+strength, the mask, hiding, subdivision levels, undo and redo. Mouse buttons and keys for things SculptForge doesn't
+have are left alone; the status bar says how many keys it took.
+
+The file is read as text and never run. The keys save themselves; **Reset Layout and Shortcuts** goes back to the
+defaults.
 
 ## Classic sculpting keys that work differently
 

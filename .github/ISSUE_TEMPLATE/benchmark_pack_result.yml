@@ -1,0 +1,44 @@
+name: Benchmark pack result
+description: Share a scene pack result (sculptforge --benchmark-pack) for the benchmarks page
+title: "Benchmark pack result: "
+labels: [benchmark]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for measuring! Download the scene pack from [sculptforge.app/benchmarks](https://sculptforge.app/benchmarks/#pack),
+        unpack it, close heavy programs, and run `sculptforge --benchmark-pack bench-pack --out results.json` (about 5 minutes,
+        any OS). Paste the whole `results.json` below. A maintainer checks it (`tools/benchmark/submit.py issue`) and adds it to the
+        table. What is in the file: [docs/benchmark.md](https://github.com/islandmed/SculptForge/blob/main/docs/benchmark.md#the-scene-pack).
+
+        The file holds your computer's CPU, graphics card and driver, memory, operating system, the SculptForge version and the
+        timings. Nothing else about you; the two boxes below are what you type, and they are shown publicly. Don't put your
+        full name, an email address or a link in them. Results of SculptForge only.
+  - type: input
+    id: name
+    attributes:
+      label: Name to show
+      description: A handle or first name as it should appear in the table (leave empty for "anonymous"). No links or email addresses.
+  - type: input
+    id: machine
+    attributes:
+      label: Machine
+      description: The computer, e.g. "Framework 16, Ryzen 7 7840HS, Radeon 7700S, plugged in, performance mode".
+    validations:
+      required: true
+  - type: textarea
+    id: json
+    attributes:
+      label: Result JSON
+      description: The whole results.json file.
+      render: json
+    validations:
+      required: true
+  - type: checkboxes
+    id: ok
+    attributes:
+      label: Listing
+      options:
+        - label: The run was on a quiet machine (no builds, games or renders running at the same time)
+        - label: I'm happy for this result to be listed publicly on sculptforge.app/benchmarks
+          required: true

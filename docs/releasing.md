@@ -36,7 +36,7 @@ the gates, what each step does, and how to recover.
      `[Unreleased]`; tests/ui/whats_new.sfui is pinned to the newest three sections (tools/release/pin_whats_new_test.py);
      website/guide is rebuilt. Don't bump version files by hand.
 
-   Step `check` verifies all of this, plus what the steps after the tag need (PKGBUILD format, the Homebrew tap, the
+   Step `check` verifies all of this, plus what the steps after the tag need (PKGBUILD format, the Homebrew tap, the Scoop manifest, the
    Omarchy PR is open, the home page's version text), so nothing stops after the tag for a reason known before it.
 3. **CI and Packages green on main** for exactly that commit. CI's run on main reuses the staging run of the same
    commit. For the bump commit, step `ci` and release.yml reuse the CI result of the commit before it when the bump
@@ -53,7 +53,12 @@ the gates, what each step does, and how to recover.
    drafted. Read the drafts, then post them.
    - **Discord**: the #announcements post is automatic once the `DISCORD_ANNOUNCE_WEBHOOK` secret is set
      (.github/workflows/discord-announce.yml). It waits for step `site` to put this version's highlights in
-     website/latest.json (up to 45 minutes). Other posts: .github/announcements/*.md, Actions > Discord announcement.
+     website/latest.json (up to 45 minutes), then for the release card at website/media/release-X.Y.Z.jpg to be live on
+     the site (up to 20 more; the launch kit commits it, site lane) and posts "## SculptForge X.Y.Z", the headline, the
+     card and masked Download / What's new links. Other posts: .github/announcements/*.md, Actions > Discord announcement.
+     One post per release: a successful post leaves a `discord-posted-<tag>` artifact, and a run (or rerun) that finds
+     it posts nothing. Once the Release workflow has started, nobody posts the release by hand; posting by hand is the
+     fallback only after the announcement run has failed, and then that run is never rerun.
 
 ## Build once, promote
 
@@ -85,7 +90,8 @@ What makes a run promotable (tools/release/staged_run.py, used by release.sh ste
   checks it again and logs both): never a pull_request, a workflow_dispatch or a fork's run. The exact commit wins,
   then the newest;
 - pushed and (re)run by islandmed (`actor` and `triggering_actor`);
-- concluded `success`, at most 7 days old (`SF_STAGED_MAX_DAYS`; artifacts are kept 14), every package artifact and
+- concluded `success` (or ended failed or cancelled with every job that is not a Python wheels job green: "Python wheels ...",
+  "Record wheel checksums", pypi; the wheels are optional, a hung one must not hold the app), at most 7 days old (`SF_STAGED_MAX_DAYS`; artifacts are kept 14), every package artifact and
   `staged-sums` still there;
 - CI passed on main for the commit (or for its parent, when the bump only added paperwork).
 
@@ -97,7 +103,8 @@ uploads. Any mismatch stops the release.
 
 Signing happens only at promotion: `UPDATE_SIGNING_KEY` is a secret of the environments `release` (job `publish`,
 deployments from tags `v*` only) and `member-release` (betas), never of the repository, so no staging or branch run can
-read it. Step `check` refuses otherwise. packages.yml reads no secret at all (tools/release/check_workflows.py).
+read it. Step `check` refuses otherwise. packages.yml reads no secret but the SignPath token, in the Windows job's signing
+steps only (tools/release/check_workflows.py; "Windows code signing" below).
 
 Unreleased builds: nothing is released, drafted or put in the feed before the tag. Staging's packages exist only as
 that run's Actions artifacts (14 days). In this public repository signed-in GitHub users can download Actions
@@ -110,8 +117,110 @@ the tag (about 40 minutes), attests and verifies them the same way, then smoke-t
 Compiler caches: release builds restore main's caches, and nothing run from a tag or a pull request ever saves one.
 Tokens: only `publish` holds a token that can write.
 
-The packages are not code-signed yet. When signing comes (SignPath for Windows, Apple notarization), it belongs in a
-step between smoke and publish that signs the promoted files, so promotion stays valid.
+## Windows code signing (SignPath Foundation)
+
+Packages are built once and promoted unchanged, so Windows signing happens in packages.yml's Windows job, not at
+promotion (macOS notarization is separate and not done yet). The repository variable **`SIGNING`** switches it on:
+`signpath` signs, anything else (the default) is the unsigned path, unchanged. With it on, on runs for `staging` and
+`v*` tags only (what a release promotes or builds from the tag; main's runs never ask for an approval):
+
+1. `sculptforge.exe`, `sculptforge-cli.exe` and any DLL in `build/Release` go to SignPath (artifact configuration
+   `SIGNPATH_CONFIG_BINARIES`, default `binaries`) and come back signed, **before** cpack makes the installer and
+   `.zip` (and build_mcpb.py the `.mcpb`), so all three carry signed exes.
+2. The NSIS installer goes (artifact configuration `SIGNPATH_CONFIG_INSTALLER`, default `installer`) and comes back signed.
+3. `tools/ci/verify_signed.ps1` (Get-AuthenticodeSignature = Valid, with a timestamp) checks every returned file, then
+   the exes and our DLLs inside the installer's `.zip` and the `.mcpb` (not the Python and MSVC runtime DLLs). A signature
+   that came back and doesn't verify fails the job.
+4. The job's summary and a notice say `Windows: signed (SignPath, <subject>)`, `Windows: partly signed (...)`,
+   `Windows: unsigned (<why>)` or `Windows: unsigned (SIGNING off)`; `release.sh --stage` prints that line.
+
+**Approvals never block the train.** The release policy needs the maintainer's approval in SignPath for every request
+(two per release: the binaries, then the installer), and we release daily. So:
+- Each request waits at most `SIGNPATH_TIMEOUT` seconds (default 1800, 30 minutes). Not approved in time, denied or
+  failed (SignPath down), the step fails *without* failing the job (`continue-on-error`, release policy only) and the
+  unsigned build ships, exactly as before signing existed: binaries not signed = the whole Windows build unsigned (no
+  installer request then); installer not signed = `partly signed` (signed exes in an unsigned installer, .zip and .mcpb
+  signed). The test policy's dry run still fails loudly.
+- `release.sh --stage` (and `--rebuild`, whose Release run builds and signs) watches its run while it waits (one API read
+  every 90 s, only with `SIGNING=signpath`). When the Windows job starts a request it wakes **input** through herdr
+  (`SignPath approval needed for SculptForge X.Y.Z (the binaries): approve the request waiting in
+  https://app.signpath.io/Web/<org>/SigningRequests as hello@ by HH:MM ...`). input approves it in Chrome, signed in as
+  hello@ (the approver account). SignPath also mails hello@ about it.
+- Not fully signed is a warning, never a stop: `release.sh --stage` prints it, and the release checklist (step `status`)
+  prints `Windows: NOT FULLY SIGNED this release: <why>` with the line to put in the release notes and #announcements.
+  The next release asks again.
+- A test-signed package is always refused: `release.sh --stage` stops, and release.yml's `verify` (`verify_staged.py`)
+  refuses SignPath's test certificate in the installer, .zip or .mcpb. Unsigned passes `verify` (`--require-signed`, by
+  hand only, refuses that too).
+
+SignPath artifact configurations (project SculptForge; both zips are flat, files at the root). SignPath Foundation requires the
+product name and version on every signed file, set and enforced: the exes (and the installer's NSIS version resource,
+CMakeLists.txt) carry `SculptForge` and the build's version, tools/ci/check_pe_metadata.ps1 fails the job before a request
+if they don't, and the workflow passes the version as the parameter `version`. `binaries`:
+
+```xml
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters><parameter name="version" required="true" /></parameters>
+  <zip-file>
+    <pe-file-set product-name="SculptForge" product-version="${version}">
+      <include path="*.exe" max-matches="unbounded" />
+      <include path="*.dll" min-matches="0" max-matches="unbounded" />
+      <for-each><authenticode-sign /></for-each>
+    </pe-file-set>
+  </zip-file>
+</artifact-configuration>
+```
+
+`installer`:
+
+```xml
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters><parameter name="version" required="true" /></parameters>
+  <zip-file>
+    <pe-file path="SculptForge-*.exe" product-name="SculptForge" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>
+```
+
+These two need parameters and metadata restrictions, which SignPath's free trial does not offer ("The element 'parameters' cannot
+be used because the corresponding feature is not available with your current subscription type"). On the trial keep the
+configurations without them (`binaries`: the `<zip-file>` with `<pe-file-set>`, the two `<include>` lines and
+`<for-each><authenticode-sign/></for-each>`, no `<parameters>` and no `product-*` attributes; `installer`: `<zip-file><pe-file
+path="SculptForge-*.exe"><authenticode-sign/></pe-file></zip-file>`) and leave the repository variable `SIGNPATH_PARAMS` unset:
+the workflow then sends no parameters, and tools/ci/check_pe_metadata.ps1 alone keeps the product name and version right.
+Once the Foundation's OSS subscription is active, paste the XML above and set `SIGNPATH_PARAMS=1` (the workflow then passes
+`version`). Both together, never one without the other: a `${version}` configuration given no parameter is refused.
+
+(No third-party DLL is shipped: SDL and every other dependency are linked into the exes. Upstream binaries must never go
+to SignPath under our subscription.)
+
+**Test signing** (a policy `test-signing` with a self-signed certificate, "Test certificate for 'SculptForge [OSS]'", looks
+worse to users than unsigned): Actions > Packages > Run workflow with *sign_test* ticked, on any branch. Only a maintainer's workflow_dispatch can
+do it (check_workflows.py), the notice says `Windows: test-signed (not for release ...)`, `verify_signed.ps1 -Test` accepts the
+untrusted root and requires the signer, and such a run can never be promoted (not a push to staging or main;
+`release.sh --stage` and `verify_staged.py` refuse the test certificate anyway).
+
+**One-time setup in SignPath (the maintainer; the workflow only submits requests).** In the SculptForge organization:
+0. Install the **SignPath GitHub App** (github.com/apps/signpath) on this repository only. Without it every request fails
+   with "Failed to retrieve GitHub App token" (seen in the 11-18 dry run).
+1. *Trusted build systems*: add **GitHub.com** to the organization and link it to the project. Without it the first request
+   fails with "Trusted build system is not allowed to log into the organization" (seen in the 11-17 dry run).
+2. *Artifact configurations* `binaries` and `installer` (the XML above, with the `version` parameter), set as the project's.
+3. *Signing policies*: `test-signing` (self-signed certificate; the dry run) and the release policy (the Foundation certificate,
+   *Verify origin* on, the maintainer as approver). Put the release policy's slug in `SIGNPATH_SIGNING_POLICY_SLUG`.
+4. A CI user whose API token is the repository secret `SIGNPATH_API_TOKEN`, allowed to submit to both policies.
+The plumbing around the signatures (verify_signed.ps1, check_pe_metadata.ps1) is exercised without SignPath or a secret by
+Actions > Signing self-test (a throwaway self-signed certificate). Then the dry run: Actions > Packages > Run workflow on a branch with *sign_test* ticked (it must end `Windows: test-signed`);
+only after that, and the release policy's first approved request, is `SIGNING=signpath` set on the repository.
+
+Variables: `SIGNING`, `SIGNPATH_PARAMS` (`1` with the versioned configurations), `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG` (the release policy), optionally
+`SIGNPATH_TEST_POLICY_SLUG`, `SIGNPATH_CONFIG_BINARIES`, `SIGNPATH_CONFIG_INSTALLER`, `SIGNPATH_TIMEOUT`. Secret: `SIGNPATH_API_TOKEN` (repository
+secret, read only by the two signing steps, which run only when `SIGN` is true; the workflow never runs on pull requests or
+`t0/**`; release.yml passes it to the `--rebuild` call of packages.yml). Pinned action, token and gating are enforced by
+check_workflows.py. The intermediate artifacts are named `signing-*` (never `windows*`: job sums and verify take those
+for packages) and kept one day.
 
 ## The script
 
@@ -136,9 +245,11 @@ The home page's What's New area (between the `whats-new` markers in website/inde
 | site | update feed (version + your highlights), home page version text, pushes; then waits for the live feed (10 min) and guide (5 min) | latest.json says X.Y.Z |
 | aur | packaging/arch/PKGBUILD: pkgver and the source checksum, computed by downloading the tag's tarball, and `.SRCINFO`; then, once `~/Work/.sf/aur-publish` exists (packaging/arch/SUBMIT.md), pushes both to the AUR | already at X.Y.Z with that checksum (and the AUR at X.Y.Z) |
 | brew | Homebrew cask through tools/publish/setup-channels.sh, after checking the .dmg's checksum here | the cask is at X.Y.Z |
+| scoop | packaging/scoop/sculptforge.json: version, url, checksum of the portable .zip (checked against SHA256SUMS.txt), pushed to main; then a copy to the islandmed/scoop-sculptforge bucket once that repository exists (ScoopInstaller/Extras updates itself from checkver once it accepts the manifest) | the manifest and the bucket are at X.Y.Z |
+| winget | packaging/winget (installer, locale, version manifests) rendered for X.Y.Z by `tools/release/winget_manifest.py` (installer URL, checksum from SHA256SUMS.txt, release date), pushed to main; then to microsoft/winget-pkgs through the islandmed fork (sparse blobless clone in `~/Work/.sf/winget`, normal push): while the first PR (#464465) is open, one "Replace A with X.Y.Z" commit on its branch and a new title; once merged, a branch sculptforge-X.Y.Z off upstream master and a PR of its own (skipped when winget-pkgs or a PR has it). `SF_WINGET_DRY=1` renders into `~/Work/.sf/winget/dry/X.Y.Z` and diffs, changing nothing | never fails the release: prints `winget: why` + the manual command, and status lists it |
 | omarchy | bumps the PKGBUILD on our branch of omacom/omarchy-pkgs#1800 (author islandmed noreply) | the PR is at X.Y.Z |
 | replies | writes `release-replies-X.Y.Z.md`: a draft per issue named in the CHANGELOG section; posts nothing | never |
-| status | winget PR state, links, reminders | never |
+| status | winget PR state (from step winget), links, reminders | never |
 
 The highlights and What's New's words are writing: the script never invents them. It checks they exist before
 tagging.
@@ -171,7 +282,7 @@ Steps for a beta: `bump check ci tag release status`.
   `VERSION 0.12.0` and `set(SCULPTFORGE_PRERELEASE "beta.1")`. The app reads "0.12.0 Beta 1" in the title bar and
   About; packages are named `SculptForge-0.12.0-*`. CITATION, rez, metainfo, the CHANGELOG section and the home page
   stay at the stable release (`build_site.py` leaves the home page alone while a prerelease is set).
-- **check** checks CMakeLists.txt (version and prerelease), the guide, the DPI tests, the workflows (below, "Secrets"),
+- **check** checks CMakeLists.txt (version and prerelease), the guide, the DPI manifest (the DPI UI tests are CI's: step **ci** waits for them, nothing is built here; only `--rebuild` still builds), the workflows (below, "Secrets"),
   that the `member-release` environment has the `INSIDERS_REPO_TOKEN` secret and that gh can see the private repository. A beta skips the site/AUR/Homebrew/Omarchy
   checks.
 - **tag / release**: `v0.12.0-beta.1` (the tag is public, like the source). release.yml checks that the tag equals the
@@ -180,6 +291,10 @@ Steps for a beta: `bump check ci tag release status`.
   `INSIDERS_REPO_TOKEN` (a fine-grained token for that repository only, Contents: read and write), and posts it in
   #members (`DISCORD_MEMBERS_WEBHOOK`). Nothing is published in the public repository, and the update feed is
   untouched: the app's Preview channel offers only what the feed names.
+  After the release is complete, `release_apk` adds the Android APKs (arm64-v8a, x86_64, signed with the CI runner's
+  debug key) from the android.yml run of the beta's commit to that private release, with `SHA256SUMS-android.txt`
+  (the signed `SHA256SUMS.txt` is left alone). Never the public release; no run, a red run, expired artifacts (14 days)
+  or a failed upload is a warning and the beta ships without them (`--from release` adds them later).
 - **status** prints the private release link, the invite command and the testers checklist (post it in #members).
 - No site, feed, AUR, Homebrew, Omarchy, winget or issue replies for a beta.
 
@@ -261,8 +376,9 @@ automatically.
   "member_requests_this_release": N}` (any part may be left out). The app's daily update check keeps it, and the small
   card shows one true line from it in turn ("Members funded this month: ...", "Founding Members so far: N of 100...",
   "N changes in this release were members' requests."); without the block the card keeps its usual Founding Members
-  line. Only real numbers: `founding` from `website/founding.json`, the requests count from
-  `tools/release/assemble_notes.py X.Y.Z --member-requests` before the bump (fragments with `member_request: true`).
+  line. Only real numbers: `founding` from `website/founding.json`; `member_requests_this_release` is automatic: the bump counts the fragments with
+  `member_request: true` (`assemble_notes.py X.Y.Z --member-requests`) before it deletes them, and the feed step writes the
+  number (and drops last release's when there are none).
   Never anything that reads as urgency.
 - **Member Requests:** each approved request goes into sculptforge/sculptforge-insiders as
   `requests/YYYY-MM/<slug>/request.json` + its file (+ `preview.png`), `"approved": true` once the requester has
@@ -300,6 +416,30 @@ private, in one private repository per studio.
   `vX.Y.Z`); every studio is on one of the two. Rebuild each studio on the new tag the day the fix ships.
 - **Privacy:** a studio's files never go into public builds, packs or the public repository, and are never run (data
   only). Studio mode is tested: `ctest -R studio` (no request or socket leaves the machine).
+
+## Python package (PyPI)
+
+`pip install sculptforge` (pyproject.toml, docs/guide/python-package.md). packages.yml job **wheels** builds the engine-only
+wheels with cibuildwheel: CPython 3.12-3.14 on Linux x86_64 and aarch64 (manylinux_2_28), macOS universal2 (11.0+)
+and Windows x64, each installed in a clean environment and tested there (`pytest tests/python`), attested like every
+package; job **wheel-sums** records their SHA-256 (staged-sums-wheels). Both are `continue-on-error`: a red wheel never
+holds the app's release, it only means no Python package for that version.
+
+The release page carries the wheels too: job **verify** checks them against staged-sums-wheels and their
+attestations, and **publish** re-checks them and adds them to `dist/`, so they are in SHA256SUMS.txt and its signature
+(`pip install <wheel link>`). A run without wheel checksums releases the app without wheels, with a warning.
+
+release.yml job **pypi** runs after the GitHub Release, for stable tags only, while the repository variable
+`PYPI_PUBLISH` is `true`: it re-checks the wheels against the recorded checksums and attestations
+(verify_staged.py), uploads to TestPyPI, installs from there in a clean venv and runs a sphere, then uploads to PyPI.
+Trusted Publishing: no token anywhere; the job is in the GitHub Environment `pypi` (deployment: tags `v*` only) and
+reads no secret (check_workflows.py). Versions are the app's; a version on PyPI can never be replaced, only yanked
+(pypi.org > project > Manage > Releases): fix forward in the next point release.
+
+One-time setup (the maintainer's account): on pypi.org and test.pypi.org, **Your projects > Publishing > Add a new
+pending publisher**: PyPI project name `sculptforge`, owner `islandmed`, repository `SculptForge`, workflow
+`release.yml`, environment `pypi`. In GitHub, **Settings > Environments > pypi**: deployment branches and tags, tag
+rule `v*`. Then `gh variable set PYPI_PUBLISH --body true`.
 
 ## When a step fails
 

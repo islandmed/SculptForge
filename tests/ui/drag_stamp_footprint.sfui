@@ -1,0 +1,51 @@
+# #174: a big Drag Stamp with a square alpha on a curved model covers its whole footprint. While dragging, the stamp
+# is pressed with the cheap region on every move; the release stamps once more over the visible surface under the
+# whole footprint, so the release paints more of the surface than the last preview did (red over white: the mean
+# green drops). A plain Stamp (a click) takes the footprint on its first dab. Shots: mid-drag, after the release,
+# the plain Stamp.
+run ui_look look=classic layout=classic        # Falloff on the O key, as the report's top bar
+run new_sphere subdivisions=6
+run set_color color=ff0000
+action draw.paint
+expect_value paint_mode == 1
+camera 0 0
+key f
+run brush_set_alpha name=square
+action stroke.type.drag_stamp
+expect_value stroke_type == 1
+drag_item "##strength" 2000 0
+expect_value rgb_intensity == 100
+# Falloff -100: the alpha shows to its square's corners, where a surface curving away left the gaps.
+key o
+key minus
+key 1
+key 0
+key 0
+key enter
+expect_value focal_shift == -100
+remember paint_mean_g white_g
+
+# Off to the side (40 degrees off the view axis), a stamp of about a third of the sphere's radius: its far corners lie
+# where the surface has curved away, outside the sphere the dab used to reach.
+drag_path 0.82 0.5 0.97 0.5 keep
+wait 0.3
+expect_value stroking == 1
+expect_value paint_mean_g < $white_g
+remember paint_mean_g mid_g
+shot mid_drag
+release
+wait_value stroking == 0 10
+wait 0.3
+expect_value paint_mean_g < $mid_g
+shot after_release
+
+# A plain Stamp: a click with the Dots stroke. Its first dab takes the footprint.
+key ctrl+z
+action stroke.type.dots
+expect_value stroke_type == 0
+brush_size 52
+stroke 0.82 0.5 0.82 0.5
+wait_value stroking == 0 10
+wait 0.3
+expect_value paint_mean_g < $white_g
+shot plain_stamp

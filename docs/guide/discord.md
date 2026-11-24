@@ -1,5 +1,12 @@
 # Show SculptForge on Discord
 
+![The lion head model (CC0, Poly Haven) in SculptForge](images/welcome-bust.jpg)
+
+> **In short:**
+> - Shows **SculptForge** and your sculpting time on your Discord profile.
+> - It is off until you switch it on.
+> - Nothing else is sent: no folders, paths, user name or model details.
+
 Let your Discord friends see that you're sculpting. Discord's profile and member list then show **SculptForge**,
 its icon and how long you've been at it. It's off until you switch it on.
 

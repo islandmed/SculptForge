@@ -23,6 +23,8 @@ expect_value moved > 10
 
 # Decimate at Level 2: half of Level 2's triangles, and the status line says what happened to the levels.
 click "Geometry/Decimate"
+# (#173: it asks first on a Part with levels)
+click "Levels/Freeze Levels and Proceed"
 expect_value sdiv_levels == 0
 expect_value triangles < 6912
 expect_value triangles > 1000

@@ -1,0 +1,35 @@
+# Blender style, a mouse (Discord #help, 0.12.7: F opened the Size box but the value would not move, Shift+F did
+# nothing visible, no circle): F and Shift+F follow the mouse sideways with the ring shown at the live size.
+restart data/prefs/ui_input_style_blender.json
+wait 0.2
+run new_sphere subdivisions=4
+camera 0 0
+brush_size 60
+hover_window 0.4 0.5
+
+# F: Size.
+key f
+expect_value size_popup_open == 1
+mouse_by 100 0
+expect_value draw_size == 160
+expect_value size_ring_px == 160
+expect_value size_ring_preview == 1
+shot blender_size
+click_here
+expect_value size_popup_open == 0
+expect_value draw_size == 160
+
+# Shift+F: Intensity; the ring keeps the size, the disc in it is the strength; Esc puts it back.
+brush_size 80
+hover_window 0.4 0.5
+remember z_intensity i0
+key shift+f
+expect_value size_popup_open == 1
+expect_value size_ring_preview == 1
+mouse_by 40 0
+expect_value z_intensity > $i0
+expect_value size_ring_px == 80
+shot blender_intensity
+key escape
+expect_value z_intensity == $i0
+expect_value size_popup_open == 0

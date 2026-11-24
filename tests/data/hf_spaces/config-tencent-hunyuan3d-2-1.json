@@ -1,0 +1,152 @@
+{
+ "_recorded": "2026-11-11 from https://tencent-hunyuan3d-2-1.hf.space/config, trimmed to the endpoints Generate 3D calls",
+ "version": "4.44.0",
+ "components": [
+  {
+   "id": 6,
+   "type": "image",
+   "props": {
+    "label": "Image"
+   }
+  },
+  {
+   "id": 7,
+   "type": "state",
+   "props": {}
+  },
+  {
+   "id": 10,
+   "type": "image",
+   "props": {
+    "label": "Front"
+   }
+  },
+  {
+   "id": 11,
+   "type": "image",
+   "props": {
+    "label": "Back"
+   }
+  },
+  {
+   "id": 13,
+   "type": "image",
+   "props": {
+    "label": "Left"
+   }
+  },
+  {
+   "id": 14,
+   "type": "image",
+   "props": {
+    "label": "Right"
+   }
+  },
+  {
+   "id": 19,
+   "type": "file",
+   "props": {
+    "label": "File"
+   }
+  },
+  {
+   "id": 28,
+   "type": "checkbox",
+   "props": {
+    "label": "Remove Background",
+    "value": true
+   }
+  },
+  {
+   "id": 29,
+   "type": "checkbox",
+   "props": {
+    "label": "Randomize seed",
+    "value": true
+   }
+  },
+  {
+   "id": 31,
+   "type": "slider",
+   "props": {
+    "label": "Seed",
+    "value": 1234
+   }
+  },
+  {
+   "id": 33,
+   "type": "slider",
+   "props": {
+    "label": "Inference Steps",
+    "value": 30
+   }
+  },
+  {
+   "id": 34,
+   "type": "slider",
+   "props": {
+    "label": "Octree Resolution",
+    "value": 256
+   }
+  },
+  {
+   "id": 37,
+   "type": "number",
+   "props": {
+    "label": "Guidance Scale",
+    "value": 5.0
+   }
+  },
+  {
+   "id": 38,
+   "type": "slider",
+   "props": {
+    "label": "Number of Chunks",
+    "value": 8000
+   }
+  },
+  {
+   "id": 55,
+   "type": "html",
+   "props": {
+    "label": "Output",
+    "value": "\n    <div style='height: 650px; width: 100%; border-radius: 8px; border-color: #e5e7eb; border-style: solid; border-width: 1px; display: flex; justify-content: center; align-items: center;'>\n      <div style='text-align: center; font-size: 16px; color: #6b7280;'>\n        <p style=\"color: #8d8d8d;\">Welcome to Hunyuan3D!</p>\n        <p style=\"color: #8d8d8d;\">No mesh here.</p>\n      </div>\n    </div>\n    "
+   }
+  },
+  {
+   "id": 59,
+   "type": "json",
+   "props": {
+    "label": "Mesh Stats",
+    "value": {}
+   }
+  }
+ ],
+ "dependencies": [
+  {
+   "id": 2,
+   "api_name": "shape_generation",
+   "inputs": [
+    7,
+    6,
+    10,
+    11,
+    13,
+    14,
+    33,
+    37,
+    31,
+    34,
+    28,
+    38,
+    29
+   ],
+   "outputs": [
+    19,
+    55,
+    59,
+    31
+   ]
+  }
+ ]
+}

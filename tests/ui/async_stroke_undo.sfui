@@ -1,0 +1,73 @@
+# cold
+# Strokes as the window runs them (`interactive_strokes on`: the dabs of a big mesh go to the stroke thread), with the thread slowed
+# (SF_DAB_DELAY_MS; ctest sets it with SF_BACKGROUND_DABS, both are read once at startup) so a stroke is still draining when the
+# next input comes. What the window does then (gh#184): Undo pressed while the last stroke drains waits for it ("queued") and then
+# undoes THAT stroke; the next press waits behind it. The surface is what is left, nothing undone comes back.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=6
+interactive_strokes on
+expect_value background_dabs == 1
+camera 0 0
+key f
+wait_idle 30
+brush_size 50
+
+# An earlier stroke stays (so Undo is available), and the stroke Z alone is the reference.
+stroke 0.30 0.30 0.40 0.70 0.5
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+snapshot
+stroke 0.40 0.45 0.60 0.55 0.5
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+expect_value view_stale < 0.5
+expect_value moved > 100
+remember moved z_moved
+remember moved_sum z_sum
+key ctrl+z
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+expect_value view_stale < 0.5
+expect_value moved == 0
+
+# S is released and still draining: Undo is queued behind it, and the next stroke's press waits behind that.
+stroke 0.40 0.40 0.60 0.60 0.5 hold
+wait 0.2
+expect_value stroke_async == 1
+release
+expect_value stroke_draining == 1
+key ctrl+z
+expect_status queued
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+expect_value view_stale < 0.5
+expect_value moved == 0
+
+# The same, then Z at once. The surface is the earlier stroke plus Z, and S is gone. (Z itself comes out shorter than Z alone: see
+# async_stroke_press_waits.sfui.)
+stroke 0.40 0.40 0.60 0.60 0.5 hold
+wait 0.2
+release
+expect_value stroke_draining == 1
+key ctrl+z
+stroke 0.40 0.45 0.60 0.55 0.5
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+expect_value view_stale < 0.5
+expect_value moved > $z_moved*0.5
+expect_value moved < $z_moved*1.05

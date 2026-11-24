@@ -1,17 +1,17 @@
 {
-  "version": "0.12.0",
+  "version": "0.13.13",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Garments and cloth: real-size sewing patterns (millimetres, curves, notches, grain line, seam allowance) from 8 templates at your sizes, sewn with matched seam lengths; print at home at real size (PDF/SVG pages) or export DXF for cutters; plus a Cloth brush and Drape for folds on any mesh. For cosplay, costume and textile work",
-    "Plugins: install sandboxed add-ons from packs (deformers and generators; no file or network access) (thanks @bribblej-web, #20)",
-    "The Tool palette in the order you work: Reshape gathers Size and the Stack, Mirror moves to Geometry > Symmetry, and Texture Image and Viewport Look say what they do (thanks foirgairwolf on Discord)",
-    "Cleaner cuts and creases: crease edges (select them by angle too) and they stay sharp when you add levels (thanks @NicTanghe on GitHub, #108, and _tfx on Discord); cut caps are even triangles instead of thin slivers (thanks dm4nd on Discord)",
-    "Tube shapes: round, square, triangle or ribbon profiles with taper that follow the surface, and any brush, tool or Esc leaves Draw Tube (thanks GABO on Discord); pose every Part at once (thanks @ABHITAR)"
+    "Contact facing keeps your brush off the far wall of a slot or the other side of a fold",
+    "Engrave and Crease Line keep smooth walls when one stroke runs up and down the same line",
+    "Dense Micro levels show Undo, Redo and Move at once, with fewer pauses as strokes start and end",
+    "Shift with the Paint brush smooths every channel you paint, across UV seams too",
+    "Texture painting works on more Android phones and tablets"
   ],
   "support": {
     "founding": {
-      "taken": 8,
+      "taken": 17,
       "limit": 100
     }
   }

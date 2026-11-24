@@ -99,12 +99,18 @@ struct TubeShape {
     bool flatCaps = false; // flat ends instead of round
     bool mirrorX = false;  // a mirror copy across x = 0 (symmetry X)
     float edge = 0.0f;     // target edge length; 0 = from the radius (16 sides around the average)
-    enum class Profile : uint8_t { Round, Square, Triangle, Ribbon };
+    // Rope, Braid (three strands) and Sleeve (a hollow tube, open ends) are built from the round sweep, not one outline.
+    enum class Profile : uint8_t { Round, Square, Triangle, Ribbon, Rope, Braid, Sleeve };
     Profile profile = Profile::Round; // the cross-section (its "radius" is half its width)
     float thickness = 0.25f;          // Ribbon: its thickness as a fraction of its width
-    float roll = 0.0f;                // degrees the cross-section is turned about the curve
+    float roll = 0.0f;                // degrees the cross-section is turned about the curve (the Turn slider)
     glm::vec3 up{0.0f};               // the first ring's orientation (0: automatic)
     float taperStart = 0.0f, taperEnd = 0.0f; // fraction of the length narrowing to a point at each end
+    float twist = 0.0f;  // degrees the cross-section turns from the start to the end (on top of roll)
+    float spin = 0.0f;   // degrees it turns per average radius of length (on top of roll and twist)
+    int strands = 3;     // Rope/Braid: how many strands (1..8; a rope of one strand is a spring)
+    float spread = 0.5f; // Rope/Braid: strand spacing (0.5: touching); Sleeve: wall thickness (half of it, as a fraction of the radius)
+    bool curve = false;  // a Curve Part: only the guide line (a thin wire) is swept until Tube from curve clears this
     bool empty() const { return points.empty(); }
 };
 
@@ -214,6 +220,15 @@ public:
     std::vector<glm::vec3> paintBase;
     std::vector<PaintLayer> paintLayers;
     int activePaintLayer = -1;
+    // The colour vertex paint last laid on `colors` / `paintBase` (paintVertex fills it): one target colour (a brush
+    // colour, or white for an erase) lets a stroke at a low subdivision level reach the detail above as
+    // lerp(old, target, amount) instead of a difference (and an undo of it take that back exactly). state 2 = several
+    // colours since subdivCommit took the paint up; `settled` = it did, so the next paintVertex starts afresh.
+    struct PaintTarget {
+        glm::vec3 color{1.0f};
+        uint8_t state = 0; // 0 none, 1 one colour, 2 mixed
+        bool settled = false;
+    } paintTarget;
 
     // Texture painting (core/Texture.h): an RGBA texture on the UVs, shared by copies of the mesh until
     // one of them changes it (mutableTexture copies first). `paintToTexture`: the Paint brush, fills and

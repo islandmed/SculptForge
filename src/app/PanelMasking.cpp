@@ -10,6 +10,7 @@
 #include "app/Pickers.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "core/Micro.h"
 
 #include <IconsLucide.h>
 
@@ -26,6 +27,8 @@ constexpr float kMaskDragThresholdPx = 4.0f; // movement that turns a Ctrl+click
 bool ctrlDown(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; }
 
 bool anyMasked(const Mesh& mesh) {
+    if (mesh.micro && std::any_of(mesh.micro->mask.begin(), mesh.micro->mask.end(), [](uint8_t m) { return m > 0; }))
+        return true; // (a micro level's own mask)
     return std::any_of(mesh.mask.begin(), mesh.mask.end(), [](float m) { return m > 0.0f; });
 }
 
@@ -63,9 +66,11 @@ void App::beginMaskStroke(float x, float y) {
     if (!doc_.sculptor.beginStroke(doc_.mesh, strokeInvert_ ? "Unmask" : "Mask", -1)) return;
     strokeMask_ = true;
     strokePaint_ = false; // mask strokes never paint or sculpt
+    strokeColourSmooth_ = false;
     strokeSculpt_ = true;
     paintSnapshot_.reset();
     strokeBrush_ = BrushType::Standard;
+    strokeSlot_ = ModifierSlot::None;
     haveLastDab_ = false;
     drag_ = Drag::Stroke;
     lastX_ = x;
@@ -152,13 +157,16 @@ std::vector<App::HeldBrushItem> App::heldBrushItems(HeldBrush held) {
     if (held == HeldBrush::Mask)
         return {{"mask.pen", "Mask Pen", "Dots", ICON_LC_PEN_TOOL, SelectShape::Pen},
                 {"mask.lasso", "Lasso Mask", "Lasso", ICON_LC_LASSO, SelectShape::Lasso},
-                {"mask.rect", "Rectangle Mask", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect}};
+                {"mask.rect", "Rectangle Mask", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect},
+                {"mask.circle", "Circle Mask", "Circle", ICON_LC_CIRCLE_DASHED, SelectShape::Circle}};
     if (held == HeldBrush::Select)
         return {{"select.rect", "Select Rectangle", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::Rect},
                 {"select.lasso", "Select Lasso", "Lasso", ICON_LC_LASSO, SelectShape::Lasso},
+                {"select.circle", "Select Circle", "Circle", ICON_LC_CIRCLE_DASHED, SelectShape::Circle},
                 {"cut.line", "Cut Line", "Line", ICON_LC_SLASH, SelectShape::CutLine},
                 {"cut.lasso", "Cut Lasso", "Lasso", ICON_LC_SCISSORS, SelectShape::CutLasso},
                 {"cut.rect", "Cut Rectangle", "Rect", ICON_LC_SQUARE_DASHED, SelectShape::CutRect},
+                {"cut.circle", "Cut Circle", "Circle", ICON_LC_CIRCLE_DASHED, SelectShape::CutCircle},
                 {"cut.polyline", "Cut Polyline", "Polyline", ICON_LC_WAYPOINTS, SelectShape::CutPolyline}};
     return {};
 }
@@ -194,6 +202,8 @@ bool App::drawHeldBrushGrid(HeldBrush held, bool strokes) {
             actions_.touch(a->id);
             a->run();
             status_ = std::string("Brush: ") + it.brush;
+            if (held == HeldBrush::Mask && uiPrefs_.modifierBrushes.bound(ModifierSlot::Ctrl))
+                setModifierBrush(ModifierSlot::Ctrl, -1); // a mask brush picked with Ctrl held: Ctrl masks again
             picked = true;
         }
         const std::string help = strokes ? std::string("Stroke of ") + it.brush + ". " + (a ? a->description : "")
@@ -208,7 +218,7 @@ namespace {
 
 // The little pictures on the Masking panel's buttons: a clay ball (or the shape of the selection), the masked part
 // dark as the viewport shows it, so each button shows what it does before it is pressed.
-enum class MaskArt { Pen, Lasso, Rect, Cavity, Peaks, FaceGroup, Colour, Facing, Border, Grow, Shrink, Sharpen, Blur,
+enum class MaskArt { Pen, Lasso, Rect, Circle, Cavity, Peaks, FaceGroup, Colour, Facing, Border, Grow, Shrink, Sharpen, Blur,
                      Invert, Clear, All };
 
 constexpr ImU32 kClay = IM_COL32(196, 178, 160, 255), kClayShade = IM_COL32(150, 134, 120, 255),
@@ -250,6 +260,20 @@ void drawMaskArt(ImDrawList* dl, ImVec2 c, float r, MaskArt art) {
         dl->AddRect(ImVec2(c.x - r * 0.55f, c.y - r * 0.4f), ImVec2(c.x + r * 0.55f, c.y + r * 0.4f), kLine, 0, 0,
                     t * 0.7f);
         break;
+    case MaskArt::Circle: { // an ellipse masked, its centre marked
+        drawBall(dl, c, r);
+        const ImVec2 radius(r * 0.55f, r * 0.42f);
+        ImVec2 pts[24];
+        for (int i = 0; i < 24; ++i) {
+            const float a = float(i) / 24.0f * 6.2832f;
+            pts[i] = ImVec2(c.x + std::cos(a) * radius.x, c.y + std::sin(a) * radius.y);
+        }
+        dl->AddConvexPolyFilled(pts, 24, kMasked);
+        dl->AddPolyline(pts, 24, kLine, ImDrawFlags_Closed, t * 0.7f);
+        dl->AddLine(ImVec2(c.x - r * 0.12f, c.y), ImVec2(c.x + r * 0.12f, c.y), kLine, t * 0.6f);
+        dl->AddLine(ImVec2(c.x, c.y - r * 0.12f), ImVec2(c.x, c.y + r * 0.12f), kLine, t * 0.6f);
+        break;
+    }
     case MaskArt::Cavity: // the creases masked
         drawBall(dl, c, r);
         for (int k = -1; k <= 1; ++k) {
@@ -412,6 +436,9 @@ void App::drawMaskingSection() {
          "Ctrl+drag draws a lasso (any free shape): what is inside gets masked (Ctrl+Alt: unmasked)."},
         {"mask.rect", "Rectangle Mask##mask.rect", MaskArt::Rect, SelectShape::Rect,
          "Ctrl+drag draws a rectangle: what is inside gets masked (Ctrl+Alt: unmasked)."},
+        {"mask.circle", "Circle Mask##mask.circle", MaskArt::Circle, SelectShape::Circle,
+         "Ctrl+drag a circle from its centre: what is inside gets masked (Ctrl+Alt: unmasked). Shift while dragging keeps "
+         "it round."},
     };
     for (const Shape& sh : shapes) {
         next();
@@ -421,10 +448,11 @@ void App::drawMaskingSection() {
                 a->run();
             }
     }
+    if (maskShape_ == SelectShape::Circle) drawCircleOptions("mask");
     if (maskShape_ != SelectShape::Pen) { // #91.3
         ImGui::Checkbox(tr("Front faces only##mask"), &maskFrontFacesOnly_);
         ui::HelpText("Front faces only", nullptr,
-                     tr("Lasso Mask and Rectangle Mask mask only what faces you: the far side and folds turned away "
+                     tr("Lasso Mask, Rectangle Mask and Circle Mask mask only what faces you: the far side and folds turned away "
                         "stay as they are."),
                      "Tool > Masking");
     }

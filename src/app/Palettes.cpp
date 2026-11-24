@@ -12,15 +12,19 @@
 #include "app/Config.h"
 #include "app/Demo.h"
 #include "app/Palettes.h"
+#include "app/Python.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 #include "core/LitSphere.h"
+#include "core/ManagedPolicy.h"
 #include "core/StarterMeshes.h"
 #include "core/Units.h"
 
 #include <IconsLucide.h>
+
+#include <imgui_internal.h>
 
 #include <algorithm>
 #include <cfloat>
@@ -28,6 +32,7 @@
 #include <cstdio>
 #include <iterator>
 #include <string>
+#include <utility>
 
 namespace sf {
 
@@ -43,6 +48,7 @@ const PaletteDef* palettes(int& count) {
         {"generate", "Generate", ICON_LC_WAND_SPARKLES, nullptr, &App::drawPalette_Generate},
         {"help", "Help", ICON_LC_CIRCLE_HELP, nullptr, &App::drawPalette_Help},
         {"material", "Material", ICON_LC_SUN, "Vertex Paint & Materials", &App::drawPalette_Material},
+        {"mypanel", "My Panel", ICON_LC_STAR, nullptr, &App::drawPalette_MyPanel},
         {"preferences", "Preferences", ICON_LC_SETTINGS, nullptr, &App::drawPalette_Preferences},
         {"render", "Render", ICON_LC_EYE, nullptr, &App::drawPalette_Render},
         {"script", "Script", ICON_LC_SQUARE_TERMINAL, nullptr, &App::drawPalette_Script},
@@ -68,7 +74,7 @@ const TaskMenuDef* taskMenus(int& count) {
     // is shaded (Lit Sphere materials, PBR) and the Gaussian splats.
     static const TaskMenuDef kMenus[] = {
         {"file", "File", {"file", "script", nullptr}, {nullptr, nullptr}},
-        {"edit", "Edit", {"edit", "preferences", nullptr}, {nullptr, nullptr}},
+        {"edit", "Edit", {"edit", "mypanel", "preferences", nullptr}, {nullptr, nullptr, nullptr}},
         {"sculpt", "Sculpt", {"brush", "draw", "stroke", "alpha", "transform", nullptr}, {nullptr, "Draw & Tablet", nullptr, nullptr, "Symmetry & Gizmo"}},
         {"paint", "Paint", {"color", nullptr}, {"Vertex Paint & Color"}},
         {"mesh", "Mesh", {"tool", "generate", nullptr}, {"Parts & Geometry", "Generate 3D"}},
@@ -155,7 +161,7 @@ void menuAction(App& app, const char* id) {
     const std::string label = std::string(trAction(a->id, a->label)) + "##" + a->id; // no icons: they'd misalign with the plain project items
     if (ImGui::MenuItem(label.c_str(), shortcut.empty() ? nullptr : shortcut.c_str(), checked, enabled) && a->run) {
         app.actions().touch(a->id);
-        a->run();
+        app.runInteractive(a->run);
     }
     ui::HelpAction(app, id);
 }
@@ -179,16 +185,24 @@ void drawOptionRow(App& app, std::initializer_list<const char*> ids) {
     ImGui::PopStyleColor(3);
 }
 
+// App::drawMyPanelSection runs a palette body with its items skipped and lets one section through: that section's
+// Section object (constructed right after subpalette() says yes) ends the pass.
+bool g_captureNext = false;
+
 } // namespace
 
 namespace tray {
 
-Section::Section() { ImGui::Indent(kSectionInset * ImGui::GetFontSize() / 15.0f); }
+Section::Section() {
+    ImGui::Indent(kSectionInset * ImGui::GetFontSize() / 15.0f);
+    capture_ = std::exchange(g_captureNext, false);
+}
 
 Section::~Section() {
     const float s = ImGui::GetFontSize() / 15.0f;
     ImGui::Unindent(kSectionInset * s);
     ImGui::Dummy(ImVec2(0, 4.0f * s));
+    if (capture_) ImGui::GetCurrentWindow()->SkipItems = true; // the rest of the palette body is not wanted
 }
 
 Style::Style() { ImGui::PushStyleColor(ImGuiCol_CheckMark, checkMark()); }
@@ -240,6 +254,17 @@ bool SliderInt(const char* id, int* v, int lo, int hi, const char* format, ImGui
 } // namespace tray
 
 bool App::subpalette(const char* id, const char* englishTitle) {
+    if (!myPanelSection_.empty()) { // My Panel draws this section's body and nothing else of the palette
+        const bool mine = myPanelSection_ == id;
+        if (mine) {
+            auto& title = myPanelTitles_[id];
+            if (title != englishTitle) title = englishTitle;
+        }
+        const bool draw = mine && !myPanelProbe_;
+        ImGui::GetCurrentWindow()->SkipItems = !draw;
+        g_captureNext = draw;
+        return draw;
+    }
     const char* title = tr(englishTitle); // the interface language (I18n.h); the id keeps the item's identity
     auto& open = layout_.openSubpalettes;
     bool isOpen = std::find(open.begin(), open.end(), id) != open.end();
@@ -247,8 +272,10 @@ bool App::subpalette(const char* id, const char* englishTitle) {
     const float h = kSectionHeaderH * s;
     const ImVec2 p = ImGui::GetCursorScreenPos();
     const float w = ImGui::GetContentRegionAvail().x;
-    const bool clicked = ImGui::InvisibleButton((std::string(title) + "##" + id).c_str(), ImVec2(w, h));
+    bool clicked = ImGui::InvisibleButton((std::string(title) + "##" + id).c_str(), ImVec2(w, h));
     const bool hovered = ImGui::IsItemHovered();
+    ui::MyPanelDragSource(id, true, title);
+    if (clicked && ui::MyPanelDragged()) clicked = false; // the end of an Alt-drag into My Panel, not a click
     // A quiet section header in the palette header's grammar: title at the left, chevron at the right. No fill until
     // hovered or open, a hairline under it. The title lines up with the section's content (tray::Section). The accent
     // is kept for the current tool (docs/ui-design.md §10), so an open section shows by its fill and text only.
@@ -327,6 +354,15 @@ void App::drawPalette_Alpha() { drawAlphaSection(); }
 
 void App::drawPalette_Brush() {
     const tray::Style style; // quiet check marks
+    if (frontFacesOnly_) { // (on: Smooth and every brush skip the inner side of a thin Part; easy to forget it is on)
+        ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.51f, 1.0f), "%s", tr("Front faces only is ON"));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", tr("Brushes skip surfaces that face away from you: the hidden inside of a thin or Extract-made "
+                                        "Part, and its far side. Smooth cannot reach spikes there. Untick Front faces only below to "
+                                        "reach them."));
+        ImGui::SameLine();
+        if (ImGui::SmallButton(tr("Turn off##front_faces_off"))) frontFacesOnly_ = false;
+    }
     // Your brushes first (PanelBrushLibrary.cpp: tags, and the right-click menu to share, rename or delete),
     // then every brush as thumbnails (Pickers.cpp, the same grid as the B picker).
     actionRow(*this, {"ui.brush_lab", "ui.brush_gallery"});
@@ -346,6 +382,11 @@ void App::drawPalette_Brush() {
     ImGui::SameLine();
     ui::Checkbox("View falloff##draw.view_falloff", &uiPrefs_.viewFalloff);
     ui::HelpAction(*this, "draw.view_falloff");
+    if (newerMenuRows() || uiPrefs_.contactFacing) { // (a row after 0.13.0: Classic keeps its old rows unless asked)
+        ui::Checkbox("Contact facing##draw.contact_facing", &uiPrefs_.contactFacing);
+        ui::HelpAction(*this, "draw.contact_facing");
+        if (uiPrefs_.contactFacing) ui::SliderInside("##facing_angle", &uiPrefs_.facingAngle, 30.0f, 180.0f, "Facing angle %.0f");
+    }
     ImGui::Checkbox(tr("Smooth keeps volume##smooth_keep_volume"), &smoothKeepVolume_);
     ui::HelpText("Smooth keeps volume", nullptr,
                  "The Smooth brush (and Shift) removes bumps without shrinking the form, instead of the plain smooth "
@@ -523,12 +564,20 @@ void App::drawPalette_Edit() {
             a->run();
         }
         ui::HelpAction(*this, "ui.palette.preferences");
+        // My Panel is on the bar only once it holds something or sits in a tray; Edit is where it is found.
+        const std::string myLabel = std::string(tr("My Panel")) + "...##edit.mypanel";
+        const std::string myKey = actions().shortcutText("ui.my_panel");
+        if (ImGui::MenuItem(myLabel.c_str(), myKey.empty() ? nullptr : myKey.c_str())) {
+            dropdown_ = "mypanel";
+            openDropdown_ = true;
+        }
+        ui::HelpAction(*this, "ui.my_panel");
     }
 }
 
 const App::SizeBounds& App::sizeBounds() {
     if (doc_.sculptor.strokeActive() || solverBusy()) return sizeBounds_; // (holds still during a stroke)
-    uint64_t key = doc_.undo.revision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activePart) << 40) ^
+    uint64_t key = doc_.undo.baseRevision() * 0x9E3779B97F4A7C15ull ^ (uint64_t(doc_.activePart) << 40) ^
                    uint64_t(doc_.mesh.vertexCount()) ^ (uint64_t(doc_.parts.size()) << 56);
     for (size_t i = 0; i < doc_.parts.size(); ++i)
         if (!doc_.parts[i].visible) key ^= 0xC2B2AE3D27D4EB4Full * (i + 1);
@@ -582,12 +631,14 @@ void App::drawPalette_File() {
     menuAction(*this, "file.export_fbx");
     menuAction(*this, "file.send_unreal");
     menuAction(*this, "file.save_splats");
+    if (policy::renderBridgeAllowed() && (newerMenuRows() || renderBridgeSetUp())) menuAction(*this, "file.render_with"); // (PanelRenderBridge.cpp)
     menuAction(*this, "pack.install"); // a review screen first (PanelPacks.cpp)
     ImGui::Separator();
     drawBridgeMenu();
     drawBlenderMenu(); // the Blender bridge (PanelBlender.cpp)
     drawMayaMenu(); // the Maya bridge (PanelMaya.cpp)
     menuAction(*this, "file.capture_phone"); // the phone link (PanelPhone.cpp)
+    if (uiPrefs_.forgeDeck) menuAction(*this, "file.forge_deck"); // Forge Deck prototype (PanelDeck.cpp): Preferences > Experimental
     ImGui::Separator();
     menuAction(*this, "file.quit");
 }
@@ -649,6 +700,7 @@ void App::drawPalette_Help() {
     menuAction(*this, "help.discord");
     menuAction(*this, "help.report");
     menuAction(*this, "help.log");
+    menuAction(*this, "help.log_copy"); // (Android keeps the folder out of the Files app: testers paste the log instead)
     menuAction(*this, "help.perf_trace");
     menuAction(*this, "help.feedback");
     menuAction(*this, "help.benchmark");
@@ -685,6 +737,10 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         drawHintsSection();
     }
+    if (subpalette("preferences.experimental", "Experimental")) {
+        tray::Section section;
+        drawExperimentalSection();
+    }
     if (subpalette("preferences.hotkeys", "Hotkeys")) {
         tray::Section section;
         config::drawHotkeysSection(*this);
@@ -692,6 +748,8 @@ void App::drawPalette_Preferences() {
     if (subpalette("preferences.display", "Display")) {
         tray::Section section;
         drawBackgroundControls("prefs");
+        ImGui::Spacing();
+        drawViewEffectsControls("prefs");
     }
     if (subpalette("preferences.library", "Library")) {
         tray::Section section;
@@ -717,6 +775,14 @@ void App::drawPalette_Preferences() {
             ImGui::Spacing();
             drawAiPrefsSection(); // the Hugging Face token
         }
+    }
+    if ((newerMenuRows() || python().enabled()) && subpalette("preferences.scripts", "Scripts")) {
+        tray::Section section;
+        drawPythonPrefs(); // Enable Python scripts (PanelPython.cpp)
+    }
+    if ((newerMenuRows() || renderBridgeSetUp()) && subpalette("preferences.render_bridge", "Render bridge")) {
+        tray::Section section;
+        drawRenderBridgePrefs(); // the render helper, the image editor, the Renders folder (PanelRenderBridge.cpp)
     }
     if (subpalette("preferences.updates", "Updates")) {
         tray::Section section;
@@ -771,6 +837,7 @@ void App::drawPalette_Render() {
     ImGui::TextDisabled("%s", tr("View resolution"));
     ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});
     drawViewsSection();
+    drawReferencesSection(); // View > Reference images (ReferenceImages.cpp)
     actionRow(*this, {"view.frame", "view.fullscreen"});
     actionRow(*this, {"ui.library", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
 }
@@ -815,6 +882,7 @@ void App::drawPalette_Script() {
     actionRow(*this, {"ui.console"});
     actionRow(*this, {"script.run_file"});
     actionRow(*this, {"script.copy_session", "script.clear_console"});
+    drawPythonScripts(); // the .py files in the Scripts folder (PanelPython.cpp)
     if (!any)
         hint(*this, "Every action is a script command: run them with --script \"subdivide; remesh resolution=200\" or the "
              "sculptforge-cli tool.");
@@ -906,10 +974,7 @@ void App::drawPalette_Tool() {
             ui::HelpAction(*this, "geometry.remesh");
         }
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(-1);
-        tray::SliderInt("##voxres", &voxelResolution_, 32, 512, "Resolution %d"); // as the remesh command (fxrtst 11-05)
-        ui::HelpText("Resolution", nullptr, "Voxels across the model: higher keeps more detail and makes more triangles.",
-                     "Tool > Remesh");
+        drawVoxelResolution(); // the slider (32-4096) and the estimate under it (PanelRetopo.cpp)
         if (voxelRemesh_) {
             if (ImGui::Button(tr("Cancel##voxelremesh"), ImVec2(half, 0))) voxelRemesh_->cancel->store(true);
             ui::HelpText("Cancel", nullptr, "Stop the remesh; the Part stays as it is.", "Tool > Remesh");

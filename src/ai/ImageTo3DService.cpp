@@ -8,6 +8,8 @@
 #include "ai/Consent.h"
 #include "ai/GradioClient.h"
 #include "ai/Hyper3D.h"
+#include "ai/SpaceHealth.h"
+#include "ai/Tripo.h"
 #include "ai/Http.h"
 #include "core/Image.h"
 #include "core/ImageTo3D.h"
@@ -16,6 +18,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -95,7 +98,7 @@ GeneratorResult runFal(const AiSettings& s, const std::string& imagePath, const 
         return result;
     }
     std::string uri;
-    if (!prepareImageDataUri(imagePath, uri, result.error)) return result;
+    if (!prepareImageDataUri(imagePath, uri, result.error, s.cutImageBackground)) return result;
     return runFalRequest(s, s.falModel, falSubmitBody(s.falModel, uri), outputStem, p);
 }
 
@@ -194,7 +197,7 @@ GeneratorResult runMeshy(const AiSettings& s, const std::string& imagePath, cons
         return result;
     }
     std::string uri;
-    if (!prepareImageDataUri(imagePath, uri, result.error)) return result;
+    if (!prepareImageDataUri(imagePath, uri, result.error, s.cutImageBackground)) return result;
     return runMeshyRequest(s, "/openapi/v1/image-to-3d", meshySubmitBody(s.meshyModel, uri), outputStem, p);
 }
 
@@ -270,18 +273,21 @@ GeneratorResult runMeshyRequest(const AiSettings& s, const std::string& taskPath
 
 // `imagePath` or `prompt` (text to 3D) - exactly one is used.
 GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath, const std::string& prompt,
-                               const std::string& outputStem, GenerationProgress* p) {
+                               const std::string& outputStem, GenerationProgress* p, const HfPreset* chosen = nullptr) {
     GeneratorResult result;
     const bool text = !prompt.empty();
-    const HfPreset* preset = &resolveHfPreset(s, text, &result.note);
-    if (!result.note.empty()) status(p, result.note);
+    const HfPreset* preset = chosen;
+    if (!preset) {
+        preset = &resolveHfPreset(s, text, &result.note);
+        if (!result.note.empty()) status(p, result.note);
+    }
     status(p, "Connecting to " + std::string(preset->label) + "...");
     GradioClient client;
     if (!client.connect(preset->space, s.resolvedHfToken(), result.error)) return result;
     Json image;
     if (!text) {
         std::string png;
-        if (!prepareImagePng(imagePath, png, result.error)) return result;
+        if (!prepareImagePng(imagePath, png, result.error, s.cutImageBackground)) return result;
         if (!client.upload(png, "input.png", image, result.error)) return result;
     }
 
@@ -291,32 +297,38 @@ GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath
             result.error = "Cancelled";
             return result;
         }
-        std::vector<Json> args;
-        for (const auto& a : step.args) {
-            if (a == "$IMG") {
-                args.push_back(image);
-            } else if (a == "$PROMPT") {
-                args.push_back(Json(prompt));
-            } else if (a.rfind("$OUT", 0) == 0) {
+        auto resolve = [&](const std::string& a) {
+            if (a == "$IMG") return image;
+            if (a == "$PROMPT") return Json(prompt);
+            if (a.rfind("$OUT", 0) == 0) {
                 const size_t n = size_t(std::stoi(a.substr(4)));
-                args.push_back(n < firstOutputs.size() ? firstOutputs[n] : Json());
-            } else {
-                Json v;
-                std::string err;
-                Json::parse(a, v, err);
-                args.push_back(v);
+                return n < firstOutputs.size() ? firstOutputs[n] : Json();
             }
-        }
+            Json v;
+            std::string err;
+            Json::parse(a, v, err);
+            return v;
+        };
+        std::vector<Json> args;
+        for (const auto& a : step.args) args.push_back(resolve(a));
+        std::vector<GradioSlot> slots;
+        for (const auto& sl : step.slots) slots.push_back({sl.label, sl.type, resolve(sl.arg), sl.optional});
         std::vector<Json> outputs;
-        if (!client.call(step.api, args, outputs, result.error, [&](const std::string& text) { status(p, text); }))
+        if (!client.call(step.api, args, outputs, result.error, [&](const std::string& text) { status(p, text); }, slots,
+                         [p] { return p && p->cancel.load(); })) {
+            std::fprintf(stderr, "Generate 3D: %s (%s) '%s' failed: %s\n", preset->label, preset->space, step.api, result.error.c_str());
+            result.error = std::string(preset->label) + ": " + result.error;
             return result;
+        }
         Json first = outputs.empty() ? Json() : outputs[0];
         if (first.isObject() && first["value"].isObject()) first = first["value"]; // unwrap component updates
         firstOutputs.push_back(first);
     }
     const std::string url = client.lastModelUrl();
     if (url.empty()) {
-        result.error = "The Space finished but returned no 3D model";
+        result.error = std::string(preset->label) + " finished without a model: try again or another provider";
+        std::fprintf(stderr, "Generate 3D: %s (%s) finished OK but returned no model file (%zu outputs)\n", preset->label, preset->space,
+                firstOutputs.size());
         return result;
     }
     status(p, "Downloading model...");
@@ -334,6 +346,30 @@ GeneratorResult runHuggingFace(const AiSettings& s, const std::string& imagePath
     result.ok = true;
     result.outputPath = path;
     return result;
+}
+
+// The free Hunyuan3D Spaces take turns: when the chosen one is down or not answering, the next answers instead (a quota,
+// a missing token or a Cancel doesn't move on: the others would say the same). Said in the result's note.
+GeneratorResult runHuggingFaceWithFallback(const AiSettings& s, const std::string& imagePath, const std::string& prompt,
+                                           const std::string& outputStem, GenerationProgress* p) {
+    std::string note;
+    const HfPreset& first = resolveHfPreset(s, !prompt.empty(), &note);
+    GeneratorResult r = runHuggingFace(s, imagePath, prompt, outputStem, p, &first);
+    r.note = note;
+    if (r.ok || !hunyuanModel(first.id) || !gradioSpaceUnavailable(r.error)) return r;
+    const auto& presets = prompt.empty() ? hfPresets() : hfTextPresets();
+    for (const HfPreset& next : presets) {
+        if (&next == &first || !hunyuanModel(next.id) || (p && p->cancel)) continue;
+        status(p, std::string(first.label) + " isn't answering: trying " + next.label + "...");
+        GeneratorResult again = runHuggingFace(s, imagePath, prompt, outputStem, p, &next);
+        if (again.ok) {
+            again.note = (note.empty() ? "" : note + " ") + std::string(first.label) + " wasn't answering; " + next.label + " ran instead.";
+            return again;
+        }
+        if (!gradioSpaceUnavailable(again.error)) return again;
+        r.error += "; " + again.error;
+    }
+    return r;
 }
 
 GeneratorResult runInflate(const std::string& imagePath, const std::string& outputStem, GenerationProgress* p) {
@@ -366,6 +402,25 @@ const std::vector<ServiceModel>& falModels() {
     return models;
 }
 
+const std::vector<RecommendedModel>& recommendedModels() {
+    // (labels are product names and prices are numbers: neither is translated; the notes are)
+    static const std::vector<RecommendedModel> list = {
+        {"tripo", tripo::kDefaultModel, "Tripo v3.1", "~$0.20", "About 2 minutes and 20 credits a picture (10 for text). Fast and good all-round.",
+         tripo::kKeyUrl, true},
+        {"fal", "fal-ai/trellis-2", "TRELLIS.2 (fal.ai)", "$0.25-0.35", "Sharp, clean shapes with fine detail.",
+         "https://fal.ai/dashboard/keys", true},
+        {"fal", "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d", "Hunyuan3D 3.1 (fal.ai)", "from $0.375",
+         "Clean geometry. Not licensed in the EU, UK or South Korea.", "https://fal.ai/dashboard/keys", true},
+        {"fal", "fal-ai/hyper3d/rodin/v2.5", "Rodin 2.5 (fal.ai)", "$0.40", "The most photographic look.",
+         "https://fal.ai/dashboard/keys", true},
+        {"huggingface", "hunyuan3d-2.1", "Hunyuan3D 2.1", "Free", "Shared GPUs with a daily allowance: no key, no account.", "", false},
+        {"huggingface", "hunyuan3d-2-turbo", "Hunyuan3D 2 mini Turbo", "Free", "The fastest free one; works from text too.", "", true},
+        {"huggingface", "trellis-2", "TRELLIS.2", "Free", "The best free detail; needs a free Hugging Face token.",
+         "https://huggingface.co/settings/tokens", false},
+    };
+    return list;
+}
+
 bool hunyuanModel(std::string_view id) {
     for (size_t i = 0; i + 7 <= id.size(); ++i) {
         std::string word(id.substr(i, 7));
@@ -394,7 +449,19 @@ const HfPreset& resolveHfPreset(const AiSettings& s, bool text, std::string* not
         return *find("hunyuan3d-2.1");
     }
     const HfPreset* preset = find(s.hfModel);
-    return preset ? *preset : presets[0];
+    if (!preset) preset = &presets[0];
+    // The feed says this Space is switched off: the first that is up runs instead, with the reason (no hang).
+    if (health::of(preset->id).state == health::State::Off) {
+        const bool token = !s.resolvedHfToken().empty();
+        for (const HfPreset& next : presets) {
+            if (&next == preset || health::of(next.id).state == health::State::Off) continue;
+            if (!text && std::string_view(next.id) == "trellis-2" && !token) continue;
+            const std::string why = health::of(preset->id).note.empty() ? std::string("switched off") : health::of(preset->id).note;
+            if (note) *note = std::string(preset->label) + " isn't available (" + why + "); " + next.label + " runs instead.";
+            return next;
+        }
+    }
+    return *preset;
 }
 
 std::string base64Encode(const uint8_t* data, size_t size) {
@@ -412,7 +479,7 @@ std::string base64Encode(const uint8_t* data, size_t size) {
     return out;
 }
 
-bool prepareImagePng(const std::string& imagePath, std::string& png, std::string& error) {
+bool prepareImagePng(const std::string& imagePath, std::string& png, std::string& error, bool cutPlainBackground) {
     Image img;
     if (!Image::load(imagePath, img, error)) return false;
     if (img.width < 16 || img.height < 16) {
@@ -420,6 +487,13 @@ bool prepareImagePng(const std::string& imagePath, std::string& png, std::string
         return false;
     }
     // Reconstruction models work best with the subject centred and filling most of a square frame.
+    // A picture with a plain backdrop (a flat colour, a vignette, a plate behind the object) is cut out first: the models
+    // otherwise build the backdrop too (a plate came back as a slab through the model). Transparent pictures are left as they are.
+    if (cutPlainBackground) {
+        bool cut = false;
+        Image cutout = img.withoutPlainBackground(&cut);
+        if (cut) img = std::move(cutout);
+    }
     Image framed = img.framedSubject(0.08f).downscaled(1024);
     std::vector<uint8_t> bytes;
     if (!framed.encodePng(bytes)) {
@@ -430,18 +504,22 @@ bool prepareImagePng(const std::string& imagePath, std::string& png, std::string
     return true;
 }
 
-bool prepareImageDataUri(const std::string& imagePath, std::string& dataUri, std::string& error) {
+bool prepareImageDataUri(const std::string& imagePath, std::string& dataUri, std::string& error, bool cutPlainBackground) {
     std::string png;
-    if (!prepareImagePng(imagePath, png, error)) return false;
+    if (!prepareImagePng(imagePath, png, error, cutPlainBackground)) return false;
     dataUri = "data:image/png;base64," + base64Encode(reinterpret_cast<const uint8_t*>(png.data()), png.size());
     return true;
 }
 
+// The image presets send an empty text prompt (the Space's own default is null) where the Space has one; 2.1's state input has none.
+static const HfSlot kNoPrompt = {"Text Prompt", "textbox", "\"\"", true};
+
 const std::vector<HfPreset>& hfTextPresets() {
     static const std::vector<HfPreset> presets = {
         {"hunyuan3d-2-turbo", "Hunyuan3D 2 mini Turbo (Tencent) - free, fast", "https://tencent-hunyuan3d-2mini-turbo.hf.space",
-         {{"shape_generation", {"$PROMPT"}}}},
-        {"hunyuan3d-2", "Hunyuan3D 2 (Tencent) - free", "https://tencent-hunyuan3d-2.hf.space", {{"shape_generation", {"$PROMPT"}}}},
+         {{"shape_generation", {}, {{"Text Prompt", "textbox", "$PROMPT"}}}}},
+        {"hunyuan3d-2", "Hunyuan3D 2 (Tencent) - free", "https://tencent-hunyuan3d-2.hf.space",
+         {{"shape_generation", {}, {{"Text Prompt", "textbox", "$PROMPT"}}}}},
     };
     return presets;
 }
@@ -450,13 +528,16 @@ const std::vector<HfPreset>& hfPresets() {
     static const std::vector<HfPreset> presets = {
         // Hunyuan3D 2.1 first: the default, works with no token. resolveHfPreset() falls back to it.
         {"hunyuan3d-2.1", "Hunyuan3D 2.1 (Tencent) - free, no token", "https://tencent-hunyuan3d-2-1.hf.space",
-         {{"shape_generation", {"$IMG"}}}},
+         {{"shape_generation", {}, {{"Image", "image", "$IMG"}, kNoPrompt}}}},
         {"trellis-2", "TRELLIS.2 (Microsoft, MIT) - Best detail (needs token)", "https://microsoft-trellis-2.hf.space",
-         {{"start_session", {}}, {"preprocess_image", {"$IMG"}}, {"image_to_3d", {"$OUT1"}}, {"extract_glb", {}}}},
+         {{"start_session", {}},
+          {"preprocess_image", {}, {{"", "image", "$IMG"}}},
+          {"image_to_3d", {}, {{"", "image", "$OUT1"}}},
+          {"extract_glb", {}}}},
         {"hunyuan3d-2-turbo", "Hunyuan3D 2 mini Turbo (Tencent) - free, fastest", "https://tencent-hunyuan3d-2mini-turbo.hf.space",
-         {{"shape_generation", {"\"\"", "$IMG"}}}},
+         {{"shape_generation", {}, {{"Image", "image", "$IMG"}, kNoPrompt}}}},
         {"hunyuan3d-2", "Hunyuan3D 2 (Tencent) - free", "https://tencent-hunyuan3d-2.hf.space",
-         {{"shape_generation", {"\"\"", "$IMG"}}}},
+         {{"shape_generation", {}, {{"Image", "image", "$IMG"}, kNoPrompt}}}},
         {"stable-fast-3d", "Stable Fast 3D (Stability AI) - free, quick and simple", "https://stabilityai-stable-fast-3d.hf.space",
          // As its UI does: check the background, remove it (fills the session state), then Run.
          {{"requires_bg_remove", {"$IMG", "0.85"}},
@@ -559,6 +640,7 @@ bool serviceAllowed(const AiSettings& s, std::string& error) {
     const std::string& svc = s.generatorService;
     if (svc == "inflate") return true;
     if (svc == "hyper3d") return aiRequestAllowed(svc, std::string(hyper3d::kApiBase) + "/rodin", error); // (pinned)
+    if (svc == "tripo") return aiRequestAllowed(svc, std::string(tripo::kApiBase) + "/generation/image-to-model", error); // (pinned)
     const std::string url = svc == "fal" ? s.falEndpoint : svc == "meshy" ? s.meshyEndpoint : svc == "comfyui" ? s.comfyUrl
                             : svc == "command" ? std::string() : std::string("https://huggingface.co/");
     if (url.empty()) return policy::aiProviderAllowed(svc, &error);
@@ -586,8 +668,68 @@ void setGeneratorStubForTests(GeneratorStub s) {
     stub = std::move(s);
 }
 
+namespace {
+
+bool paidService(const std::string& svc) {
+    return svc == "fal" || svc == "meshy" || svc == "hyper3d" || svc == "tripo";
+}
+
+// Worth another provider: the service was unreachable, timed out or was busy (not a bad key, no credits or a refusal,
+// which any other provider would not share and the artist must fix). The direct providers say so (result.transient);
+// the older ones by the words they have always used.
+bool transientFailure(const GeneratorResult& r) {
+    return r.transient || r.error.rfind("Could not reach ", 0) == 0 || r.error.rfind("Timed out waiting for ", 0) == 0;
+}
+
+// A paid service that couldn't be reached falls back to the free Hugging Face models, and only if the artist already
+// allowed them (their first-use notice): never to another paid service, so nothing is billed the artist didn't choose.
+// Anything else (a bad key, no credits, a refusal, Cancel) is reported as it is. The note says what ran instead.
+GeneratorResult withFreeFallback(const AiSettings& s, GeneratorResult r, const std::string& imagePath, const std::string& prompt,
+                                 const std::string& outputStem, GenerationProgress* p) {
+    if (r.ok || !paidService(s.generatorService) || !transientFailure(r) || (p && p->cancel)) return r;
+    AiSettings free = s;
+    free.generatorService = "huggingface";
+    std::string why;
+    if (!serviceAllowed(free, why) || !checkSendAllowed(free, generateTarget(free, !prompt.empty()), why)) {
+        r.error += ". The free models were not tried (" + why + ")";
+        return r;
+    }
+    const HfPreset& next = resolveHfPreset(free, !prompt.empty());
+    if (health::of(next.id).state == health::State::Off) { // (the feed says they're down too: no second hang)
+        r.error += ". The free models are " + health::reason(health::of(next.id)) + " too";
+        return r;
+    }
+    status(p, "That service isn't answering: trying " + std::string(next.label) + "...");
+    GeneratorResult again = runHuggingFaceWithFallback(free, imagePath, prompt, outputStem, p);
+    if (again.ok) {
+        again.note = r.error + ". " + next.label + " ran instead (free).";
+        return again;
+    }
+    r.error += ". The free model didn't answer either: " + again.error;
+    return r;
+}
+
+GeneratorResult generate3DOnce(const AiSettings& s, const std::string& imagePath, const std::string& outputStem,
+                               GenerationProgress* progress);
+GeneratorResult generate3DFromTextOnce(const AiSettings& s, const std::string& prompt, const std::string& outputStem,
+                                       GenerationProgress* progress);
+
+} // namespace
+
 GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, const std::string& outputStem,
                            GenerationProgress* progress) {
+    return withFreeFallback(s, generate3DOnce(s, imagePath, outputStem, progress), imagePath, {}, outputStem, progress);
+}
+
+GeneratorResult generate3DFromText(const AiSettings& s, const std::string& prompt, const std::string& outputStem,
+                                   GenerationProgress* progress) {
+    return withFreeFallback(s, generate3DFromTextOnce(s, prompt, outputStem, progress), {}, prompt, outputStem, progress);
+}
+
+namespace {
+
+GeneratorResult generate3DOnce(const AiSettings& s, const std::string& imagePath, const std::string& outputStem,
+                               GenerationProgress* progress) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
     if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
     if (std::string why; !generateKeyMissing(s) && !checkSendAllowed(s, generateTarget(s, false), why))
@@ -595,6 +737,7 @@ GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, co
     if (GeneratorResult r; stubbed(outputStem, progress, r)) return r;
     if (s.generatorService == "meshy") return runMeshy(s, imagePath, outputStem, progress);
     if (s.generatorService == "hyper3d") return hyper3d::run(s, imagePath, {}, progress);
+    if (s.generatorService == "tripo") return tripo::run(s, imagePath, {}, progress);
     if (s.generatorService == "command") {
         status(progress, "Running your generator...");
         return runGenerator(s.generatorCommand, imagePath, outputStem + ".glb");
@@ -602,8 +745,10 @@ GeneratorResult generate3D(const AiSettings& s, const std::string& imagePath, co
     if (s.generatorService == "inflate") return runInflate(imagePath, outputStem, progress);
     if (s.generatorService == "fal") return runFal(s, imagePath, outputStem, progress);
     if (s.generatorService == "comfyui") return comfy::run(s, {}, imagePath, {}, outputStem, progress);
-    return runHuggingFace(s, imagePath, {}, outputStem, progress);
+    return runHuggingFaceWithFallback(s, imagePath, {}, outputStem, progress);
 }
+
+} // namespace
 
 std::string meshyTextBody(const std::string& model, const std::string& prompt) {
     Json body = Json::object();
@@ -625,8 +770,10 @@ std::string falTextBody(const std::string& prompt, const std::string& model) {
     return body.dump();
 }
 
-GeneratorResult generate3DFromText(const AiSettings& s, const std::string& prompt, const std::string& outputStem,
-                                   GenerationProgress* progress) {
+namespace {
+
+GeneratorResult generate3DFromTextOnce(const AiSettings& s, const std::string& prompt, const std::string& outputStem,
+                                       GenerationProgress* progress) {
     if (!aiEnabled()) return {false, {}, aiOffError()};
     if (std::string why; !serviceAllowed(s, why)) return {false, {}, why};
     if (std::string why; !generateKeyMissing(s) && !checkSendAllowed(s, generateTarget(s, true), why))
@@ -638,15 +785,18 @@ GeneratorResult generate3DFromText(const AiSettings& s, const std::string& promp
     }
     if (stubbed(outputStem, progress, result)) return result;
     if (s.generatorService == "hyper3d") return hyper3d::run(s, {}, prompt, progress);
+    if (s.generatorService == "tripo") return tripo::run(s, {}, prompt, progress);
     if (s.generatorService == "meshy") return runMeshyRequest(s, "/openapi/v2/text-to-3d", meshyTextBody(s.meshyModel, prompt), outputStem, progress);
     if (s.generatorService == "fal")
         return runFalRequest(s, falTextModel(s.falModel), falTextBody(prompt, s.falModel), outputStem, progress);
     if (s.generatorService == "comfyui") return comfy::run(s, {}, {}, prompt, outputStem, progress);
     if (s.generatorService == "command" || s.generatorService == "inflate") {
-        result.error = "Text to 3D needs Hugging Face (free), fal.ai, Meshy, Hyper3D or ComfyUI - pick one of those services";
+        result.error = "Text to 3D needs Hugging Face (free), fal.ai, Meshy, Hyper3D, Tripo or ComfyUI - pick one of those services";
         return result;
     }
-    return runHuggingFace(s, {}, prompt, outputStem, progress);
+    return runHuggingFaceWithFallback(s, {}, prompt, outputStem, progress);
 }
+
+} // namespace
 
 } // namespace sf::ai

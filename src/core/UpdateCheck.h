@@ -28,6 +28,14 @@ struct SupportFeed {
     int memberRequests = -1;           // features in this release that members asked for
 };
 
+// How the free Hugging Face Spaces behind Generate 3D are doing (the feed's optional "ai3d" block, ai/SpaceHealth.h):
+// {"ai3d": {"spaces": {"trellis-2": {"state": "off", "note": "Switched off by its author"}}}}. A script checks the
+// Spaces and writes it; the app only reads what the update check already fetched (no extra request). state is "up",
+// "slow" or "off"; anything else is dropped. id: letters, digits, '.', '-' (40 at most); note printable text (96 bytes).
+struct SpaceHealthFeed {
+    std::string id, state, note;
+};
+
 struct UpdateInfo {
     std::string version;                 // "0.6.0"
     std::string downloadUrl;             // the download page
@@ -40,6 +48,7 @@ struct UpdateInfo {
     // '-' (32 at most), title printable text (48 bytes at most).
     std::string challengeId, challengeTitle;
     SupportFeed support;
+    std::vector<SpaceHealthFeed> spaceHealth; // at most 16
 };
 
 // Which releases the update check offers (Preferences > Updates): Stable, or Preview, which adds the betas
@@ -72,5 +81,17 @@ ShownVersion shownVersion(const std::string& version, const std::string& prerele
 inline bool updateCheckDue(int64_t lastCheck, int64_t now) {
     return lastCheck <= 0 || now < lastCheck || now - lastCheck >= kUpdateCheckInterval;
 }
+
+// The Windows installer's "Check for updates once a day" box: the installer writes bin/installer.json
+// ({"check_updates": true|false}) next to the program. The app applies the choice once per installer run, so a reinstall
+// sets it again and the Preferences > Updates switch is free to change it in between. `stamp` is the file's modification
+// time (seconds), `appliedStamp` the one already applied (kept in the preferences). Returns true when the setting
+// changed or a new run was recorded (the preferences need saving). A portable build has no file: nothing happens.
+struct InstallerChoice {
+    bool present = false;       // the file exists and has the key
+    bool checkUpdates = true;
+};
+InstallerChoice parseInstallerChoice(const std::string& json);
+bool applyInstallerChoice(const InstallerChoice& choice, int64_t stamp, int64_t& appliedStamp, bool& checkUpdates);
 
 } // namespace sf

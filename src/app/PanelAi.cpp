@@ -13,6 +13,7 @@
 
 #include "ai/AiCommands.h"
 #include "ai/Oidc.h"
+#include "ai/SpaceHealth.h"
 #include "core/AuditLog.h"
 #include "core/ManagedPolicy.h"
 
@@ -48,6 +49,27 @@ void App::registerPolicyTestCommand() {
                        applyAiFeatures(ai::aiFeaturesAllowed(true), false); // (UI tests start with AI on)
                        applyUpdatePolicy();
                        return {true, policy::describe(policy::current())};
+                   }});
+    // UI tests only: what the update feed's "ai3d" block would say about the free Spaces (ai/SpaceHealth.h), as
+    // "id=state:note;id=state" (state up, slow or off); "" clears it.
+    commands_.add({"ui_space_health", "UI tests: set the free Spaces' health as the update feed would (\"id=off:note;id=slow\"; \"\" clears).",
+                   {{"spaces", ParamSpec::Type::String, "id=state[:note] entries separated by ';'.", true}},
+                   [](Document&, const Args& a) -> CommandResult {
+                       std::vector<SpaceHealthFeed> feed;
+                       const std::string text = argString(a, "spaces");
+                       size_t at = 0;
+                       while (at < text.size()) {
+                           const size_t end = std::min(text.find(';', at), text.size());
+                           const std::string item = text.substr(at, end - at);
+                           at = end + 1;
+                           const size_t eq = item.find('=');
+                           if (eq == std::string::npos) continue;
+                           const std::string rest = item.substr(eq + 1);
+                           const size_t colon = rest.find(':');
+                           feed.push_back({item.substr(0, eq), rest.substr(0, colon), colon == std::string::npos ? std::string() : rest.substr(colon + 1)});
+                       }
+                       ai::health::set(feed);
+                       return {true, std::to_string(feed.size()) + " Spaces"};
                    }});
 }
 

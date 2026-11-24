@@ -1,0 +1,39 @@
+# e2e: cloth. A plane Part dropped on a ball (Tool > Drape > Simulate): it falls, wraps the ball and comes to rest as
+# one undo step. At rest means at rest: the sheet doesn't creep afterwards, doesn't go through the ball and keeps its
+# triangles; undo puts the plane back exactly.
+run ui_look look=classic layout=classic
+run new_plane resolution=80
+run transform translate=0,0.62,0
+run part_append type=sphere size=0.5 name=Ball
+run transform translate=-1.6,-0.62,0
+run part_select name=Plane
+camera 20 -25
+zoom 1.6
+remember triangles tris
+click "Tool##palette.tool"
+click "Drape##tool.drape"
+snapshot
+click "Simulate##drape"
+wait_value drape_running == 1 10
+wait_value drape_running == 0 60
+wait_idle 30
+expect_value moved > 3000
+expect_value can_undo == 1
+expect_value triangles == $tris
+expect_value open_edges == 320   # the plane's border, nothing torn
+
+# At rest: a second later the sheet hasn't moved.
+remember moved_sum at_rest
+wait 1
+expect_value moved_sum < $at_rest*1.001
+expect_value moved_sum > $at_rest*0.999
+expect_value drape_running == 0
+
+# Wrapped, not fallen through: the sheet is still above the ball's lower half (centre y stays above the start - 0.7).
+expect_value center_y > -0.3
+shot cloth_rest
+
+key ctrl+z
+expect_value moved == 0
+key ctrl+shift+z
+expect_value moved > 3000

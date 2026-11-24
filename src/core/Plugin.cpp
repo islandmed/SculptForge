@@ -754,7 +754,8 @@ bool writeOff(const std::map<std::string, std::string>& off, std::string& error)
     for (const auto& [sha, why] : off) j.set(sha, why);
     std::error_code ec;
     fs::create_directories(u8path(packsRoot()), ec);
-    const fs::path tmp = offPath().string() + ".tmp";
+    fs::path tmp = offPath();
+    tmp += ".tmp";
     {
         std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
         f << j.dump(true) << "\n";

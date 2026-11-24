@@ -1,0 +1,116 @@
+# Preferences > Input > Mouse orbit speed (hullalmiah on Discord, #help: the orbit was too fast): a
+# rotation drag with the mouse turns the view by 0.008 radians per pixel times the setting, in every input style; the
+# pen keeps its own View speed;
+# the page fits at 100% and 200% UI scale.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+expect_value mouse_orbit_speed == 100
+
+# A drag over the background beside the model, in each style (Classic: left drag; Maya and Blender:
+# Alt+left drag), from the front. 1x is the turn it always was; 0.3x turns by 0.3 of it; 2x by twice.
+input_style classic
+camera 0 0
+drag_path -0.2 0.5 -0.4 0.5
+remember camera_yaw classic1
+expect_value camera_yaw != 0
+camera 0 0
+mouse_orbit_speed 0.3
+drag_path -0.2 0.5 -0.4 0.5
+expect_value camera_yaw > $classic1*0.28
+expect_value camera_yaw < $classic1*0.32
+camera 0 0
+mouse_orbit_speed 2
+drag_path -0.2 0.5 -0.4 0.5
+expect_value camera_yaw > $classic1*1.95
+expect_value camera_yaw < $classic1*2.05
+
+mouse_orbit_speed 1
+input_style maya
+camera 0 0
+hold alt
+drag_path -0.2 0.5 -0.4 0.5
+hold none
+remember camera_yaw maya1
+expect_value camera_yaw != 0
+camera 0 0
+mouse_orbit_speed 0.3
+hold alt
+drag_path -0.2 0.5 -0.4 0.5
+hold none
+expect_value camera_yaw > $maya1*0.28
+expect_value camera_yaw < $maya1*0.32
+
+mouse_orbit_speed 1
+input_style blender
+camera 0 0
+hold alt
+drag_path -0.2 0.5 -0.4 0.5
+hold none
+remember camera_yaw blender1
+expect_value camera_yaw != 0
+camera 0 0
+mouse_orbit_speed 0.3
+hold alt
+drag_path -0.2 0.5 -0.4 0.5
+hold none
+expect_value camera_yaw > $blender1*0.28
+expect_value camera_yaw < $blender1*0.32
+
+# The page: the row reads at 100% and at 200% UI scale (2880 px).
+mouse_orbit_speed 1
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+expect "##input.mouse_orbit_speed"
+expect_text Mouse orbit speed
+expect_text 1.00x
+shot mouse_orbit_pref
+ui_scale 200
+hover "##input.mouse_orbit_speed"
+expect_text 1.00x
+shot mouse_orbit_pref_200
+ui_scale 100
+
+# Saved with the preferences: a ui.json with the speed set reads back; one from before it has 1x.
+restart data/prefs/ui_mouse_orbit.json
+wait 0.2
+expect_value mouse_orbit_speed == 40
+restart data/prefs/ui_0_11_0.json
+wait 0.2
+expect_value mouse_orbit_speed == 100
+
+# The pen's own drag (lower side button) is the View speed's alone: the mouse setting does not touch it (its yaw is
+# negative: a drag to the right).
+run new_sphere subdivisions=3   # (after the restarts above)
+input_style classic
+mouse_orbit_speed 1
+action view.reset      # (the pen starts on the model: the target moves to the pointer's depth, so the whole view is reset,
+wait 0.6               # and let it settle: the model is positioned by where it is on screen)
+pen_hover 0.5 0.5      # (a first pen drag from the mouse's place drops its first step: one to warm up)
+pen_button 1 down
+pen_hover 0.6 0.5
+pen_button 1 up
+action view.reset
+wait 0.6
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_hover 0.6 0.5
+pen_button 1 up
+remember camera_yaw pen1
+expect_value camera_yaw != 0
+action view.reset
+wait 0.6
+mouse_orbit_speed 0.3
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_hover 0.6 0.5
+pen_button 1 up
+remember camera_yaw pen3
+expect_value camera_yaw < $pen1*0.9      # (not scaled down by the mouse's 0.3x: the pen turns at least as far)
+mouse_orbit_speed 1
+action view.reset
+wait 0.6
+pen_hover 0.5 0.5
+pen_button 1 down
+pen_hover 0.6 0.5
+pen_button 1 up
+remember camera_yaw pen4

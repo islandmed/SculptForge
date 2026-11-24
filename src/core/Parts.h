@@ -10,6 +10,7 @@
 #include "core/Document.h"
 #include "io/MeshObject.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -28,6 +29,38 @@ Mesh mergeMeshes(const std::vector<const Mesh*>& meshes);
 Mesh placedMesh(const Mesh& mesh, const glm::mat4& transform);
 // Part `i`'s mesh where it is in the scene: the mesh itself when it isn't moved, else a placed copy in `scratch`.
 const Mesh& partPlacedMesh(const Document& doc, int i, Mesh& scratch);
+
+// Pointer travel (window points: a Retina screen needs no scaling) that turns an Alt+click on a Part into a drag. A
+// trackpad click wobbles a few points, which made a click look like a drag (and start a stroke) on macOS.
+constexpr float kPartClickSlop = 6.0f;
+// How far from the pointer a Part still counts for a Part click.
+constexpr float kPartPickTolerance = 8.0f;
+inline bool partClickIsDrag(float dx, float dy) { return dx * dx + dy * dy >= kPartClickSlop * kPartClickSlop; }
+
+// The visible Part a click at a screen point lands on (the nearest hit of `rayAt(x, y, origin, dir)`), or -1. With
+// `tolerance` > 0 (screen units) a thin or far Part just beside the pointer counts too, when it is in front of what the
+// pointer is exactly on and that is the Part `active` or nothing (Alt+click to select a Part: a click a few pixels off
+// a wire or an edge still finds it). `hit` gets the exact hit, or the nearby one.
+using PartRayFn = std::function<void(float x, float y, glm::vec3& origin, glm::vec3& dir)>;
+int pickPartAt(Document& doc, const PartRayFn& rayAt, float x, float y, float tolerance = 0.0f, int active = -1,
+               RayHit* hit = nullptr);
+
+// The visible Part (not `skip`) whose closed surface has the scene point inside it, or -1: the camera sitting inside
+// a head, the eye's view from within. The innermost when several enclose it.
+int partEnclosing(Document& doc, const glm::vec3& point, int skip = -1);
+
+// What the colour pick (C) finds under a screen point: the nearest hit across every visible Part, never only the active
+// one. The colour is that Part's texture or vertex paint under the point; a Part with neither gives `base` (the colour
+// the view shows it in). `hit` is in the Part's own space (what sampleColor and sampleTextureAt want). When nothing can
+// be picked `part` is -1 and `message` says why (shown to the user).
+struct PartColorPick {
+    int part = -1;
+    RayHit hit;
+    glm::vec3 colour{1.0f}; // linear
+    enum class From { None, Texture, VertexPaint, Base } from = From::None;
+    std::string message;
+};
+PartColorPick pickPartColor(Document& doc, const PartRayFn& rayAt, float x, float y, const glm::vec3& base);
 
 // The visible Parts merged into one mesh (for exporters that write a single
 // mesh), where they are in the scene. With one Part this is a copy of it, whether shown or not.

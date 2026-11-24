@@ -144,6 +144,7 @@ TierBudgets budgetsForTier(HwTier t) {
         b.focusGpuPoolMB = 2048;
         b.focusUpdateMs = 6.0;
         b.maxTextureSize = 16384;
+        b.microDrawAbove = 3;
         break;
     }
     return b;
@@ -169,6 +170,7 @@ const std::vector<TierBudgetField>& tierBudgetFields() {
             SF_FIELD(focusGpuPoolMB, U64, "Focus Detail GPU pool (MB)"),
             SF_FIELD(focusUpdateMs, Double, "Focus Detail work per frame (ms)"),
             SF_FIELD(focusLookaheadSeconds, Double, "Focus Detail brush look-ahead (s)"),
+            SF_FIELD(microDrawAbove, Int, "micro levels drawn above the stored one (close-ups)"),
             SF_FIELD(stillFrameMs, Double, "still frame GPU time before preview detail (ms)"),
             SF_FIELD(stillDelaySeconds, Double, "rest before full detail (s)"),
             SF_FIELD(motionBudgetFraction, Double, "triangle budget share while moving"),
@@ -390,9 +392,11 @@ std::vector<std::string> tierTurnsOn(HwTier tier, const TierBudgets& b) {
     std::vector<std::string> out;
     if (tier == HwTier::Floor) {
         out.push_back("Settings tuned for this machine, so sculpting stays smooth");
+#if !defined(_WIN32) // (Focus Detail streams on Linux and macOS for now: core/FocusDetail.cpp)
         out.push_back("Focus Detail keeps " + formatMegabytes(b.focusResidentMB) + " of full-resolution detail close by");
     } else {
         out.push_back("Focus Detail keeps " + formatMegabytes(b.focusResidentMB) + " of full-resolution detail close by, and streams it in faster");
+#endif
     }
     if (b.maxTextureSize >= 16384) out.push_back("16K paint and bake textures");
     out.push_back("Free memory is watched: if it gets tight, the tier steps down instead of running out");

@@ -34,6 +34,7 @@ jobs:
       CCACHE_DEPEND: 'true'
       SF_TEST_BUDGET: 150 # seconds per test, as ci.yml: software OpenGL on 4 cores
       SF_DEPS_CACHE: .deps
+      SF_IWYU_CXX: g++-11 # the Ubuntu 22.04 packages' standard library (tools/ci/iwyu_lite.py, run by tools/ci/t0.sh)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,8 +52,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo ./packaging/linux/install-build-deps.sh >/dev/null
-          sudo apt-get install -y -qq --no-install-recommends ccache ninja-build libgl1-mesa-dri libegl1 mold >/dev/null
-          python -m pip install -q numpy
+          sudo ./packaging/linux/apt-retry.sh install -y -qq --no-install-recommends ccache ninja-build libgl1-mesa-dri libegl1 mold g++-11 >/dev/null
+          python -m pip install -q numpy pytest
       - name: Compiler cache (restore main's)
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:

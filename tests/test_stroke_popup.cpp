@@ -8,6 +8,7 @@
 #include "core/StrokePopup.h"
 
 #include <cmath>
+#include <string>
 
 using namespace sf;
 
@@ -29,7 +30,7 @@ glm::vec2 centre(const StrokePopupGeometry& g, int item) { return g.itemMin(item
 } // namespace
 
 TEST(stroke_popup_items) {
-    CHECK(kStrokePopupItems == int(StrokeType::Count) + 5 + 7);
+    CHECK(kStrokePopupItems == int(StrokeType::Count) + 5 + 9);
     CHECK(strokePopupIsStroke(0));
     CHECK(strokePopupIsStroke(int(StrokeType::LazyMouse)));
     CHECK(!strokePopupIsStroke(kStrokePopupStrokes));
@@ -47,6 +48,26 @@ TEST(stroke_popup_items) {
     CHECK(strokeShapeLatch(StrokeShape::MaskRect) == StrokeLatch::Mask);
     CHECK(strokeShapeLatch(StrokeShape::CutLine) == StrokeLatch::Select);
     CHECK(strokeShapeLatch(StrokeShape::CutPolyline) == StrokeLatch::Select);
+}
+
+TEST(stroke_popup_modifier_keys_follow_the_input_style) {
+    auto is = [](int style, StrokeModifier m, const char* keys) { return std::string(strokeModifierKeys(style, m)) == keys; };
+    for (int style : {0, 1}) { // Classic and SculptForge
+        CHECK(is(style, StrokeModifier::Sub, "Alt"));
+        CHECK(is(style, StrokeModifier::Smooth, "Shift"));
+        CHECK(is(style, StrokeModifier::Mask, "Ctrl"));
+        CHECK(is(style, StrokeModifier::Select, "Ctrl+Shift"));
+    }
+    CHECK(is(2, StrokeModifier::Sub, "Ctrl")); // gh#233: Blender inverts with Ctrl and masks with Alt
+    CHECK(is(2, StrokeModifier::Smooth, "Shift"));
+    CHECK(is(2, StrokeModifier::Mask, "Alt"));
+    CHECK(is(2, StrokeModifier::Select, "Ctrl+Shift"));
+    CHECK(is(3, StrokeModifier::Sub, "Ctrl"));
+    CHECK(is(3, StrokeModifier::Mask, "Ctrl+Alt"));
+    CHECK(is(3, StrokeModifier::Select, "Ctrl+Shift"));
+    CHECK(is(1, StrokeModifier::Add, "")); // nothing to hold for Add, in every style
+    CHECK(is(-1, StrokeModifier::Mask, "Ctrl")); // out of range: clamped, as setInputStyle does
+    CHECK(is(7, StrokeModifier::Mask, "Ctrl+Alt"));
 }
 
 TEST(stroke_popup_every_item_hits_itself) {

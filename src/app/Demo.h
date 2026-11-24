@@ -35,6 +35,7 @@ class App;
 
 class Demo {
 public:
+    using TraceSample = std::array<float, 5>; // view_trace: yaw, pitch (degrees), target x y z (x100)
     explicit Demo(App& app) : app_(app) {}
 
     static std::vector<std::string> names();
@@ -51,7 +52,8 @@ public:
 
     // Screen rect of the most recent UI item with this label (text before "##" also matches;
     // "Window/label" picks the item in one window).
-    bool findItem(const std::string& label, ImVec2& center, bool* visible = nullptr, ImVec4* clip = nullptr) const;
+    bool findItem(const std::string& label, ImVec2& center, bool* visible = nullptr, ImVec4* clip = nullptr,
+                  ImVec4* rect = nullptr) const; // rect: the item's own box (min x, min y, max x, max y)
     static void beginFrame(); // clears the item table (called before ImGui::NewFrame)
     // Items drawn between these are also found as "NAME/label" (palettes in the shell's trays and drop-downs,
     // whose ImGui window is the tray, keep their panel names: "Parts/Append").
@@ -65,6 +67,10 @@ public:
     // open then ("Extract/Corners"). clippedLabels(scope) lists last frame's, all of them for an empty scope.
     static void noteClippedLabel(const std::string& label);
     static std::vector<std::string> clippedLabels(const std::string& scope);
+    // The full labels ("Adjust##stencil.adjust") of the items drawn last frame inside SCOPE that are within their window's
+    // sides (not pushed past a panel's edge), sorted: what a person can reach there. Vertical scrolling doesn't count.
+    static std::vector<std::string> scopeItems(const std::string& scope);
+    static std::vector<std::string> scopeItemsInOrder(const std::string& scope); // the same, in drawing order (dump_ui)
 
     // UI tests (UiTest.cpp). Steps that fail stop the run; failures() lists why.
     bool loadScript(const std::string& path, std::string& error);
@@ -125,7 +131,12 @@ private:
     double query(const std::string& name, bool& known) const;
     // Modes and the monkey (UiTestModes.cpp): their steps, values and generated cases.
     bool parseModeStep(int line, const std::vector<std::string>& words, std::string& error, bool& handled);
+    bool parseDragItemTo(int line, const std::vector<std::string>& words, std::string& error);
     double queryModes(const std::string& name, bool& known) const;
+    // The render matrix (UiTestRender.cpp): gl_limits, render_cell and their value.
+    bool parseRenderStep(int line, const std::vector<std::string>& words, std::string& error);
+    double queryRender(const std::string& name, bool& known) const;
+    double lastRenderCoverage_ = 0.0;
     int openEdges() const;
     bool buildModeMatrix(int line, const std::vector<std::string>& only, std::string& error);
     bool buildMonkey(int line, uint64_t seed, int count, std::string& error);
@@ -156,7 +167,7 @@ private:
     void penMove(float x, float y);                 // PEN_MOTION (+ mouse motion), touching or hovering
     void penPressure(float pressure);               // PEN_AXIS pressure
     void penTouch(bool down, bool eraser);          // PEN_DOWN / PEN_UP (+ left button)
-    void penButtonEvent(int button, bool down);     // PEN_BUTTON_DOWN / UP (+ SDL 3.4's mouse button)
+    void penButtonEvent(int button, bool down, const ImVec2* at = nullptr); // PEN_BUTTON_DOWN / UP (+ SDL 3.4's mouse button); at: the event's position
     void penStroke(std::function<ImVec2(float u)> path, float p0, float p1, bool eraser, bool leave, float seconds,
                    std::function<void()> afterSample = {}, // afterSample: e.g. a driver's stray mouse event
                    bool tail = false); // tail: the pressure falls to 0 over the last samples before the lift (#146)
@@ -247,6 +258,15 @@ private:
     // sdl_pen_mouse / pen_lost). A Huion-style driver also sends mouse events of its own (pen_stream huion).
     bool sdlPenMouse_ = true;
     bool huionStream_ = false;
+    bool mouseSteps_ = true; // (mouse_steps off: motion events without xrel / yrel)
+    bool lateRight_ = false, driverRightHeld_ = false; // (right_late)
+    bool viewTrace_ = false;             // view_trace on: penMove notes the camera
+    std::vector<TraceSample> viewTraceData_;
+    void checkViewTrace(int line, float ratio);
+    int kdeTick_ = 0;   // pen_stream kde_sparse: pen samples since the pointer last reported
+    int kdeStall_ = 0;  // pen_stream kde_stalled: pointer moves still to be sent after a button went down
+    int kdeStream_ = 0; // 1: tablet-protocol button and pointer click (pen_stream kde); 2: the pointer click only (kde_pointer); 3: kde_stalled; 4: kde_sparse   // pen_stream kde: the compositor maps the barrel buttons to a right / middle click and moves its own pointer with the pen (#216)
+    int driverRight_ = 0; // pen_stream right_after / right_first: the driver clicks the right mouse button for a pen button, after / before the pen's event
     // pen_rest on: the pen lies still in range and, as a real one does, sends a hair of tilt and sub-pixel motion
     // every frame (phoenix 11-05) until pen_rest off.
     bool penResting_ = false;
@@ -266,7 +286,10 @@ private:
     static constexpr SDL_MouseID kDriverMouse = 7; // the driver's own mouse device
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.
     std::vector<glm::vec3> basePositions_, baseNormals_;
+    std::vector<uint8_t> baseTexels_; // (snapshot: the texture's texels, for texture_changed)
+    std::vector<int16_t> baseMicro_; // (snapshot: the micro level's grid, for micro_moved)
     std::map<std::string, double> remembered_;
+    std::map<std::string, std::vector<std::string>> rememberedItems_; // remember_items NAME SCOPE
     // Simulated SpaceMouse (spacemouse* steps): an SDL virtual joystick with a SpaceMouse Compact's ids.
     SDL_JoystickID virtualSpaceMouse_ = 0;
     SDL_Joystick* virtualSpaceMouseHandle_ = nullptr;

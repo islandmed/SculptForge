@@ -144,7 +144,7 @@ jobs:
       - run: |
           python3 tools/media_takedown.py --self-test
           python3 tools/check_marks_media.py || { grep -q . <(python3 tools/check_marks_media.py 2>/dev/null | grep "not in tools/marks_media_cache.json") &&
-            sudo apt-get update -qq && sudo apt-get install -y -qq tesseract-ocr ffmpeg python3-pil >/dev/null && python3 tools/check_marks_media.py; }
+            sudo ./packaging/linux/apt-retry.sh update -qq && sudo ./packaging/linux/apt-retry.sh install -y -qq tesseract-ocr ffmpeg python3-pil >/dev/null && python3 tools/check_marks_media.py; }
 
   build:
     name: ${{ matrix.name }} (${{ matrix.shard }}/${{ matrix.shards }})
@@ -187,7 +187,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo ./packaging/linux/install-build-deps.sh
-          sudo apt-get install -y --no-install-recommends ccache xvfb libgl1-mesa-dri mold # mold: faster links (docs/build-speed.md)
+          sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends ccache xvfb libgl1-mesa-dri mold # mold: faster links (docs/build-speed.md)
       - name: ccache (macOS; the release binary, pinned by hash)
         if: runner.os == 'macOS'
         run: |
@@ -220,8 +220,8 @@ jobs:
           path: .ccache
           key: ccache-ci-${{ matrix.key }}.${{ github.sha }}
           restore-keys: ccache-ci-${{ matrix.key }}.
-      - name: NumPy for the Python API test
-        run: python -m pip install numpy
+      - name: NumPy and pytest for the Python API tests
+        run: python -m pip install numpy pytest
       # The configured build folder (CMake's cache with every compiler and library check, the fetched dependency
       # sources, the generated project), right after configure and before any compiling: a hit skips the minute or
       # more of checks (93 s on Windows). Exact key only: the runner image (compiler), Python and every CMake file, so
@@ -300,7 +300,7 @@ jobs:
           if-no-files-found: ignore
 
   # The Blender add-on inside Blender itself (the bpy wheel is Blender as a Python module), against
-  # sculptforge-cli: the oldest supported Blender (4.2 LTS, Python 3.11) and the newest.
+  # sculptforge-cli: the oldest supported Blender (4.2 LTS, Python 3.11), the newest, and the one before splats.
   blender-addon:
     name: Blender add-on (bpy ${{ matrix.bpy }})
     needs: changes
@@ -312,6 +312,7 @@ jobs:
         include:
           - { bpy: '4.2.0', python: '3.11' }
           - { bpy: '5.2.3', python: '3.13' }
+          - { bpy: '5.3.0', python: '3.13' } # first with Gaussian splats
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_BASEDIR: ${{ github.workspace }}
@@ -331,7 +332,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: |
           sudo ./packaging/linux/install-build-deps.sh
-          sudo apt-get install -y --no-install-recommends ccache
+          sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends ccache
       - name: Compiler cache (restore)
         uses: actions/cache/restore@v5
         with:
@@ -367,7 +368,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}
-    container: ${{ matrix.image }}
+    container:
+      image: ${{ matrix.image }}
+      # 11-17: rockylinux:9 was republished without PATH in its config; a step's GITHUB_PATH then left PATH without /usr/bin ("sh" not found).
+      env: { PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" }
     strategy:
       fail-fast: false
       matrix:
@@ -410,7 +414,7 @@ jobs:
           f=$(tools/ci/fetch.sh "https://github.com/astral-sh/python-build-standalone/releases/download/20251014/cpython-3.13.9%2B20251014-$(uname -m)-unknown-linux-gnu-install_only_stripped.tar.gz" $sum)
           tar xzf "$f" -C /opt # /opt/python
           /opt/python/bin/python3.13 -m venv /opt/py313
-          /opt/py313/bin/python -m pip install --retries 8 --timeout 60 numpy
+          /opt/py313/bin/python -m pip install --retries 8 --timeout 60 numpy pytest
           echo "PYTHON313=/opt/py313/bin/python" >> "$GITHUB_ENV"
       - name: Build with GCC 14
         run: |
@@ -432,7 +436,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure -LE 'ui|nightly' -j 4
       - name: Check binary compatibility (glibc <= ${{ matrix.glibc }})
         run: |
-          for f in build/sculptforge build/sculptforge-cli build/sculptforge*.so; do
+          for f in build/sculptforge build/sculptforge-cli build/python-package/sculptforge/_core*.so; do
             max=$(objdump -T "$f" | grep -o 'GLIBC_[0-9.]*' | sort -V | tail -1)
             echo "$f needs $max"
             [ "$(printf '%s\n' "GLIBC_${{ matrix.glibc }}" "$max" | sort -V | tail -1)" = "GLIBC_${{ matrix.glibc }}" ]
@@ -440,9 +444,12 @@ jobs:
 
   # The oldest Linux headers the packages build against (the .deb/AppImage job runs on Ubuntu 22.04: wayland 1.20,
   # older than 24.04's 1.22 and EL8/9's 1.21), on every code change, not just full runs: SDL 3.4.18 named a
-  # wayland 1.24 enum and broke the 24.04 builds unseen (11-07). Builds only the fetched SDL, a few minutes.
+  # wayland 1.24 enum and broke the 24.04 builds unseen (11-07). Builds only the fetched SDL, a few minutes. Also every
+  # src/ and tests/ .cpp, syntax-checked without the precompiled headers (tools/ci/iwyu_lite.py): 22.04's ccache is older
+  # than 4.8, so the packages build there without the PCH, and a missing standard #include (0.13.11: std::memcmp in
+  # tests/test_texture.cpp) compiled everywhere else and failed only at the stage.
   oldest-linux:
-    name: Oldest Linux headers (Ubuntu 22.04, SDL)
+    name: Oldest Linux headers (Ubuntu 22.04, SDL, no PCH)
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ${{ vars.SF_RUNNER_LINUX_OLD || 'ubuntu-22.04' }}
@@ -460,10 +467,12 @@ jobs:
       - name: Configure and build SDL3 (Wayland and X11 on, as the packages)
         run: |
           pkg-config --modversion wayland-client
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_TESTS=OFF \
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
             -DSCULPTFORGE_MOLD=OFF -DSDL_WAYLAND=ON -DSDL_X11=ON
           cmake --build build --target SDL3-static -j4
           find build -name SDL_waylandevents.c.o | grep -q . # Wayland really built, not quietly left out
+      - name: Every source without the precompiled headers (the packages' compiler and standard library)
+        run: python3 tools/ci/iwyu_lite.py --build build -j 4 --all
 
   # The checks branch protection requires, by name. Each passes when the build and test jobs passed or were skipped
   # (a website-only change); a failure anywhere fails them all, and the run shows which job failed.

@@ -596,6 +596,13 @@ std::string windowsHelperScript(const Install& install, const Download& d, unsig
          "  try { Move-Item -LiteralPath $root -Destination $old; $moved = $true } catch { Start-Sleep -Milliseconds 500 } }\n";
     s += "if (-not $moved) { Remove-Item -LiteralPath $new -Recurse -Force; exit 5 }\n";
     s += "Move-Item -LiteralPath $src -Destination $root\n";
+    // A copy on a stick keeps its settings in bin/data (core/DataDir.h): carried over. The new zip ships portable.txt; a copy
+    // that had no marker (the install script's, or one whose owner deleted it) is still per-user afterwards.
+    s += "$oldBin = Join-Path $old 'bin'; $newBin = Join-Path $root 'bin'\n";
+    s += "if ((Test-Path -LiteralPath (Join-Path $oldBin 'portable.txt')) -or (Test-Path -LiteralPath (Join-Path $oldBin 'data'))) {\n"
+         "  if (Test-Path -LiteralPath (Join-Path $oldBin 'data')) { Copy-Item -LiteralPath (Join-Path $oldBin 'data') -Destination $newBin "
+         "-Recurse -Force -ErrorAction SilentlyContinue }\n"
+         "} else { Remove-Item -LiteralPath (Join-Path $newBin 'portable.txt') -Force -ErrorAction SilentlyContinue }\n";
     s += "if ($src -ne $new) { Remove-Item -LiteralPath $new -Recurse -Force -ErrorAction SilentlyContinue }\n";
     if (relaunch) {
         // A new version that exits with an error within 20 seconds is rolled back and the old one started again.

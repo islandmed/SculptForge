@@ -446,7 +446,18 @@ bool splatSurface(const SplatCloud& cloud, const SplatSurfaceOptions& o, Mesh& o
     const size_t n = grid.size();
     std::vector<uint8_t> wall(n);
     const float threshold = std::max(o.threshold, 1e-4f);
-    for (size_t i = 0; i < n; ++i) wall[i] = grid.values[i] > threshold ? 1 : 0;
+    // The log of the density as 0..255, the threshold at 128 (a Gaussian's log is a parabola, so the final surface
+    // finds where the density crosses the threshold between voxels; a 0/1 solid alone puts it on voxel steps, which
+    // read as contour rings on gentle curves). 0 and 255 are about 12 times below and above the threshold.
+    std::vector<uint8_t> level(n);
+    parallelFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const float d = grid.values[i];
+            wall[i] = d > threshold ? 1 : 0;
+            const float g = d > 0.0f ? std::clamp(0.5f + 0.2f * std::log(d / threshold), 0.0f, 1.0f) : 0.0f;
+            level[i] = uint8_t(std::lround(255.0f * g));
+        }
+    }, 1 << 16);
     std::vector<float>().swap(grid.values);
     morph(wall, dims, closeRadius, true);
     if (!tick(progress, 0.62f)) return fail("Cancelled");
@@ -526,7 +537,14 @@ bool splatSurface(const SplatCloud& cloud, const SplatSurfaceOptions& o, Mesh& o
 
     const auto t2 = Clock::now();
     {
-        std::vector<float> field(solid.begin(), solid.end());
+        // Cells where the density agrees with the solid keep it; the rest (closed gaps, filled holes, dropped
+        // floaters) are firmly inside or outside, as before.
+        std::vector<float> field(n);
+        for (size_t i = 0; i < n; ++i) {
+            const float g = float(level[i]) / 255.0f;
+            field[i] = solid[i] ? (g > 0.5f ? g : 1.0f) : (g < 0.5f ? g : 0.0f);
+        }
+        std::vector<uint8_t>().swap(level);
         std::vector<uint8_t>().swap(solid);
         std::vector<uint8_t>().swap(visited);
         blurField(field, dims);
@@ -1670,13 +1688,19 @@ SplatCloud makeTestCapture(const Mesh& mesh, const TestCaptureOptions& o) {
             push(p, glm::quat(1, 0, 0, 0), vec3(spacing * 1.2f), 0.9f, vec3(0.8f, 0.8f, 0.8f));
         }
     }
-    cloud.resize(pos.size(), 0);
+    cloud.resize(pos.size(), std::clamp(o.shDegree, 0, 3));
+    const size_t K = size_t(cloud.shCount());
     for (size_t i = 0; i < pos.size(); ++i) {
         cloud.positions[i] = pos[i];
         cloud.rotations[i] = rot[i];
         cloud.scales[i] = scale[i];
         cloud.opacities[i] = alpha[i];
         cloud.setColor(i, col[i]);
+        // A view-dependent sheen (as captures of skin and glaze have): warmer seen looking towards +X, cooler towards
+        // -X (band 1); brighter from above and below than from the side (band 2); a slight twist (band 3).
+        if (K > 1) cloud.sh[i * K + 3] = vec3(-0.35f, -0.1f, 0.25f);
+        if (K > 4) cloud.sh[i * K + 6] = vec3(0.3f);
+        if (K > 9) cloud.sh[i * K + 10] = vec3(0.1f, -0.05f, 0.0f);
     }
     return cloud;
 }
@@ -1877,7 +1901,9 @@ void registerSculptableCommands(CommandRegistry& reg) {
              {{"kind", T::String, "head (default) or object.", false},
               {"count", T::Number, "Surface splats (10000-5000000). Default 200000.", false},
               {"floaters", T::Number, "Floating clusters around the subject. Default 12.", false},
-              {"open_bottom", T::Bool, "Leave out the bottom (as a subject standing on a table). Default false.", false}},
+              {"open_bottom", T::Bool, "Leave out the bottom (as a subject standing on a table). Default false.", false},
+              {"sh_degree", T::Number, "View-dependent colour: spherical-harmonics degree 0-3 (a sheen that changes with the "
+                                       "view). Default 0.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  const std::string kind = argString(a, "kind", "head");
                  if (kind != "head" && kind != "object") return {false, "kind must be head or object"};
@@ -1886,6 +1912,7 @@ void registerSculptableCommands(CommandRegistry& reg) {
                  o.floaters = size_t(std::clamp(argNumber(a, "floaters", 12.0), 0.0, 1000.0));
                  o.interior = o.count / 20;
                  o.openBottom = argBool(a, "open_bottom", false);
+                 o.shDegree = int(std::clamp(argNumber(a, "sh_degree", 0.0), 0.0, 3.0));
                  doc.splats = makeTestCapture(kind == "head" ? makeTestHead(6) : makeTestObject(), o);
                  doc.splats.name = kind == "head" ? "Test Head" : "Test Mug";
                  doc.splatsChanged();

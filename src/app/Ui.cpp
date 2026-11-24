@@ -126,6 +126,25 @@ bool CtrlHeld() {
 
 bool AltHeld() { return ImGui::GetIO().KeyAlt || (SDL_GetModState() & SDL_KMOD_ALT) != 0; }
 
+bool MyPanelDragSource(const char* id, bool section, const char* label, bool fromPanel) {
+    if (!AltHeld() || CtrlHeld()) return false;
+    if (!ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) return false;
+    MyPanelPayload p;
+    std::snprintf(p.entry, sizeof p.entry, "%s%s", section ? "section:" : "action:", id);
+    p.fromPanel = fromPanel;
+    ImGui::SetDragDropPayload(kMyPanelPayload, &p, sizeof p);
+    ImGui::TextUnformatted(label);
+    ImGui::TextColored(rgba(color::textDim), "%s", tr(fromPanel ? "Drop on My Panel to move, elsewhere to remove" : "Drop on My Panel to add"));
+    ImGui::EndDragDropSource();
+    return true;
+}
+
+bool MyPanelDragged() {
+    if (!AltHeld() || CtrlHeld()) return false;
+    const ImGuiIO& io = ImGui::GetIO();
+    return std::abs(io.MousePos.x - io.MouseClickedPos[0].x) + std::abs(io.MousePos.y - io.MouseClickedPos[0].y) >= 4.0f;
+}
+
 const char* FloatingWindowAt(ImVec2 p) {
     const ImGuiContext* g = ImGui::GetCurrentContext();
     if (!g) return nullptr;
@@ -147,6 +166,11 @@ bool UiItemDragSource(App& app, const char* itemId, const char* label) {
     int shelf, index;
     takeOrigin(shelf, index);
     return dragSource(app, itemId, label, shelf, index);
+}
+
+void SameLineAt(float cursorPosX) {
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(cursorPosX);
 }
 
 void HelpText(const char* title, const char* shortcut, const char* description, const char* path) {
@@ -297,6 +321,9 @@ void HelpAction(App& app, const char* actionId) {
     g_help.command = a->command;
     g_help.disabled = a->enabled && !a->enabled();
     g_help.description = tr(a->description);
+    if (brushTypeOfAction(a->id) >= 0) // (ModifierBrush.cpp)
+        g_help.description += std::string(" ") + tr("Shift+click: hold Shift to use it instead of Smooth. Ctrl+click: hold "
+                                                     "Ctrl to use it instead of the mask.");
     if (const Command* c = a->command.empty() ? nullptr : app.commands().find(a->command)) {
         if (g_help.description.empty()) g_help.description = tr(c->description);
         g_help.params = c->params;
@@ -314,10 +341,14 @@ float KeycapsWidth(const std::string& chord) {
         const std::string part = chord.substr(start, at == std::string::npos ? std::string::npos : at - start);
         if (!firstChord) w += ImGui::CalcTextSize("/").x + 2 * gap;
         firstChord = false;
-        const auto keys = chordKeys(part);
-        for (size_t i = 0; i < keys.size(); ++i) {
-            if (i) w += ImGui::CalcTextSize("+").x + 2 * gap;
-            w += ImGui::CalcTextSize(keys[i].c_str()).x + 2 * pad;
+        const auto steps = shortcutSteps(part); // "A then S": two chords with a dim "then" between
+        for (size_t step = 0; step < steps.size(); ++step) {
+            if (step) w += ImGui::CalcTextSize("then").x + 2 * gap;
+            const auto keys = chordKeys(steps[step]);
+            for (size_t i = 0; i < keys.size(); ++i) {
+                if (i) w += ImGui::CalcTextSize("+").x + 2 * gap;
+                w += ImGui::CalcTextSize(keys[i].c_str()).x + 2 * pad;
+            }
         }
         if (at == std::string::npos) break;
         start = at + 3;
@@ -341,15 +372,19 @@ float KeycapsAt(ImDrawList* dl, ImVec2 p, const std::string& chord) {
         const std::string part = chord.substr(start, at == std::string::npos ? std::string::npos : at - start);
         if (!firstChord) dimText("/");
         firstChord = false;
-        const auto keys = chordKeys(part);
-        for (size_t i = 0; i < keys.size(); ++i) {
-            if (i) dimText("+");
-            const ImVec2 ts = ImGui::CalcTextSize(keys[i].c_str());
-            const ImVec2 a = p, b(p.x + ts.x + 2 * pad, p.y + h);
-            dl->AddRectFilled(a, b, lookColor(IM_COL32(0x2c, 0x2c, 0x30, 0xff), theme::frame), theme::rounding(3.0f * s));
-            dl->AddRect(a, b, lookColor(IM_COL32(0x4a, 0x4a, 0x50, 0xff), theme::tileBorder), theme::rounding(3.0f * s));
-            dl->AddText(ImVec2(a.x + pad, a.y + 1.0f * s), color::accent, keys[i].c_str());
-            p.x = b.x;
+        const auto steps = shortcutSteps(part);
+        for (size_t step = 0; step < steps.size(); ++step) {
+            if (step) dimText("then");
+            const auto keys = chordKeys(steps[step]);
+            for (size_t i = 0; i < keys.size(); ++i) {
+                if (i) dimText("+");
+                const ImVec2 ts = ImGui::CalcTextSize(keys[i].c_str());
+                const ImVec2 a = p, b(p.x + ts.x + 2 * pad, p.y + h);
+                dl->AddRectFilled(a, b, lookColor(IM_COL32(0x2c, 0x2c, 0x30, 0xff), theme::frame), theme::rounding(3.0f * s));
+                dl->AddRect(a, b, lookColor(IM_COL32(0x4a, 0x4a, 0x50, 0xff), theme::tileBorder), theme::rounding(3.0f * s));
+                dl->AddText(ImVec2(a.x + pad, a.y + 1.0f * s), color::accent, keys[i].c_str());
+                p.x = b.x;
+            }
         }
         if (at == std::string::npos) break;
         start = at + 3;
@@ -618,7 +653,10 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
             colors = 3;
         }
     }
-    ImGui::BeginDisabled(!enabled);
+    // Customize Shelves: a button that doesn't apply now (Backface-style options, Vertex / Texture paint without a texture) must
+    // still take the Ctrl+Alt press, or it can't be moved (#bug 45).
+    const bool grabbable = app.layout().customize && CtrlHeld() && AltHeld();
+    ImGui::BeginDisabled(!enabled && !grabbable);
     bool clicked = false;
     bool clipped = false;
     if (look == Look::Label) {
@@ -684,17 +722,24 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
 
     const bool customize = app.layout().customize;
     dragSource(app, id.c_str(), label.c_str(), shelf, index);
+    MyPanelDragSource(id.c_str(), false, label.c_str());
     HelpAction(app, id.c_str());
     if (clipped) {
         const std::string chord = app.actions().shortcutText(id);
         DelayedTooltip((chord.empty() ? label : label + "   " + chord).c_str());
     }
     if (!clicked) return false;
+    if (MyPanelDragged()) return false; // the end of an Alt-drag into My Panel, not a click
     if (CtrlHeld() && AltHeld()) {
         // Ctrl+Alt+click: customize mode drags instead; otherwise it assigns a shortcut.
-        if (!customize) app.beginShortcutCapture(id);
+        // A click that moved was the start of a customize drag (Fenix, Discord: it rebound F silently).
+        const ImVec2 io = ImGui::GetIO().MousePos, down = ImGui::GetIO().MouseClickedPos[0];
+        const float moved = std::abs(io.x - down.x) + std::abs(io.y - down.y);
+        if (!customize && moved < 4.0f) app.beginShortcutCapture(id);
         return false;
     }
+    // Shift+click / Ctrl+click a brush: it becomes the Shift / Ctrl brush, the main one stays (ModifierBrush.cpp).
+    if (const int type = brushTypeOfAction(id); type >= 0 && app.modifierBrushClick(type)) return true;
     if (run) run();
     return true;
 }
@@ -790,7 +835,7 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     }
     dl->ChannelsMerge();
     // The value, exactly, while pointing at it or dragging (the label inside may round it or be clipped).
-    if (hover > 0.0f && (ImGui::IsItemHovered() || active) && !CtrlHeld() && format) {
+    if (hover > 0.0f && (ImGui::IsItemHovered() || active) && !CtrlHeld() && format && !ImGui::TempInputIsActive(ImGui::GetItemID())) {
         const char* f = tr(format);
         const char* spec = ImParseFormatFindStart(f);
         if (*spec) {
@@ -906,11 +951,13 @@ void DrawHelp(App& app) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * s, 4.0f * s));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, rgba(lookColor(IM_COL32(0x18, 0x18, 0x1a, 0xff), theme::shellBg), std::clamp(prefs.helpOpacity, 0.3f, 1.0f)));
-    ImGui::PushStyleColor(ImGuiCol_Border, rgba(color::accent, 0.6f));
+    // Help is the info role (Theme.h): its blue edge and strip, or the accent edge with Pop-up colours off.
+    ImGui::PushStyleColor(ImGuiCol_Border, theme::rolePopups ? theme::edge(theme::Role::Info) : rgba(color::accent, 0.6f));
     const ImGuiWindowFlags flags = ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize;
     if (ImGui::Begin("##sf_help", nullptr, flags)) {
+        RoleStrip(theme::Role::Info);
         ImDrawList* dl = ImGui::GetWindowDrawList();
         // Title row: icon + title (SemiBold), keycaps on the right.
         const float keysW = r.shortcut.empty() ? 0.0f : KeycapsWidth(r.shortcut);
@@ -1001,5 +1048,75 @@ void DrawHelp(App& app) {
 }
 
 const std::string& HelpShown() { return g_shown; }
+
+namespace {
+int g_roleColors = 0; // what the last PushRole pushed
+} // namespace
+
+ImVec4 RoleSurface(theme::Role role, float lift, float wash) {
+    const ImVec4 e = theme::edge(role), base = theme::panelBg, white(1, 1, 1, 1);
+    auto mix = [](const ImVec4& a, const ImVec4& b, float t) {
+        return ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, 1.0f);
+    };
+    // One step lighter than the panels, so it sits on the UI, with a wash of the role.
+    return mix(mix(base, white, lift < 0.0f ? theme::popupLift : lift), e, wash);
+}
+
+void PushRole(theme::Role role) {
+    g_roleColors = 0;
+    if (!theme::rolePopups) return;
+    const ImVec4 e = theme::edge(role);
+    auto mix = [](const ImVec4& a, const ImVec4& b, float t) {
+        return ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, 1.0f);
+    };
+    // Its buttons and fields lift with the surface, so they keep their step above it.
+    const ImVec4 white(1, 1, 1, 1);
+    const float step = theme::popupLift;
+    const ImVec4 surface = RoleSurface(role);
+    const ImVec4 title = ImGui::GetStyleColorVec4(ImGuiCol_TitleBg), border = ImGui::GetStyleColorVec4(ImGuiCol_Border);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, surface);
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, surface);
+    ImGui::PushStyleColor(ImGuiCol_Border, mix(border, e, 0.85f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, mix(title, e, 0.20f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, mix(title, e, 0.26f));
+    const ImGuiCol lifted[] = {ImGuiCol_Button, ImGuiCol_ButtonHovered, ImGuiCol_ButtonActive, ImGuiCol_FrameBg,
+                               ImGuiCol_FrameBgHovered};
+    for (ImGuiCol c : lifted) ImGui::PushStyleColor(c, mix(ImGui::GetStyleColorVec4(c), white, step));
+    g_roleColors = 5 + int(std::size(lifted));
+}
+
+void PopRole() {
+    if (g_roleColors) ImGui::PopStyleColor(g_roleColors);
+    g_roleColors = 0;
+}
+
+void RoleStrip(theme::Role role) {
+    if (!theme::rolePopups) return;
+    ImGuiWindow* w = ImGui::GetCurrentWindow();
+    if (!w || w->SkipItems) return;
+    ImDrawList* dl = w->DrawList;
+    const float s = std::max(1.0f, ImGui::GetStyle().FramePadding.y / 3.0f); // the UI scale (FramePadding is 3 at 100 %)
+    const ImRect r = w->Rect();
+    const ImU32 edge = theme::u32(theme::edge(role));
+    dl->PushClipRect(r.Min, r.Max, false);
+    const float strip = std::max(3.0f, std::round(4.0f * s));
+    dl->PushClipRect(r.Min, ImVec2(r.Max.x, r.Min.y + strip), true); // the top of the window's own rounded shape
+    dl->AddRectFilled(r.Min, r.Max, edge, w->WindowRounding);
+    dl->PopClipRect();
+    if (!(w->Flags & ImGuiWindowFlags_NoTitleBar)) {
+        // The role's icon just after the title, while it clears the close button.
+        const ImRect bar = w->TitleBarRect();
+        const ImGuiStyle& st = ImGui::GetStyle();
+        const char* end = ImGui::FindRenderedTextEnd(w->Name);
+        const float titleW = ImGui::CalcTextSize(w->Name, end).x;
+        const char* icon = theme::roleIcon(role);
+        const ImVec2 iconSize = ImGui::CalcTextSize(icon);
+        const float x = std::floor(bar.Min.x + st.FramePadding.x + titleW + st.ItemInnerSpacing.x * 2.0f);
+        const float closeW = w->HasCloseButton ? ImGui::GetFrameHeight() : 0.0f;
+        if (x + iconSize.x < bar.Max.x - st.FramePadding.x - closeW)
+            dl->AddText(ImVec2(x, std::floor(bar.GetCenter().y - iconSize.y * 0.5f)), theme::u32(theme::ink(role)), icon);
+    }
+    dl->PopClipRect();
+}
 
 } // namespace sf::ui

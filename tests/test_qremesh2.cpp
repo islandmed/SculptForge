@@ -16,6 +16,7 @@
 #include "core/QRemesh.h"
 #include "core/SurfaceQuery.h"
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -24,6 +25,8 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <vector>
 
 using namespace sf;
 
@@ -184,6 +187,92 @@ TEST(qremesh2_thin_horn_stays_clean) {
     CHECK(r.st.quality.measured && r.st.quality.hausdorff < 2.0f);
     CHECK(r.st.quality.poles < 600);
     CHECK(ms < 30000.0); // "takes an eternity" guard only: CI machines differ
+}
+
+// gh#226 (Quad Remesh held at 52% and Cancel did nothing): Cancel from another thread, as the app's button does, at
+// points spread over a whole run (each phase: proxy build, cross field, grid map, extraction, relax) returns within a
+// second and writes nothing; the run after it is the same as an uncancelled one. Two sizes keep it inside the 20 s
+// test budget (the first draft ran 25 s on the PC): the ~82k-triangle sculpt takes every press point with and without
+// Symmetry, and the ~330k one (the dense path, parallel pre-decimation) three points.
+namespace {
+// Presses Cancel at each fraction of a warm uncancelled run's time (the first run is the warm-up and the reference for
+// the same-result check); returns the worst Cancel-to-return latency in seconds.
+double cancelSweep(const Mesh& m, const QRemeshOptions& o, const std::vector<double>& points) {
+    using Clock = std::chrono::steady_clock;
+    Mesh whole, again;
+    std::string err;
+    CHECK(qremesh(m, o, whole, err)); // warm-up: the first run pays cold caches and thread start, so it is no timing
+    const auto t0 = Clock::now();
+    CHECK(qremesh(m, o, again, err));
+    const double total = std::chrono::duration<double>(Clock::now() - t0).count();
+    CHECK(again.positions == whole.positions && again.triangles == whole.triangles);
+    double worst = 0.0;
+    for (double at : points) {
+        std::atomic<bool> cancel{false};
+        Clock::time_point asked{};
+        Mesh out;
+        std::thread button([&] {
+            std::this_thread::sleep_for(std::chrono::duration<double>(at * total));
+            asked = Clock::now();
+            cancel = true;
+        });
+        const bool ok = qremesh(m, o, out, err, [&](float) { return !cancel.load(); });
+        const auto back = Clock::now();
+        button.join();
+        if (ok) continue; // finished before the press (a faster run than the timed one)
+        const double latency = std::chrono::duration<double>(back - asked).count();
+        worst = std::max(worst, latency);
+        std::printf("  %u tris, symmetry %d, cancel at %.0f%% of %.2f s: back in %.0f ms\n", m.triangleCount(),
+                    o.symmetryAxis, 100.0 * at, total, 1000.0 * latency);
+        CHECK(err.find("cancelled") != std::string::npos);
+        CHECK(out.triangleCount() == 0); // nothing written
+        CHECK(latency < timeLimit(1.0));
+    }
+    std::printf("  %u tris, symmetry %d: worst Cancel latency %.0f ms\n", m.triangleCount(), o.symmetryAxis, 1000.0 * worst);
+    return worst;
+}
+} // namespace
+
+TEST(qremesh2_cancel_answers_within_a_second) {
+    const Mesh small = sculptedSphere(0);
+    for (int symmetry : {-1, 0}) { // Symmetry on adds the mirror-plane search and the cut before the pieces
+        QRemeshOptions o;
+        o.targetQuads = 3000;
+        o.symmetryAxis = symmetry;
+        cancelSweep(small, o, {0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.92});
+    }
+    QRemeshOptions o;
+    o.targetQuads = 3000;
+    cancelSweep(sculptedSphere(1), o, {0.05, 0.25, 0.6}); // dense path: decimation first
+}
+
+// gh#226: a dense sculpt with grain (pores, scan noise) along its normals. The grain's sharp edges join into a net
+// that is no hard edge, its points are no sharp tips, and a field with a singularity every few quads goes to the
+// legacy method instead of the grid map: it finishes in seconds near the target (on the member's 2.4M triangles the
+// grain gave 1.4M "hard edges", 690k singularities and a grid map that never finished). The target is 1500 quads: at
+// 5000 the run took 15 s alone on the PC (20 s under load, over the budget); the mesh and the grain are the same
+// (835 singularities, 9.5 s). Whether the field falls back to legacy depends on the singularities per target quad, so
+// the test asserts the result (near the target, in time), not the path.
+TEST(qremesh2_grainy_sculpt_is_not_hard_edges) {
+    using Clock = std::chrono::steady_clock;
+    Mesh m = sculptedSphere(1);
+    m.recomputeAllNormals();
+    const float d = diag(m);
+    uint32_t state = 12345u;
+    for (size_t v = 0; v < m.positions.size(); ++v) {
+        state = state * 1664525u + 1013904223u;
+        m.positions[v] += m.normals[v] * (0.002f * d * (2.0f * float(state >> 8) / float(1u << 24) - 1.0f));
+    }
+    m.recomputeAllNormals();
+    const auto t0 = Clock::now();
+    const Run r = run(m, 1500, QRemeshMethod::V2);
+    const double s = std::chrono::duration<double>(Clock::now() - t0).count();
+    std::printf("  grainy %u triangles: %.2f s, %zu quads, %zu singularities, %zu legacy pieces\n", m.triangleCount(),
+                s, r.out.triangleCount() / 2, r.st.singularities, r.st.fallbackPieces);
+    CHECK(r.ok);
+    const double quads = double(r.out.triangleCount()) / 2.0;
+    CHECK(quads > 0.75 * 1500.0 && quads < 1.25 * 1500.0);
+    CHECK(s < timeLimit(20.0));
 }
 
 TEST(qremesh2_is_deterministic) {

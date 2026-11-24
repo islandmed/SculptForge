@@ -89,6 +89,8 @@ constexpr GLenum GL_TEXTURE_BUFFER = 0x8C2A;
 constexpr GLenum GL_MAX_TEXTURE_BUFFER_SIZE = 0x8C2B;
 constexpr GLenum GL_R32UI = 0x8236;
 constexpr GLenum GL_RG32F = 0x8230;
+constexpr GLenum GL_RG = 0x8227;
+constexpr GLenum GL_MAX_TEXTURE_SIZE = 0x0D33;
 constexpr GLenum GL_GEOMETRY_SHADER = 0x8DD9;
 constexpr GLenum GL_SRGB8_ALPHA8 = 0x8C43;
 constexpr GLenum GL_LINEAR_MIPMAP_LINEAR = 0x2703;
@@ -105,6 +107,7 @@ constexpr GLenum GL_BACK = 0x0405;
 constexpr GLenum GL_R16UI = 0x8234;
 constexpr GLenum GL_RED_INTEGER = 0x8D94;
 constexpr GLenum GL_R16I = 0x8233;
+constexpr GLenum GL_RG16F = 0x822F;
 constexpr GLenum GL_RGBA32UI = 0x8D70;
 constexpr GLbitfield GL_MAP_INVALIDATE_RANGE_BIT = 0x0004;
 constexpr GLbitfield GL_DEPTH_BUFFER_BIT = 0x0100;
@@ -121,6 +124,7 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, DepthFunc, GLenum)                                                               \
     X(void, DepthMask, GLboolean)                                                            \
     X(void, ColorMask, GLboolean, GLboolean, GLboolean, GLboolean)                           \
+    X(void, DrawBuffers, GLsizei, const GLenum*)                                             \
     X(void, BlendFunc, GLenum, GLenum)                                                       \
     X(void, PolygonMode, GLenum, GLenum)                                                     \
     X(void, PolygonOffset, GLfloat, GLfloat)                                                 \
@@ -232,5 +236,21 @@ using ProcLoader = GenericProc (*)(const char* name);
 
 // Returns the name of the first missing function, or nullptr on success.
 const char* load(ProcLoader loader);
+
+// The buffer-texture limit the renderer reads (GL_MAX_TEXTURE_BUFFER_SIZE, in texels) and the most texels one buffer of the
+// micro renderer holds (`natural`, 2^26): the driver's, or less while a UI test script has lowered it (`gl_limits`, tests only,
+// no setting or environment reaches it), so the path a mesh past a small GPU's limits takes runs on CI's.
+GLint maxTextureBufferTexels();
+uint32_t bufferChunkTexels(uint32_t natural);
+void setTestTexelLimit(uint32_t texels); // 0: the driver's limits
+bool testTinyGpu(); // a test lowered the limit to 256 texels or less: no 2D-texture fallback either (a texture then cannot be shown)
+// Partial buffer updates as GPU copies (render/BufferUpload.h): on Mesa's OpenGL over D3D12, whose glBufferSubData into
+// busy texture buffers removes the device; elsewhere BufferSubData (copies cost large micro strokes a third of their frame
+// rate on Mesa/Apple, 11-17). setTestCopyUploads: 1/0 forces it (`gl_limits copies=`, tests only), -1 the driver's.
+bool copyUploads();
+void setTestCopyUploads(int copies);
+// Can this context still draw offscreen (a 4x4 framebuffer completes, no GL error)? false once the GPU dropped the device
+// (Mesa's OpenGL over D3D12: "D3D12: Removing Device"). Clears pending GL errors first.
+bool contextHealthy();
 
 } // namespace gl

@@ -1,0 +1,91 @@
+# File > Forge Deck (prototype; docs/phone-link.md): off at every start, turned on per session from the File menu with
+# a QR code, the banner with the phone's name and Disconnect while a phone drives, every phone action one allowlisted
+# command (anything else refused), and the kill switch. A scripted phone delivers the messages its data channel would.
+run ui_look look=classic layout=classic
+env SCULPTFORGE_LINK_PORT 0
+run new_sphere subdivisions=4
+
+# Off at the start: no window, nothing listening.
+expect_value deck_on == 0
+expect_value phone_running == 0
+
+# Off by default in Preferences > Experimental: no File menu entry until it is turned on.
+click "File##palette.file"
+wait 0.2
+expect_not "Forge Deck (prototype)##file.forge_deck"
+click "File##palette.file"
+click "Preferences##palette.preferences"
+click "Experimental##preferences.experimental"
+expect "Forge Deck (prototype)##experimental.forge_deck"
+click "Forge Deck (prototype)##experimental.forge_deck"
+click "Preferences##palette.preferences"
+shot experimental
+click "File##palette.file"
+wait 0.2
+expect "Forge Deck (prototype)##file.forge_deck"
+hold ctrl
+hover "Forge Deck (prototype)##file.forge_deck"
+expect_help "Off until you turn it on here"
+hold none
+click "Forge Deck (prototype)##file.forge_deck"
+wait 0.4
+expect_value deck_on == 1
+expect_value phone_running == 1
+expect_text "Scan with your phone's camera"
+wait_value deck_qr == 1 20
+expect_text "Waiting for your phone"
+shot qr
+
+# Nothing is accepted until the page says hello; the old HTTP routes are gone; only the Deck's six commands go through.
+phone_request GET /api/deck/state 404
+deck_message ok {"type":"hello","ua":"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1"}
+wait 0.3
+expect_value deck_connected == 1
+expect_text "is driving this session"
+expect_text "Disconnect"
+shot banner
+
+deck_message ok {"cmd":"symmetry_toggle","axis":"x"}
+wait 0.3
+expect_value deck_symmetry_x == 0
+deck_message ok {"cmd":"symmetry_toggle","axis":"x"}
+wait 0.3
+expect_value deck_symmetry_x == 1
+deck_message ok {"cmd":"intensity_set","value":0.25}
+wait 0.3
+expect_value deck_intensity == 25
+deck_message ok {"cmd":"size_set","value":0.55}
+wait 0.3
+expect_value draw_size == 54
+expect_value deck_size_position == 55
+deck_message ok {"cmd":"brush_use","name":"Smooth"}
+deck_message ok {"cmd":"size_set","value":1}
+wait 0.3
+expect_value draw_size == 800
+deck_message refused {"cmd":"open","path":"/tmp/x.sfproj"}
+deck_message refused {"cmd":"run","line":"quit"}
+wait 0.3
+expect_value deck_refused == 2
+expect_value deck_accepted == 6
+
+# The kill switch: Disconnect on the banner closes the link.
+click "Disconnect##deckbanner"
+wait 0.4
+expect_value deck_on == 0
+expect_value phone_running == 0
+
+# Turning the setting off (its section is still open) hides the entry again, and ends a running Deck at once.
+click "File##palette.file"
+wait 0.2
+click "Forge Deck (prototype)##file.forge_deck"
+wait 0.4
+expect_value deck_on == 1
+click "Preferences##palette.preferences"
+click "Forge Deck (prototype)##experimental.forge_deck"
+click "Preferences##palette.preferences"
+wait 0.4
+expect_value deck_on == 0
+expect_value phone_running == 0
+click "File##palette.file"
+wait 0.2
+expect_not "Forge Deck (prototype)##file.forge_deck"

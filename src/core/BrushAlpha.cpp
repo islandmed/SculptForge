@@ -2,13 +2,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushAlpha.h"
 
+#include "core/BakeImage.h"
 #include "core/Commands.h"
+#include "core/CreatureSkin.h"
 #include "core/Sculpt.h"
+#include "core/ThreadPool.h"
+
+#include "tinyexr.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <memory>
+#include <mutex>
+#include <thread>
 
 namespace sf {
 
@@ -358,7 +370,290 @@ const Generated kGenerated[] = {
              return std::clamp(facet * 1.6f, 0.0f, 1.0f) * roundEdge(u, v);
          });
      }},
+    {"Weathered Grain", "Long, uneven grain lines with worn-down soft wood between, for old boards and driftwood.",
+     [] {
+         return generate("Weathered Grain", [](float u, float v) {
+             const float warp = (fbm(u * 1.5f + 9.0f, v * 0.5f, 111, 3) - 0.5f) * 0.9f;
+             const float line = 1.0f - std::abs(std::sin((u * 5.0f + warp) * kPi));
+             const float hard = std::pow(line, 2.5f);                        // thin hard late-wood lines
+             const float wear = fbm(u * 3.0f, v * 7.0f + 5.0f, 113, 3);      // soft wood wears away in patches
+             return std::clamp(hard * (0.45f + 0.7f * wear) + 0.2f * wear, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
+    {"Splinters", "A fan of thin, sharp splinters and torn fibres, for broken planks and snapped wood.",
+     [] {
+         return generate("Splinters", [](float u, float v) {
+             float best = 0.0f;
+             for (int k = 0; k < 9; ++k) {
+                 const float h = hash01(k, 3, 117);
+                 const float x0 = (float(k) - 4.0f) * 0.17f + (h - 0.5f) * 0.1f;
+                 const float len = 0.45f + 0.5f * hash01(k, 5, 119);
+                 const float lean = (hash01(k, 7, 121) - 0.5f) * 0.35f;
+                 const float y0 = -0.9f, y1 = -0.9f + len * 1.8f;
+                 const float d = segmentDistance(u, v, x0, y0, x0 + lean * (y1 - y0), y1);
+                 const float along = smooth01((v - y0) / std::max(y1 - y0, 0.01f));
+                 const float width = 0.075f * (1.0f - along * 0.85f) + 0.008f; // tapers to a point
+                 best = std::max(best, 1.0f - smooth01(d / width));
+             }
+             return best * squareEdge(u, v);
+         });
+     }},
+    {"Grain Cracks", "Narrow splits that run along the grain and fork, for dried and checked timber.",
+     [] {
+         return generate("Grain Cracks", [](float u, float v) {
+             float best = 0.0f;
+             for (int k = 0; k < 4; ++k) {
+                 const float cx = (float(k) - 1.5f) * 0.45f + (hash01(k, 2, 123) - 0.5f) * 0.2f;
+                 const float len = 0.6f + 0.35f * hash01(k, 4, 125);
+                 const float off = (hash01(k, 6, 127) - 0.5f) * 0.5f;
+                 const float wob = (fbm(v * 3.0f + float(k) * 5.0f, 2.0f, 129, 2) - 0.5f) * 0.18f;
+                 const float d = std::abs(u - cx - wob - 0.12f * (v + off) * (hash01(k, 8, 131) - 0.5f));
+                 const float taper = smooth01((len - std::abs(v - off)) / 0.3f);
+                 best = std::max(best, (1.0f - smooth01(d / (0.045f * taper + 0.006f))) * taper);
+             }
+             return best * squareEdge(u, v);
+         });
+     }},
+    {"Knot", "A round knot where the grain bends around a dark core, for boards, beams and trunks.",
+     [] {
+         return generate("Knot", [](float u, float v) {
+             const float r = std::hypot(u * 1.15f, v * 0.85f);
+             const float rings = 0.5f + 0.5f * std::cos(r * 9.0f * kPi + (fbm(u * 3.0f + 2.0f, v * 3.0f, 133) - 0.5f));
+             const float core = 1.0f - smooth01(r / 0.28f);
+             const float body = (1.0f - smooth01((r - 0.45f) / 0.35f)) * (0.55f + 0.3f * rings);
+             const float lines = (1.0f - smooth01(std::abs(v) / 0.9f)) * 0.15f * (0.5f + 0.5f * std::sin(u * 14.0f));
+             return std::clamp(std::max(body, core) + lines, 0.0f, 1.0f) * roundEdge(u, v);
+         });
+     }},
+    {"End Rings", "Concentric growth rings with radial checks, as on a sawn log end.",
+     [] {
+         return generate("End Rings", [](float u, float v) {
+             const float cx = 0.08f, cy = -0.05f; // the pith sits a little off centre
+             const float r = std::hypot(u - cx, v - cy) * (1.0f + 0.04f * std::sin(std::atan2(v - cy, u - cx) * 3.0f));
+             const float wob = (fbm(u * 2.5f + 1.0f, v * 2.5f, 135) - 0.5f) * 0.12f;
+             const float ring = std::pow(0.5f + 0.5f * std::cos((r + wob) * 13.0f * kPi * 0.5f), 1.6f);
+             const float ang = std::atan2(v - cy, u - cx);
+             const float check = smooth01(std::abs(std::sin(ang * 2.5f + 0.7f)) * 6.0f - 5.0f) * smooth01(r / 0.2f);
+             return std::clamp(ring * (1.0f - 0.8f * check), 0.0f, 1.0f) * roundEdge(u, v);
+         });
+     }},
+    {"Plank Seams", "Two boards meeting at a dark seam, with grain and nail dimples, for floors, decks and doors.",
+     [] {
+         return generate("Plank Seams", [](float u, float v) {
+             const float seam = smooth01((std::abs(u) - 0.035f) / 0.09f);   // 0 in the seam, 1 on the boards
+             const float side = u < 0.0f ? 0.0f : 1.0f;
+             const float level = 0.72f + 0.14f * side;                       // each board sits at its own height
+             const float grain = 0.1f * std::sin((u * 26.0f + 3.0f * fbm(u * 2.0f, v * 0.7f, 139)) * kPi);
+             const float nail = 1.0f - smooth01(std::hypot(std::abs(u) - 0.55f, std::fmod(std::abs(v) + 0.5f, 1.0f) - 0.5f) / 0.09f);
+             return std::clamp(seam * (level + grain) - 0.3f * nail * seam, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
+    // Procedural stand-ins for scanned boards (the alpha pool, core/AlphaOptions.h, takes real scans from a folder).
+    {"Procedural Wood Straight", "Made in code, not a scan: fine straight grain lines with pores, for planed boards.",
+     [] {
+         return generate("Procedural Wood Straight", [](float u, float v) {
+             const float warp = (fbm(u * 1.2f + 3.0f, v * 0.35f, 141, 3) - 0.5f) * 0.35f;
+             const float ring = 0.5f + 0.5f * std::sin((u * 11.0f + warp) * kPi);
+             const float late = std::pow(ring, 3.0f);                       // thin hard late-wood lines
+             const float pores = fbm(u * 14.0f, v * 1.6f + 7.0f, 143, 2);   // long, thin pores along the grain
+             const float fine = std::pow(std::max(pores - 0.48f, 0.0f) * 3.0f, 1.5f);
+             return std::clamp(0.25f + 0.55f * late - 0.45f * fine, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
+    {"Procedural Wood Cathedral", "Made in code, not a scan: nested pointed arches of flat-sawn grain, for boards and veneers.",
+     [] {
+         return generate("Procedural Wood Cathedral", [](float u, float v) {
+             const float wob = (fbm(u * 2.0f + 5.0f, v * 1.0f, 145, 3) - 0.5f) * 0.25f;
+             const float d = std::abs(u) * 1.6f + (1.0f - (v * 0.5f + 0.5f)) * 0.55f * (1.0f - std::abs(u)) + wob; // arches opening downward
+             const float rings = 0.5f + 0.5f * std::cos(d * 9.0f * kPi * 0.5f);
+             const float late = std::pow(rings, 2.2f);
+             const float fibre = fbm(u * 18.0f, v * 2.0f + 11.0f, 147, 2);
+             return std::clamp(0.2f + 0.65f * late + 0.15f * fibre, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
+    {"Procedural Wood Weathered", "Made in code, not a scan: sun-bleached board with raised grain, worn pits and a few checks.",
+     [] {
+         return generate("Procedural Wood Weathered", [](float u, float v) {
+             const float warp = (fbm(u * 1.4f + 2.0f, v * 0.4f, 149, 3) - 0.5f) * 0.6f;
+             const float line = std::pow(1.0f - std::abs(std::sin((u * 7.0f + warp) * kPi)), 3.0f);
+             const float wear = fbm(u * 4.0f, v * 2.5f + 3.0f, 151, 3);
+             const float pit = smooth01((fbm(u * 22.0f, v * 22.0f, 153, 2) - 0.62f) / 0.12f);
+             const float check = (1.0f - smooth01(std::abs(u - 0.35f - 0.1f * std::sin(v * 5.0f)) / 0.015f)) * smooth01((0.7f - std::abs(v)) / 0.2f);
+             return std::clamp(line * (0.4f + 0.8f * wear) + 0.15f * wear - 0.35f * pit - 0.5f * check, 0.0f, 1.0f) * squareEdge(u, v);
+         });
+     }},
 };
+
+// Creature Skin (core/CreatureSkin.h): rows in parallel, then stretched to 0..1 between the 0.05% and 99.95% levels
+// (each generator shapes its relief; this sets the range, so a few stray pixels can't flatten the rest).
+// `ownThreads`: rows on threads of its own instead of the shared pool (a prefetch in the background must not take
+// the pool from a stroke, which would then run on one thread).
+BrushAlpha makeCreature(const CreatureAlpha& c, int n, int ownThreads = 0) {
+    BrushAlpha a;
+    a.name = c.name;
+    a.width = a.height = n;
+    a.values.resize(size_t(n) * size_t(n));
+    auto rows = [&](size_t y0, size_t y1, size_t step) {
+        for (size_t y = y0; y < y1; y += step)
+            for (int x = 0; x < n; ++x)
+                a.values[y * size_t(n) + size_t(x)] = c.height((float(x) + 0.5f) / float(n), (float(y) + 0.5f) / float(n));
+    };
+    if (ownThreads > 0) {
+        std::vector<std::thread> workers;
+        for (int t = 0; t < ownThreads; ++t) workers.emplace_back([&rows, t, ownThreads, n] { rows(size_t(t), size_t(n), size_t(ownThreads)); });
+        for (std::thread& w : workers) w.join();
+    } else {
+        poolFor(size_t(n), [&](size_t y0, size_t y1) { rows(y0, y1, 1); }, 8);
+    }
+    const auto [mn, mx] = std::minmax_element(a.values.begin(), a.values.end());
+    const float lo0 = *mn, span0 = std::max(*mx - *mn, 1e-6f);
+    constexpr int kBins = 4096;
+    std::vector<size_t> hist(kBins, 0);
+    for (float v : a.values) ++hist[size_t(std::min(int((v - lo0) / span0 * float(kBins)), kBins - 1))];
+    const size_t cut = a.values.size() / 2000;
+    int b0 = 0, b1 = kBins - 1;
+    for (size_t sum = 0; b0 < kBins - 1 && (sum += hist[size_t(b0)]) <= cut;) ++b0;
+    for (size_t sum = 0; b1 > b0 && (sum += hist[size_t(b1)]) <= cut;) --b1;
+    const float lo = lo0 + span0 * float(b0) / float(kBins), hi = lo0 + span0 * float(b1 + 1) / float(kBins);
+    for (float& v : a.values) v = std::clamp((v - lo) / std::max(hi - lo, 1e-6f), 0.0f, 1.0f);
+    return a;
+}
+
+int creatureIndex(const std::string& key) {
+    size_t n = 0;
+    const CreatureAlpha* all = creatureAlphas(n);
+    for (size_t i = 0; i < n; ++i)
+        if (lookupKey(all[i].name) == key) return int(i);
+    return -1;
+}
+
+// The full-size one, made once (the first brush that needs it pays about a tenth of a second on the pool).
+std::atomic<bool> gDeferCreature{false};
+std::atomic<uint64_t> gCreatureReady{0}; // one bit per Creature Skin alpha made at full size
+
+struct CreatureStore {
+    size_t count = 0;
+    const CreatureAlpha* all = creatureAlphas(count);
+    std::unique_ptr<std::once_flag[]> once{new std::once_flag[count]};
+    std::unique_ptr<std::shared_ptr<const BrushAlpha>[]> made{new std::shared_ptr<const BrushAlpha>[count]};
+};
+CreatureStore& creatureStore() {
+    static CreatureStore store;
+    return store;
+}
+
+const BrushAlpha& creatureFull(int i, int ownThreads = 0) {
+    CreatureStore& s = creatureStore();
+    std::call_once(s.once[size_t(i)], [&] {
+        s.made[size_t(i)] = std::make_shared<const BrushAlpha>(makeCreature(s.all[i], kCreatureSize, ownThreads));
+    });
+    gCreatureReady.fetch_or(uint64_t(1) << i); // (after call_once returns: a frame that sees the bit never waits on it)
+    return *s.made[size_t(i)];
+}
+
+// Background prefetches, joined at exit before the store goes (made after it, so destroyed first).
+struct Prefetches {
+    std::mutex mutex;
+    std::vector<std::thread> threads;
+    uint64_t started = 0; // one bit per Creature Skin alpha
+    ~Prefetches() {
+        for (std::thread& t : threads)
+            if (t.joinable()) t.join();
+    }
+};
+
+
+// Grey (luminance x alpha) planes from a file, at full precision: 16-bit PNG and OpenEXR (half or float, any
+// compression tinyexr reads) without an 8-bit step; other formats through Image. False with `error` when unreadable.
+bool loadGrey(const std::string& path, int& w, int& h, std::vector<float>& grey, std::string& error) {
+    std::ifstream f(std::filesystem::path(std::u8string(path.begin(), path.end())), std::ios::binary);
+    if (!f) {
+        error = "Cannot open " + path;
+        return false;
+    }
+    const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    auto lum = [](float r, float g, float b) { return 0.2126f * r + 0.7152f * g + 0.0722f * b; };
+    if (bytes.size() >= 4 && IsEXRFromMemory(bytes.data(), bytes.size()) == TINYEXR_SUCCESS) {
+        EXRVersion version;
+        EXRHeader header;
+        InitEXRHeader(&header);
+        bool hasAlpha = false, single = false;
+        // The header first: its size is checked before LoadEXRFromMemory allocates anything for the pixels.
+        const bool parsed = ParseEXRVersionFromMemory(&version, bytes.data(), bytes.size()) == TINYEXR_SUCCESS &&
+                            ParseEXRHeaderFromMemory(&header, &version, bytes.data(), bytes.size(), nullptr) == TINYEXR_SUCCESS;
+        int64_t hw = 0, hh = 0;
+        if (parsed) {
+            single = header.num_channels == 1;
+            for (int c = 0; c < header.num_channels; ++c) hasAlpha |= std::string(header.channels[c].name) == "A";
+            hw = int64_t(header.data_window.max_x) - header.data_window.min_x + 1;
+            hh = int64_t(header.data_window.max_y) - header.data_window.min_y + 1;
+        }
+        FreeEXRHeader(&header); // (safe after InitEXRHeader, parsed or not)
+        if (!parsed) {
+            error = "Can't read the EXR header";
+            return false;
+        }
+        if (hw <= 0 || hh <= 0 || hw > 16384 || hh > 16384) {
+            error = "The EXR is empty or too large (" + std::to_string(hw) + " x " + std::to_string(hh) + "; up to 16384 a side)";
+            return false;
+        }
+        float* rgba = nullptr;
+        const char* err = nullptr;
+        if (LoadEXRFromMemory(&rgba, &w, &h, bytes.data(), bytes.size(), &err) != TINYEXR_SUCCESS) {
+            error = std::string("Can't read the EXR: ") + (err ? err : "unknown error");
+            if (err) FreeEXRErrorMessage(err);
+            return false;
+        }
+        if (w <= 0 || h <= 0 || size_t(w) * size_t(h) > size_t(16384) * 16384) {
+            std::free(rgba);
+            error = "The EXR is empty or too large";
+            return false;
+        }
+        grey.resize(size_t(w) * size_t(h));
+        std::vector<float> alpha(grey.size(), 1.0f);
+        for (size_t i = 0; i < grey.size(); ++i) {
+            const float* p = &rgba[i * 4];
+            if (hasAlpha && !single) alpha[i] = std::isfinite(p[3]) ? std::clamp(p[3], 0.0f, 1.0f) : 0.0f; // (one channel fills all four)
+            grey[i] = single ? p[0] : lum(p[0], p[1], p[2]);
+            if (!std::isfinite(grey[i])) grey[i] = 0.0f, alpha[i] = 0.0f;
+        }
+        std::free(rgba);
+        // A height map in its own units (negative, or above 1): its lowest to 0 and highest to 1, over the pixels that
+        // show; then alpha, so transparent pixels are no effect whatever the range (not the lowest value stretched).
+        float lo = 0.0f, hi = 0.0f;
+        bool any = false;
+        for (size_t i = 0; i < grey.size(); ++i)
+            if (alpha[i] > 0.0f) lo = any ? std::min(lo, grey[i]) : grey[i], hi = any ? std::max(hi, grey[i]) : grey[i], any = true;
+        const bool stretch = any && (lo < 0.0f || hi > 1.0f);
+        const float span = std::max(hi - lo, 1e-12f);
+        for (size_t i = 0; i < grey.size(); ++i) {
+            const float v = stretch ? (grey[i] - lo) / span : grey[i];
+            grey[i] = std::clamp(v, 0.0f, 1.0f) * alpha[i];
+        }
+        return true;
+    }
+    if (bytes.size() >= 8 && bytes[0] == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') {
+        std::vector<uint16_t> px;
+        int channels = 0;
+        if (!decodePng16(bytes.data(), bytes.size(), w, h, channels, px, error, 4)) return false;
+        grey.resize(size_t(w) * size_t(h));
+        for (size_t i = 0; i < grey.size(); ++i) {
+            const uint16_t* p = &px[i * 4];
+            grey[i] = lum(p[0], p[1], p[2]) / 65535.0f * (float(p[3]) / 65535.0f);
+        }
+        return true;
+    }
+    Image img;
+    if (!Image::decode(bytes.data(), bytes.size(), img, error)) return false;
+    w = img.width;
+    h = img.height;
+    grey.resize(size_t(w) * size_t(h));
+    for (size_t i = 0; i < grey.size(); ++i) {
+        const uint8_t* p = &img.rgba[i * 4];
+        grey[i] = lum(p[0], p[1], p[2]) / 255.0f * (float(p[3]) / 255.0f);
+    }
+    return true;
+}
 
 } // namespace
 
@@ -418,6 +713,9 @@ const std::vector<BrushAlpha>& BrushAlpha::builtins() {
         std::vector<BrushAlpha> v{round(), square(), noise()};
         v.front().name = "Round";
         for (const Generated& g : kGenerated) v.push_back(g.make());
+        size_t n = 0;
+        const CreatureAlpha* creature = creatureAlphas(n);
+        for (size_t i = 0; i < n; ++i) v.push_back(makeCreature(creature[i], kCreaturePreview)); // (tiles only)
         return v;
     }();
     return all;
@@ -430,7 +728,73 @@ std::string BrushAlpha::builtinHelp(const std::string& name) {
     if (key == "noise") return "A noisy stamp for rough, organic texture.";
     for (const Generated& g : kGenerated)
         if (lookupKey(g.name) == key) return g.help;
+    size_t n = 0;
+    const CreatureAlpha* creature = creatureAlphas(n);
+    if (const int i = creatureIndex(key); i >= 0) return creature[i].help;
     return {};
+}
+
+void BrushAlpha::prefetch(const std::string& name) {
+    const int i = creatureIndex(lookupKey(name));
+    if (i < 0) return;
+    creatureStore();
+    static Prefetches pre;
+    std::lock_guard lock(pre.mutex);
+    if (pre.started & (uint64_t(1) << i)) return;
+    pre.started |= uint64_t(1) << i;
+    const int threads = std::max(2, int(std::thread::hardware_concurrency()) / 2);
+    pre.threads.emplace_back([i, threads] { creatureFull(i, threads); });
+}
+
+void BrushAlpha::setDeferCreature(bool defer) { gDeferCreature = defer; }
+
+std::shared_ptr<const BrushAlpha> BrushAlpha::shared(const BrushAlpha& a) {
+    if (!a.path.empty() || a.width != kCreatureSize || a.tiled()) return nullptr;
+    const int i = creatureIndex(lookupKey(a.name));
+    if (i < 0 || !(gCreatureReady.load() & (uint64_t(1) << i))) return nullptr;
+    const std::shared_ptr<const BrushAlpha>& made = creatureStore().made[size_t(i)];
+    if (made->values.size() != a.values.size()) return nullptr;
+    for (size_t k = 0; k < 64; ++k) // (a copy of it, not an edited one: a few samples are enough)
+        if (made->values[k * a.values.size() / 64] != a.values[k * a.values.size() / 64]) return nullptr;
+    return made;
+}
+
+bool BrushAlpha::finishCreature(BrushAlpha& a, bool wait) {
+    if (!a.pending) return false;
+    const int i = creatureIndex(lookupKey(a.name));
+    if (i < 0 || (!wait && !(gCreatureReady.load() & (uint64_t(1) << i)))) return false;
+    const BrushAlpha& full = creatureFull(i);
+    a.width = full.width;
+    a.height = full.height;
+    a.values = full.values; // (Tile and the rest stay as they are)
+    a.pending = false;
+    return true;
+}
+
+std::string BrushAlpha::builtinGroup(const std::string& name) {
+    return creatureIndex(lookupKey(name)) >= 0 ? "Creature Skin" : std::string();
+}
+
+std::string BrushAlpha::builtinName(const std::string& name) {
+    const std::string key = lookupKey(name);
+    if (key == "none" || key.empty()) return "Round";
+    for (const BrushAlpha& a : builtins())
+        if (lookupKey(a.name) == key) return a.name;
+    return {};
+}
+
+bool BrushAlpha::builtinPreview(const std::string& name, BrushAlpha& out) {
+    const std::string key = lookupKey(name);
+    if (key == "none" || key.empty()) {
+        out = round();
+        return true;
+    }
+    for (const BrushAlpha& a : builtins())
+        if (lookupKey(a.name) == key) {
+            out = a;
+            return true;
+        }
+    return false;
 }
 
 std::string BrushAlpha::builtinNames() {
@@ -445,12 +809,17 @@ bool BrushAlpha::builtin(const std::string& name, BrushAlpha& out) {
         out = round();
         return true;
     }
-    for (const BrushAlpha& a : builtins())
-        if (lookupKey(a.name) == key) {
-            out = a;
-            return true;
+    if (const int i = creatureIndex(key); i >= 0) {
+        if (gDeferCreature && !(gCreatureReady.load() & (uint64_t(1) << i))) { // the tile now, the full one soon
+            prefetch(name);
+            const bool ok = builtinPreview(name, out);
+            out.pending = ok;
+            return ok;
         }
-    return false;
+        out = creatureFull(i);
+        return true;
+    }
+    return builtinPreview(name, out);
 }
 
 bool BrushAlpha::builtinAt(const std::string& name, int size, BrushAlpha& out) {
@@ -462,6 +831,11 @@ bool BrushAlpha::builtinAt(const std::string& name, int size, BrushAlpha& out) {
             gGenerateSize = kBuiltinSize;
             return true;
         }
+    if (const int i = creatureIndex(key); i >= 0) {
+        size_t n = 0;
+        out = makeCreature(creatureAlphas(n)[i], std::clamp(size, 8, 4096));
+        return true;
+    }
     return builtin(name, out); // (Round, Square, Noise: as made)
 }
 
@@ -482,27 +856,55 @@ BrushAlpha BrushAlpha::fromImage(const Image& image, std::string name, bool inve
     return a;
 }
 
+bool BrushAlpha::fromFile(const std::string& path, std::string name, bool invert, BrushAlpha& out, std::string& error,
+                          int maxSide) {
+    int w = 0, h = 0;
+    std::vector<float> grey;
+    if (!loadGrey(path, w, h, grey, error)) return false;
+    // Box-filtered down to maxSide, in floats (no 8-bit step).
+    const int side = std::max(w, h), cap = std::clamp(maxSide, 8, 8192);
+    const int k = side > cap ? (side + cap - 1) / cap : 1;
+    BrushAlpha a;
+    a.name = std::move(name);
+    a.width = std::max(1, (w + k - 1) / k); // (rounded up: the last, partial box keeps the right and bottom edge)
+    a.height = std::max(1, (h + k - 1) / k);
+    a.values.resize(size_t(a.width) * size_t(a.height));
+    for (int y = 0; y < a.height; ++y)
+        for (int x = 0; x < a.width; ++x) {
+            float sum = 0.0f;
+            int cnt = 0;
+            for (int yy = y * k; yy < std::min(h, (y + 1) * k); ++yy)
+                for (int xx = x * k; xx < std::min(w, (x + 1) * k); ++xx, ++cnt) sum += grey[size_t(yy) * size_t(w) + size_t(xx)];
+            const float l = std::clamp(sum / float(std::max(cnt, 1)), 0.0f, 1.0f);
+            a.values[size_t(y) * size_t(a.width) + size_t(x)] = invert ? 1.0f - l : l;
+        }
+    a.path = path;
+    a.inverted = invert;
+    out = std::move(a);
+    return true;
+}
+
 void registerBrushCommands(CommandRegistry& registry) {
     using T = ParamSpec::Type;
     registry.add({"brush_set_alpha",
                   "Set the brush alpha (grayscale stamp shaping the falloff of every brush): a built-in "
                   "(round = none, square, noise, pores, cracks, scales, rivets, stitches, fabric weave, bark, rock "
-                  "strata, wrinkles, skin folds, hair strands, dot grid) or a grayscale image file.",
+                  "strata, wrinkles, skin folds, hair strands, dot grid, the Creature Skin set: elephant hide, snake scales, "
+                  "pores fine, nose pores open, skin crosshatch...) or a grayscale image file.",
                   {{"name", T::String, "Built-in alpha: round, square, noise, pores, cracks, scales, rivets, stitches, "
                                        "fabric_weave, bark, rock_strata, wrinkles, skin_folds, hair_strands or dot_grid.", false},
-                   {"path", T::String, "Image file (png, jpg, ...) used as the alpha; overrides name.", false},
+                   {"path", T::String, "Image file (png, jpg, exr, ...; 16-bit PNG and EXR keep their precision) used as the alpha; overrides name.", false},
                    {"invert", T::Bool, "Use the image's negative (white = no effect).", false}},
                   [](Document& doc, const Args& a) -> CommandResult {
                       const std::string path = argString(a, "path");
                       if (!path.empty()) {
-                          Image img;
                           std::string err;
-                          if (!Image::load(path, img, err)) return {false, err};
                           auto stem = std::filesystem::path(std::u8string(path.begin(), path.end())).stem().u8string();
-                          doc.brushAlpha = BrushAlpha::fromImage(img, std::string(stem.begin(), stem.end()),
-                                                                 argBool(a, "invert", false));
-                          doc.brushAlpha.path = path;
-                          doc.brushAlpha.inverted = argBool(a, "invert", false);
+                          BrushAlpha loaded;
+                          if (!BrushAlpha::fromFile(path, std::string(stem.begin(), stem.end()), argBool(a, "invert", false),
+                                                    loaded, err))
+                              return {false, err};
+                          doc.brushAlpha = std::move(loaded);
                           return {true, "Alpha '" + doc.brushAlpha.name + "' (" + std::to_string(doc.brushAlpha.width) +
                                             "x" + std::to_string(doc.brushAlpha.height) + ")"};
                       }

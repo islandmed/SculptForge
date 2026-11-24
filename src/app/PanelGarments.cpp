@@ -477,6 +477,7 @@ void SDLCALL App::onGarmentFileChosen(void* userdata, const char* const* files, 
 void App::garmentsChanged(bool garmentCommand) {
     if (!garments_) return;
     garments_->dirty = true;
+    garmentPreviewDirty_ = garmentPreviewDirty_ || garmentCommand; // (the placed panels' preview follows the pattern)
     garments_->fromCommand = garments_->fromCommand || garmentCommand;
 }
 
@@ -625,6 +626,7 @@ void App::drawGarmentsContents() {
     const Pattern& pat = garments_->pat;
     if (pat.panels.empty()) ImGui::TextDisabled("%s", tr("No pattern yet"));
     else ImGui::TextDisabled(tr("%d panels, %d seams"), int(pat.panels.size()), int(pat.seams.size()));
+    drawGarmentDrapeSection(); // PanelGarmentDrape.cpp
 }
 
 void App::drawGarments() {
@@ -1076,6 +1078,7 @@ bool App::garmentKey(SDL_Keycode key, SDL_Keymod mod) {
 double App::garmentTestValue(const std::string& name) {
     const double nan = std::numeric_limits<double>::quiet_NaN();
     if (name.rfind("garment_", 0) != 0 || !garments_) return nan;
+    if (const double v = garmentDrapeTestValue(name); !std::isnan(v)) return v;
     GarmentEditorState& s = *garments_;
     GarmentUi u{*this, s};
     u.refresh();

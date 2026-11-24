@@ -1,0 +1,38 @@
+# e2e: shelf. A brush refined in Brush Lab lands in your library and on a bottom-shelf slot; after Save Layout and a
+# restart the brush is still in the library, still on its slot, and still sculpts. A brush that vanished from the shelf
+# at launch was data loss (rand_gogh, Discord #bug-reports 1569719436750102643, thread 1566596362273824868).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+expect_value user_brushes == 0
+click "AI Brush"
+click "Brush##palette.brush"
+click "Brush/##totray"
+run brush_create name="Soft Planes" depth=0.2 smooth=0.4
+click "Recipe: Soft Planes"
+click "Brush Lab/Front faces only"
+wait 1.2
+expect_value library_files == 1
+expect_value user_brushes == 1
+
+# On a slot of the bottom shelf, layout saved.
+click "##addbrush"
+click "Soft Planes"
+expect "Soft Planes##brush.recipe.Soft Planes"
+key f3
+type "##Command palette" "save layout"
+key enter
+expect_status "Layout saved"
+
+# The next start: library, slot and brush are all there; the brush sculpts.
+restart
+wait 0.5
+expect_value user_brushes == 1
+expect_value library_files == 1
+expect "Soft Planes##brush.recipe.Soft Planes"
+click "Soft Planes##brush.recipe.Soft Planes"
+expect_value custom_brush_active == 1
+snapshot
+stroke 0.3 0.5 0.7 0.5
+expect_value moved > 0
+key ctrl+z
+expect_value moved == 0

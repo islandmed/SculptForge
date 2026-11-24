@@ -423,7 +423,11 @@ void App::drawBrushSetSave() {
     }
 
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(deletePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+    ui::PushRole(theme::Role::Danger);
+    const bool deleting = ImGui::BeginPopupModal(deletePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
+    ui::PopRole();
+    if (deleting) {
+        ui::RoleStrip(theme::Role::Danger);
         ImGui::Text(tr("Delete the brush set %s?"), brushSets_.deleting.c_str());
         ImGui::TextDisabled("%s", tr("Only the set goes: the brushes and the shelf stay as they are."));
         bool close = false;

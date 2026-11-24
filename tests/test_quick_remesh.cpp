@@ -96,7 +96,7 @@ TEST(quick_remesh_gentle_stroke_keeps_the_mesh) {
 }
 
 TEST(quick_remesh_pulled_vertex_remeshes) {
-    // One vertex pulled far out (a Move or Snake Hook pull): its whole ring of edges stretched. (Vertex 20 has six
+    // One vertex pulled far out (a Move or Tendril pull): its whole ring of edges stretched. (Vertex 20 has six
     // neighbours; the twelve first ones, the icosahedron's corners, have five, one short of kStretchedEdges.)
     Mesh mesh = makeIcosphere(3);
     CHECK(mesh.neighbors(20).size() == 6);

@@ -3,6 +3,7 @@
 #include "core/Commands.h"
 
 #include "core/AgentTools.h"
+#include "core/DetailPass.h"
 #include "core/ViewCapture.h"
 
 #include "core/Bake.h"
@@ -10,6 +11,7 @@
 #include "core/BrushAlpha.h"
 #include "core/BrushLibrary.h"
 #include "core/Decimate.h"
+#include "core/OpControl.h"
 #include "core/KeepMasked.h"
 #include "core/Macro.h"
 #include "core/Pack.h"
@@ -27,11 +29,13 @@
 #include "core/Multires.h"
 #include "core/Micro.h"
 #include "core/FigurePose.h"
+#include "core/UndoBatch.h"
 #include "core/MeshTransform.h"
 #include "core/MeshCheck.h"
 #include "core/PathStroke.h"
 #include "core/FaceGroups.h"
 #include "core/SelectionSets.h"
+#include "core/PartBoolean.h"
 #include "core/Parts.h"
 #include "core/Units.h"
 #include "core/VertexPaint.h"
@@ -41,6 +45,7 @@
 #include "core/ForgeSpheres.h"
 #include "core/Tube.h"
 #include "core/Garment.h"
+#include "core/GarmentDrape.h"
 #include "core/Deform.h"
 #include "core/Drape.h"
 #include "core/Sculptable.h"
@@ -61,8 +66,10 @@
 #include "io/PlyIO.h"
 #include "io/StlIO.h"
 #include "io/UsdIO.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
+#include <exception>
 #include <cctype>
 #include <filesystem>
 #include <glm/gtc/matrix_transform.hpp>
@@ -98,7 +105,7 @@ namespace {
 constexpr size_t kMaxSubdivideTriangles = 50'000'000;
 
 std::string lowerExtension(const std::string& path) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = extensionUtf8(path);
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     return ext;
 }
@@ -244,7 +251,7 @@ CommandRegistry::CommandRegistry() {
              }
              if (m.triangleCount() > 0) objects.push_back({"", std::move(m)});
              std::erase_if(objects, [](const MeshObject& o) { return o.mesh.triangleCount() == 0; });
-             std::string msg = "Opened " + std::filesystem::path(path).filename().string();  // file name only: status shows in screen recordings
+             std::string msg = "Opened " + fileNameUtf8(path);  // file name only: status shows in screen recordings
              const bool hasMesh = !objects.empty();
              if (hasMesh) {
                  size_t tris = 0, quads = 0, layers = 0;
@@ -278,8 +285,10 @@ CommandRegistry::CommandRegistry() {
     add({"remesh",
          "Voxel remesh (like Voxel Remesh): rebuild the sculpt as an even, watertight surface, merging overlapping "
          "parts and fixing broken scans or generated models. Sculpt layers are baked in. A painted texture is "
-         "kept (new Auto UVs, colour projected from the old surface) unless keep_texture=false.",
-         {{"resolution", T::Number, "Voxels across the longest side (32-512). Default 200; higher keeps more detail.", false},
+         "kept (new Auto UVs, colour projected from the old surface) unless keep_texture=false. Reports progress and can be cancelled (the scene stays as it was).",
+         {{"resolution", T::Number, "Voxels across the longest side (32-4096). Default 200; higher keeps more detail. "
+                                  "Above 512 it can make tens of millions of triangles; it stops with a message when "
+                                  "it would not fit in the free memory.", false},
           {"keep_texture", T::Bool, "Keep a painted texture: Auto UV the result and project the texture onto it. "
                                     "Default true.", false},
           {"keep_masked", T::Bool, "Keep masked: masked areas keep their triangles exactly; the rest is remeshed and "
@@ -290,16 +299,23 @@ CommandRegistry::CommandRegistry() {
              const bool keeping = std::find(keep.begin(), keep.end(), 1) != keep.end();
              if (keeping && std::find(keep.begin(), keep.end(), 0) == keep.end())
                  return {false, "Remesh: everything is masked, so nothing would change"};
-             Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), 32, 512), &err);
+             Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), kVoxelResolutionMin, kVoxelResolutionMax), &err,
+                                  [](float f) { // (progress and cancel for an MCP call, core/OpControl.h)
+                                      opProgress(0.9f * f, "Remeshing");
+                                      return !opCancelled();
+                                  });
              if (m.triangleCount() == 0) return {false, err};
+             if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
              std::string keepNote;
              if (keeping) {
                  Mesh stitched;
                  if (!stitchKeptTriangles(doc.mesh, keep, m, stitched, err, &keepNote)) return {false, "Remesh (Keep masked): " + err};
                  m = std::move(stitched);
              }
+             opProgress(0.95f, "Carrying the texture");
+             if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
              const std::string texture = carryTextureNote(doc.mesh, m, argBool(a, "keep_texture", true));
-             doc.replaceMeshUndoable(std::move(m), "Remesh");
+             doc.replaceMeshUndoable(std::move(m), "Remesh", true);
              return {true, "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture +
                            (keepNote.empty() ? "" : "; Keep masked: " + keepNote)};
          }});
@@ -395,7 +411,7 @@ CommandRegistry::CommandRegistry() {
 
     add({"subdivide",
          "Smoothly subdivide the mesh (Loop subdivision). Each level multiplies the triangle count by 4. Unlike "
-         "Divide (subdiv_divide), it keeps no lower levels to step back to.",
+         "Divide (subdiv_divide), it keeps no lower levels to step back to. Can be cancelled between levels.",
          {{"levels", T::Number, "Number of subdivision levels to apply (1-4). Default 1.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              int levels = std::clamp(int(argNumber(a, "levels", 1)), 1, 4);
@@ -403,8 +419,12 @@ CommandRegistry::CommandRegistry() {
              for (int i = 0; i < levels; ++i) projected *= 4;
              if (projected > kMaxSubdivideTriangles)
                  return {false, "Subdividing would exceed " + std::to_string(kMaxSubdivideTriangles) + " triangles"};
-             Mesh m = loopSubdivide(doc.mesh);
-             for (int i = 1; i < levels; ++i) m = loopSubdivide(m);
+             Mesh m = loopSubdivide(doc.mesh); // (a cancel point after each level: one level itself can't stop)
+             for (int i = 1; i <= levels; ++i) {
+                 opProgress(float(i) / float(levels), "Subdivided level " + std::to_string(i) + " of " + std::to_string(levels));
+                 if (opCancelled()) return {false, "Subdivide cancelled; the scene is unchanged"};
+                 if (i < levels) m = loopSubdivide(m);
+             }
              doc.replaceMeshUndoable(std::move(m), "Subdivide");
              return {true, "Subdivided to " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
          }});
@@ -457,7 +477,7 @@ CommandRegistry::CommandRegistry() {
          }});
 
     add({"decimate",
-         "Reduce triangle count while preserving shape (quadric edge collapse). Sculpt layers are kept.",
+         "Reduce triangle count while preserving shape (quadric edge collapse). Sculpt layers are kept. Reports progress and can be cancelled (the scene stays as it was).",
          {{"ratio", T::Number, "Fraction of triangles to keep (0.01-1). Default 0.5.", false},
           {"triangles", T::Number, "Exact target triangle count (overrides ratio).", false},
           {"keep_masked", T::Bool, "Keep masked: masked vertices aren't moved or removed, so masked areas keep their "
@@ -467,7 +487,9 @@ CommandRegistry::CommandRegistry() {
                                  ? size_t(std::max(4.0, argNumber(a, "triangles", 4)))
                                  : size_t(double(doc.mesh.triangleCount()) *
                                           std::clamp(argNumber(a, "ratio", 0.5), 0.01, 1.0));
-             doc.replaceMeshUndoable(decimate(doc.mesh, target, argBool(a, "keep_masked", false)), "Decimate");
+             Mesh m = decimate(doc.mesh, target, argBool(a, "keep_masked", false));
+             if (opCancelled()) return {false, "Decimate cancelled; the scene is unchanged"};
+             doc.replaceMeshUndoable(std::move(m), "Decimate", true);
              return {true, "Decimated to " + std::to_string(doc.mesh.triangleCount()) + " triangles"};
          }});
 
@@ -569,7 +591,7 @@ CommandRegistry::CommandRegistry() {
 
     add({"export_lods",
          "Generate a LOD chain of every visible Part and export each level as <name>_LOD<n>.glb next to `path`. "
-         "Blend shapes are kept on every LOD.",
+         "Blend shapes are kept on every LOD. Reports progress and can be cancelled before it writes the files or between them.",
          {{"path", T::String, "Base output path, e.g. /assets/rock.glb.", true},
           {"levels", T::Number, "Number of LODs including LOD0 (1-8). Default 4.", false},
           {"ratio", T::Number, "Triangle ratio between consecutive LODs (0.1-0.9). Default 0.5.", false}},
@@ -582,8 +604,11 @@ CommandRegistry::CommandRegistry() {
              if (objects.empty()) return {false, "Nothing visible to export"};
              // Every visible Part is decimated on its own; LOD n of each goes into <name>_LOD<n>.glb.
              std::vector<std::vector<Mesh>> lods;
-             for (const auto& o : objects) {
+             for (size_t k = 0; k < objects.size(); ++k) {
+                 const auto& o = objects[k];
+                 OpProgressWindow window(0.8f * float(k) / float(objects.size()), 0.8f / float(objects.size()));
                  lods.push_back(generateLods(*o.mesh, levels, ratio));
+                 if (opCancelled()) return {false, "Export LODs cancelled; nothing was written"};
                  // Decimation keeps the UVs, so every level can carry the Part's texture.
                  for (auto& l : lods.back()) l.texture = o.mesh->texture;
              }
@@ -592,6 +617,9 @@ CommandRegistry::CommandRegistry() {
              std::ostringstream msg;
              msg << "Exported";
              for (size_t i = 0; i < lods[0].size(); ++i) {
+                 // A cancel point before each file: the ones already written stay (they are complete files).
+                 opProgress(0.8f + 0.2f * float(i) / float(lods[0].size()), "Writing LOD" + std::to_string(i));
+                 if (opCancelled()) return {false, "Export LODs cancelled after " + std::to_string(i) + " of " + std::to_string(lods[0].size()) + " files"};
                  std::string fileName = stem + "_LOD" + std::to_string(i) + ".glb";
                  auto out = (base.parent_path() / std::u8string(fileName.begin(), fileName.end())).u8string();
                  std::string outPath(out.begin(), out.end());
@@ -625,6 +653,14 @@ CommandRegistry::CommandRegistry() {
                           false});
         params.push_back({"viewFalloff", T::Bool,
                           "Measure the falloff on screen: a cylinder through the model along the view. Default false.",
+                          false});
+        params.push_back({"planeLock", T::Bool,
+                          "Take the plane at the stroke's start and keep it for the whole stroke (false: the plane "
+                          "follows the surface). Default false.",
+                          false});
+        params.push_back({"crispEdge", T::Bool,
+                          "A hard tip edge with a thin anti-aliased band, and the plane pulled all the way: clean, "
+                          "sharp boundaries for hard-surface planes and bevels. Default false.",
                           false});
         add({"brush_create",
              "Create (or update, by name) a custom sculpting brush from a recipe and make it the active brush. "
@@ -695,6 +731,7 @@ CommandRegistry::CommandRegistry() {
     registerBrushLibraryCommands(*this); // brush_install, brush_code, brush_delete, ... (BrushLibrary.cpp)
     registerBrushCommands(*this); // brush_set_alpha (BrushAlpha.cpp)
     registerStencilCommands(*this); // stencil_load, stencil_set, stencil_clear (Stencil.cpp)
+    registerReferenceCommands(*this); // reference_add, reference_set, reference_remove, reference_pair (Reference.cpp)
     registerVdmCommands(*this);   // vdm_set, vdm_capture, vdm_stamp, ... (Vdm.cpp)
     registerKelvinletCommands(*this); // kelvinlet_settings (Kelvinlet.cpp)
     registerCaptureCommands(*this); // capture_alpha, capture_vdm: alpha / VDM from the viewport (ViewCapture.cpp)
@@ -703,6 +740,7 @@ CommandRegistry::CommandRegistry() {
     registerForgeSphereCommands(*this);      // Forge Sphere_new, ... (Forge Spheres.cpp)
     registerTubeCommands(*this);             // tube_new, ... (Tube.cpp)
     registerAgentTools(*this);               // blockout, measure, scene_overview (core/AgentTools.cpp)
+    registerDetailCommands(*this);           // detail_pass (core/DetailPass.cpp)
     registerDrapeCommands(*this);        // cloth_drape (Drape.cpp)
     registerDeformCommands(*this);       // deform_polish, deform_relax, deform_smooth, deform_balloon (Deform.cpp)
 
@@ -713,12 +751,16 @@ CommandRegistry::CommandRegistry() {
          {{"points", T::String,
            "World-space path: \"x,y,z x,y,z ...\" (or separated by '|'). One point stamps a single dab.", true},
           {"brush", T::String,
-           "Custom brush (library name) or built-in brush (Standard, Clay, Crease, Inflate, ...). Default: the "
-           "active brush.",
+           "Custom brush (library name), built-in brush (Standard, Clay, Crease, Inflate, ...) or a detail preset "
+           "(Detail Crease, Detail Wrinkle, Detail Pores, Detail Skin, Detail Scales, Detail Scar: its own brush, "
+           "radius and strength, for fine detail on a dense mesh). Default: the active brush.",
            false},
           {"view", T::String, "Direction the path is projected along, \"x,y,z\" (default 0,0,-1: front view).", false},
-          {"radius", T::Number, "Brush radius in world units (default 4% of the mesh size).", false},
-          {"strength", T::Number, "Strength 0-1 (default 0.5).", false},
+          {"radius", T::Number,
+           "Brush radius in world units (default 4% of the mesh size: big forms; a detail preset's own, 0.3-2.5%). "
+           "Secondary forms want 1.5-4%, fine detail 0.3-1% on a mesh whose edges are under radius / 2.5.",
+           false},
+          {"strength", T::Number, "Strength 0-1 (default 0.5; a detail preset's own).", false},
           {"pressure", T::Number, "Constant pen pressure 0-1 (default 1).", false},
           {"invert", T::Bool, "Invert the brush (carve instead of build, like holding Alt).", false},
           {"curve", T::Bool, "Smooth curve through the points (default true); false = straight segments.", false},
@@ -731,12 +773,15 @@ CommandRegistry::CommandRegistry() {
              if (!parsePathPoints(argString(a, "points"), st.points, err)) return {false, err};
              const std::string view = argString(a, "view");
              if (!view.empty() && !parseVec3(view, st.view)) return {false, "Bad view '" + view + "' (expected x,y,z)"};
-             st.radius = float(argNumber(a, "radius", 0.0));
-             st.strength = float(argNumber(a, "strength", 0.5));
+             // A detail preset (core/DetailPass.h) brings its brush, size and strength; the arguments still win.
+             const DetailPreset* detail = findDetailPreset(argString(a, "brush"));
+             const float diag = glm::length(doc.mesh.bounds().extent());
+             st.radius = float(argNumber(a, "radius", detail ? detail->size * diag : 0.0));
+             st.strength = float(argNumber(a, "strength", detail ? detail->strength : 0.5));
              st.pressure = float(argNumber(a, "pressure", 1.0));
-             st.invert = argBool(a, "invert", false);
+             st.invert = argBool(a, "invert", false) != (detail && detail->invert);
              st.curve = argBool(a, "curve", true);
-             st.spacing = float(argNumber(a, "spacing", -1.0));
+             st.spacing = float(argNumber(a, "spacing", detail ? detail->spacing : -1.0));
              st.seed = uint32_t(std::max(argNumber(a, "seed", 1.0), 0.0));
              if (!symmetryArg(a, doc.mesh, st.symmetry, err)) return {false, err};
              if (const Part& part = doc.activePartInfo(); part.moved()) { // a moved linked copy (#94): into its space
@@ -756,6 +801,18 @@ CommandRegistry::CommandRegistry() {
              };
              const BrushRecipe* recipe = nullptr;
              BrushType type = BrushType::Standard;
+             if (detail) {
+                 // Its alpha for this stroke only: the user's own comes back after.
+                 BrushAlpha alpha;
+                 if (*detail->alpha) BrushAlpha::builtin(detail->alpha, alpha);
+                 std::swap(doc.brushAlpha, alpha);
+                 const int dabs = strokePath(doc, nullptr, detail->type, st, err);
+                 std::swap(doc.brushAlpha, alpha);
+                 if (dabs < 0) return {false, err};
+                 if (dabs == 0) return {false, "The path never crosses the surface (check the points and view)"};
+                 return {true, "Stroked " + std::to_string(dabs) + " dabs with " + detail->name + " (radius " +
+                                   std::to_string(st.radius) + ")"};
+             }
              if (name.empty()) {
                  if (doc.activeBrush >= 0 && doc.activeBrush < int(doc.brushes.size())) recipe = &doc.brushes[doc.activeBrush];
              } else {
@@ -860,19 +917,13 @@ CommandRegistry::CommandRegistry() {
 
     add({"undo", "Undo the last action.", {},
          [](Document& doc, const Args&) -> CommandResult {
-             if (!doc.undo.undo(doc.mesh, doc.bvh)) return {false, "Nothing to undo"};
-             if (UndoRecord* r = doc.undo.lastRedo(); r && r->part) doc.applyPartStep(*r->part);
-             if (UndoRecord* r = doc.undo.lastRedo(); r && r->group) undoGroupOnOtherParts(doc, r->group, true);
-             doc.modified = true;
+             if (!undoStepOrBatch(doc)) return {false, "Nothing to undo"};
              return {true, "Undone"};
          }});
 
     add({"redo", "Redo the last undone action.", {},
          [](Document& doc, const Args&) -> CommandResult {
-             if (!doc.undo.redo(doc.mesh, doc.bvh)) return {false, "Nothing to redo"};
-             if (UndoRecord* r = doc.undo.lastUndo(); r && r->part) doc.applyPartStep(*r->part);
-             if (UndoRecord* r = doc.undo.lastUndo(); r && r->group) undoGroupOnOtherParts(doc, r->group, false);
-             doc.modified = true;
+             if (!redoStepOrBatch(doc)) return {false, "Nothing to redo"};
              return {true, "Redone"};
          }});
 
@@ -894,6 +945,7 @@ CommandRegistry::CommandRegistry() {
     registerFaceGroupCommands(*this);
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerPartCommands(*this);
+    registerBooleanCommands(*this); // part_boolean, boolean_parts, make_boolean_mesh (core/PartBoolean.h)
     registerSubdivCommands(*this); // subdiv_* (core/MultiresCommands.cpp)
     registerMicroCommands(*this);  // micro_* (core/MicroCommands.cpp)
     registerDyntopoCommands(*this); // dyntopo (core/DyntopoCommands.cpp)
@@ -911,6 +963,7 @@ CommandRegistry::CommandRegistry() {
     registerMayaCommands(*this); // maya_send/receive (io/MayaCommands.cpp)
     registerBakeCommands(*this); // bake (core/Bake.cpp)
     registerGarmentCommands(*this); // garment_* (core/GarmentCommands.cpp)
+    registerGarmentDrapeCommands(*this); // garment_place, garment_drape (core/GarmentDrape.cpp)
     registerFaceCommands(*this); // face_shapes_generate, face_weights, ... (core/FaceCommands.cpp)
     registerStarterMeshCommands(*this); // new_starter_mesh (core/StarterMeshes.h)
     registerPackCommands(*this);    // pack_install, pack_list, pack_remove, ... (core/Pack.h)
@@ -979,9 +1032,20 @@ CommandResult CommandRegistry::execute(Document& doc, const std::string& name, c
     // exporting never writes it.
     if (doc.extractPreview.id && name.rfind("extract", 0) != 0)
         doc.dropExtractPreview(!(name.rfind("save", 0) == 0 || name.rfind("export", 0) == 0));
-    CommandResult r = cmd->run(doc, args);
+    // A command that throws (a file name the system can't convert, a full disk, no memory) fails with the reason,
+    // never closes the app without a word (gh#223).
+    auto run = [&](const Args& a) -> CommandResult {
+        try {
+            return cmd->run(doc, a);
+        } catch (const std::exception& e) {
+            return {false, name + " failed: " + e.what()};
+        } catch (...) {
+            return {false, name + " failed"};
+        }
+    };
+    CommandResult r = run(args);
     if (!r.ok && anyOldValue(args)) // a name value an older version used: try today's; keep the first answer if it fails too
-        if (CommandResult again = cmd->run(doc, modernizedArgs(args, true)); again.ok) r = std::move(again);
+        if (CommandResult again = run(modernizedArgs(args, true)); again.ok) r = std::move(again);
     if (const std::string notice = doc.takeNotice(); !notice.empty() && r.ok) r.message += ". " + notice;
     return r;
 }

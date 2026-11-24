@@ -12,6 +12,7 @@
 //  4. Laplacian smoothing of the inside points (never folding a triangle) and constrained Lawson flips back to
 //     a Delaunay triangulation.
 #include "core/Garment.h"
+#include "core/StableMath.h"
 
 #include <algorithm>
 #include <array>
@@ -361,7 +362,7 @@ bool triangulatePattern(const Pattern& pat, GarmentMesh& out, std::string& error
         std::vector<dvec2> poly(P.begin(), P.end());
         // Fill: a triangular lattice along the grain.
         const double g = double(p.grainDegrees) * 3.14159265358979 / 180.0;
-        const dvec2 e1 = h * dvec2(std::cos(g), std::sin(g)), e2 = h * dvec2(std::cos(g + 1.0471975512), std::sin(g + 1.0471975512));
+        const dvec2 e1 = h * dvec2(stableCos(g), stableSin(g)), e2 = h * dvec2(stableCos(g + 1.0471975512), stableSin(g + 1.0471975512));
         dvec2 lo(1e30), hi(-1e30);
         for (dvec2 q : poly) {
             lo = glm::min(lo, q);
@@ -420,7 +421,7 @@ bool triangulatePattern(const Pattern& pat, GarmentMesh& out, std::string& error
             const long ra = long((P[a].y - lo.y) / oc), rb = long((P[b].y - lo.y) / oc);
             if (ra != rb) return ra < rb;
             const double xa = (ra & 1) ? -P[a].x : P[a].x, xb = (rb & 1) ? -P[b].x : P[b].x;
-            return xa < xb;
+            return xa != xb ? xa < xb : a < b; // (a tie by index: standard libraries order ties their own way)
         });
         std::vector<int> dtIndex(P.size());
         for (uint32_t k : order) {

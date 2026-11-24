@@ -9,6 +9,7 @@
 #include "app/SearchAliases.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "core/DataDir.h"
 #include "core/ListSort.h"
 #include "core/LitSphere.h"
 #include "core/Primitives.h"
@@ -325,6 +326,18 @@ void LibraryBrowser::rootEntries(App& app, std::vector<AssetEntry>& out) {
                 out.push_back(std::move(e));
             }
         }
+        if (!app.prefDir_.empty()) { // the autosave a crashed session left, when a later session went on without restoring it
+            const std::string prev = app.prefDir_ + "autosave.prev.sfproj";
+            std::error_code ec;
+            if (fs::is_regular_file(fsPath(prev), ec)) {
+                AssetEntry e;
+                e.kind = AssetKind::Project;
+                e.name = "Autosave (previous session)";
+                e.path = prev;
+                e.mtime = modifiedTime(prev);
+                out.push_back(std::move(e));
+            }
+        }
         // "QuickSave 2026-10-21 23-15-04" reads better as its time: "Oct 21  23:15:04".
         for (AssetEntry e : scan(userDir, true)) {
             if ((e.name.rfind("Snapshot ", 0) == 0 || e.name.rfind("QuickSave ", 0) == 0) && e.mtime) { // (older ones: QuickSave)
@@ -430,9 +443,9 @@ ImTextureID LibraryBrowser::thumbnail(App& app, const AssetEntry& e) {
     case AssetKind::Primitive:
         return t.primitive(e.index);
     case AssetKind::BrushType:
-        return t.brush(e.index);
+        return app.brushThumbnail(e.index);
     case AssetKind::Recipe:
-        return e.index >= 0 && e.index < int(app.doc_.brushes.size()) ? t.recipe(app.doc_.brushes[size_t(e.index)])
+        return e.index >= 0 && e.index < int(app.doc_.brushes.size()) ? app.recipeThumbnail(app.doc_.brushes[size_t(e.index)])
                                                                       : ImTextureID(0);
     case AssetKind::Alpha:
         return t.alpha(builtinAlpha(e.index));
@@ -563,6 +576,19 @@ void LibraryBrowser::contextMenu(App& app, const AssetEntry& e) {
         if (ImGui::MenuItem(tr("Use as alpha")))
             app.runCommand("brush_set_alpha", {{"path", e.path}, {"invert", app.alphaInvert_}});
     }
+    if (place_.tab == LibraryTab::Alpha) { // the alpha pool (core/AlphaOptions.h): each dab takes one at random
+        if (e.kind == AssetKind::Folder && ImGui::MenuItem(tr("Use folder as alpha pool")))
+            app.runCommand("brush_alpha_pool", {{"folder", e.path}});
+        if (e.kind == AssetKind::Alpha && ImGui::MenuItem(tr("Add to alpha pool")))
+            app.runCommand("brush_alpha_pool", {{"name", builtinAlpha(e.index).name}});
+        if (e.kind == AssetKind::AlphaFile && ImGui::MenuItem(tr("Add to alpha pool")))
+            app.runCommand("brush_alpha_pool", {{"path", e.path}});
+    }
+    if (e.kind == AssetKind::BrushType && e.index != kPaintBrush && ImGui::MenuItem(tr("Regenerate thumbnail")))
+        app.regenerateBrushThumbnail(e.index);
+    if (e.kind == AssetKind::Recipe && e.index >= 0 && e.index < int(app.doc_.brushes.size()) &&
+        ImGui::MenuItem(tr("Regenerate thumbnail")))
+        app.regenerateRecipeThumbnail(app.doc_.brushes[size_t(e.index)]);
     if (!e.path.empty() && e.kind != AssetKind::Up) {
         ImGui::Separator();
         if (ImGui::MenuItem(tr("Show in file manager"))) {
@@ -1195,7 +1221,7 @@ void App::initLibraryBrowser() {
         std::error_code ec;
         fs::remove_all(fsPath(library_.user), ec);
     } else if (!recording) {
-        const char* docs = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
+        const char* docs = dataLocation().portable ? nullptr : SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS); // (a portable copy's library is data/library)
         library_.user = !uiPrefs_.libraryFolder.empty() ? uiPrefs_.libraryFolder // Preferences > Library
                                                         : defaultUserLibrary(docs ? docs : "", prefDir_);
     }

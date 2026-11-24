@@ -1,0 +1,14 @@
+# Reference for closeup_detail: the plain brushes the presets use, same paths, sizes and strengths.
+run ui_look look=classic layout=classic
+run new_head
+run subdivide levels=3
+wait_idle 120
+run save_obj path=cf_00.obj
+run stroke brush="Sharp Crease" points="-0.03,-0.06,0.2 0.03,-0.06,0.2" radius=0.00117 strength=0.6 spacing=0.1 symmetry=x
+wait_idle 60
+run save_obj path=cf_01.obj
+#step 00 01 any plain Sharp Crease symx
+run stroke brush="Detail Crease" points="-0.03,-0.06,0.2 0.03,-0.06,0.2" symmetry=x
+wait_idle 60
+run save_obj path=cf_02.obj
+#step 01 02 any preset Detail Crease symx

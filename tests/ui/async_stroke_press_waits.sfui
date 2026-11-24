@@ -1,0 +1,55 @@
+# cold
+# xfail: gh#184-follow-up a press while the last stroke drains places fewer dabs than the same stroke after it (about 15% at SF_DAB_DELAY_MS=150); cause not found yet, maybe the backlog thinning in strokeTo
+# A press while the last stroke still drains waits behind it, then runs as if it came after (AsyncStroke.cpp, App::onMouseDown):
+# two strokes far apart, the second pressed at once, leave what the two drawn one after the other leave. (SF_DAB_DELAY_MS slows the
+# stroke thread; ctest sets it with SF_BACKGROUND_DABS, both are read once at startup.)
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=6
+interactive_strokes on
+camera 0 0
+key f
+wait_idle 30
+brush_size 40
+snapshot
+stroke 0.25 0.30 0.35 0.45 0.5
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+stroke 0.60 0.55 0.75 0.70 0.5
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+expect_value moved > 100
+remember moved both_moved
+remember moved_sum both_sum
+key ctrl+z
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+key ctrl+z
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+expect_value moved == 0
+
+stroke 0.25 0.30 0.35 0.45 0.5 hold
+wait 0.2
+release
+expect_value stroke_draining == 1
+stroke 0.60 0.55 0.75 0.70 0.5
+wait_idle 30
+wait_value stroke_draining == 0 30
+wait_real 1
+wait 0.3
+wait_idle 30
+expect_value moved == $both_moved
+expect_value moved_sum > $both_sum*0.999
+expect_value moved_sum < $both_sum*1.001

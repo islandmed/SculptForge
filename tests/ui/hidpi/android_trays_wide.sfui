@@ -1,0 +1,60 @@
+# Android tablets (a member on a Mali-G72 tablet, 0.12.14-beta.2: "I still can't open the Right Tray"; their window: 2000x1200 at UI scale
+# 2.62 = 763 logical px; upright, neither tray opened): with fingers only (no hover, no right click, no keys) each tray opens
+# with one tap on its edge handle and closes with one, and the canvas still takes a stroke after.
+# Wide (1280 logical px and up): as on a desktop, both trays open together.
+run new_sphere subdivisions=3
+snapshot
+
+# --- 1280 logical px (wide): both trays together ---
+logical_width 1280
+wait_idle 30
+expect_value shell_narrow == 0
+expect_value right_tray_shown == 1
+touch_tap "##rightdivider"
+wait_idle 10
+expect_value right_tray_shown == 0
+touch_tap "##rightdivider"
+wait_idle 10
+expect_value right_tray_shown == 1
+touch_tap "##leftdivider"
+wait_idle 10
+expect_value left_tray_shown == 1
+expect_value right_tray_shown == 1
+expect_value canvas_width > 100
+shot wide-1280-both
+touch_stroke 0.5 0.45 0.6 0.55
+expect_value stroking == 0
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+touch_tap "##leftdivider"
+wait_idle 10
+expect_value left_tray_shown == 0
+expect_value right_tray_shown == 1
+
+# --- 1600 logical px (wide): both trays together ---
+logical_width 1600
+wait_idle 30
+expect_value shell_narrow == 0
+expect_value right_tray_shown == 1
+touch_tap "##rightdivider"
+wait_idle 10
+expect_value right_tray_shown == 0
+touch_tap "##rightdivider"
+wait_idle 10
+expect_value right_tray_shown == 1
+touch_tap "##leftdivider"
+wait_idle 10
+expect_value left_tray_shown == 1
+expect_value right_tray_shown == 1
+expect_value canvas_width > 100
+shot wide-1600-both
+touch_stroke 0.5 0.45 0.6 0.55
+expect_value stroking == 0
+expect_value moved_out > 0
+key ctrl+z
+expect_value moved == 0
+touch_tap "##leftdivider"
+wait_idle 10
+expect_value left_tray_shown == 0
+expect_value right_tray_shown == 1

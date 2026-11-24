@@ -1,0 +1,69 @@
+# Vertex paint across subdivision levels (@masterfull95): small dots and blobs painted at the highest level keep their
+# colour when a low-opacity stroke is painted over them at level 1 and the view goes back up. They used to turn black
+# with a pale halo around them. Steps of the filed clip; shots: before the stroke, level 1, back at the top.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+run subdiv_divide
+run subdiv_divide
+run subdiv_divide
+expect_value sdiv_levels == 4
+expect_value subdiv_level == 4
+key f
+zoom 2
+action draw.paint
+run set_color color=c0101c
+# Two blobs and fine dots, painted at the highest level (a small brush for the dots).
+stroke 0.3 0.35 0.4 0.3 0.45 0.37
+stroke 0.7 0.35 0.6 0.3 0.55 0.37
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+key [
+stroke 0.44 0.5 0.44 0.5
+stroke 0.5 0.53 0.5 0.53
+stroke 0.56 0.5 0.56 0.5
+stroke 0.5 0.46 0.5 0.46
+stroke 0.38 0.56 0.38 0.56
+stroke 0.62 0.56 0.62 0.56
+wait_idle
+wait 20
+shot detail-before
+
+run subdiv_level level=1
+expect_value subdiv_level == 1
+run set_color color=30b050
+drag_item "##strength" -2000 0
+drag_item "##strength" 3 0
+expect_value rgb_intensity < 60
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+key ]
+stroke 0.25 0.5 0.75 0.5
+wait_idle
+wait 20
+shot low-level-stroke
+
+run subdiv_level level=4
+expect_value subdiv_level == 4
+wait_idle
+wait 40
+shot detail-after

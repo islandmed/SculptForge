@@ -1,0 +1,1 @@
+# Member betas are paused (tools/ci/check_betas_paused.py). path<TAB>text on the line<TAB>reason. A line that matches nothing fails.

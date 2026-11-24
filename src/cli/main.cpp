@@ -7,10 +7,12 @@
 #include "ai/AiPolicy.h"
 #include "ai/Oidc.h"
 #include "ai/Secrets.h"
+#include "ai/RenderBridge.h"
 #include "ai/SplatTrainer.h"
 #include "cli/McpAttach.h"
 #include "cli/McpServer.h"
 #include "core/Benchmark.h"
+#include "core/Utf8Path.h"
 #include "core/AuditLog.h"
 #include "core/BrushLibrary.h"
 #include "core/Commands.h"
@@ -46,6 +48,7 @@ void usage() {
         "      --no-packs             Safe mode: leave every installed pack out (pack_install still works)\n"
         "      --studio FILE          Studio mode with this studio profile (studio.json; docs/studios.md)\n"
         "      --offline              Studio mode without a profile: no outside connection at all\n"
+        "      --render-helper PATH   The render bridge's helper for render_bridge (usdrecord; else the app's choice)\n"
         "      --policy               Show what your studio's policy file manages (docs/studios.md \"IT deployment\")\n"
         "      --sign-in              Sign in with your studio account (the policy's identity provider; device code)\n"
         "      --sign-out             Sign out of your studio account\n"
@@ -57,6 +60,7 @@ void usage() {
         "      --bench-no-project     Skip the project save / open (it needs twice the memory)\n"
         "      --bench-view           Benchmark only what the viewport costs (uploads, orbit)\n"
         "      --bench-dyntopo        Benchmark dynamic topology strokes (e.g. --bench-sizes 0.25,1,4)\n"
+        "      --bench-dyntopo-uvs    The same on a painted Part (UVs and a texture)\n"
         "      --bench-micro          Benchmark micro-displacement levels (sizes = micro triangles, e.g. 33,100,300)\n"
         "      --bench-micro-level N  Micro level for --bench-micro (default 4: 256 per base triangle)\n"
         "      --bench-out FILE       Write the benchmark report (Markdown) to FILE\n"
@@ -76,11 +80,13 @@ int main(int argc, char** argv) {
     // while AI is on there (Preferences > AI), SF_AI allows it and --no-ai isn't given (ai/AiPolicy.h).
     std::string studioProfile;
     bool offline = false;
+    std::string renderHelper; // --render-helper PATH: the render bridge's helper for this run (ai/RenderBridge.h)
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
         if (a == "--no-ai") sf::ai::setAiForcedOff(true);
         else if (a == "--studio" && i + 1 < argc) studioProfile = argv[i + 1];
         else if (a == "--offline") offline = true;
+        else if (a == "--render-helper" && i + 1 < argc) renderHelper = argv[i + 1];
     }
     { // studio mode (core/StudioProfile.h) before anything can reach the network
         std::error_code ec;
@@ -99,6 +105,9 @@ int main(int argc, char** argv) {
     sf::ai::registerAiCommands(registry, [] { return sf::ai::AiSettings::load(sf::ai::defaultAiSettingsPath()); });
     // splat_train: trains in the foreground with the app's tool settings (ai/SplatTrainer.h).
     sf::ai::registerSplatTrainCommands(registry, [] { return sf::ai::SplatTrainSettings::load(sf::ai::defaultSplatTrainSettingsPath()); });
+    // render_bridge: a still through the render helper set up in the app (ai/RenderBridge.h), in the foreground.
+    sf::renderbridge::registerCommands(registry, [] { return sf::renderbridge::Settings::load(sf::renderbridge::defaultSettingsPath()); },
+                                      renderHelper);
     std::string script;
     bool quiet = false;
     std::map<std::string, std::string> vars;
@@ -136,6 +145,8 @@ int main(int argc, char** argv) {
                 return 1;
             }
             vars[kv.substr(0, eq)] = kv.substr(eq + 1);
+        } else if (a == "--acp-selftest") {
+            return sf::utf8CodePageSelfTest();
         } else if (a == "-l" || a == "--list") {
             for (const auto& c : registry.all()) {
                 std::printf("%-18s %s\n", c.name.c_str(), c.description.c_str());
@@ -174,7 +185,7 @@ int main(int argc, char** argv) {
         } else if (a == "--mcp") {
             // --attach: drive the open app (live mode, cli/McpAttach.h) instead of a scene of our own.
             for (int j = i + 1; j < argc; ++j)
-                if (std::string(argv[j]) == "--attach") return sf::runMcpAttach(std::cin, std::cout);
+                if (std::string(argv[j]) == "--attach") return sf::runMcpAttach(std::cin, std::cout, {}, &registry);
             return sf::runMcpServer(registry, std::cin, std::cout);
         } else if (a == "--schema") {
             std::puts(registry.toolSchemaJson().c_str());
@@ -185,7 +196,7 @@ int main(int argc, char** argv) {
             // read before the commands were registered
         } else if (a == "--no-packs") {
             sf::setPacksSafeMode(true);
-        } else if (a == "--studio") {
+        } else if (a == "--studio" || a == "--render-helper") {
             ++i; // read before the commands were registered
         } else if (a == "--offline") {
         } else if (a == "-q" || a == "--quiet") {

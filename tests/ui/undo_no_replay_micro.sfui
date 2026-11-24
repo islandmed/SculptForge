@@ -1,0 +1,55 @@
+# gh#184: undo N strokes, one new stroke: no undone stroke comes back, on a micro level (a 20K base at Micro 4, the same
+# 5M micro triangles) with Keep Strokes Editable off. The reference is the stroke alone (micro grid points changed).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+run micro_divide level=4
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+brush_size 50
+
+snapshot
+stroke 0.40 0.45 0.60 0.55 0.5
+wait_idle 30
+expect_value micro_moved > 100
+remember micro_moved ref_grid
+key ctrl+z
+wait_idle 30
+expect_value micro_moved == 0
+expect_value view_stale < 0.3
+
+stroke 0.40 0.40 0.60 0.60 0.5
+wait_idle 30
+stroke 0.45 0.55 0.65 0.45 0.5
+wait_idle 30
+stroke 0.35 0.50 0.60 0.50 0.5
+wait_idle 30
+key ctrl+z
+wait_idle 30
+key ctrl+z
+wait_idle 30
+key ctrl+z
+wait_idle 30
+expect_value micro_moved == 0
+expect_value view_stale < 0.3
+snapshot
+stroke 0.40 0.45 0.60 0.55 0.5
+wait_idle 30
+expect_value micro_moved == $ref_grid
+expect_value view_stale < 0.3
+key ctrl+z
+wait_idle 30
+expect_value micro_moved == 0
+expect_value view_stale < 0.3
+
+# No wait between the undos and the new stroke.
+stroke 0.40 0.40 0.60 0.60 0.5
+stroke 0.45 0.55 0.65 0.45 0.5
+key ctrl+z
+key ctrl+z
+snapshot
+stroke 0.40 0.45 0.60 0.55 0.5
+wait_idle 30
+expect_value micro_moved == $ref_grid
+expect_value view_stale < 0.3

@@ -34,6 +34,7 @@ namespace sf::whatsnew {
 inline constexpr int kDetailed = 3;      // versions shown in full
 inline constexpr int kSeriesGroups = 2;  // folded series with a group of their own; older ones share the last group
 inline constexpr int kMaxHighlights = 6; // one-line highlights per group
+inline constexpr int kSinceCards = 8;    // cards in the "New since" window; the rest become "and N more improvements"
 
 struct Card {
     std::string title, line, image, action, link;
@@ -78,6 +79,17 @@ int compareVersions(std::string_view a, std::string_view b);
 bool parseFeatures(std::string_view text, Version& v, std::string& error);
 // The chapter's versions, those newer than CURRENT left out ("" keeps all), grouped as described above.
 Page build(const guide::Document& doc, std::string_view current, int detailed = kDetailed);
+// What the window shows after an update: the cards of every version newer than SINCE up to the newest in PAGE, newest
+// version first and each version's cards in the order its features block lists them (its lead card first), at most
+// MAXCARDS; MORE counts what was left out (the cards beyond the cap and the highlights of versions without cards).
+struct Since {
+    std::vector<Card> cards;
+    std::vector<std::string> cardVersions; // the version each card is from
+    std::vector<std::string> versions;     // the versions covered, newest first
+    int more = 0;
+};
+// SINCE empty, not older than the newest version, or unknown: just the newest version (as Help > What's New shows it).
+Since cardsSince(const Page& page, std::string_view since, int maxCards = kSinceCards);
 // "Title: one line" -> {"Title", "one line"}; no colon: {"", text}.
 std::pair<std::string, std::string> splitHighlight(std::string_view highlight);
 

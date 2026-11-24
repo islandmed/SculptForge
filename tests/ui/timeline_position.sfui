@@ -30,8 +30,9 @@ shot bottom
 # The choice saves itself (#117): it is still there after a restart, and so is the next one.
 restart
 expect_value timeline_top == 0
+# (the open Interface section is part of the layout, which saves itself too: it is still open after the restart)
 click "Preferences##palette.preferences"
-click "Interface##preferences.interface"
+expect "Top of viewport##view.timeline_top"
 click "Top of viewport##view.timeline_top"
 key escape
 expect_value timeline_top == 1

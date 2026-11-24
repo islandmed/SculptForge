@@ -1,0 +1,40 @@
+# Paint mode with a pen (macOS 0.13.9 report: the pen never coloured, Paint on and Sculpt off on the top shelf): the tip
+# colours whatever brush was picked before Paint, Smooth included. A side button or the eraser end set to Smooth
+# smooths only while it is down / flipped, and the next plain tip stroke paints again.
+run ui_look look=classic layout=classic
+wait 0.2
+run new_sphere subdivisions=5
+run set_color color=ff0000
+snapshot
+
+# Baseline: Paint on, the default brush, the pen's tip.
+action draw.paint
+expect_value paint_mode == 1
+remember paint_mean_g white_g
+pen_stroke 0.3 0.5 0.7 0.5 0.6 0.6
+expect_value paint_mean_g < $white_g
+expect_value moved_sum <= 0.000001
+key ctrl+z
+pen_out
+
+# Smooth picked first, then Paint.
+action brush.smooth
+action draw.paint
+pen_stroke 0.3 0.5 0.7 0.5 0.6 0.6
+expect_value paint_mean_g < $white_g
+expect_value moved_sum <= 0.000001
+key ctrl+z
+pen_out
+
+# The eraser end mapped to Smooth: it blends the colour (none to blend on white), then the tip paints again.
+click "Preferences##palette.preferences"
+click "Tablet##preferences.tablet"
+click "##Eraser"
+click "Smooth (Shift)##Eraser"
+key escape
+pen_out
+pen_stroke 0.3 0.5 0.7 0.5 0.6 0.6 eraser
+expect_value paint_mean_g >= $white_g
+pen_out
+pen_stroke 0.3 0.5 0.7 0.5 0.6 0.6
+expect_value paint_mean_g < $white_g

@@ -7,7 +7,7 @@ list. User documentation: [docs/guide/blender.md](guide/blender.md).
 Code: `src/io/BlenderBridge.h/.cpp` (folder, manifest, send/receive), `src/io/BlenderCommands.cpp`
 (`blender_send`, `blender_receive`), `src/app/PanelBlender.cpp` (File > Blender, polling, heartbeat),
 `addons/blender/sculptforge_bridge/exchange.py` (the add-on's bpy-free side: folder, manifest, Bridge file, faces) and
-`__init__.py` (Blender UI, mesh <-> arrays). Tests: `tests/test_blender_bridge.cpp`,
+`__init__.py` (Blender UI, mesh <-> arrays). Tests: `tests/test_blender_bridge.cpp` (also `blender_splats_round_trip`),
 `tests/blender/test_exchange.py` (numpy, against `sculptforge-cli`), `tests/blender/test_in_blender.py` (a real
 Blender or the `bpy` wheel; CI), `tests/ui/blender_bridge.sfui`.
 
@@ -68,13 +68,26 @@ Windows).
   holds the mesh in object space. SculptForge places it with `A * M * A^-1` where `A` maps Blender
   `(x, y, z)` to SculptForge `(x, z, -y)` (metres both). SculptForge -> Blender sends world space without a
   matrix; the add-on applies the inverse of the object's current `matrix_world`.
-- `shapes` (SculptForge -> Blender only, optional): a file beside the Bridge file with the object's sculpt layers, which
-  the add-on turns into shape keys (a Basis, then one key per layer with its name and weight; the 52 ARKit facial
-  shapes keep their names). The Bridge file then holds the base shape (every layer at zero). Layout (little endian):
+- `shapes` (optional, both directions): a file beside the Bridge file with the object's sculpt layers / shape keys. The Bridge
+  file then holds the base shape (every layer at zero, the Basis). SculptForge -> Blender: the add-on turns it into shape
+  keys (a Basis, then one key per layer with its name and weight; the 52 ARKit facial shapes keep their names); the offsets
+  are world space. Blender -> SculptForge: one entry per shape key but the Basis, in the key list's order, each the key's
+  points minus the Basis's (not relative to its "relative to" key), at the key's value; the offsets are in the object's own
+  space like the Bridge file, and SculptForge applies the linear part of `matrix_world` to them as it does to the positions.
+  SculptForge reads each entry as a sculpt layer with that name and weight. A file for another vertex count is skipped with
+  a note. Layout (little endian):
   `"SFSHAPES"`, u32 version 1, u32 vertex count, u32 shape count, then per shape u32 name length, the UTF-8 name,
-  f32 weight, u32 count N, u32[N] vertex indices, f32[3N] offsets in Blender's axes (world space, metres).
+  f32 weight, u32 count N, u32[N] vertex indices, f32[3N] offsets in Blender's axes (metres). A shape with N = 0 is kept.
   Older add-ons ignore the field (and then get the base shape without the keys).
 - Version: readers refuse a manifest with a higher `version` and say which side to update.
+
+- `splats` (optional, beside `objects`; older readers skip the key, so the version stays 1): Gaussian splat objects, each
+  `{name, file, matrix_world}` with a standard 3DGS PLY (`f_dc_*`, `f_rest_*` channel-major, logit `opacity`, log
+  `scale_*`, `rot_*` as w, x, y, z; SH up to degree 3). The PLY holds the splats **as they are in the object**, in
+  both directions: nothing is rotated or baked, so view-dependent colour (spherical harmonics) keeps pointing the
+  right way. SculptForge keeps one capture: the first entry is loaded, with `SplatCloud::transform` set to
+  `A * matrix_world` (`splatPlacementFromBlender`: scale made uniform, rotation orthonormal), and it sends its capture
+  back with `A^-1 * transform` as the matrix. So Flip / Turn 90 / Fit in SculptForge move the Blender object, not the data.
 
 ## Faces, winding and in-place updates
 
@@ -101,6 +114,27 @@ quads, reversed back for a mirrored object.
 | `.sculpt_mask` (float, point) | mask (1 = masked). A send without a mask section removes `.sculpt_mask` |
 | `.sculpt_face_set` (int, face) | face group = face set - 1 (16-bit, renumbered if out of range) |
 
+## Gaussian splats (Blender 5.3+)
+
+Blender 5.3 (`projects.blender.org` PR 163102, design issue 159470) stores splats as a point cloud whose `type` is
+`'GAUSSIAN_SPLAT'`, with the attributes `scale` (linear: the PLY's log already exponentiated), `rotation` (quaternion),
+`radiance:base` (a float4: the band-0 coefficient `f_dc` and the linear opacity) and `radiance:sh_<k>` (a float3 per
+further coefficient, in PLY order: the k-th of `f_rest` for red, green and blue). It imports PLY (the importer
+recognises splats by `f_dc_*`, `opacity`, `scale_*`, `rot_*` and no faces), SPZ, glTF and USD, also on a viewport
+drop, and has **no export**. The add-on therefore
+
+- **receives** through `bpy.ops.wm.ply_import` (Blender's own decoding; identity axes, the matrix is set from the manifest)
+  and swaps the data into an object of the same name, so its collections, materials and modifiers stay;
+- **sends** by reading the attributes with `foreach_get` and writing the PLY itself (`splats.py`, numpy only);
+- adds **File > Export > Gaussian Splats (.ply)** (world space by default: `splats.baked`; a turned splat keeps band 0
+  only, like `SplatCloud::bakeTransform`) and a `FileHandler` for the compact `.splat` format on viewport drops;
+- refuses cleanly on older Blenders (`splats_supported()` looks for the enum value): a message, no change.
+
+Apply Transform on a splat object is wrong in Blender 5.3 (it does not update rotation and SH), which is one more
+reason the placement travels as a matrix. Blender assumes sRGB splats. Tests: `test_exchange.py` (PLY, `.splat`, baking,
+a round trip through `sculptforge-cli`), `test_in_blender.py` `test_splats` (import, attributes against the PLY, the
+round trip through SculptForge, export, `.splat`), run against bpy 5.3.0 in CI; 4.2 and 5.2 check the refusal.
+
 ## Starting SculptForge
 
 On send, the add-on treats SculptForge as running when `alive.json` is less than 6 seconds old. SculptForge beats
@@ -126,7 +160,7 @@ folder for **Add-ons > Install from Disk**), with fixed timestamps. CMake: `--ta
 `addons/blender/sculptforge_bridge/classic_keys.py`: the add-on preference `classic_keys` adds items to the add-on
 keyconfig's "Sculpt" keymap (`key_table()`) and removes exactly those again (`disable()`, also on unregister).
 Add-on keymap items take priority over Blender's own while they exist. Things that differ between versions,
-found by running real Blender 4.2.23 and 5.2.3 headless:
+found by running real Blender 4.2.23, 5.2.3 and 5.3.0 headless (CI runs the same three through the bpy wheel):
 
 - The radial controls' unified size / strength are `tool_settings.unified_paint_settings` in 4.2 and per mode,
   `tool_settings.sculpt.unified_paint_settings`, in 5 (`_unified_path()`).

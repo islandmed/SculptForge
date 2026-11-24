@@ -1,11 +1,16 @@
 # Brush Lab and sharing brushes
 
+![Brush Lab with a brush designed from a description](images/brush-lab.jpg)
+
+> **In short:**
+> - Describe a brush in words ("dry cracked mud") and an AI model builds it.
+> - Refine it in words, or tune every recipe value with sliders.
+> - Share brushes as `.sfbrush` files, one-line brush codes, studio folders or the gallery.
+
 Brush Lab designs sculpting brushes from a description: type "dry cracked mud" and an AI model builds the
 brush, then you refine it in words or with sliders. This chapter covers Brush Lab, the AI providers it can use,
 the recipe settings, your brush library, and the ways to share brushes: `.sfbrush` files, one-line brush
 codes, studio folders and the community gallery.
-
-![Brush Lab with a brush designed from a description](images/brush-lab.jpg)
 
 ## What a custom brush is
 
@@ -18,10 +23,12 @@ with <kbd>Alt</kbd>, <kbd>Shift</kbd>, masks, symmetry, strokes and alphas.
 
 ## Open Brush Lab
 
-Click **AI Brush** on the top shelf, or **AI Brush** at the top of **Sculpt > Brush**. Brush Lab is a
-floating window; it opens at the top-left corner of the canvas the first time, and you can drag it anywhere.
-Click the button again, or the window's close box, to hide it. Not there? AI features are off: turn them on in
-**Edit > Preferences > AI** (see [Turning AI off](interface.md#turning-ai-off)).
+Click **AI Brush** on the top shelf, or **AI Brush** at the top of **Sculpt > Brush**. Brush Lab is a floating window;
+it opens at the top-left corner of the canvas the first time, and you can drag it anywhere. Click the button again, or
+the window's close box, to hide it.
+
+Not there? AI features are off: turn them on in **Edit > Preferences > AI** (see [Turning AI
+off](interface.md#turning-ai-off)).
 
 ## Design a brush
 
@@ -66,6 +73,10 @@ description.
 | **Jitter** | 0 to 1 | Random scatter of dabs around the stroke. |
 | **Pressure curve** | 0.3 to 3 | Tablet response: above 1 needs a firmer press, below 1 responds to a light touch. |
 | **Front faces only** | on / off | Only affects surfaces facing the camera, protecting thin parts. |
+| **Connected only** | on / off | Only reaches the surface joined to the point under the cursor. |
+| **View falloff** | on / off | Measures the falloff on screen, as a cylinder through the model along the view. |
+| **Lock plane** | on / off | The plane is taken where the stroke starts and kept for the whole stroke, so one stroke cuts one flat face. Off, the plane follows the surface under each dab. |
+| **Crisp edge** | on / off | Full strength out to a hard edge with a thin smoothed band (about two or three polygons wide, so the edge doesn't stair-step), the plane pulled all the way at the default Intensity, and, on a Flatten plane, only cutting (nothing below the plane is raised; a Fill plane still fills shallow dips). Hardness and Tip sharpness don't apply. |
 | **Cavity mask** | -1 to 1 | Positive: only cavities. Negative: only ridges and peaks (as Edge Wear does). |
 
 The name field at the top of the editor renames the brush when you press <kbd>Enter</kbd>.
@@ -96,11 +107,12 @@ Each choice fills in the address and a model:
 | **OpenRouter** | An OpenRouter key | Many models through one key. |
 | **Other OpenAI-compatible server** | An endpoint, a model name and, for hosted services, a key | Any server that speaks the OpenAI chat completions API. |
 
-You can edit the **Endpoint**, **Model** and **API key** fields. Leave the key empty to use the
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `OPENROUTER_API_KEY` environment variable. Click **Save settings** to keep
-your choice. Keys are kept in your system's keychain (macOS Keychain, Windows Credential Manager, or the Secret
-Service on Linux), never in a settings file. Requests go only to the endpoint you set. If your studio manages
-SculptForge, some providers may be greyed out with **Managed by your studio**.
+You can edit the **Endpoint**, **Model** and **API key** fields. Leave the key empty to use the `ANTHROPIC_API_KEY`,
+`OPENAI_API_KEY` or `OPENROUTER_API_KEY` environment variable. Click **Save settings** to keep your choice.
+
+Keys are kept in your system's keychain (macOS Keychain, Windows Credential Manager, or the Secret Service on Linux),
+never in a settings file. Requests go only to the endpoint you set. If your studio manages SculptForge, some providers
+may be greyed out with **Managed by your studio**.
 
 The first time a provider on someone else's computer would receive a request (Free included), Brush Lab says what is
 sent, where, and who pays, and waits for **Allow**. See [What leaves your computer](interface.md#what-leaves-your-computer).
@@ -197,11 +209,13 @@ The file format and every key are documented in
 
 ### Studio brush folders
 
-A studio can share brushes read-only from network folders. Set the environment variable
-`SCULPTFORGE_BRUSH_PATH` to one or more folders (separated by `:` on Linux and macOS, `;` on Windows). Every
-`.sfbrush` file in them loads at start-up, tagged `studio`. Artists can't change or delete studio brushes; if
-they edit one, their own version is saved in their library under the same name. The Rez package adds the
-folder in `SCULPTFORGE_STUDIO_BRUSHES` to this path. See [For studios](studios.md).
+A studio can share brushes read-only from network folders. Set the environment variable `SCULPTFORGE_BRUSH_PATH` to
+one or more folders (separated by `:` on Linux and macOS, `;` on Windows). Every `.sfbrush` file in them loads at
+start-up, tagged `studio`.
+
+Artists can't change or delete studio brushes; if they edit one, their own version is saved in their library under the
+same name. The Rez package adds the folder in `SCULPTFORGE_STUDIO_BRUSHES` to this path. See [For
+studios](studios.md).
 
 Projects (`.sfproj`) also store the brushes they use, so a scene opens with its brushes on any machine.
 

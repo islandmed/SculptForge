@@ -274,6 +274,9 @@ bool PhoneLink::start(const PhoneLinkOptions& options, std::string& error) {
     {
         std::lock_guard lock(mutex_);
         newToken();
+        deckEnabled_ = false; // Forge Deck: off at every start
+        deckSeenEver_ = false;
+        deckActions_.clear();
         addresses_ = localNetworkAddresses();
         address_ = addresses_.empty() ? "127.0.0.1" : addresses_.front();
         lastError_.clear();
@@ -296,6 +299,7 @@ void PhoneLink::stop() {
     if (!running_ && !server_.running()) return;
     server_.stop();
     stopRelay();
+    stopDeckRelay();
     {
         std::lock_guard lock(rtcMutex_);
         if (rtc_) rtc_->close();
@@ -312,6 +316,9 @@ void PhoneLink::stop() {
     faceConnected_ = false;
     seen_ = false;
     paired_ = false;
+    deckEnabled_ = false;
+    deckSeenEver_ = false;
+    deckActions_.clear();
     arGlb_.clear();
     arUsdz_.clear();
     arBusy_ = false;
@@ -551,6 +558,7 @@ std::string PhoneLink::statusJson() {
     face.set("recording", take_.isOpen());
     j.set("face", face);
     j.set("captures", double(capturesReceived_));
+    j.set("deck", deckEnabled_);
     return j.dump();
 }
 
@@ -1045,19 +1053,33 @@ void PhoneLink::onFaceState(int state) {
     }
 }
 
-bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar, const std::string& arScope, float arSizeCm) {
+bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar, const std::string& arScope, float arSizeCm,
+                               bool deck) {
     if (!webrtcAvailable()) {
-        error = ar ? "This SculptForge was built without WebRTC, so AR on Android is not available (use Download)."
-                   : "This SculptForge was built without WebRTC, so the live face feed is not available.";
+        error = deck ? "This SculptForge was built without WebRTC, so the Forge Deck is not available."
+                : ar ? "This SculptForge was built without WebRTC, so AR on Android is not available (use Download)."
+                     : "This SculptForge was built without WebRTC, so the live face feed is not available.";
+        return false;
+    }
+    if (deck && !deckEnabled()) {
+        error = "The Forge Deck is off";
         return false;
     }
     std::lock_guard linkLock(faceLinkMutex_); // one new face link at a time
     stopRelay();                               // (outside rtcMutex_: the relay thread takes it to answer)
+    stopDeckRelay();
     std::lock_guard rtcLock(rtcMutex_);
     if (rtc_) rtc_->close();
-    rtc_ = std::make_unique<FaceRtc>(ar ? FaceRtc::Mode::Ar : FaceRtc::Mode::Face, uint16_t(port()));
+    rtc_ = std::make_unique<FaceRtc>(ar ? FaceRtc::Mode::Ar : deck ? FaceRtc::Mode::Deck : FaceRtc::Mode::Face, uint16_t(port()));
     arSentVersion_ = 0;
-    if (ar) {
+    deckStateSentSerial_ = 0;
+    if (deck) {
+        rtc_->onMessage = [this](const std::string& text) {
+            std::string err;
+            receiveDeckMessage(text, "WebRTC", err);
+        };
+        rtc_->onState = [this](FaceRtc::State s) { onDeckState(int(s)); };
+    } else if (ar) {
         rtc_->onMessage = [this](const std::string& text) {
             std::string err;
             receiveArMessage(text, err);
@@ -1072,6 +1094,12 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar
     std::string sdp;
     if (!rtc_->createOffer(sdp, error)) {
         rtc_.reset();
+        return false;
+    }
+    if (deck && !deckEnabled()) { // switched off while the offer was being made (kill switch, window closed)
+        rtc_->close();
+        rtc_.reset();
+        error = "The Forge Deck is off";
         return false;
     }
     const std::string topic = "sculptforge-" + hex(randomBytes(12));
@@ -1089,6 +1117,7 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar
     std::string page = options_.siteUrl;
     // ?v= changes with each page change that SculptForge depends on, so phones don't use a cached older copy.
     if (ar) page = page.substr(0, page.rfind('/') + 1) + "ar.html?v=5";
+    if (deck) page = page.substr(0, page.rfind('/') + 1) + "deck.html?v=1";
     // AR: the model also goes through our relay (its /blob/ path), for phones whose browser can't reach this computer.
     std::string blobUrl;
     if (ar)
@@ -1130,7 +1159,22 @@ bool PhoneLink::createFaceLink(std::string& faceUrl, std::string& error, bool ar
         relayThread_ = std::thread([this, topic, key, since] { relayLoop(topic, key, since); });
     }
     if (ar) uploadArModel(); // the current model, if there is one
+    if (deck) {
+        faceUrl += "&m=deck";
+        // The fallback: the relay's /deck/ mailbox and the tiles' blob (our own relay only: ntfy.sh can't carry it).
+        for (const std::string& relay : relays)
+            if (const size_t at = relay.rfind("/relay/"); at != std::string::npos && at + 7 == relay.size()) {
+                const std::string base = relay.substr(0, at);
+                faceUrl += "&b=" + percentEncode(base + "/blob/" + topic);
+                deckRelayThread_ = std::thread([this, base, topic, key] { deckRelayLoop(base, topic, key); });
+                break;
+            }
+    }
     return true;
+}
+
+bool PhoneLink::createDeckLink(std::string& deckUrl, std::string& error) {
+    return createFaceLink(deckUrl, error, false, "part", 20.0f, true);
 }
 
 HttpResponse PhoneLink::faceLink(const HttpRequest& request) {
@@ -1236,6 +1280,325 @@ void PhoneLink::stopRelay() {
     relayStop_ = true;
     if (relayThread_.joinable()) relayThread_.join();
     relayStop_ = false;
+}
+
+
+// --- Forge Deck (prototype) ---
+
+void PhoneLink::setDeckEnabled(bool on) {
+    std::lock_guard lock(mutex_);
+    deckEnabled_ = on;
+    if (!on) {
+        deckActions_.clear();
+        deckSeenEver_ = false;
+    }
+}
+
+bool PhoneLink::deckEnabled() const {
+    std::lock_guard lock(mutex_);
+    return deckEnabled_;
+}
+
+void PhoneLink::setDeckState(std::string json) {
+    std::lock_guard lock(mutex_);
+    deckState_ = std::move(json);
+    ++deckStateSerial_;
+}
+
+void PhoneLink::setDeckImage(const std::string& name, std::string png) {
+    std::lock_guard lock(mutex_);
+    deckImages_[name] = std::move(png);
+    deckImagesUnsent_.insert(name);
+    ++deckImagesSerial_;
+}
+
+bool PhoneLink::hasDeckImage(const std::string& name) const {
+    std::lock_guard lock(mutex_);
+    return deckImages_.count(name) != 0;
+}
+
+std::vector<DeckAction> PhoneLink::takeDeckActions() {
+    std::lock_guard lock(mutex_);
+    std::vector<DeckAction> out(deckActions_.begin(), deckActions_.end());
+    deckActions_.clear();
+    return out;
+}
+
+DeckStatus PhoneLink::deckStatus() const {
+    std::lock_guard lock(mutex_);
+    DeckStatus s;
+    s.enabled = deckEnabled_;
+    s.device = deckDevice_;
+    if (deckSeenEver_) {
+        s.secondsSinceSeen = std::chrono::duration<double>(Clock::now() - deckSeen_).count();
+        s.connected = deckEnabled_ && s.secondsSinceSeen < 6.0;
+    }
+    s.accepted = deckAccepted_;
+    s.refused = deckRefused_;
+    s.lastRefusal = deckLastRefusal_;
+    s.transport = deckTransport_;
+    return s;
+}
+
+void PhoneLink::deckDisconnect() {
+    {
+        std::lock_guard rtcLock(rtcMutex_); // (the relay thread isn't joined here: its answers find no link and stop)
+        if (rtc_ && rtc_->mode() == FaceRtc::Mode::Deck) {
+            rtc_->send("{\"type\":\"bye\"}");
+            rtc_->close();
+            rtc_.reset();
+        }
+    }
+    deckRelayBye_ = true; // the relay thread tells the page (a phone on the relay) and ends
+    std::lock_guard lock(mutex_);
+    deckEnabled_ = false;
+    deckSeenEver_ = false;
+    deckActions_.clear();
+    deckTransport_.clear();
+    newToken(); // the paired phone's link is dead; the next QR code is a new one
+    pushEvent(PhoneEvent::make(PhoneEvent::Type::Error, "Forge Deck disconnected"));
+}
+
+void PhoneLink::onDeckState(int state) {
+    const auto s = FaceRtc::State(state);
+    std::lock_guard lock(mutex_);
+    if (s == FaceRtc::State::Closed || s == FaceRtc::State::Failed) {
+        if (deckSeenEver_) pushEvent(PhoneEvent::make(PhoneEvent::Type::Error, "Forge Deck: the phone's link closed"));
+        deckSeenEver_ = false;
+        deckTransport_.clear();
+    }
+}
+
+// Every message from the Deck page, whatever carried it. The page is an untrusted remote: control messages are
+// three fixed shapes, everything else must be exactly one allowlisted command (DeckCommands.h). Refusals are
+// counted, shown on the desktop and logged.
+bool PhoneLink::receiveDeckMessage(const std::string& text, const std::string& transport, std::string& error) {
+    std::unique_lock lock(mutex_);
+    if (!deckEnabled_) {
+        error = "Forge Deck is off";
+        return false;
+    }
+    auto refuse = [&](const std::string& message) {
+        ++deckRefused_;
+        deckLastRefusal_ = message;
+        error = message;
+        pushEvent(PhoneEvent::make(PhoneEvent::Type::Error, "Forge Deck refused a request: " + message));
+        const auto log = deckLog_;
+        lock.unlock();
+        if (log) log("refused", false, message);
+        return false;
+    };
+    if (text.size() > kMaxDeckMessageBytes) return refuse("message too long");
+    Json msg;
+    std::string why;
+    if (!Json::parse(text, msg, why) || !msg.isObject()) return refuse("not a command");
+    auto touch = [&] {
+        deckSeen_ = Clock::now();
+        deckSeenEver_ = true;
+        deckTransport_ = transport;
+    };
+    if (!msg.has("cmd")) { // control: {"type":"hello","ua":"..."} {"type":"ping"} {"type":"bye"}
+        const std::string type = msg["type"].asString();
+        if (!deckControlLimit_.allow()) return refuse("too many messages a second");
+        if (type == "hello") {
+            deckDevice_ = describeDevice(msg["ua"].asString().substr(0, 400));
+            touch();
+            // The page (re)starts: it needs the state and every tile again.
+            for (const auto& [name, png] : deckImages_) deckImagesUnsent_.insert(name);
+            deckStateSerial_++;
+            if (wake_) wake_();
+            return true;
+        }
+        if (type == "ping") {
+            touch();
+            deckPong_ = true; // the page ends the link when nothing comes back for 7 seconds
+            if (wake_) wake_();
+            return true;
+        }
+        if (type == "bye") {
+            deckSeenEver_ = false;
+            deckActions_.clear();
+            pushEvent(PhoneEvent::make(PhoneEvent::Type::Error, "Forge Deck: the phone disconnected"));
+            return true;
+        }
+        return refuse("not a command");
+    }
+    DeckAction action;
+    // (the command's own refusal text is plain words and cut: see parseDeckMessage)
+    if (!deckLimit_.allow()) return refuse("too many commands a second");
+    if (deckActions_.size() >= kMaxQueuedDeckActions) return refuse("the desktop is busy: too many commands waiting");
+    if (!parseDeckMessage(text, action, why)) return refuse(why);
+    touch();
+    ++deckAccepted_;
+    deckActions_.push_back(action);
+    const auto log = deckLog_;
+    lock.unlock();
+    if (log) log(deckCommandName(action.command), true, action.name);
+    if (wake_) wake_();
+    return true;
+}
+
+std::string PhoneLink::deckStateMessage(uint64_t& serial) {
+    std::string state, desktop;
+    {
+        std::lock_guard lock(mutex_);
+        serial = deckStateSerial_;
+        state = deckState_;
+        desktop = options_.desktopName.empty() ? std::string("SculptForge") : options_.desktopName;
+    }
+    Json j;
+    std::string err;
+    if (!Json::parse(state, j, err) || !j.isObject()) j = Json::object();
+    j.set("type", "state");
+    j.set("desktop", desktop);
+    return j.dump();
+}
+
+void PhoneLink::pumpDeck() {
+    // Called every frame on the main thread: never wait behind a new link being made (createOffer takes seconds).
+    std::unique_lock rtcLock(rtcMutex_, std::try_to_lock);
+    if (!rtcLock.owns_lock()) return;
+    if (!rtc_ || rtc_->mode() != FaceRtc::Mode::Deck || rtc_->state() != FaceRtc::State::Connected) return;
+    std::vector<std::pair<std::string, std::string>> tiles;
+    bool pong = false;
+    uint64_t serial;
+    {
+        std::lock_guard lock(mutex_);
+        if (!deckEnabled_ || !deckSeenEver_ || deckTransport_ != "WebRTC") return; // nothing goes to a page that hasn't said hello
+        serial = deckStateSerial_;
+        pong = std::exchange(deckPong_, false);
+        for (auto it = deckImagesUnsent_.begin(); it != deckImagesUnsent_.end();) {
+            const auto image = deckImages_.find(*it);
+            if (image != deckImages_.end() && image->second.size() <= 128 * 1024) tiles.emplace_back(image->first, image->second);
+            it = deckImagesUnsent_.erase(it);
+        }
+    }
+    if (pong) rtc_->send("{\"type\":\"pong\"}");
+    for (const auto& [name, png] : tiles) { // a tile: its header, then the PNG as one binary message
+        Json head = Json::object();
+        head.set("type", "img");
+        head.set("name", name);
+        head.set("bytes", double(png.size()));
+        if (!rtc_->send(head.dump()) || !rtc_->sendBinary(png)) return;
+    }
+    if (serial != deckStateSentSerial_ && rtc_->send(deckStateMessage(serial))) deckStateSentSerial_ = serial;
+}
+
+void PhoneLink::stopDeckRelay() {
+    deckRelayStop_ = true;
+    if (deckRelayThread_.joinable()) deckRelayThread_.join();
+    deckRelayStop_ = false;
+    deckRelayBye_ = false;
+}
+
+// The relay fallback for a phone whose browser can't reach this computer (or whose Wi-Fi link dropped): the page's
+// commands arrive as AES-GCM envelopes {"d":"p2d","s":sequence,"m":the message}, and the state goes back the same
+// way ("d2p"). Only the relay's /deck/ mailbox is used (services/link-worker). It polls only while the direct
+// link is down and for at most 5 minutes after the last sign of the page. An envelope that isn't for this
+// direction, doesn't decrypt, or whose sequence number isn't higher than the last one is dropped (forged, replayed
+// or reordered); a surviving message goes through the same allowlist as the direct channel.
+void PhoneLink::deckRelayLoop(std::string base, std::string topic, std::string key) {
+    const std::string upUrl = base + "/deck/" + topic + "/up", downUrl = base + "/deck/" + topic + "/down",
+                      blobUrl = base + "/blob/" + topic;
+    const std::vector<std::string> json = {"Content-Type: text/plain"};
+    auto slice = [&](int ms) {
+        for (int i = 0; i < ms / 100 && !deckRelayStop_; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    };
+    auto postDown = [&](const std::string& message, double seq) {
+        Json env = Json::object();
+        env.set("d", "d2p");
+        env.set("s", seq);
+        env.set("m", message);
+        std::string packed, error;
+        if (!aesGcmEncrypt(key, env.dump(), packed, error)) return false;
+        return ai::httpRequest("POST", downUrl, json, packed, 5).status == 200;
+    };
+    uint64_t tilesSerial = 0; // deckImagesSerial_ at the last upload
+    auto uploadTiles = [&](uint64_t version) {
+        Json tiles = Json::object();
+        {
+            std::lock_guard lock(mutex_);
+            tilesSerial = deckImagesSerial_;
+            for (const auto& [name, png] : deckImages_)
+                if (png.size() <= 128 * 1024) tiles.set(name, base64UrlEncode(png));
+        }
+        std::string packed, bytes, error;
+        if (!aesGcmEncrypt(key, tiles.dump(), packed, error) || !base64UrlDecode(packed, bytes)) return;
+        ai::httpRequest("POST", blobUrl + "?v=" + std::to_string(version), {"Content-Type: application/octet-stream"}, bytes, 30);
+    };
+    auto until = Clock::now() + std::chrono::minutes(5);
+    int64_t lastN = 0;
+    double lastSeq = 0, downSeq = 0;
+    uint64_t sentSerial = 0, tilesVersion = 0;
+    Clock::time_point lastPost{}, lastHeard{};
+    bool heard = false;
+    while (!deckRelayStop_) {
+        const auto now = Clock::now();
+        bool enabled, direct;
+        {
+            std::lock_guard lock(mutex_);
+            enabled = deckEnabled_;
+            direct = deckSeenEver_ && deckTransport_ == "WebRTC" && now - deckSeen_ < std::chrono::seconds(6);
+        }
+        if (!enabled) break;
+        if (direct) { // the direct link works: no relay traffic; the 5 minutes count from when it stops
+            until = now + std::chrono::minutes(5);
+            heard = false;
+            slice(500);
+            continue;
+        }
+        if (now > until) break;
+        const ai::HttpResponse r = ai::httpRequest("GET", upUrl + "?after=" + std::to_string(lastN), {}, {}, 5);
+        if (deckRelayStop_) break;
+        if (r.status == 200) {
+            Json list;
+            std::string err;
+            if (Json::parse(r.body, list, err) && list.isArray())
+                for (size_t i = 0; i < list.size() && i < kMaxQueuedDeckActions; ++i) {
+                    lastN = std::max(lastN, int64_t(list[i]["n"].asNumber(0)));
+                    std::string plain;
+                    Json env, inner;
+                    const std::string packed = list[i]["message"].asString();
+                    if (packed.size() > 1400 || !aesGcmDecrypt(key, packed, plain, err) || !Json::parse(plain, env, err) ||
+                        !env.isObject() || env["d"].asString() != "p2d")
+                        continue; // not ours: wrong key, wrong direction, garbage
+                    const double seq = env["s"].asNumber(0);
+                    if (!(seq > lastSeq)) continue; // replayed or out of order
+                    lastSeq = seq;
+                    const std::string message = env["m"].asString();
+                    if (!receiveDeckMessage(message, "relay", err)) continue;
+                    until = now + std::chrono::minutes(5);
+                    lastHeard = now;
+                    if (!heard || (Json::parse(message, inner, err) && inner["type"].asString() == "hello")) {
+                        heard = true; // a (re)start of the page: its tiles and the state again
+                        uploadTiles(++tilesVersion);
+                        sentSerial = 0;
+                    }
+                }
+        }
+        if (heard && now - lastHeard > std::chrono::seconds(20)) heard = false;
+        if (heard) { // a brush thumbnail that arrived after the phone did (they are drawn lazily): send the tiles again
+            uint64_t images;
+            {
+                std::lock_guard lock(mutex_);
+                images = deckImagesSerial_;
+            }
+            if (images != tilesSerial) uploadTiles(++tilesVersion);
+        }
+        if (heard && now - lastPost > std::chrono::milliseconds(200)) {
+            uint64_t serial;
+            const std::string state = deckStateMessage(serial);
+            bool pong;
+            {
+                std::lock_guard lock(mutex_);
+                pong = std::exchange(deckPong_, false);
+            }
+            if (serial != sentSerial && postDown(state, ++downSeq)) sentSerial = serial, lastPost = now;
+            else if (pong && postDown("{\"type\":\"pong\"}", ++downSeq)) lastPost = now;
+        }
+        slice(heard ? 300 : 1500);
+    }
+    if (deckRelayBye_) postDown("{\"type\":\"bye\"}", downSeq + 1);
 }
 
 } // namespace sf::link

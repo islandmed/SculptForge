@@ -10,6 +10,7 @@
 #include "ai/ImageTo3DService.h"
 #include "core/EnginePresets.h"
 #include "core/Backdrop.h"
+#include "core/OpControl.h"
 #include "core/GeneratedRemesh.h"
 #include "core/Texture.h"
 #include "core/Voxel.h"
@@ -19,6 +20,7 @@
 #include <chrono>
 #include <filesystem>
 #include <optional>
+#include <thread>
 
 namespace sf::ai {
 
@@ -74,6 +76,102 @@ CommandResult importGenerated(Document& doc, const Args& a, const GeneratorResul
 
 } // namespace
 
+bool prepareGenerateJob(const std::string& name, const Args& a, const AiSettings& settings, GenerateJob& job,
+                        CommandResult& refused) {
+    const bool text = name == "text_to_3d";
+    AiSettings s = settings;
+    s.cutImageBackground = argBool(a, "remove_background", true); // (a plain backdrop is cut out of the picture first, then a flat plane out of the model)
+    if (a.contains("service")) s.generatorService = argString(a, "service");
+    if (a.contains("url")) s.comfyUrl = argString(a, "url");
+    if (text && (s.generatorService == "command" || s.generatorService == "inflate")) {
+        refused = {false, "Text to 3D can't use '" + s.generatorService + "' (it works from an image); pass "
+                          "service=huggingface, fal, meshy, hyper3d, tripo or comfyui"};
+        return false;
+    }
+    if (a.contains("model")) {
+        if (s.generatorService == "meshy") s.meshyModel = argString(a, "model");
+        else if (s.generatorService == "hyper3d") s.hyper3dTier = argString(a, "model");
+        else if (s.generatorService == "tripo") s.tripoModel = argString(a, "model");
+        else if (s.generatorService == "fal") s.falModel = argString(a, "model");
+        else s.hfModel = argString(a, "model");
+    }
+    const auto stem = std::filesystem::temp_directory_path() /
+                      ((text ? "sculptforge_text_" : "sculptforge_generated_") +
+                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto stemU8 = stem.u8string();
+    const std::string out(stemU8.begin(), stemU8.end());
+    GeneratedRemesh mode;
+    std::string err;
+    if (!remeshArg(a, mode, err)) {
+        refused = {false, err};
+        return false;
+    }
+    if (text && s.generatorService == "comfyui" && argString(a, "prompt").find_first_not_of(" \t\r\n") == std::string::npos) {
+        refused = {false, "Describe the model you want"};
+        return false;
+    }
+    job.work = [s, a, out, text](GenerationProgress* progress) -> GeneratorResult {
+        const std::string input = argString(a, text ? "prompt" : "path");
+        if (s.generatorService == "comfyui")
+            return text ? comfy::run(s, argString(a, "workflow"), {}, input, out, progress, comfySeed(a))
+                        : comfy::run(s, argString(a, "workflow"), input, {}, out, progress, comfySeed(a));
+        return text ? generate3DFromText(s, input, out, progress) : generate3D(s, input, out, progress);
+    };
+    job.finish = [a, mode, text](Document& doc, GeneratorResult& r) -> CommandResult {
+        if (!r.ok) return {false, r.error + (r.note.empty() ? std::string() : " " + r.note)};
+        return importGenerated(doc, a, r, mode, text ? " from text" : "");
+    };
+    return true;
+}
+
+void recordGenerateRun(const std::string& name, const Args& a, const CommandResult& r, int64_t ms) {
+    audit::Entry e;
+    e.tool = "ai";
+    e.command = name;
+    e.args = audit::summarizeArgs(a);
+    e.ok = r.ok;
+    e.message = r.message;
+    e.ms = ms;
+    audit::record(e);
+}
+
+namespace {
+CommandResult runGenerateJob(const std::string& name, Document& doc, const Args& a, const AiSettings& settings) {
+    GenerateJob job;
+    CommandResult refused;
+    if (!prepareGenerateJob(name, a, settings, job, refused)) return refused;
+    GeneratorResult r;
+    if (!currentOpControl()) { // (the app, a script: nobody watches)
+        r = job.work(nullptr);
+        return job.finish(doc, r);
+    }
+    // An MCP call (core/OpControl.h): the generator runs on a helper thread while this one forwards its progress to the
+    // agent and its Cancel to the generator (every service polls GenerationProgress::cancel).
+    GenerationProgress progress;
+    std::atomic<bool> finished{false};
+    std::thread worker([&] {
+        r = job.work(&progress);
+        finished = true;
+    });
+    while (!finished) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        if (opCancelled()) progress.cancel = true;
+        const int percent = progress.percent;
+        opProgress(percent < 0 ? 0.0f : 0.9f * float(percent) / 100.0f, progress.status());
+    }
+    worker.join();
+    if (opCancelled()) { // (whatever it made is not wanted: nothing is imported, the scene is as before)
+        std::error_code ec;
+        if (!r.outputPath.empty()) std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
+        if (!r.privateDir.empty()) std::filesystem::remove_all(std::filesystem::path(std::u8string(r.privateDir.begin(), r.privateDir.end())), ec);
+        return {false, "Generation cancelled; the scene is unchanged"};
+    }
+    opProgress(0.95f, "Importing the model");
+    return job.finish(doc, r);
+}
+
+} // namespace
+
 void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()> settings) {
     // Every run goes into the audit log (core/AuditLog.h), from the app, a script, the CLI or an AI tool; with the
     // policy's audit.required, a run whose line can't be written is refused before anything is sent.
@@ -124,10 +222,11 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
     add({"image_to_3d",
                   "Reconstruct a full 3D model from one picture (character, creature, prop) and make it sculptable. "
                   "Free by default via Hugging Face Spaces (Hunyuan3D, TRELLIS.2, Stable Fast 3D; HF_TOKEN raises the "
-                  "daily quota), paid via fal.ai (FAL_KEY) / Meshy (MESHY_API_KEY) / Hyper3D Rodin direct (service=hyper3d, your key saved in Generate 3D), or any workflow on your own "
-                  "ComfyUI (service=comfyui workflow=FILE). Replaces the scene. A transparent background works best.",
+                  "daily quota), paid via fal.ai (FAL_KEY) / Meshy (MESHY_API_KEY) / Hyper3D Rodin direct (service=hyper3d) / Tripo direct (service=tripo), each with your key saved in Generate 3D, or any workflow on your own "
+                  "ComfyUI (service=comfyui workflow=FILE). Replaces the scene. A transparent background works best."
+                  " Reports progress and can be cancelled (the scene stays as it was).",
                   {{"path", T::String, "Image file (png, jpg...).", true},
-                   {"service", T::String, "'huggingface' (free, default), 'fal', 'meshy', 'hyper3d' (Rodin direct, your Hyper3D key), 'comfyui' (your ComfyUI server), 'command' (your generator) or 'inflate' (offline blockout).", false},
+                   {"service", T::String, "'huggingface' (free, default), 'fal', 'meshy', 'hyper3d' (Rodin direct, your Hyper3D key), 'tripo' (your Tripo key), 'comfyui' (your ComfyUI server), 'command' (your generator) or 'inflate' (offline blockout).", false},
                    {"model", T::String, "huggingface: hunyuan3d-2.1 (default, no token), trellis-2 (needs HF_TOKEN, else hunyuan3d-2.1 runs), hunyuan3d-2-turbo, hunyuan3d-2, stable-fast-3d; fal: a model id such as fal-ai/trellis-2 or fal-ai/hyper3d/rodin/v2.5; hyper3d: a tier, Gen-2.5-Extreme-Low, Gen-2.5-Low (default), Gen-2.5-Medium, Gen-2.5-High or Gen-2.5-Extreme-High.", false},
                    {"workflow", T::String, "comfyui: API-format workflow file (default: your saved one, else the bundled one).", false},
                    {"url", T::String, "comfyui: server address. Default http://127.0.0.1:8188 or your saved one.", false},
@@ -139,41 +238,21 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                                              "resolution^2/2 quads (256: 32768). Default 256.", false},
                    {"levels", T::Number, "quad: subdivision levels above the quad cage (0-2), projected onto the "
                                          "model. Default 1.", false},
-                   {"remove_background", T::Bool, "Drop a flat plane the background became (a wall behind or ground "
+                   {"remove_background", T::Bool, "Cut a plain backdrop (flat, a vignette, a rounded plate) out of the picture before sending, and drop a flat plane the background became (a wall behind or ground "
                                                   "under the subject; a relief or coin alone is kept). Default true.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
-                      AiSettings s = settings();
-                      if (a.contains("service")) s.generatorService = argString(a, "service");
-                      if (a.contains("url")) s.comfyUrl = argString(a, "url");
-                      if (a.contains("model")) {
-                          if (s.generatorService == "meshy") s.meshyModel = argString(a, "model");
-                          else if (s.generatorService == "hyper3d") s.hyper3dTier = argString(a, "model");
-                          else if (s.generatorService == "fal") s.falModel = argString(a, "model");
-                          else s.hfModel = argString(a, "model");
-                      }
-                      const auto stem = std::filesystem::temp_directory_path() /
-                                        ("sculptforge_generated_" +
-                                         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-                      const auto stemU8 = stem.u8string();
-                      const std::string out(stemU8.begin(), stemU8.end());
-                      GeneratedRemesh mode;
-                      std::string err;
-                      if (!remeshArg(a, mode, err)) return {false, err};
-                      GeneratorResult r = s.generatorService == "comfyui"
-                                              ? comfy::run(s, argString(a, "workflow"), argString(a, "path"), {}, out, nullptr, comfySeed(a))
-                                              : generate3D(s, argString(a, "path"), out);
-                      if (!r.ok) return {false, r.error + (r.note.empty() ? std::string() : " " + r.note)};
-                      return importGenerated(doc, a, r, mode, "");
+                      return runGenerateJob("image_to_3d", doc, a, settings());
                   }});
 
     add({"text_to_3d",
                   "Create a 3D model from a description and make it sculptable. Free by default via Hugging Face "
                   "(Hunyuan3D 2 / 2 mini Turbo; HF_TOKEN raises the daily quota), or paid via fal.ai (FAL_KEY) / "
-                  "Meshy (MESHY_API_KEY) / Hyper3D Rodin direct (service=hyper3d, your key saved in Generate 3D), or a workflow on your own ComfyUI (service=comfyui workflow=FILE). Replaces the scene.",
+                  "Meshy (MESHY_API_KEY) / Hyper3D Rodin direct (service=hyper3d) / Tripo direct (service=tripo), each with your key saved in Generate 3D, or a workflow on your own ComfyUI (service=comfyui workflow=FILE). Replaces the scene."
+                  " Reports progress and can be cancelled (the scene stays as it was).",
                   {{"prompt", T::String, "One object, e.g. 'a stylised dragon head with curled horns'.", true},
-                   {"service", T::String, "'huggingface' (free, default), 'fal', 'meshy', 'hyper3d' (Rodin direct, your Hyper3D key) or 'comfyui' (your ComfyUI server).", false},
+                   {"service", T::String, "'huggingface' (free, default), 'fal', 'meshy', 'hyper3d' (Rodin direct, your Hyper3D key), 'tripo' (your Tripo key) or 'comfyui' (your ComfyUI server).", false},
                    {"model", T::String, "huggingface: hunyuan3d-2-turbo or hunyuan3d-2; fal: fal-ai/hyper3d/rodin/v2.5 (or /fast), "
-                                         "else Hunyuan3D 3.1 Rapid; hyper3d: a Gen-2.5 tier (default Gen-2.5-Low).", false},
+                                         "else Hunyuan3D 3.1 Rapid; hyper3d: a Gen-2.5 tier (default Gen-2.5-Low); tripo: v3.1-20260211 (default) or v3.0-20250812.", false},
                    {"workflow", T::String, "comfyui: API-format workflow file (default: your saved one, else the bundled one).", false},
                    {"url", T::String, "comfyui: server address. Default http://127.0.0.1:8188 or your saved one.", false},
                    {"seed", T::Number, "comfyui: seed for the workflow's sf_seed / seed inputs (default: random).", false},
@@ -184,38 +263,10 @@ void addAiFeatureCommands(CommandRegistry& registry, std::function<AiSettings()>
                                              "resolution^2/2 quads (256: 32768). Default 256.", false},
                    {"levels", T::Number, "quad: subdivision levels above the quad cage (0-2), projected onto the "
                                          "model. Default 1.", false},
-                   {"remove_background", T::Bool, "Drop a flat plane the background became (a wall behind or ground "
+                   {"remove_background", T::Bool, "Cut a plain backdrop (flat, a vignette, a rounded plate) out of the picture before sending, and drop a flat plane the background became (a wall behind or ground "
                                                   "under the subject; a relief or coin alone is kept). Default true.", false}},
                   [settings](Document& doc, const Args& a) -> CommandResult {
-                      AiSettings s = settings();
-                      if (a.contains("service")) s.generatorService = argString(a, "service");
-                      if (a.contains("url")) s.comfyUrl = argString(a, "url");
-                      if (s.generatorService == "command" || s.generatorService == "inflate")
-                          return {false, "Text to 3D can't use '" + s.generatorService + "' (it works from an image); pass "
-                                         "service=huggingface, fal, meshy, hyper3d or comfyui"};
-                      if (a.contains("model")) {
-                          if (s.generatorService == "meshy") s.meshyModel = argString(a, "model");
-                          else if (s.generatorService == "hyper3d") s.hyper3dTier = argString(a, "model");
-                          else if (s.generatorService == "fal") s.falModel = argString(a, "model");
-                          else s.hfModel = argString(a, "model");
-                      }
-                      const auto stem = std::filesystem::temp_directory_path() /
-                                        ("sculptforge_text_" +
-                                         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-                      const auto stemU8 = stem.u8string();
-                      const std::string out(stemU8.begin(), stemU8.end());
-                      GeneratedRemesh mode;
-                      std::string err;
-                      if (!remeshArg(a, mode, err)) return {false, err};
-                      GeneratorResult r;
-                      if (s.generatorService == "comfyui") {
-                          if (argString(a, "prompt").find_first_not_of(" \t\r\n") == std::string::npos) return {false, "Describe the model you want"};
-                          r = comfy::run(s, argString(a, "workflow"), {}, argString(a, "prompt"), out, nullptr, comfySeed(a));
-                      } else {
-                          r = generate3DFromText(s, argString(a, "prompt"), out);
-                      }
-                      if (!r.ok) return {false, r.error + (r.note.empty() ? std::string() : " " + r.note)};
-                      return importGenerated(doc, a, r, mode, " from text");
+                      return runGenerateJob("text_to_3d", doc, a, settings());
                   }});
 
     add({"comfyui_check",

@@ -33,12 +33,13 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 5. [Install SculptForge on Windows, macOS and Linux](installing.md)
 6. [The interface](interface.md)
 7. [Navigating the view](navigation.md)
+    - [Reference images](reference-images.md)
 
 ## Sculpting
 
 8. [Sculpting and brushes](sculpting.md)
 9. [Brush Lab and sharing brushes](brush-lab.md)
-    - [Brush packs: sixty built-in brushes](brush-packs.md)
+    - [Brush packs: eighty-seven built-in brushes](brush-packs.md)
 10. [Masking](masking.md)
 11. [Face Groups and visibility](face-groups.md)
 12. [Selection sets and morph targets](selection-sets.md)
@@ -76,11 +77,14 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 
 33. [Baking normal and displacement maps](baking.md)
 34. [Exporting, Unreal and Bridge](exporting.md)
+    - [Render with your renderer](render-bridge.md)
 35. [Export presets](export-presets.md)
 36. [Working with Blender](blender.md)
 37. [Working with Maya](maya.md)
 38. [Projects, autosave and Snapshots](projects.md)
 39. [Scripting and automation](scripting.md)
+    - [Python scripting](python.md)
+    - [The Python package (import sculptforge)](python-package.md)
 40. [Packs and macros](packs-and-macros.md)
 41. [SculptForge for studios](studios.md)
 42. [Security overview for IT reviews](security.md)
@@ -92,6 +96,8 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 45. [Troubleshooting: tablets, display, crashes and FAQ](troubleshooting.md)
 46. [Glossary](glossary.md)
 47. [Show SculptForge on Discord](discord.md)
+48. [Forge Deck (prototype)](forge-deck.md)
+49. [Support and membership](support.md)
 
 ## Getting help
 

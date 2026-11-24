@@ -1,0 +1,23 @@
+# #173: Preferences > Interface > Ask before dropping subdivision levels. On (the default) Mirror asks on a Part with
+# levels; unticked, it goes straight through (undo brings the levels back); ticked again, it asks.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2
+run subdiv_divide
+run subdiv_divide
+expect_value sdiv_levels == 3
+
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+expect "Ask before dropping subdivision levels"
+shot prefs-ask-levels
+click "Ask before dropping subdivision levels"
+run mirror axis=x
+expect_not "Levels/Freeze Levels and Proceed"
+expect_value sdiv_levels == 0
+key ctrl+z
+expect_value sdiv_levels == 3
+click "Ask before dropping subdivision levels"
+action deformation.mirror
+expect "Levels/Freeze Levels and Proceed"
+key escape
+expect_value sdiv_levels == 3

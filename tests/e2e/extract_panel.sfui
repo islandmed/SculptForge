@@ -1,0 +1,42 @@
+# e2e: Extract. Mask the top of a sphere, Extract a thin shell, Accept it, then sculpt on the sheet: Standard and Smooth
+# leave it a closed, valid sheet that gains volume where material is added and never loses it. Undo takes every stroke back.
+run new_sphere subdivisions=5
+run mask_rect y0=0.3
+expect_value masked > 0
+camera 25 25
+key f
+click "Extract/Make Shell"
+expect_value extract_preview == 1
+click "Extract/Accept"
+expect_value extract_preview == 0
+expect_value parts == 2
+run mask_clear
+run part_select index=1
+expect_value open_edges == 0
+expect_value groups == 3
+remember solid_volume sheet
+remember triangles tris
+expect_value solid_volume > 0
+snapshot
+brush_size 120
+
+# Standard adds material to the near layer: the sheet's volume goes up, the far layer is left alone.
+click "Standard##brush.standard"
+stroke 0.3 0.4 0.7 0.5
+stroke 0.3 0.5 0.7 0.6
+expect_value moved > 0
+expect_value solid_volume >= $sheet*0.999
+expect_value open_edges == 0
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+expect_value moved == 0
+
+# Smooth over the sheet: still closed, still valid, no triangles added.
+action brush.smooth
+stroke 0.3 0.5 0.7 0.5
+expect_value open_edges == 0
+expect_mesh_valid
+expect_value triangles == $tris
+key ctrl+z
+expect_value moved == 0

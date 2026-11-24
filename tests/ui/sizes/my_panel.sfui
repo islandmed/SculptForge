@@ -1,0 +1,28 @@
+# My Panel (Member Request) for the look review at 1440 logical px (CMake: ui_my_panel_1440 at 100 %, ui_my_panel_1440_200
+# at 200 %): empty in the left tray, a button and a whole section dragged in with Alt, and floating at the cursor.
+logical_width 1440
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Edit##palette.edit"
+click "My Panel...##edit.mypanel"
+hold shift
+click "My Panel/##totray"
+hold none
+wait 0.2
+shot empty
+hold alt
+drag_to "Wire##view.wire" "My Panel/##totray" 0 100
+hold none
+click "Parts##tool.part"
+hold alt
+drag_to "Masking##tool.masking" "My Panel/##totray" 0 100
+hold none
+wait 0.2
+shot filled
+click "Masking##mypanel.section.tool.masking"
+wait 0.2
+shot folded
+key f4
+wait 0.3
+shot floating
+expect_value mypanel_entries == 2

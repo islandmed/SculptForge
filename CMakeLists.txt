@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.12.0 LANGUAGES C CXX)
+project(SculptForge VERSION 0.13.14 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -18,10 +18,23 @@ endif()
 
 option(SCULPTFORGE_BUILD_APP "Build the SculptForge desktop application" ON)
 option(SCULPTFORGE_BUILD_PYTHON "Build the Python module (import sculptforge)" OFF)
+option(SCULPTFORGE_APP_PYTHON "Python scripting in the app (the sculptforge_pyhost library, loaded on first use)" ${SCULPTFORGE_BUILD_PYTHON})
+# An unpacked CPython (python-build-standalone's install_only layout) to build the app's Python against and ship
+# beside it (lib/sculptforge/python, the Windows bin\python, the macOS bundle's Frameworks/python). Empty: the
+# Python CMake finds, not shipped (source builds, distribution packages that depend on their own python).
+set(SCULPTFORGE_PYTHON_RUNTIME "" CACHE PATH "CPython to build the app's Python against and install with it")
 set(SCULPTFORGE_PACKAGE_SUFFIX "" CACHE STRING "Extra tag in package file names, e.g. vfx2026")
 option(SCULPTFORGE_BUILD_TESTS "Build unit tests" ON)
 option(SCULPTFORGE_USE_SYSTEM_SDL "Use an installed SDL3 if one is found" ON)
 option(SCULPTFORGE_UPDATE_CHECK "The app checks the website for a newer version once a day (OFF for package managers)" ON)
+# Android (android/README.md): the app is libmain.so inside an APK, drawing with OpenGL ES 3.2. SCULPTFORGE_GLES=ON on a
+# desktop builds that same ES path against the desktop's GLES driver (Mesa), to test it without a device.
+option(SCULPTFORGE_GLES "Draw with OpenGL ES 3.2 instead of desktop OpenGL 3.3 (ON for Android)" ${ANDROID})
+if(ANDROID)
+  set(SCULPTFORGE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(SCULPTFORGE_WEBRTC OFF CACHE BOOL "" FORCE) # the live face feed is the phone's job, not the tablet's (M1)
+  set(SCULPTFORGE_UPDATE_CHECK OFF CACHE BOOL "" FORCE) # (the insiders release says when a new APK is out)
+endif()
 if(SCULPTFORGE_BUILD_TESTS)
   enable_testing()
 endif()
@@ -54,6 +67,7 @@ add_library(sculptforge_core STATIC
   src/core/ThreadPool.cpp
   src/core/UploadOrder.cpp
   src/core/Benchmark.cpp
+  src/core/BenchPack.cpp
   src/core/HardwareProfile.cpp
   src/core/FrameGovernor.cpp
   src/core/PerfTrace.cpp
@@ -61,14 +75,17 @@ add_library(sculptforge_core STATIC
   src/core/HardwareTier.cpp
   src/core/MemoryGuard.cpp
   src/core/Sculpt.cpp
+  src/core/ModifierBrush.cpp
   src/core/SculptBatch.cpp
   src/core/Dyntopo.cpp
   src/core/DyntopoCommands.cpp
   src/core/Undo.cpp
+  src/core/UndoBatch.cpp
   src/core/Timeline.cpp
   src/core/Primitives.cpp
   src/core/Document.cpp
   src/core/Commands.cpp
+  src/core/CommandParse.cpp
   src/core/FaceGroups.cpp
   src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
@@ -78,6 +95,7 @@ add_library(sculptforge_core STATIC
   src/core/GarmentMesh.cpp
   src/core/GarmentFiles.cpp
   src/core/GarmentCommands.cpp
+  src/core/GarmentDrape.cpp
   src/core/GarmentPrint.cpp
   src/core/GarmentTemplates.cpp
   src/core/ExtractMirror.cpp
@@ -98,22 +116,31 @@ add_library(sculptforge_core STATIC
   src/core/BrushPacks.cpp
   src/core/BrushSets.cpp
   src/core/BrushSettings.cpp
+  src/core/FileReplace.cpp
+  src/core/Utf8Path.cpp
   src/core/AlphaOptions.cpp
   src/core/BrushLibrary.cpp
+  src/core/ScriptPath.cpp
+  src/core/DataDir.cpp
   src/core/Image.cpp
   src/core/ImageTo3D.cpp
   src/core/Splats.cpp
   src/core/SplatCapture.cpp
   src/core/Sculptable.cpp
   src/core/Voxel.cpp
+  src/core/VoxelSparse.cpp
   src/core/QuickRemesh.cpp
   src/core/EnginePresets.cpp
   src/core/Masking.cpp
   src/core/Cut.cpp
+  src/core/MeshBoolean.cpp
+  src/core/PartBoolean.cpp
   src/core/CloseHoles.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
+  src/core/CreatureSkin.cpp
   src/core/Stencil.cpp
+  src/core/Reference.cpp
   src/core/Stroke.cpp
   src/core/Precision.cpp
   src/core/PathStroke.cpp
@@ -145,10 +172,13 @@ add_library(sculptforge_core STATIC
   src/core/LayerStackIO.cpp
   src/core/MapExport.cpp
   src/core/Multires.cpp
+  src/core/Ink.cpp
   src/core/Micro.cpp
+  src/core/MicroHistory.cpp
   src/core/MicroSculpt.cpp
   src/core/MicroCommands.cpp
   src/core/MicroStore.cpp
+  src/core/MicroTiles.cpp
   src/core/FocusDetail.cpp
   src/core/FocusBench.cpp
   src/core/MultiresCommands.cpp
@@ -165,7 +195,7 @@ add_library(sculptforge_core STATIC
   src/core/QRemesh2Field.cpp
   src/core/QRemesh2Param.cpp
   src/core/QuadQuality.cpp
-  src/core/ForgeSpheres.cpp src/core/AgentTools.cpp
+  src/core/ForgeSpheres.cpp src/core/AgentTools.cpp src/core/DetailPass.cpp
   src/core/Tube.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
@@ -190,6 +220,7 @@ add_library(sculptforge_core STATIC
   src/core/Guide.cpp
   src/core/WhatsNew.cpp
   src/core/UpdateCheck.cpp
+  src/core/Featured.cpp
   src/core/Tablet.cpp
   src/core/RadialMenu.cpp
   src/core/StrokePopup.cpp
@@ -224,6 +255,7 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedStarterMeshes.cpp sf::assets
   starterHumanHead ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/human-head.sfproj.z
   starterBust ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/bust.sfproj.z
   starterFullBody ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/full-body.sfproj.z
+  starterHumanMale ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/human-male.sfproj.z
   starterHand ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/hand.sfproj.z
   starterFoot ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/foot.sfproj.z
   starterEar ${CMAKE_CURRENT_SOURCE_DIR}/assets/starter/ear.sfproj.z
@@ -279,8 +311,9 @@ if(APPLE)
 endif()
 # zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
 # Not on macOS: Homebrew's zstd is single-architecture and breaks the universal (x86_64 + arm64) build.
+# Not on Android: pkg-config finds the build machine's zstd, and the NDK has no zstd.h.
 find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND AND NOT APPLE)
+if(PkgConfig_FOUND AND NOT APPLE AND NOT ANDROID)
   pkg_check_modules(SF_ZSTD QUIET IMPORTED_TARGET libzstd)
 endif()
 if(SF_ZSTD_FOUND)
@@ -295,7 +328,9 @@ if(MSVC)
 else()
   # -ffp-contract=off: no fused multiply-adds, so a result doesn't depend on the optimisation level (distro
   # packages build at -O2; face_weights' fast path is tested to match a full evaluation exactly).
-  target_compile_options(sculptforge_core PRIVATE -Wall -Wextra -Wno-unused-parameter -ffp-contract=off)
+  # -fno-fast-math: a packager's -ffast-math / -Ofast (CFLAGS come first, these win) would turn the brushes' NaN
+  # guards (std::isfinite, gh#229) into nothing.
+  target_compile_options(sculptforge_core PRIVATE -Wall -Wextra -Wno-unused-parameter -ffp-contract=off -fno-fast-math)
 endif()
 sculptforge_pch(sculptforge_core)
 set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/tinyexr_impl.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp
@@ -303,13 +338,22 @@ set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/ti
 
 # --- Bring-your-own-AI (brush assistant). HTTPS via WinHTTP or libcurl. ---
 add_library(sculptforge_ai STATIC src/ai/Http.cpp src/ai/AiPolicy.cpp src/ai/Providers.cpp src/ai/Consent.cpp src/ai/Secrets.cpp src/ai/Oidc.cpp src/ai/BrushAssistant.cpp src/ai/Generator3D.cpp
-  src/ai/ImageTo3DService.cpp src/ai/Hyper3D.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
-  src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/SplatTrainer.cpp)
+  src/ai/ImageTo3DService.cpp src/ai/Hyper3D.cpp src/ai/GlbFetch.cpp src/ai/SpaceHealth.cpp src/ai/Tripo.cpp src/ai/GradioClient.cpp src/ai/ComfyUI.cpp src/ai/AiCommands.cpp src/ai/BrushGalleryClient.cpp src/link/Socket.cpp
+  src/link/UnrealLink.cpp src/ai/Process.cpp src/ai/VideoEncoder.cpp src/ai/SplatTrainer.cpp src/ai/RenderBridge.cpp)
+target_include_directories(sculptforge_ai PRIVATE third_party/tinyexr) # (the render bridge reads EXR stills)
 # Lets a build run from its tree find the bundled ComfyUI workflows (integrations/comfyui/workflows).
 target_compile_definitions(sculptforge_ai PRIVATE SF_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 find_package(Threads REQUIRED)
 target_link_libraries(sculptforge_ai PUBLIC sculptforge_core Threads::Threads)
-if(WIN32)
+# OFF: no HTTP transport at all (the Python wheels: no libcurl to bundle, and a library that never reaches the network);
+# the AI service commands then say so.
+option(SCULPTFORGE_HTTP "HTTPS for AI services and the brush gallery (WinHTTP or libcurl)" ON)
+if(NOT SCULPTFORGE_HTTP)
+  target_compile_definitions(sculptforge_ai PRIVATE SF_NO_HTTP)
+  if(WIN32)
+    target_link_libraries(sculptforge_ai PRIVATE ws2_32)
+  endif()
+elseif(WIN32)
   target_link_libraries(sculptforge_ai PRIVATE winhttp ws2_32)
 else()
   find_package(CURL QUIET)
@@ -334,7 +378,7 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedPhone.cpp sf::phone_assets
   capturePage ${CMAKE_CURRENT_SOURCE_DIR}/assets/phone/capture.html
   facePage ${CMAKE_CURRENT_SOURCE_DIR}/website/link/index.html)
 add_library(sculptforge_phone STATIC ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedPhone.cpp src/link/HttpServer.cpp
-  src/link/PhoneLink.cpp src/link/FaceFeed.cpp src/link/PhoneRtc.cpp src/link/Qr.cpp third_party/qrcodegen/qrcodegen.cpp)
+  src/link/PhoneLink.cpp src/link/DeckCommands.cpp src/link/FaceFeed.cpp src/link/PhoneRtc.cpp src/link/Qr.cpp third_party/qrcodegen/qrcodegen.cpp)
 target_include_directories(sculptforge_phone PRIVATE third_party/qrcodegen)
 target_link_libraries(sculptforge_phone PUBLIC sculptforge_ai)
 if(SCULPTFORGE_WEBRTC)
@@ -356,7 +400,7 @@ set_source_files_properties(third_party/qrcodegen/qrcodegen.cpp ${CMAKE_CURRENT_
 
 # --- Headless command-line tool (pipelines, build farms, AI agents) ---
 # The MCP server (src/cli/McpServer.cpp) is a library of its own: the tool and the tests link it, nobody compiles it twice.
-add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp src/cli/McpTools.cpp src/cli/McpAttach.cpp src/link/AiLink.cpp src/link/AiLinkSession.cpp
+add_library(sculptforge_mcp STATIC src/cli/McpServer.cpp src/cli/McpBatch.cpp src/cli/McpTools.cpp src/cli/McpScene.cpp src/cli/McpAttach.cpp src/link/AiLink.cpp src/link/AiLinkSession.cpp
   src/link/MayaLink.cpp)
 target_compile_definitions(sculptforge_mcp PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
 target_link_libraries(sculptforge_mcp PUBLIC sculptforge_core sculptforge_ai)
@@ -370,9 +414,9 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 # App code the tests also run (layout, looks, translations, Library, brush previews, camera, clusters): one static
 # library both link, so an edit to one of these files compiles once, not once per program.
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
-  add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/UiLayout.cpp
+  add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/OpenUrl.cpp src/app/UiLayout.cpp
     src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
-    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
+    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/I18nJapanese.cpp src/app/StartupSplash.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
   if(MSVC)
     target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)
@@ -403,19 +447,30 @@ if(SCULPTFORGE_BUILD_APP)
     fontMonoBold ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/JetBrainsMono-SemiBold.ttf
     fontCjk ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansTC-UI.otf # Traditional Chinese (tools/i18n/subset_cjk_font.py)
     fontCjkSc ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansSC-UI.otf # Simplified Chinese (the same tool)
+    fontCjkJp ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansJP-UI.otf # Japanese (the same tool)
     appIcon ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-256.png # the cube app icon: window, title bar (BrandMark.cpp)
     appIconSmall ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge-32.png # its small cut (up to 32 px)
+    splashWordmark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/splash-wordmark.png # the start-up splash: wordmark and brand bust
+    splashBust ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/splash-bust.png # (StartupSplashWindow.cpp; the bust is website/press/sculptforge-bust-1024.png at 576 px, 256 colours)
     bustMark ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/bust/bust-256.png # the illustration: About, What's New, support card
+    socialIcons ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/social/social-icons.png # the community icon strip (Welcome; tools/brand/make_social_icons.py)
     supporters ${CMAKE_CURRENT_SOURCE_DIR}/docs/supporters.txt # Help > About (never empty: it starts with comments)
     foundingMembers ${CMAKE_CURRENT_SOURCE_DIR}/website/founding.json) # Help > About and the membership card
   include(cmake/EmbedGuide.cmake)
   embed_guide(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp ${CMAKE_CURRENT_SOURCE_DIR}/docs/guide)
-  add_executable(sculptforge
+  if(ANDROID)
+    add_library(sculptforge SHARED) # SDL's Java activity loads libmain.so and calls SDL_main
+    set_target_properties(sculptforge PROPERTIES OUTPUT_NAME main)
+  else()
+    add_executable(sculptforge)
+  endif()
+  target_sources(sculptforge PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
     src/app/main.cpp
     src/app/Bench.cpp
     src/app/Calibration.cpp
+    src/app/StartupSplashWindow.cpp
     src/app/OptimisticBench.cpp
     src/app/PanelPerformanceProfile.cpp
     src/app/PanelHardwareTier.cpp
@@ -426,15 +481,22 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Demo.cpp
     src/app/UiTest.cpp
     src/app/UiTestModes.cpp
+    src/app/UiTestRender.cpp
     src/app/NativeDialog.cpp
     src/app/UiServe.cpp
     src/app/Ui.cpp
     src/app/UserGlyphs.cpp
     src/app/Shell.cpp
+    src/app/PanelWindows.cpp
+    src/app/PanelMyPanel.cpp
     src/app/Palettes.cpp
     src/app/Theme.cpp
     src/app/CommandPalette.cpp
+    src/app/CommandBar.cpp
     src/app/Console.cpp
+    src/app/Python.cpp
+    src/python/CoreCalls.cpp
+    src/app/PanelPython.cpp
     src/app/Config.cpp
     src/app/LibraryBrowser.cpp
     src/app/Thumbnails.cpp
@@ -449,6 +511,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/Selection.cpp
     src/app/PanelBrushes.cpp
     src/app/BrushSettingsUi.cpp
+    src/app/ModifierBrush.cpp
     src/app/PanelVdm.cpp
     src/app/PanelKelvinlet.cpp
     src/app/PanelCloth.cpp
@@ -459,6 +522,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelVertexPaint.cpp
     src/app/LineGradient.cpp
     src/app/StencilOverlay.cpp
+    src/app/ReferenceImages.cpp
     src/app/PanelPacks.cpp
     src/app/PanelPlugins.cpp
     src/app/PanelBrushSets.cpp
@@ -466,6 +530,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelPaintLayers.cpp
     src/app/PanelTexture.cpp
     src/app/PanelGarments.cpp
+    src/app/PanelGarmentDrape.cpp
     src/app/PanelUvEditor.cpp
     src/app/PanelPbr.cpp
     src/app/PanelFill.cpp
@@ -479,15 +544,18 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelForgeSpheres.cpp
     src/app/PanelTube.cpp
     src/app/PanelSplatTrain.cpp
+    src/app/PanelRenderBridge.cpp
     src/app/PanelSculptable.cpp
     src/app/PanelPerformance.cpp
     src/app/PanelBridge.cpp
     src/app/PanelBlender.cpp
     src/app/PanelMaya.cpp
     src/app/PanelPhone.cpp
+    src/app/PanelDeck.cpp
     src/app/PanelProject.cpp
     src/app/PanelUpdate.cpp
     src/app/PanelParts.cpp
+    src/app/BooleanPreview.cpp
     src/app/PanelSupport.cpp
     src/app/QuickTour.cpp
     src/app/PanelAi.cpp
@@ -495,6 +563,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelAiLink.cpp
     src/app/PanelConnectAi.cpp
     src/app/PanelSupportCard.cpp
+  src/app/PanelFeatured.cpp
     src/app/PanelIntegrations.cpp
     src/app/WhatsNewPopup.cpp
     src/app/PanelDeform.cpp
@@ -513,13 +582,22 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/StrokePopup.cpp
     src/render/GL.cpp
     src/render/ScreenStroke.cpp
+    src/render/Occlusion.cpp
     src/render/Renderer.cpp
     src/render/UvView.cpp
+    src/render/MicroFocus.cpp
+    src/render/MicroTilePages.cpp
     src/render/MicroRenderer.cpp
   )
   target_link_libraries(sculptforge PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_appshared
                                             sculptforge_mcp sculptforge_actions imgui SDL3::SDL3)
   target_include_directories(sculptforge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lucide)
+  if(SCULPTFORGE_GLES)
+    target_compile_definitions(sculptforge PRIVATE SF_GLES=1)
+  endif()
+  if(ANDROID)
+    target_link_libraries(sculptforge PRIVATE android log GLESv3 EGL)
+  endif()
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
@@ -544,8 +622,7 @@ if(SCULPTFORGE_BUILD_APP)
     target_compile_options(sculptforge PRIVATE -Wall -Wextra -Wno-unused-parameter)
   endif()
   sculptforge_pch(sculptforge <imgui.h>)
-  set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp
-                              PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+  set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedFonts.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedGuide.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
   if(WIN32)
     set_target_properties(sculptforge PROPERTIES WIN32_EXECUTABLE $<CONFIG:Release,MinSizeRel>)
     set(ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.ico")
@@ -554,11 +631,14 @@ if(SCULPTFORGE_BUILD_APP)
     endif()
     configure_file(packaging/windows/sculptforge.rc ${CMAKE_CURRENT_BINARY_DIR}/sculptforge.rc @ONLY)
     target_sources(sculptforge PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sculptforge.rc)
+    configure_file(packaging/windows/sculptforge-cli.rc ${CMAKE_CURRENT_BINARY_DIR}/sculptforge-cli.rc @ONLY)
+    target_sources(sculptforge-cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sculptforge-cli.rc)
     # Per-monitor DPI v2 from the first instruction (a window moved between 100 % and 150 % monitors stays sharp
     # and SDL reports each monitor's scale); MSVC merges it into the manifest the linker writes. (SDL 3 also asks
     # for it at start-up; the manifest covers what runs before, and other toolchains rely on that.)
-    if(MSVC)
+    if(MSVC) # (the same manifest, UTF-8 code page included, for the command-line program: its argv and paths)
       target_sources(sculptforge PRIVATE packaging/windows/sculptforge.manifest)
+      target_sources(sculptforge-cli PRIVATE packaging/windows/sculptforge.manifest)
     endif()
   endif()
   if(APPLE)
@@ -613,7 +693,7 @@ if(MSVC)
   set(CMAKE_INSTALL_UCRT_LIBRARIES OFF) # the Universal CRT is part of Windows 10 and 11
   include(InstallRequiredSystemLibraries)
 endif()
-install(FILES LICENSE THIRD_PARTY_NOTICES.md README.md CHANGELOG.md DESTINATION ${SF_DOC_DIR})
+install(FILES LICENSE LICENSE-EXCEPTION.md THIRD_PARTY_NOTICES.md README.md CHANGELOG.md DESTINATION ${SF_DOC_DIR})
 install(FILES docs/ai-services.md docs/unreal.md docs/generators.md docs/comfyui.md DESTINATION ${SF_DOC_DIR}/docs)
 # A studio build: the profile's folder (packs, preferences, logo) where core/StudioProfile.h looks for it.
 if(SCULPTFORGE_STUDIO_PROFILE)
@@ -669,6 +749,15 @@ set(CPACK_RPM_PACKAGE_LICENSE "GPL-3.0-or-later")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/Multimedia")
 set(CPACK_RPM_PACKAGE_URL "https://sculptforge.app/")
 set(CPACK_RPM_PACKAGE_AUTOREQ ON)
+# Python scripting's runtime (lib/sculptforge/python, cmake/PythonRuntime.cmake) ships whole: rpmbuild leaves its
+# scripts' shebangs alone and doesn't byte-compile them with the system's Python, and it neither needs nor offers
+# system packages (the host's libpython is the bundled one).
+set(CPACK_RPM_SPEC_MORE_DEFINE "%global __brp_mangle_shebangs_exclude_from ^/usr/lib/sculptforge/python/
+%global _python_bytecompile_extra 0
+%global _python_bytecompile_errors_terminate_build 0
+%global __requires_exclude_from ^/usr/lib/sculptforge/python/
+%global __provides_exclude_from ^/usr/lib/sculptforge/python/
+%global __requires_exclude ^libpython3")
 # Windows installer
 set(CPACK_NSIS_DISPLAY_NAME "SculptForge")
 set(CPACK_NSIS_PACKAGE_NAME "SculptForge")
@@ -676,7 +765,26 @@ set(CPACK_NSIS_MUI_ICON ${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/sculptforge.
 set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\sculptforge.exe")
 set(CPACK_NSIS_URL_INFO_ABOUT "https://sculptforge.app/")
 set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+# The installer's own version resource: SignPath's artifact configuration requires product name and version on every
+# signed file (docs/releasing.md "Windows code signing"; tools/ci/check_pe_metadata.ps1 checks it in CI).
+# (NSIS single quotes: CPack writes this value into CPackConfig.cmake without escaping double ones.)
+set(CPACK_NSIS_DEFINES "VIProductVersion ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}.0
+VIAddVersionKey ProductName 'SculptForge'
+VIAddVersionKey ProductVersion '${PROJECT_VERSION}'
+VIAddVersionKey FileVersion '${PROJECT_VERSION}'
+VIAddVersionKey FileDescription 'SculptForge installer'
+VIAddVersionKey CompanyName 'The SculptForge contributors'
+VIAddVersionKey LegalCopyright 'Copyright (C) 2026 The SculptForge contributors. GPL-3.0-or-later.'")
 set(CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\SculptForge.lnk' '$INSTDIR\\\\bin\\\\sculptforge.exe'")
+# The "Check for updates once a day" page before the files are copied (packaging/windows/update-check.nsh): its choice goes
+# to bin\installer.json, which the app applies once per installer run (core/UpdateCheck.h). CPack puts
+# CPACK_NSIS_PAGE_COMPONENTS between the Start Menu page and the install page (the installer has no components).
+# (NSIS wants backslashes in !include; CPack stores the value unescaped, so each is doubled, as for CPACK_NSIS_CREATE_ICONS_EXTRA.)
+string(REPLACE "/" "\\\\" SF_UPDATE_NSH "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/update-check.nsh")
+string(APPEND CPACK_NSIS_DEFINES "\n!include '${SF_UPDATE_NSH}'")
+set(CPACK_NSIS_PAGE_COMPONENTS "Page custom SfUpdatePage SfUpdatePageLeave")
+set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "!insertmacro SfWriteInstallerJson")
+set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "!insertmacro SfRemoveInstallerJson")
 # macOS disk image
 set(CPACK_DMG_VOLUME_NAME "SculptForge")
 if(APPLE)
@@ -691,21 +799,121 @@ else()
 endif()
 include(CPack)
 
-# --- Python module ---
-if(SCULPTFORGE_BUILD_PYTHON)
-  find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
+# --- Python module, and the app's Python host ---
+if(SCULPTFORGE_BUILD_PYTHON OR (SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP))
+  if(SCULPTFORGE_PYTHON_RUNTIME)
+    set(Python_ROOT_DIR ${SCULPTFORGE_PYTHON_RUNTIME})
+    set(Python_FIND_STRATEGY LOCATION)
+  endif()
+  set(SF_PYTHON_COMPONENTS Interpreter Development.Module)
+  if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP)
+    list(APPEND SF_PYTHON_COMPONENTS Development.Embed)
+  endif()
+  find_package(Python 3.9 REQUIRED COMPONENTS ${SF_PYTHON_COMPONENTS})
   sf_fetch_declare(pybind11 DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
   FetchContent_MakeAvailable(pybind11)
-  pybind11_add_module(sculptforge_python MODULE src/python/module.cpp)
-  set_target_properties(sculptforge_python PROPERTIES OUTPUT_NAME sculptforge)
+endif()
+if(SCULPTFORGE_APP_PYTHON AND SCULPTFORGE_BUILD_APP AND NOT ANDROID)
+  # The app loads it the first time a script runs (src/app/Python.cpp): CPython in it, nothing at start-up.
+  add_library(sculptforge_pyhost MODULE src/python/AppHost.cpp src/python/Bindings.cpp)
+  # No core of its own: every core function it calls is the app's (src/python/CoreCalls.h), so it takes only the core's
+  # headers, and the linker refuses a call that bypasses that (no undefined symbols).
+  target_link_libraries(sculptforge_pyhost PRIVATE pybind11::embed glm::glm ${CMAKE_DL_LIBS}) # (dladdr/dlopen: libdl on older glibc)
+  target_include_directories(sculptforge_pyhost PRIVATE $<TARGET_PROPERTY:sculptforge_core,INTERFACE_INCLUDE_DIRECTORIES>)
+  target_compile_definitions(sculptforge_pyhost PRIVATE $<TARGET_PROPERTY:sculptforge_core,INTERFACE_COMPILE_DEFINITIONS>)
+  target_compile_definitions(sculptforge_pyhost PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
+  set_target_properties(sculptforge_pyhost PROPERTIES PREFIX "" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
+  if(APPLE)
+    set_target_properties(sculptforge_pyhost PROPERTIES SUFFIX ".dylib" INSTALL_RPATH "@loader_path/../Resources/python/lib")
+    set(SF_PYHOST_DIR SculptForge.app/Contents/Frameworks)
+  elseif(WIN32)
+    set(SF_PYHOST_DIR ${CMAKE_INSTALL_BINDIR})
+    configure_file(packaging/windows/sculptforge-pyhost.rc ${CMAKE_CURRENT_BINARY_DIR}/sculptforge-pyhost.rc @ONLY)
+    target_sources(sculptforge_pyhost PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sculptforge-pyhost.rc)
+  else()
+    set_target_properties(sculptforge_pyhost PROPERTIES INSTALL_RPATH "$ORIGIN/python/lib")
+    target_link_options(sculptforge_pyhost PRIVATE -Wl,--no-undefined)
+    set(SF_PYHOST_DIR lib/sculptforge)
+  endif()
+  # In a build folder it sits where the installed app has it: next to the executable, or in the macOS bundle's
+  # Frameworks.
+  if(APPLE)
+    set_target_properties(sculptforge_pyhost PROPERTIES LIBRARY_OUTPUT_DIRECTORY $<TARGET_BUNDLE_CONTENT_DIR:sculptforge>/Frameworks)
+  else()
+    set_target_properties(sculptforge_pyhost PROPERTIES LIBRARY_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:sculptforge>)
+  endif()
+  execute_process(COMMAND ${Python_EXECUTABLE} -c "import sys; print(sys.base_prefix)" OUTPUT_VARIABLE SF_PYTHON_BUILD_HOME
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  file(TO_CMAKE_PATH "${SF_PYTHON_BUILD_HOME}" SF_PYTHON_BUILD_HOME)
+  if(SCULPTFORGE_PYTHON_RUNTIME)
+    # Packages: only the runtime shipped beside the host, never a path baked in at build time (it would name a folder
+    # anyone could create on a user's computer). The build folder gets that same layout, for the tests.
+    if(APPLE)
+      set(SF_PYRT_STAGE $<TARGET_BUNDLE_CONTENT_DIR:sculptforge>/Resources/python)
+    else()
+      set(SF_PYRT_STAGE $<TARGET_FILE_DIR:sculptforge>/python)
+    endif()
+    if(WIN32)
+      add_custom_command(TARGET sculptforge_pyhost POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${SCULPTFORGE_PYTHON_RUNTIME}/Lib" "${SF_PYRT_STAGE}/Lib"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${SCULPTFORGE_PYTHON_RUNTIME}/DLLs" "${SF_PYRT_STAGE}/DLLs")
+    else()
+      add_custom_command(TARGET sculptforge_pyhost POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${SF_PYRT_STAGE}"
+        COMMAND ${CMAKE_COMMAND} -E create_symlink "${SCULPTFORGE_PYTHON_RUNTIME}/lib" "${SF_PYRT_STAGE}/lib")
+    endif()
+  else()
+    # Source and distribution builds against an installed Python (no runtime shipped): that Python's own home.
+    target_compile_definitions(sculptforge_pyhost PRIVATE SF_PYTHON_BUILD_HOME="${SF_PYTHON_BUILD_HOME}")
+  endif()
+  if(WIN32) # the Python DLLs the host links, beside it in the build folder (the installer puts them next to the exe)
+    file(GLOB SF_PYTHON_DLLS "${SF_PYTHON_BUILD_HOME}/python3*.dll" "${Python_RUNTIME_LIBRARY_DIRS}/python3*.dll")
+    foreach(dll ${SF_PYTHON_DLLS})
+      add_custom_command(TARGET sculptforge_pyhost POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different "${dll}"
+                         $<TARGET_FILE_DIR:sculptforge_pyhost>)
+    endforeach()
+  endif()
+  add_dependencies(sculptforge sculptforge_pyhost)
+  install(TARGETS sculptforge_pyhost LIBRARY DESTINATION ${SF_PYHOST_DIR})
+  if(SCULPTFORGE_PYTHON_RUNTIME)
+    include(cmake/PythonRuntime.cmake)
+    sf_install_python_runtime(${SCULPTFORGE_PYTHON_RUNTIME} ${SF_PYHOST_DIR})
+  endif()
+endif()
+if(SCULPTFORGE_BUILD_PYTHON)
+  # The package `sculptforge` (python/sculptforge: __init__.py, type stubs) around the compiled sculptforge._core. In the
+  # build folder it is laid out as installed, in python-package/ (not python/: the app's Python home), for the tests.
+  # The wheel (pyproject.toml, scikit-build-core) installs only component python.
+  pybind11_add_module(sculptforge_python MODULE src/python/module.cpp src/python/Bindings.cpp src/python/CoreCalls.cpp)
+  set(SF_PY_PACKAGE_DIR ${CMAKE_CURRENT_BINARY_DIR}/python-package/sculptforge)
+  set_target_properties(sculptforge_python PROPERTIES OUTPUT_NAME _core LIBRARY_OUTPUT_DIRECTORY ${SF_PY_PACKAGE_DIR})
+  foreach(cfg ${CMAKE_CONFIGURATION_TYPES}) # (multi-config generators: no Release/ subfolder)
+    string(TOUPPER ${cfg} CFG)
+    set_target_properties(sculptforge_python PROPERTIES LIBRARY_OUTPUT_DIRECTORY_${CFG} ${SF_PY_PACKAGE_DIR})
+  endforeach()
   target_link_libraries(sculptforge_python PRIVATE sculptforge_core sculptforge_ai)
   target_compile_definitions(sculptforge_python PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}")
-  set(SCULPTFORGE_PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages"
-      CACHE STRING "Where to install the Python module")
-  install(TARGETS sculptforge_python LIBRARY DESTINATION ${SCULPTFORGE_PYTHON_INSTALL_DIR})
+  file(GLOB SF_PY_PACKAGE_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/python/sculptforge/*)
+  add_custom_command(TARGET sculptforge_python POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SF_PY_PACKAGE_FILES} ${SF_PY_PACKAGE_DIR})
+  if(SKBUILD) # a wheel: the package at the root of site-packages
+    set(SCULPTFORGE_PYTHON_INSTALL_DIR "." CACHE STRING "Where to install the Python package")
+  else()
+    set(SCULPTFORGE_PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages"
+        CACHE STRING "Where to install the Python package")
+  endif()
+  install(TARGETS sculptforge_python LIBRARY DESTINATION ${SCULPTFORGE_PYTHON_INSTALL_DIR}/sculptforge COMPONENT python)
+  install(FILES ${SF_PY_PACKAGE_FILES} DESTINATION ${SCULPTFORGE_PYTHON_INSTALL_DIR}/sculptforge COMPONENT python)
   if(SCULPTFORGE_BUILD_TESTS)
-    add_test(NAME python_api COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=$<TARGET_FILE_DIR:sculptforge_python>
+    add_test(NAME python_api COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/python-package
              ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_python.py)
+    # The package's own suite (the wheels run it too), here also against sculptforge-cli: the same bytes from both.
+    execute_process(COMMAND ${Python_EXECUTABLE} -c "import pytest, numpy" RESULT_VARIABLE SF_NO_PYTEST OUTPUT_QUIET ERROR_QUIET)
+    if(SF_NO_PYTEST EQUAL 0)
+      add_test(NAME python_package COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/python-package
+               SF_CLI=$<TARGET_FILE:sculptforge-cli> ${Python_EXECUTABLE} -m pytest -q -p no:cacheprovider
+               ${CMAKE_CURRENT_SOURCE_DIR}/tests/python)
+    endif()
   endif()
 endif()
 
@@ -729,6 +937,13 @@ if(SCULPTFORGE_BUILD_TESTS)
     target_compile_definitions(sculptforge_tests PRIVATE SF_PYTHON_EXE="${Python3_EXECUTABLE}")
   endif()
   target_link_libraries(sculptforge_tests PRIVATE sculptforge_core sculptforge_ai sculptforge_phone sculptforge_mcp sculptforge_appshared)
+  if(TARGET sculptforge_pyhost) # the app's Python host, loaded as the app loads it (tests/test_python_host.cpp)
+    target_compile_definitions(sculptforge_tests PRIVATE SF_PYHOST_PATH="$<TARGET_FILE:sculptforge_pyhost>"
+                                                         SF_PYHOST_BUILD="${PROJECT_VERSION}")
+    target_link_libraries(sculptforge_tests PRIVATE SDL3::SDL3)
+    add_dependencies(sculptforge_tests sculptforge_pyhost)
+    target_sources(sculptforge_tests PRIVATE src/python/CoreCalls.cpp)
+  endif()
   sculptforge_pch(sculptforge_tests)
   if(SCULPTFORGE_BUILD_APP) # the action registry (key chords, shortcut overrides) needs SDL's key names
     target_link_libraries(sculptforge_tests PRIVATE sculptforge_actions)
@@ -750,16 +965,34 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES COST 1000 # the longest: start first
                          ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
   endforeach()
+  if(SCULPTFORGE_BUILD_APP) # the start-up splash by each of its three ways onto the window (surface, renderer, software), on SDL's dummy driver
+    add_test(NAME splash_paths COMMAND sculptforge --splash-selftest)
+    set_tests_properties(splash_paths PROPERTIES ENVIRONMENT "SDL_VIDEO_DRIVER=dummy")
+  endif()
+  if(MSVC AND SCULPTFORGE_BUILD_APP) # the manifest's UTF-8 code page took effect, in the app and in the command-line program (gh#223)
+    add_test(NAME windows_utf8_codepage COMMAND sculptforge --acp-selftest)
+    add_test(NAME windows_utf8_codepage_cli COMMAND sculptforge-cli --acp-selftest)
+  endif()
+  if(TARGET sculptforge_pyhost) # Python scripting's host starts from the build folder (packages run it on their install)
+    add_test(NAME python_selftest COMMAND sculptforge --python-selftest)
+  endif()
   # T3 (docs/testing-flow.md): the TEST(nightly_*) cases, which no shard runs. Label nightly: tools/test/run.py and CI
   # leave it out; the nightly workflow and tools/test/nightly.sh run `ctest -L nightly`.
   add_test(NAME sculptforge_tests_nightly COMMAND sculptforge_tests --nightly)
   set_tests_properties(sculptforge_tests_nightly PROPERTIES LABELS nightly TIMEOUT 3600
+                       ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
+  # The voxel and remesh real-model nightlies alone: T0 runs them when Voxel/Remesh/MemoryGuard change (tools/test/impacted.py).
+  add_test(NAME sculptforge_tests_nightly_voxel COMMAND sculptforge_tests --nightly voxel remesh)
+  set_tests_properties(sculptforge_tests_nightly_voxel PROPERTIES LABELS nightly_area TIMEOUT 900
                        ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly)
   # Opt-in benches: own entry, labels bench + nightly (T0, CI and the shards never run them), hard timeout.
   # SF_FIGURE_POSE_MTRIS=2,20,50 selects the sizes (tests/test_figure_pose.cpp); without it the entry does nothing.
   add_test(NAME figure_pose_bench COMMAND sculptforge_tests --nightly nightly_figure_pose_bench)
   set_tests_properties(figure_pose_bench PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
+  # SF_BOOLEAN_BENCH=1: Part Booleans on 2 x 100k and 2 x 1M triangles (tests/test_mesh_boolean.cpp).
+  add_test(NAME boolean_bench COMMAND sculptforge_tests --nightly nightly_boolean_bench)
+  set_tests_properties(boolean_bench PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
   # SF_DECIMATE_AB=1: decimate() with and without its valence cap (tests/test_decimate_valence.cpp).
   add_test(NAME decimate_valence_ab COMMAND sculptforge_tests --nightly nightly_decimate_valence_cap)
   set_tests_properties(decimate_valence_ab PROPERTIES LABELS "bench;nightly" TIMEOUT 1800 RUN_SERIAL TRUE)
@@ -768,12 +1001,41 @@ if(SCULPTFORGE_BUILD_TESTS)
   target_include_directories(sf_fake_splat_tools PRIVATE third_party/stb)
   target_link_libraries(sf_fake_splat_tools PRIVATE sculptforge_core)
   add_dependencies(sculptforge_tests sf_fake_splat_tools)
+  # A stand-in for ffmpeg as the video encoder calls it (tests/tools/fake_ffmpeg.cpp): exits 1, stalls, writes nothing.
+  add_executable(sf_fake_ffmpeg tests/tools/fake_ffmpeg.cpp)
+  add_dependencies(sculptforge_tests sf_fake_ffmpeg)
+  target_compile_definitions(sculptforge_tests PRIVATE SF_FAKE_FFMPEG="$<TARGET_FILE:sf_fake_ffmpeg>")
   # Remesh timings per path and stage at the UI defaults (tests/tools/remesh_bench.cpp).
   add_executable(sf_remesh_bench tests/tools/remesh_bench.cpp)
   target_link_libraries(sf_remesh_bench PRIVATE sculptforge_core)
+  # One Clay Block stroke with dynamic topology on a dense Part: per-dab and stroke-end ms (tests/tools/dyntopo_bench.cpp).
+  add_executable(sf_dyntopo_bench tests/tools/dyntopo_bench.cpp)
+  target_link_libraries(sf_dyntopo_bench PRIVATE sculptforge_core)
+  # Forge Ink on a Micro level (core-200m head in memory): edit ms vs the micro points touched (tests/tools/ink_micro_bench.cpp).
+  add_executable(sf_ink_micro_bench tests/tools/ink_micro_bench.cpp)
+  target_link_libraries(sf_ink_micro_bench PRIVATE sculptforge_core)
+  # Every Micro stroke editable (core/MicroHistory.h): edit ms vs how deep the stroke is (tests/tools/ink_replay_bench.cpp).
+  add_executable(sf_ink_replay_bench tests/tools/ink_replay_bench.cpp)
+  target_link_libraries(sf_ink_replay_bench PRIVATE sculptforge_core)
+  # Detail per stroke (10x scoreboard axis 3): edge width and line FWHM one alpha dab resolves on a Micro level, and its cost (tests/tools/detail_bench.cpp).
+  add_executable(sf_detail_bench tests/tools/detail_bench.cpp)
+  target_link_libraries(sf_detail_bench PRIVATE sculptforge_core)
+  # Adaptive Detail tiles, step 0 (10x scoreboard axis 2): a standalone tile-store prototype's memory, undo ring, page re-resolve and LOD walk on the floor (tests/tools/tiles_probe_bench.cpp).
+  add_executable(sf_tiles_probe_bench tests/tools/tiles_probe_bench.cpp)
+  target_link_libraries(sf_tiles_probe_bench PRIVATE sculptforge_core)
   # Nightly (and the 3060 sanity row: pc.sh . -L nightly -R '^remesh_bench$' -V): the matrix at the UI defaults.
   add_test(NAME remesh_bench COMMAND sf_remesh_bench --runs 3 --tris 1000,10000,100000,1000000 --bumpy)
   set_tests_properties(remesh_bench PROPERTIES LABELS nightly TIMEOUT 1800)
+  # gh#226 (Quad Remesh held at 52%, Cancel ignored): a member's size and target (2.4M triangles, 50000 quads) smooth, with
+  # grain along the normals, on the bust with grain, and cancelled after 9 s. Each finished in 15-140 s after the fix;
+  # the grainy ones ran past the 600 s limit before it.
+  set(qr226 sf_remesh_bench --runs 1 --tris 2378056 --target 50000 --paths qr2)
+  add_test(NAME remesh_bench_226 COMMAND ${qr226} --bumpy)
+  add_test(NAME remesh_bench_226_grain COMMAND ${qr226} --bumpy --noise 0.002)
+  add_test(NAME remesh_bench_226_bust COMMAND ${qr226} --shape starter:bust --noise 0.0005)
+  add_test(NAME remesh_bench_226_cancel COMMAND ${qr226} --bumpy --noise 0.002 --cancel-after 9000)
+  set_tests_properties(remesh_bench_226 remesh_bench_226_grain remesh_bench_226_bust remesh_bench_226_cancel PROPERTIES LABELS nightly
+                       TIMEOUT 600)
   target_compile_definitions(sculptforge_tests PRIVATE SF_FAKE_SPLAT_TOOLS="$<TARGET_FILE:sf_fake_splat_tools>")
 
   # Tests that launch our programs from Python get a path they can run directly. When cross-compiling
@@ -857,6 +1119,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME i18n_raw_labels COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/i18n/coverage.py --raw-check)
     # The release's SBOM (tools/release/sbom.py, docs/guide/security.md): every fetched archive is a listed component.
     add_test(NAME sbom COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/sbom.py --check)
+    # Member betas are paused: no member-facing copy (app strings, guide, README, site) promises them; exceptions in
+    # tools/ci/betas_allow.txt, each with a reason.
+    add_test(NAME betas_paused COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/check_betas_paused.py)
+    add_test(NAME betas_paused_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/check_betas_paused.py --self-test)
     add_test(NAME marks_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_marks.py --self-test)
     # Our email address stays off everything public (website/, docs/, README*): hello@ is a private support inbox.
     add_test(NAME public_email COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_public_email.py
@@ -893,22 +1159,52 @@ if(SCULPTFORGE_BUILD_TESTS)
                --out ${CMAKE_CURRENT_BINARY_DIR}/mcpb-test/SculptForge-test.mcpb)
     endif()
     add_test(NAME release_notes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --self-test)
+    # step winget: the manifests render with the release's version, installer checksum and date (tools/release/winget_manifest.py),
+    # and reach main + the winget-pkgs PR (open: replace commit and title; merged: a PR per release) without ever failing the release.
+    add_test(NAME release_winget_manifest COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/winget_manifest.py --self-test)
     add_test(NAME release_notes_fragments COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/assemble_notes.py --check)
     # The members' publishing path stays locked down: release.yml's actions pinned to commit SHAs, INSIDERS_REPO_TOKEN only
     # in GitHub Environments, no pull_request_target (tools/release/check_workflows.py; release.sh check runs it too).
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux") # (the scripts that run release.sh run on the Linux release host only)
+      add_test(NAME release_card COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_card_test.sh)
+      set_tests_properties(release_card PROPERTIES TIMEOUT 60)
+    endif()
+    add_test(NAME discord_announce COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/discord_announce_test.py)
+    # The members' beta step creates the release in the insiders repository with --target (its checkout has the tag, that repository not).
+    # That step only runs on the Linux release host (input 11-21: the release-script self-tests are Linux only; 11-21 the winget one failed on macOS).
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_test(NAME release_insiders_target COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_insiders_target_test.py)
+    endif()
     add_test(NAME release_workflows COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py)
     add_test(NAME release_workflows_self_test COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_workflows.py --self-test)
     # Every asset install/install.sh and install.ps1 download is one release.yml publishes (#159; release.sh checks
     # the real release's asset list too).
     add_test(NAME release_install_assets COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_install_assets.py)
     add_test(NAME release_install_assets_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/check_install_assets.py --self-test)
+    # release.sh --stage warns (never fails) when the CMO's launch headline is missing or its keywords miss HIGHLIGHTS line 1 / the tagline.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      add_test(NAME release_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_headline_test.sh)
+      set_tests_properties(release_headline PROPERTIES TIMEOUT 60)
+      add_test(NAME release_body_headline COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_body_headline_test.sh)
+      set_tests_properties(release_body_headline PROPERTIES TIMEOUT 60)
+      add_test(NAME release_apk COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_apk_test.sh)
+      set_tests_properties(release_apk PROPERTIES TIMEOUT 60)
+      # A members' beta through the whole release step (floor, sums, install check, APKs): tests/release_beta_path_test.sh.
+      add_test(NAME release_beta_path COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_path_test.sh)
+      set_tests_properties(release_beta_path PROPERTIES TIMEOUT 60)
+      add_test(NAME release_winget COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_winget_test.sh)
+      set_tests_properties(release_winget PROPERTIES TIMEOUT 120)
+    endif()
     add_test(NAME release_paperwork COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/paperwork_only.py --self-test)
     # Build once, promote: only a maintainer's push run on staging is promotable (staged_run.py), and every package must
     # match its recorded SHA-256 and attestation before publishing (verify_staged.py).
     add_test(NAME release_staged_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/staged_run.py --self-test)
+    add_test(NAME release_flaky_log COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/flaky_log.py --self-test)
     add_test(NAME release_verify_staged COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/verify_staged.py --self-test)
     # Step bump pins tests/ui/whats_new.sfui to the newest What's New sections (tools/release/pin_whats_new_test.py).
     add_test(NAME release_pin_whats_new COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/pin_whats_new_test.py --self-test)
+    # The launch headline, README line and HIGHLIGHTS name only what the release's notes name (release.sh stage/check).
+    add_test(NAME release_notes_names COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/notes_names.py --self-test)
     # scripts/merge-queue.sh refuses a merge or squash that throws away the other side's change (tools/ci/no_revert.py).
     add_test(NAME ci_no_revert COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/no_revert.py --self-test)
     # A branch made from an old tree (a squash with reset --soft onto a moved origin/main) put older main files back (0.11.11).
@@ -919,16 +1215,41 @@ if(SCULPTFORGE_BUILD_TESTS)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
       set_tests_properties(release_script_beta PROPERTIES TIMEOUT 300)
     endif()
+    # release.sh's one rerun of a CI run red in a test step: flaky.md row when it passes, red and named when it fails again.
+    if(UNIX AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+      add_test(NAME release_rerun COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_rerun_test.sh)
+      set_tests_properties(release_rerun PROPERTIES TIMEOUT 60)
+    endif()
+    # packaging/linux/apt-retry.sh: apt-get through a mirror that fails DNS (stand-in apt-get, sandbox /etc/apt).
+    if(UNIX AND NOT APPLE)
+      add_test(NAME apt_retry COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/apt_retry_test.sh)
+      set_tests_properties(apt_retry PROPERTIES TIMEOUT 60)
+    endif()
+    # tools/ci/ci_status.sh: the ci-status branch's one line per finished run (ci-status.yml), in a local bare remote.
+    if(UNIX AND NOT APPLE) # (it only ever runs on the Ubuntu runner; macOS's BSD tools differ and 0.12.6's staging failed there)
+      add_test(NAME ci_status COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/ci_status.sh --self-test)
+      set_tests_properties(ci_status PROPERTIES TIMEOUT 60)
+    endif()
     # The Actions cache pruner keeps the newest cache of each kind (tools/ci/prune_caches.py).
     add_test(NAME ci_prune_caches COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/prune_caches.py --self-test)
+    add_test(NAME test_warm_ui COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/warm_ui.py self-test)
     add_test(NAME ci_slowest_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/slowest_tests.py --self-test)
     add_test(NAME test_impact COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/impacted.py --self-test)
     add_test(NAME test_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/run.py --self-test)
+    # Areas (tests/areas.map, docs/testing-flow.md): the picker's self-test, and every test in exactly one area.
+    add_test(NAME test_affected COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/affected.py --self-test)
+    add_test(NAME test_areas COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/check_areas.py
+             --map ${CMAKE_CURRENT_SOURCE_DIR}/tests/areas.map --tsv ${CMAKE_CURRENT_BINARY_DIR}/test-areas.tsv
+             --units $<TARGET_FILE:sculptforge_tests>)
     add_test(NAME benchmark_submit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/submit.py selftest)
+    # The scene pack (bench/pack, the Creature Head starter it names) hashes to the published one: changing it needs a new version.
+    add_test(NAME bench_pack_hash COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/benchmark/make_pack.py check)
     # The upstream watch (tools/upstream-watch, .github/workflows/upstream-watch.yml) against recorded API responses.
     add_test(NAME upstream_watch COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/upstream/test_upstream_watch.py)
     add_test(NAME guide_site COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/build_site.py --check
                                      --out ${CMAKE_CURRENT_BINARY_DIR}/guide-site)
+    # The home page says the newest release's news once (the announcement bar), not in the hero, lede and first card too.
+    add_test(NAME guide_home_news COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/home_news_test.py)
     # Menu paths in the guide name the SculptForge layout's task menus (Edit > Preferences, not Preferences).
     add_test(NAME guide_menu_paths COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/guide/menu_paths.py --check)
     # No system dialog or URL opens from a test or an agent's run: every SDL_Show*Dialog / SDL_OpenURL call goes
@@ -936,12 +1257,17 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME native_dialogs COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_native_dialogs.py
                                          ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME native_dialogs_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_native_dialogs.py --self-test)
+    # MSVC stops at about 128 nested blocks (C1061) and every `else if` nests one: a chain of 100 under src/ fails on Linux
+    # first (0.12.13: UiTest.cpp's step dispatch broke the Windows stage twice). Use a table or a switch.
+    add_test(NAME else_if_chains COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_else_if_chains.py
+                                         ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME else_if_chains_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_else_if_chains.py --self-test)
   endif()
 
   # The phone link's relay (services/link-worker, a Cloudflare Worker) under plain Node, when Node 20+ is installed.
   find_program(SCULPTFORGE_NODE node)
   if(SCULPTFORGE_NODE)
-    add_test(NAME link_worker COMMAND ${SCULPTFORGE_NODE} --test test/relay.test.mjs
+    add_test(NAME link_worker COMMAND ${SCULPTFORGE_NODE} --test test/relay.test.mjs test/deck.test.mjs
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/services/link-worker)
   endif()
 
@@ -961,6 +1287,10 @@ if(SCULPTFORGE_BUILD_TESTS)
       add_test(NAME ui_warm_stop COMMAND ${SF_UI_WARM_PY} stop --dir ${SF_UI_WARM_DIR})
       set_tests_properties(ui_warm_start PROPERTIES FIXTURES_SETUP ui_warm LABELS ui TIMEOUT 60)
       set_tests_properties(ui_warm_stop PROPERTIES FIXTURES_CLEANUP ui_warm LABELS ui TIMEOUT 400)
+      # A server that runs 40 scripts in a row stays under 700 MB (software Mesa: 330; it held 2180 when each script left its capture targets, ~50 MB, behind).
+      # 40 scripts take ~2 min on the PC (0.12.4 stage: 125.7 s, budget 20 s): nightly, not in every full suite.
+      add_test(NAME ui_serve_leak COMMAND ${SF_UI_WARM_PY} leak-check --app ${SF_UI_WARM_APP} --runs 40 --max-mb 700)
+      set_tests_properties(ui_serve_leak PROPERTIES LABELS "ui;nightly" TIMEOUT 600)
     endif()
     # sculptforge_ui_test(NAME SCRIPT [ARGS...]): ui_NAME runs tests/ui/SCRIPT.sfui, screenshots in ui-shots/NAME.
     function(sculptforge_ui_test name script)
@@ -975,10 +1305,49 @@ if(SCULPTFORGE_BUILD_TESTS)
       set_tests_properties(ui_${name} PROPERTIES LABELS ui TIMEOUT 300)
     endfunction()
     file(GLOB SCULPTFORGE_UI_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/*.sfui)
+    list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/mode_matrix\\.sfui$") # (four shards, below)
+    list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/hardware_tier_panel\\.sfui$") # (only at 1440 and 2880, below)
+    if(NOT TARGET sculptforge_pyhost) # (a build without Python in the app: its console says so, nothing to drive)
+      list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/python_[a-z_]+\\.sfui$")
+    endif()
+    if(WIN32) # (Focus Detail is Unix and macOS only, core/FocusDetail.cpp: no deferred range widen to see on Windows)
+      list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/micro_widen_live_stroke\\.sfui$")
+    endif()
+    if(WIN32) # (Focus Detail streams memory-mapped files: Linux and macOS for now, core/FocusDetail.h; enable with focus-detail-windows)
+      list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/focus_detail_open_command\\.sfui$")
+    endif()
     foreach(script ${SCULPTFORGE_UI_TESTS})
       get_filename_component(name ${script} NAME_WE)
       sculptforge_ui_test(${name} ${name})
     endforeach()
+    sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
+    sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
+    sculptforge_ui_test(guide_window_look_1440 guide_window_look --size 1440x900) # the guide's Learn edge, strip and surface
+    sculptforge_ui_test(guide_window_look_2880 guide_window_look --size 2880x1800)
+    sculptforge_ui_test(guide_window_look_800 guide_window_look --size 800x1280)
+    sculptforge_ui_test(prefs_updates_1440 prefs_updates --size 1440x900) # the installer's update-check box lands on this switch
+    sculptforge_ui_test(prefs_updates_2880 prefs_updates --size 2880x1620)
+    sculptforge_ui_test(timelapse_failure_1440 timelapse_failure --size 1440x900) # the missing-ffmpeg dialog
+    sculptforge_ui_test(timelapse_failure_2880 timelapse_failure --size 2880x1800)
+    sculptforge_ui_test(keep_strokes_editable_checkbox_1440 keep_strokes_editable_checkbox --size 1440x900)
+    sculptforge_ui_test(keep_strokes_editable_checkbox_2880 keep_strokes_editable_checkbox --size 2880x1800)
+    sculptforge_ui_test(undo_no_replay_lod_1440 undo_no_replay_lod --size 1440x900) # gh#184: the view after undo + a stroke
+    sculptforge_ui_test(undo_no_replay_lod_2880 undo_no_replay_lod --size 2880x1800)
+    # (gh#184, the stroke thread: settings read once at startup, so these run cold with their environment set here)
+    sculptforge_ui_test(async_stroke_undo_view_1440 async_stroke_undo_view --size 1440x900)
+    sculptforge_ui_test(async_stroke_undo_view_2880 async_stroke_undo_view --size 2880x1800)
+    set_tests_properties(ui_async_stroke_undo_view ui_async_stroke_undo_view_1440 ui_async_stroke_undo_view_2880 PROPERTIES
+                         ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=100")
+    if(NOT WIN32) # (any widen splits over two frames here, whatever this computer's speed; tests/ui/micro_widen_live_stroke.sfui)
+      set_tests_properties(ui_micro_widen_live_stroke PROPERTIES ENVIRONMENT "SF_WIDEN_SPLIT_MS=0")
+    endif()
+    set_tests_properties(ui_async_stroke_press_waits PROPERTIES
+                         ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=40")
+    set_tests_properties(ui_async_stroke_undo PROPERTIES
+                         ENVIRONMENT "SF_TRIANGLE_BUDGET=40000;SF_STILL_FRAME_MS=0.001;SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=40")
+    sculptforge_ui_test(keep_strokes_editable_checkbox_tablet keep_strokes_editable_checkbox --size 1024x768)
+    sculptforge_ui_test(render_bridge_1440 render_bridge --size 1440x900) # File > Render with... (the Render window)
+    sculptforge_ui_test(render_bridge_2880 render_bridge --size 2880x1620)
     # Heavy-mesh and benchmark scripts (tests/perf/*.sfui, e.g. 33M-triangle precision): nightly only (T3).
     file(GLOB SCULPTFORGE_PERF_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/perf/*.sfui)
     foreach(script ${SCULPTFORGE_PERF_TESTS})
@@ -986,6 +1355,50 @@ if(SCULPTFORGE_BUILD_TESTS)
       add_test(NAME perf_${name} COMMAND sculptforge --ui-test ${script} --ui-out ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/perf_${name})
       set_tests_properties(perf_${name} PROPERTIES LABELS "ui;nightly" TIMEOUT 3600 RUN_SERIAL TRUE)
     endforeach()
+    # End-to-end modelling scenarios (tests/e2e/*.sfui, docs/testing-flow.md "End-to-end"): each is a real artist workflow with
+    # numeric asserts. ui_e2e_NAME, labels ui + e2e, so every suite that runs the UI tests runs them: no extra release step.
+    # `ctest -L e2e` runs just these. A `# xfail: BUG-ID` line in a script marks a bug whose fix isn't merged yet (XFAIL, XPASS).
+    # quit_*.sfui are driven by quit_clean.py (below), not run alone.
+    file(GLOB SCULPTFORGE_E2E_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/*.sfui)
+    foreach(script ${SCULPTFORGE_E2E_TESTS})
+      get_filename_component(name ${script} NAME_WE)
+      if(name MATCHES "^quit_")
+        continue()
+      endif()
+      sculptforge_ui_test(e2e_${name} ../e2e/${name})
+      set_tests_properties(ui_e2e_${name} PROPERTIES LABELS "ui;e2e")
+    endforeach()
+    # The Dynamic-on-a-painted-Part scenario at the shots bar's sizes too (the stills of the paint surviving the stroke).
+    foreach(size 1440x900 2880x1800)
+      string(REGEX REPLACE "x.*" "" w ${size})
+      sculptforge_ui_test(e2e_dynamic_keeps_texture_${w} ../e2e/dynamic_keeps_texture --size ${size})
+      set_tests_properties(ui_e2e_dynamic_keeps_texture_${w} PROPERTIES LABELS "ui;e2e")
+    endforeach()
+    if(NOT WIN32 AND Python3_Interpreter_FOUND AND TARGET sf_fake_splat_tools)
+      # Quitting the app, every way, with a trainer child running: nothing outside it is signalled (#183).
+      add_test(NAME e2e_quit_clean COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/quit_clean.py
+               $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/e2e_quit_clean)
+      set_tests_properties(e2e_quit_clean PROPERTIES LABELS "ui;e2e" TIMEOUT 600 ENVIRONMENT
+        "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
+    endif()
+    # The render matrix (tests/render_matrix, docs/testing-flow.md): the model is drawn in every shading mode on every mesh path,
+    # the over-the-GPU-limit ones included. Label t0: it is in the T0 set whenever the app or its renderer changes.
+    sculptforge_ui_test(render_matrix ../render_matrix/matrix)
+    set_tests_properties(ui_render_matrix PROPERTIES LABELS "ui;t0" TIMEOUT 180)
+    # Nightly, on the PC's real GPU: the benchmark scenes (a plain mesh and a micro level) drawn in every shading mode, failing when the
+    # model is not in the picture (SF_BENCH_RENDER_CHECK, src/app/Bench.cpp). The same cells as the matrix, at size.
+    add_test(NAME render_check_gpu COMMAND sculptforge --bench --bench-view --bench-sizes 1 --bench-no-project
+             --bench-out ${CMAKE_CURRENT_BINARY_DIR}/render_check_gpu.md)
+    add_test(NAME render_check_gpu_micro COMMAND sculptforge --bench --bench-view --bench-micro --bench-sizes 2 --bench-no-project
+             --bench-out ${CMAKE_CURRENT_BINARY_DIR}/render_check_gpu_micro.md)
+    set_tests_properties(render_check_gpu render_check_gpu_micro PROPERTIES LABELS "ui;nightly" TIMEOUT 900 RUN_SERIAL TRUE
+                         ENVIRONMENT "SF_BENCH_RENDER_CHECK=1")
+    # --ui-test x.sfui --record out.mp4: the before/after clips of bug fixes (needs ffmpeg + ffprobe, else the test skips: exit 77).
+    if(NOT WIN32 AND Python3_Interpreter_FOUND)
+      add_test(NAME e2e_record_clip COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e/record_clip.py
+               $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/record_clip.sfui ${CMAKE_CURRENT_BINARY_DIR}/ui-shots/e2e_record_clip)
+      set_tests_properties(e2e_record_clip PROPERTIES LABELS "ui;e2e" TIMEOUT 300 SKIP_RETURN_CODE 77)
+    endif()
     # Splat training (also started by a phone scan) runs the fake Brush / COLMAP / ffmpeg.
     foreach(t ui_splat_train ui_phone_link)
       if(TEST ${t})
@@ -993,36 +1406,124 @@ if(SCULPTFORGE_BUILD_TESTS)
           "SCULPTFORGE_BRUSH=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_COLMAP=$<TARGET_FILE:sf_fake_splat_tools>;SCULPTFORGE_FFMPEG=$<TARGET_FILE:sf_fake_splat_tools>")
       endif()
     endforeach()
-    # Label no_d3d12: tests that the Windows PC's WSL GPU path (Mesa's OpenGL on D3D12, ~/Work/.sf/pc.sh) can't run and
-    # pc.sh leaves out. ui_micro_levels: its first micro-displacement frame makes D3D12 remove the device (a segfault,
-    # and every UI test running beside it loses its GL context); it passes on CI's llvmpipe and on the same PC's native
-    # NVIDIA driver (2026-11-03, v0.10.11, 128 frames), so it is the translation layer, not SculptForge.
-    if(TEST ui_micro_levels)
-      set_tests_properties(ui_micro_levels PROPERTIES LABELS "ui;no_d3d12")
-    endif()
     # The hardware profile panel with a real calibration (tests/ui/hardware_profile.sfui).
     if(TEST ui_hardware_profile)
       set_tests_properties(ui_hardware_profile PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1")
     endif()
     # Hardware tiers: the first-run card, the tier chip, Turbo, the panel (tests/ui/hardware_tier.sfui).
     # Also at 2880 px wide, so the 200 % top bar has room for the chip and the bolt (the shots show them).
+    sculptforge_ui_test(hardware_tier_panel_1440 hardware_tier_panel --size 1440x900) # the tier's panel (shots)
+    sculptforge_ui_test(hardware_tier_panel_2880 hardware_tier_panel --size 2880x1800)
     sculptforge_ui_test(hardware_tier_2880 hardware_tier --size 2880x1620)
+    sculptforge_ui_test(first_run_modal_order_2880 first_run_modal_order --size 2880x1620)
     if(TEST ui_hardware_tier)
-      set_tests_properties(ui_hardware_tier ui_hardware_tier_2880 PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
+      set_tests_properties(ui_hardware_tier ui_hardware_tier_2880 ui_hardware_tier_panel_1440 ui_hardware_tier_panel_2880 PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
     endif()
     # Putting the first-run tier card away: every way, first press, any scale, nothing under it sculpted (#161).
     if(TEST ui_tier_card_click)
-      set_tests_properties(ui_tier_card_click PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
+      set_tests_properties(ui_tier_card_click ui_first_run_modal_order ui_first_run_modal_order_2880 PROPERTIES ENVIRONMENT "SF_HW_PROFILE_IN_TESTS=1;SF_NO_CALIBRATION=1;SF_HW_SIMULATE=high")
     endif()
+    # One Alpha palette in the Classic and the SculptForge layout: the same controls reachable (tests/ui/alpha_layouts.sfui,
+    # MasterFULL on Discord: Stencil's Adjust and Tile), at 1440 px of UI and at 200 % (2880 px).
+    if(TARGET sculptforge_pyhost)
+      sculptforge_ui_test(python_ui_1440 python_ui --size 1440x900) # script-made interface (sf.ui)
+      sculptforge_ui_test(python_ui_2880 python_ui --size 2880x1800)
+      sculptforge_ui_test(python_startup_1440 python_startup --size 1440x900)
+      sculptforge_ui_test(python_script_path_1440 python_script_path --size 1440x900)
+      sculptforge_ui_test(python_script_path_2880 python_script_path --size 2880x1800)
+    endif()
+    sculptforge_ui_test(alpha_layouts_1440 alpha_layouts --size 1440x900)
+    # Adaptive Detail tiles drawn, before/after at three zooms (tests/ui/micro_tiles_closeup.sfui): the READY shots.
+    sculptforge_ui_test(micro_tiles_closeup_1440 micro_tiles_closeup --size 1440x900)
+    sculptforge_ui_test(micro_tiles_closeup_2880 micro_tiles_closeup --size 2880x1800)
+    sculptforge_ui_test(alpha_layouts_2880 alpha_layouts --size 2880x1800)
+    # Space slides a Mask / Select / Cut shape while it is dragged out (tests/ui/selection_space.sfui, #214), at the review sizes.
+    sculptforge_ui_test(whats_new_since_1440 whats_new_since --size 1440x900)
+    sculptforge_ui_test(whats_new_since_2880 whats_new_since --size 2880x1800)
+    sculptforge_ui_test(whats_new_since_phone whats_new_since --size 800x1280)
+    sculptforge_ui_test(selection_space_1440 selection_space --size 1440x900)
+    sculptforge_ui_test(selection_space_2880 selection_space --size 2880x1800)
+    # The Remesh palette's Voxel Resolution slider dropped on a shelf (tests/ui/shelf_value_drop.sfui, #191), at the review sizes.
+    sculptforge_ui_test(shelf_value_drop_1440 shelf_value_drop --size 1440x900)
+    sculptforge_ui_test(shelf_value_drop_2880 shelf_value_drop --size 2880x1800)
+    # Guide Strength, Target Quads and Level dropped on a shelf (tests/ui/shelf_slider_drop.sfui), and plain slider drags (slider_drag).
+    sculptforge_ui_test(shelf_slider_drop_1440 shelf_slider_drop --size 1440x900)
+    sculptforge_ui_test(shelf_slider_drop_2880 shelf_slider_drop --size 2880x1800)
+    # A double-click types an exact value on every slider and drag number (tests/ui/slider_exact.sfui), at the review sizes.
+    sculptforge_ui_test(slider_exact_1440 slider_exact --size 1440x900)
+    sculptforge_ui_test(slider_exact_2880 slider_exact --size 2880x1800)
+    # Forge Deck prototype (tests/ui/deck.sfui), at 1440 px of UI and at 200 % (2880 px).
+    sculptforge_ui_test(deck_1440 deck --size 1440x900)
+    sculptforge_ui_test(deck_2880 deck --size 2880x1800)
+    # The alpha pool and Scale / Position jitter (tests/ui/alpha_pool.sfui), at 1440 px of UI and at 200 % (2880 px).
+    sculptforge_ui_test(alpha_pool_1440 alpha_pool --size 1440x900)
+    sculptforge_ui_test(alpha_pool_2880 alpha_pool --size 2880x1800)
+    # The command line in the F3 search (tests/ui/command_bar.sfui).
+    sculptforge_ui_test(command_bar_1440 command_bar --size 1440x900)
+    sculptforge_ui_test(command_bar_2880 command_bar --size 2880x1800)
+    # Two-key shortcuts: the Two-key window preference and the Hotkeys boxes (tests/ui/two_key_window.sfui), at 1440 px and 200 %.
+    sculptforge_ui_test(two_key_window_1440 two_key_window --size 1440x900)
+    sculptforge_ui_test(two_key_window_2880 two_key_window --size 2880x1800)
+    # The undo budget in Preferences > Performance and the status line when steps are dropped (tests/ui/undo_budget.sfui), at 1440 px and 2880 px.
+    sculptforge_ui_test(undo_budget_1440 undo_budget --size 1440x900)
+    sculptforge_ui_test(undo_budget_2880 undo_budget --size 2880x1800)
+    # The Orbit around the pointer preference (tests/ui/orbit_at_pointer.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(orbit_at_pointer_1440 orbit_at_pointer --size 1440x900)
+    sculptforge_ui_test(orbit_at_pointer_2880 orbit_at_pointer --size 2880x1800)
+    # C picks the colour of the Part under the pointer, active or not, and the status bar says when nothing can be picked
+    # (tests/ui/pick_colour_parts.sfui), at 1440 px and 2880 px.
+    sculptforge_ui_test(pick_colour_parts_1440 pick_colour_parts --size 1440x900)
+    sculptforge_ui_test(pick_colour_parts_2880 pick_colour_parts --size 2880x1800)
+    # View > Reference images (tests/ui/reference_images.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(reference_images_1440 reference_images --size 1440x900)
+    sculptforge_ui_test(reference_images_2880 reference_images --size 2880x1800)
+    # Mouse orbit speed (tests/ui/mouse_orbit_speed.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(mouse_orbit_speed_1440 mouse_orbit_speed --size 1440x900)
+    sculptforge_ui_test(mouse_orbit_speed_2880 mouse_orbit_speed --size 2880x1800)
+    # A shelf slot whose brush is missing (tests/ui/shelf_missing_brush.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(shelf_missing_brush_1440 shelf_missing_brush --size 1440x900)
+    sculptforge_ui_test(shelf_missing_brush_2880 shelf_missing_brush --size 2880x1800)
+    # A brush's thumbnail shows its alpha in its stroke type (tests/ui/brush_alpha_thumbnail.sfui, #208), at 1440 px and 2880 px.
+    sculptforge_ui_test(brush_alpha_thumbnail_1440 brush_alpha_thumbnail --size 1440x900)
+    sculptforge_ui_test(brush_alpha_thumbnail_2880 brush_alpha_thumbnail --size 2880x1800)
+    sculptforge_ui_test(brush_thumb_stable_1440 brush_thumb_stable --size 1440x900)
+    sculptforge_ui_test(brush_thumb_stable_2880 brush_thumb_stable --size 2880x1800)
+    # A shelf slot follows its brush through a rename (tests/ui/shelf_slot_rename.sfui).
+    sculptforge_ui_test(shelf_slot_rename_1440 shelf_slot_rename --size 1440x900)
+    sculptforge_ui_test(shelf_slot_rename_2880 shelf_slot_rename --size 2880x1800)
+    # Revert to Saved Layout / Reset Layout from a layout with the colour picker dragged off (tests/ui/layout_revert.sfui),
+    # at 1440 px of UI and at 200 % (2880 px).
+    sculptforge_ui_test(layout_revert_1440 layout_revert --size 1440x900)
+    sculptforge_ui_test(layout_revert_2880 layout_revert --size 2880x1800)
+    # The layout saves itself; Save Layout marks what Revert returns to (tests/ui/layout_autosave.sfui).
+    sculptforge_ui_test(layout_autosave_1440 layout_autosave --size 1440x900)
+    sculptforge_ui_test(layout_autosave_2880 layout_autosave --size 2880x1800)
+    # Front faces only's tag by the cursor and in the Brush palette, at 1440 px and at 200 % (tests/ui/front_faces_tag.sfui).
+    sculptforge_ui_test(front_faces_tag_1440 front_faces_tag --size 1440x900)
+    sculptforge_ui_test(front_faces_tag_2880 front_faces_tag --size 2880x1800)
+    # Crisp Flatten's chamfer, grazing views and Brush Lab options (tests/ui/crisp_flatten.sfui), at 1440 px and 2880 px.
+    sculptforge_ui_test(crisp_flatten_1440 crisp_flatten --size 1440x900)
+    sculptforge_ui_test(crisp_flatten_2880 crisp_flatten --size 2880x1800)
+    # Smooth Peaks (tests/ui/smooth_peaks.sfui), at 1440 px and at 200 % (2880 px).
+    sculptforge_ui_test(smooth_peaks_1440 smooth_peaks --size 1440x900)
+    sculptforge_ui_test(smooth_peaks_2880 smooth_peaks --size 2880x1800)
+    sculptforge_ui_test(key_sequence_1440 key_sequence --size 1440x900)
+    sculptforge_ui_test(key_sequence_2880 key_sequence --size 2880x1800)
     # The shell layout again on a 1920x1080 window (docs/ui-design.md §2.3).
     # Studio mode: About shows the studio (tests/data/studio; core/StudioProfile.h).
     sculptforge_ui_test(studio_mode studio/studio_mode --studio ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/studio/studio.json)
     sculptforge_ui_test(shell_layout_1080 shell_layout --size 1920x1080)
     sculptforge_ui_test(menu_stable_720 menu_stable --size 1280x720)
     sculptforge_ui_test(title_version_1440 title_version --size 1440x900)
+    sculptforge_ui_test(open_unicode_name_1440 open_unicode_name --size 1440x900)
+    sculptforge_ui_test(open_unicode_name_2880 open_unicode_name --size 2880x1800)
     sculptforge_ui_test(title_version_1024 title_version --size 1024x768)
     sculptforge_ui_test(tablet_view_speed_1440 tablet_view_speed --size 1440x900)
     sculptforge_ui_test(paint_intensity_1440 paint_intensity --size 1440x900) # #164: the top bar's Intensity at 1440
+    sculptforge_ui_test(paint_shift_smooth_1440 paint_shift_smooth --size 1440x900) # Shift smooths the colour, never the shape
+    sculptforge_ui_test(paint_shift_smooth_2880 paint_shift_smooth --size 2880x1800)
+    sculptforge_ui_test(rgb_sub_1440 rgb_sub --size 1440x900)  # #186: Rgb lays colour on Sub strokes
+    sculptforge_ui_test(rgb_sub_2880 rgb_sub --size 2880x1800)
     sculptforge_ui_test(tablet_view_speed_1024 tablet_view_speed --size 1024x768)
     sculptforge_ui_test(tablet_troubleshooting_1440 tablet_troubleshooting --size 1440x900)
     sculptforge_ui_test(tablet_troubleshooting_1024 tablet_troubleshooting --size 1024x768)
@@ -1031,12 +1532,66 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The first-use notice for online AI services (tests/ui/ai_consent.sfui, 100% and 200% inside).
     sculptforge_ui_test(ai_consent_1440 ai_consent --size 1440x900)
     sculptforge_ui_test(ai_consent_2880 ai_consent --size 2880x1800) # its 200% shots: 1440 px of UI
+    sculptforge_ui_test(member_sign_in_1440 member_sign_in --size 1440x900) # Preferences > Updates > Member builds' messages
+    sculptforge_ui_test(member_sign_in_2880 member_sign_in --size 2880x1800)
+    sculptforge_ui_test(drag_stamp_footprint_1440 drag_stamp_footprint --size 1440x900) # #174's shots at 1440 and 2880 px
+    sculptforge_ui_test(drag_stamp_footprint_2880 drag_stamp_footprint --size 2880x1800)
+    # Origin tools in the Gizmo panel and the Classic frame keys (tests/ui/origin_frame.sfui).
+    sculptforge_ui_test(origin_frame_1440 origin_frame --size 1440x900)
+    sculptforge_ui_test(origin_frame_2880 origin_frame --size 2880x1800)
+    # #175's Preferences row in three languages at 1440 and 2880 px (tests/ui/slide_rotate_prefs.sfui).
+    sculptforge_ui_test(slide_rotate_prefs_1440 slide_rotate_prefs --size 1440x900)
+    sculptforge_ui_test(slide_rotate_prefs_2880 slide_rotate_prefs --size 2880x1800)
+    # A free Space that returns no model / switched Text to 3D off (tests/ui/generate_space_refused.sfui).
+    sculptforge_ui_test(generate_space_refused_1440 generate_space_refused --size 1440x900)
+    sculptforge_ui_test(generate_space_refused_2880 generate_space_refused --size 2880x1800)
+    # image_to_3d / text_to_3d from a command run on a worker (tests/ui/generate_command_background.sfui).
+    sculptforge_ui_test(generate_command_background_1440 generate_command_background --size 1440x900)
+    sculptforge_ui_test(generate_command_background_2880 generate_command_background --size 2880x1800)
+    # Recommended models, Tripo and a free Space the feed reports switched off (tests/ui/generate_recommended.sfui).
+    sculptforge_ui_test(generate_recommended_1440 generate_recommended --size 1440x900)
+    sculptforge_ui_test(generate_recommended_2880 generate_recommended --size 2880x1800)
+    sculptforge_ui_test(modifier_brush_1440 modifier_brush --size 1440x900) # the Shift / Ctrl badges at 1440 and 2880 px
+    sculptforge_ui_test(modifier_brush_2880 modifier_brush --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
+    sculptforge_ui_test(popup_click_outside_1440 popup_click_outside --size 1440x900) # #210: context menus and combo lists close on a press outside
+    sculptforge_ui_test(popup_click_outside_2880 popup_click_outside --size 2880x1800)
+    # #182: the high-resolution and may-use-swap remesh dialogs at the review sizes (tests/ui/voxel_highres.sfui).
+    sculptforge_ui_test(voxel_highres_1440 voxel_highres --size 1440x900)
+    sculptforge_ui_test(voxel_highres_2880 voxel_highres --size 2880x1800)
+    sculptforge_ui_test(unlit_view_1440 unlit_view --size 1440x1300) # #168: the Unlit button and the unlit colours at 1440 and 2880 px
+    sculptforge_ui_test(unlit_view_2880 unlit_view --size 2880x3200)
     sculptforge_ui_test(geometry_groups_1024 narrow/geometry_groups --size 1024x768)
+    # Curves and the Tube modifiers at 1440 and 2880 px (tests/ui/curve.sfui; its 200% shots inside).
+    sculptforge_ui_test(curve_1440 curve --size 1440x900)
+    sculptforge_ui_test(curve_2880 curve --size 2880x1800)
+    # Garments draped on the Full Body at 1440 and 2880 px (tests/ui/garments_drape.sfui).
+    sculptforge_ui_test(garments_drape_1440 garments_drape --size 1440x900)
+    sculptforge_ui_test(garments_drape_2880 garments_drape --size 2880x1800)
+    # Drape on the Full Body (centimetres) at its default Units per metre: comes to rest (tests/ui/cloth_drape_units.sfui).
+    sculptforge_ui_test(cloth_drape_units_1440 cloth_drape_units --size 1440x900)
+    sculptforge_ui_test(cloth_drape_units_2880 cloth_drape_units --size 2880x1800)
+    # Tube strands (a spring) and Repeat along curve at 1440 and 2880 px (tests/ui/tube_modifiers.sfui).
+    sculptforge_ui_test(tube_modifiers_1440 tube_modifiers --size 1440x900)
+    sculptforge_ui_test(tube_modifiers_2880 tube_modifiers --size 2880x1800)
+    # Tube Braid: round woven strands, loose to tight, and the Twist / Spin / Spread / Strands order (tests/ui/tube_braid.sfui).
+    sculptforge_ui_test(tube_braid_1440 tube_braid --size 1440x900)
+    sculptforge_ui_test(tube_braid_2880 tube_braid --size 2880x1800)
+    # #215: dragging and resizing points of a long tube (full mesh over 60,000 triangles), undo, drag again (tests/ui/tube_long_drag.sfui).
+    sculptforge_ui_test(tube_long_drag_1440 tube_long_drag --size 1440x900)
+    sculptforge_ui_test(tube_long_drag_2880 tube_long_drag --size 2880x1800)
     # #163's unhide prompt at 1440 and 2880 px (tests/ui/unhide_prompt.sfui).
     sculptforge_ui_test(unhide_prompt_1440 unhide_prompt --size 1440x900)
     sculptforge_ui_test(unhide_prompt_2880 unhide_prompt --size 2880x1800)
+    # #173's levels prompt before a remesh or decimate (tests/ui/levels_confirm.sfui).
+    sculptforge_ui_test(levels_confirm_1440 levels_confirm --size 1440x900)
+    sculptforge_ui_test(levels_confirm_2880 levels_confirm --size 2880x1800)
+    # The same prompt before Mirror, Make Symmetric, Delete Masked, Split and Merge by Distance, and its Preferences switch.
+    sculptforge_ui_test(levels_confirm_ops_1440 levels_confirm_ops --size 1440x900)
+    sculptforge_ui_test(levels_confirm_ops_2880 levels_confirm_ops --size 2880x1800)
+    sculptforge_ui_test(levels_confirm_prefs_1440 levels_confirm_prefs --size 1440x900)
+    sculptforge_ui_test(levels_confirm_prefs_2880 levels_confirm_prefs --size 2880x1800)
     # The Tool sub-palettes named and ordered by task (tests/ui/tool_palettes.sfui; narrow/ at 1024).
     sculptforge_ui_test(tool_palettes_1440 tool_palettes --size 1440x900)
     sculptforge_ui_test(tool_palettes_2880 tool_palettes --size 2880x1800)
@@ -1050,6 +1605,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The Transform gizmo's look, each mode front and 3/4, 100% and 200% (tests/ui/gizmo/look.sfui).
     sculptforge_ui_test(gizmo_look_1440 gizmo/look --size 1440x900)
     sculptforge_ui_test(gizmo_look_2880 gizmo/look --size 2880x1800)
+    # Forge Spheres in one mode (#167): the hover hint and drags at 1440 and 2880 px (tests/ui/forge_spheres_one_mode.sfui).
+    sculptforge_ui_test(forge_spheres_one_mode_1440 forge_spheres_one_mode --size 1440x900)
+    sculptforge_ui_test(forge_spheres_one_mode_2880 forge_spheres_one_mode --size 2880x1800)
+    # Moving Forge Spheres (tests/ui/forge_spheres_move.sfui): depth, Shift, Snap to Surface on a long chain, at 1440 and 2880 px.
+    sculptforge_ui_test(forge_spheres_move_1440 forge_spheres_move --size 1440x900)
+    sculptforge_ui_test(forge_spheres_move_2880 forge_spheres_move --size 2880x1800)
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     sculptforge_ui_test(extract_labels_1024 extract_labels --size 1024x768)
     sculptforge_ui_test(extract_labels_1440 extract_labels --size 1440x900)
@@ -1060,18 +1621,49 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(support_shots_1440 support/support_shots --size 1440x900)
     # Help > Support (the welcome screen) and the full membership card at 1440 px: the perk lines fit (100 % and 200 %).
     sculptforge_ui_test(support_1440 support --size 1440x900)
+    sculptforge_ui_test(support_2880 support --size 2880x1620) # the welcome and About at 200 %: the icon rows keep their line
+    # The appeal card at 1440 and 2880 px (the READY shots).
+    sculptforge_ui_test(appeal_card_1440 appeal_card --size 1440x900)
+    sculptforge_ui_test(appeal_card_2880 appeal_card --size 2880x1620)
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
+    # Member betas are paused: the Help text and the Quick Tour last page name early builds (READY shots at 1440 + 2880).
+    sculptforge_ui_test(betas_wording_1440 betas_wording --size 1440x900)
+    sculptforge_ui_test(betas_wording_2880 betas_wording --size 2880x1620)
+    sculptforge_ui_test(member_card_1440 member_card --size 1440x900) # the Updated member card's wording (shot "updated")
+    sculptforge_ui_test(member_card_2880 member_card --size 2880x1620)
+    sculptforge_ui_test(support_card_2880 support_card --size 2880x1620)
+    sculptforge_ui_test(support_card_yearly_1440 support_card_yearly --size 1440x900) # the yearly-first card, Streamlined
+    sculptforge_ui_test(support_card_yearly_2880 support_card_yearly --size 2880x1620)
     sculptforge_ui_test(support_shots_1024 support/support_shots --size 1024x768)
+    # The welcome window's Featured creator card at 1440 and 2880 px (tests/ui/featured_creator.sfui).
+    sculptforge_ui_test(featured_creator_1440 featured_creator --size 1440x900)
+    sculptforge_ui_test(featured_creator_2880 featured_creator --size 2880x1800)
+    # The first start's language: the OS-language decision, the welcome's language row and the "SculptForge is in..." bar (1440 + 2880).
+    sculptforge_ui_test(first_run_language_1440 first_run_language --size 1440x900)
+    sculptforge_ui_test(first_run_language_2880 first_run_language --size 2880x1800)
+    # Japanese (日本語): the picker, the kana and kanji from the JP font subset, menus and panels at 1440 and 2880 px.
+    sculptforge_ui_test(language_ja_1440 language_ja --size 1440x900)
+    sculptforge_ui_test(language_ja_2880 language_ja --size 2880x1800)
+    sculptforge_ui_test(save_visible_parts_1440 sizes/save_visible_parts --size 1440x900)
+    sculptforge_ui_test(save_visible_parts_2880 sizes/save_visible_parts --size 2880x1800)
     sculptforge_ui_test(help_console_1080 help_console --size 1920x1080)
     # The S / U / I / O slider on a UI scaled 1.5x (Windows at 150%, #9): it must still open under the cursor.
     sculptforge_ui_test(size_popup_scaled size_popup --size 2400x1350)
+    # The follow-the-mouse pop-up at the review sizes (1440 and 1440@200%): ring and readout in both.
+    sculptforge_ui_test(size_follow_1440 size_follow --size 1440x810)
+    sculptforge_ui_test(size_follow_2880 size_follow --size 2880x1620)
     # The Parts / Geometry tools (foirgairwolf on Discord) at a laptop's and a small window's width: rows fit.
     sculptforge_ui_test(parts_split_selection_1440 parts_split_selection --size 1440x900)
     sculptforge_ui_test(mesh_check_1440 mesh_check --size 1440x900)
     sculptforge_ui_test(weld_preview_200 sizes/weld_preview_200 --size 2880x1800) # Merge by Distance's dots at 200%
+    sculptforge_ui_test(mesh_check_messy_1440 mesh_check_messy --size 1440x900)
+    sculptforge_ui_test(mesh_check_messy_2880 mesh_check_messy --size 2880x1800) # (200%: the "Not fixed:" line wraps)
     sculptforge_ui_test(parts_tools_1024 sizes/parts_tools_1024 --size 1024x768) # (palettes are drop-downs there)
     # The stroke popup on a UI scaled 1.5x: it opens under the cursor and its items are where they're drawn.
     sculptforge_ui_test(stroke_popup_scaled stroke_popup --size 2400x1350)
+    # The popup's key labels per input style (gh#233) at 100% and 200%: the 1440 and 2880 shots.
+    sculptforge_ui_test(stroke_popup_style_keys_1440 stroke_popup_style_keys --size 1440x810)
+    sculptforge_ui_test(stroke_popup_style_keys_2880 stroke_popup_style_keys --size 2880x1620)
     # Library single click (#142) on a UI scaled 1.5x: tiles still take one click.
     sculptforge_ui_test(library_click_scaled library_click --size 2400x1350)
     # UI scale (#87) at 1600x900, where Automatic in a test is exactly 100 %; label "dpi": release.sh step check runs them before the tag.
@@ -1099,13 +1691,32 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(part_folders_hidpi hidpi/part_folders --size 3200x1800)
     # Trays and columns never scroll sideways at auto scale on a 1920x1200 screen (dm4nd on Discord).
     sculptforge_ui_test(tray_hscroll_hidpi hidpi/tray_hscroll --size 1920x1200)
+    # The welcome window on a 1080x2400 phone at 300 %: inside the view, its X and Close reachable (Hameron, Pixel).
+    sculptforge_ui_test(welcome_phone hidpi/welcome_phone --size 1080x2400)
+    # The welcome with a finger only (touch taps, Android's Back, safe-area insets), both ways up, two phone densities, and a
+    # swipe that scrolls it in landscape: its X and Close whole and one tap closes (Hameron, Pixel, 11-13).
+    sculptforge_ui_test(welcome_touch_portrait hidpi/welcome_touch --size 1080x2400)
+    sculptforge_ui_test(welcome_touch_landscape hidpi/welcome_touch --size 2400x1080)
+    sculptforge_ui_test(welcome_touch_350_portrait hidpi/welcome_touch_350 --size 1440x3120)
+    sculptforge_ui_test(welcome_touch_350_landscape hidpi/welcome_touch_350 --size 3120x1440)
+    sculptforge_ui_test(welcome_touch_scroll hidpi/welcome_touch_scroll --size 2400x1080)
     set_tests_properties(ui_right_tray_looks_720 ui_windows_dpi_2560 ui_windows_dpi_2160 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
+    # Android tablets (Mali-G72): each tray opens and closes with one finger tap, wide, landscape and upright.
+    sculptforge_ui_test(android_trays_wide_1920 hidpi/android_trays_wide --size 1920x1200)
+    sculptforge_ui_test(android_trays_wide_2560 hidpi/android_trays_wide --size 2560x1600)
+    sculptforge_ui_test(android_trays_narrow_1920 hidpi/android_trays_narrow --size 1920x1200)
+    sculptforge_ui_test(android_trays_narrow_2000 hidpi/android_trays_narrow --size 2000x1200)
+    sculptforge_ui_test(android_trays_narrow_2560 hidpi/android_trays_narrow --size 2560x1600)
+    sculptforge_ui_test(android_trays_portrait_1200 hidpi/android_trays_portrait --size 1200x1920)
+    sculptforge_ui_test(android_trays_portrait_1600 hidpi/android_trays_portrait --size 1600x2560)
     sculptforge_ui_test(user_guide_1080 user_guide --size 1920x1080)
-    # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-10 min on a loaded CI runner, so it starts first.
-    if(TEST ui_mode_matrix)
-      set_tests_properties(ui_mode_matrix PROPERTIES TIMEOUT 1200 COST 500)
-      set_property(TEST ui_mode_matrix APPEND PROPERTY ENVIRONMENT SF_UI_TIMEOUT=1190) # warm_ui.py's own limit
-    endif()
+    # The mode matrix probes every registry action (tests/ui/mode_matrix.sfui): 3-10 min on a loaded CI runner in one
+    # process, the longest test of every app T0, so it runs as four shards side by side (SF_MODE_MATRIX_SHARD), first.
+    foreach(k RANGE 3)
+      sculptforge_ui_test(mode_matrix_${k}of4 mode_matrix)
+      set_tests_properties(ui_mode_matrix_${k}of4 PROPERTIES TIMEOUT 600 COST 500)
+      set_property(TEST ui_mode_matrix_${k}of4 APPEND PROPERTY ENVIRONMENT SF_UI_TIMEOUT=590 SF_MODE_MATRIX_SHARD=${k}/4)
+    endforeach()
     # Seeded user-action fuzz, many seeds (tests/ui/monkey.sfui runs a few in T0): nightly only (T3).
     sculptforge_ui_test(monkey_many nightly/monkey_many)
     set_tests_properties(ui_monkey_many PROPERTIES LABELS "ui;nightly" TIMEOUT 1800)
@@ -1119,15 +1730,41 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The right shelf's view toggles and the Size slider's ring at 1440 px, 100 % and 200 % (tests/ui/sizes/view_toggles.sfui).
     sculptforge_ui_test(view_toggles_1440 sizes/view_toggles --size 1440x900)
     sculptforge_ui_test(view_toggles_1440_200 sizes/view_toggles --size 2880x1800)
+    # Preferences > Interface > Mask colour and the mask in it (tests/ui/sizes/mask_colour.sfui).
+    sculptforge_ui_test(mask_colour_1440 sizes/mask_colour --size 1440x900)
+    sculptforge_ui_test(mask_colour_1440_200 sizes/mask_colour --size 2880x1800)
     # A shorter window: the view toggles fold into one View button (tests/ui/sizes/view_toggles_short.sfui).
     sculptforge_ui_test(view_toggles_1024 sizes/view_toggles_short --size 1024x768)
     sculptforge_ui_test(view_toggles_1024_200 sizes/view_toggles_short --size 2048x1536)
+    # The right shelf with the console open holds still at every window height (tests/ui/sizes/shelf_console_*.sfui; the member's Retina: 982 logical px).
+    sculptforge_ui_test(shelf_console_classic sizes/shelf_console_classic --size 1512x982)
+    sculptforge_ui_test(shelf_console_forge sizes/shelf_console_forge --size 1512x982)
     # Cut caps, Wire on, low-poly and 20k spheres, for the look review at 1440 px, 100 % and 200 % (tests/ui/sizes/cut_cap_quality.sfui).
     sculptforge_ui_test(cut_cap_quality_1440 sizes/cut_cap_quality --size 1440x900)
     sculptforge_ui_test(cut_cap_quality_1440_200 sizes/cut_cap_quality --size 2880x1800)
+    # Panels in windows of their own (Founding Member #1's request), for the look review at 1440 px, 100 % and 200 %.
+    sculptforge_ui_test(detach_panels_1440 sizes/detach_panels --size 1440x900)
+    sculptforge_ui_test(detach_panels_1440_200 sizes/detach_panels --size 2880x1800)
+    # My Panel (Member Request), for the look review at 1440 px, 100 % and 200 %.
+    sculptforge_ui_test(my_panel_1440 sizes/my_panel --size 1440x900)
+    sculptforge_ui_test(my_panel_1440_200 sizes/my_panel --size 2880x1800)
+    sculptforge_ui_test(my_panel_paths_1440 sizes/my_panel_paths --size 1440x900)
+    sculptforge_ui_test(my_panel_paths_1440_200 sizes/my_panel_paths --size 2880x1800)
     # A crash leaves a note in the log file (#16). Needs no window.
     add_test(NAME crash_log COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
              -DDIR=${CMAKE_CURRENT_BINARY_DIR}/crash-log-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/crash_log.cmake)
+    # A portable copy keeps its data beside the program (src/core/DataDir.h): the real program, copied to a folder with
+    # spaces with portable.txt, saves a value and the crash log there and nothing under the machine's own folders; the
+    # folder moved, it finds the value; without the marker it is per-user again. Needs no window.
+    add_test(NAME portable_data COMMAND ${CMAKE_COMMAND} -DAPP=$<TARGET_FILE:sculptforge>
+             -DDIR=${CMAKE_CURRENT_BINARY_DIR}/portable-data-test -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/portable_data.cmake)
+    # A Threads value saved in Preferences reaches the shared pool at the next start (#184; the 0.12.5 fix never ran in the
+    # real app, the App's Document started the pool at 16 first). Starts the app twice, offscreen.
+    if(NOT WIN32 AND Python3_Interpreter_FOUND)
+      add_test(NAME threads_restart COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/threads_restart.py
+               $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_BINARY_DIR}/threads-restart-test)
+      set_tests_properties(threads_restart PROPERTIES LABELS ui TIMEOUT 300)
+    endif()
     # Idle, the app draws nothing (#14) and uses next to no CPU: --measure-idle fails when it keeps drawing frames or
     # its process CPU is over SF_IDLE_CPU_MAX % of one core (4 s here: a spinning loop's 100 % fails it; the 30 s
     # nightly holds it to 2 %).
@@ -1142,6 +1779,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # pointer's circle (#19).
     add_test(NAME ui_stroke_path COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_path PROPERTIES LABELS ui TIMEOUT 60 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
+    # The pan and zoom keys in the interactive loop (0.12.5: updateKeyNav was only in the UI test loop, no key worked): tap and
+    # hold of each action on its default key and rebound (tests/ui/key_nav.sfui covers the logic in the test runner's loop).
+    add_test(NAME ui_key_nav_loop COMMAND sculptforge --run "new_sphere" --measure-key-nav)
+    set_tests_properties(ui_key_nav_loop PROPERTIES LABELS ui TIMEOUT 90 ENVIRONMENT "SF_NO_UPDATE_CHECK=1")
     # A benchmark take (--benchmark-script, src/app/BenchTake.cpp) on a sphere: played in real time, a CSV row per
     # frame with the strokes' lag, and a video as long as the take (within 5%).
     if(Python3_Interpreter_FOUND)
@@ -1149,6 +1790,10 @@ if(SCULPTFORGE_BUILD_TESTS)
                                             $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_SOURCE_DIR}/tests/takes/sphere.sfui
                                             ${CMAKE_CURRENT_BINARY_DIR}/bench-take --min-seconds 5)
       set_tests_properties(bench_take_sphere PROPERTIES LABELS ui TIMEOUT 240 RUN_SERIAL TRUE)
+      add_test(NAME bench_pack_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench_pack_run.py $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_BINARY_DIR}/bench-pack-run)
+      set_tests_properties(bench_pack_run PROPERTIES LABELS ui TIMEOUT 900 RUN_SERIAL TRUE)
+      add_test(NAME bench_scene_names COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/bench_scene_names.py $<TARGET_FILE:sculptforge> ${CMAKE_CURRENT_BINARY_DIR}/bench-scene-names)
+      set_tests_properties(bench_scene_names PROPERTIES LABELS "ui;nightly" TIMEOUT 900 RUN_SERIAL TRUE)
     endif()
     # Background dabs (a heavy mesh's stroke on the solver thread, no preview), forced on a light sphere: replaying
     # the stroke in the frame loop gives the same mesh, bit for bit, and its undo the mesh it started from.
@@ -1169,7 +1814,24 @@ if(SCULPTFORGE_BUILD_TESTS)
     # mesh, bit for bit, and its undo the mesh it started from.
     add_test(NAME ui_stroke_resize COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
     set_tests_properties(ui_stroke_resize PROPERTIES LABELS ui TIMEOUT 60 DISABLED TRUE # predictive strokes: not yet identical in every run
+                         # (20/20 on a laptop; a loaded CI runner gave different positions, the replay identical to itself)
                          ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_RESIZE=1;SF_MEASURE_VERIFY=1;SF_PREDICTIVE_STROKE=1")
+    # Ctrl+Z, or a click on the model, while a released stroke's dabs are still being placed: it waits for them (the
+    # window keeps drawing) and then runs: the undo restores the mesh from before the stroke, the click is a stroke after it.
+    add_test(NAME ui_stroke_drain_undo COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_drain_undo PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=undo;SF_PREDICTIVE_STROKE=1")
+    # And Ctrl+S: the file, opened again, is the finished stroke, bit for bit, and no frame waits on the stroke meanwhile.
+    add_test(NAME ui_stroke_drain_save COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_drain_save PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=save;SF_PREDICTIVE_STROKE=1")
+    # And Esc while the Ctrl+Z waits: it is dropped, the stroke stays.
+    add_test(NAME ui_stroke_drain_esc COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_drain_esc PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=esc;SF_PREDICTIVE_STROKE=1")
+    add_test(NAME ui_stroke_drain_click COMMAND sculptforge --run "new_sphere" --measure-stroke 1.5)
+    set_tests_properties(ui_stroke_drain_click PROPERTIES LABELS ui TIMEOUT 60
+                         ENVIRONMENT "SF_NO_UPDATE_CHECK=1;SF_MEASURE_VERIFY=1;SF_MEASURE_DRAIN=stroke;SF_PREDICTIVE_STROKE=1")
     # The system clipboard is one per desktop (one X server under CI's xvfb-run), and on X11 every SDL program asks a
     # new clipboard owner what it holds: a program that quits meanwhile makes the owner's answer fail (BadWindow).
     # Scripts that set, read or paste it (or click a Copy / Paste button) run alone under ctest -j.
@@ -1222,4 +1884,7 @@ if(SCULPTFORGE_BUILD_TESTS)
       endif()
     endif()
   endforeach()
+  # One area label per entry, a smoke label on the quick cross-area set (tests/areas.map, docs/testing-flow.md).
+  include(cmake/TestAreas.cmake)
+  sculptforge_label_test_areas()
 endif()

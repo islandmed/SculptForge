@@ -561,7 +561,7 @@ TEST(discord_bursts_send_the_latest) {
         got.push_back(stateOf(frame));
     }
     CHECK(!got.empty() && got.back() == "a8.sfproj");
-    CHECK(got.size() <= 2); // not 8
+    CHECK(got.size() <= 4); // not 8 (2 here; a slow macOS runner stretched the 20 ms sleeps past the 400 ms window once)
     close(c);
     close(listener);
 }

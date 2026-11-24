@@ -5,10 +5,25 @@ four times: by the agent, by the merger's full local ctest, by CI on main, and b
 
 | tier | when | where | what | target |
 |---|---|---|---|---|
-| **T0 impact** | every agent commit | the PC (laptop if the PC sleeps), or GitHub Actions while the PC queue is long | build + the tests the change can break | < 1 min |
+| **T0 impact** | every agent commit | GitHub Actions (the PC only for `SF_PC_PRIO=1`) | build + the tests the change can break | < 1 min |
 | **T1 batch** | once per merge batch | the PC, while T2 runs | the whole suite, -j10 on the GPU, test cache on | < 5 min |
 | **T2 platforms** | once per merge batch | CI on the branch `staging` | every platform, VFX Reference Platform, Blender | the gate for main |
 | **T3 nightly** | once a day | CI (scheduled) + the PC | label `nightly`: benchmarks, stress, heavy meshes, floor-tier perf | |
+
+## Tiers: pay for accuracy where it decides something
+
+| tier | when | what | replay of 98 Actions T0s (11-11) |
+|---|---|---|---|
+| **push** | every push while working: `SF_T0_TIER=push` on the T0 runner (ref `t0/push/<branch>`) | impacted.py's direct picks (build graph, own files, hand map, name words) + `PUSH_SMOKE` (start, open a model and sculpt on the real frame loop, undo, save and open a project) + `marks` + `stale_tree` | tests 331 -> 161 s median; 0 failures left for READY |
+| **ready** | before READY (the default) | the T0 below: smoke incl. the mode matrix shards and the monkey, the changed areas, co-changed UI tests | the verdict a reviewer reads |
+| **batch** / **nightly** / **release** | T1 + T2, T3, release stage | the whole suite; nightly labels, floor benches; packages | unchanged |
+
+A push-tier result says "push tier: not a READY verdict" and is never cached as a verdict. A green READY verdict is
+kept by tree hash and base tree hash in the T0 runner's verdict log: a squash, a reworded commit or a re-push
+of the same tree on the same base reuses it (`SF_T0_FRESH=1` runs it again). Known flakes go in
+`tests/quarantine.txt` with an owner, a date and a follow-up task (optionally one case, `[monkey 1064]`: another case of
+the test still blocks, and every quarantined failure names its FAIL lines): they don't block until then, and block again after it.
+`tools/test/replay_selection.py RESULTS.tsv` (the T0 runner's log of past runs) replays past runs through a selection change before it lands.
 
 ## T0: what can this change break?
 
@@ -26,21 +41,35 @@ four times: by the agent, by the merger's full local ctest, by CI on main, and b
    commits as it in the last 600 commits, and a smoke set.
 
 `marks` (the IP check) always runs. CMake files mean everything runs (`.`). `-v` explains each pick.
-Run it with `~/Work/.sf/t0.sh`: `pc.sh` builds on the PC, runs impacted.py there against the PC's build graph, then
-runs the tests through `tools/test/run.py`.
+Run it with `~/Work/.sf/t0.sh`: it runs on GitHub Actions (below); the PC only builds and runs T0 for `SF_PC_PRIO=1`
+(there `pc.sh` runs impacted.py against the PC's build graph, then the tests through `tools/test/run.py`).
 
 ### T0 on GitHub Actions
 
-`SF_T0_CI=1 ~/Work/.sf/t0.sh` (automatic while more than 3 jobs wait for the PC, never with `SF_PC_PRIO=1`;
-`SF_T0_CI=0` turns it off) runs the same T0 on GitHub's free runners, so branches test in parallel instead of
-queueing for the PC. `~/Work/.sf/t0-ci.sh <worktree>` pushes the worktree's state to `t0/<branch>` (uncommitted work
+`~/Work/.sf/t0.sh` (the default; never with `SF_PC_PRIO=1`; `SF_T0_CI=0` skips it) runs T0 on GitHub's free runners,
+so branches test in parallel instead of queueing for the PC. `~/Work/.sf/t0-ci.sh <worktree>` pushes the worktree's state to `t0/<branch>` (uncommitted work
 as a temporary commit; the worktree is not touched), waits for `.github/workflows/t0.yml`, prints the same lines as
-`t0.sh` and exits 0 green, 1 red, 3 unavailable (t0.sh then uses the PC); it deletes the `t0/` ref after. Results
+`t0.sh` and exits 0 green, 1 red, 3 unavailable (t0.sh then uses the PC only if nobody waits for it, else the laptop); it deletes the `t0/` ref after. Results
 stay in `~/Work/.sf/t0-ci/<worktree>/`.
+
+### PC flow guards (11-10: 13 branch T0s and a daytime bench jammed both PC slots for hours)
+
+- `pc.sh` refuses a branch T0 (`SF_T0=1`, exit 7, "use t0-ci.sh") unless `SF_PC_PRIO=1` (release stage, security), `--shots` or `--bench`.
+- A whole-PC job (`bench.sh` PC rows, `win.sh run`) holds the slots only 00:30-06:30 local, or when no `pc.sh` job waits; otherwise it queues behind them (`SF_WIN_NOW=1`: by hand).
+- A `SF_PC_PRIO=1` job always goes first, past a draining or between-run bench; whole-PC runs step behind it.
+- Queue watchdog (`pcq.sh alerts`, every minute while the queue is active): a job waiting > 45 min (PRIO > 10 min) wakes the coordinator once, with the queue table.
+- `spawn.sh` starts agents on Sonnet (`--opus` for hard design or perf work); the model is a column of `agents.tsv`.
+- `tidy.sh --apply` closes the herdr pane of an idle agent whose branch is merged and whose REPORT.md says done.
 
 - The run (`tools/ci/t0.sh`): `check_marks`, a Ninja build, impacted.py against the merge base with `origin/main`,
   the picked tests through `run.py` on the CPU (Mesa llvmpipe, `SDL_VIDEO_DRIVER=offscreen`, `SF_TEST_BUDGET=150`;
   `GITHUB_ACTIONS` gives the in-test time limits their CI slack).
+- **A full run fits**: all ~390 tests finish in about 10 minutes on a runner, as long as the warm UI servers
+  (`tools/test/warm_ui.py`) stay small. They keep memory from each script they run, so a server is replaced after 60
+  scripts or 2 GB (`SF_UI_SERVER_RUNS` / `SF_UI_SERVER_MB`; test `test_warm_ui`). Before that, a full T0 ran two servers
+  to 15 GB on the 16 GB runner and the kernel's OOM kill ended the job (exit 143, no artifact). The log prints memory and
+  tests done every minute, and on a SIGTERM what held the memory. `[t0 full]` in the tip commit's subject forces every
+  test, the proof that a full run completes.
 - **Always green**: the job is `continue-on-error` and the script never fails, so a red T0 emails nobody. The verdict
   is the run summary and the artifact `t0-result` (`result.json`: green/red, stage, failed tests; `failed.txt`:
   LastTestsFailed + FAILED lines; `output.txt`: `ctest --output-on-failure` on the failed tests).
@@ -51,6 +80,62 @@ stay in `~/Work/.sf/t0-ci/<worktree>/`.
 - A branch older than t0.yml gets it (and `tools/ci/t0.sh`) from origin/main in one extra commit, "t0-ci overlay";
   the tests are still picked from the branch's own files.
 - The PC stays for GPU-specific checks (it runs the D3D12 GPU path), T1 and release staging.
+
+## Brush and tool promises (geometric invariants)
+
+Every brush and tool states a promise in its description or the guide ("only cuts", "keeps the volume", "a clean
+sharp edge"). `tests/test_geom_invariants.cpp` checks each one on dense curved meshes (a 1.3M-triangle sphere and a
+saddle, never a flat plane alone: a plane cut on a plane hides the defect), with the checks in `tests/GeomInvariants.h`:
+
+- **Direction**: cut-only = no vertex rises along its normal (`maxRise`), build-only = none sinks (`maxSink`).
+- **Clean edges** (`edgeOutliers`): in the falloff ring (0.6 to 1.1 radii from the nearest dab) the umbrella of the
+  displacement (a vertex's move minus its ring's mean move) stays under 0.25 mean edges; the base surface cancels,
+  so a spike, a speck or a stair-step scores its height in edges. A round tip's one-dab profile never climbs going
+  outward (`radialProfile`: a ring or a terrace). The artist close-ups (tools/qa/closeup.py) use an absolute
+  umbrella rule (> 0.6 mean edges and > 3x the ring median) on app meshes, where there is no before.
+- **Everything**: no NaN, no triangle turned against all its neighbours (`invertedFaces`), nothing moves outside the
+  brush, the X mirror holds (`symmetryError`), all under two crossing pen strokes (pressure 0.2 to 1 and back).
+- **Tools**: remesh, decimate, booleans and Cut stay closed, face outwards, on the form and within 1% of the volume;
+  Smooth removes relief and keeps the volume; a mask holds what it covers.
+
+A library brush gets its `<name>_invariant` test by itself: its promise is read from the recipe (Scrape and Crisp
+Flatten cut, Clay and Fill build, a texture or alpha skips the edge check). For a new brush type, a new tool or a
+new promise: add the case to `promiseOf` or a `*_invariant` TEST, run it on main first and see it fail on the
+defect it is meant to catch. A red found on main is filed as an issue and listed in `kKnown` with it: the test
+prints KNOWN and stays green, and turns red once it passes. A fix must flip its known-red to a normal test: the
+fixing branch deletes its `kKnown` line in the same commit, so the test guards the fix from then on.
+ready.sh refuses a brush or tool branch (~/Work/.sf/brush-paths.txt) without added test lines naming an invariant.
+
+## Areas: test the part you touched, the whole once per batch
+
+`tests/areas.map` is the one map. Eight areas: **sculpt** (brush engine, strokes, masking, paint, input, performance),
+**mesh** (remesh, cut, crease, levels, tube, parts, UV), **cloth**, **ui** (shell, panels, menus, gizmos), **render**,
+**io** (formats, projects, bridges, packs), **ai** (generation, links, updates), **site** (i18n, docs, release and CI
+tooling, repo checks). Its sections map ctest names (`[tests]`), `tests/test_*.cpp` files (`[units]`) and source paths
+(`[paths]`); `[smoke]` is the cross-area set (start, open, stroke, save/load, a UI shot, mode matrix and monkey);
+`[core]` lists the paths that mean everything.
+
+- **Labels**: cmake/TestAreas.cmake gives every ctest entry exactly one label `area_<name>` (plus `smoke`).
+  `ctest -L area_cloth` is the cloth tests, `ctest -L smoke` the quick set; `tools/test/affected.py --area cloth` prints the
+  names. The `sculptforge_tests` shards are area `unit`: their TEST cases belong to the area of their file (`[units]`) and
+  `SF_TEST_AREA=cloth,ui` (or `--area`) makes every shard run only those cases. `test_areas` fails for a test, a unit
+  file or a smoke name the map doesn't cover (add a line; the globs cover most new tests), so every test has one area.
+- **T0 = smoke + the changed files' areas + impacted.py's direct picks** (tools/test/affected.py `--merge`; t0.sh, pc.sh and
+  tools/ci/t0.sh call it). A branch that touches one area runs that area's tests (a broad area, over 40 tests, only its unit
+  cases and the smoke set: its UI tests are impacted.py's picks; `affected.py --area sculpt` or `ctest -L area_sculpt`
+  runs them all), and not the other areas' tests. A CMakeLists.txt edit that only registers tests counts as those tests' area.
+- **Everything runs** (`.`) for a [core] path (CMake beyond test registrations, the harness, the map), a src/core or tests header included by
+  30+ files (Document.h, Mesh.h, Json.h ...; app and render headers are the build graph's), or a path no `[paths]` line covers. Nothing is skipped
+  or weakened by areas: a flaky test stays in its area and is listed in tests/flaky.md; T1 and the batch stage run every test.
+- **The full suite runs once per release batch**: `merge-batch.sh` stages the batch (CI on `staging` and `t1.sh` on the PC,
+  both the whole suite). `t1.sh` logs a green run on a clean tree in `~/Work/.sf/t1/green.tsv`, and `release.sh X.Y.Z --stage`
+  skips its own T1 when the bump commit only adds release paperwork to a commit logged there
+  (`tools/release/paperwork_only.py`, the rule CI's reuse uses; `SF_T1_FORCE=1` runs it anyway). It does the same for the
+  full CI on `staging` (`ci_reused`: the batch commit's CI passed, so `SF_STAGE_CI_REUSED` makes merge-queue.sh skip the
+  second dispatch). The push to `staging` still happens, for its Packages run. The bump costs paperwork checks, not a second
+  suite; the bump's own tests (What's New, guide, notes) run in step `check`. The bump pins `tests/ui/whats_new.sfui`, which
+  paperwork_only.py now allows line by line (version, comment, expected texts); before, every real bump failed that check.
+  Floor benches stay with `bench.sh`.
 
 ## T1 and T2: one batch, two machines at once
 
@@ -110,10 +195,11 @@ Every tier runs ctest through `tools/test/run.py --build build [-- ctest args]`:
 - **Parallel runs** (`ctest -jN`, N > 1): timing checks get CI's slack (`SF_TIME_LIMIT_SCALE=4`, `timeLimit()` in
   tests/TestHarness.h). With `--threads-per-test auto` (pc.sh), each test process gets its share of the cores
   (`SF_THREADS`, core/ThreadPool.cpp), instead of ten pools each the size of the machine.
-- **GPU lost**: a failure whose output says the graphics device went away is the machine, not the code (exit 4).
-  pc.sh says so, and such a failure is never logged as a flake. Tests that the PC's WSL GPU path (Mesa on D3D12) can't
-  run carry the label `no_d3d12`, which pc.sh leaves out. ui_micro_levels makes D3D12 remove the device, yet passes on
-  CI and on the same PC's native driver.
+- **GPU lost**: a failure whose output says the graphics device went away is reported apart (exit 4) and never logged
+  as a flake. It is not always the machine: micro strokes made the PC's WSL GPU path (Mesa's OpenGL on D3D12, also
+  Windows on ARM) remove the device on every run until 11-17 (BufferSubData into busy texture buffers;
+  copies there: render/BufferUpload.h). A test that loses the device there is a bug to isolate, not a test to label away: the render
+  matrix's cells fail by name when the context is gone after their frame.
 
 ## Modes and the monkey
 
@@ -121,7 +207,7 @@ A mode that won't let go (Draw Tube or Append > Insert taking every drag after a
 app for the person using it, and a hand-written test only covers the modes someone thought of. Two generated UI tests
 cover the class (src/app/UiTestModes.cpp); both run in T0 whenever the app changes (tools/test/impacted.py SMOKE).
 
-- **`ui_mode_matrix`** (tests/ui/mode_matrix.sfui, about 30 s): every action in the registry is run on a small sphere.
+- **`ui_mode_matrix_0of4` .. `_3of4`** (tests/ui/mode_matrix.sfui in four shards side by side, `SF_MODE_MATRIX_SHARD=K/N`; about 30 s in all): every action in the registry is run on a small sphere.
   One that then latches something (`App::latchedForTest()`: a mode a drag goes to, input still captured, an overlay or
   modal) or stops a plain stroke from sculpting is a **mode**, and each way out is tried from it: Esc, a brush on the
   shelf, Draw, Move, Scale, Rotate, a palette action, undo. Afterwards the tool is the one picked, a plain stroke
@@ -146,6 +232,60 @@ cover the class (src/app/UiTestModes.cpp); both run in T0 whenever the app chang
 - **Values for any script:** `latched`, `latched_modes`, `input_captured`, `overlay_open`; steps `expect_latched none`,
   `expect_sculpts`, `expect_status_not TEXT`, `snapshot_start` / `undo_all` / `expect_restored`, `expect_mesh_valid`,
   `action ID`. A new mode's state belongs in `App::latchedForTest()` (one line) so failures can name it.
+
+## End-to-end scenarios (label `e2e`)
+
+`tests/e2e/*.sfui` are real modelling workflows, run headless in the real app with numeric asserts (mesh stats, colour,
+undo, frame-time caps for the floor tier). They are ctest entries `ui_e2e_<name>` with labels `ui;e2e`, so **no new release
+step**: the UI tests every tier already runs include them (T0 by the area of the workflow, `ui_e2e_*` lines in
+tests/areas.map; T1 and the Actions full suite whole). `ctest -L e2e` runs only them; the whole set is a few minutes on the
+PC, and each is parallel-safe (UI tests use an isolated settings folder; `e2e_quit_clean` tags its processes).
+
+| scenario | workflow |
+|---|---|
+| sculpt_basics | sphere, Clay raises a bump, Smooth with every stroke type (Dots too), Front Faces Only on / off, undo and redo |
+| voxel_remesh | remesh to about 2M triangles, strokes on it with a frame cap, undo, Quick Remesh |
+| extract_panel, extract_thin_sheet | mask, Extract, Accept, sculpt on the thin sheet (Clay / Flatten are the hidden-spikes bug) |
+| shelf_brush_restart, shelf_value_field | a Brush Lab brush on the shelf survives Save Layout and restart; a value field dropped on a shelf |
+| paint_rgb | Rgb on: Add and Sub both lay the colour |
+| curves_tube | draw a tube, its modifiers, Bake |
+| cloth_drape | a plane draped on a ball comes to rest, one undo step |
+| parts_project | Parts with a hidden one, save project, reopen |
+| export_roundtrip | OBJ, STL, glTF, USD, USDZ, FBX out and back: same counts |
+| prefs_threads | a threads override is kept for the next start |
+| e2e_quit_clean | quit by SIGTERM and SIGINT with a trainer running, and a trainer child's every end: nothing outside the app is signalled (#183) |
+
+**The rule: every bug fix adds or extends a scenario** that reproduces the reporter's steps, with the issue or Discord link
+in the script's first comment. A bug whose fix isn't merged yet is written first with `# xfail: BUG-ID what` in the
+script's first 40 lines: it logs `XFAIL` and passes while the bug stands, and logs `XPASS` when the fix lands (delete the
+line then). A script that names a hook its fix adds (it doesn't parse yet) is XFAIL too. `# xfail` never blocks a batch,
+and it hides any failure in that script, so keep such a script to the one bug.
+
+Run one: `build/sculptforge --ui-test tests/e2e/NAME.sfui --ui-out DIR` (a failure prints `FAIL file:line: why` and
+saves `FAIL-line-N.png` in DIR: read the shot first), or `ctest -R ui_e2e_NAME` / `ctest -L e2e` in a build.
+
+Add one:
+
+1. `tests/e2e/NAME.sfui`, started from a neighbour. The steps and `expect_value` names are listed in the header comment of
+   `src/app/UiTest.cpp`; `run COMMAND` takes any `sculptforge-cli -l` command. Useful: `snapshot` and `moved*`,
+   `remember X name` and `$name`, `expect_mesh_valid`, `open_edges`, `solid_volume`, and `longest_frame_ms` (reset on read;
+   scale its cap by `$scale` after `remember time_limit_scale scale`: 4 on CI).
+2. Write a number that fails when the bug is back, and run the script against the unfixed build to see it fail.
+3. CMake picks the file up. `tests/areas.map` gives it an area by name (the `ui_e2e_*` lines); add a line for a new family.
+4. A new test hook is one line in `UiTest.cpp` (the value, plus its header comment). No other app code for a test.
+5. A scenario that needs its own process (the thread pool, quit paths) is a script plus a small driver, like
+   `tests/e2e/quit_clean.py`. The language has no loops: generate repeated blocks and commit the result.
+
+## Render matrix (label `t0`)
+
+Tests that check "no crash" miss a model that is simply not drawn (0.12.15: a micro level was invisible in PBR). The matrix
+`tests/render_matrix/matrix.sfui` (`ui_render_matrix`, in T0's smoke set) draws the scene offscreen at 256 px in each shading
+mode (Lit Sphere, PBR, flat, wire) on each mesh path (a plain mesh, a dense Micro level, Focus Detail, and Micro and Focus
+Detail with the GPU buffer limit lowered by `gl_limits texels=N`, as a small GPU's is). `render_cell "MODE x PATH" mode=...`
+fails, naming the cell, when under 25% of the pixels inside the model's projected box differ from the background or they are
+all one colour; the picture goes to `--ui-out` as `FAIL-cell-*.png`. A failing cell does not stop the script: every empty cell is listed.
+**Rule: a new render path, shading mode or GPU limit adds its cells in the same branch** (`ready.sh` warns on `src/render/` without them).
+`SF_BENCH_RENDER_CHECK=1 sculptforge --bench ...` runs the same check on the benchmark scenes on the real GPU (`render_check_gpu`, nightly).
 
 ## T3 nightly
 

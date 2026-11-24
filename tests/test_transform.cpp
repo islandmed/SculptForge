@@ -444,6 +444,106 @@ TEST(transform_session_never_accumulates) {
     CHECK(sameBits(c.mesh.positions, arm.positions));
 }
 
+TEST(transform_whole_drag_drawn_by_one_matrix) {
+    // The Gizmo's GPU path (app/Gizmo.cpp, gizmo_.gpu): a whole Part is drawn by MeshTransform::matrix while dragging
+    // and the release applies only the final transform. That leaves exactly what applying every frame's did, and the
+    // matrix drew what the vertices end up as.
+    Mesh arm = makeArm(4);
+    arm.addLayer("Detail");
+    for (uint32_t v = 0; v < arm.vertexCount(); ++v) arm.layers[0].delta[v] = arm.normals[v] * 0.02f;
+    arm.setLayerWeight(0, 1.0f);
+    for (const bool rotate : {false, true}) {
+        Document a = makeDoc(arm), b = makeDoc(arm);
+        MeshTransform t;
+        t.pivot = glm::vec3(0.5f, 0.1f, 0.0f);
+        TransformSession sa, sb;
+        CHECK(sa.begin(a.mesh, transformWeights(a.mesh, true, 0.0f), Symmetry{true, false, false}, t.pivot));
+        CHECK(sb.begin(b.mesh, transformWeights(b.mesh, true, 0.0f), Symmetry{true, false, false}, t.pivot));
+        CHECK(sa.wholeRigid(a.mesh) && sb.wholeRigid(b.mesh));
+        for (int i = 1; i <= 30; ++i) { // every frame's transform (the per-frame path)
+            t.translate = glm::vec3(0.02f * float(i), -0.01f * float(i), 0.03f);
+            if (rotate) t.rotate = glm::angleAxis(glm::radians(3.0f * float(i)), glm::normalize(glm::vec3(0.2f, 1, 0.1f)));
+            t.scale = glm::vec3(1.0f + 0.01f * float(i));
+            sa.apply(a.mesh, t);
+        }
+        sb.apply(b.mesh, t); // only the last (the GPU path's release)
+        a.undo.push(sa.finish(a.mesh, a.bvh, "Gizmo Move"));
+        b.undo.push(sb.finish(b.mesh, b.bvh, "Gizmo Move"));
+        CHECK(sameBits(a.mesh.positions, b.mesh.positions));
+        CHECK(sameBits(a.mesh.normals, b.mesh.normals));
+        CHECK(sameBits(a.mesh.base, b.mesh.base));
+        CHECK(sameBits(a.mesh.layers[0].delta, b.mesh.layers[0].delta));
+        const glm::mat4 m = t.matrix();
+        float off = 0.0f;
+        for (uint32_t v = 0; v < arm.vertexCount(); ++v)
+            off = std::max(off, glm::length(glm::vec3(m * glm::vec4(arm.positions[v], 1.0f)) - b.mesh.positions[v]));
+        CHECK(off < 1e-5f);
+        CHECK(run(b, "undo").ok);
+        CHECK(sameBits(b.mesh.positions, arm.positions));
+    }
+    // Not a whole rigid move: a masked part, or a hidden vertex (it stays).
+    Mesh masked = makeArm(3);
+    maskBelowX(masked, 0.0f);
+    TransformSession s;
+    CHECK(s.begin(masked, transformWeights(masked, true, 0.0f), Symmetry{}, glm::vec3(0.0f)));
+    CHECK(!s.wholeRigid(masked));
+    CHECK(s.begin(masked, transformWeights(masked, false, 0.0f), Symmetry{}, glm::vec3(0.0f)));
+    CHECK(s.wholeRigid(masked)); // (the mask ignored: Gizmo > Masked off)
+    Mesh part = makeArm(3);
+    part.hidden.assign(part.triangleCount(), 0);
+    for (size_t t = 0; t < part.triangleCount(); ++t) part.hidden[t] = part.positions[part.triangles[t].x].x < -1.0f ? 1 : 0;
+    CHECK(s.begin(part, transformWeights(part, false, 0.0f), Symmetry{}, glm::vec3(0.0f)));
+    CHECK(!s.wholeRigid(part));
+}
+
+TEST(transform_axis_scale_drawn_by_one_matrix) {
+    // An axis scale joins the GPU path (the renderer corrects the normals): the release's single apply leaves what every
+    // frame's apply did, the vertices are where the matrix drew them, and the normals are the stretched surface's.
+    // 164k vertices: begin() takes its threaded path, which must give the lists the weighted path gives.
+    Mesh arm = makeIcosphere(7, 1.0f);
+    for (auto& p : arm.positions) p *= glm::vec3(3.0f, 0.6f, 0.6f);
+    arm.recomputeAllNormals();
+    Document a = makeDoc(arm), b = makeDoc(arm), c = makeDoc(arm);
+    MeshTransform t;
+    t.pivot = glm::vec3(0.5f, 0.1f, 0.0f);
+    t.frame = glm::mat3_cast(glm::angleAxis(glm::radians(25.0f), glm::normalize(glm::vec3(0.3f, 1, 0.2f))));
+    TransformSession sa, sb, sc;
+    const Symmetry none{false, false, false};
+    CHECK(sa.begin(a.mesh, {}, none, t.pivot) && sb.begin(b.mesh, {}, none, t.pivot));
+    CHECK(sc.begin(c.mesh, std::vector<float>(c.mesh.vertexCount(), 1.0f), none, t.pivot)); // (every weight given)
+    CHECK(sa.wholeRigid(a.mesh));
+    CHECK(sb.wholeRigid(b.mesh));
+    CHECK(sc.wholeRigid(c.mesh));
+    CHECK(sa.movingVertices() == arm.vertexCount() && sc.movingVertices() == arm.vertexCount());
+    for (int i = 1; i <= 20; ++i) { // the per-frame path
+        t.scale = glm::vec3(1.0f + 0.04f * float(i), 1.0f, 1.0f);
+        sa.apply(a.mesh, t);
+    }
+    sb.apply(b.mesh, t); // the release of a drag drawn by one matrix
+    sc.apply(c.mesh, t);
+    CHECK(sameBits(a.mesh.positions, b.mesh.positions));
+    CHECK(sameBits(a.mesh.normals, b.mesh.normals));
+    CHECK(sameBits(c.mesh.positions, b.mesh.positions));
+    CHECK(sameBits(c.mesh.normals, b.mesh.normals));
+    const glm::mat4 m = t.matrix();
+    float off = 0.0f;
+    for (uint32_t v = 0; v < arm.vertexCount(); ++v)
+        off = std::max(off, glm::length(glm::vec3(m * glm::vec4(arm.positions[v], 1.0f)) - b.mesh.positions[v]));
+    CHECK(off < 1e-4f);
+    // The normals the renderer is given while dragging: the matrix's linear part, corrected (Renderer::normalFixFor's
+    // formula), must be the true normals of the stretched surface (what the release leaves).
+    const glm::mat3 lin(m), fix = glm::inverse(glm::transpose(lin) * lin);
+    double worst = 0.0;
+    for (uint32_t v = 0; v < arm.vertexCount(); v += 97) {
+        const glm::vec3 drawn = glm::normalize(lin * (fix * arm.normals[v])); // the shader: mat3(view*model) * fix * n
+        worst = std::max(worst, double(std::acos(std::min(1.0f, glm::dot(drawn, b.mesh.normals[v])))));
+    }
+    CHECK(worst < 1e-3);
+    a.undo.push(sa.finish(a.mesh, a.bvh, "Gizmo Scale"));
+    CHECK(run(a, "undo").ok);
+    CHECK(sameBits(a.mesh.positions, arm.positions));
+}
+
 TEST(transform_bvh_follows) {
     Document d = makeDoc(makeIcosphere(3));
     CHECK(run(d, "transform", {{"translate", std::string("10,0,0")}}).ok);

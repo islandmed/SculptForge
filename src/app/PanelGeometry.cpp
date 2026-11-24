@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <imgui_internal.h>
 #include <string>
 
 namespace sf {
@@ -32,6 +33,34 @@ std::string triangleCount(size_t n) {
 }
 } // namespace
 
+void App::drawLevelSlider(bool compact) {
+    const Mesh& m = doc_.mesh;
+    const int levels = subdivLevelCount(m), current = subdivCurrentLevel(m);
+    ImGui::BeginDisabled(levels < 2 && !(layout_.customize && ui::CtrlHeld() && ui::AltHeld())); // (a one-level Part's slider can still be picked up)
+    if (!sdivHeld_) sdivSlider_ = float(current + 1);
+    if (!compact) ImGui::SetNextItemWidth(-1);
+    const bool grab = !compact && beginShelfGrab();
+    char format[32];
+    std::snprintf(format, sizeof format, "Level %%.0f / %d", std::max(levels, 1));
+    ui::SliderInside(compact ? "##level.shelf" : "##level", &sdivSlider_, 1.0f, float(std::max(levels, 1)), format, ImGuiSliderFlags_AlwaysClamp);
+    if (grab) endShelfGrab("##levelgrab", "widget.level", "Level");
+    sdivHeld_ = ImGui::IsItemActive();
+    sdivSlider_ = std::round(sdivSlider_);
+    // Every way of setting it applies at once, a plain click too (in every setup): a double-click's first click has
+    // already switched, and the typed field opens on the second (slider_exact.sfui). Esc on that field leaves the level.
+    const bool typing = ImGui::TempInputIsActive(ImGui::GetItemID());
+    if (ImGui::IsItemDeactivatedAfterEdit() && int(sdivSlider_) - 1 != current) {
+        if (sdivTyping_ && !typing && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+            sdivSlider_ = float(current + 1); // (the field's Esc put back the value from before the first click)
+        } else {
+            ++sdivSwitches_;
+            runCommand("subdiv_level", {{"level", double(sdivSlider_)}});
+        }
+    }
+    sdivTyping_ = typing;
+    ImGui::EndDisabled();
+}
+
 void App::drawGeometrySection() {
     const Mesh& m = doc_.mesh;
     const int levels = subdivLevelCount(m), current = subdivCurrentLevel(m);
@@ -41,17 +70,7 @@ void App::drawGeometrySection() {
     // Grouped by what you do (fix/ip-labels): Levels, Edges, Micro Detail, Resolution, Cleanup, Symmetry.
     tray::GroupLabel(*this, "Levels");
     // Level: the slider (1 = the base cage). Applied when released, as one undo step.
-    ImGui::BeginDisabled(levels < 2);
-    if (!sdivHeld_) sdivSlider_ = float(current + 1);
-    ImGui::SetNextItemWidth(-1);
-    char format[32];
-    std::snprintf(format, sizeof format, "Level %%.0f / %d", std::max(levels, 1));
-    ui::SliderInside("##level", &sdivSlider_, 1.0f, float(std::max(levels, 1)), format, ImGuiSliderFlags_AlwaysClamp);
-    sdivHeld_ = ImGui::IsItemActive();
-    sdivSlider_ = std::round(sdivSlider_);
-    if (ImGui::IsItemDeactivatedAfterEdit() && int(sdivSlider_) - 1 != current)
-        runCommand("subdiv_level", {{"level", double(sdivSlider_)}});
-    ImGui::EndDisabled();
+    drawLevelSlider();
     ui::HelpText("Level", nullptr,
                  "The subdivision level to sculpt at: 1 is the base cage, the highest has the finest detail. "
                  "D / Shift+D step up / down. Detail is kept on every level.",
@@ -96,7 +115,8 @@ void App::drawGeometrySection() {
     {
         const size_t est = m.triangleCount() << (2 * int(microSlider_));
         char fmt[64];
-        std::snprintf(fmt, sizeof fmt, "Micro %%.0f (%.0fM)", double(est) / 1e6);
+        // (before Add Micro the slider is only what the button would make: a level that isn't there reads as "New")
+        std::snprintf(fmt, sizeof fmt, micro ? "Micro %%.0f (%.0fM)" : "New Micro %%.0f (%.0fM)", double(est) / 1e6);
         ui::SliderInside("##micro", &microSlider_, 1.0f, float(MicroMesh::kMaxLevel), fmt, ImGuiSliderFlags_AlwaysClamp);
         microSlider_ = std::round(microSlider_);
     }
@@ -120,10 +140,16 @@ void App::drawGeometrySection() {
     }
     if (micro && m.micro) { // (a button above may have just removed it)
         const MicroMesh& mm = *m.micro;
-        char info[128];
+        char info[160];
         std::snprintf(info, sizeof info, "Micro %d: %.1fM triangles, %.0f MB%s", mm.level, double(mm.microTriangles()) / 1e6,
                       double(mm.bytes()) / 1e6, mm.disp.mapped() ? ", out of core" : "");
         ImGui::TextDisabled("%s", info);
+        if (mm.focus) { // streamed from its detail file (core/FocusDetail.h)
+            ImGui::TextDisabled("%s", tr("Streamed: full detail loads where you look and sculpt"));
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", tr("Focus Detail keeps this micro level in a .sfdetail file beside the project and "
+                                           "loads full detail only where you look and sculpt. Keep the file with the project."));
+        }
     }
 
     // Resolution: these change the mesh itself and keep no levels.
@@ -135,7 +161,7 @@ void App::drawGeometrySection() {
             if (decimateKeepMasked_) args["keep_masked"] = true;
             runCommand("decimate", args);
         };
-        if (unhideAllows("Decimate", decimate)) decimate(); // #163
+        if (unhideAllows("Decimate", decimate) && levelsAllow("Decimate", decimate)) decimate(); // #163, #173
     }
     ui::HelpText("Decimate", nullptr, "Reduce the triangle count while keeping the shape. Sculpt layers are kept.",
                  "Tool > Geometry");

@@ -5,6 +5,7 @@
 #include "app/AssetLibrary.h"
 #include "core/BrushAlpha.h"
 #include "core/Document.h"
+#include "core/Image.h"
 #include "core/PathStroke.h"
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
@@ -66,22 +67,142 @@ std::vector<glm::vec3> arc(float cx, float cy, float r, float a0, float a1, int 
 }
 
 void stroke(Document& d, const BrushRecipe* recipe, BrushType type, std::vector<glm::vec3> pts, float radius,
-            float strength, bool curve = true) {
+            float strength, bool curve = true, float alphaAngle = 0.0f) {
     PathStroke st;
     st.points = std::move(pts);
     st.view = glm::vec3(0.0f, 0.0f, -1.0f);
     st.radius = radius;
     st.strength = strength;
     st.curve = curve;
+    st.alphaAngle = alphaAngle;
     std::string err;
     strokePath(d, recipe, type, st, err);
 }
 
+// The alpha pressed into the ball the way the brush's stroke type presses it (#208): Dots and Lazy Mouse lay the
+// S across the front, Drag Stamp one big stamp (its top up, the drag going up the screen), Drag Dot one dab,
+// Spray a scatter of small ones.
+void alphaStroke(Document& d, const BrushRecipe* recipe, BrushType type, const AlphaLook& look) {
+    const AlphaOptions& o = look.options;
+    d.brushAlpha = look.alpha;
+    d.brushAlpha.tileX = std::clamp(o.tileX, 1, 8);
+    d.brushAlpha.tileY = std::clamp(o.tileY, 1, 8);
+    // A dab raises the surface by a few percent of its radius: at shelf size one pass of a shallow brush is a pixel
+    // of relief, so the alpha is pressed in deep, twice over.
+    BrushRecipe deep;
+    if (recipe) {
+        deep = *recipe;
+        deep.depth = deep.depth < 0.0f ? -0.8f : 0.8f;
+        recipe = &deep;
+    }
+    const float turn = alphaStampAngle(o, false, {}, 0.0f);
+    auto press = [&](std::vector<glm::vec3> pts, float radius, bool curve, float angle, int passes) {
+        for (int i = 0; i < passes; ++i) stroke(d, recipe, type, pts, radius, 1.0f, curve, angle);
+    };
+    switch (look.stroke) {
+    case StrokeType::DragRect: // (Drag Stamp turns along the drag; ours goes up the screen)
+        press({glm::vec3(0.0f, 0.0f, 2.0f)}, 0.55f, false, alphaStampAngle(o, true, {0.0f, -1.0f}, 0.0f), 2);
+        break;
+    case StrokeType::DragDot:
+        press({glm::vec3(0.0f, 0.0f, 2.0f)}, 0.4f, false, turn, 2);
+        break;
+    case StrokeType::Spray: {
+        constexpr float kPi = 3.14159265f;
+        for (int i = 0; i < 7; ++i) {
+            const float a = 2.4f * float(i), r = 0.1f + 0.5f * float(i % 4) / 3.0f; // (a spiral of dabs)
+            press({glm::vec3(r * std::cos(a), r * std::sin(a), 2.0f)}, 0.2f + 0.03f * float(i % 3), false,
+                  turn + (i % 2 ? 1.0f : -1.0f) * 0.35f * kPi * float(i % 3), 3);
+        }
+        break;
+    }
+    default: // Dots, Lazy Mouse: an alpha strokes wider, so its texture reads at thumbnail size
+        press(frontCurve(), 0.26f, true, turn, 2);
+        break;
+    }
+}
+
 } // namespace
+
+// The alpha as the ball can show it: at most 96 px (area averaged) and blurred once, so a hard edge or a one-pixel
+// crack becomes a slope the ball's triangles can follow instead of a cliff that folds them.
+static void softenForPreview(BrushAlpha& a) {
+    const int n = std::min({a.width, a.height, 96});
+    if (n < 2 || a.values.size() != size_t(a.width) * size_t(a.height)) return;
+    std::vector<float> small(size_t(n) * size_t(n), 0.0f);
+    for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x) {
+            const int x0 = x * a.width / n, x1 = std::max(x0 + 1, (x + 1) * a.width / n);
+            const int y0 = y * a.height / n, y1 = std::max(y0 + 1, (y + 1) * a.height / n);
+            float sum = 0.0f;
+            for (int sy = y0; sy < y1; ++sy)
+                for (int sx = x0; sx < x1; ++sx) sum += a.values[size_t(sy) * size_t(a.width) + size_t(sx)];
+            small[size_t(y) * size_t(n) + size_t(x)] = sum / float((x1 - x0) * (y1 - y0));
+        }
+    std::vector<float> blurred(small.size());
+    for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x) {
+            float sum = 0.0f;
+            int count = 0;
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx) {
+                    const int sx = x + dx, sy = y + dy;
+                    if (sx < 0 || sy < 0 || sx >= n || sy >= n) continue;
+                    sum += small[size_t(sy) * size_t(n) + size_t(sx)];
+                    ++count;
+                }
+            blurred[size_t(y) * size_t(n) + size_t(x)] = sum / float(count);
+        }
+    a.width = a.height = n;
+    a.values = std::move(blurred);
+}
+
+bool hasAlphaLook(const BrushToolSettings& s) {
+    if (!s.alphaPath.empty()) return true;
+    std::string n;
+    for (char c : s.alphaName)
+        if (c != ' ' && c != '_' && c != '-') n += char(std::tolower(static_cast<unsigned char>(c)));
+    return !n.empty() && n != "round" && n != "none";
+}
+
+bool makeAlphaLook(const BrushToolSettings& s, AlphaLook& out) {
+    if (!hasAlphaLook(s)) return false;
+    out.stroke = s.stroke;
+    out.options = s.alphaOptions;
+    if (s.alphaPath.empty()) {
+        if (!BrushAlpha::builtinPreview(s.alphaName, out.alpha) || out.alpha.empty()) return false;
+    } else {
+        std::string err;
+        if (!BrushAlpha::fromFile(s.alphaPath, s.alphaName, s.alphaInvert, out.alpha, err, 512) || out.alpha.empty())
+            return false;
+    }
+    softenForPreview(out.alpha);
+    return true;
+}
+
+bool brushTakesAlpha(BrushType type) {
+    switch (type) {
+    case BrushType::Move:
+    case BrushType::Tendril:
+    case BrushType::KelvinGrab:
+    case BrushType::KelvinTwist:
+    case BrushType::KelvinScale:
+    case BrushType::KelvinSnake:
+    case BrushType::Cloth:
+    case BrushType::Smooth:
+    case BrushType::SmoothPeaks:
+    case BrushType::Nudge:
+    case BrushType::DetailClone:
+    case BrushType::Vdm:
+    case BrushType::Morph:
+        return false;
+    default:
+        return true;
+    }
+}
 
 // Sculpts the preview of a brush (a recipe when given, else `type`) with the same code real strokes use,
 // on the shared ball (see kBallRadius).
-std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
+std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type, const AlphaLook* look) {
     if (type == kPaintBrush) {
         // Vertex paint: a coloured S on the ball; white elsewhere, so the material shows as on the others.
         Mesh m = makeIcosphere(kBallDetail, kBallRadius);
@@ -99,12 +220,19 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
     }
     Document d;
     d.setMesh(makeIcosphere(kBallDetail, kBallRadius));
+    const bool alphaLook = look && !look->alpha.empty() && (recipe || brushTakesAlpha(BrushType(type)));
     const float r = 0.17f;
+    if (alphaLook) {
+        alphaStroke(d, recipe, recipe ? BrushType::Standard : BrushType(type), *look);
+        return sceneMesh(d);
+    }
     if (recipe) {
-        if (!recipe->alpha.empty()) BrushAlpha::builtin(recipe->alpha, d.brushAlpha); // (as its first pick has)
+        if (!recipe->alpha.empty()) BrushAlpha::builtinPreview(recipe->alpha, d.brushAlpha); // (as its first pick has)
         // A textured brush (alpha or pattern) strokes wider, so its texture reads at thumbnail size.
         const bool textured = !recipe->alpha.empty() || recipe->pattern != BrushRecipe::Pattern::None;
-        stroke(d, recipe, BrushType::Standard, frontCurve(), textured ? 0.26f : r, 0.9f);
+        // A crisp flatten only cuts: its mark is the top of the ball under the plane, so it strokes wider too.
+        const bool cutOnly = recipe->crispEdge && recipe->plane == BrushRecipe::Plane::Flatten;
+        stroke(d, recipe, BrushType::Standard, frontCurve(), textured || cutOnly ? 0.26f : r, 0.9f);
         return sceneMesh(d);
     }
     // Each brush gets a mark of its own shape that shows what it does, so the shelf tells them apart at a glance
@@ -135,7 +263,7 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
     case BrushType::Move: // the silhouette pulled out into a broad soft lobe on the upper left
         stroke(d, nullptr, bt, line({-0.5f, 0.45f, 2.0f}, {-0.78f, 0.72f, 2.0f}), 0.5f, 1.0f, false);
         break;
-    case BrushType::SnakeHook:
+    case BrushType::Tendril:
         // A curling horn pulled out of the front into the tile's top right corner (the only room past the ball's
         // silhouette; the ball fills the tile's height). It drags in the view plane, as in the viewport.
         stroke(d, nullptr, bt, line({0.3f, 0.3f, 2.0f}, {0.86f, 0.86f, 2.0f}), 0.26f, 1.0f, false);
@@ -148,7 +276,8 @@ std::unique_ptr<Mesh> sculptBrushPreview(const BrushRecipe* recipe, int type) {
         for (int pass = 0; pass < 2; ++pass)
             stroke(d, nullptr, bt, {{-0.5f, 0.35f, 2.0f}, {0.0f, -0.3f, 2.0f}, {0.5f, 0.35f, 2.0f}}, 0.22f, 1.0f, false);
         break;
-    case BrushType::Smooth: { // a bumpy ridge, its right half smoothed away
+    case BrushType::Smooth:
+    case BrushType::SmoothPeaks: { // a bumpy ridge, its right half smoothed away (the peaks come down)
         for (int i = 0; i < 7; ++i)
             for (int pass = 0; pass < 4; ++pass)
                 stroke(d, nullptr, BrushType::Standard, {glm::vec3(-0.6f + 0.2f * float(i), 0.0f, 2.0f)}, 0.13f, 1.0f, false);

@@ -1,9 +1,18 @@
 # Working with Blender
 
+![The Blender menu](images/blender-menu.jpg)
+
+> **In short:**
+> - The **SculptForge Bridge** add-on sends selected objects to SculptForge with one click.
+> - One click sends them back; transforms, materials and modifiers stay as they were.
+> - Works through a shared folder on Linux, Windows and macOS, with Blender 4.2 or newer.
+
 Keep Blender for the scene, rigging, shading and animation, and sculpt in SculptForge: the **SculptForge Bridge**
-add-on sends the selected objects from Blender to SculptForge with one click, and one click in SculptForge sends
-them back. The objects update in place in Blender: their transform, materials and modifiers stay as they were.
-It works through files in a shared folder, on Linux, Windows and macOS, with Blender 4.2 or newer.
+add-on sends the selected objects from Blender to SculptForge with one click, and one click in SculptForge sends them
+back. The objects update in place in Blender: their transform, materials and modifiers stay as they were.
+
+It works through files in a shared folder, on Linux, Windows and macOS, with Blender 4.2 or newer; every release is tested on Blender 4.2 LTS, 5.2 and 5.3. Gaussian splats go
+the same way with Blender 5.3 or newer ([Splats with Blender](#splats-with-blender)).
 
 ## Install the add-on
 
@@ -34,8 +43,6 @@ add-on's preferences (**Edit > Preferences > Add-ons > SculptForge Bridge**).
 
 Sending again from Blender updates the same Parts: each update is one undo step on that Part in
 SculptForge, and each receive in Blender is one undo step there.
-
-![File > Blender in SculptForge](images/blender-menu.jpg)
 
 ## What comes across
 
@@ -86,10 +93,12 @@ The add-on's preferences add the path of SculptForge and the exchange folder (be
 
 ## Classic sculpting keys in Sculpt Mode
 
-Sculpting in Blender too? Turn on **The Classic sculpting keys in Sculpt Mode** in the add-on's preferences (**Edit >
-Preferences > Add-ons > SculptForge Bridge**) and Blender's Sculpt Mode answers to the Classic sculpting keys where Blender
-has the same thing. Turning it off removes them again, and Blender's own keys are back; so does disabling the
-add-on. The preferences list every key while it's on.
+Sculpting in Blender too? Turn on **The Classic sculpting keys in Sculpt Mode** in the add-on's preferences
+(**Edit > Preferences > Add-ons > SculptForge Bridge**) and Blender's Sculpt Mode answers to the Classic sculpting
+keys where Blender has the same thing.
+
+Turning it off removes them again, and Blender's own keys are back; so does disabling the add-on. The preferences list
+every key while it's on.
 
 | Classic key | In Blender's Sculpt Mode |
 |---|---|
@@ -143,6 +152,49 @@ SculptForge's VDM brushes and Blender's use the same maps (see
   **Non-Color**), set **Mapping** to **Area Plane**, turn on **Vector Displacement**, then set the stroke method
   to **Anchored** and Strength to 1. Drag on the model to stamp it.
 
+## Splats with Blender
+
+Blender 5.3 draws Gaussian splats natively (a point cloud of the type **3D Gaussian Splat**) and imports them, but it
+can't save them. With the add-on, splats go the same way meshes do, both ways, with everything that makes a splat look
+right: positions, sizes, rotations, opacity and colour including the view-dependent colour (spherical harmonics, up to
+degree 3).
+
+It needs Blender 5.3 or newer; on older versions the splat buttons say so and the mesh bridge works as before. The
+file formats and what SculptForge does with a capture are in [Gaussian splats](splats.md).
+
+**From Blender to SculptForge**
+
+1. Select the splat object (import a capture with **File > Import > Stanford PLY (.ply)**, or just drop a `.ply` or
+   `.spz` capture on Blender's viewport).
+2. Click **Send to SculptForge**. The capture loads next to your sculpt, as a reference, exactly as if you had opened
+   the PLY there, placed as it is in the Blender scene. (A scene holds one capture: with several selected, the first
+   goes.)
+
+**From SculptForge to Blender**
+
+1. With splats loaded (a capture, or **Sculpt to splats**), choose **File > Blender > Send to Blender**.
+2. They arrive as a splat object named after the capture. Send again and the same object is updated in place, with
+   its materials and modifiers; **Flip**, **Turn 90** and **Fit** in SculptForge move the object, not the splats.
+
+![Splats in SculptForge, ready to send to Blender](images/splats.jpg)
+
+**Drag and drop**
+
+- Drop a `.ply` or `.spz` capture on **Blender's viewport**: Blender 5.3 imports it as splats by itself. The add-on adds
+  the compact `.splat` format (the one many web viewers use) to that.
+- Drop a `.ply`, `.splat`, `.glb` or OpenUSD splat file on **SculptForge's window**: it loads as a reference.
+
+**Saving splats from Blender**
+
+**File > Export > Gaussian Splats (.ply)** saves the selected splat object as a standard 3D Gaussian Splatting PLY
+(Blender has no splat export of its own), which SculptForge, SuperSplat, Postshot and most tools open. By default it
+applies the object's transform; turn off **Apply Object Transform** to write the splats as they are in the object. A
+turned splat keeps its view-dependent colour: it turns with the splat, so the capture looks the same from the turned view.
+
+> **Note:** Blender's own **Apply > All Transforms** doesn't update a splat's rotations and spherical harmonics yet
+> (Blender 5.3 release notes), so move splat objects with their transform and let SculptForge or the export apply it.
+> Blender also assumes splats are in sRGB, so very faint, bright splats can look different from a splat viewer.
+
 ## How it works
 
 The two programs share a folder in your user data: `~/.local/share/SculptForge/SculptForge/blender` on Linux,
@@ -162,14 +214,20 @@ SculptForge with `--blender` loads what Blender last sent.
   programs. Set the add-on's exchange folder to a folder both can reach, start SculptForge yourself with
   `SCULPTFORGE_BLENDER_EXCHANGE` set to it, and send.
 - **Linked duplicates** (objects sharing one mesh) all show the last one received.
-- **Shape keys**: the Basis and the keys named like SculptForge's layers are updated; other keys keep their shapes.
+- **Shape keys**: the Basis and the keys named like SculptForge's layers are updated; other keys keep their shapes (a key you
+  add in Blender goes to SculptForge as a layer the next time you send).
 - **Subdivision levels** don't go to Blender: it receives the level you're on (like Bridge files).
-- **Sculpt layers** arrive as **shape keys** (Basis plus one key per layer, with its name and weight), so the 52
-  [facial shapes](facial-shapes.md) keep their ARKit names. Shape keys don't come back from Blender, and textures
-  stay in SculptForge.
+- **Sculpt layers and shape keys** go both ways. A layer arrives in Blender as a **shape key** (Basis plus one key per
+  layer, with its name and weight), so the 52 [facial shapes](facial-shapes.md) keep their ARKit names. A shape key
+  sent from Blender arrives in SculptForge as a [sculpt layer](layers.md) with its name and value, in the same order;
+  each key counts from the Basis (not from the key it is "relative to"), and a key limited by a vertex group or a
+  slider range is sent as it is. With **Apply modifiers** on, the keys are baked into the sent mesh and don't travel.
+  Textures stay in SculptForge.
 - **Nothing arrives in SculptForge?** Check **File > Blender > Receive automatically**, or choose **Receive from
   Blender**. **Nothing arrives in Blender?** Click **Receive from SculptForge**; automatic receiving starts after the
   first send from that Blender session.
+- **Splats** need Blender 5.3 or newer. With several splat objects selected only the first is sent (SculptForge holds one
+  capture); the compact `.splat` format loses a little precision in colour and rotation, and has no view-dependent colour.
 - Objects in Edit Mode or Sculpt Mode are updated too: the add-on switches to Object Mode for the update and back.
 
 ## See also

@@ -14,6 +14,14 @@ float trayWidth(float stored, float logicalWindowWidth) {
     return std::clamp(stored, kTrayMinW, kTrayMaxW);
 }
 
+float leftShelfWidth(float stored, float logicalWindowWidth) {
+    const bool narrow = logicalWindowWidth < kNarrowWidth;
+    const float base = narrow ? kLeftShelfNarrowW : kLeftShelfW;
+    if (!(stored > 0.0f)) return base;
+    const float cap = narrow ? std::max(base, logicalWindowWidth * 0.3f) : kLeftShelfMaxW;
+    return std::clamp(stored, base, std::min(cap, kLeftShelfMaxW));
+}
+
 CircledPlus circledPlus(float cx, float cy, float r, float scale) {
     const float s = scale > 0.0f ? scale : 1.0f;
     CircledPlus p;
@@ -125,8 +133,12 @@ ShellGeometry computeShell(const UiLayout& l, float W, float H, float s, float t
 
     float left = 0.0f, right = W; // the span between the dividers
     if (g.shelves) {
-        const float lw = l.leftTrayOpen ? trayWidth(l.leftTrayWidth, logicalW) * s : 0.0f;
-        const float rw = l.rightTrayOpen && !g.narrow ? trayWidth(l.rightTrayWidth, logicalW) * s : 0.0f;
+        // A narrow window (a tablet at 240-320 dpi is 760-1000 logical px; upright, 450-800) holds one tray at a time, at
+        // most 40 % of its width: the left one if both are open. The right one opens there only once asked for (rightTrayPeek).
+        const float cap = g.narrow ? std::max(kPhoneTrayMinW, logicalW * 0.4f) : kTrayMaxW;
+        const float lw = l.leftTrayOpen ? std::min(trayWidth(l.leftTrayWidth, logicalW), cap) * s : 0.0f;
+        const bool rightWanted = l.rightTrayOpen && (!g.narrow || (l.rightTrayPeek && !l.leftTrayOpen));
+        const float rw = rightWanted ? std::min(trayWidth(l.rightTrayWidth, logicalW), cap) * s : 0.0f;
         const float dw = m.dividerW * s;
         g.leftTray = {0, top, lw, H - top};
         g.leftDivider = {lw, top, dw, H - top};
@@ -152,7 +164,7 @@ ShellGeometry computeShell(const UiLayout& l, float W, float H, float s, float t
     g.console = {left, g.bottomShelf.y - consoleH, span, consoleH};
 
     const float y0 = top + topH, y1 = std::max(y0, g.console.y);
-    const float leftW = shown(l.leftShelf) ? ((g.narrow ? kLeftShelfNarrowW : kLeftShelfW) + m.grow) * s : 0.0f;
+    const float leftW = shown(l.leftShelf) ? (leftShelfWidth(l.leftShelfWidth, logicalW) + m.grow) * s : 0.0f;
     const float rightW = shown(l.rightShelf) ? (kRightShelfW + m.grow) * s : 0.0f;
     g.leftShelf = {left, y0, leftW, y1 - y0};
     g.rightShelf = {right - rightW, y0, rightW, y1 - y0};

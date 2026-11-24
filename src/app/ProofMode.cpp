@@ -17,6 +17,7 @@
 
 #include "core/Precision.h"
 
+#include "core/BenchLag.h"
 #include "core/FocusDetail.h"
 #include "core/Micro.h"
 
@@ -27,14 +28,18 @@
 #include "core/Benchmark.h"
 #include "core/BrushAlpha.h"
 #include "core/HardwareProfile.h"
+#include "core/HardwareTier.h"
+#include "core/TierConfig.h"
 #include "core/MemoryGuard.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "core/Timeline.h"
 
 #include "render/GL.h"
+#include "render/MicroFocus.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -86,8 +91,10 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
     // ~150 bytes a triangle like the spheres; the head is built the same way (a cube's quads, divided).
     const ProofMeshSize s15{15, "15M", [](size_t t) { return makeBenchHead(t); }, 150};
     const ProofMeshSize s33{33, "33M", [](size_t t) { return makeBenchHead(t); }, 150};
+    const ProofMeshSize s100{100, "100M", [](size_t t) { return makeBenchHead(t); }, 150}; // (104M: the same head, one level up)
     if (name == "standard-15m") return {s15};
     if (name == "standard-33m") return {s33};
+    if (name == "standard-100m") return {s100};
     if (name == "standard") return {s15, s33};
     if (name == "standard-1b") { // Focus Detail (prototype): ~1.02 billion micro triangles from a detail file
         const ProofMeshSize s1b{1019, "1B Focus Detail", [](size_t) {
@@ -99,7 +106,7 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                         return makeBenchHead(size_t(1) << 20);
                                     }
                                     return m;
-                                }, 5};
+                                }, 2}; // (heights 1 GB + per-tile GPU levels, render/MicroFocus.h: ~2 bytes a micro triangle)
         return {s1b};
     }
     if (name.rfind("file:", 0) == 0) { // --benchmark-file: a project from disk (a scan, a real sculpt), the scoreboard's strokes
@@ -117,8 +124,7 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                               }, 150}; // (the file's size in 20-byte triangles, at the spheres' 150 bytes each: the memory check)
         return {s};
     }
-    if (name == "core-200m" || name == "core-100m") { // research (docs/design/core-200m.md): micro triangles in memory, opened from a project
-        const int millions = name == "core-100m" ? 100 : 200;
+    if (const int millions = coreSceneMillions(name)) { // research (docs/design/core-200m.md): micro triangles in memory, opened from a project
         const ProofMeshSize s{double(millions), std::to_string(millions) + "M micro", [millions](size_t) {
                                   std::string err;
                                   const std::string path = core200mScenePath(err, {}, millions); // (main wrote it first)
@@ -128,25 +134,24 @@ std::vector<ProofMeshSize> proofStandardScene(const std::string& name) {
                                       return makeBenchHead(size_t(1) << 20);
                                   }
                                   return std::move(d.mesh);
-                              }, 8};
+                              }, kCoreBytesPerMicroTriangle};
         return {s};
     }
     return {};
 }
 
-size_t totalMemoryBytes() {
-#if defined(_WIN32)
-    MEMORYSTATUSEX m{};
-    m.dwLength = sizeof m;
-    return GlobalMemoryStatusEx(&m) ? size_t(m.ullTotalPhys) : 0;
-#elif defined(__APPLE__)
-    uint64_t bytes = 0;
-    size_t len = sizeof bytes;
-    return sysctlbyname("hw.memsize", &bytes, &len, nullptr, 0) == 0 ? size_t(bytes) : 0;
-#else
-    const long pages = sysconf(_SC_PHYS_PAGES), page = sysconf(_SC_PAGE_SIZE);
-    return pages > 0 && page > 0 ? size_t(pages) * size_t(page) : 0;
-#endif
+std::vector<ProofMeshSize> proofPackScenes(std::shared_ptr<const BenchPack> pack) {
+    std::vector<ProofMeshSize> out;
+    for (const BenchPackScene& scene : pack->scenes) {
+        ProofMeshSize s;
+        s.millions = scene.triangles / 1e6;
+        s.label = scene.id;
+        s.tier = scene.tier;
+        s.bytesPerTriangle = 150; // like the heads: mesh, BVH, levels, GPU buffers, history
+        s.tryBuild = [pack, scene](Mesh& m, std::string& error) { return buildBenchPackScene(*pack, scene, m, error); };
+        out.push_back(std::move(s));
+    }
+    return out;
 }
 
 namespace {
@@ -264,7 +269,32 @@ struct PhaseSpec {
     BrushType brush = BrushType::Standard;
     float strength = 0.35f;
     float pathScale = 1.0f; // the figure eight's size (Move drags the surface along: a smaller one)
+    // > 0: a CLOSE-UP (radiusPx 0, no stroke): the camera this fraction of the model's size from the surface point under
+    // the view's centre, turning +-10 degrees over the phase. Where micro levels draw past their stored resolution
+    // (TierBudgets::microDrawAbove) and where Adaptive Detail will store its finest tiles: the 10x scoreboard's row.
+    float closeUp = 0.0f;
+    int gizmo = 0;           // 1 / 2: a Gizmo Move / Rotate drag of the whole Part (the centre handle), no stroke
+    bool wholeView = false;  // the brush as big as the framed model (half the view's height)
+    bool sweep = false;      // a serpentine over the whole front of the model instead of the figure eight: fresh surface all the way
 };
+
+// SF_BENCH_DENSE=1 with --benchmark-file (bench.sh dense): a dense plain mesh's interactive actions, each on the mesh
+// the phases before it left: Move at three sizes, Standard at 240 px, a Gizmo drag and turn, the orbit.
+std::vector<PhaseSpec> densePhases(double seconds) {
+    PhaseSpec whole{"move whole", 1.0f, seconds, BrushType::Move, 0.25f, 0.4f};
+    whole.wholeView = true;
+    PhaseSpec gm{"gizmo move", 0.0f, seconds}, gr{"gizmo rotate", 0.0f, seconds};
+    gm.gizmo = 1;
+    gr.gizmo = 2;
+    return {{"orbit", 0.0f, 10.0},
+            {"move 60 px", 60.0f, seconds, BrushType::Move, 0.25f, 0.4f},
+            {"move 240 px", 240.0f, seconds, BrushType::Move, 0.25f, 0.4f},
+            whole,
+            {"standard 240 px", 240.0f, seconds, BrushType::Standard, 0.35f},
+            gm,
+            gr,
+            {"still", -1.0f, 0.6}};
+}
 
 // The standard scenes' stroke set (kProofStrokeSet): the same figure eight with each brush in turn, on one mesh.
 std::vector<PhaseSpec> standardPhases(double seconds) {
@@ -275,7 +305,8 @@ std::vector<PhaseSpec> standardPhases(double seconds) {
             {"smooth", 60.0f, seconds, BrushType::Smooth, 0.5f},
             {"240 px brush", 240.0f, seconds, BrushType::Clay, 0.35f},
             {"orbit", 0.0f, 3.0},
-            {"still", -1.0f, 0.6}};
+            {"still", -1.0f, 0.6},
+            {"close-up", 0.0f, 4.0, BrushType::Standard, 0.35f, 1.0f, 1.0f / 400.0f}};
 }
 
 const char* proofBrushName(BrushType b) {
@@ -300,27 +331,85 @@ long long driverFreeVramKb() {
     return -1;
 }
 
+// Linux: the GPU memory this process holds as the kernel's DRM driver counts it (/proc/self/fdinfo, drm-total-* or
+// drm-resident-* summed over its GPU files; on unified memory too), in KB; -1 when the driver doesn't say.
+long long drmUsedKb() {
+#if defined(__linux__)
+    long long total = 0, resident = 0;
+    bool any = false;
+    std::error_code ec;
+    for (const auto& e : std::filesystem::directory_iterator("/proc/self/fdinfo", ec)) {
+        std::ifstream f(e.path());
+        std::string line;
+        while (std::getline(f, line)) {
+            const bool isTotal = line.rfind("drm-total-", 0) == 0, isResident = line.rfind("drm-resident-", 0) == 0;
+            if (!isTotal && !isResident) continue;
+            const size_t colon = line.find(':');
+            if (colon == std::string::npos) continue;
+            std::istringstream in(line.substr(colon + 1));
+            long long v = 0;
+            std::string unit;
+            if (!(in >> v)) continue;
+            in >> unit;
+            const long long kb = unit == "MiB" ? v << 10 : unit == "GiB" ? v << 20 : unit == "KiB" ? v : v >> 10;
+            (isTotal ? total : resident) += kb;
+            any = true;
+        }
+    }
+    if (any) return std::max(total, resident);
+    // Drivers that don't count it there (Asahi): the GPU buffers mapped from the render node (unified memory maps
+    // them all; v0.11.9 on standard-1b: 3,006 MB, the renderer's own count 3,130 MB).
+    std::ifstream smaps("/proc/self/smaps");
+    std::string line;
+    bool dri = false;
+    long long kb = 0;
+    while (std::getline(smaps, line)) {
+        if (!line.empty() && std::isxdigit(static_cast<unsigned char>(line[0])) && line.find('-') != std::string::npos &&
+            line.find(':') > line.find(' ')) {
+            dri = line.find("/dev/dri/") != std::string::npos;
+            any = any || dri;
+        } else if (dri && line.rfind("Size:", 0) == 0) {
+            kb += std::atoll(line.c_str() + 5);
+        }
+    }
+    return any ? kb : -1;
+#else
+    return -1;
+#endif
+}
+
 struct PhaseResult {
     std::string name;
     std::string brush;
     float radiusPx = 0;
+    int gizmo = 0; // a Gizmo drag (PhaseSpec::gizmo)
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
-    size_t dabs = 0, samples = 0;
+    float pathRadiusPx = 0; // the stroke path's size (strokePoint's R, fitted to the model)
+    double pathLaps = 1.0;  // ... how often round it relative to the full-size path (ProofState::laps)
+    bool pathUpright = false;
+    size_t dabs = 0, dabsOffModel = 0, samples = 0; // dabsOffModel: dabs that found no surface (a path's stretch off the model)
     std::vector<double> frameMs, lagMs, lagPx;
+    // lagMs of the frames whose newest dab reached the surface: a dab off the model costs nothing, so the frames after
+    // it are quick and their lag small; where they fall decided whether a heavy stroke's lag_ms p50 read 24 or 370 ms (#184)
+    std::vector<double> lagOnModelMs, lagOnModelPx;
     std::vector<double> previewLagPx; // the predictive preview's head behind the pointer (the surface's without it)
     std::vector<double> drawn;    // triangles each frame drew (Renderer::lastDrawnTriangles)
     std::vector<double> gpuMs;    // GPU time of the phase's frames (GL_TIME_ELAPSED; empty without timer queries)
     std::vector<double> coarse;   // clusters each frame drew at a coarse level (0: full detail)
     size_t screenStrokeFrames = 0; // frames the view showed pending dabs on the screen (render/ScreenStroke.h)
     std::vector<double> split[6]; // each frame by part (App::frameSplitMs_, the frame before: the swap comes after)
+    std::vector<double> focusSplit[7]; // a streamed level's main-thread work each frame: promote, then MicroFocus::Part
+    std::vector<double> pendingPromote, pendingShade; // (SF_BENCH_TRACE) tiles still waiting to be promoted / coarse-shaded each frame
     SculptTimings stroke;         // the stroke's own work (solver thread: kernel, normals, BVH), when it ended
     double strokeSyncMs = 0;      // its uploads to the GPU (main thread, over strokeFrames frames)
     int strokeFrames = 0;
+    double catchUpSeconds = 0;    // a rest phase: the shading the strokes before it left waiting, until it was done (MicroFocus)
 };
 
 struct SizeResult {
     std::string label;
+    std::string tier; // a scene pack scene's tier label
     size_t triangles = 0, vertices = 0;
     double buildSeconds = 0;
     double firstFrameSeconds = 0; // build start to the first frame showing the mesh
@@ -330,9 +419,11 @@ struct SizeResult {
     size_t gpuBufferBytes = 0;   // the most the renderer's vertex and index buffers held (documentMemory().gpu)
     long long vramUsedKb = -1;   // the most the driver's free graphics memory dropped from before the build (-1: unknown)
     long long vramFreeBeforeKb = -1;
+    long long drmKb = -1, drmBeforeKb = -1; // the most drmUsedKb() showed, and before the build
     std::vector<PhaseResult> phases;
     MemoryCheck memory;  // free memory before the build
-    std::string skipped; // not built: too little free memory (benchmarkSkippedMessage)
+    std::string skipped; // not built: too little free memory (benchmarkSkippedMessage), or a pack scene that wouldn't build (failed)
+    bool failed = false; // a pack scene that wouldn't build
 };
 
 } // namespace
@@ -341,7 +432,8 @@ struct ProofState {
     enum class Stage { Intro, Announce, Build, Settle, Phase, Finish, Results };
     Stage stage = Stage::Intro;
     bool cli = false, video = true, vsync = false;
-    std::string scene; // "standard-15m", "standard-33m", "standard", or empty (the sphere sizes)
+    std::string scene; // "standard-15m", "standard-33m", "standard", "pack:<dir>" (a scene pack), or empty (the sphere sizes)
+    std::shared_ptr<const BenchPack> pack; // the scene pack of a pack: scene
     int sceneChoice = 0; // the Intro's choice: 0 standard-15m, 1 standard-33m, 2 standard, 3 spheres
     double strokeSeconds = 6.0;
     std::string jsonPath, videoPath;
@@ -351,6 +443,7 @@ struct ProofState {
     std::vector<PhaseSpec> phases;
     std::vector<SizeResult> results;
     double stageStart = 0, lastFrame = 0, lastSample = 0;
+    float closeYaw = 0.0f; // a close-up phase: the yaw it turns about
     // The stroke
     float cx = 0, cy = 0, R = 0;
     struct Sample {
@@ -360,10 +453,19 @@ struct ProofState {
     };
     std::vector<Sample> samples;
     std::vector<glm::vec2> dabs;
+    std::vector<uint8_t> dabHits; // (App::strokeHitProbe_) 1: that dab reached the surface
     size_t sent = 1; // samples handed to onMouseMove (the first went to onMouseDown)
+    // SF_BENCH_DENSE: Move and the Gizmo follow the pointer on the main thread (no dabs to match): their lag is the
+    // age of the oldest sample handed over last frame when this frame shows it (its index; -1: none handed).
+    bool dense = false;
+    double shownFrom = -1;
+    glm::vec2 grabAt{0.0f}; // a Gizmo phase: the handle grabbed (p.cx, p.cy: the pivot on screen)
     // The samples the newest dab / preview head were last matched to: the stroke only moves forward, so the
     // next match is searched from there on (the figure eight crosses itself; an older pass is never the match).
     size_t dabFrom = 0, previewFrom = 0;
+    bool sweep = false; // PhaseSpec::sweep
+    bool upright = false; // the path turned a quarter (a tall model: Lucy)
+    double laps = 1.0;    // times round the path in the phase: a path fitted smaller goes round more, at the same pointer speed
     bool pressed = false;
     bool releasing = false; // let go: the phase ends with the stroke (predictive strokes finish after the release)
     double releaseAt = 0;
@@ -383,9 +485,16 @@ struct ProofState {
 namespace {
 
 glm::vec2 strokePoint(const ProofState& p, double u) {
-    // A figure eight across the front of the model, three times round.
-    const double phi = 2.0 * 3.14159265358979 * 3.0 * u;
-    return {p.cx + p.R * 1.25f * float(std::sin(phi)), p.cy + p.R * 0.75f * float(std::sin(2.0 * phi))};
+    u *= p.laps;
+    glm::vec2 d;
+    if (p.sweep) { // zigzags across the framed model while the height swings once up and down: fresh surface all the way
+        const double phi = 2.0 * 3.14159265358979 * u;
+        d = {1.2f * p.R * float(std::sin(11.0 * phi)), 0.9f * p.R * float(std::sin(phi))};
+    } else { // A figure eight across the front of the model, three times round.
+        const double phi = 2.0 * 3.14159265358979 * 3.0 * u;
+        d = {p.R * 1.25f * float(std::sin(phi)), p.R * 0.75f * float(std::sin(2.0 * phi))};
+    }
+    return p.upright ? glm::vec2(p.cx + d.y, p.cy + d.x) : glm::vec2(p.cx + d.x, p.cy + d.y);
 }
 
 std::string isoDate() {
@@ -419,7 +528,14 @@ std::vector<ProofMeshSize> parseSizes(const std::string& list) {
 
 bool App::proofSkippedScenes() const {
     if (!proof_) return false;
+    // A scene pack leaves out what the computer has no memory for (the result says so, and it still counts); only a
+    // scene that wouldn't build is a failure (exit 1, below).
+    if (proof_->pack) return false;
     return std::any_of(proof_->results.begin(), proof_->results.end(), [](const SizeResult& r) { return !r.skipped.empty(); });
+}
+
+bool App::proofFailed() const {
+    return proof_ && std::any_of(proof_->results.begin(), proof_->results.end(), [](const SizeResult& r) { return r.failed; });
 }
 
 void App::startProofMode() {
@@ -427,14 +543,28 @@ void App::startProofMode() {
     auto p = std::make_shared<ProofState>();
     p->cli = options_.benchmark;
     p->video = !options_.benchmarkNoVideo;
+    if (options_.benchmarkScene.rfind("pack:", 0) == 0 && options_.benchmarkVideo.empty()) p->video = false; // (a pack run writes one JSON; --benchmark-video asks for the clip)
     p->vsync = options_.benchmarkVsync;
     p->strokeSeconds = std::max(1.0f, options_.benchmarkStrokeSeconds);
     // The CLI's scene, or for Help > Benchmark the standard 15M scene (the Intro offers the others).
     p->scene = options_.benchmarkScene;
     if (p->scene.empty() && !p->cli && options_.benchmarkSizes.empty()) p->scene = "standard-15m";
     p->sceneChoice = p->scene == "standard-33m" ? 1 : p->scene == "standard" ? 2 : p->scene.empty() ? 3 : 0;
-    p->sizes = !p->scene.empty() ? proofStandardScene(p->scene)
-               : options_.benchmarkSizes.empty() ? proofDefaultSizes(availableMemoryBytes()) : parseSizes(options_.benchmarkSizes);
+    if (p->scene.rfind("pack:", 0) == 0) { // --benchmark-pack DIR (main checked the pack before the window opened)
+        auto pack = std::make_shared<BenchPack>();
+        std::string error;
+        if (loadBenchPack(p->scene.substr(5), *pack, error)) {
+            p->pack = pack;
+            p->sizes = proofPackScenes(pack);
+        } else {
+            std::fprintf(stderr, "benchmark pack: %s\n", error.c_str());
+            p->error = error;
+            p->scene.clear();
+        }
+    } else {
+        p->sizes = !p->scene.empty() ? proofStandardScene(p->scene)
+                   : options_.benchmarkSizes.empty() ? proofDefaultSizes(availableMemoryBytes()) : parseSizes(options_.benchmarkSizes);
+    }
     if (p->sizes.empty()) p->sizes = proofDefaultSizes(availableMemoryBytes());
     const std::string stamp = fileStamp();
     std::filesystem::path dir = std::filesystem::current_path();
@@ -447,15 +577,41 @@ void App::startProofMode() {
     };
     p->jsonPath = !options_.benchmarkOut.empty() ? options_.benchmarkOut : u8(dir / ("sculptforge-benchmark-" + stamp + ".json"));
     p->videoPath = !options_.benchmarkVideo.empty() ? options_.benchmarkVideo : u8(dir / ("sculptforge-benchmark-" + stamp + ".mp4"));
-    if (p->scene.rfind("core-", 0) == 0 || p->scene.rfind("file:", 0) == 0) // the perf scoreboard (docs/design/perf-scoreboard.md): its three brush sizes, then orbit
+    if (const char* dense = std::getenv("SF_BENCH_DENSE"); dense && *dense == '1' && p->scene.rfind("file:", 0) == 0)
+        p->phases = densePhases(p->strokeSeconds), p->dense = true;
+    else if (p->scene.rfind("core-", 0) == 0 || p->scene.rfind("file:", 0) == 0) // the perf scoreboard (docs/design/perf-scoreboard.md): its three brush sizes, then orbit
         p->phases = {{"clay small", 25.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"clay large", 120.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"240 px brush", 240.0f, p->strokeSeconds, BrushType::Clay, 0.35f},
                      {"orbit", 0.0f, 10.0},
-                     {"still", -1.0f, 0.6}}; // (the view at rest: coarse levels give way to full detail, Renderer::coarsePreviewOnly)
-    else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds);
+                     {"still", -1.0f, 0.6}, // (the view at rest: coarse levels give way to full detail, Renderer::coarsePreviewOnly)
+                     {"close-up", 0.0f, 4.0, BrushType::Standard, 0.35f, 1.0f, 1.0f / 400.0f}};
+    else if (!p->scene.empty()) p->phases = standardPhases(p->strokeSeconds); // (a pack too: kProofPackStrokeSet)
     else p->phases = {{"stroke", 60.0f, p->strokeSeconds}, {"large brush stroke", 240.0f, p->strokeSeconds}, {"orbit", 0.0f, 3.0},
                       {"still", -1.0f, 0.6}};
+    // SF_BENCH_STILL_SECONDS=8: a longer view at rest (#184: what a micro level settles to once its detail is in).
+    if (const char* still = std::getenv("SF_BENCH_STILL_SECONDS"); still && std::atof(still) > 0)
+        for (PhaseSpec& ph : p->phases)
+            if (std::string(ph.name) == "still") ph.seconds = std::atof(still);
+    // SF_BENCH_LONG=120:25: one continuous Clay stroke of that radius (px) and length (s), named "clay long", before the
+    // other phases (#184: a hang that only shows once a stroke has been going for seconds).
+    if (const char* lg = std::getenv("SF_BENCH_LONG"); lg && *lg) {
+        const float r = float(std::atof(lg));
+        const char* colon = std::strchr(lg, ':');
+        p->phases.insert(p->phases.begin(), PhaseSpec{"clay long", r > 0 ? r : 60.0f, colon ? std::max(1.0, std::atof(colon + 1)) : 25.0, BrushType::Clay, 0.35f});
+        p->phases.front().sweep = std::getenv("SF_BENCH_LONG_EIGHT") == nullptr; // (SF_BENCH_LONG_EIGHT=1: the figure eight)
+        // ... then a second stroke at once (60 px, 6 s, the figure eight): started while the first one's shading catches up.
+        p->phases.insert(p->phases.begin() + 1, PhaseSpec{"clay second", 60.0f, 6.0, BrushType::Clay, 0.35f});
+    }
+    // SF_BENCH_SETTLED=1: a "still settled" phase after "still" (the rest view once the shading the strokes left is done).
+    if (const char* st = std::getenv("SF_BENCH_SETTLED"); st && *st == '1')
+        for (auto it = p->phases.begin(); it != p->phases.end(); ++it)
+            if (std::string(it->name) == "still") {
+                PhaseSpec settled = *it;
+                settled.name = "still settled";
+                p->phases.insert(it + 1, settled);
+                break;
+            }
     // SF_BENCH_PHASES=smooth,240: only the phases whose names contain one of these (each on the fresh mesh's
     // shape, not on what the phases before it left).
     if (const char* only = std::getenv("SF_BENCH_PHASES"); only && *only) {
@@ -642,6 +798,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (p.pressed) onMouseUp();
         p.pressed = false;
         strokeProbe_ = nullptr;
+        strokeHitProbe_ = nullptr;
         p.stage = Stage::Finish;
     }
 
@@ -649,7 +806,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
     if (p.video && p.stage != Stage::Announce && p.stage != Stage::Build) {
         const int w = fbW & ~1, h = fbH & ~1;
         if (!p.writer.running() && p.error.find("video") == std::string::npos && !p.writer.start(p.videoPath, w, h)) {
-            p.error = "The video couldn't be recorded (ffmpeg missing?)";
+            p.error = p.writer.error();
             p.video = false;
         }
         p.writer.grab(now, w, h);
@@ -663,26 +820,110 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         SizeResult& r = p.results.back();
         r.phases.push_back({});
         r.phases.back().name = spec.name;
-        r.phases.back().radiusPx = spec.radiusPx;
+        r.phases.back().radiusPx = spec.wholeView ? 0.5f * std::min(c.w, c.h) : spec.radiusPx;
+        r.phases.back().gizmo = spec.gizmo;
         if (spec.radiusPx > 0) r.phases.back().brush = proofBrushName(spec.brush);
+        if (!spec.gizmo && gizmo_.mode != GizmoMode::Off) setGizmoMode(GizmoMode::Off);
+        p.shownFrom = -1;
         p.stageStart = p.lastFrame = nowSeconds(); // (not counting what the last phase's release cost)
         proofGpuMs_.clear(); // (frames from before the phase)
         p.samples.clear();
         p.dabs.clear();
+        p.dabHits.clear();
         p.sent = 1;
         p.dabFrom = p.previewFrom = 0;
+        // SF_BENCH_REFERENCES=a.png;b.png: reference images in the view for every phase (View > Reference images): the
+        // first behind the model filling the view, the others planes in the scene (front, side, top). bench.sh quick
+        // SHA SHA with SHA_ENV=SF_BENCH_REFERENCES=... measures what they cost an orbit.
+        if (const char* refs = std::getenv("SF_BENCH_REFERENCES"); refs && *refs && doc_.references.empty()) {
+            static constexpr const char* kPlanes[] = {"front", "side", "top"};
+            std::string list = refs;
+            for (size_t at = 0, k = 0; at <= list.size() && k < 4; ++k) {
+                const size_t end = std::min(list.find(';', at), list.size());
+                const std::string path = list.substr(at, end - at);
+                at = end + 1;
+                if (path.empty()) continue;
+                if (k == 0) runCommand("reference_add", {{"path", path}, {"height", 1.0}, {"opacity", 0.5}});
+                else runCommand("reference_add", {{"path", path}, {"mode", std::string("scene")}, {"plane", std::string(kPlanes[(k - 1) % 3])}});
+            }
+            std::fprintf(stderr, "bench references: %zu, %.1f MB of textures\n", doc_.references.size(),
+                         double(referenceGpuBytes(doc_.references)) / double(1 << 20));
+        }
+        if (spec.closeUp > 0.0f) { // the surface point under the view's centre, the camera closeUp x the model's size from it
+            RayHit hit;
+            const AABB bounds = sceneBounds();
+            const float size = bounds.valid() ? glm::length(bounds.extent()) : 1.0f;
+            if (pick(c.x + c.w * 0.5f, c.y + c.h * 0.5f, hit)) camera_.target = hit.position;
+            camera_.distance = std::max(size * spec.closeUp, 1e-5f);
+            p.closeYaw = camera_.yaw;
+        }
         if (spec.radiusPx > 0) {
             brush_ = spec.brush;
             doc_.activeBrush = -1;
+            // SF_BENCH_BRUSH=Flatten (a built-in brush) or =CrispFlatten (a custom or pack brush, spaces and case
+            // ignored): the Clay phases sculpt with it instead, to measure one brush against another (BASE_ENV and
+            // SHA_ENV in bench.sh).
+            if (const char* bb = std::getenv("SF_BENCH_BRUSH"); bb && *bb && spec.brush == BrushType::Clay) {
+                auto key = [](std::string t) {
+                    std::erase_if(t, [](char ch) { return ch == ' '; });
+                    for (char& ch : t) ch = char(std::tolower(static_cast<unsigned char>(ch)));
+                    return t;
+                };
+                BrushType t;
+                if (brushFromName(bb, t)) brush_ = t;
+                else
+                    for (size_t i = 0; i < doc_.brushes.size(); ++i)
+                        if (key(doc_.brushes[i].name) == key(bb)) doc_.activeBrush = int(i);
+                if (p.phaseIndex == 0)
+                    std::fprintf(stderr, "bench brush: %s\n", doc_.activeBrush >= 0 ? doc_.brushes[doc_.activeBrush].name.c_str()
+                                                                                   : brushName(brush_));
+            }
             paintMode_ = false;
-            radiusPx_ = spec.radiusPx;
+            radiusPx_ = r.phases.back().radiusPx;
             strength_ = spec.strength;
             p.cx = c.x + c.w * 0.5f;
             p.cy = c.y + c.h * 0.5f;
             p.R = 0.26f * std::min(c.w, c.h) * spec.pathScale;
+            p.sweep = spec.sweep;
+            // The path stays on the model: a dab off it costs nothing, and the quick frames after it made the lag
+            // read 24 ms or 370 ms by where they fell (#184; the 1B scene had 88% of its small dabs off the model).
+            // Smaller until at most 2% of the path misses, lying or upright (a tall model), whichever stays larger, and
+            // round it more often: the pointer keeps its speed (lag depends on it). A miss is the dab's own (dabAt: no
+            // surface within the brush circle), so a phase whose dabs all land keeps the full path and stays comparable
+            // with earlier results (in practice only the small brushes are fitted).
+            {
+                RayHit h;
+                const float full = p.R;
+                p.laps = 1.0;
+                auto fit = [&](bool upright) {
+                    p.upright = upright;
+                    p.R = full;
+                    auto misses = [&] {
+                        int miss = 0;
+                        for (int k = 0; k < 120; ++k) {
+                            const glm::vec2 q = strokePoint(p, double(k) / 120.0);
+                            if (!pickNearCursor(q.x, q.y, radiusPx_, [&](float x, float y, RayHit& c) { return pick(x, y, c); }, h)) ++miss;
+                        }
+                        return miss;
+                    };
+                    for (int k = 0; k < 12 && misses() > 2; ++k) p.R *= 0.85f;
+                    return p.R;
+                };
+                const float lying = fit(false);
+                if (lying < full && fit(true) < lying) {
+                    p.upright = false;
+                    p.R = lying;
+                }
+                p.laps = double(full / p.R);
+                r.phases.back().pathRadiusPx = p.R;
+                r.phases.back().pathLaps = p.laps;
+                r.phases.back().pathUpright = p.upright;
+            }
+            const double start = nowSeconds(); // (the fit's picks are not the phase's)
+            p.stageStart = p.lastFrame = start;
             const glm::vec2 q = strokePoint(p, 0.0);
-            p.samples.push_back({now, q, 0.0});
-            p.lastSample = now;
+            p.samples.push_back({start, q, 0.0});
+            p.lastSample = start;
             // SF_BENCH_STENCIL=Cobblestone (a built-in alpha's name) or =photo.png: the strokes go through that Stencil
             // (#155), tiled so every dab reads it; SF_BENCH_STENCIL_SIZE=0.1 its height as a fraction of the view's (default
             // 0.8; small: vertices many image pixels apart, every read a disc). bench.sh stencil.
@@ -701,13 +942,38 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                              doc_.stencil.image ? doc_.stencil.image->width : 0,
                              doc_.stencil.image ? doc_.stencil.image->height : 0, doc_.stencil.size);
             }
+            // SF_BENCH_ALPHA=Cracks (a built-in alpha's name): the brush itself stamps that alpha, so every dab takes the
+            // alpha path (the region reaches the stamp's corners). bench.sh alpha.
+            if (const char* ab = std::getenv("SF_BENCH_ALPHA"); ab && *ab) {
+                if (BrushAlpha::builtin(ab, doc_.brushAlpha))
+                    std::fprintf(stderr, "bench alpha: %s\n", ab);
+                benchStampFootprint_ = std::getenv("SF_BENCH_STAMP") != nullptr; // every dab as a stamp's (dabAt)
+            }
             strokeProbe_ = &p.dabs;
+            strokeHitProbe_ = &p.dabHits;
             onMouseDown(q.x, q.y, SDL_BUTTON_LEFT);
             p.pressed = drag_ == Drag::Stroke;
             if (!p.pressed) {
                 strokeProbe_ = nullptr;
+                strokeHitProbe_ = nullptr;
                 p.error = "No stroke began on the " + r.label + " mesh (nothing under the pointer)";
             }
+        } else if (spec.gizmo) { // the centre handle: Move drags in the view plane, Rotate turns about the view axis
+            setGizmoMode(spec.gizmo == 1 ? GizmoMode::Move : GizmoMode::Rotate);
+            ImVec2 at, pc;
+            p.pressed = false;
+            if (gizmoHandleScreen(spec.gizmo == 1 ? GizmoHandle::MoveView : GizmoHandle::RotateView, at) &&
+                gizmoProject(gizmo_.pivot, pc)) {
+                p.cx = pc.x;
+                p.cy = pc.y;
+                p.R = 0.12f * std::min(c.w, c.h);
+                p.grabAt = {at.x, at.y};
+                p.samples.push_back({now, p.grabAt, 0.0});
+                p.lastSample = now;
+                onMouseDown(at.x, at.y, SDL_BUTTON_LEFT);
+                p.pressed = drag_ == Drag::Gizmo;
+            }
+            if (!p.pressed) p.error = "No Gizmo drag began on the " + r.label + " mesh";
         }
         p.stage = Stage::Phase;
     };
@@ -718,6 +984,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (r.vramFreeBeforeKb >= 0)
             if (const long long freeKb = driverFreeVramKb(); freeKb >= 0)
                 r.vramUsedKb = std::max(r.vramUsedKb, std::max(0LL, r.vramFreeBeforeKb - freeKb));
+        r.drmKb = std::max(r.drmKb, drmUsedKb());
         ++p.phaseIndex;
         if (p.phaseIndex < p.phases.size()) {
             beginPhase();
@@ -749,6 +1016,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     reinterpret_cast<const char*>(gl::GetString(GL_VERSION));
             p.hardware = describeHardware();
             p.hardware.set("gpu", p.gpu);
+            // The same, split for the results page: the renderer, and the driver as the OpenGL version string reports it
+            // (Mesa and NVIDIA put their release in it), and the hardware tier SculptForge put this computer in.
+            p.hardware.set("gpu_name", std::string(reinterpret_cast<const char*>(gl::GetString(GL_RENDERER))));
+            p.hardware.set("driver", std::string(reinterpret_cast<const char*>(gl::GetString(GL_VERSION))));
+            p.hardware.set("hw_tier", std::string(hwTierName(currentTierConfig().hwTier)));
             int ww = 0, wh = 0;
             SDL_GetWindowSize(window_, &ww, &wh);
             Json win = Json::array();
@@ -774,6 +1046,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (!memory.enough) {
             SizeResult r;
             r.label = s.label;
+            r.tier = s.tier;
             r.memory = memory;
             r.skipped = benchmarkSkippedMessage(s.label, memory);
             SDL_Log("Benchmark: %s", r.skipped.c_str());
@@ -784,19 +1057,38 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             p.stage = p.sizeIndex < p.sizes.size() ? Stage::Announce : Stage::Finish;
             break;
         }
-        const long long vramBefore = driverFreeVramKb();
+        const long long vramBefore = driverFreeVramKb(), drmBefore = drmUsedKb();
         resetPeakResidentBytes();
         const double t0 = nowSeconds();
         const size_t tris = size_t(s.millions * 1e6);
-        Mesh m = s.build ? s.build(tris) : makeBenchSphere(tris);
+        Mesh m;
+        std::string buildError;
+        const bool built = s.tryBuild ? s.tryBuild(m, buildError) : (m = s.build ? s.build(tris) : makeBenchSphere(tris), true);
+        if (!built) { // a pack scene that won't build: said in the result, which then isn't a complete one
+            SizeResult r;
+            r.label = s.label;
+            r.tier = s.tier;
+            r.skipped = buildError;
+            r.failed = true;
+            SDL_Log("Benchmark: %s", r.skipped.c_str());
+            std::fprintf(stderr, "benchmark: %s\n", r.skipped.c_str());
+            p.error += (p.error.empty() ? "" : "; ") + r.skipped;
+            p.results.push_back(r);
+            p.hudTitle = r.skipped;
+            ++p.sizeIndex;
+            p.stage = p.sizeIndex < p.sizes.size() ? Stage::Announce : Stage::Finish;
+            break;
+        }
         SizeResult r;
         r.label = s.label;
+        r.tier = s.tier;
         r.triangles = m.micro ? microTriangleCount(m) : m.triangleCount(); // (a micro level: its micro triangles)
         r.vertices = m.vertexCount();
         doc_.setMesh(std::move(m), "Benchmark");
         r.buildSeconds = nowSeconds() - t0;
         p.buildStart = t0;
         r.vramFreeBeforeKb = vramBefore;
+        r.drmBeforeKb = drmBefore;
         p.results.push_back(r);
         camera_.frame(sceneBounds());
         camera_.yaw = 0.0f;
@@ -833,7 +1125,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             ph.strokeSyncMs = perf_.lastStrokeSyncMs;
             ph.strokeFrames = perf_.lastStrokeFrames;
             strokeProbe_ = nullptr;
+            strokeHitProbe_ = nullptr;
             ph.dabs = p.dabs.size();
+            ph.dabsOffModel = size_t(std::count(p.dabHits.begin(), p.dabHits.end(), uint8_t(0)));
             // SF_BENCH_DUMP=<prefix>: the positions after each stroke (<prefix>-<phase>.bin, raw floats), to compare
             // what two settings' strokes made (a result check beside the timings).
             // SF_BENCH_DUMP_PHASES="clay large,smooth": only those.
@@ -849,9 +1143,25 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             nextPhase();
             break;
         }
+        // "still settled" (SF_BENCH_SETTLED=1, after "still", which is measured as always, catch-up inside it): first the coarse shading
+        // the strokes left waiting (a micro level's catch-up, 30 s at most), timed on its own ("catch_up_s"), then the view at rest.
+        if (std::string(spec.name) == "still settled" && ph.frameMs.empty() && ph.catchUpSeconds < 30.0 && doc_.mesh.micro &&
+            doc_.mesh.micro->focus && renderer_.microPendingCoarse() > 0) {
+            ph.catchUpSeconds += frameMs / 1000.0;
+            p.stageStart = now;
+            break;
+        }
         if (ph.frameMs.size() < 1000000 && now - p.stageStart > 0.0) {
             ph.frameMs.push_back(frameMs);
             for (int k = 0; k < 6; ++k) ph.split[k].push_back(frameSplitMs_[k]);
+            if (doc_.mesh.micro && doc_.mesh.micro->focus) {
+                double f[MicroFocus::kParts] = {};
+                renderer_.takeFocusSplit(f);
+                ph.focusSplit[0].push_back(doc_.mesh.micro->focus->lastUpdateMs());
+                ph.pendingPromote.push_back(double(doc_.mesh.micro->focus->stats().lastPending));
+                ph.pendingShade.push_back(double(renderer_.microPendingCoarse()));
+                for (int k = 0; k < MicroFocus::kParts; ++k) ph.focusSplit[k + 1].push_back(f[k]);
+            }
             ph.drawn.push_back(double(renderer_.lastDrawnTriangles()));
             ph.coarse.push_back(double(renderer_.coarseDrawnClusters()));
             ph.screenStrokeFrames += renderer_.screenStrokeDrawn() ? 1 : 0;
@@ -859,8 +1169,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             proofGpuMs_.clear();
         }
         const double u = std::min(1.0, (now - p.stageStart) / spec.seconds);
-        if (spec.radiusPx < 0) { // still: the view at rest (nothing moves)
-        } else if (spec.radiusPx <= 0) { // orbit: the view turns, as a drag would
+        if (spec.closeUp > 0.0f) { // close-up: a slow turn of +-10 degrees about the surface point
+            camera_.yaw = p.closeYaw + 0.1745f * float(std::sin(6.2831853 * u));
+            perf_.framesStill = 0;
+        } else if (spec.radiusPx < 0) { // still: the view at rest (nothing moves)
+        } else if (spec.radiusPx <= 0 && !spec.gizmo) { // orbit: the view turns, as a drag would
             camera_.yaw = float(6.2831853 * u);
             perf_.framesStill = 0;
         } else if (p.pressed) {
@@ -868,22 +1181,28 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             while (p.lastSample + 1.0 / kPointerHz <= now) {
                 p.lastSample += 1.0 / kPointerHz;
                 const double su = std::min(1.0, (p.lastSample - p.stageStart) / spec.seconds);
-                const glm::vec2 q = strokePoint(p, su);
+                glm::vec2 q = strokePoint(p, su);
+                if (spec.gizmo == 1) { // a figure eight from the grabbed centre
+                    const double phi = 2.0 * 3.14159265358979 * 2.0 * su;
+                    q = p.grabAt + p.R * glm::vec2(float(std::sin(phi)), 0.5f * float(std::sin(2.0 * phi)));
+                } else if (spec.gizmo == 2) { // the grabbed point turned 135 degrees each way about the pivot, twice
+                    const float a = 0.75f * 3.14159265f * float(std::sin(2.0 * 3.14159265358979 * 2.0 * su));
+                    const glm::vec2 r0 = p.grabAt - glm::vec2(p.cx, p.cy);
+                    q = glm::vec2(p.cx, p.cy) + glm::vec2(r0.x * std::cos(a) - r0.y * std::sin(a), r0.x * std::sin(a) + r0.y * std::cos(a));
+                }
                 p.samples.push_back({p.lastSample, q, p.samples.back().s + double(glm::length(q - p.samples.back().p))});
                 ++ph.samples;
             }
             // How far the stroke on screen (the newest dab in this frame) trails the pointer (the newest sample).
             if (!p.dabs.empty()) {
                 const glm::vec2 d = p.dabs.back();
-                size_t best = p.samples.size() - 1;
-                float bestDist = 1e30f;
-                for (size_t i = p.samples.size(); i-- > p.dabFrom && p.samples.size() - i < 2000;) {
-                    const float dist = glm::length(p.samples[i].p - d);
-                    if (dist < bestDist) bestDist = dist, best = i;
-                }
+                // Its sample: on the dab's own lap of the path (core/BenchLag.h), not a later one over the same spot.
+                const size_t best = dabSampleIndex(p.samples.size(), p.dabFrom, d.x, d.y, [&](size_t i) { return p.samples[i].p; });
                 p.dabFrom = best;
                 ph.lagMs.push_back((now - p.samples[best].t) * 1000.0);
                 ph.lagPx.push_back(p.samples.back().s - p.samples[best].s);
+                if (p.dabHits.size() == p.dabs.size() && p.dabHits.back())
+                    ph.lagOnModelMs.push_back(ph.lagMs.back()), ph.lagOnModelPx.push_back(ph.lagPx.back());
                 // The same for what is on screen ahead of the solved surface: the predictive preview's head.
                 const glm::vec2 h = ghostHeadValid_ ? ghostHead_ : d;
                 size_t nearest = p.samples.size() - 1;
@@ -895,9 +1214,21 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 p.previewFrom = nearest;
                 ph.previewLagPx.push_back(p.samples.back().s - p.samples[nearest].s);
             }
+            if (p.dense && p.dabs.empty() && (spec.gizmo || spec.brush == BrushType::Move)) {
+                if (p.shownFrom >= 0) {
+                    ph.lagMs.push_back((now - p.samples[size_t(p.shownFrom)].t) * 1000.0);
+                    ph.lagPx.push_back(p.samples.back().s - p.samples[size_t(p.shownFrom)].s);
+                }
+                p.shownFrom = p.sent < p.samples.size() ? double(p.sent) : -1;
+            }
             // ... then the new samples go to the input handler, as the next frame's events would.
-            for (; p.sent < p.samples.size(); ++p.sent)
+            // (each with its own time, as SDL stamps a tablet's events: the batch is handled at once, they weren't made at once)
+            for (; p.sent < p.samples.size(); ++p.sent) {
+                const double ago = std::max(0.0, now - p.samples[p.sent].t);
+                pointerEventNs_ = SDL_GetTicksNS() - std::min<Uint64>(SDL_GetTicksNS(), Uint64(ago * 1e9));
                 onMouseMove(p.samples[p.sent].p.x, p.samples[p.sent].p.y, 0.0f, 0.0f, false);
+            }
+            pointerEventNs_ = 0;
             if (u >= 1.0) {
                 const double up = nowSeconds();
                 onMouseUp(); // places the dabs still waiting, ends the stroke (undo step, timeline)
@@ -955,7 +1286,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
     case Stage::Finish: {
         if (!p.vsync) SDL_GL_SetSwapInterval(1);
         if (p.writer.running()) {
-            if (!p.writer.finish()) p.error += (p.error.empty() ? "" : "; ") + std::string("the video couldn't be written");
+            if (!p.writer.finish()) p.error += (p.error.empty() ? "" : "; ") + std::string("the video couldn't be written: ") + p.writer.error();
         }
         Json root = Json::object();
         root.set("schema", "sculptforge-benchmark/1");
@@ -970,12 +1301,22 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         settings.set("video", p.video);
         settings.set("pointer_hz", kPointerHz);
         settings.set("stroke_seconds", p.strokeSeconds);
-        if (!p.scene.empty()) {
+        if (p.pack) { // a scene pack: which one (the hash is of pack.json and every scene file), and the strokes it played
+            settings.set("scene", "pack-" + std::to_string(p.pack->version));
+            settings.set("stroke_set", kProofPackStrokeSet);
+            Json pk = Json::object();
+            pk.set("name", p.pack->name);
+            pk.set("version", p.pack->version);
+            pk.set("sha256", p.pack->sha256);
+            settings.set("pack", pk);
+        } else if (!p.scene.empty()) {
             settings.set("scene", p.scene);
             settings.set("stroke_set", kProofStrokeSet);
         }
+        if (const char* sim = std::getenv("SF_HW_SIMULATE"); sim && *sim) settings.set("hw_simulate", std::string(sim)); // a simulated tier says so (not in the hardware fields)
         settings.set("input", "scripted pointer samples into App::onMouseMove (the mouse / pen handler)");
         settings.set("lag", "pointer sample time to SwapWindow of the frame showing its dab (display scan-out not included)");
+        settings.set("lag_on_model", "lag over the frames whose newest dab reached the surface (dabs_off_model: those that found none)");
         root.set("settings", settings);
         Json runs = Json::array(), skipped = Json::array();
         for (const SizeResult& r : p.results) {
@@ -990,6 +1331,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             }
             Json run = Json::object();
             run.set("label", r.label);
+            if (!r.tier.empty()) run.set("tier", r.tier);
             run.set("triangles", double(r.triangles));
             run.set("vertices", double(r.vertices));
             run.set("build_seconds", std::round(r.buildSeconds * 100) / 100);
@@ -1001,6 +1343,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             run.set("ram_mb", double(r.ramBytes >> 20));
             run.set("peak_ram_mb", double(r.peakRamBytes >> 20));
             run.set("gpu_buffers_mb", double(r.gpuBufferBytes >> 20));
+            if (r.drmKb > 0) run.set("gpu_driver_mb", double((r.drmKb - std::max(0LL, r.drmBeforeKb)) >> 10)); // (fdinfo, less what the app held before)
             if (r.vramUsedKb > 0) run.set("vram_used_mb", double(r.vramUsedKb >> 10)); // (0: the driver's number never moved, as on unified memory)
             double stall = 0;
             for (const PhaseResult& ph : r.phases) stall = std::max(stall, worstStallMs(ph.frameMs, ph.releaseMs));
@@ -1014,6 +1357,26 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 j.set("worst_stall_ms", std::round(worstStallMs(ph.frameMs, ph.releaseMs) * 10) / 10);
                 j.set("seconds", std::round(ph.seconds * 100) / 100);
                 j.set("frames", double(ph.frameMs.size()));
+                if (ph.catchUpSeconds > 0) j.set("catch_up_s", std::round(ph.catchUpSeconds * 100) / 100);
+                if (const char* tr = std::getenv("SF_BENCH_TRACE"); tr && *tr == '1') { // every frame: total, main-thread parts, Focus Detail's promote
+                    Json t = Json::object();
+                    auto col = [&](const char* n, const std::vector<double>& v) {
+                        Json a = Json::array();
+                        for (double x : v) a.push(std::round(x * 10) / 10);
+                        t.set(n, a);
+                    };
+                    col("frame", ph.frameMs);
+                    const char* names[6] = {"events", "sculpt", "ui", "upload", "draw", "swap_wait"};
+                    for (int k = 0; k < 6; ++k) col(names[k], ph.split[k]);
+                    if (!ph.focusSplit[0].empty()) {
+                        const char* fnames[7] = {"promote", "coarse", "records", "shade_coarse", "pages", "shade_pages", "sync_all"};
+                        for (int k = 0; k < 7; ++k) col(fnames[k], ph.focusSplit[k]);
+                    }
+                    col("drawn", ph.drawn);
+                    col("pending_promote", ph.pendingPromote);
+                    col("pending_shade", ph.pendingShade);
+                    j.set("trace", t);
+                }
                 j.set("fps", ph.seconds > 0 ? std::round(double(ph.frameMs.size()) / ph.seconds * 10) / 10 : 0.0);
                 j.set("frame_ms", percentilesJson(percentiles(ph.frameMs)));
                 { // where the frames went (main thread; the solver thread's dabs run beside them, waits are in "sculpt")
@@ -1021,6 +1384,12 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     const char* names[6] = {"events", "sculpt", "ui", "upload", "draw", "swap_wait"};
                     for (int k = 0; k < 6; ++k) split.set(names[k], percentilesJson(percentiles(ph.split[k])));
                     j.set("frame_split_ms", split);
+                    if (!ph.focusSplit[0].empty()) { // (Focus Detail: where "upload" went)
+                        Json fs = Json::object();
+                        const char* fnames[7] = {"promote", "coarse", "records", "shade_coarse", "pages", "shade_pages", "sync_all"};
+                        for (int k = 0; k < 7; ++k) fs.set(fnames[k], percentilesJson(percentiles(ph.focusSplit[k])));
+                        j.set("focus_split_ms", fs);
+                    }
                     j.set("triangles_drawn", percentilesJson(percentiles(ph.drawn)));
                     if (ph.radiusPx < 0 && !ph.drawn.empty()) { // still: what its last frame drew (after the 150 ms wait)
                         j.set("detail", ph.coarse.empty() || ph.coarse.back() == 0 ? "full" : "coarse");
@@ -1048,7 +1417,13 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                         j.set("spacing_floor_ms", std::round(floorMs * 10) / 10);
                         j.set("lag_adjusted_ms", percentilesJson(percentiles(adjusted)));
                     }
+                    if (!ph.lagOnModelMs.empty()) j.set("lag_on_model_ms", percentilesJson(percentiles(ph.lagOnModelMs)));
+                    if (!ph.lagOnModelPx.empty()) j.set("lag_on_model_px", percentilesJson(percentiles(ph.lagOnModelPx)));
                     j.set("dabs", double(ph.dabs));
+                    j.set("dabs_off_model", double(ph.dabsOffModel));
+                    j.set("path_radius_px", std::round(double(ph.pathRadiusPx)));
+                    j.set("path_laps", std::round(ph.pathLaps * 100) / 100);
+                    if (ph.pathUpright) j.set("path_upright", true);
                     j.set("pointer_samples", double(ph.samples));
                     j.set("path_px", std::round(ph.pathPx));
                     j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
@@ -1066,6 +1441,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     }
                     j.set("preview_lag_px", percentilesJson(percentiles(ph.previewLagPx)));
                     j.set("pointer_speed_px_s", ph.seconds > 0 ? std::round(ph.pathPx / ph.seconds) : 0.0);
+                } else if (ph.gizmo) { // a Gizmo drag (SF_BENCH_DENSE): how far behind the pointer, and letting go
+                    if (!ph.lagMs.empty()) j.set("lag_ms", percentilesJson(percentiles(ph.lagMs)));
+                    j.set("pointer_samples", double(ph.samples));
+                    j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
+                    j.set("release_done_ms", std::round(ph.releaseDoneMs * 10) / 10);
                 }
                 phases.push(j);
             }
@@ -1078,7 +1458,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         if (!p.error.empty()) root.set("notes", p.error);
         {
             std::ofstream f(std::filesystem::path(std::u8string(p.jsonPath.begin(), p.jsonPath.end())));
-            f << root.dump(true) << "\n";
+            // (A pack result is pasted into an issue form, whose text box holds 65,536 characters: no indentation.)
+            f << root.dump(!p.pack) << "\n";
             if (!f) p.error += (p.error.empty() ? "" : "; ") + ("couldn't write " + p.jsonPath);
         }
         // A summary on the terminal too.
@@ -1094,7 +1475,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             if (r.shadedSeconds > 0) std::printf(", fully shaded %.2f s (RAM then %zu MB)", r.shadedSeconds, r.loadedRamBytes >> 20);
             std::printf("\n");
             std::printf("  %-5s peak RAM %zu MB, GPU buffers %zu MB%s, worst stall %.0f ms\n", r.label.c_str(), r.peakRamBytes >> 20,
-                        r.gpuBufferBytes >> 20, r.vramUsedKb > 0 ? (", driver VRAM used " + std::to_string(r.vramUsedKb >> 10) + " MB").c_str() : "",
+                        r.gpuBufferBytes >> 20,
+                        (std::string(r.vramUsedKb > 0 ? ", driver VRAM used " + std::to_string(r.vramUsedKb >> 10) + " MB" : "") +
+                         (r.drmKb > 0 ? ", driver GPU memory " + std::to_string((r.drmKb - std::max(0LL, r.drmBeforeKb)) >> 10) + " MB" : ""))
+                            .c_str(),
                         [&] { double w = 0; for (const PhaseResult& ph : r.phases) w = std::max(w, worstStallMs(ph.frameMs, ph.releaseMs)); return w; }());
             for (const PhaseResult& ph : r.phases) {
                 const Percentiles f = percentiles(ph.frameMs), l = percentiles(ph.lagMs), lp = percentiles(ph.lagPx);

@@ -146,6 +146,8 @@ Json BrushRecipe::toJson() const {
     j.set("description", r.description);
     if (connectedOnly) j.set("connectedOnly", true);
     if (viewFalloff) j.set("viewFalloff", true);
+    if (planeLock) j.set("planeLock", true);
+    if (crispEdge) j.set("crispEdge", true);
     if (!alpha.empty()) j.set("alpha", alpha);
     if (alphaFollow) j.set("alphaFollow", true);
     if (alphaAngle != 0.0f) j.set("alphaAngle", std::round(double(alphaAngle) * 1000.0) / 1000.0);
@@ -172,14 +174,16 @@ void BrushRecipe::applyJson(const Json& j) {
     if (j["description"].isString()) description = j["description"].asString();
     if (j["connectedOnly"].isBool()) connectedOnly = j["connectedOnly"].asBool();
     if (j["viewFalloff"].isBool()) viewFalloff = j["viewFalloff"].asBool();
+    if (j["planeLock"].isBool()) planeLock = j["planeLock"].asBool();
+    if (j["crispEdge"].isBool()) crispEdge = j["crispEdge"].asBool();
     if (j["alphaFollow"].isBool()) alphaFollow = j["alphaFollow"].asBool();
     if (j["alphaAngle"].isNumber()) alphaAngle = float(j["alphaAngle"].asNumber());
     if (j["alphaAngleJitter"].isNumber()) alphaJitter = float(j["alphaAngleJitter"].asNumber());
     if (j["penPressureSize"].isString()) pressureSize = penPressureFromId(j["penPressureSize"].asString());
     if (j["penPressureStrength"].isString()) pressureStrength = penPressureFromId(j["penPressureStrength"].asString());
     if (j["alpha"].isString()) {
-        BrushAlpha a;
-        alpha = BrushAlpha::builtin(j["alpha"].asString(), a) && !a.empty() ? a.name : std::string();
+        alpha = BrushAlpha::builtinName(j["alpha"].asString()); // (no stroke-size alpha made just to read a file)
+        if (alpha == "Round") alpha.clear();
     }
     for (const auto& p : recipeParams()) {
         const Json& v = j[p.key];

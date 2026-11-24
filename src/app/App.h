@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "ai/AiCommands.h"
 #include "ai/AiPolicy.h"
 #include "ai/BrushAssistant.h"
 #include "ai/Consent.h"
@@ -9,6 +10,7 @@
 #include "app/AssetLibrary.h"
 #include "app/AxisGizmo.h"
 #include "app/GizmoAll.h"
+#include "app/OrbitSpeed.h"
 #include "app/CommandPalette.h"
 #include "app/Config.h"
 #include "app/Console.h"
@@ -22,19 +24,25 @@
 #include "app/UiLayout.h"
 #include "app/UserGuide.h"
 #include "ai/ComfyUI.h"
+
+#include <set>
 #include "ai/ImageTo3DService.h"
+#include "core/MemberBuilds.h"
 #include "core/BrushSets.h"
 #include "core/BrushSettings.h"
 #include "core/Commands.h"
+#include "core/CommandParse.h"
 #include "core/Image.h"
 #include "link/AiLinkSession.h"
 #include "core/Macro.h"
 #include "core/Pack.h"
 #include "core/Plugin.h"
+#include "core/PartBoolean.h"
 #include "core/Parts.h"
 #include "core/Document.h"
 #include "core/Deform.h"
 #include "core/Drape.h"
+#include "core/Garment.h"
 #include "core/DiscordPresence.h"
 #include "core/Face.h"
 #include "core/Backdrop.h"
@@ -47,6 +55,7 @@
 #include "core/QRemesh.h"
 #include "core/RadialMenu.h"
 #include "core/Precision.h"
+#include "core/ScreenSelect.h"
 #include "core/StrokePopup.h"
 #include "core/Stroke.h"
 #include "core/StrokePath.h"
@@ -57,7 +66,9 @@
 #include "core/SelfUpdate.h"
 #include "core/StudioProfile.h"
 #include "core/UpdateCheck.h"
+#include "core/Featured.h"
 #include "core/ViewCapture.h"
+#include "core/Voxel.h"
 #include "core/WhatsNew.h"
 #include "core/Texture.h"
 #include "io/ArExport.h"
@@ -88,6 +99,10 @@
 #include <utility>
 #include <vector>
 
+namespace sf::splash {
+class Window; // StartupSplashWindow.h
+}
+
 namespace sf::ai {
 class ChildProcess; // ai/Process.h (the updater's restart)
 }
@@ -109,6 +124,7 @@ struct AppOptions {
     std::string demo;       // scripted demo to play (see Demo.h)
     std::string recordPath; // record the session to this .mp4 (needs ffmpeg) and exit
     std::string uiRecordPath; // --ui-test: also record every frame, paced to real time, to this .mp4 (launch clips)
+    bool uiRecordClip = false; // --ui-test --record: a small unpaced bug clip (crf 23, veryfast) instead of a launch clip
     std::string demoAsset;  // file the demo opens (image or model)
     std::string demoOutput; // where the demo saves its result (optional)
     int fps = 30;
@@ -116,8 +132,10 @@ struct AppOptions {
     std::string uiTest;   // run this .sfui UI test script headless and exit (see UiTest.cpp)
     std::string uiOutDir; // where UI tests save screenshots
     bool fullscreen = false; // start fullscreen (F11 toggles)
+    bool resetLayout = false; // --reset-layout: start with the standard layout and every panel in the main window (keys and preferences stay)
     float measureStroke = 0.0f; // --measure-stroke S: a scripted fast circle stroke, report its path and frame times
     float measureStrokeRadius = 0.0f; // --measure-stroke S,R: the brush radius in screen pixels
+    bool measureKeyNav = false; // --measure-key-nav: tap and hold every pan / zoom key in the interactive loop, exit 1 if the view stays
     float measureIdle = 0.0f; // --measure-idle S: after a settling pause, count the frames drawn in S idle seconds, exit
     // --timelapse out.mp4: render the opened project's history (its .sfhist) as a turntable timelapse and exit.
     std::string timelapsePath;
@@ -125,16 +143,21 @@ struct AppOptions {
     // --benchmark: proof mode (ProofMode.cpp), then exit. Sizes in millions of triangles (empty: 5, 20, 33 and
     // 100 when memory allows); outputs default to the current folder.
     bool benchmark = false;
-    std::string benchmarkScene; // --benchmark standard-15m | standard-33m | standard | standard-1b: a standard scene (ProofMode.h)
+    std::string benchmarkScene; // --benchmark standard-15m | standard-33m | standard-100m | standard | standard-1b: a standard scene (ProofMode.h)
     std::string benchmarkSizes, benchmarkOut, benchmarkVideo;
     bool benchmarkNoVideo = false, benchmarkVsync = false;
     float benchmarkStrokeSeconds = 6.0f;
     // --benchmark-script take.sfui: the take (a UI test script's input) played in real time with the benchmark HUD,
     // video and a per-frame CSV (BenchTake.cpp); benchmark is set too (isolated settings, --size 1920x1080).
     std::string benchmarkScript;
+    std::string splashShotPath; // --splash-shot FILE: the start-up splash as a PNG at --size, no window (StartupSplash.h)
 };
 
 class Demo;
+class PythonScripting; // app/Python.h
+namespace python {
+struct UiPanel; // python/PyHost.h
+}
 struct LengthUnit; // core/Units.h
 struct StudioSignInJob; // PanelAi.cpp: the studio sign-in on a worker (ai/Oidc.h)
 
@@ -153,26 +176,41 @@ class App {
 
 public:
     App();
+    void setMaskColor(bool custom, const glm::vec3& srgb); // Preferences > Interface > Mask colour (false: the default look)
     void setMaskDarkness(float k); // 0-1: the preference and the view (Preferences > Interface, Tool > Masking)
     ~App();
     bool init(const AppOptions& options);
     const std::string& startError() const { return startError_; } // why init failed, for the message box (#109)
     int run(); // returns the process exit code
+    static bool usesProfileThreads(const AppOptions& options); // a window run (not a test, render, recording or demo): the saved hardware profile's threads
+    static std::string splashVersionLine(); // "Version 0.12.2 Beta 1" in the interface language
+    void closeSplash(); // the start-up splash goes (the main window drew its first frame, or start-up failed)
     // Redraw on demand (#14): the interactive loop sleeps in SDL_WaitEventTimeout until an event, a background
     // job or an animation needs a new frame. UI tests and recordings (runRecording) draw every frame as before.
     bool backgroundBusy() const; // a background job runs (also the UI tests' wait_idle)
 
     ActionRegistry& actions() { return actions_; }
     UiLayout& layout() { return layout_; }
+    // The menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts and > Render bridge, Brush > Contact facing): off in the Classic
+    // layout (its menus keep their old rows) unless Preferences > Interface > Show newer menu rows says so; on in SculptForge.
+    bool newerMenuRows() const { return uiPrefs_.newerMenuRows < 0 ? uiPrefs_.shellLayout == 1 : uiPrefs_.newerMenuRows != 0; }
     ThumbnailCache& thumbnails() { return thumbs_; }
+    // A brush tile clicked (bottom shelf, brush picker): with Shift / Ctrl held it becomes the Shift / Ctrl brush
+    // (true) instead of the main one (ModifierBrush.cpp).
+    bool modifierBrushClick(int type);
+    const ModifierBrushes& modifierBrushes() const { return uiPrefs_.modifierBrushes; }
     void shutdown();
     // The warm UI test server (sculptforge --ui-serve, UiServe.cpp): every App it makes draws in this one hidden
     // window and GL context, made once, instead of its own; shutdown() leaves them (and SDL) for the next script.
     static void shareWindow(SDL_Window* window, SDL_GLContext context);
+    // The main window's native handle for Python (sf.ui.main_window_handle): HWND, NSWindow*, X11 Window id; 0 where
+    // SDL has none (Wayland, the offscreen and dummy drivers).
+    uint64_t nativeWindowHandle() const;
     static void glWindowAttributes(); // OpenGL 3.3 core, before a window is made
+    void setInterfaceLanguage(Language lang); // live and remembered in ui.json (Preferences > Interface, the welcome, the bar)
     void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
 
-    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, InsertSet, Count };
+    enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, SaveVisibleParts, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, InsertSet, Count };
     struct DialogRequest {
         App* app;
         FileAction action;
@@ -182,7 +220,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil, Tube }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil, Tube, Reference }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
     void dispatchEvent(const SDL_Event& e);
@@ -191,13 +229,26 @@ private:
     void onMouseUp();
     bool blenderNavigationDown(Uint8 button); // Blender style: a press that navigates (Input.cpp's style)
     // A rotation drag: free, turntable, or about the world X or Z axis (View > Orbit lock); Shift snaps.
-    void orbitBy(float x, float y, float dx, float dy);
+    void orbitBy(float x, float y, float dx, float dy, bool mouse = false);
+    std::optional<glm::vec3> orbitPivotAt(float x, float y); // Preferences > Input > Orbit around the pointer
+    std::optional<glm::vec3> backgroundOrbitPivot();         // ... started over the background: the visible model, not the view's middle
+    std::optional<glm::vec3> lastStrokePoint() const;        // where a stroke last landed, in the scene, while it is still on a Part
+    void noteStrokePoint(const glm::vec3& local);            // (the active Part's space)
+    void frameLastStroke();                                  // the view.frame_last_stroke action
     float rollSweep(float x, float y, float dx, float dy) const; // radians the cursor turns around the canvas centre
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
-    void onKey(SDL_Keycode key, SDL_Keymod mod);
+    void onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat = false);
 
     bool pick(float x, float y, RayHit& hit) const; // the active Part (what brushes work on)
     BrushType activeBrush() const;
+    // The Shift and Ctrl brushes (core/ModifierBrush.h, ModifierBrush.cpp): Shift+click / Ctrl+click a brush tile.
+    ModifierSlot heldSlot() const; // the rebound slot the keyboard's keys held now pick (None: the usual meanings)
+    void setModifierBrush(ModifierSlot slot, int type); // -1: back to Smooth / the mask
+    float& heldIntensity(); // the Intensity the next stroke (or the one going on) uses: what the U slider sets
+    std::string heldIntensityName(); // "Intensity", "Smooth Intensity", "Trim Intensity (Shift)"
+    float strokeStrength() const; // the stroke's Intensity outside Smooth: the main one or its slot's
+    ModifierSlot strokeSlot_ = ModifierSlot::None; // the slot the stroke going on began with
+    void registerModifierBrushCommands(); // set_modifier_brush, brush.shift_reset, brush.ctrl_reset
     void beginStroke(float x, float y, const RayHit& hit);
     // Preferences > Input > Start strokes off the model (#62): a left press on the background waits as
     // Drag::AirStroke; the stroke begins where the drag first reaches the surface (airStrokeTo, Input.cpp).
@@ -209,7 +260,7 @@ private:
     bool airMoved_ = false;           // it moved past the click slop (a Ctrl+click still inverts the mask)
     float airX_ = 0.0f, airY_ = 0.0f; // where it was pressed
     void strokeTo(float x, float y);
-    void dabAt(float x, float y, float pressure = -1.0f); // pressure < 0: strokePressure()
+    void dabAt(float x, float y, float pressure = -1.0f, bool stamp = false); // pressure < 0: strokePressure()
     void endStroke();
     // Dynamic topology (dynamic topology, core/Dyntopo.h): turns it on or off (not on a mesh with
     // subdivision levels), saying so in the status bar; the Detail slider.
@@ -230,6 +281,13 @@ private:
     std::string unhideOperation_;
     std::function<void()> unhideProceed_;
     bool openUnhideConfirm_ = false;
+    // #173: Voxel Remesh, Quad Remesh and Decimate drop the subdivision levels; on a Part with levels they ask first
+    // (Freeze Levels and Proceed / Cancel). Same shape as unhideAllows; `skip` for automatic remeshes.
+    bool levelsAllow(const char* operation, std::function<void()> proceed, bool skip = false);
+    std::string levelsOperation_;
+    std::function<void()> levelsProceed_;
+    bool openLevelsConfirm_ = false;
+    bool levelsConfirmed_ = false; // Freeze Levels and Proceed was clicked: the next levelsAllow lets it through
     void drawDetailSlider(const char* id);
 
     void runCommand(const std::string& name, const Args& args = {});
@@ -280,8 +338,11 @@ private:
     bool drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring);
     bool sizeRingPreview_ = false; // the last ring drawn was the S / O pop-up's preview (UI tests: size_ring_preview)
     float sizeRingPreviewPx_ = 0.0f; // its radius, pixels (UI tests: size_ring_px)
+    float sizeRingPreviewValue_ = 0.0f;       // the value it shows (Intensity 0..1: the disc inside the ring)
+    bool sizeRingPreviewIntensity_ = false;   // an Intensity pop-up's preview: a disc in the ring
     std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
+    bool frontFacesTagShown_ = false; // the last cursor drawn carried the "Front faces only" tag (UI tests: front_faces_tag)
     bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
     void updateTitle();
 
@@ -352,8 +413,12 @@ private:
     // Rotation drags: the unsnapped view, so Shift (snap to an axis) can be pressed and released mid-drag.
     Camera orbitRaw_;
     bool orbitStarted_ = false;
+    // Orbit around the pointer: the surface point under the pointer as the drag began (picked once per drag; none
+    // over the background or the axis gizmo's disc: the view turns about its target).
+    std::optional<glm::vec3> orbitPivot_;
+    bool orbitPivotPicked_ = false;
     bool panFromAlt_ = false;       // a pan started with Alt: releasing Alt mid-drag zooms
-    bool forceTurntable_ = false;   // demos orbit like a turntable whatever the preference
+    bool forceTurntable_ = false;   // demos orbit like a turntable about the target whatever the preferences
     float mouseX_ = 0.0f, mouseY_ = 0.0f;
     float lastX_ = 0.0f, lastY_ = 0.0f;
     // Dabs are placed along the pointer's path (strokePath_), queued, and worked through for a limited time per
@@ -365,6 +430,7 @@ private:
     std::vector<PathDab> strokeScratch_;
     std::vector<glm::vec2>* strokeProbe_ = nullptr; // --measure-stroke: where each dab went (screen)
     std::vector<float>* strokeRadiusProbe_ = nullptr; // ... and its brush radius (px)
+    std::vector<uint8_t>* strokeHitProbe_ = nullptr; // ... and whether it reached the surface (Help > Benchmark: 0 = off the model)
     double dabSeconds_ = 0.0;         // what a dab of this stroke costs (running average), for the backlog limit
     bool interactiveStrokes_ = false; // App::run(): budgeted dabs and curved long gaps; other loops dab at once
     void drainStrokeDabs(double budgetSeconds); // places queued dabs; budget <= 0: all of them
@@ -394,14 +460,16 @@ private:
         bool smoothKeepVolume = false; // Smooth keeps the volume (smoothKeepVolume_, or the alternate smooth)
         bool smoothGroupBorders = false; // Smooth moves face group borders only (smoothGroupBorders_, #81)
         bool pressureSize = false, pressureStrength = true, invert = false, frontFacesOnly = false;
-        bool connectedOnly = false, viewFalloff = false; // the falloff options (Brush palette)
+        bool connectedOnly = false, viewFalloff = false, contactFacing = false; // the falloff options (Brush palette)
+        float facingAngle = 180.0f;
         bool mask = false, paint = false, sculpt = true, visible = true;
-        AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter (#76; Tile is the alpha's own)
+        AlphaOptions alphaOptions; // Follow stroke direction, Angle, Angle jitter, Scale / Position jitter (#76; Tile is the alpha's own)
         BrushType brush = BrushType::Standard;
         StrokeType strokeType = StrokeType::Dots;
         Symmetry symmetry;
         const BrushRecipe* recipe = nullptr;
         const BrushAlpha* alpha = nullptr;
+        std::shared_ptr<const AlphaPool> pool; // the alphas each dab picks from (alphaPool_; null: just `alpha`)
         Stencil stencil; // (a copy: its image is shared and never changes, so the solver thread can read it)
         const VectorDisplacement* vdm = nullptr;
         std::shared_ptr<const VectorDisplacement> vdmOwner; // (keeps the VDM alive for the batch)
@@ -415,6 +483,11 @@ private:
         DabSettings settings;
         std::vector<glm::vec2>* probe = nullptr; // --measure-stroke: where its dabs went
         std::vector<float>* radiusProbe = nullptr; // ... and their brush radius in pixels (verify replays it)
+        std::vector<uint8_t>* hitProbe = nullptr; // ... and whether each reached the surface
+        // The batch's last dab on the Part's mesh: written by the solver thread (dabAt), read by the main thread once
+        // the batch is done (the hand-over orders them), for lastStrokeLocal_.
+        mutable glm::vec3 lastHit{0.0f};
+        mutable bool lastHitSeen = false;
     };
     std::unique_ptr<StrokeSolver> solver_;
     const DabView* dabView_ = nullptr; // set while the solver thread places dabs (dabAt reads it)
@@ -424,6 +497,10 @@ private:
     bool previewStrokes() const;       // the stroke's dabs draw the predictive preview (predictive, or SF_BG_GHOST)
     bool fastBigBrushes() const;       // Preferences > Performance > Fast Big Brushes (SF_ADAPTIVE_DABS=0 / 1 overrides it)
     bool draftStrokes() const;         // Draft Strokes (SF_DRAFT_STROKE=0 / 1 overrides)
+    // Keep Strokes Editable (SF_KEEP_EDITABLE=0 / 1 overrides), unless memory is short: the floor tier under 8 GB, or
+    // under 1 GB free now (the status line says so once). Strokes then run exactly as before.
+    bool keepStrokesEditable();
+    bool inkGuardSaid_ = false;
     bool backgroundDabs() const;       // a heavy mesh's dabs on the solver thread without the preview (SF_BACKGROUND_DABS)
     bool asyncStrokeAllowed() const;   // the stroke beginning now may use the solver thread
     bool solverBusy() const;
@@ -438,6 +515,8 @@ private:
     PenPredictor penPredictor_;
     glm::vec2 pointerLatest_{0.0f};   // the newest pointer sample of the stroke (window pixels)
     double pointerLatestAt_ = 0.0;    // its time (seconds)
+    Uint64 pointerEventNs_ = 0;       // the pointer event being handled: when it happened (SDL ticks, ns; 0 = now)
+    double pointerEventSeconds() const; // that, or now: the pen predictor's sample time (not when it's handled)
     double frameSeconds_ = 1.0 / 60.0; // running mean of the frame interval (how far ahead to predict)
     double prepSeconds_ = 0.0;         // running mean of what packing a batch's upload costs (the batch size)
     Sculptor::DabFrame ghostFrame_;    // the last placed dab's frame (the ghost's estimates start from it)
@@ -458,13 +537,20 @@ private:
     bool penSeen_ = false;
     BrushType strokeBrush_ = BrushType::Standard;
     bool strokeInvert_ = false;
+    // The brush material before a swatch set it, and what the swatch set: a plain colour picked afterwards gives the
+    // roughness / metallic / channels back, so red after Gold is red paint, not red metal (beginPaintStroke).
+    struct MaterialSwatchMemo {
+        bool active = false;
+        BrushMaterial before, applied;
+        glm::vec3 color{1.0f};
+    } swatchMemo_;
     glm::vec3 grabLast_{0.0f};
-    // A grab (Move, Snake Hook, KelvinGrab) follows the pen's motion on screen, not where the pen points: when the view
+    // A grab (Move, Tendril, KelvinGrab) follows the pen's motion on screen, not where the pen points: when the view
     // turns under a still pen (a SpaceMouse with Hold during strokes off), the grabbed point stays where it is in the
     // world and the pen carries on from it (fenix, Discord 11-06: the model flew off as the cap turned).
     // grabScreen_: the pen's last position the grab used; grabScreenOffset_: from it to the grabbed point on screen.
     glm::vec2 grabScreen_{0.0f}, grabScreenOffset_{0.0f};
-    bool grabStroke() const;     // a Move / Snake Hook / KelvinGrab stroke under way
+    bool grabStroke() const;     // a Move / Tendril / KelvinGrab stroke under way
     void regrabAfterViewMove();  // the view moved mid-grab: the grabbed point stays put (grabScreenOffset_)
     // Live Move (Preferences > Performance, experimental; docs/design/perf-moonshots.md): a Move drag on a plain mesh
     // isn't applied frame by frame; the GPU draws it (render/Ghost.h, GhostKind::Move) from the grab's start, and
@@ -474,9 +560,13 @@ private:
         glm::vec3 center{0.0f}, delta{0.0f};
         float radius = 0.0f, scale = 0.0f;
     } liveMove_;
-    bool liveMoveEnabled() const;      // the Live Move preference (and SF_LIVE_MOVE)
+    // The Live Move preference, or a dense mesh whose grab moves `region` vertices or more (and SF_LIVE_MOVE).
+    bool liveMoveEnabled(size_t region = SIZE_MAX) const;
+    static constexpr size_t kLiveMoveAutoVertices = 1'000'000; // (about 2M triangles)
+    static constexpr size_t kLiveMoveAutoRegion = 100'000;     // (smaller grabs: the CPU Move keeps up, and draws less)
     void commitLiveMove();
     bool grabPending_ = false; // Move: positions moved, normals and BVH not yet (queueGrab / flushGrab, once a frame)
+    std::vector<glm::vec3> grabQueued_; // Move in the app's loop: the pointer's moves since the last frame, not yet applied
     void queueGrab(const glm::vec3& delta);
     void flushGrab();
     // Along the normal (from the discussions): Move, Tendril, Elastic Tendril and KelvinGrab strokes that began with
@@ -491,6 +581,7 @@ private:
     glm::vec3 alongNormalTarget(float x, float y) const;
 
     std::string status_;
+    bool textureNoticeShown_ = false; // the "texture not shown on this GPU" status was given for the Part's texture
     bool lastCommandOk_ = true; // result of the last runCommand (UI tests check it)
     bool showHelp_ = false;
     bool showAbout_ = false;
@@ -500,12 +591,26 @@ private:
     void drawConnectAi();
     // Supporting SculptForge (Support.h): the app only ever opens the membership page or its Stripe checkout links in the
     // browser; nothing else changes.
-    void openSupportPage();
+    void openSupportPage(const char* source); // source: the entry point, the link's utm_campaign (supportPageUrl)
+    void openSocialLink(int index); // kSocialLinks[index] in the browser (UI tests: the status bar only)
+    void drawSocialRow(const char* where, ImVec2 at); // `at`: its left edge and vertical centre (screen) // the community icon row at the cursor: "welcome" or "about" (PanelSupport.cpp)
+    float socialRowWidth() const;          // its width
     void openDiscordPage(); // kDiscordUrl in the browser (UI tests: the status bar only)
     void openSupportLink(const char* url); // one of the Support.h links (UI tests: the status bar only)
+    void keepWindowInView(const CanvasRect& c); // after Begin: the window inside the view (PanelSupport.cpp)
     void drawSupportUi();               // the first-run welcome and the new-look note
     void drawSupportersSection();       // Help > About: the names from docs/supporters.txt, as plain text
     bool showWelcome_ = false;          // the first start (no project.json yet), or Help > Welcome
+    // The first start's language (#44, PanelSupport.cpp): an OS language SculptForge ships starts in it, with a small bar
+    // ("SculptForge is in Español. [Change]") for this session only; any other OS language keeps English and the
+    // welcome's language row is the offer. Never in tests, renders, demos or a headless display.
+    void offerFirstRunLanguage(std::string_view osTag); // the decision, from osLanguageTag() (UI tests: any tag)
+    void drawLanguageRow();                              // the welcome's row: each language in its own script
+    void drawLanguageBar(const CanvasRect& canvas);
+    void openPreferencesSection(const char* subpalette); // Preferences with that section open and flashed
+    bool languageBar_ = false;                           // the bar after an automatic switch
+    Language languageBarFor_ = Language::English;        // (it goes when the language is changed another way)
+    bool languageUnsaved_ = false;                       // the automatic choice isn't in ui.json yet (autosavePrefs)
     // project.json "input_style": the key style an install started with (the welcome's "Coming from" choice, or
     // SculptForge for a new install), used while ui.json (saved automatically) names none; -1: an install from before it,
     // which keeps the Classic sculpting keys it had.
@@ -534,6 +639,8 @@ private:
     size_t sceneTrianglesWithMicro() const; // visible base triangles, micro levels counted in full
     void openPerformancePrefs();            // Preferences > Performance, opened and flashed
     void tickBigMeshTip();                  // every frame (drawSupportUi): shows the tip when due
+    int socialRequests_ = 0;            // UI tests: how often a community icon was clicked
+    int lastSocial_ = -1;               // and which one (index into kSocialLinks)
     int discordRequests_ = 0;           // UI tests: how often the Discord invite was asked for
     int supportPageRequests_ = 0;       // UI tests: how often the page was asked for (only opened when interactive)
     // The membership cards (Support.h, PanelSupportCard.cpp): the full card on the first start (and from Help >
@@ -548,6 +655,8 @@ private:
     void showSupportCard(SupportCardReason reason); // (also Help > Support and the welcome)
     void closeSupportCard();
     bool supportCardOpen() const;
+    bool pleaBlocked() const;          // a member (or Android: members-only APKs): no membership card of any kind
+    void tickSupportCardQueue();       // opens the queued first-run card once the other first-run boxes are away
     bool supportCardEvent(const SDL_Event& e); // input while it's open goes to it, not the canvas or shortcuts
     void drawSupportCard();
     void drawSupportPrefs();                    // Preferences > Support
@@ -557,6 +666,12 @@ private:
     void memberMoment(MemberMoment m);          // a good moment happened: the card follows if it may (Support.h)
     void tickMemberCard(float dt);              // the sculpting time, and the card once the frame is calm
     void drawMemberCard();
+    bool appealPending_ = false, appealOpen_ = false; // the appeal card (Support.h appealDue): due at startup / showing
+    bool appealUpdateCheckOff() const;          // update checks off: a package manager's build, the policy, the env var
+    bool appealOwesUpdate_ = false;             // the pending appeal pre-empted an update moment (kept in updateOwed once it shows)
+    void startupUpdateMoment();                 // startup: the update card's moment (a new version, or owed since the appeal)
+    void launchAppeal();                        // startup: due -> pending (and the small card's update moment steps aside)
+    void drawAppealCard();                      // PanelSupportCard.cpp
     void memberCardChoice(MemberCardChoice c);
     void verifyMember();                        // "I'm already a member": the member builds' GitHub sign-in
     void memberSignInFinished(bool member);     // the card's sign-in ended (startMemberSignIn's onDone)
@@ -592,16 +707,19 @@ private:
     void updateDiscordPresence();                // every frame: sends only when what's shown changes
     bool discordAgentRun() const;                // agent or offscreen run: never (discord::agentRun)
     void drawIntegrationsPrefs();                // Preferences > Integrations
-    bool welcomeAfterCard_ = false;             // the first-run welcome waits until the card closes
+    bool supportCardQueued_ = false;            // the first start's full card waits for the welcome and the tier card
     // What's New (WhatsNewPopup.cpp): the newest version's feature cards from docs/guide/whats-new.md, once after an
     // update and from Help > What's New; each Try it runs the card's action (runWhatsNewAction).
     struct WhatsNewPopup;
     struct WhatsNewDelete { void operator()(WhatsNewPopup* p) const; };
     std::unique_ptr<WhatsNewPopup, WhatsNewDelete> whatsNew_;
-    void showWhatsNew(); // the popup, or the guide's chapter when this version has no cards
+    void showWhatsNew(const std::string& since = {}); // the popup (all versions newer than SINCE, else the newest), or the guide's chapter when it has no cards
+    std::string whatsNewSince_; // the last version seen when this start is an update ("" otherwise)
     void closeWhatsNew();
     bool whatsNewOpen() const;
     const whatsnew::Version* whatsNewVersion() const; // what the popup shows (UI tests), null when closed
+    int whatsNewMore() const;       // improvements past the cards (UI tests)
+    bool whatsNewScrolled() const;  // the cards scrolled (UI tests)
     bool whatsNewEvent(const SDL_Event& e);           // input while it's open goes to it
     void drawWhatsNew();
     // A card's action: look:new, card:membership, brush:NAME, guide:FILE[#ANCHOR] or an action id (help.benchmark).
@@ -658,6 +776,13 @@ private:
     void pollAiLink();             // every frame: the connection's messages, one at a time
     void drawAiLink();             // the Approve and Allow dialogs, the "AI connected" badge
     void drawAiLinkPrefs();        // its switch in Preferences > AI
+    // ---- Python scripting (app/Python.h, PanelPython.cpp) ----
+    PythonScripting& python();     // made on first use (no file read, nothing loaded until a script runs)
+    void drawPythonPrefs();        // Preferences > Scripts
+    void drawPythonScripts();      // the Script palette's list of the Scripts folder
+    void drawPythonPanel(python::UiPanel& panel); // a script's panel (sf.ui.panel), a section of the Script palette
+    void runPythonFile(const std::string& path);
+    std::unique_ptr<PythonScripting> python_;
     void aiLinkDisconnect(const std::string& why); // the kill switch: closes the connection now
     void aiLinkPicked(const std::string& path);    // a file the user chose: an AI tool may use it without asking
     int aiLinkStateValue() const;  // UI tests: 0 off, 1 listening, 2 waiting for approval, 3 connected, 4 asking
@@ -715,7 +840,7 @@ private:
     float projectDepth_ = 0.02f;
     bool projectInvert_ = false;
     char generatorCommand_[1024] = "";
-    char falKey_[256] = "", falModel_[256] = "", meshyKey_[256] = "", hfToken_[256] = "", hyper3dKey_[256] = "";
+    char falKey_[256] = "", falModel_[256] = "", meshyKey_[256] = "", hfToken_[256] = "", hyper3dKey_[256] = "", tripoKey_[256] = "";
     // ComfyUI: "Test connection" result, bundled workflows, the chosen file's problem (UI format...)
     char comfyUrl_[256] = "";
     struct ComfyCheck {
@@ -739,6 +864,7 @@ private:
     bool keepTexture_ = true; // Keep Texture: remeshes carry a painted texture over (core/TextureTransfer.h)
     int remeshResolution_ = 256; // Generate 3D's sculpting base (its Voxel Remesh resolution)
     bool removeBackground_ = true; // Generate 3D's "Remove flat background" (core/Backdrop.h)
+    bool refImageBusyBackground_ = false; // the chosen picture has no transparency and no plain backdrop to cut out: the panel says what works best
     // Generate 3D (PanelGenerate3D.cpp): generate for form, remesh for topology. One press makes 1-3 candidates side by
     // side (a thumbnail and a silhouette each); the one picked becomes a Part; "Use as sculpting base" then remeshes it.
     struct GeneratedCandidate {
@@ -773,12 +899,17 @@ private:
     bool openHunyuanNotice_ = false;
     std::shared_ptr<ai::GenerationProgress> generatorProgress_;
     float generatorTime_ = 0.0f;
+    std::set<std::string> textOffPresets_; // free text presets a Space refused this session ("Text to 3D is disable"); never probed
+    std::string textOffKey() const; // the chosen free text preset, "" when the service is not the free Hugging Face one
+    std::string generatorError_; // why the last Generate 3D gave no model; stays in the panel until the next run
     int candidateCountForService() const;
     void clearCandidates();
     void pickCandidate(int index);
     void useAsSculptingBase();
     void pollSculptingBase();
     void drawGeneratedCandidates();
+    void drawRecommendedModels();     // PanelGenerate3D.cpp: the "Recommended" list (price, note, key link, free Space health)
+    std::string hfOffReason() const;  // PanelGenerate3D.cpp: why the free model that would run is switched off ("" = it can run)
     void drawSculptingBase();
 
     glm::vec3 lastDabHit_{0.0f};
@@ -851,8 +982,9 @@ private:
     // visibility (Ctrl+Shift, classic SelectRect / SelectLasso) or for the mask
     // (Ctrl, MaskRect / MaskLasso). Pen is the mask's brush-stroke mode.
     // The Cut shapes share the Ctrl+Shift drag with SelectRect / SelectLasso (PanelCut.cpp).
-    enum class SelectShape { Pen, Lasso, Rect, CutLine, CutLasso, CutRect, CutPolyline };
-    static bool isCutShape(SelectShape s) { return s >= SelectShape::CutLine; }
+    enum class SelectShape { Pen, Lasso, Rect, CutLine, CutLasso, CutRect, CutPolyline, Circle, CutCircle };
+    static bool isCutShape(SelectShape s) { return s >= SelectShape::CutLine && s != SelectShape::Circle; }
+    static bool isCircleShape(SelectShape s) { return s == SelectShape::Circle || s == SelectShape::CutCircle; }
     static SelectShape selectShapeOf(StrokeShape shape); // the stroke popup's shapes (StrokePopup.cpp)
     bool strokeShapeOn(StrokeShape shape) const;         // its latch is on with this shape
     enum class SelectTarget { Hide, Mask };
@@ -870,13 +1002,24 @@ private:
     // Window pixels: the start, then the lasso's points (a rectangle's other corner is the cursor).
     std::vector<ImVec2> selectPath_;
     bool selectMoved_ = false; // left the click slop: a drag, not a click
+    // Space held mid-drag (#214): the whole shape follows the cursor instead of growing; let go and it sizes again.
+    bool selectSpace_ = false;
+    ImVec2 selectLast_{0.0f, 0.0f}; // the cursor at the last move: how far Space slides the shape
+    // The Circle shapes (#213): the press is the centre, or a corner of the ellipse's box (Alt at the press for Cut Circle,
+    // where Alt is free, or the option); Shift changed since the press (pressed for Mask, let go for Select and Cut,
+    // which hold it already) or the option keeps it round. The ellipse always runs from the press to the cursor.
+    bool circleFromCorner_ = false, circleRound_ = false; // the options (Tool > Masking, Visibility, Cut)
+    bool selectCorner_ = false, selectShiftAtPress_ = false; // latched when the drag starts
+    DragEllipse selectEllipse() const;                       // window pixels
+    void drawCircleOptions(const char* scope); // scope: the panel, so two open panels keep their own checkboxes
+    void drawCircleShape(ImDrawList* dl, const DragEllipse& e, ImU32 fill, ImU32 line, float width) const;
     float facegroupAngle_ = 30.0f;
     // visibleFace groupCount is O(triangles): recomputed only when the key below changes.
     size_t visibleGroups_ = 0;
     std::array<uint64_t, 6> visibleGroupsKey_{};
     // Stroke types, alphas and the extra brushes (PanelBrushes.cpp).
-    void snakeHookTo(float x, float y);
-    void dragRectTo(float x, float y);
+    void tendrilTo(float x, float y);
+    void dragRectTo(float x, float y, bool commit = false); // commit: the release's final stamp (the footprint)
     glm::vec3 screenUpVector(float angle) const; // camera up rotated by `angle` around the view axis
     static void SDLCALL onAlphaChosen(void* userdata, const char* const* files, int filter);
     StrokeType strokeType_ = StrokeType::Dots;
@@ -960,17 +1103,29 @@ private:
     AlphaOptions alphaOptions_;
     AlphaRake alphaRake_;
     uint32_t alphaSeed_ = 1;
+    // The alpha pool (Alpha palette > Pool; session only): each dab, and each Drag Stamp, takes one of its alphas at random.
+    // The seed starts from the stroke's number, so a stroke draws the same on every replay and no two look alike.
+    std::shared_ptr<const AlphaPool> alphaPool_;
+    uint32_t alphaStrokeSerial_ = 0;
+    std::shared_ptr<const BrushAlpha> stampAlpha_; // this Drag Stamp's pick from the pool (null: the brush's alpha)
     // Drag Stamp / Slide Stamp (#136): Angle jitter's turn for this stroke's one stamp, from a seed that carries on
     // from stroke to stroke (each stamp gets its own turn).
     float stampJitter_ = 0.0f;
     uint32_t stampSeed_ = 0x2545f491u;
+    // Drag Stamp / Slide Stamp re-stamp on every move; the footprint query is paid once, by the release's final stamp.
+    glm::vec2 stampCursor_{0.0f};
+    bool stampPlaced_ = false;
+    bool benchStampFootprint_ = false; // bench.sh alpha with SF_BENCH_STAMP: every dab takes the stamp footprint
+    SDL_Keymod slideKeysAtStart_ = SDL_KMOD_NONE; // the modifiers down when a Slide Stamp stroke began
+    SlideStampTurn slideTurn_; // Slide Stamp: the alpha turned toward the cursor while the rotate key is held (#175)
+    bool slideRotateHeld() const; // the Preferences > Input key is down now (and, for Shift, was not at the press)
     float lastDabAngle_ = 0.0f; // radians (UI tests: last_dab_angle)
     void drawAlphaOptions(bool vdm = false); // vdm: Brush > Vector Displacement's rows (no Tile, #136)
     std::mutex alphaMutex_;
     std::string pendingAlphaPath_; // set by the file dialog thread
     // Vector displacement brushes (PanelVdm.cpp, core/Vdm.h): the Brush palette's Vector Displacement section,
     // its file dialogs and actions, DragDot, and the DragRect stroke the VDM brush brings along (as the classic do).
-    void dragDotTo(float x, float y);
+    void dragDotTo(float x, float y, bool commit = false);
     bool vdmBrushActive() const { return brush_ == BrushType::Vdm && doc_.activeBrush < 0 && !paintMode_; }
     void drawVdmSection();
     void registerVdmActions();
@@ -1015,10 +1170,13 @@ private:
     struct DrapeJob;
     std::shared_ptr<DrapeJob> drape_;
     DrapeRequest drapeRequest_;
+    bool drapeScaleTouched_ = false; // the user moved the slider: stop guessing
+    uint32_t drapeScalePart_ = 0xffffffffu;       // the active Part the guess was made for
     void drawDrapeSection();
     void startDrape();
     void pollDrape();
     void finishDrape(bool keep);
+    int drapeFrame() const; // the running Drape's frame count (0 when none; the UI tests read it)
     // Kelvinlet brushes and Alpha / VDM from viewport (PanelKelvinlet.cpp, core/Kelvinlet.h, core/ViewCapture.h).
     bool kelvinStrokeBrush() const; // KelvinGrab / Twist / Scale: the drag drives the brush, not dabs
     void kelvinBegin(const RayHit& hit);
@@ -1084,6 +1242,36 @@ private:
         bool texInvert = false;
         std::string pendingPath;     // set by the file dialog thread (under alphaMutex_)
     } stencil_;
+    // Reference images (ReferenceImages.cpp; core/Reference.h): View > Reference images. Adjust puts handles on the
+    // selected one (drag inside to move, a corner to scale, Shift keeps its proportions) until Enter or Esc; outside
+    // Adjust they take no clicks at all.
+    void registerReferenceActions();
+    void drawReferencesSection(); // View palette
+    void drawReferenceOverlay();  // Adjust's outline and handles, under the panels
+    bool referenceCorners(const ReferenceImage& r, std::array<glm::vec2, 4>& out) const; // window corners; false edge-on
+    bool referenceMouseDown(float x, float y, SDL_Keymod mod); // true when Adjust takes the click
+    void referenceMouseMove(float x, float y);
+    void referenceMouseUp();
+    bool referenceKey(SDL_Keycode key, SDL_Keymod mod);
+    bool referenceUiValue(const std::string& name, double& out); // (reference_render_r renders)
+    bool takeReferenceDrop(const std::string& path); // an image dropped while the section shows becomes a reference
+    void openReferenceDialog(int kind);              // 0 add images, 1 the front of a pair, 2 its side
+    static void SDLCALL onReferenceChosen(void* userdata, const char* const* files, int filter);
+    void pollReferenceFiles();
+    struct ReferenceUi {
+        int selected = -1; // in doc_.references
+        size_t count = 0;  // doc_.references.size() last frame (a new one is selected)
+        bool adjust = false;
+        int handle = -1;   // being dragged: 0 inside, 1-4 a corner (referenceHandleAt's)
+        ReferenceImage start; // as it was when the drag began
+        glm::vec2 startMouse{0.0f};
+        glm::vec2 startLocal{0.0f}; // the pointer in the reference's own plane at the press
+        double sectionShownAt = -1.0; // seconds() when the View palette last drew the section (drops go to it)
+        int dialogKind = 0;
+        std::vector<std::string> pending; // set by the file dialog thread (under alphaMutex_), with pendingKind
+        int pendingKind = 0;
+        std::string pairFront; // the pair's front image, waiting for its side
+    } refUi_;
     bool gradientUiValue(const std::string& name, double& out) const; // UI test values
     struct GradientUi {
         bool armed = false;
@@ -1105,6 +1293,7 @@ private:
     glm::vec3 kelvinTarget_{0.0f}; // KelvinGrab: where the cursor wants the grabbed point
     float kelvinPending_ = 0.0f;   // Twist / Scale: the turn or scale still to apply
     float kelvinAmount_ = 1.0f;
+    bool kelvinMaskHinted_ = false;     // this stroke's "nothing near a mask" hint was shown
     bool kelvinMovedThisFrame_ = false; // kelvinTo moved it since the last kelvinCatchUp
     static void SDLCALL onVdmChosen(void* userdata, const char* const* files, int filter);
     static void SDLCALL onVdmExportChosen(void* userdata, const char* const* files, int filter);
@@ -1146,6 +1335,7 @@ private:
     bool paintMode_ = false;  // Paint brush: colour only, no sculpting (Rgb on, Raise off)
     bool paintRgb_ = false;   // also paint the colour while sculpting (Rgb + Raise)
     bool strokePaint_ = false, strokeSculpt_ = true;
+    bool strokeColourSmooth_ = false; // Shift with the Paint brush: the stroke smooths the colour, not the shape
     void registerPaintUiCommands();
     std::string litsphereFolder() const; // <library>/Lit Spheres, empty without a library
     void loadLitSphereLibrary();         // custom Lit Spheres from the studio folders and lit sphereFolder() (start-up)
@@ -1215,6 +1405,32 @@ private:
     double garmentTestValue(const std::string& name);
     static void SDLCALL onGarmentFileChosen(void* userdata, const char* const* files, int filter);
     std::shared_ptr<struct GarmentEditorState> garments_;
+    // Drape on the body (PanelGarmentDrape.cpp; core/GarmentDrape.h): Place panels (a click on the body per panel),
+    // the placed panels as a preview Part (no undo), Drape live on it, Convert to Part (one undo step).
+    struct GarmentDrapeJob;
+    std::shared_ptr<GarmentDrapeJob> garmentDrape_;
+    int garmentPlacing_ = -1;      // the panel the next click on the body places (-1: not placing)
+    int garmentEditPanel_ = -1;    // the placed panel Turn / Wrap / Gap adjust
+    garment::Placement garmentEdit_; // its values while a slider is dragged
+    bool garmentEditing_ = false;
+    bool garmentPreviewDirty_ = false;
+    uint32_t garmentPreview_ = 0;  // the preview Part's id (0: none)
+    std::vector<glm::vec3> garmentDrapeResult_; // metres, the last drape (Convert to Part keeps it)
+    float garmentSeamGapMm_ = -1.0f;            // its widest seam gap, whether it rested, particles left inside a
+    bool garmentDrapeRested_ = false;           // body (UI tests)
+    int garmentInside_ = -1;
+    void drawGarmentDrapeSection();
+    bool garmentPlaceMouseDown(float x, float y, SDL_Keymod mod);
+    void garmentPreviewRefresh();
+    void dropGarmentPreview();
+    void startGarmentDrape();
+    void pollGarmentDrape();
+    void finishGarmentDrape();
+    void convertGarment();
+    void garmentDraped(); // before garment_drape: the placement preview goes (else it collides), placing stops
+    // UI test values: garment_placed, garment_placing, garment_drape_running, garment_draped, garment_preview,
+    // garment_units, garment_seam_gap_mm, garment_drape_rested, garment_inside; NaN for other names.
+    double garmentDrapeTestValue(const std::string& name);
     bool showGarments_ = false;
     // Auto UV on a worker (xatlas takes seconds on big meshes): the button, New Texture, and the uv_auto command from
     // the console, an AI tool or a UI test (resolution 0: the texture's size, or the size chosen under Texture Image).
@@ -1224,13 +1440,27 @@ private:
     void pollAutoUv();
     // A command that runs on a worker (uv_auto): it returned at once and its result comes later. The console, the AI
     // link and UI tests wait for it before their next statement, then take its result (once).
-    bool commandRunning() const { return autoUv_ && autoUv_->command; }
+    bool commandRunning() const { return (autoUv_ && autoUv_->command) || generateCommand_; }
     bool takeCommandResult(CommandResult& out) {
         if (!commandResult_) return false;
         out = *std::exchange(commandResult_, std::nullopt);
         return true;
     }
     std::optional<CommandResult> commandResult_;
+    // image_to_3d / text_to_3d from a command (console, script, AI tool): the service call waits on a worker (minutes at
+    // worst, the window stays alive and shows its status), the result lands in pollGenerateCommand (PanelGenerate3D.cpp).
+    struct GenerateCommandJob {
+        std::string name;
+        Args args;
+        ai::GenerateJob job;
+        std::shared_ptr<ai::GenerationProgress> progress;
+        std::future<ai::GeneratorResult> done;
+        std::chrono::steady_clock::time_point start;
+        uint64_t revision = 0; // the scene it will replace: if it changed meanwhile, nothing is replaced
+    };
+    std::unique_ptr<GenerateCommandJob> generateCommand_;
+    CommandResult startGenerateCommand(const std::string& name, const Args& args);
+    void pollGenerateCommand();
     struct AutoUvJob {
         std::future<bool> done;
         std::shared_ptr<std::atomic<float>> progress;
@@ -1302,6 +1532,19 @@ private:
     // splat_train_psnr; NaN for other names.
     double splatTrainTestValue(const std::string& name);
     std::shared_ptr<struct SplatTrainUi> splatTrain_;
+    // File > Render with... (PanelRenderBridge.cpp, ai/RenderBridge.h): a still from a Hydra render delegate through
+    // the user's render helper, run as its own program; the Render window, Preferences > Render bridge.
+    void registerRenderBridgeUi();
+    CommandResult startRenderBridge();
+    void openRenderInEditor();
+    void pollRenderBridge();
+    void drawRenderBridgeOverlay(); // the Render window, the helper prompt
+    void drawRenderBridgePrefs();
+    void shutdownRenderBridge();    // (the still's texture, while the GL context is current)
+    bool renderBridgeBusy() const;
+    // UI test values: render_bridge_state, _window, _confirm, _ready, _renderers, _shown, _command; NaN otherwise.
+    double renderBridgeTestValue(const std::string& name);
+    std::shared_ptr<struct RenderBridgeUi> renderBridge_;
     std::string lastExportFolder_; // where the last export went: the default folder for baked maps
     // Cached UV wireframe of the active Part for the UV view: segments in 0..1 UV space.
     std::vector<glm::vec2> uvLines_;
@@ -1314,6 +1557,17 @@ private:
     void applyPerformancePrefs();
     void notePerformanceFrame(double syncMs); // after syncScene: upload time, GPU memory warnings
     void noteStillness();                     // after viewSamples: RenderSettings::stillSeconds, stroking
+    // View shadows and AO (render/Occlusion.h; PanelView.cpp): the preferences into renderSettings_, by the hardware
+    // tier where they are left to it, and off while the view moves or a stroke runs where they would cost the frame
+    // (the Essential tier, Turbo, or frames slower than the display's), back on once it settles.
+    void applyViewEffects();
+    void drawViewEffectsControls(const char* idSuffix); // Preferences > Display and Material > Viewport Shading
+    bool viewEffectsDropped_ = false;
+    // Splats' view-dependent colour (SH 1-3): off on the floor tier (it doubled the frame at 1.5M splats, SH 3, on the
+    // floor bench machine), where their SH aren't uploaded either. UI tests (render_cell splats=1) force it on.
+    bool splatViewColorForced_ = false;
+    int viewEffectsBusyFrames_ = 0;
+    double viewEffectsBusyAt_ = 0.0, viewEffectsBusyMs_ = 0.0;
     struct PerfState {
         glm::mat4 lastView{0.0f};
         int framesStill = 0;          // frames since the view last moved
@@ -1363,9 +1617,11 @@ private:
     // Performance, the first-run tier card, the tier chip and Turbo in the top bar, the memory guard.
     void drawHardwareTierSection();
     void drawTierCard();               // once per machine, after calibration (or a hardware change); never blocks
+    bool tierCardCovered() const;      // a modal card is over it: the tier card waits (not drawn, no input)
     bool tierCardEvent(const SDL_Event& e); // its buttons take the press (never the canvas); Esc and Enter put it away
     void dismissTierCard();            // Got it, the close, Esc, Enter: not again on this machine (saved)
     void tierCardFromDisk();           // UI tests' restart: shown again unless the saved profile puts it away
+    void updateUndoNotice();           // every frame: "Oldest N undo steps removed to free memory" when a history dropped steps
     void updateTierMemoryGuard();      // every frame (cheap: looks once a second)
     void registerHardwareTierUiActions();
     void saveProfileOverrides(const struct ProfileOverrides& o); // map, save, apply
@@ -1409,12 +1665,14 @@ private:
     void pollVoxelRemesh();
     void quickRemesh(RemeshTrigger trigger); // Quick Remesh / Remesh after each stroke: checks, then startVoxelRemesh
     void drawQuickRemeshContents();          // their checkboxes under Tool > Remesh (PanelRetopo.cpp)
+    std::string remeshSkippedNote(int reason);           // why Remesh after each stroke passed over this Part (0 levels, 1 layers, 2 texture)
     void strokeEndedForRemesh(const UndoRecord& stroke); // Remesh after each stroke: did it stretch the surface?
     bool quickRemeshDragDown(float x, float y);          // a press on the background with the drag key held
     void quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down); // tracks the held drag key
     SDL_Keycode quickRemeshDragKey_ = SDLK_UNKNOWN; // the "hold and drag" key while it is down
     bool autoRemeshDue_ = false;                    // a stroke stretched the surface: remesh once nothing waits
     size_t lastStrokeStretched_ = 0;                // the last stroke's stretched edges (UI tests: stroke_stretched)
+    std::set<std::pair<uint32_t, int>> remeshSkipNoted_; // (Part id, reason) already told why a remesh was skipped
     struct VoxelRemeshJob {
         RemeshTrigger trigger = RemeshTrigger::Button;
         uint64_t revision = 0; // doc_.undo.revision() when it began (the quick ones land only on that state)
@@ -1427,8 +1685,39 @@ private:
         size_t triangles = 0;
         int resolution = 200;
         bool keepMasked = false, keepTexture = true;
+        bool allowSwap = false; // the person agreed to a remesh past the free memory (MemoryTier::NeedsSwap)
     };
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
+    // Resolution above 512: the estimate under the slider, a one-time confirmation with it
+    // (again after going back to 512 or less), and a refusal when it won't fit in the free memory (PanelRetopo.cpp).
+    // Customize Shelves, Ctrl+Alt: sliders that can be picked up and dropped on a shelf (PanelRetopo.cpp); compact: the shelf's copy,
+    // the slider alone at the width set before. The Guide Strength, Target Quads and Level sliders draw through these.
+    bool beginShelfGrab();
+    void endShelfGrab(const char* buttonId, const char* item, const char* title);
+    void drawGuideStrength(bool compact = false);
+    void drawTargetQuads(bool compact = false);
+    void drawLevelSlider(bool compact = false); // PanelGeometry.cpp
+    void drawVoxelResolution(bool compact = false); // the slider (2/3 of its travel for 32-512) and the estimate line; compact: the shelf's, the slider alone at the width set before
+    void drawVoxelHighResConfirm();
+    struct VoxelEstimateCache {
+        uint32_t part = ~0u;
+        uint64_t revision = ~0ull;
+        size_t triangles = 0;
+        int resolution = 0;
+        double area = 0.0;
+        VoxelRemeshEstimate estimate;
+    } voxelEstimate_;
+    const VoxelRemeshEstimate& voxelEstimate(); // for the active Part at voxelResolution_
+    bool voxelHighResOk_ = false; // confirmed for this trip above 512
+    int voxelResolutionTyped_ = 200; // Ctrl+click on the slider: the number being typed
+    // More than is free but within RAM + the most swap: the same dialog says so and asks every time ("Proceed anyway",
+    // Cancel is the default; nothing is remembered). Proceed autosaves first, then runs with the usual progress + Cancel.
+    struct VoxelHighResConfirm {
+        bool open = false;
+        RemeshTrigger trigger = RemeshTrigger::Button;
+        bool swap = false;
+    } voxelHighResConfirm_;
+    bool voxelSwapOk_ = false; // Proceed anyway was pressed: the next startVoxelRemesh goes on (once)
     void pollQRemesh();
     struct QRemeshJob {
         std::future<bool> done;
@@ -1511,13 +1800,20 @@ private:
     void drawForgeSpheresContents();                          // Tool > Forge Spheres
     bool forgesphereMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
     void forgesphereDragTo(float x, float y);
+    void flushForgeSphereDrag();                                // the pointer's moves since the last frame, as one
+    void forgesphereShow(const std::vector<ForgeSphere>& s);    // a drag's armature on screen (in place when it can)
+    glm::vec3 forgesphereGrab(float x, float y, const glm::vec3& center) const; // Move: the centre's offset from the press
     void forgesphereRelease();
     void drawForgeSphereOverlay();                            // the hovered sphere's outline
     bool forgesphereActive() const { return !doc_.mesh.forgespheres.empty(); }
     int forgesphereAt(float x, float y, bool* link = nullptr) const; // sphere (or link's child) under the cursor, or -1
+    bool forgesphereNearRim(int i, float x, float y) const; // (x, y) on sphere i's rim band (Draw: a drag resizes)
     float worldPerPixel(const glm::vec3& at) const;       // world size of one canvas pixel at `at`'s depth
     ForgeSphereMode forgesphereMode_ = ForgeSphereMode::Draw;
     bool forgespherePlaceChild_ = false; // Draw: the drag moves the new sphere away from its parent (Ctrl does it too)
+    bool forgesphereSnap_ = false;      // Move: a moved sphere's centre lands on the sphere under the pointer
+    bool forgesphereBranch_ = false;    // Move: what grows from a moved sphere comes along
+    int forgesphereHint_ = 0;           // the overlay's hint: what a Draw drag would do (0 none, 1 move, 2 resize, 3 add)
     int forgesphereSelected_ = -1;      // the sphere last clicked or added (Delete Selected, the menu); -1 none
     // The right-click menu on a sphere: armed by a right press on one, opened if it was a click.
     struct ForgeSphereMenu {
@@ -1544,8 +1840,14 @@ private:
         float x = 0.0f, y = 0.0f;      // where the press was
         bool changed = false;
         bool place = false;            // Draw: the new sphere follows the cursor (Drag places child, Ctrl)
+        bool pending = false;          // Draw: nothing yet; a click adds a sphere, a drag moves it (body) or resizes it (rim)
+        bool rim = false;              // Draw: the press was on the sphere's outer band
+        float rimFrom = 0.0f;          // Draw's resize: the press's screen distance from the sphere's centre
         int added = -1;                // Draw: the new sphere's index
         const char* label = "";
+        bool pendingMove = false;      // a pointer move waits for the frame (flushForgeSphereDrag)
+        float atX = 0.0f, atY = 0.0f;  // ... where the pointer is
+        bool keepLength = false;       // Move: Shift held at the last update (its link keeps its length)
     } zsDrag_;
     // Tube (PanelTube.cpp, core/Tube.h): with Draw Tube on, a left-drag anywhere draws a clay tube in the air (on a
     // plane facing the view, or snapped onto surfaces); a Tube Part's points are dragged to move them (Ctrl: resize,
@@ -1585,6 +1887,11 @@ private:
     bool tubeLookEditing_ = false; // a Shape slider is held: the active Tube Part previews it
     Mesh tubeLookBefore_;          // (its mesh before, put back before the one undo step)
     bool tubeMerge_ = false;       // into the active Part (even edges) instead of a new Tube Part
+    bool tubeCurve_ = false;       // each stroke makes a Curve Part (a guide line; Tube from curve makes the tube)
+    float tubeResampleEdit_ = -1.0f; // the Resample slider while held (the point count), else -1
+    float tubeStrandsEdit_ = -1.0f; // the Strands slider while held, else -1
+    uint32_t tubeRepeatPart_ = 0;   // Repeat along curve: the Part to repeat (its id; 0 = none picked)
+    float tubeRepeatSpacing_ = 1.0f, tubeRepeatTurn_ = 0.0f; // ... how far apart the copies are, how far each is turned
     bool tubeBakeUniform_ = false; // Bake re-sweeps with even edges (dynamic topology)
     int tubeSelected_ = -1;
     float tubeRadiusEdit_ = -1.0f; // the selected point's Radius slider while it is held
@@ -1694,6 +2001,26 @@ private:
     // exported on a worker; face frames drive face_weights.
     void initPhoneActions();
     void drawPhoneWindow();
+    // Forge Deck prototype (PanelDeck.cpp): the phone as a control pad. Off at every start; File > Forge Deck turns it
+    // on for the session and shows its QR code. A phone message is one allowlisted action (link/DeckCommands.h).
+    void initDeckActions();
+    void drawExperimentalSection(); // Preferences > Experimental
+    void drawDeckWindow();  // the pairing window, and the banner while a phone is driving
+    void pollDeck();        // every frame while the link runs: run the phone's actions, publish the state and tiles
+    void runDeckAction(const link::DeckAction& action);
+    void killDeck();        // the kill switch: Deck off, token changed, link closed
+    std::string deckStateJson() const;
+    bool showDeck_ = false;           // never saved: off at every app start
+    bool deckApplied_ = false;        // what the link was last told
+    uint64_t deckRev_ = 0;
+    std::string deckLastState_;
+    std::string deckQrText_;
+    link::QrCode deckQr_;
+    std::vector<int> deckImagesSent_; // BrushType indexes whose tile image the phone has
+    double deckLastImageTry_ = -1e9;
+    std::future<std::pair<bool, std::string>> deckLinkJob_; // the pairing link being made (ok, url or error)
+    std::string deckLinkError_;
+    double deckLinkMade_ = -1e9;
     void pollPhone(); // every frame: events, face frames, AR re-exports
     void setPhoneLinkOpen(bool open);
     void handlePhoneCapture(const link::PhoneEvent& e);
@@ -1731,6 +2058,7 @@ private:
     void tickProject(float dt);
     void saveProjectAs(bool forceDialog); // Ctrl+S (dialog only when needed) / Ctrl+Shift+S
     void saveProjectTo(const std::string& path);
+    void saveVisiblePartsAs(); // File > Save Visible Parts As...: a copy with only the visible Parts
     void storeProjectSettings(); // camera, render, brush and symmetry -> doc_.projectSettings
     void applyProjectSettings(); // and back, after opening a project
     void afterCommand(const std::string& name, const Args& args, const CommandResult& r);
@@ -1742,6 +2070,7 @@ private:
     void drawFileMenuProjectItems();
     void rememberRecent(const std::string& path);
     void saveProjectPrefs();
+    void applyInstallerUpdateChoice(); // bin/installer.json: the installer's update-check box (PanelProject.cpp)
     std::string prefDir_;
     std::vector<std::string> recentFiles_;
     std::function<void()> discardAction_;
@@ -1760,7 +2089,28 @@ private:
         std::string error;
         std::string memberError;   // the member check's problem (the public check may still have worked)
         bool memberSignedOut = false; // the sign-in ran out or was revoked: signed out
+        bool featuredTried = false, featuredOk = false; // the featured creator feed (PanelFeatured.cpp)
+        std::vector<FeaturedItem> featured;
     };
+    // The welcome window's featured creator card (PanelFeatured.cpp, core/Featured.h): the kept featured.json and
+    // thumbnails, refreshed by the daily update check; one entry a start; the x hides a video for good.
+    static bool readFeedText(const std::string& from, std::string& body, std::string& error);
+    static void fetchFeatured(UpdateJob& job, const std::string& source, const std::string& fallback, const std::string& dir);
+    void applyFeaturedJob(const UpdateJob& job);
+    void loadFeaturedCache();
+    void pickFeaturedCard();
+    const FeaturedItem* featuredCard() const; // what is shown, nullptr when nothing is
+    void watchFeatured();
+    void hideFeatured();
+    unsigned featuredTexture(const FeaturedItem& it);
+    void drawFeaturedCard();
+    std::vector<FeaturedItem> featured_;
+    int featuredShown_ = -1;
+    std::vector<std::string> featuredHidden_; // links of the videos the x hid
+    uint64_t featuredLaunch_ = 0;             // starts so far: each start shows the next entry
+    unsigned featuredTex_ = 0;
+    std::string featuredTexFor_;
+    int featuredWatchRequests_ = 0;           // UI tests: Watch clicks (never opens a browser there)
     void startUpdateCheck(bool manual);
     void pollUpdateCheck();
     static const char* appPrerelease();     // "beta.1" in a beta build, else ""
@@ -1771,6 +2121,7 @@ private:
     void drawUpdatesSection(); // Preferences > Updates
     bool checkUpdates_ = true;
     int64_t updateCheckedAt_ = 0;   // unix time of the last automatic check
+    int64_t installerStamp_ = 0;    // the installer run whose update-check choice was applied (bin/installer.json, core/UpdateCheck.h)
     std::string updateSkipped_;     // "Skip this version"
     UpdateChannel updateChannel_ = appPrerelease()[0] ? UpdateChannel::Preview : UpdateChannel::Stable; // a beta stays on betas
     std::shared_ptr<UpdateJob> updateJob_;
@@ -1814,7 +2165,7 @@ private:
     // member" both use it): `onDone(member)` runs on the main thread when it ends: true = signed in with an account
     // that can see member builds (memberBuilds_ is then true); false = not a member, declined, failed or cancelled.
     void startMemberSignIn(std::function<void(bool member)> onDone = {});
-    void finishMemberSignInForTest(bool ok); // UI tests' member_sign_in: the running sign-in ends (GitHub never reached)
+    void finishMemberSignInForTest(member::SignInResult result); // UI tests' member_sign_in: the running sign-in ends (GitHub never reached)
     void memberSignOut();
     std::shared_ptr<MemberAuth> memberAuth_;
     std::shared_ptr<MemberSignIn> memberSignIn_;
@@ -1823,17 +2174,20 @@ private:
     std::string memberLogin_;    // the GitHub login shown ("Signed in as ..."); saved; not a secret
     bool memberSessionOnly_ = false; // signed in, but no keychain kept it: not saved, gone at quit
     std::string memberStatus_;
+    bool memberInvitesLink_ = false; // the last sign-in found no access or a pending invitation: offer the invitations page
     int autosaveMinutes_ = 5; // 0 = off
     float autosaveTimer_ = 0.0f;
     uint64_t autosaveRevision_ = ~uint64_t(0);
     bool autosaveWritten_ = false;
     std::string windowTitle_;
+    float infoFontPx_ = 0.0f; // the title strip's info readout font size as drawn (UI tests: info_font_px)
     std::vector<std::pair<float, float>> barSpans_; // the top bar's widgets, x from-to, last frame (UI tests: no overlaps)
     std::vector<std::pair<float, float>> timelineSpans_; // the timeline header's pieces, x from-to (UI tests: no overlaps)
     // Parts (PanelParts.cpp): the panel, and Alt+click in the viewport to select one.
     void drawPartPopups();
     // Index of the nearest visible Part under the cursor (-1: none); builds stale BVHs on the way.
     int pickPart(float x, float y, RayHit* hit = nullptr);
+    int pickPartNear(float x, float y, RayHit* hit = nullptr); // ... and a Part a few points off the pointer
     void partClickMove(float x, float y); // Alt press on another Part: dragging turns it into a stroke
     void partClickRelease();              // ... and releasing without dragging selects it
     int partClickTarget_ = -1;
@@ -1867,6 +2221,17 @@ private:
     PartThumbnailSchedule partThumbSchedule_;
     std::unordered_map<uint32_t, unsigned> partThumbs_;
     bool partPanelShown_ = false; // drawn this frame
+    // The scene's Boolean (core/PartBoolean.h), shown in the view in place of its Parts while two or more take part
+    // (app/BooleanPreview.cpp): worked out on another thread whenever they change, live while they're sculpted or
+    // moved when that is quick, else on release.
+    std::unique_ptr<struct BooleanPreviewState> boolPreview_;
+    bool booleanPreview_ = true;         // Parts > Boolean > Preview
+    BooleanSceneOptions booleanOptions_; // Make Boolean Mesh's options
+    void updateBooleanPreview();         // syncScene, before the upload: takes a finished run, starts the next
+    bool booleanPreviewDrawn(uint32_t partId) const; // Part `partId` is drawn as part of the shown result
+    Mesh* booleanPreviewMesh();          // the result to draw (null: none, or the Parts are shown as they are)
+    void drawBooleanSection();           // the Parts panel's Boolean row (PanelParts.cpp)
+    Args booleanArgs() const;            // booleanOptions_ as make_boolean_mesh's arguments
     void updatePartThumbnails();  // after syncScene, GL current
     void clearPartThumbnails();
     bool focusRename_ = false;
@@ -1892,6 +2257,20 @@ private:
 
     // ---- Shell (A): layout, shelves, palettes, trays, theme ----
     float topInset() const;  // window px kept clear at the top (camera notch)
+    // Window px the system covers (camera cut-out, bars, gesture area; SDL's safe area). UI tests: `safe_area` sets them.
+    struct SafeInsets {
+        float l = 0.0f, t = 0.0f, r = 0.0f, b = 0.0f;
+    };
+    SafeInsets safeInsets() const;
+    CanvasRect safeRect() const; // the window inside those insets
+    bool safeInsetsTest_ = false;
+    SafeInsets safeInsetsTestValue_;
+    // Android's Back (SDLK_AC_BACK): closes the topmost card or window and answers true; false: nothing open, the system's
+    // Back (leave the app) goes on. androidBackWanted() is the same question, for SDL's trap-the-button hint.
+    bool androidBack();
+    bool androidBackWanted() const;
+    ImVec4 welcomeCloseRect_{}, welcomeXRect_{}; // the welcome's Close button and title-bar X as last drawn (UI tests)
+    float welcomeScrollY_ = 0.0f, welcomeScrollMax_ = 0.0f, welcomeBodyH_ = 0.0f; // its scrolling part on a phone (PanelSupport.cpp)
     bool hideBrushCursor_ = false; // demos: camera moves while the cursor is off screen
     float fpsShown_ = -1.0f; // title-strip frame rate, refreshed twice a second
     double fpsShownAt_ = 0.0;
@@ -1933,6 +2312,7 @@ private:
     void drawLookChrome();    // a look's gaps, tile borders and effects (Shell.cpp)
     ShellMetrics shellMetrics() const;
     bool sculptForgeLayout() const { return uiPrefs_.shellLayout == 1; }
+    bool renderBridgeSetUp() const; // a render helper is chosen (PanelRenderBridge.cpp)
     void setShellLayout(int layout); // swaps the shelves to that layout's standard ones
     bool lookDirty_ = false;   // uiPrefs_.look or the layout changed: applied at the start of the next shell
     CanvasRect focusRect_;     // the tile under the pointer (tiled looks highlight its border)
@@ -1949,10 +2329,64 @@ private:
     bool paletteHeader(const char* id, bool inTray, bool right); // false: collapsed
     void drawPaletteBody(const std::string& id);
     void movePaletteToTray(const std::string& id, bool right);
+    void setTrayOpen(bool right, bool open);
+    bool trayShown(bool right) const;
     void removePaletteFromTrays(const std::string& id);
     // In a tray that is drawn: below 1280 px the right tray isn't, and its palettes open as drop-downs instead.
     bool paletteInShownTray(const std::string& id) const;
+    // Panels in windows of their own, for a second monitor (PanelWindows.cpp, docs/design/detach-panels.md):
+    // "palette.<id>", "guide" or "controls". Each has an SDL window and its own ImGui context sharing the fonts,
+    // the GL context and the renderer; with no window system to make one (offscreen tests) a palette floats inside
+    // the main window instead (window null).
+    struct PanelWindow {
+        std::string id;
+        SDL_Window* window = nullptr;
+        SDL_WindowID windowId = 0;
+        ImGuiContext* ctx = nullptr;
+        bool shown = false;
+        int cursor = 0; // its ImGui's mouse cursor after its last frame
+        int frames = 0; // drawn so far
+    };
+    std::vector<PanelWindow> panelWindows_;
+    std::vector<PanelPlacement> panelPlacements_; // where each panel window was (panels.json)
+    std::string pendingDetach_;  // asked for during a stroke or a drag: made once it ends
+    double panelsSaveAt_ = 0.0;   // a move or resize to write to panels.json, once it settles
+    double panelsDrawnAt_ = 0.0;
+    double panelsActiveUntil_ = 0.0; // hover input in a panel: it keeps redrawing (tooltips) this long
+    bool panelsDirty_ = false;       // a panel needs a frame (hover in it), the main window doesn't
+    bool benchPanels_ = false;       // SF_BENCH_PANELS: panel windows offscreen too (bench.sh A/B)
+    PanelWindow* panelHost_ = nullptr; // drawing inside this panel window's ImGui context now
+    enum class PanelEvent { None, PanelOnly, Main }; // not a panel's / redraw the panel only / the main window too
+    PanelEvent panelWindowEvent(const SDL_Event& e);
+    PanelWindow* findPanel(std::string_view id);
+    bool panelDetached(std::string_view id) const;
+    bool panelWindowsAvailable() const;
+    std::string panelTitle(const std::string& id) const;
+    // restoring: at start-up, shown without taking the focus; the User Guide and Controls stay closed until opened
+    void detachPanel(const std::string& id, bool restoring = false);
+    void dockPanel(const std::string& id);
+    void resetPanels();
+    void drawPanelWindows(bool force);  // after a main frame (force: also while a drag runs)
+    void drawPanelWindow(PanelWindow& p);
+    void drawFloatingPanels();          // the in-window fallback, from drawUi
+    void restorePanelWindows();         // at start-up, from panels.json
+    void savePanelWindows();
+    void closePanelWindows();           // at quit (the placements are kept)
+    void notePanelPlacement(const PanelWindow& p);
+    // In a panel window: the next ImGui::Begin fills it under its header (the User Guide's and Controls' own windows).
+    void fillPanelHost(ImGuiWindowFlags& flags);
+    void registerPanelActions();
     void finishShelfDrag();
+    std::string myPanelSection_;      // while drawMyPanelSection runs: the section whose body subpalette() lets through
+    bool myPanelFloating_ = false;    // the floating My Panel is open (ui.my_panel)
+    bool myPanelPlace_ = false;       // ... and wants placing at the cursor this frame
+    std::vector<std::string> myPanelFolded_; // sections folded in My Panel (session only)
+    std::unordered_map<std::string, std::string> myPanelTitles_; // section id -> its title as the palette gives it (English)
+    bool myPanelProbe_ = false;       // drawMyPanelSection only learns the title
+    struct MyPanelDrag {
+        bool active = false, accepted = false, fromPanel = false;
+        std::string entry;
+    } myPanelDrag_;
     void noteLayoutChanged();
     void applyPreset(int preset);
     void updateCameraAspect(); // camera_.aspect from the canvas
@@ -1974,7 +2408,8 @@ private:
     void drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type); // the shelf tile's picture
     void drawAlphaTile(const char* id, ImVec2 size);
     void drawMaterialTile(const char* id, ImVec2 size);
-    void drawColorWidget(float width);
+    void drawColorWidget(float width, float fit = 1.0f);
+    void drawLeftShelfGrip(const CanvasRect& shelf);
     // Palettes.cpp: every palette body, also used by the trays and drop-downs.
     bool subpalette(const char* id, const char* title); // Tool sub-palette header; true while open
     void drawPalette_Alpha();
@@ -1993,6 +2428,15 @@ private:
     void drawPalette_Stroke();
     void drawPalette_Tool();
     void drawPalette_Transform();
+    // My Panel (PanelMyPanel.cpp): buttons and whole sections dragged in from any palette, in a tray or a drop-down
+    // like the others, or floating at the cursor on a key (ui.my_panel).
+    void drawPalette_MyPanel();
+    void drawMyPanelSection(const std::string& sectionId); // one palette section's body, without its header
+    void drawMyPanelFloating();
+    void registerMyPanelActions();
+    void finishMyPanelDrag();
+    bool droppedOnMyPanelWindow(); // the pointer is over My Panel's own window as a drag ends
+    bool myPanelAdd(const std::string& entry, int at); // false when it is not an entry
     void drawRadialSymmetryControls(); // Transform > Symmetry: radial symmetry's toggle, count and axis (Palettes.cpp)
     void drawAlphaSection();
     void drawLayersContents();
@@ -2019,6 +2463,8 @@ private:
     float sdivSlider_ = 1.0f;   // the Level slider while dragged (1-based)
     float microSlider_ = 4.0f;  // Tool > Geometry > Micro: the micro level the next Add Micro makes
     bool sdivHeld_ = false;
+    bool sdivTyping_ = false;    // its number was being typed last frame
+    int sdivSwitches_ = 0;       // level switches the Level slider has made (UI tests)
     void drawPartsContents();
     // Parts list folders (#96): what a frame's folder rows asked for, run after the list (by folder name).
     struct PartFolderActions {
@@ -2049,9 +2495,11 @@ private:
     size_t weldCount_ = 0;
     std::vector<glm::vec3> weldPoints_; // a sample (<= 20000) of the points that would merge, for the preview
     MeshReport meshReport_;
+    std::string meshFixLeft_; // what the last Fix couldn't do, and why (its status after "Left: "); cleared by a check
     uint64_t meshReportKey_ = 0; // 0 = not checked yet
     int meshReportScroll_ = 0; // frames left to scroll down to Find Problems (after Merge) or a new report's rows (below the fold)
     void runMeshCheck();
+    void runMeshFix(const std::string& issue); // mesh_fix, then a check; keeps what was left (meshFixLeft_)
     void runExtract(); // Extract with the palette's settings (a preview; Accept keeps it)
     static std::string axesText(const bool axes[3]); // "x", "xz", "" (the axis argument of mirror commands)
     float extractThick_ = 0.015f;          // Thickness: fraction of the Part's size
@@ -2102,8 +2550,13 @@ private:
     ImVec4 dropdownRect_{};    // the open drop-down's rect last frame (x, y, w, h)
     // A press outside every open popup (a palette drop-down or task menu, the command palette, a context menu; not on the
     // menu names, which switch or close menus, nor with a modal dialog open) closes them before the UI sees the press, so
-    // the press acts: a shelf brush is picked, a stroke on the model starts (mode matrix).
-    void closePopupsOnPressOutside(const SDL_Event& e);
+    // the press acts: a shelf brush is picked, a stroke on the model starts (mode matrix). True: the press only closed a
+    // context menu or combo list over the canvas, and starts nothing (#210).
+    bool closePopupsOnPressOutside(const SDL_Event& e);
+    std::pair<ImGuiID, int> parentPress_{0, 0}; // the popup a press in its parent window left to ImGui (id, open frame)
+    void closeParentPressPopup();               // ... closed after the frame if ImGui left it open (#210)
+    bool closeTopPopupOnEscape(); // Esc closes the top context menu or combo list (#210)
+    bool pressSpent_ = false; // this press only closed a popup (closePopupsOnPressOutside)
     bool openDropdown_ = false;
     float decimateRatio_ = 0.5f;
     bool decimateKeepMasked_ = false; // Decimate's Keep Masked (#43)
@@ -2111,6 +2564,7 @@ private:
     double flashStart_ = 0.0;
     std::vector<std::string> collapsedPalettes_; // tray palettes showing only their header
     void autoCollapseTray(bool right, const std::string& keep);
+    float colourCellMin_ = 0.0f; // the smallest colour cell drawn on the left shelf last frame, logical px (UiTest colour_cell_min)
     glm::vec3 secondaryColor_{1.0f, 1.0f, 1.0f}; // the left shelf's second swatch (click swaps, "Alternate")
     // The left shelf's recent colours: the last paint colours a stroke or Fill used, newest first (Oslen on Discord).
     // Saved in project.json (the app's preferences), linear like doc_.paintColor.
@@ -2119,6 +2573,7 @@ private:
     void rememberPaintColor(const glm::vec3& linear);
     uint64_t activeTrisKey_ = ~uint64_t(0); // the top shelf's ActiveTris, recounted when the scene changes
     size_t activeTris_ = 0;
+    std::map<std::string, double> shelfBrushTried_; // shelf slots whose brush is missing: when its file was last looked for
     float bottomTileW_ = 58.0f; // bottom shelf tiles shrink (down to 44 px) before the shelf scrolls
     float shelfFit_[4] = {1.0f, 1.0f, 1.0f, 1.0f}; // a side shelf's tiles and colour picker shrink (to 0.6) before it scrolls
     int shelfClipped_[4] = {0, 0, 0, 0};           // items past a side shelf's visible bottom last frame (UI tests)
@@ -2128,6 +2583,9 @@ private:
     // The right shelf too tall for the window (1024x768, 1600x960 at 150 %): its view toggles (Turntable, Ortho,
     // Floor, Flat) fold into one View button with a pop-over, until the window is tall enough again.
     bool rightShelfFolded_ = false;
+    float rightShelfFoldH_ = 0.0f;        // the shelf's height when it folded: it unfolds only when taller (no flicker at the edge)
+    float shelfShrinkH_[4] = {0, 0, 0, 0}; // a side shelf's height when its buttons last shrank: they grow back only for a taller one
+    int rightShelfChanges_ = 0; // frames that folded, unfolded or resized the right shelf (UI tests: none without input)
     float topShelfFullW_ = 0.0f, topShelfTailW_ = 0.0f;
     int navDrag_ = -1;          // right-shelf drag button being dragged (0 move, 1 zoom, 2 rotate)
     ImVec2 navLast_{0, 0};      // the cursor at its last frame (the drag moves by the cursor's own steps)
@@ -2190,10 +2648,29 @@ public:
     const CommandRegistry& commands() const { return commands_; }
     ImFont* helpTitleFont() const { return fontHelpTitle_ ? fontHelpTitle_ : ImGui::GetFont(); }
     ImFont* consoleFont() const { return fontConsole_ ? fontConsole_ : ImGui::GetFont(); }
-    // The next key press becomes ACTION's shortcut (Ctrl+Alt+click a button, or Preferences > Hotkeys).
-    void beginShortcutCapture(const std::string& actionId);
+    // The next key press becomes ACTION's shortcut (Ctrl+Alt+click a button, or Preferences > Hotkeys). SEQUENCE: the
+    // next two different keys, one after the other, are added as a two-key shortcut ("A then S", Hotkeys' second button).
+    void beginShortcutCapture(const std::string& actionId, bool sequence = false);
+    const std::string& captureFirstKey() const { return captureFirst_; }
+    bool capturingSequence() const { return !capturingShortcut_.empty() && captureSequence_; }
+    // Once a frame in both frame loops: a first key that was waiting for its second runs alone when the time is up.
+    void tickKeySequence(float dt);
     const std::string& capturingShortcut() const { return capturingShortcut_; }
+    // A pressed key that another action already uses waits here for Replace or Cancel (a popup by the button).
+    bool shortcutConflictOpen() const { return !conflict_.actionId.empty(); }
+    void resolveShortcutConflict(bool replace);
+    void drawShortcutConflict(); // the Replace / Cancel popup (Config.cpp)
     void openCommandPalette() { palette_.open(); }
+    // The command line of the F3 search (CommandBar.cpp): "clay 40", "mirror x", "hide all but head".
+    const cmd::Catalog& commandCatalog();                          // what the parser matches (names in every language, Parts)
+    std::string commandPreview(const cmd::Interpretation& r);      // "Clay - Size 40": what Enter will do
+    std::string commandKeys(const cmd::Interpretation& r);         // the key of the action behind it, "" when none
+    const char* commandIcon(const cmd::Interpretation& r);
+    bool commandRunnable(const cmd::Interpretation& r) const;
+    std::string runCommandLine(const cmd::Interpretation& r);      // runs it; the result line (with the key)
+    cmd::CommandHistory& commandHistory() { return commandHistory_; }
+    void saveCommandHistory();
+    void loadCommandHistory();
     void setConsoleOpen(bool open);
     void consolePrefill(const std::string& text); // opens the console with TEXT typed
     // Save Layout / Reset Layout and Shortcuts / Revert to Saved Layout / Export Interface... / Import Interface...
@@ -2202,6 +2679,16 @@ public:
     void savePrefsNow(); // config.store: write them at once
     void restartPrefsForTest(const std::string& uiJson = {}); // the UI test step `restart`: save, back to the defaults, read ui.json again
     void restoreStandardUi();
+    // Revert / Reset run at the top of the next frame (applyPendingLayoutOp, Shell.cpp), never inside the palette that
+    // asked: they swap the layout, the shell mode, the preferences and the fonts under the frame being drawn.
+    int pendingLayoutOp_ = 0;            // 1 Revert to Saved Layout, 2 Reset Layout, 3 Reset Layout and Shortcuts, 4 import
+    std::string pendingImportPath_;
+    void queueLayoutOp(int op) { pendingLayoutOp_ = op; redrawIn(0.0); }
+    void applyPendingLayoutOp();
+    bool autosaveNow(); // an autosave right now if there is unsaved work (before a risky step); true if one was written
+    void resetLayoutOnly();  // config.reset_layout: the built-in layout and every panel back in the main window; keys stay
+    std::vector<std::string> missingShelfWidgets() const; // the standard shelves' widgets (colour picker, tiles...) no shelf holds now
+    void addShelfWidget(const std::string& id);           // puts one back where the standard layout has it
     void restoreCustomUi();
     void saveUiDialog();
     void loadUiDialog();
@@ -2209,6 +2696,7 @@ public:
 
 private:
     friend class Console;
+    friend class PythonScripting;
     friend class CommandPalette;
     friend void config::drawHotkeysSection(App&);
     friend void config::drawLibraryBrowserSection(App&);
@@ -2218,6 +2706,7 @@ private:
     void drawHelpConsoleUi();              // console, command palette, Controls, shortcut capture, Ctrl help
     void drawControlsWindow();
     bool captureShortcutKey(SDL_Keycode key, SDL_Keymod mod);
+
     void consoleEcho(const std::string& name, const Args& args, const CommandResult& r);
     std::string uiConfigPath() const;
     // Window size, position, maximised and full screen, kept in window.json beside ui.json (#35). Not for tests,
@@ -2231,6 +2720,14 @@ private:
     static WindowState loadWindowState();
     void saveWindowState() const;
     bool rememberWindow_ = false;
+    // The start-up splash (StartupSplash.h): with it enabled the main window starts hidden; it shows after its first
+    // frame, and the splash (opened at the first start-up step) closes then.
+    std::unique_ptr<splash::Window> splash_;
+    bool splashEnabled_ = false, splashForced_ = false, splashShown_ = false, mainWindowHidden_ = false;
+    std::chrono::steady_clock::time_point startedAt_, splashOpenedAt_;
+    void makeMainContextCurrent(bool force = false); // after any splash step
+    void splashCheckpoint(); // between start-up steps and before the first frame
+    void revealMainWindow(); // after the first frame
     void drawAxisGizmo();
     std::array<AxisGizmoEnd, 6> axisGizmoLayout() const; // the gizmo's ends on screen now (AxisGizmo.h)
     glm::vec2 axisGizmoCentre() const;                  // the centre of its disc
@@ -2263,9 +2760,10 @@ private:
     // own: our ui.json (its layout becomes storedLayout_; it may have none), not a shared file.
     bool readUiConfig(const std::string& path, std::string& err, bool own = false);
     bool writeUiConfig(const std::string& path, std::string& err);
+    void backUpUiConfigOnce();
     static bool writeJsonAtomic(const std::string& path, const Json& j, std::string& err); // temp file, then rename
     std::string prefsKey() const;          // the shortcuts, preferences and radial menus, to notice changes
-    bool saveUiPrefs(std::string& err);     // ui.json with them and storedLayout_
+    bool saveUiPrefs(std::string& err);     // ui.json: them, the layout in use and storedLayout_
     void autosavePrefs(bool flush = false); // every frame: saves a moment after a change (flush: now, at quit)
     void noteLayoutStored();                // layout_ is what ui.json keeps now
     std::string layoutKey() const; // the layout without per-session state, to notice edits
@@ -2277,12 +2775,39 @@ private:
     UiPrefs uiPrefs_;
     Console console_;
     CommandPalette palette_;
+    cmd::Catalog commandCatalog_;     // rebuilt when the actions, the language or the brushes change
+    std::string commandCatalogKey_;
+    cmd::CommandHistory commandHistory_;
     std::string configDir_;           // <prefs>/ (ui.json, console_history.txt, recent_actions.txt)
     std::string capturingShortcut_;   // action id waiting for a key
+    bool captureSequence_ = false;    // ...for two keys in a row (added to its other keys)
+    std::string captureFirst_;        // the first key of that sequence, once pressed
+    struct ShortcutConflict {
+        std::string actionId, chord, holders; // the action being set, the key pressed, "Orbit left, Zoom in"
+        bool keepOthers = false;              // a sequence is added to the action's keys, not instead of them
+    } conflict_;
+    ImVec4 shortcutAnchor_{};           // the button the capture began from (min x, y, max x, y); zero: unknown
+    bool conflictPopupOpened_ = false;  // OpenPopup was called for the open conflict
+    int conflictDrawnFrame_ = -1, conflictOpenedFrame_ = 0;
+    ImVec4 shortcutPopupRect_{};        // the Replace / Cancel popup as last drawn (UiTest checks it clears the anchor)
+    std::vector<std::pair<SDL_Keycode, SDL_Keymod>> keysDown_; // keys held now, with the modifiers at their press (updateKeyNav)
+    std::map<std::string, KeyNavEase> keyNavEase_; // each pan / zoom key's eased speed (updateKeyNav)
+    std::map<std::string, float> keyNavTap_;      // seconds a pressed key still counts as down (a tap shorter than a frame still glides)
+    bool keyNavMoving_ = false;
+    struct KeyNavProbe { // --measure-key-nav's state
+        int caseIndex = 0, failures = 0;
+        double stageAt = 0.0;
+        int stage = 0; // 0: press, 1: held (checked while down), 2: waiting after the release
+        glm::vec3 target{0.0f};
+        float distance = 0.0f;
+        bool rebound = false, movedWhileHeld = false;
+    } keyNavProbe_;
     std::string layoutBaseline_;      // layoutKey() as last stored / loaded / restored
-    Json storedLayout_;               // the layout ui.json keeps (Save Layout); null: none yet, the standard one
+    Json storedLayout_;               // the layout Save Layout last kept ("layoutSaved"; Revert returns to it); null: none yet
     std::string prefsSavedKey_;       // prefsKey() as last saved (or read at the start)
+    std::string layoutSavedKey_;      // layoutKey() as ui.json's layout last has it (the autosave writes when it changes)
     bool prefsKeyKnown_ = false, actionsReady_ = false;
+    bool uiConfigBackedUp_ = false; // ui.json copied to ui.prev.json before this session's first write
     double prefsCheckedAt_ = 0.0, prefsSaveAt_ = 0.0; // the last look; when a pending change is written (0: none)
     bool layoutHintShown_ = false;
     int layoutCheckFrame_ = 0;
@@ -2290,6 +2815,36 @@ private:
     ImFont* fontHelpTitle_ = nullptr;
     ImFont* fontConsole_ = nullptr;
     std::string commandSource_; // shown before echoed commands, e.g. "AI" while the agent drives the app
+    // A released stroke whose dabs the solver thread is still placing (AsyncStroke.cpp): a command from a shortcut or a
+    // menu waits for it in drainQueue_ (in order, each once; Esc drops them) instead of finishing the stroke on this
+    // thread, which froze the window for the rest of the stroke (up to ~1 s on a 28M mesh on the floor tier). Scripts,
+    // macros, the AI link and panel buttons still finish it first: they need the result at once.
+    int interactiveCommand_ = 0; // > 0: a shortcut or menu item is running
+    std::vector<std::pair<std::string, Args>> drainQueue_;
+    // A press while the stroke drains: it and the pointer after it wait (each with its event time) and run as they came
+    // once the stroke is done (drainQueue_'s kHeldPress entry), so the next stroke picks the finished surface.
+    struct HeldPointer {
+        enum Kind : uint8_t { Down, Move, Up } kind;
+        float x, y, dx, dy;
+        Uint8 button;
+        bool fromPen;
+        Uint64 ns;
+    };
+    std::vector<HeldPointer> heldPointer_;
+    bool holdingPointer_ = false;
+    bool drainNextFrame_ = false; // the stroke ended: the queue runs next frame (a stroke's end and a press are both long)
+    static constexpr const char* kHeldPress = "(stroke)";
+    void replayHeldPointer();
+    bool strokeDraining() const;
+public:
+    void runInteractive(const std::function<void()>& run) { // a menu item: as a shortcut (drainQueue_)
+        ++interactiveCommand_;
+        run();
+        --interactiveCommand_;
+    }
+private:
+    void runDrainQueue();
+    std::string drainStatus() const;
     std::mutex uiFileMutex_;
     std::vector<std::pair<int, std::string>> uiFiles_; // (kind, path) from file dialogs
     // ---- end Help/Console/Config (C) ----
@@ -2321,7 +2876,10 @@ private:
     bool gizmoActive() const { return gizmo_.mode != GizmoMode::Off; }
     bool gizmoMouseDown(float x, float y, SDL_Keymod mod); // true if it took the click
     void gizmoDragTo(float x, float y);
+    void flushGizmoDrag(); // the newest pointer position of a drag, once a frame (gizmo_.pending)
     void gizmoRelease();
+    // Where the scene draws Part `index` (its transform), with a whole-Part Gizmo drag drawn by the GPU (gizmo_.gpu).
+    glm::mat4 gizmoDrawnTransform(int index) const;
     void drawGizmo();          // the handles over the canvas, and the Transform gizmo panel
     void drawGizmoPanel();
     void drawGizmoContents(bool compact); // Transform palette > Transform gizmo and the floating panel
@@ -2368,6 +2926,16 @@ private:
         MeshTransform current;
         std::vector<int> parts;
         std::vector<TransformSession> sessions;
+        // A dense mesh moved as a whole (TransformSession::wholeRigid, not shared, even scale): while dragging, its
+        // vertices stay and the Part is drawn moved by `gpuModel` (one matrix, nothing uploaded); the release bakes
+        // the transform into the vertices, as the per-frame path would have. Parallel to sessions.
+        std::vector<uint8_t> gpu;
+        glm::mat4 gpuModel{1.0f}; // the drag's world matrix (MeshTransform::matrix)
+        float gridSize = 0.0f;    // the size of what moves, for Shift snapping (read once per drag)
+        // In the app's loop the pointer's samples only note where it is; the drag follows the newest once a frame
+        // (every apply starts from the originals, so the skipped ones changed nothing).
+        bool pending = false;
+        ImVec2 pendingAt{0, 0};
         // Linked copies (#94) the drag moves as a whole (partMovesWhole), and their transforms when it began.
         std::vector<int> wholeParts;
         std::vector<glm::mat4> wholeStart;
@@ -2415,10 +2983,20 @@ private:
     void restoreView(int index);
     void drawViewsSection(); // Palettes.cpp, in View
     void viewOrbitStep(float yawDegrees, float pitchDegrees);
+    void keyNavStep(const std::string& id);   // notes a press of a pan or zoom key
+    int measureKeyNavStep(bool& draw); // --measure-key-nav, once a loop pass: -1 running, else the exit code
+    void updateKeyNav(float dt);              // once a frame: the held ones keep moving the view
     void frameActivePart();
+    void noteViewInsideAnotherPart();                // after Frame: the camera sits inside another Part (an eye in its head)
+    void notePressOnAnotherPart(float x, float y);   // a press the brush ignored because another Part is under it
+    uint64_t pressHintKey_ = 0;                      // ... (active Part id << 32 | the other's) it last said, and when:
+    Uint64 pressHintNs_ = 0;                         //     once per pair per half minute, orbiting over Parts is normal
+    void frameKeyPress(); // F: the active Part, twice quickly the scene (Classic sculpting keys, several Parts)
+    Uint64 lastFrameKeyNs_ = 0;
+    void originMove(const char* which); // Gizmo Origin tools (Gizmo.cpp)
     // Focus Detail (prototype, FocusDetailApp.cpp): open a .sfdetail file; once a frame, the camera and brush.
-    void openFocusDetail(const std::string& path);
-    void updateFocusDetail();
+    bool openFocusDetail(const std::string& path); // false: refused (status_ says why)
+    void updateFocusDetail(float heightPx = 0.0f); // (0: the canvas's)
     glm::vec3 focusBrushPos_{0.0f}, focusBrushVel_{0.0f};
     float focusBrushRadius_ = 0.0f;
     double focusBrushTime_ = 0.0;
@@ -2458,6 +3036,12 @@ private:
     // pixels; Preferences > Hints lists them. hintShown: not hidden by either.
     bool hintShown(const char* id) const;
     void drawViewportHint(const char* id, const char* text, ImU32 colour, float top);
+    // A short note over the 3D view for a key that found nothing to act on (C with nothing under the pointer): the status
+    // bar's message is small and elided in a narrow bar, and was missed. It also goes to the status bar.
+    void toastInViewport(const std::string& text);
+    void drawViewportToast();
+    std::string viewportToast_;
+    double viewportToastUntil_ = 0.0;
     void drawHintsSection();
     // Intensity (0-100 on screen): Smooth's own while Shift is held or Smooth is the brush.
     void drawZIntensitySlider(const char* id);
@@ -2465,6 +3049,9 @@ private:
     // Colour intensity (#164: painting reads it, so in Paint mode Intensity is how strongly paint colours), or the
     // sculpt Intensity.
     float& intensityValue(bool smooth) { return smooth ? smoothStrength_ : paintMode_ ? rgbIntensity_ : strength_; }
+    // What the running stroke sculpts with: Smooth's own Intensity when it smooths (Shift held at the press, #180),
+    // else the brush's (the Shift / Ctrl brush's own, ModifierBrush.cpp). Every stroke type reads this, none reads strength_ itself.
+    float strokeIntensity() const { return strokeBrush_ == BrushType::Smooth ? smoothStrength_ : strokeStrength(); }
     void openQuickMenu();
     void quickMenuKeyUp();   // Space released: a hold closes the menu, a tap leaves it open
     // A right click on the canvas (pressed and let go without moving past kRightClickSlop) opens the QuickMenu
@@ -2490,7 +3077,14 @@ private:
     // to Default puts back the shipped values. Off in demo videos and benchmarks (their scripts set every value).
 public:
     std::string currentBrushKey() const; // "builtin:Clay", "custom:Clay Slab"
+    // Brush thumbnails with the brush's own alpha and stroke type (#208): the live settings for the brush in use, else
+    // what it used this session or saved; a brush with no alpha gets the plain thumbnail.
+    ImTextureID brushThumbnail(int brushType);
+    ImTextureID recipeThumbnail(const BrushRecipe& recipe);
+    void regenerateBrushThumbnail(int brushType);
+    void regenerateRecipeThumbnail(const BrushRecipe& recipe);
     BrushToolSettings liveBrushSettings() const;
+    bool thumbnailLook(const std::string& key, BrushToolSettings& out) const;
     void applyBrushSettings(const BrushToolSettings& s);
     void saveBrushSettings();  // Brush > Save Brush Settings
     void resetBrushSettings(); // Brush > Reset Brush to Default
@@ -2500,12 +3094,15 @@ public:
 private:
     void initBrushSettings();
     void syncBrushSettings(); // every frame, outside strokes
+    bool alphaIsBrushsOwn(const std::string& key, const BrushToolSettings& s) const; // an alpha a custom brush brought with it
     void recipeAlpha(BrushToolSettings& s) const; // the active recipe's own alpha (brush packs) into `s`
     void recipePenPressure(BrushToolSettings& s) const; // the active recipe's own pen pressure (#122) into `s`
     void shippedPenPressure(); // the current brush's own pen pressure, as shipped (or its recipe's)
     void registerPenPressureCommand(); // brush_pen_pressure (#122)
     void syncAlphaTile();     // the brush's Tile onto the current alpha
-    void registerAlphaOptionsCommand(); // brush_alpha_options (#76)
+    void registerAlphaOptionsCommand(); // brush_alpha_options (#76) and brush_alpha_pool
+    void registerAlphaPoolCommand();    // brush_alpha_pool
+    void drawAlphaPool();               // the Alpha palette's Pool row (PanelBrushes.cpp)
     std::string brushSettingsPath() const;
     BrushSettingsStore brushSettings_;
     std::string brushSettingsKey_; // the brush the live values belong to
@@ -2694,6 +3291,7 @@ private:
     void runRadialSlot(int slot);
     bool radialMouseEvent(const SDL_Event& e); // true: the pie used the event (clicks while open, bound buttons)
     bool radialPenButton(int button, bool down, float x, float y);
+    void penButtonsSync(SDL_PenInputFlags state); // lets go of buttons SDL no longer holds (Tablet.cpp)
     void radialKeyUp(SDL_Keycode key);
     int radialMenuForButton(RadialButton b) const; // -1: none
     PenAction penButtonAction(int button) const;   // Preferences > Tablet, unless a radial menu claims the button
@@ -2728,6 +3326,7 @@ private:
     void strokePopupKeyUp(SDL_Keycode key);
     void drawStrokePopup();
     bool strokePopupItemScreen(int item, ImVec2& out) const; // an item's centre, window pixels (UI tests)
+    std::string strokeModifierKeysText(StrokeModifier m) const; // the active input style's keys for a popup tile
     StrokeLatch strokeLatch() const; // the latch in effect (None once another brush was picked)
     void setStrokeLatch(StrokeLatch latch);
     struct StrokePopupOpen {
@@ -2747,6 +3346,7 @@ private:
         bool paint = false;
     } strokeLatch_;
     uint32_t strokePopupSwallowUp_ = 0; // mouse buttons whose press the popup took: their release is its too
+    SDL_Keycode aloneSavedKey_ = SDLK_UNKNOWN; // keyDown_ while a waiting first key runs alone (Actions setAloneHook)
     SDL_Keycode keyDown_ = SDLK_UNKNOWN; // the key onKey is handling: a radial menu's key holds the pie open
     uint32_t radialSwallowUp_ = 0;       // mouse buttons whose press the pie took: their release is its too
     std::optional<Json> radialPending_;  // radial menus read from ui.json before the actions existed
@@ -2763,6 +3363,7 @@ private:
     } radialEdit_;
     struct RightClick {
         bool pending = false; // a right press that hasn't moved past the slop: navigation waits
+        bool down = false;    // the right button is held (a second press for it is the driver's echo, not a click)
         float x = 0.0f, y = 0.0f;
         float dx = 0.0f, dy = 0.0f; // the motion since the press
     } rightClick_;
@@ -2783,6 +3384,8 @@ private:
     float rollStartX_ = 0.0f, rollStartY_ = 0.0f;
     glm::vec2 lastDabScreen_{0.0f}; // window pixels of the last dab (UI tests: last_dab_x / last_dab_y)
     glm::vec3 lastDabCentre_{0.0f}; // ... and its centre on the active Part's mesh (UI tests: dab_scene_error_px)
+    glm::vec3 lastStrokeLocal_{0.0f}; // where the last stroke landed, on that Part's mesh, and the Part (-1: none yet)
+    int lastStrokePart_ = -1;
     bool maskClickPending_ = false; // Ctrl+press on the model: a click blurs (Alt: sharpens), a drag paints
     float maskClickX_ = 0.0f, maskClickY_ = 0.0f;
     // ---- end classic feel ----
@@ -2804,7 +3407,7 @@ private:
     // end and the side buttons, which are mapped in Preferences > Tablet.
     bool dropPenMouseEvent(const SDL_Event& e) const; // SDL's own mouse events for the pen (Tablet.cpp)
     void penMouseEvents(const SDL_Event& pen, bool before); // the pen tip's mouse events, made from the pen's
-    void sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window);
+    void sendPenMouse(SDL_EventType type, float x, float y, SDL_WindowID window, Uint64 timestamp);
     // SDL sends a pen sample's motion before its pressure (every platform; Wayland per tablet frame): the tip's
     // mouse motion, which moves the stroke, waits for the axes that follow it (Tablet.cpp).
     void flushPenMotion();
@@ -2869,6 +3472,8 @@ private:
     uint32_t penButtons_ = 0; // bit N: pen button N is held
     int penNavButton_ = 0;    // the pen button driving a view drag (0: none)
     bool dragFromPen_ = false;
+    bool pointerDragMoved_ = false; // the pointer itself (not the pen) has moved the view drag a mouse button began (#216)
+    Uint64 pointerDragNs_ = 0; // when it last did, clickClockNs (the pen's samples take the drag over once it has been still)
     bool firstDabPending_ = false;
     float lastStrokePressure_ = 1.0f; // pressure at the previous stroke sample (dabs in between interpolate)
     float penTiltX_ = 0.0f, penTiltY_ = 0.0f;
@@ -2886,9 +3491,10 @@ private:
     // every frame, independently of the mouse and pen (held while a stroke runs, unless Hold during strokes is off),
     // its buttons run actions.
     void spaceMouseEvent(const SDL_Event& e); // hot-plug and buttons
-    void spaceMouseScan();                    // take the first SpaceMouse SDL knows about, if none is open
+    void spaceMouseScan(bool retry = false);              // take the first SpaceMouse SDL knows about, if none is open
     void spaceMouseClose();
     void updateSpaceMouse(float dt);          // once a frame: move the camera by the held axes
+    bool keyNavMoving() const { return keyNavMoving_; }
     bool spaceMouseMoving() const { return spaceMouseMoving_; } // keep frames coming while the cap is pushed
     bool spaceMouseDeflected() const; // the cap is pushed past the dead zone now (an axis event worth a frame)
     void drawSpaceMouseSection();             // Preferences > Input > SpaceMouse
@@ -2899,6 +3505,8 @@ private:
     std::array<float, kSmAxes> spaceMouseAxes_{}; // the last values read, -1 .. 1 (Preferences shows them)
     bool spaceMouseMoving_ = false;
     int spaceMouseLastButton_ = -1; // for Preferences: "Button N pressed"
+    bool spaceMouseOpenFailed_ = false; // SDL listed a SpaceMouse it could not open: updateSpaceMouse tries again (#110)
+    double spaceMouseRetryAt_ = 0.0;
     bool spaceMouseReported_ = false; // an axis has moved since the device was opened (else 3DxWare may hold it, #104)
     // Every joystick SDL listed at the last scan and why it was or wasn't taken, for Preferences and the device
     // report a user can paste into an issue (#104).
@@ -2930,11 +3538,25 @@ private:
     bool touchMouseEvent(const SDL_Event& e);  // SDL's mouse events made from a finger: true when held or dropped
     void touchTick();                          // once a frame: a held press that waited long enough goes through
     void touchFlushPress();
+    void fitStartView(bool resized); // the starting model fits a narrow view (Shell.cpp)
+    bool startFrameChecked_ = false;
+    bool autoFramed_ = false;              // the camera is still where fitStartView left it
+    glm::vec3 autoFramedTarget_{0.0f};
+    float autoFramedDistance_ = 0.0f;
+    void logWindowGeometry() const;            // one log line: window, pixels, density, safe area, UI scale (Android bug reports)
+    void touchReset();                         // every finger forgotten (focus lost, a resize): no gesture stays stuck
     void touchApply(const TwoFingerStep& step);
     TouchGesture touch_;
     bool touchNavigates_ = false;   // this touch began over the 3D view
     bool touchDirect_ = true;       // a touch screen (false: a trackpad)
     bool touchSwallowMouse_ = false; // a gesture ran: the finger's mouse events stay off the canvas until it lifts
+    // Palm rejection (Preferences > Tablet, TabletSettings::palmRejection): a finger that lands while a pen is in range,
+    // or within PalmGuard::kAfterPen of it leaving, is a palm or a resting hand: ignored until it lifts. Every maker's
+    // pen reports proximity.
+    PalmGuard palm_;
+    bool touchPalm_ = false;    // the touch whose mouse events are being dropped
+    bool palmGuard() const;
+    bool palmMouseEvent(const SDL_Event& e); // true: a palm's, dropped
     bool touchNativePinch_ = false; // SDL sends pinch events: a trackpad's finger spread doesn't zoom again
     bool touchTwisting_ = false;    // the twist passed kTouchTwistStart: it rolls the view from now on
     bool touchPinching_ = false;    // a trackpad pinch or twist is under way: its stray scroll doesn't zoom
@@ -2978,6 +3600,7 @@ private:
     bool renderTimelapseFrame(const Camera& cam, int width, int height, std::vector<uint8_t>& rgba, std::string& err);
     void startProofMode();                    // Help > Benchmark, sculptforge --benchmark
     bool proofSkippedScenes() const;          // the benchmark skipped a scene: too little free memory
+    bool proofFailed() const;                 // a benchmark pack scene would not build (exit 1)
     bool proofRunning() const;                // a benchmark is measuring (not its intro or results): every frame is wanted
     void proofBeforeSwap(int fbW, int fbH);   // the interactive loop, after drawing a frame, before showing it
     void drawProofUi();

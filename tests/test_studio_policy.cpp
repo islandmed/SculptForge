@@ -96,6 +96,7 @@ constexpr const char* kFullPolicy = R"({
   "network": {"enabled": false, "allow": ["https://sw.acme.internal/"], "localNetwork": true},
   "mcp": {"enabled": true, "live": "never", "categories": ["info", "edit"]},
   "maya": {"link": "never"},
+  "python": {"scripts": "never"},
   "audit": {"path": "/mnt/audit/{user}@{host}.jsonl", "maxMB": 20, "keep": 10, "required": true},
   "signIn": {"issuer": "https://acme.okta.com/oauth2/default", "clientId": "0oa1abc", "scopes": ["openid", "email"],
              "useFor": ["https://llm.acme.internal/"]},
@@ -112,13 +113,14 @@ TEST(studio_policy_parses_every_key) {
     CHECK(p.network == policy::Lock::Off && p.networkAllow.size() == 1 && p.localNetwork);
     CHECK(p.mcp == policy::Lock::On && !p.mcpLiveAllowed && p.mcpCategories.size() == 2);
     CHECK(!p.mayaLinkAllowed && policy::describe(p).find("Maya Live link never") != std::string::npos);
+    CHECK(!p.pythonAllowed && policy::describe(p).find("Python scripts never") != std::string::npos);
     CHECK(p.auditPath == "/mnt/audit/{user}@{host}.jsonl" && p.auditMaxMB == 20 && p.auditKeep == 10 && p.auditRequired);
     CHECK(p.signInConfigured() && p.clientId == "0oa1abc" && p.scopes.size() == 2 && p.signInUseFor.size() == 1);
     CHECK(p.updateCheck == policy::Lock::On && p.updateChannel == "stable" && !p.updateFeed.empty());
     // Everything is optional: the smallest policy manages nothing.
     const policy::Policy empty = parsed(R"({"format": "sculptforge-policy", "version": 1})");
     CHECK(empty.ai == policy::Lock::Unset && empty.network == policy::Lock::Unset && empty.mcpLiveAllowed &&
-          empty.mayaLinkAllowed);
+          empty.mayaLinkAllowed && empty.pythonAllowed);
     CHECK(policy::describe(p).find("telemetry none") != std::string::npos);
 }
 
@@ -136,6 +138,8 @@ TEST(studio_policy_rejects_mistakes) {
     CHECK(!parseError(R"({"format": "sculptforge-policy", "version": 1, "mcp": {"live": "sometimes"}})").empty());
     CHECK(!parseError(R"({"format": "sculptforge-policy", "version": 1, "maya": {"link": true}})").empty());
     CHECK(!parseError(R"({"format": "sculptforge-policy", "version": 1, "maya": {"port": 1}})").empty());
+    CHECK(!parseError(R"({"format": "sculptforge-policy", "version": 1, "python": {"scripts": "sometimes"}})").empty());
+    CHECK(!parseError(R"({"format": "sculptforge-policy", "version": 1, "python": {"enabled": true}})").empty());
     // There is no telemetry to turn on.
     CHECK(parseError(R"({"format": "sculptforge-policy", "version": 1, "telemetry": true})").find("no telemetry") !=
           std::string::npos);
@@ -155,7 +159,7 @@ TEST(studio_policy_fails_closed) {
     const policy::Policy broken = policy::loadPolicyFile(dir + "/policy.json", "test", &messages);
     CHECK(broken.present && broken.broken && !messages.empty());
     CHECK(broken.ai == policy::Lock::Off && broken.network == policy::Lock::Off && broken.mcp == policy::Lock::Off);
-    CHECK(!broken.mcpLiveAllowed && !broken.mayaLinkAllowed && broken.updateCheck == policy::Lock::Off);
+    CHECK(!broken.mcpLiveAllowed && !broken.mayaLinkAllowed && !broken.pythonAllowed && broken.updateCheck == policy::Lock::Off);
     const policy::Policy missing = policy::loadPolicyFile(dir + "/none.json", "test");
     CHECK(missing.broken && missing.ai == policy::Lock::Off);
     std::ofstream(dir + "/good.json") << kFullPolicy;
@@ -266,6 +270,52 @@ TEST(studio_audit_log_records_mcp_calls) {
     CHECK(second["args"]["api_key"].asString() == "<redacted>");
     CHECK(second["args"]["code"].asString().find("bytes") != std::string::npos);
     CHECK(l[1].find("sk-secret") == std::string::npos && l[1].find("0123456789abcdef") == std::string::npos);
+}
+
+TEST(studio_policy_and_audit_cover_mcp_resources) {
+    StudioState state("mcp_resources");
+    CommandRegistry registry;
+    Document doc;
+    auto rpc = [&](int id, const std::string& method, const std::string& params = "{}") {
+        Json j;
+        std::string err;
+        CHECK(Json::parse(handleMcpMessage(registry, doc, R"({"jsonrpc":"2.0","id":)" + std::to_string(id) + R"(,"method":")" + method +
+                                                              R"(","params":)" + params + "}"),
+                          j, err));
+        return j;
+    };
+    // Reading allowed: the numbers are in every result, resources work, and each read is in the audit log.
+    policy::setPolicyForTests(parsed(R"({"format": "sculptforge-policy", "version": 1, "mcp": {"categories": ["info", "edit"]}})"));
+    CHECK(rpc(1, "initialize")["result"]["capabilities"]["resources"].isObject());
+    rpc(2, "tools/call", R"({"name":"new_sphere","arguments":{"subdivisions":2}})");
+    CHECK(rpc(3, "tools/call", R"({"name":"new_sphere","arguments":{"subdivisions":2}})")["result"]["structuredContent"].has("triangles"));
+    CHECK(rpc(4, "resources/read", R"({"uri":"sculptforge://scene"})")["result"]["contents"][0]["text"].asString().find("triangles") != std::string::npos);
+    CHECK(readFile(state.auditPath()).find("\"resources/read\"") != std::string::npos);
+    CHECK(readFile(state.auditPath()).find("sculptforge://scene") != std::string::npos);
+
+    // "info" not allowed: the scene's numbers stay hidden everywhere (results, schemas, resources).
+    policy::setPolicyForTests(parsed(R"({"format": "sculptforge-policy", "version": 1, "mcp": {"categories": ["edit"]}})"));
+    CHECK(!rpc(5, "initialize")["result"]["capabilities"].has("resources"));
+    const Json call = rpc(6, "tools/call", R"({"name":"new_sphere","arguments":{"subdivisions":2}})");
+    const Json& sc = call["result"]["structuredContent"];
+    CHECK(sc["ok"].asBool() && sc.has("ms") && !sc.has("triangles") && !sc.has("bounds") && !sc.has("scene"));
+    const Json list = rpc(7, "tools/list");
+    CHECK(list["result"]["tools"][0]["outputSchema"]["properties"].has("ms") && !list["result"]["tools"][0]["outputSchema"]["properties"].has("triangles"));
+    CHECK(rpc(8, "resources/list")["result"]["resources"].size() == 0);
+    const Json read = rpc(9, "resources/read", R"({"uri":"sculptforge://scene"})");
+    CHECK(read.has("error") && read["error"]["message"].asString().find("policy") != std::string::npos);
+    CHECK(readFile(state.auditPath()).find("policy") != std::string::npos); // (the refused read is logged too)
+
+    // audit.required and an unwritable log: the read is refused before it runs.
+    policy::Policy p = parsed(R"({"format": "sculptforge-policy", "version": 1})");
+    p.auditRequired = true;
+    policy::setPolicyForTests(p);
+    const std::string blocker = state.auditDir + "/file";
+    std::ofstream(blocker) << "x";
+    audit::setPathForTests(blocker + "/audit.jsonl");
+    const Json blocked = rpc(10, "resources/read", R"({"uri":"sculptforge://scene"})");
+    CHECK(blocked.has("error") && blocked["error"]["message"].asString().find("audit log") != std::string::npos);
+    policy::resetPolicyForTests();
 }
 
 TEST(studio_audit_log_rotates_and_can_be_required) {

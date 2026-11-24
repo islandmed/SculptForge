@@ -1,0 +1,36 @@
+# #173 (@TheLycanFenrir), the rest of the destructive operations: Mirror, Make Symmetric, Merge by Distance, Delete
+# Masked / Hidden and Split also drop the subdivision levels, so on a Part with levels they ask first (the same pop-up as
+# Decimate). Cancel changes nothing, Proceed runs and undo brings the levels back, a copy ("keep") and a Part without levels
+# are not asked, and the Preferences switch turns the asking off.
+run new_sphere subdivisions=1
+run part_append type=cube name=Box
+run part_delete index=0
+run subdiv_reconstruct
+run subdiv_reconstruct
+expect_value sdiv_levels == 3
+
+action deformation.mirror
+expect "Levels/Freeze Levels and Proceed"
+expect_text "Mirror keeps the level shown"
+shot prompt-mirror
+click "Levels/Cancel##remesh_levels"
+expect_not "Levels/Freeze Levels and Proceed"
+expect_value sdiv_levels == 3
+
+action geometry.mirror_weld
+expect "Levels/Freeze Levels and Proceed"
+expect_text "Make Symmetric keeps the level shown"
+key escape
+expect_value sdiv_levels == 3
+
+action deformation.mirror
+click "Levels/Freeze Levels and Proceed"
+expect_value sdiv_levels == 0
+key ctrl+z
+expect_value sdiv_levels == 3
+
+# A copy leaves the Part as it is: no prompt.
+run mask_rect y0=0.3
+run part_split_masked keep=true
+expect_not "Levels/Freeze Levels and Proceed"
+expect_value sdiv_levels == 3

@@ -83,7 +83,7 @@ def read_manifest(folder):
         raise ValueError("Not a SculptForge bridge manifest")
     if data.get("version", 1) > VERSION:
         raise ValueError("The manifest is from a newer SculptForge; update the add-on")
-    for obj in data.get("objects", []):
+    for obj in data.get("objects", []) + data.get("splats", []):
         name = obj.get("file", "")
         if not name or os.path.basename(name) != name or name in (".", ".."):
             raise ValueError("The manifest names a bad file: %r" % name)
@@ -105,9 +105,11 @@ def _write_atomically(path, data):
     os.replace(tmp, path)
 
 
-def write_manifest(folder, objects, sender_version=""):
+def write_manifest(folder, objects, sender_version="", splats=None):
     """Writes manifest.json for `objects` (dicts with name, file and optionally matrix_world as 4 rows) with
-    the next revision, then removes the files of earlier sends. Returns the revision."""
+    the next revision, then removes the files of earlier sends. `splats`: the same for Gaussian splat objects
+    (PLY files), in their own key so that older readers skip them. Returns the revision."""
+    splats = splats or []
     os.makedirs(folder, exist_ok=True)
     rev = max(revision(folder), 0) + 1
     manifest = {
@@ -119,8 +121,10 @@ def write_manifest(folder, objects, sender_version=""):
         "time": time.time(),
         "objects": objects,
     }
+    if splats:
+        manifest["splats"] = splats
     _write_atomically(manifest_path(folder), json.dumps(manifest, indent=2).encode("utf-8"))
-    keep = {o["file"] for o in objects}
+    keep = {o["file"] for o in objects + splats}
     for path in glob.glob(os.path.join(folder, "r*_*")):
         if os.path.basename(path) not in keep and not os.path.basename(path).startswith("r%d_" % rev):
             try:
@@ -412,6 +416,20 @@ def read_shapes(path):
             raise ValueError("The shapes file has bad vertex indices: %s" % path)
         shapes.append((name, float(weight), idx, off))
     return nv, shapes
+
+
+def write_shapes(path, nv, shapes):
+    """The same file read_shapes reads, for Blender -> SculptForge: `shapes` is a list of (name, weight, indices,
+    offsets) with offsets (N, 3) in Blender's axes, in the object's own space (like its Bridge file: SculptForge
+    applies the object's matrix_world to them as it does to the positions). Written for a shape key (its offsets
+    from the Basis); SculptForge turns each into a sculpt layer."""
+    out = [b"SFSHAPES", struct.pack("<III", 1, nv, len(shapes))]
+    for name, weight, idx, off in shapes:
+        raw = name.encode("utf-8")
+        idx = np.asarray(idx, dtype="<u4")
+        off = np.asarray(off, dtype="<f4").reshape(-1, 3)
+        out += [struct.pack("<I", len(raw)), raw, struct.pack("<fI", float(weight), len(idx)), idx.tobytes(), off.tobytes()]
+    _write_atomically(path, b"".join(out))
 
 
 # --------------------------------------------------------------------------------------------------

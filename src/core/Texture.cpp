@@ -1,6 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Texture.h"
+#include "core/AtomicRef.h"
+#include "core/Parallel.h"
 
 #include "core/ThreadPool.h"
 
@@ -11,6 +13,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include <unordered_map>
 #include <limits>
 #include <chrono>
 #include <cstdio>
@@ -60,7 +63,7 @@ inline void putLinear(uint8_t* p, const glm::vec3& c) {
 // Runs fn(begin, end) over rows [0, n) on several threads for big jobs.
 template <class Fn>
 void parallelRows(int n, size_t work, Fn fn) {
-    const int threads = work < 500000 ? 1 : int(std::clamp<unsigned>(std::thread::hardware_concurrency(), 1u, 16u));
+    const int threads = work < 500000 ? 1 : parallelThreads();
     if (threads <= 1 || n < 2) {
         fn(0, n);
         return;
@@ -771,6 +774,8 @@ bool TexturePainter::begin(Mesh& mesh, uint32_t channels) {
     active_ = false;
     tiles_.clear();
     dab_ = 0;
+    smoothRadius_ = 0;
+    smoothTopo_.reset();
     if (!paintsTexture(mesh)) return false;
     const PaintTexture& t = *mesh.texture;
     layer_ = t.layers.empty() ? -1 : std::clamp(t.activeLayer, -1, int(t.layers.size()) - 1);
@@ -983,6 +988,98 @@ std::vector<uint8_t> coverageFromIndex(const Mesh& m, int w, int h, const UvTile
     return cov;
 }
 
+// What smoothDab needs of the mesh's connectivity: each triangle's UV island (triangles that share a vertex at the same UV
+// are one island, 1-based) and the triangles around each vertex (to find the triangle across an island's border).
+} // namespace
+
+struct SmoothWindow;
+
+struct SmoothTopo {
+    std::vector<uint32_t> island;
+    std::vector<uint32_t> vtStart; // vertexCount + 1
+    std::vector<uint32_t> vt;      // 3 per triangle
+    std::vector<uint32_t> partner; // per triangle edge (corner c to c + 1): the triangle across it when the island ends there, else UINT32_MAX
+    // The tile windows smoothDab built (geometry only: they hold no colour), kept with the layout so every stroke after the
+    // first on a layout reuses them. Valid for one set of radii (windowsKey); at most kMaxWindows are kept.
+    mutable std::vector<std::shared_ptr<SmoothWindow>> windows;
+    mutable uint64_t windowsKey = 0;
+    mutable std::atomic<int> windowCount{0};
+};
+
+static std::shared_ptr<const SmoothTopo> buildSmoothTopo(const Mesh& m) {
+    auto topo = std::make_shared<SmoothTopo>();
+    const size_t nv = m.vertexCount(), nt = m.triangleCount();
+    std::vector<uint32_t> parent, first(nv, UINT32_MAX);
+    std::vector<glm::vec2> firstUv(nv);
+    std::unordered_multimap<uint32_t, std::pair<glm::vec2, uint32_t>> more; // the vertices with several UVs (seams)
+    auto find = [&](uint32_t a) {
+        while (parent[a] != a) a = parent[a] = parent[parent[a]];
+        return a;
+    };
+    auto node = [&](uint32_t v, const glm::vec2& uv) {
+        if (first[v] == UINT32_MAX) {
+            first[v] = uint32_t(parent.size());
+            firstUv[v] = uv;
+            parent.push_back(first[v]);
+            return first[v];
+        }
+        if (firstUv[v] == uv) return first[v];
+        const auto range = more.equal_range(v);
+        for (auto it = range.first; it != range.second; ++it)
+            if (it->second.first == uv) return it->second.second;
+        const uint32_t id = uint32_t(parent.size());
+        parent.push_back(id);
+        more.emplace(v, std::make_pair(uv, id));
+        return id;
+    };
+    std::vector<uint32_t> corner(nt);
+    topo->vtStart.assign(nv + 1, 0);
+    for (size_t t = 0; t < nt; ++t) {
+        uint32_t n[3];
+        for (int c = 0; c < 3; ++c) {
+            n[c] = node(m.triangles[t][c], m.uvs[t * 3 + size_t(c)]);
+            ++topo->vtStart[m.triangles[t][c] + 1];
+        }
+        for (int c = 1; c < 3; ++c) parent[find(n[c])] = find(n[0]);
+        corner[t] = n[0];
+    }
+    topo->island.resize(nt);
+    for (size_t t = 0; t < nt; ++t) topo->island[t] = find(corner[t]) + 1;
+    for (size_t v = 0; v < nv; ++v) topo->vtStart[v + 1] += topo->vtStart[v];
+    topo->vt.resize(nt * 3);
+    std::vector<uint32_t> fill(topo->vtStart.begin(), topo->vtStart.end() - 1);
+    for (size_t t = 0; t < nt; ++t)
+        for (int c = 0; c < 3; ++c) topo->vt[fill[m.triangles[t][c]]++] = uint32_t(t);
+    topo->partner.assign(nt * 3, UINT32_MAX);
+    poolFor(nt, [&](size_t b, size_t e) {
+        for (size_t t = b; t < e; ++t) {
+            const glm::uvec3 tv = m.triangles[t];
+            for (int c = 0; c < 3; ++c) {
+                const uint32_t va = tv[c], vb = tv[(c + 1) % 3];
+                for (uint32_t k = topo->vtStart[va]; k < topo->vtStart[va + 1]; ++k) {
+                    const uint32_t t2 = topo->vt[k];
+                    if (t2 == t) continue;
+                    const glm::uvec3 ov = m.triangles[t2];
+                    int ia = -1, ib = -1;
+                    for (int c2 = 0; c2 < 3; ++c2) {
+                        if (ov[c2] == va) ia = c2;
+                        if (ov[c2] == vb) ib = c2;
+                    }
+                    if (ia < 0 || ib < 0) continue;
+                    const glm::vec2 ua = m.uvs[t * 3 + size_t(c)], ub = m.uvs[t * 3 + size_t((c + 1) % 3)];
+                    const glm::vec2 pa = m.uvs[size_t(t2) * 3 + size_t(ia)], pb = m.uvs[size_t(t2) * 3 + size_t(ib)];
+                    // (the same two UVs: the edge is inside the island; the UVs are texels / size, so compare as stored)
+                    if (!(ua == pa && ub == pb)) topo->partner[t * 3 + size_t(c)] = t2;
+                    break;
+                }
+            }
+        }
+    }, 4096);
+    return topo;
+}
+
+namespace {
+
 // Texture-painting caches by UV layout and texture size (not by texture: copies, undo steps and new textures on
 // the same UVs share them): the UV bins, the texel maps and the coverage. The two most recent layouts are kept.
 struct PaintCacheEntry {
@@ -990,6 +1087,7 @@ struct PaintCacheEntry {
     std::shared_ptr<const UvTileIndex> index;
     std::shared_ptr<TexelMapCache> maps;
     std::shared_ptr<const std::vector<uint8_t>> coverage;
+    std::shared_ptr<const SmoothTopo> smooth;
 };
 std::mutex gPaintCacheMutex;
 std::vector<PaintCacheEntry> gPaintCache; // most recent first
@@ -1157,12 +1255,26 @@ void TexturePainter::prewarm(Mesh& mesh, const BVH* bvh, std::span<const glm::ve
     dp.strength = 0.0f;
     const DabContext ctx{mesh, *bvh, dp, tex, tex.pixels, 0.0f, false, false, false, radius, radius * radius, mirrors};
     std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
-    dabTiles(ctx, [](Tile&, size_t, int, int, float) {}, false, rects);
+    dabTiles(ctx, [](Tile&, size_t, int, int, float, float) {}, false, rects);
 }
 
 void prewarmTexturePainting(Mesh& mesh, const BVH* bvh, std::span<const glm::vec3> centers, float radius) {
     TexturePainter painter;
     painter.prewarm(mesh, bvh, centers, radius);
+}
+
+std::shared_ptr<const SmoothTopo> cachedSmoothTopo(const Mesh& m, int w, int h) {
+    const uint64_t key = paintKey(m, w, h);
+    {
+        std::lock_guard lock(gPaintCacheMutex);
+        for (const PaintCacheEntry& c : gPaintCache)
+            if (c.key == key && c.smooth && c.smooth->vtStart.size() == m.vertexCount() + 1) return c.smooth;
+    }
+    auto topo = buildSmoothTopo(m);
+    std::lock_guard lock(gPaintCacheMutex);
+    for (PaintCacheEntry& c : gPaintCache)
+        if (c.key == key) c.smooth = topo;
+    return topo;
 }
 
 std::shared_ptr<const std::vector<uint8_t>> cachedCoverage(const Mesh& m, int w, int h) {
@@ -1194,11 +1306,11 @@ size_t texturePaintCacheBytes() {
 }
 
 
-bool TexturePainter::useTilePath(const Mesh& mesh, PaintTexture& tex) const {
+bool TexturePainter::useTilePath(const Mesh& mesh, PaintTexture& tex, bool force) const {
     const Path path = Path(gDabPath.load());
-    if (path == Path::Triangles) return false;
+    if (path == Path::Triangles && !force) return false;
     if (tileCount(tex.width) > 256 || tileCount(tex.height) > 256) return false;
-    if (path == Path::Auto && mesh.triangleCount() * 64 < tex.texelCount()) return false;
+    if (path == Path::Auto && !force && mesh.triangleCount() * 64 < tex.texelCount()) return false;
     const uint64_t key = texelMapKey(mesh, tex);
     if (!tex.uvIndex || tex.uvIndex->key != key || !tex.texelMaps || tex.texelMaps->key != key) {
         const PaintCacheEntry e = paintCache(mesh, tex.width, tex.height, key);
@@ -1210,7 +1322,8 @@ bool TexturePainter::useTilePath(const Mesh& mesh, PaintTexture& tex) const {
 
 template <class Paint>
 size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool composite,
-                                std::vector<std::pair<glm::ivec2, glm::ivec2>>& rects) {
+                                std::vector<std::pair<glm::ivec2, glm::ivec2>>& rects,
+                                const std::function<void(const std::vector<uint32_t>&)>* prepare) {
     const UvTileIndex& idx = *c.tex.uvIndex;
     TexelMapCache& cache = *c.tex.texelMaps;
     const Mesh& mesh = c.mesh;
@@ -1239,7 +1352,7 @@ size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool co
                 for (int ty = ty0; ty <= ty1; ++ty)
                     for (int tx = tx0; tx <= tx1; ++tx) {
                         uint8_t& flag = touchedFlag_[size_t(ty) * size_t(idx.tilesX) + size_t(tx)];
-                        std::atomic_ref<uint8_t> f(flag);
+                        AtomicRef<uint8_t> f(flag);
                         if (!f.load(std::memory_order_relaxed)) f.store(1, std::memory_order_relaxed);
                     }
             }
@@ -1268,6 +1381,7 @@ size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool co
         }
     }
     cache.live += missing;
+    if (prepare && c.s > 0.0f) (*prepare)(touched_);
     // 3. Every texel of those tiles, tiles in parallel (each texel in one tile: the same result on any thread count).
     struct Result {
         glm::ivec2 lo{INT32_MAX}, hi{INT32_MIN};
@@ -1325,7 +1439,7 @@ size_t TexturePainter::dabTiles(const DabContext& c, const Paint& paint, bool co
                     t.stamp[li] = mi.stamp;
                     float& acc = t.coverage[li];
                     acc += std::min(wgt, 1.0f) * (1.0f - acc);
-                    paint(t, li, x, y, acc);
+                    paint(t, li, x, y, acc, std::min(wgt, 1.0f));
                     res.lo = glm::min(res.lo, glm::ivec2(x, y));
                     res.hi = glm::max(res.hi, glm::ivec2(x + 1, y + 1));
                     ++res.changed;
@@ -1375,7 +1489,10 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
     std::vector<uint8_t>& target = tex.target(layer_);
     const bool onLayer = layer_ >= 0;
     const glm::vec3 color = material.color;
-    const uint32_t painted = channels_ & material.channels;
+    // Erasing the Base with a brush that paints colour clears every channel the stroke began with (the App begins an
+    // erase stroke with all enabled channels): a true erase leaves no metal or roughness under the white.
+    const bool eraseBase = p.invert && layer_ < 0 && (material.channels & 1u);
+    const uint32_t painted = eraseBase ? channels_ : channels_ & material.channels;
     const bool paintColor = painted & 1u;
     // The material channels this dab writes, with the brush's value and the channel's default (for erasing).
     struct ChanJob {
@@ -1420,7 +1537,7 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
     if (useTilePath(mesh, tex)) {
         const DabContext ctx{mesh, bvh, p, tex, target, s, useAlpha, masked, normals, r, r2, mirrors};
         std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
-        const size_t changed = dabTiles(ctx, [&](Tile& t, size_t li, int x, int y, float acc) {
+        const size_t changed = dabTiles(ctx, [&](Tile& t, size_t li, int x, int y, float acc, float) {
             if (paintColor)
                 paintTexel(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t.original[li * 4], onLayer, color, acc, p.invert);
             for (const ChanJob& j : jobs) {
@@ -1571,6 +1688,528 @@ size_t TexturePainter::dab(Mesh& mesh, const BVH& bvh, const DabParams& p, const
     return changed;
 }
 
+// A tile's window for smoothDab, geometry only (no colour): for each UV island that reaches the tile or its gutter ring, the
+// texels its blur reads and the tile-and-ring texels it writes.
+constexpr int kSmoothC = 5; // the blur's channels: r, g, b (x alpha), alpha, 1
+struct SmoothIsland {
+    uint32_t island = 0;
+    int ki = 1;                 // its radius in texels
+    int rx0 = 0, ry0 = 0, rw = 0, rh = 0; // its region in window coordinates
+    std::vector<int32_t> src;   // per region texel: the image texel (y * w + x) it reads, -1 none: the island's own, the
+                                // padding past its borders (the surface across the seam) and the corner wedges (the nearest)
+    std::vector<uint16_t> outs; // window index (j * n + i) of its texels in the tile and its gutter ring
+    // Tangent frames: a texel read from the surface across a seam lies in the other island's UV frame. frame[r] is 0 (this
+    // island's own frame) or an index into `frames`, the 2D map (rotation, or a reflection for a mirrored island) from that
+    // island's UV directions to this one's: what turns a tangent-space Normal's x, y into this island's frame.
+    std::vector<uint16_t> frame;
+    std::vector<glm::mat2> frames; // [0] is the identity
+};
+struct SmoothWindow {
+    std::vector<SmoothIsland> islands;
+    std::vector<int32_t> gutter; // per tile texel: the ring index ((j + kG) * wt + i + kG) of the island texel whose blur it
+                                 // takes (itself when it is one), -1 none
+};
+constexpr int kSmoothMaxWindows = 1200;
+constexpr int kSmoothBuildsPerDab = 64; // tile windows one dab may build (the rest wait for the next dabs, which overlap it)
+
+static std::shared_ptr<SmoothWindow> buildSmoothWindow(const Mesh& mesh, const SmoothTopo& topo, const UvTileIndex& uvIndex, int w,
+                                                       int h, int tx, int ty, int k, const std::vector<uint8_t>& islandK) {
+    constexpr int kT = kTextureTile;
+    constexpr int kG = kTextureGutter + 1; // the gutter ring around the tile (padding texels read by filtering)
+    const float fw = float(w), fh = float(h);
+    const int x0 = tx * kT, y0 = ty * kT;
+    const int n = kT + 2 * k, lx0 = x0 - k, ly0 = y0 - k;
+    const glm::vec2 winLo{float(lx0), float(ly0)}, winHi{float(lx0 + n), float(ly0 + n)};
+    struct Border {
+        uint32_t island;
+        glm::vec2 a, e, nOut;  // the edge in texels (from a, by e), unit normal pointing out of its triangle
+        glm::vec2 pa, pe, nIn; // the triangle across: the same edge, unit normal pointing into it
+        float scale;           // its length over this one's
+        glm::mat2 toThis;      // the triangle across's UV directions -> this one's (maps pe / |pe| to e / |e|, nIn to nOut)
+    };
+    // The island of each texel around the tile (0: none), rasterised from the UV bins of the tiles around it, and the island
+    // borders there (each edge whose other triangle has other UVs for the same two vertices).
+    thread_local std::vector<uint32_t> id; // (scratch kept per thread: a window is built on every core at once)
+    thread_local std::vector<Border> borders;
+    id.assign(size_t(n) * size_t(n), 0);
+    borders.clear();
+    for (int by = std::max(ty - 1, 0); by <= std::min(ty + 1, uvIndex.tilesY - 1); ++by)
+        for (int bx = std::max(tx - 1, 0); bx <= std::min(tx + 1, uvIndex.tilesX - 1); ++bx) {
+            const size_t bin = size_t(by) * size_t(uvIndex.tilesX) + size_t(bx);
+            for (uint32_t b = uvIndex.binStart[bin]; b < uvIndex.binStart[bin + 1]; ++b) {
+                const uint32_t tri = uvIndex.bins[b];
+                const uint8_t* tt = &uvIndex.triTiles[size_t(tri) * 4]; // the tiles it covers: x0, y0, x1, y1
+                if (bx != std::max(int(tt[0]), tx - 1) || by != std::max(int(tt[1]), ty - 1)) continue; // (once, from its first bin here)
+                {   // (a triangle that cannot reach the window: no need to set it up)
+                    const glm::vec2 u0 = mesh.uvs[size_t(tri) * 3] * glm::vec2(fw, fh), u1 = mesh.uvs[size_t(tri) * 3 + 1] * glm::vec2(fw, fh),
+                                    u2 = mesh.uvs[size_t(tri) * 3 + 2] * glm::vec2(fw, fh);
+                    if (std::max({u0.x, u1.x, u2.x}) < winLo.x - 1.0f || std::min({u0.x, u1.x, u2.x}) > winHi.x + 1.0f ||
+                        std::max({u0.y, u1.y, u2.y}) < winLo.y - 1.0f || std::min({u0.y, u1.y, u2.y}) > winHi.y + 1.0f)
+                        continue;
+                }
+                const TriSetup su(mesh.uvs[size_t(tri) * 3], mesh.uvs[size_t(tri) * 3 + 1], mesh.uvs[size_t(tri) * 3 + 2], w, h);
+                visitTriangle(su, w, h, 0, nullptr, lx0, ly0, lx0 + n - 1, ly0 + n - 1, [&](int x, int y, const glm::vec3&, bool) {
+                    id[size_t(y - ly0) * size_t(n) + size_t(x - lx0)] = topo.island[tri];
+                });
+                const glm::uvec3 tv = mesh.triangles[tri];
+                for (int c = 0; c < 3; ++c) {
+                    const uint32_t other = topo.partner[size_t(tri) * 3 + size_t(c)]; // the triangle across the border
+                    if (other == UINT32_MAX) continue; // inside the island, or an open edge: nothing continues there
+                    const uint32_t va = tv[c], vb = tv[(c + 1) % 3];
+                    const glm::vec2 ua = mesh.uvs[size_t(tri) * 3 + size_t(c)] * glm::vec2(fw, fh),
+                                    ub = mesh.uvs[size_t(tri) * 3 + size_t((c + 1) % 3)] * glm::vec2(fw, fh);
+                    if (glm::max(ua, ub).x < winLo.x || glm::min(ua, ub).x > winHi.x || glm::max(ua, ub).y < winLo.y ||
+                        glm::min(ua, ub).y > winHi.y)
+                        continue; // (an edge off the window)
+                    const glm::uvec3 ov = mesh.triangles[other];
+                    int ia = 0, ib = 0;
+                    for (int c2 = 0; c2 < 3; ++c2) {
+                        if (ov[c2] == va) ia = c2;
+                        if (ov[c2] == vb) ib = c2;
+                    }
+                    if (ia == ib) continue;
+                    const glm::vec2 pa = mesh.uvs[size_t(other) * 3 + size_t(ia)] * glm::vec2(fw, fh),
+                                    pb = mesh.uvs[size_t(other) * 3 + size_t(ib)] * glm::vec2(fw, fh);
+                    const glm::vec2 e = ub - ua, e2 = pb - pa;
+                    const float len = glm::length(e), len2 = glm::length(e2);
+                    if (len < 1e-3f || len2 < 1e-3f) continue;
+                    const glm::vec2 third = mesh.uvs[size_t(tri) * 3 + size_t((c + 2) % 3)] * glm::vec2(fw, fh),
+                                    third2 = mesh.uvs[size_t(other) * 3 + size_t(3 - ia - ib)] * glm::vec2(fw, fh);
+                    glm::vec2 nOut = glm::vec2(-e.y, e.x) / len, nIn = glm::vec2(-e2.y, e2.x) / len2;
+                    if (glm::dot(nOut, third - ua) > 0.0f) nOut = -nOut;
+                    if (glm::dot(nIn, third2 - pa) < 0.0f) nIn = -nIn;
+                    const glm::mat2 mine(e / len, nOut), theirs(e2 / len2, nIn); // (columns: along the edge, out of the triangle)
+                    borders.push_back({topo.island[tri], ua, e, nOut, pa, e2, nIn, len2 / len, mine * glm::transpose(theirs)});
+                }
+            }
+        }
+    // Each island's box in the tile and its gutter ring (window coordinates): its work stays inside that box grown by its radius.
+    thread_local std::vector<uint32_t> islands;
+    islands.clear();
+    for (int j = k - kG; j < k + kT + kG; ++j)
+        for (int i = k - kG; i < k + kT + kG; ++i) islands.push_back(id[size_t(j) * size_t(n) + size_t(i)]);
+    std::sort(islands.begin(), islands.end());
+    islands.erase(std::unique(islands.begin(), islands.end()), islands.end());
+    struct Box {
+        int x0 = INT32_MAX, y0 = INT32_MAX, x1 = -1, y1 = -1;
+    };
+    std::vector<Box> boxes(islands.size());
+    for (int j = k - kG; j < k + kT + kG; ++j)
+        for (int i = k - kG; i < k + kT + kG; ++i) {
+            const uint32_t v = id[size_t(j) * size_t(n) + size_t(i)];
+            if (!v) continue;
+            Box& bx = boxes[size_t(std::lower_bound(islands.begin(), islands.end(), v) - islands.begin())];
+            bx.x0 = std::min(bx.x0, i), bx.y0 = std::min(bx.y0, j), bx.x1 = std::max(bx.x1, i), bx.y1 = std::max(bx.y1, j);
+        }
+    auto win = std::make_shared<SmoothWindow>();
+    thread_local std::vector<float> nearest;
+    thread_local std::vector<uint8_t> have;
+    thread_local std::vector<int> sx, sy;
+    for (size_t ii = 0; ii < islands.size(); ++ii) {
+        const uint32_t island = islands[ii];
+        if (!island || boxes[ii].x1 < 0) continue;
+        SmoothIsland si;
+        si.island = island;
+        const int ki = si.ki = islandK[island];
+        si.rx0 = std::max(0, boxes[ii].x0 - ki - 1), si.ry0 = std::max(0, boxes[ii].y0 - ki - 1);
+        const int rx1 = std::min(n - 1, boxes[ii].x1 + ki + 1), ry1 = std::min(n - 1, boxes[ii].y1 + ki + 1);
+        si.rw = rx1 - si.rx0 + 1, si.rh = ry1 - si.ry0 + 1;
+        const int rx0 = si.rx0, ry0 = si.ry0, rw = si.rw, rh = si.rh;
+        auto at2 = [&](int i, int j) { return size_t(j - ry0) * size_t(rw) + size_t(i - rx0); }; // window -> region index
+        si.src.assign(size_t(rw) * size_t(rh), -1);
+        si.frame.assign(si.src.size(), uint16_t(0));
+        si.frames.assign(1, glm::mat2(1.0f));
+        have.assign(size_t(rw) * size_t(rh), uint8_t(0));
+        nearest.assign(size_t(rw) * size_t(rh), 1e9f);
+        for (int j = ry0; j <= ry1; ++j)
+            for (int i = rx0; i <= rx1; ++i) {
+                const int x = lx0 + i, y = ly0 + j;
+                if (id[size_t(j) * size_t(n) + size_t(i)] != island || x < 0 || y < 0 || x >= w || y >= h) continue;
+                si.src[at2(i, j)] = y * w + x;
+                have[at2(i, j)] = 1;
+            }
+        for (const Border& bd : borders) { // the padding: texels out to ki past this island's borders
+            if (bd.island != island) continue;
+            uint16_t frameId = 0; // (made when the border claims its first texel)
+            const float len = glm::length(bd.e), inv = 1.0f / (len * len);
+            const glm::vec2 lo = glm::min(bd.a, bd.a + bd.e) - glm::vec2(float(ki) + 1.0f),
+                            hi = glm::max(bd.a, bd.a + bd.e) + glm::vec2(float(ki) + 1.0f);
+            const int bx0 = std::max(int(std::floor(lo.x)), lx0 + rx0), by0 = std::max(int(std::floor(lo.y)), ly0 + ry0),
+                      bx1 = std::min(int(std::ceil(hi.x)), lx0 + rx1), by1 = std::min(int(std::ceil(hi.y)), ly0 + ry1);
+            for (int y = by0; y <= by1; ++y)
+                for (int x = bx0; x <= bx1; ++x) {
+                    if (x < 0 || y < 0 || x >= w || y >= h) continue;
+                    const size_t li = at2(x - lx0, y - ly0);
+                    if (id[size_t(y - ly0) * size_t(n) + size_t(x - lx0)] == island) continue; // (the island's own texel)
+                    const glm::vec2 rel = glm::vec2(float(x) + 0.5f, float(y) + 0.5f) - bd.a;
+                    const float d = glm::dot(rel, bd.nOut); // texels outside the edge
+                    const float t = glm::dot(rel, bd.e) * inv; // along it
+                    if (d <= 0.0f || d > float(ki) + 0.5f || t < -0.001f || t > 1.001f) continue;
+                    if (d >= nearest[li]) continue; // the nearest border edge claims the texel
+                    nearest[li] = d;
+                    const glm::vec2 q = bd.pa + bd.pe * t + bd.nIn * (d * bd.scale);
+                    si.src[li] = std::clamp(int(std::floor(q.y)), 0, h - 1) * w + std::clamp(int(std::floor(q.x)), 0, w - 1);
+                    if (!frameId && si.frames.size() < 65535) frameId = uint16_t(si.frames.size()), si.frames.push_back(bd.toThis);
+                    si.frame[li] = frameId;
+                    have[li] = 1;
+                }
+        }
+        // The wedges past a corner of the island (no edge's span reaches them): the nearest texel that has a colour.
+        sx.assign(si.src.size(), -1), sy.assign(si.src.size(), 0); // the nearest filled texel's region coordinates
+        for (int j = 0; j < rh; ++j)
+            for (int i = 0; i < rw; ++i)
+                if (have[size_t(j) * size_t(rw) + size_t(i)]) sx[size_t(j) * size_t(rw) + size_t(i)] = i, sy[size_t(j) * size_t(rw) + size_t(i)] = j;
+        auto relaxFill = [&](int i, int j, int ni, int nj) {
+            if (ni < 0 || nj < 0 || ni >= rw || nj >= rh) return;
+            const size_t me = size_t(j) * size_t(rw) + size_t(i), nb = size_t(nj) * size_t(rw) + size_t(ni);
+            if (sx[nb] < 0) return;
+            const int dn = (i - sx[nb]) * (i - sx[nb]) + (j - sy[nb]) * (j - sy[nb]);
+            if (sx[me] < 0 || dn < (i - sx[me]) * (i - sx[me]) + (j - sy[me]) * (j - sy[me])) sx[me] = sx[nb], sy[me] = sy[nb];
+        };
+        for (int j = 0; j < rh; ++j)
+            for (int i = 0; i < rw; ++i) relaxFill(i, j, i - 1, j), relaxFill(i, j, i - 1, j - 1), relaxFill(i, j, i, j - 1), relaxFill(i, j, i + 1, j - 1);
+        for (int j = rh - 1; j >= 0; --j)
+            for (int i = rw - 1; i >= 0; --i) relaxFill(i, j, i + 1, j), relaxFill(i, j, i + 1, j + 1), relaxFill(i, j, i, j + 1), relaxFill(i, j, i - 1, j + 1);
+        for (int j = 0; j < rh; ++j)
+            for (int i = 0; i < rw; ++i) {
+                const size_t me = size_t(j) * size_t(rw) + size_t(i);
+                if (have[me] || sx[me] < 0 || id[size_t(j + ry0) * size_t(n) + size_t(i + rx0)] == island) continue;
+                if ((i - sx[me]) * (i - sx[me]) + (j - sy[me]) * (j - sy[me]) > (ki + 1) * (ki + 1)) continue;
+                const int x = lx0 + rx0 + i, y = ly0 + ry0 + j;
+                if (x < 0 || y < 0 || x >= w || y >= h) continue;
+                si.src[me] = si.src[size_t(sy[me]) * size_t(rw) + size_t(sx[me])];
+                si.frame[me] = si.frame[size_t(sy[me]) * size_t(rw) + size_t(sx[me])];
+            }
+        for (int j = k - kG; j < k + kT + kG; ++j) // the texels of the island this window writes
+            for (int i = k - kG; i < k + kT + kG; ++i)
+                if (id[size_t(j) * size_t(n) + size_t(i)] == island) si.outs.push_back(uint16_t(j * n + i));
+        win->islands.push_back(std::move(si));
+    }
+    // A texel of the tile that is on no island (the gutter) takes the blur of the nearest island texel in the ring (a sweep
+    // that carries each texel's nearest island texel along).
+    const int wt = kT + 2 * kG;
+    thread_local std::vector<int> gx, gy;
+    gx.assign(size_t(wt) * size_t(wt), -1), gy.assign(size_t(wt) * size_t(wt), 0);
+    for (int j = 0; j < wt; ++j)
+        for (int i = 0; i < wt; ++i)
+            if (id[size_t(j + k - kG) * size_t(n) + size_t(i + k - kG)]) gx[size_t(j) * size_t(wt) + size_t(i)] = i, gy[size_t(j) * size_t(wt) + size_t(i)] = j;
+    auto relaxG = [&](int i, int j, int ni, int nj) {
+        if (ni < 0 || nj < 0 || ni >= wt || nj >= wt) return;
+        const size_t me = size_t(j) * size_t(wt) + size_t(i), nb = size_t(nj) * size_t(wt) + size_t(ni);
+        if (gx[nb] < 0) return;
+        const int dn = (i - gx[nb]) * (i - gx[nb]) + (j - gy[nb]) * (j - gy[nb]);
+        if (gx[me] < 0 || dn < (i - gx[me]) * (i - gx[me]) + (j - gy[me]) * (j - gy[me])) gx[me] = gx[nb], gy[me] = gy[nb];
+    };
+    for (int j = 0; j < wt; ++j)
+        for (int i = 0; i < wt; ++i) relaxG(i, j, i - 1, j), relaxG(i, j, i - 1, j - 1), relaxG(i, j, i, j - 1), relaxG(i, j, i + 1, j - 1);
+    for (int j = wt - 1; j >= 0; --j)
+        for (int i = wt - 1; i >= 0; --i) relaxG(i, j, i + 1, j), relaxG(i, j, i + 1, j + 1), relaxG(i, j, i, j + 1), relaxG(i, j, i - 1, j + 1);
+    win->gutter.assign(size_t(kT) * size_t(kT), -1);
+    for (int j = 0; j < kT; ++j)
+        for (int i = 0; i < kT; ++i) {
+            const size_t me = size_t(j + kG) * size_t(wt) + size_t(i + kG);
+            if (gx[me] < 0 || std::abs(gx[me] - (i + kG)) > kG || std::abs(gy[me] - (j + kG)) > kG) continue;
+            win->gutter[size_t(j) * size_t(kT) + size_t(i)] = gy[me] * wt + gx[me];
+        }
+    return win;
+}
+
+size_t TexturePainter::smoothDab(Mesh& mesh, const BVH& bvh, const DabParams& p, Symmetry sym) {
+    if (!active_ || p.radius <= 0.0f || !hasTexture(mesh)) return 0;
+    PaintTexture& tex = mutableTexture(mesh);
+    if (!textureLayerEditable(tex, layer_) || (layer_ >= 0 && layer_ >= int(tex.layers.size()))) return 0;
+    const int w = tex.width, h = tex.height;
+    const float s = std::clamp(p.strength, 0.0f, 1.0f) * std::clamp(p.pressure, 0.0f, 1.0f);
+    if (s <= 0.0f || !useTilePath(mesh, tex, true)) return 0; // (textures over 256 tiles a side: no smooth colour)
+    if (!tex.uvIndex) return 0;
+    std::vector<uint8_t>& target = tex.target(layer_);
+    const bool onLayer = layer_ >= 0;
+    const bool useAlpha = p.alpha && !p.alpha->empty();
+    std::vector<DabMirror> mirrors;
+    for (const SymCopy& m : Sculptor::copies(sym)) {
+        DabMirror mi;
+        mi.center = m.point(p.center);
+        mi.viewDir = m.dir(p.viewDir);
+        glm::vec3 aUp = m.dir(p.alphaUp);
+        aUp -= mi.viewDir * glm::dot(aUp, mi.viewDir);
+        mi.aUp = glm::length(aUp) > 1e-6f ? glm::normalize(aUp) : glm::vec3(0, 1, 0);
+        mi.aRight = glm::cross(mi.aUp, -mi.viewDir);
+        mi.stamp = ++dab_;
+        mirrors.push_back(mi);
+    }
+    const DabContext ctx{mesh, bvh, p, tex, target, s, useAlpha, mesh.hasMask(), mesh.normals.size() == mesh.vertexCount(),
+                         p.radius, p.radius * p.radius, mirrors};
+    // The blur's reach: the mesh's mean triangle edge (what a vertex's ring averages over), the same on every chart, so its
+    // radius in texels follows each UV island's texel size. Worked out once a stroke (the positions as the stroke starts).
+    if (smoothRadius_ <= 0) {
+        smoothTopo_ = cachedSmoothTopo(mesh, w, h);
+        const SmoothTopo& topo = *smoothTopo_;
+        uint32_t islands = 0;
+        for (uint32_t id : topo.island) islands = std::max(islands, id);
+        std::vector<double> area3(size_t(islands) + 1, 0.0), areaUv(size_t(islands) + 1, 0.0);
+        double total3 = 0.0;
+        for (size_t t = 0; t < mesh.triangleCount(); ++t) {
+            const glm::uvec3 tv = mesh.triangles[t];
+            const double a3 = 0.5 * double(glm::length(glm::cross(mesh.positions[tv.y] - mesh.positions[tv.x], mesh.positions[tv.z] - mesh.positions[tv.x])));
+            const glm::vec2 a = mesh.uvs[t * 3], b = mesh.uvs[t * 3 + 1], c = mesh.uvs[t * 3 + 2];
+            const double au = 0.5 * std::abs(double((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y))) * double(w) * double(h);
+            area3[topo.island[t]] += a3, areaUv[topo.island[t]] += au, total3 += a3;
+        }
+        const double reach = 1.5 * std::sqrt(total3 / double(std::max<size_t>(mesh.triangleCount(), 1))); // (scene units)
+        smoothIslandK_.assign(size_t(islands) + 1, 1);
+        int widest = 1;
+        for (size_t i = 1; i < smoothIslandK_.size(); ++i) {
+            if (area3[i] <= 0.0 || areaUv[i] <= 0.0) continue;
+            const double texel = std::sqrt(area3[i] / areaUv[i]); // scene units per texel on this island
+            smoothIslandK_[i] = uint8_t(std::clamp(int(std::lround(reach / texel)), 1, 16));
+            widest = std::max(widest, int(smoothIslandK_[i]));
+        }
+        smoothRadius_ = widest;
+        smoothKey_ = uint64_t(widest) * 0x9E3779B97F4A7C15ull;
+        for (uint8_t kk : smoothIslandK_) smoothKey_ = (smoothKey_ ^ kk) * 1099511628211ull;
+    }
+    const int k = smoothRadius_ + kTextureGutter + 1; // (the window's halo: the widest radius, plus the gutter ring)
+    constexpr int kT = kTextureTile;
+    const UvTileIndex& uvIndex = *tex.uvIndex;
+    // The planes this stroke smooths: Base Color (plane 0, colour x alpha) when it paints it, then every material channel it
+    // paints (value x coverage), each blurred with the same windows. C = components + coverage + count.
+    struct Plane {
+        int c, n, bits, tb, C;
+        bool srgb, normal;
+        TileImage* img;
+    };
+    std::vector<Plane> planes;
+    if (channels_ & 1u) planes.push_back({0, 3, 8, 4, kSmoothC, true, false, nullptr});
+    for (int c = 1; c < kChannelCount; ++c) {
+        TileImage* img = channelTarget(tex, c);
+        if (!img) continue;
+        const ChannelFormat& f = channelFormat(c);
+        planes.push_back({c, f.components, f.bits, img->texelBytes(), f.components + 2, f.srgb, c == int(Channel::Normal), img});
+    }
+    if (planes.empty()) return 0;
+    for (const Plane& pl : planes)
+        if (smoothBlur_[size_t(pl.c)].size() != tiles_.size()) smoothBlur_[size_t(pl.c)].assign(tiles_.size(), {});
+    const SmoothTopo& topo = *smoothTopo_;
+    auto unitAt = [](const uint8_t* q, int comp, int bits) {
+        if (bits == 16) {
+            uint16_t u;
+            std::memcpy(&u, q + comp * 2, 2);
+            return float(u) * (1.0f / 65535.0f);
+        }
+        return float(q[comp]) * (1.0f / 255.0f);
+    };
+    auto putUnit = [](uint8_t* q, int comp, int bits, float v) {
+        v = std::clamp(v, 0.0f, 1.0f);
+        if (bits == 16) {
+            const uint16_t u = uint16_t(v * 65535.0f + 0.5f);
+            std::memcpy(q + comp * 2, &u, 2);
+        } else {
+            q[comp] = uint8_t(v * 255.0f + 0.5f);
+        }
+    };
+    // Per reached tile, before any texel: the box average (radius of its island) of [value x alpha, alpha, 1] around every texel
+    // of the tile, from the texels before the dab. A texel averages its own UV island's texels and, past the island's border,
+    // the texels of the surface that continues on the other side (see buildSmoothWindow, which finds where those texels are
+    // once per tile and layout). So a hard edge that runs across or along a seam smooths like anywhere else.
+    const std::function<void(const std::vector<uint32_t>&)> prepare = [&](const std::vector<uint32_t>& reached) {
+        {   // (what an earlier dab of the stroke left on tiles this dab does not reach goes; the others are reused)
+            std::vector<uint8_t> reachedFlag(tiles_.size(), 0);
+            for (uint32_t t : reached) reachedFlag[t] = 1;
+            for (const Plane& pl : planes)
+                for (size_t t = 0; t < tiles_.size(); ++t)
+                    if (!reachedFlag[t] && !smoothBlur_[size_t(pl.c)][t].empty()) std::vector<float>().swap(smoothBlur_[size_t(pl.c)][t]);
+        }
+        if (topo.windowsKey != smoothKey_ || topo.windows.size() != tiles_.size()) { // (other radii or another texture size)
+            topo.windows.assign(tiles_.size(), nullptr);
+            topo.windowCount = 0;
+            topo.windowsKey = smoothKey_;
+        }
+        // (which missing windows this dab builds: the first ones in tile order, so the result never depends on thread timing)
+        std::vector<uint8_t> mayBuild(reached.size(), 0);
+        for (size_t j = 0, missing = 0; j < reached.size(); ++j)
+            if (!topo.windows[reached[j]] && missing++ < size_t(kSmoothBuildsPerDab)) mayBuild[j] = 1;
+        ThreadPool::shared().run(reached.size(), [&](size_t job) {
+            constexpr int kG = kTextureGutter + 1;
+            const uint32_t ti = reached[job];
+            const int tx = int(ti % uint32_t(tilesX_)), ty = int(ti / uint32_t(tilesX_));
+            const int n = kT + 2 * k;
+            std::shared_ptr<SmoothWindow> win = topo.windows[ti];
+            if (!win) {
+                // A fresh layout: building every window the brush reaches at once is a hitch (140 tiles for a big brush on a
+                // head), so a dab builds a limited number and leaves the other tiles for the next dabs (they overlap).
+                if (topo.windowCount.load() < kSmoothMaxWindows) {
+                    if (!mayBuild[job]) return; // (this tile waits: smoothBlur_[..][ti] stays empty)
+                    win = buildSmoothWindow(mesh, topo, uvIndex, w, h, tx, ty, k, smoothIslandK_);
+                    topo.windows[ti] = win;
+                    topo.windowCount.fetch_add(1);
+                } else {
+                    win = buildSmoothWindow(mesh, topo, uvIndex, w, h, tx, ty, k, smoothIslandK_); // (cache full: used for this dab only)
+                }
+            }
+            const int wt = kT + 2 * kG; // the blur of the tile and its gutter ring, for the gutter texels to copy
+            // (scratch kept per thread: only what is written is read, so nothing is zeroed that does not need to be)
+            thread_local std::vector<float> wout, val;
+            thread_local std::vector<double> sat;
+            for (const Plane& pl : planes) {
+                const int kC = pl.C;
+                wout.resize(size_t(wt) * size_t(wt) * size_t(kC));
+                for (const SmoothIsland& si : win->islands) {
+                    const int ki = si.ki, rw = si.rw, rh = si.rh;
+                    val.resize(size_t(rw) * size_t(rh) * size_t(kC));
+                    for (size_t r = 0; r < si.src.size(); ++r) {
+                        float* v = &val[r * size_t(kC)];
+                        if (si.src[r] < 0) {
+                            std::memset(v, 0, size_t(kC) * sizeof(float));
+                            continue;
+                        }
+                        if (pl.c == 0) {
+                            const uint8_t* np = &target[size_t(si.src[r]) * 4];
+                            const float a = onLayer ? float(np[3]) / 255.0f : 1.0f; // a transparent texel lends no colour
+                            const glm::vec3 c = linearRgb(np) * a;
+                            v[0] = c.x, v[1] = c.y, v[2] = c.z, v[3] = a, v[4] = 1.0f;
+                            continue;
+                        }
+                        uint8_t scratch[8];
+                        const uint8_t* np = pl.img->texel(si.src[r] % w, si.src[r] / w, scratch);
+                        const float a = onLayer ? unitAt(np, pl.n, pl.bits) : 1.0f;
+                        float u[4];
+                        for (int q = 0; q < pl.n; ++q) u[q] = unitAt(np, q, pl.bits);
+                        if (pl.normal && pl.n == 3) { // the direction in this island's tangent frame
+                            const glm::vec2 xy = si.frames[si.frame[r]] * glm::vec2(u[0] * 2.0f - 1.0f, u[1] * 2.0f - 1.0f);
+                            v[0] = xy.x * a, v[1] = xy.y * a, v[2] = (u[2] * 2.0f - 1.0f) * a;
+                        } else if (pl.srgb) {
+                            for (int q = 0; q < pl.n; ++q) v[q] = linearOf(uint8_t(std::lround(u[q] * 255.0f))) * a;
+                        } else {
+                            for (int q = 0; q < pl.n; ++q) v[q] = u[q] * a;
+                        }
+                        v[pl.n] = a, v[pl.n + 1] = 1.0f;
+                    }
+                    // The summed-area table over the region (double: sums of thousands), then the box around each texel it writes.
+                    const size_t stride = size_t(rw) + 1;
+                    sat.resize(stride * (size_t(rh) + 1) * size_t(kC));
+                    std::fill(sat.begin(), sat.begin() + std::ptrdiff_t(stride * size_t(kC)), 0.0); // (the table's first row and column are zero)
+                    for (int j = 0; j < rh; ++j) std::fill_n(&sat[((size_t(j) + 1) * stride) * size_t(kC)], kC, 0.0);
+                    for (int j = 0; j < rh; ++j)
+                        for (int i = 0; i < rw; ++i)
+                            for (int c = 0; c < kC; ++c)
+                                sat[((size_t(j) + 1) * stride + size_t(i) + 1) * size_t(kC) + size_t(c)] =
+                                    double(val[(size_t(j) * size_t(rw) + size_t(i)) * size_t(kC) + size_t(c)]) +
+                                    sat[(size_t(j) * stride + size_t(i) + 1) * size_t(kC) + size_t(c)] +
+                                    sat[((size_t(j) + 1) * stride + size_t(i)) * size_t(kC) + size_t(c)] -
+                                    sat[(size_t(j) * stride + size_t(i)) * size_t(kC) + size_t(c)];
+                    for (const uint16_t wi : si.outs) {
+                        const int i = wi % n, j = wi / n;
+                        const int ci = i - si.rx0, cj = j - si.ry0; // in the region
+                        float* o = &wout[(size_t(j - k + kG) * size_t(wt) + size_t(i - k + kG)) * size_t(kC)];
+                        for (int c = 0; c < kC; ++c) {
+                            auto sum = [&](int jj, int ii) { return sat[(size_t(jj) * stride + size_t(ii)) * size_t(kC) + size_t(c)]; };
+                            o[c] = float(sum(cj + ki + 1, ci + ki + 1) - sum(cj - ki, ci + ki + 1) - sum(cj + ki + 1, ci - ki) + sum(cj - ki, ci - ki));
+                        }
+                    }
+                }
+                std::vector<float>& out = smoothBlur_[size_t(pl.c)][ti];
+                out.resize(size_t(kT) * size_t(kT) * size_t(kC));
+                for (size_t t = 0; t < win->gutter.size(); ++t)
+                    if (win->gutter[t] >= 0) std::memcpy(&out[t * size_t(kC)], &wout[size_t(win->gutter[t]) * size_t(kC)], size_t(kC) * sizeof(float));
+                    else std::memset(&out[t * size_t(kC)], 0, size_t(kC) * sizeof(float)); // (no island within reach: nothing to blend)
+            }
+        });
+    };
+    // Pass 1 (tiles in parallel): every new texel from the blur of the texels before the dab; written in pass 2.
+    std::vector<std::pair<glm::ivec2, glm::ivec2>> rects;
+    dabTiles(ctx, [&](Tile& t, size_t li, int x, int y, float, float dabWeight) {
+        const size_t tileIndex = size_t(y / kT) * size_t(tilesX_) + size_t(x / kT);
+        const Plane& first = planes[0];
+        const std::vector<float>& lead = smoothBlur_[size_t(first.c)][tileIndex];
+        if (lead.empty()) return; // (its window is not built yet; every plane's is made together)
+        if (lead[li * size_t(first.C) + size_t(first.C) - 1] <= 0.0f) return; // no island texel in reach
+        const float wd = std::clamp(dabWeight, 0.0f, 1.0f);
+        const size_t i = size_t(y) * size_t(w) + size_t(x);
+        uint32_t packed = 0;
+        for (const Plane& pl : planes) {
+            const float* b = &smoothBlur_[size_t(pl.c)][tileIndex][li * size_t(pl.C)];
+            const int n = pl.n;
+            if (pl.c == 0) {
+                const uint8_t* own = &target[i * 4];
+                uint8_t out[4];
+                const glm::vec3 avg = b[3] > 1e-6f ? glm::vec3(b[0], b[1], b[2]) / b[3] : linearRgb(own);
+                if (!onLayer) {
+                    putLinear(out, glm::mix(linearRgb(own), avg, wd));
+                    out[3] = 255;
+                } else {
+                    const float a = float(own[3]) / 255.0f;
+                    putLinear(out, a > 1e-6f ? glm::mix(linearRgb(own), avg, wd) : avg);
+                    out[3] = unit8(glm::mix(a, b[3] / b[4], wd));
+                }
+                std::memcpy(&packed, out, 4);
+                continue;
+            }
+            const uint8_t* own = t.channels[size_t(pl.c)].texels + li * size_t(pl.tb);
+            const float a = onLayer ? unitAt(own, n, pl.bits) : 1.0f;
+            float v[4];
+            for (int q = 0; q < n; ++q) {
+                float o = unitAt(own, q, pl.bits); // the texel, in the space the blur holds (a direction, linear light, or the value)
+                if (pl.normal) o = o * 2.0f - 1.0f;
+                else if (pl.srgb) o = linearOf(uint8_t(std::lround(o * 255.0f)));
+                const float avg = b[n] > 1e-6f ? b[q] / b[n] : o;
+                v[q] = onLayer && a <= 1e-6f ? avg : glm::mix(o, avg, wd);
+            }
+            uint8_t out[8] = {};
+            if (pl.normal && n == 3) { // a blend of directions is shorter than one: back to unit length
+                glm::vec3 d(v[0], v[1], v[2]);
+                const float len = glm::length(d);
+                d = len > 1e-6f ? d / len : glm::vec3(0, 0, 1);
+                for (int q = 0; q < 3; ++q) putUnit(out, q, pl.bits, d[q] * 0.5f + 0.5f);
+            } else {
+                for (int q = 0; q < n; ++q) {
+                    if (pl.srgb) out[q] = srgb8(v[q]);
+                    else putUnit(out, q, pl.bits, v[q]);
+                }
+            }
+            if (onLayer) putUnit(out, n, pl.bits, glm::mix(a, b[n] / b[n + 1], wd));
+            std::vector<uint8_t>& pend = t.pendingChannel[size_t(pl.c)];
+            pend.insert(pend.end(), out, out + pl.tb);
+        }
+        if (t.pendingTexel.empty()) t.pendingTexel.reserve(size_t(kT) * kT), t.pendingRgba.reserve(size_t(kT) * kT);
+        t.pendingTexel.push_back(uint32_t(li));
+        t.pendingRgba.push_back(packed);
+    }, false, rects, &prepare);
+    // Pass 2: write them (the tile's undo original was kept when the dab first reached it).
+    size_t changed = 0;
+    const bool smoothBase = planes[0].c == 0;
+    for (uint32_t ti : touched_) {
+        Tile* t = tilePtr_[ti].load(std::memory_order_acquire);
+        if (!t) continue;
+        const int x0 = int(ti % uint32_t(tilesX_)) * kTextureTile, y0 = int(ti / uint32_t(tilesX_)) * kTextureTile;
+        glm::ivec2 lo{INT32_MAX}, hi{INT32_MIN};
+        for (size_t q = 0; q < t->pendingTexel.size(); ++q) {
+            const uint32_t li = t->pendingTexel[q];
+            const int x = x0 + int(li % kTextureTile), y = y0 + int(li / kTextureTile);
+            if (smoothBase) std::memcpy(&target[(size_t(y) * size_t(w) + size_t(x)) * 4], &t->pendingRgba[q], 4);
+            for (const Plane& pl : planes)
+                if (pl.c) std::memcpy(t->channels[size_t(pl.c)].texels + size_t(li) * size_t(pl.tb), &t->pendingChannel[size_t(pl.c)][q * size_t(pl.tb)], size_t(pl.tb));
+            lo = glm::min(lo, glm::ivec2(x, y));
+            hi = glm::max(hi, glm::ivec2(x + 1, y + 1));
+        }
+        if (t->pendingTexel.empty()) continue;
+        changed += t->pendingTexel.size();
+        t->pendingTexel.clear();
+        t->pendingRgba.clear();
+        for (auto& pend : t->pendingChannel) pend.clear();
+        if (smoothBase && !tex.layers.empty() && tex.base.size() == tex.pixels.size())
+            for (int y = lo.y; y < hi.y; ++y)
+                for (int x = lo.x; x < hi.x; ++x) {
+                    const size_t i = size_t(y) * size_t(w) + size_t(x);
+                    compositeTexel(tex, i, &tex.pixels[i * 4]);
+                }
+        if (!tex.layers.empty())
+            for (const Plane& pl : planes)
+                if (pl.c) compositeChannel(tex, Channel(pl.c), lo.x, lo.y, hi.x, hi.y);
+        tex.markDirty(lo.x, lo.y, hi.x, hi.y);
+    }
+    return changed;
+}
+
 void TexturePainter::end(UndoRecord& record) {
     if (active_) {
         auto u = std::make_unique<TextureTileUndo>();
@@ -1605,6 +2244,7 @@ void TexturePainter::end(UndoRecord& record) {
     active_ = false;
     tiles_.clear();
     tilePtr_.reset();
+    for (auto& plane : smoothBlur_) std::vector<std::vector<float>>().swap(plane);
     std::vector<uint32_t>().swap(tris_);
     std::vector<DabTri>().swap(dabTris_);
     bandTris_.clear();

@@ -1,5 +1,12 @@
 # Selection sets and morph targets
 
+![A sculpted head, before and after](images/mirror-weld.jpg)
+
+> **In short:**
+> - A selection set is a named snapshot of a Part's mask, groups, paint, visibility, UVs and shape.
+> - Store, restore, rename and combine sets in **Tool > Selection Sets**.
+> - Sets work across subdivision levels; a stored shape can drive the **Morph** brush.
+
 A selection set is a named snapshot of a Part's mask, face groups, vertex paint, visibility (which faces are
 hidden), UVs and shape. Store as many as you like, bring any of them back later, combine them, and use a stored
 shape as the target of the **Morph** brush. Sets belong to the Part, travel with the project, and work across its

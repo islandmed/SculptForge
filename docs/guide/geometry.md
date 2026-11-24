@@ -1,5 +1,12 @@
 # Subdivide, remesh, decimate and LODs
 
+![A head after Voxel Remesh](images/quick-tour/02-voxel.jpg)
+
+> **In short:**
+> - Subdivide, remesh, decimate, make symmetric and build LODs for the active Part.
+> - Everything except the LOD preview is undoable with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
+> - Find the tools in **Tool > Geometry**, grouped by what you do.
+
 These tools change the topology of the active Part: add resolution for detail, rebuild an even surface,
 reduce the triangle count, make it symmetric, or make a chain of levels of detail for a game engine. This
 chapter explains what each one does to your mesh and its attributes, and when to use it.
@@ -25,11 +32,12 @@ In **Tool > Geometry** they are grouped by what you do: **Levels** (see [Subdivi
 
 ## Quads and triangles
 
-SculptForge sculpts on triangles, but it remembers which pairs of triangles were one quad. A model you open
-from the Bridge, Blender or Maya (OBJ, FBX, PLY, USD) keeps its quads: **Wire** draws them as quads, without
-the diagonal, and OBJ, FBX, PLY, USD and Bridge exports write them back as quads, corner for corner. Polygons with
-more than four sides are split into triangles. The new **Plane** and **Cube** are made of quads, and so is the
-result of a voxel remesh.
+SculptForge sculpts on triangles, but it remembers which pairs of triangles were one quad. A model you open from the
+Bridge, Blender or Maya (OBJ, FBX, PLY, USD) keeps its quads: **Wire** draws them as quads, without the diagonal, and
+OBJ, FBX, PLY, USD and Bridge exports write them back as quads, corner for corner.
+
+Polygons with more than four sides are split into triangles. The new **Plane** and **Cube** are made of quads, and so
+is the result of a voxel remesh.
 
 Sculpting, masking, vertex paint, sculpt layers, undo, Parts and project files all keep the quads. Subdivide
 turns every quad into four quads. Two things turn quads into triangles:
@@ -71,11 +79,32 @@ Use it to:
 - even out stretched triangles after heavy Move or Tendril work;
 - clean up scans, splat conversions and AI-generated models before sculpting.
 
-The **Resolution** slider next to the button sets how many voxels span the longest side of the model (32 to 512, as
-the `remesh` command; default 200). Higher keeps more detail and makes more triangles. 512 is safe on an 8 GB
-computer: a 28M-triangle scan remeshes at 512 in about 8 s (14 s on 4 cores) into about 760,000 triangles; a round
-2M-triangle sculpt, which fills its box, in about 3 s (5 s on 4 cores) into about 2.5 million triangles, with about
-2 GB of memory at its peak.
+The **Resolution** slider next to the button sets how many voxels span the longest side of the model (32 to 4096, as
+the `remesh` command; default 200). Higher keeps more detail and makes more triangles, about four times as many for
+each doubling.
+
+Two thirds of the slider covers 32 to 512, the everyday range; the last third goes up to 2048 and then 4096
+(Ctrl+click it to type a number). The line under it estimates the result, *About 1.6M triangles*, from the Part's
+surface area (fine detail smaller than a voxel counts there, so a dense scan comes out somewhat lower).
+
+512 is safe on an 8 GB computer: a 28M-triangle scan remeshes at 512 in about 8 s (14 s on 4 cores) into about
+760,000 triangles; a round 2M-triangle sculpt, which fills its box, in about 3 s (5 s on 4 cores) into about 2.5
+million triangles, with about 2 GB of memory at its peak.
+
+Above 512 only the voxels near the surface are stored, so memory grows with the surface, not the volume: a sculpted
+head remeshes at 1024 into about 5.6 million triangles in about 3 s (5 s on 4 cores; 0.8 GB at its peak) and at
+2048 into about 22 million in about 9 s (21 s on 4 cores; 3 GB). At 4096 the same head would be about 90 million
+triangles and needs over 16 GB, so on most computers it says so instead of starting. Above 512:
+
+- the estimate line also shows the memory the remesh needs, in red when that is more than is free now;
+- the first remesh asks once, with the estimate (**Remesh** or **Cancel**); it asks again after the Resolution has
+  been back at 512 or less;
+- a remesh that won't fit in the free memory doesn't start: the status line says how much it needs and how much is
+  free. Lower the Resolution or close other apps;
+- it runs in the background with a progress bar; **Cancel** stops it within seconds and the Part stays as it was.
+
+Sculpting tens of millions of triangles needs a fast computer: **Decimate** or a lower Resolution makes the result
+lighter.
 
 ![Wireframe of a model before and after a voxel remesh](images/remesh.jpg)
 
@@ -111,18 +140,21 @@ Remesh as you sculpt, without going to the palette (#121). Turn on **Tool > Reme
   stroke).
 
 Either one remeshes the active Part at the **Resolution** above, with **Keep Masked** and **Keep Texture** as set
-there. It runs in the background with the same progress bar and **Cancel**, so you can keep sculpting; the status
-bar says when it's done and how many triangles the Part has now. Each remesh is one undo step. If you sculpt or
-undo while it runs, it doesn't throw that work away: it remeshes the Part again as it is now.
+there. It runs in the background with the same progress bar and **Cancel**, so you can keep sculpting; the status bar
+says when it's done and how many triangles the Part has now.
+
+Each remesh is one undo step. If you sculpt or undo while it runs, it doesn't throw that work away: it remeshes the
+Part again as it is now.
 
 Both keys change in **Edit > Preferences > Hotkeys** (*Quick Remesh* and *Quick Remesh (hold and drag)*). Neither
 <kbd>Shift</kbd>+<kbd>R</kbd> nor <kbd>N</kbd> is used by any key style, and holding <kbd>N</kbd> changes no other
 drag on the background: without it, a drag there turns, pans or zooms the view, or draws the mask and hide shapes,
 exactly as your key style says. With Quick Remesh off, the keys only tell you where to turn it on.
 
-**Remesh after each stroke** (off by default) does it for you: when you lift the pen after a stroke that stretched
-the surface (edges pulled to more than 1.6 times their length, as a long Move or Snake Hook pull does), the active
-Part is remeshed in the background. Strokes that don't stretch anything, and masking or painting, never remesh.
+**Remesh after each stroke** (off by default) does it for you: when you lift the pen after a stroke that stretched the
+surface (edges pulled to more than 1.6 times their length, as a long Move or Tendril pull does), the active Part is
+remeshed in the background. Strokes that don't stretch anything, and masking or painting, never remesh.
+
 Sculpting never waits for it. It skips Parts with subdivision levels, sculpt layers or a painted texture (Keep
 Texture), where a remesh would bake or drop them; use the button or <kbd>Shift</kbd>+<kbd>R</kbd> there.
 
@@ -139,6 +171,7 @@ projection](retopology.md).
 **Tool > Geometry > Fill Holes** caps every open boundary of the active Part, such as a hole, an open bottom or the
 rim of an extracted shell. The new patch's triangles are sized like the ones around the hole, and the patch follows
 the curve of the surface around it, so a hole in a sphere closes round, not flat. The rest of the Part is not changed.
+
 The patches get a [face group](face-groups.md) of their own, so you can mask or hide them in one click. Fill Holes
 makes an open scan or an extracted part watertight without a remesh. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings the holes
 back.
@@ -210,16 +243,18 @@ changes only what that row names, as one undo step.
 
 | Row | What it is | What Fix does |
 |---|---|---|
-| **Non-manifold edges** | Edges shared by three or more triangles (a fin, a wall inside the mesh) | Each triangle past the first two gets its own copy of the edge, so it comes loose; nothing is deleted |
-| **Holes** | Open boundary loops | Caps each with a patch, as [Fill Holes](#fill-holes) does |
+| **Non-manifold edges** | Edges shared by three or more triangles (a fin, a wall inside the mesh, two solids touching along an edge) | Pulls the edge apart; nothing is deleted. Solids that only touch come apart closed; a fin or wall comes loose, which leaves its edge open (a hole) |
+| **Holes** | Open boundary loops | Caps each with a patch, as [Fill Holes](#fill-holes) does. The edge of a loose fin or sheet isn't capped (the cap would lie on it) |
 | **Duplicate triangles** | Triangles on the same three points as another, either way round | Deletes the copies |
 | **Degenerate triangles** | Triangles that use one point twice | Deletes them |
 | **Zero-area triangles** | Three different points in one line (a sliver) | Collapses each one's shortest edge |
-| **Flipped triangles** | Triangles wound against their neighbours, or a closed piece that is inside out | Turns them to match the rest of their piece, and closed pieces right way out |
+| **Flipped triangles** | Triangles wound against their neighbours, or a closed piece that is inside out | Turns them to match the rest of their piece, and closed pieces right way out (a piece inside another, such as a hollow's inner wall or an eye, keeps its way) |
 | **Isolated points** | Points no triangle uses | Removes them |
 
 **Fix all** fixes every row except **Holes**, in one undo step: a mesh can be open on purpose (a cloth panel, a
-mask, a relief), so holes are only capped when you click their own **Fix**. After a fix the list checks again.
+mask, a relief), so holes are only capped when you click their own **Fix**. One fix can cause another (collapsing a
+sliver can leave a duplicate), so Fix all checks again and repeats until nothing but holes is left. After any fix
+the list checks again, and whatever is still there is explained under the rows (**Not fixed:**), with why.
 
 ## LOD chains
 
@@ -267,7 +302,7 @@ each of them. Before a big change on a heavy sculpt:
 | Command | Options |
 |---|---|
 | `subdivide` | `levels` 1-4 (default 1) |
-| `remesh` | `resolution` 32-512 voxels across the longest side (default 200); `keep_texture` (default true) |
+| `remesh` | `resolution` 32-4096 voxels across the longest side (default 200; above 512 it stops with a message when it won't fit in the free memory); `keep_texture` (default true) |
 | `decimate` | `ratio` 0.01-1 of the triangles to keep (default 0.5), or `triangles` for an exact target |
 | `qremesh` | `target` quads (default 5000), `adaptive`, `keep_groups`, `detect_edges`, `use_vertexpaint`, `symmetry`, `keep_original`, `keep_texture`; see [Quad retopology](retopology.md#scripting) |
 | `close_holes` | `max_edges` closes only holes with at most that many boundary edges (default 0: all); `refine` (default true; false: as few triangles as possible); `new_group` (default true) |
@@ -281,8 +316,6 @@ each of them. Before a big change on a heavy sculpt:
 ```sh
 sculptforge-cli -c 'open path=scan.obj; remesh resolution=256; decimate triangles=200000; export_lods path=out/rock.glb levels=4 ratio=0.5'
 ```
-
-The command line accepts a wider remesh range (32-512) than the palette slider.
 
 ## See also
 

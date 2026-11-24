@@ -17,14 +17,23 @@
 //   shading grid, so lighting keeps every micro detail even where the geometry is coarser.
 // - Brushes mark base triangles dirty; their displacement tiles are re-sent at once, their shading (and that of
 //   their neighbours) within a per-frame budget of grid points (the rest follows on the next frames).
+// - A level that streams from a detail file (Focus Detail) keeps a small record per tile and full grids only for
+//   the tiles drawn finer than its coarse level (render/MicroFocus.h).
+// - Adaptive Detail tiles (core/MicroTiles.h) draw through per-slot delta pages added to the surface at every level
+//   (render/MicroTilePages.h).
 // GL 3.3 core: texture buffers, instancing, no tessellation or compute shaders (macOS stops at GL 4.1).
 #pragma once
 
 #include "core/Micro.h"
+#include "render/BufferUpload.h"
 #include "render/Clusters.h"
+#include "render/MicroFocus.h"
+#include "render/MicroTilePages.h"
 #include "render/GL.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <vector>
 
@@ -46,15 +55,49 @@ public:
     bool closed() const { return closed_; }
     // Grid points whose shading still waits for a frame (budget), for tests and the benchmark.
     size_t pendingShading() const { return pendingCount_ + staleCount_; }
+    // Base triangles whose coarse shading waits for a frame's budget (MicroFocus: a stroke's changed tiles, a few frames' work).
+    size_t pendingCoarse() const { return focus_ ? focus_->pendingCoarse() : 0; }
+    // Strokes' range widens shown a frame late (sync), for tests.
+    size_t widenDeferrals() const { return widenDeferrals_; }
+    // Pages (full grid and shading) of full tiles that wait for a frame's budget to be shaded (MicroFocus: pores come in with them).
+    size_t pendingPages() const { return focus_ ? focus_->pendingPages() : 0; }
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
     // The view moves (set by the Renderer before sync: Fast Navigation's proxy frames): shading gets a time cap.
     bool viewMoving = false;
+    bool cameraMoving = false; // the camera moved since the last frame (set by the Renderer before sync)
     // The last draw: the level used by each visible cluster (-1 = culled), and the target it settled on.
     float lastTargetPx = 0.0f;
+    // Levels a cluster may draw ABOVE the stored one (TierBudgets::microDrawAbove; 0 = the stored level caps the draw,
+    // as before 0.13.5): the vertex shader evaluates the Phong base at the finer point and the height linear between
+    // the stored grid points (an exact integer sum, so both sides of a shared edge agree to the bit), so a close-up
+    // past the stored resolution shows a smooth surface instead of the stored facets. Never past kMaxDrawLevel (the
+    // patch index buffers are 16-bit), and the triangle budget still rules.
+    int drawAbove = 0;
+    // Flat shading shows the stored grid itself: nothing above level_ (11-17 artist-qa: neighbouring clusters drawn one
+    // level apart above the stored grid read as a seam in flat shading, ~10 px facets next to the stored ones with a
+    // dark column between; smooth shading, which interpolates the stored normals, never showed it). Set per draw.
+    bool flatShading = false;
+    static constexpr int kMaxDrawLevel = 8;
+    int maxDrawLevel() const { return flatShading ? level_ : tilePageLevel(); }
+    // Adaptive Detail tiles' page level: the finest level smooth shading draws (flat shading's coarser draws read the same
+    // pages, so switching shading keeps them).
+    int tilePageLevel() const { return std::min(level_ + std::max(drawAbove, 0), kMaxDrawLevel); }
+    // Focus Detail's per-tile GPU levels (null for a level in memory), for tests and the benchmark.
+    const MicroFocus* focus() const { return focus_.get(); }
+    MicroFocus* focus() { return focus_.get(); }
+    // Adaptive Detail tiles' delta pages (null for a Focus Detail level), for tests and the benchmark.
+    const MicroTilePages* tilePages() const { return tilePages_.get(); }
+    // The tile pages want one more frame (MicroTilePages::wantsFrame).
+    bool tilePagesWantFrame() const { return tilePages_ && tilePages_->wantsFrame(); }
+    // Tile pages to draw: the plain program's TILES variant (without pages the draw is the program without tiles).
+    bool tilePagesOn() const { return tilePages_ && tilePages_->pages() > 0; }
 
 private:
+    friend class MicroFocus;
+    friend class MicroTilePages;
     void buildLayout(const Mesh& mesh);
+    void uploadTris(const Mesh& mesh);
     void uploadBase(const Mesh& mesh);
     void updateClusterBounds(const Mesh& mesh, const std::vector<uint32_t>& clusters);
     // The same after only displacement changed (the base didn't move): the clusters' displacement range only.
@@ -69,6 +112,8 @@ private:
     int level_ = 0;
     uint32_t n_ = 1, samples_ = 3;
     float step_ = 0.0f;
+    bool rescaleDeferred_ = false; // a stroke's range widen waits one frame (sync)
+    size_t widenDeferrals_ = 0;
     bool closed_ = false;
     std::vector<uint32_t> order_;   // slot -> base triangle
     std::vector<uint32_t> slotOf_;  // base triangle -> slot
@@ -108,13 +153,16 @@ private:
     std::vector<uint64_t> slotBits_, baseBits_;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> baseRuns_; // per block of moved vertices: [first, end) runs
     std::vector<uint8_t> staging_;
+    BufferUpload upload_; // partial updates of the buffers above, as GPU copies (render/BufferUpload.h)
     std::vector<uint32_t> levels_;
     std::vector<int8_t> want_;
     struct Uniforms {
         GLuint program = 0;
-        GLint slotBase = -1, chunkSlot = -1, level = -1, n = -1, samples = -1, clusterShift = -1, step = -1, unrolled = -1,
-              corners = -1;
+        GLint slotBase = -1, chunkSlot = -1, level = -1, stored = -1, n = -1, samples = -1, clusterShift = -1, step = -1,
+              unrolled = -1, corners = -1;
     } u_;
+    std::unique_ptr<MicroFocus> focus_;
+    std::unique_ptr<MicroTilePages> tilePages_;
 };
 
 // The micro mesh shader's vertex stage (with the mesh fragment shader under MICRO).

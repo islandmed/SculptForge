@@ -17,8 +17,9 @@
   <meta property="og:url" content="https://sculptforge.app/code-signing.html">
   <link rel="canonical" href="https://sculptforge.app/code-signing.html">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=35">
-  <script src="motion.js?v=12" defer></script>
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="style.css?v=44">
+  <script src="motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   <style>
     .terms > * { max-width: 720px; }
@@ -38,10 +39,12 @@
         <a href="guide/index.html">Guide</a>
         <a href="studios.html">For studios</a>
         <a href="why.html">About</a>
+        <a href="labs/index.html">Labs</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
+        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#facebook"/></svg></a></span>
         <a class="nav-support" href="support.html">Support</a>
         <a class="nav-dl" href="index.html#download">Download</a>
-        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
-        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
       </nav>
     </div>
   </header>
@@ -51,8 +54,8 @@
       <div class="wrap">
         <p class="eyebrow">Security</p>
         <h1>Code signing policy</h1>
-        <p class="lede">Free code signing provided by <a href="https://signpath.io" rel="noopener">SignPath.io</a>,
-          certificate by <a href="https://signpath.org" rel="noopener">SignPath Foundation</a>.</p>
+        <p class="lede">Free code signing provided by <a href="https://about.signpath.io" rel="noopener">SignPath.io</a>,
+          certificate by <a href="https://signpath.org" rel="noopener">SignPath Foundation</a></p>
       </div>
     </section>
 
@@ -70,14 +73,19 @@
           signed; nothing built elsewhere is sent for signing.</p>
 
         <h2 id="roles">Team roles</h2>
+        <p>Everyone in these roles is a member of the SculptForge team; the project's
+          <a href="https://github.com/islandmed/SculptForge">source repository</a> shows who has write access.</p>
         <ul>
-          <li><strong>Committers and reviewers:</strong> the members of the
-            <a href="https://github.com/islandmed/SculptForge">SculptForge repository</a> with write access. Every change
-            is reviewed before it is merged.</li>
-          <li><strong>Approvers:</strong> the maintainer, who approves each signing request for a release.</li>
+          <li><strong>Authors:</strong> the SculptForge team, the people who may change the source without a further
+            review.</li>
+          <li><strong>Reviewers:</strong> the SculptForge team. Every change from anyone outside the team (a pull
+            request) is reviewed by a team member before it is merged.</li>
+          <li><strong>Approvers:</strong> the SculptForge owner, who approves each signing request, one per release,
+            after the release's packages have been built and tested.</li>
         </ul>
 
-        <h2 id="privacy">Privacy</h2>
+        <h2 id="privacy">Privacy policy</h2>
+        <p>The full policy, for every platform, members and this website: <a href="privacy.html">Privacy policy</a>.</p>
         <p>SculptForge does not transfer information to networked systems unless specifically requested by the user or
           the person installing or operating it, with one exception that can be turned off: once a day at start-up it
           downloads a small file from sculptforge.app that names the newest version. It sends nothing else about you,
@@ -95,6 +103,9 @@
           <li><strong>Phone capture and the local tools</strong> (such as the splat trainer): downloaded or connected
             only when you start them.</li>
         </ul>
+        <p>The third-party components SculptForge includes are listed with their licences in
+          <a href="https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>;
+          they connect only for the features described above.</p>
         <p>Studios can turn every outside connection off with a policy file; see
           <a href="guide/security.html">Security and privacy</a> in the user guide.</p>
 
@@ -114,17 +125,21 @@
       </div>
       <div class="links">
         <a href="performance/">Performance</a>
+        <a href="labs/index.html">Labs</a>
         <a href="guide/index.html">User Guide</a>
         <a href="brushes.html">Community brushes</a>
         <a href="benchmarks/">Benchmarks: 15M and 33M</a>
         <a href="press.html">Press kit</a>
         <a href="support.html">Membership</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=footer" rel="noopener">Shop</a>
         <a href="supporters.html">Members</a>
         <a href="terms.html">Terms</a>
-        <a href="code-signing.html">Code signing</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="code-signing.html">Code signing policy</a>
         <a href="jobs.html">Jobs</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#facebook"/></svg></a></div>
       </div>
       <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners. The site uses no cookies. Visits are counted anonymously with <a href="https://www.goatcounter.com/">GoatCounter</a>.</p>
     </div>

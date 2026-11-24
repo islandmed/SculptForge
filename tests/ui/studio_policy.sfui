@@ -16,7 +16,9 @@ expect_text AI tools work on their own scene
 expect_text SculptForge has no telemetry
 shot studio-policy-ai
 
-# Only the allowed providers can be picked.
+# Only the allowed providers can be picked. (The online services list above the provider is long: scroll down to it.)
+wheel_item "Enable AI features##prefs.ai" 0 -20
+wait 0.2
 click "##provider"
 shot studio-policy-providers
 key escape                                     # (closes Preferences too)

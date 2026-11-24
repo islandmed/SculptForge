@@ -1,10 +1,18 @@
 # Packs and macros
 
-A **pack** is one file (`.sfpack`) that brings brushes, alphas, Lit Spheres, Material Recipes, VDM brushes,
-keymaps, pie menus, macros and **plugins** at once. A **macro** is a list of SculptForge commands you can run with
-one click, one key or one pie-menu slot. A **plugin** is a small sandboxed tool that turns a mesh into a mesh. Nothing
-in a pack runs when you install it or open a project: macros run when you run them, and plugins only when you click
-**Apply** (see [Plugins](#plugins)).
+![The brush Library](images/brush-library.jpg)
+
+> **In short:**
+> - A pack (`.sfpack`) brings brushes, alphas, keymaps, macros and plugins in one file.
+> - A macro runs a list of commands from one click, key or pie slot.
+> - Nothing in a pack runs when you install it.
+
+A **pack** is one file (`.sfpack`) that brings brushes, alphas, Lit Spheres, Material Recipes, VDM brushes, keymaps,
+pie menus, macros and **plugins** at once. A **macro** is a list of SculptForge commands you can run with one click,
+one key or one pie-menu slot.
+
+A **plugin** is a small sandboxed tool that turns a mesh into a mesh. Nothing in a pack runs when you install it or
+open a project: macros run when you run them, and plugins only when you click **Apply** (see [Plugins](#plugins)).
 
 ## Install a pack
 
@@ -85,16 +93,20 @@ Click a plugin's name in **Tool > Reshape > Plugins** (or in its pack's details)
 drawn by SculptForge from what the plugin declares, and **Apply** (**Add Part** for a generator). It runs on a copy
 of the Part; the window shows how long it has been running, and **Stop** ends it at once.
 
-**What a plugin can do: only the mesh.** Plugins run in a WebAssembly sandbox. A plugin gets a copy of the Part's
-mesh and its settings, and returns a mesh. It can't open, read or write files, reach the network, read the clock,
-see other Parts, your settings or your keys, or start anything; a pack whose plugin asks for any of that is refused
-when you review it. A plugin never draws its own windows, and it never runs on its own: not on install, not when a
-project opens, not from a macro, and not from an AI agent.
+**What a plugin can do: only the mesh.** Plugins run in a WebAssembly sandbox. A plugin gets a copy of the Part's mesh
+and its settings, and returns a mesh.
+
+It can't open, read or write files, reach the network, read the clock, see other Parts, your settings or your keys, or
+start anything; a pack whose plugin asks for any of that is refused when you review it. A plugin never draws its own
+windows, and it never runs on its own: not on install, not when a project opens, not from a macro, and not from an AI
+agent.
 
 **Limits.** Each run gets a time limit (20 seconds), a work limit and a memory limit. A plugin that crashes or runs
 past a limit is stopped, your mesh is left exactly as it was, and the plugin is **turned off** with the reason shown
-in its window. Click **Turn on again** there (or run `plugin_enable id=...`) to give it another try. Turning the pack
-off or removing it removes its plugins.
+in its window.
+
+Click **Turn on again** there (or run `plugin_enable id=...`) to give it another try. Turning the pack off or removing
+it removes its plugins.
 
 Making plugins: the plugin format, a sample and a C header are in
 [docs/design/plugins.md](https://github.com/islandmed/SculptForge/blob/main/docs/design/plugins.md) and

@@ -4,6 +4,7 @@
 // subdiv_* commands: the classic Tool > Geometry subdivision levels for scripts, the console and the AI assistant.
 #include "core/Commands.h"
 #include "core/Multires.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
 #include <cctype>
@@ -18,7 +19,7 @@ using T = ParamSpec::Type;
 CommandResult result(bool ok, std::string message) { return {ok, std::move(message)}; }
 
 std::string lowerExtension(const std::string& path) {
-    std::string ext = std::filesystem::path(std::u8string(path.begin(), path.end())).extension().string();
+    std::string ext = pathToUtf8(std::filesystem::path(std::u8string(path.begin(), path.end())).extension());
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
     return ext;
 }
@@ -41,7 +42,7 @@ void registerSubdivCommands(CommandRegistry& reg) {
     reg.add({"subdiv_divide",
              "Divide: add a subdivision level above the highest one and step "
              "to it. Quads stay quads (Catmull-Clark); triangle meshes use Loop subdivision. Lower levels are kept, so "
-             "you can step down to sculpt big forms and back up to the detail. Each level has 4x the polygons.",
+             "you can step down to sculpt big forms and back up to the detail. Each level has 4x the polygons. It has no cancel point: once started it runs to the end.",
              {{"smooth", T::Bool, "Smooth: smooth the new level (default true); false divides flat, keeping hard edges.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  std::string msg;

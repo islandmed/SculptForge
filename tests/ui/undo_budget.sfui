@@ -1,0 +1,25 @@
+# The undo history's budget follows the computer's memory (#202): Preferences > Performance shows "Undo X of Y" with the
+# live budget, and when steps must go the status line says how many. Memory is mocked: an 8 GB computer with 100 MB free
+# (the budget is the 256 MB floor). CMake runs it at 1440 and 2880 px wide (ui_undo_budget_1440 / _2880).
+env SF_TOTAL_MEMORY_MB 8192
+env SF_AVAILABLE_MEMORY_MB 6000
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+click "Preferences##palette.preferences"
+click "Performance##preferences.performance"
+wait 0.5
+expect_text "Undo 0 MB of 2.00 GB"
+shot roomy
+# Other programs take the memory: the budget falls to the floor.
+env SF_AVAILABLE_MEMORY_MB 100
+wait 0.3
+expect_text "of 256 MB"
+shot tight
+# Whole-mesh steps (Decimate) of a dense mesh fill it; the oldest go, and the status line says so.
+run new_sphere subdivisions=8
+run decimate ratio=0.9
+run decimate ratio=0.9
+run decimate ratio=0.9
+run decimate ratio=0.9
+expect_status Oldest
+expect_status "undo step"

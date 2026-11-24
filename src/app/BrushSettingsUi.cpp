@@ -5,6 +5,8 @@
 // strokes, so every way of picking a brush (shelf, pickers, keys, the Library, scripts, Ctrl-held brushes) behaves
 // the same without each of them knowing about it.
 #include "app/App.h"
+#include "app/AssetLibrary.h"
+#include "app/BrushPreview.h"
 #include "app/I18n.h"
 #include "app/Ui.h"
 
@@ -56,6 +58,47 @@ BrushToolSettings App::liveBrushSettings() const {
     return s;
 }
 
+bool App::thumbnailLook(const std::string& key, BrushToolSettings& out) const {
+    if (key == brushSettingsKey_) out = liveBrushSettings();
+    else if (!brushSettings_.peek(key, out)) return false;
+    return hasAlphaLook(out);
+}
+
+ImTextureID App::brushThumbnail(int brushType) {
+    BrushToolSettings look;
+    const bool has = brushType != kPaintBrush && brushType >= 0 && brushType < int(BrushType::Count) &&
+                     thumbnailLook(brushSettingsKey(brushName(BrushType(brushType))), look);
+    return thumbs_.brush(brushType, has ? &look : nullptr);
+}
+
+// True when `s` is just the look the recipe itself has (its own alpha and turn, the Dots stroke, no tiling): its thumbnail
+// is then the recipe's own preview, the same before and after the brush is picked.
+static bool recipesOwnLook(const BrushRecipe& r, const BrushToolSettings& s) {
+    const AlphaOptions& o = s.alphaOptions;
+    return s.alphaPath.empty() && !s.alphaInvert && s.stroke == StrokeType::Dots &&
+           lower(s.alphaName) == lower(r.alpha.empty() ? std::string("Round") : r.alpha) && o.followStroke == r.alphaFollow &&
+           o.angle == r.alphaAngle && o.tileX == 1 && o.tileY == 1;
+}
+
+ImTextureID App::recipeThumbnail(const BrushRecipe& recipe) {
+    BrushToolSettings look;
+    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look) && !recipesOwnLook(recipe, look);
+    return thumbs_.recipe(recipe, has ? &look : nullptr);
+}
+
+void App::regenerateBrushThumbnail(int brushType) {
+    BrushToolSettings look;
+    const bool has = brushType != kPaintBrush && brushType >= 0 && brushType < int(BrushType::Count) &&
+                     thumbnailLook(brushSettingsKey(brushName(BrushType(brushType))), look);
+    thumbs_.regenerateBrush(brushType, has ? &look : nullptr);
+}
+
+void App::regenerateRecipeThumbnail(const BrushRecipe& recipe) {
+    BrushToolSettings look;
+    const bool has = thumbnailLook(brushSettingsKey("", recipe.name), look) && !recipesOwnLook(recipe, look);
+    thumbs_.regenerateRecipe(recipe, has ? &look : nullptr);
+}
+
 void App::applyBrushSettings(const BrushToolSettings& in) {
     BrushToolSettings s = in;
     s.clamp();
@@ -78,21 +121,19 @@ void App::applyBrushSettings(const BrushToolSettings& in) {
         if (BrushAlpha::builtin(s.alphaName, a)) doc_.brushAlpha = std::move(a);
         return;
     }
-    Image img;
+    BrushAlpha a;
     std::string err;
-    if (!Image::load(s.alphaPath, img, err)) return;
-    BrushAlpha a = BrushAlpha::fromImage(img, s.alphaName, s.alphaInvert);
-    a.path = s.alphaPath;
-    a.inverted = s.alphaInvert;
+    if (!BrushAlpha::fromFile(s.alphaPath, s.alphaName, s.alphaInvert, a, err)) return;
     doc_.brushAlpha = std::move(a);
 }
 
 void App::initBrushSettings() {
     const bool recording = !options_.recordPath.empty() && options_.uiTest.empty(); // demo videos
     brushSettingsOn_ = !recording && !options_.benchmark && options_.timelapsePath.empty() &&
-                       options_.renderPath.empty() && options_.measureIdle <= 0.0f && options_.measureStroke <= 0.0f;
+                       options_.renderPath.empty() && options_.measureIdle <= 0.0f && options_.measureStroke <= 0.0f && !options_.measureKeyNav;
     brushSettingsKey_ = currentBrushKey();
     registerAlphaOptionsCommand();
+    registerAlphaPoolCommand();
     registerPenPressureCommand();
     shippedPenPressure();
     if (!brushSettingsOn_) return;
@@ -113,12 +154,33 @@ void App::syncBrushSettings() {
         return;
     }
     const bool firstUse = !brushSettings_.known(key);
-    BrushToolSettings next = brushSettings_.switchBrush(brushSettingsKey_, key, liveBrushSettings());
+    const BrushToolSettings live = liveBrushSettings();
+    const bool leavingOwnAlpha = firstUse && alphaIsBrushsOwn(brushSettingsKey_, live);
+    BrushToolSettings next = brushSettings_.switchBrush(brushSettingsKey_, key, live);
+    if (leavingOwnAlpha) { // a brush's own alpha stays with it: the next brush starts plain, thumbnail and strokes alike
+        const BrushToolSettings plain = BrushSettingsStore::shipped(key);
+        next.alphaName = plain.alphaName;
+        next.alphaPath = plain.alphaPath;
+        next.alphaInvert = plain.alphaInvert;
+        next.alphaOptions = plain.alphaOptions;
+    }
     if (firstUse) recipeAlpha(next); // a brush-pack brush starts with its own alpha (or none), not the last brush's
     if (firstUse) recipePenPressure(next);
     applyBrushSettings(next);
     brushSettingsKey_ = key;
     syncAlphaTile();
+}
+
+// True when `s`'s alpha is the one the custom brush under `key` brought with it (a library or pack brush's own), not one
+// picked for the session: that one must not spread to the next brush clicked.
+bool App::alphaIsBrushsOwn(const std::string& key, const BrushToolSettings& s) const {
+    if (key.rfind("custom:", 0) != 0 || !s.alphaPath.empty()) return false;
+    for (const BrushRecipe& r : doc_.brushes) {
+        if (brushSettingsKey("", r.name) != key) continue;
+        const bool own = !r.alpha.empty() ? lower(s.alphaName) == lower(r.alpha) : !r.origin.pack.empty();
+        return own && hasAlphaLook(s);
+    }
+    return false;
 }
 
 void App::recipeAlpha(BrushToolSettings& s) const {
@@ -215,6 +277,8 @@ void App::registerAlphaOptionsCommand() {
                    {{"follow_stroke", T::Bool, "Turn the alpha along the stroke (smoothed over 20 pixels).", false},
                     {"angle", T::Number, "Fixed angle in degrees, -180..180 (counter-clockwise).", false},
                     {"angle_jitter", T::Number, "Random turn per dab, up to this many degrees either way (0..180).", false},
+                    {"scale_jitter", T::Number, "Random size per dab, up to this many percent bigger or smaller (0..90).", false},
+                    {"position_jitter", T::Number, "Random shift per dab, up to this many percent of the dab's radius (0..100).", false},
                     {"tile_x", T::Number, "Repeat the alpha this many times across the dab (1..8).", false},
                     {"tile_y", T::Number, "Repeat the alpha this many times down the dab (1..8).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
@@ -222,6 +286,8 @@ void App::registerAlphaOptionsCommand() {
                        o.followStroke = argBool(a, "follow_stroke", o.followStroke);
                        o.angle = float(argNumber(a, "angle", o.angle));
                        o.jitter = float(argNumber(a, "angle_jitter", o.jitter));
+                       o.scaleJitter = float(argNumber(a, "scale_jitter", o.scaleJitter));
+                       o.positionJitter = float(argNumber(a, "position_jitter", o.positionJitter));
                        o.tileX = int(std::lround(argNumber(a, "tile_x", o.tileX)));
                        o.tileY = int(std::lround(argNumber(a, "tile_y", o.tileY)));
                        syncAlphaTile();
@@ -231,8 +297,53 @@ void App::registerAlphaOptionsCommand() {
                                              std::to_string(int(std::lround(o.jitter)))};
                        return {true, std::string("Alpha: ") + (o.followStroke ? "follows the stroke, " : "") + "angle " +
                                          std::to_string(int(std::lround(o.angle))) + ", jitter " +
-                                         std::to_string(int(std::lround(o.jitter))) + ", tile " +
+                                         std::to_string(int(std::lround(o.jitter))) + ", scale jitter " +
+                                         std::to_string(int(std::lround(o.scaleJitter))) + "%, position jitter " +
+                                         std::to_string(int(std::lround(o.positionJitter))) + "%, tile " +
                                          std::to_string(o.tileX) + " x " + std::to_string(o.tileY)};
+                   }});
+}
+
+// The alpha pool (core/AlphaOptions.h): each dab takes one of these alphas at random. Not kept per brush or in the
+// project: a folder of scans is one command (or one right-click in the Library) away.
+void App::registerAlphaPoolCommand() {
+    using T = ParamSpec::Type;
+    commands_.add({"brush_alpha_pool",
+                   "The alpha pool: each dab (and each Drag Stamp) draws with one of these alphas, picked at random. "
+                   "Use a folder of images, or add alphas one at a time; clear empties it. Combine with Angle, Scale and "
+                   "Position jitter so the detail never repeats.",
+                   {{"folder", T::String, "Replace the pool with the images in this folder (up to 32, A-Z).", false},
+                    {"path", T::String, "Add this image file to the pool.", false},
+                    {"name", T::String, "Add this built-in alpha to the pool.", false},
+                    {"clear", T::Bool, "Empty the pool (the brush draws with its own alpha again).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       if (argBool(a, "clear", false)) {
+                           alphaPool_.reset();
+                           return {true, "Alpha pool emptied"};
+                       }
+                       if (const std::string folder = argString(a, "folder"); !folder.empty()) {
+                           std::string err;
+                           auto pool = AlphaPool::fromFolder(folder, err);
+                           if (!pool) return {false, err};
+                           alphaPool_ = std::move(pool);
+                       } else if (const std::string path = argString(a, "path"); !path.empty()) {
+                           std::string err;
+                           const auto stem = std::filesystem::path(std::u8string(path.begin(), path.end())).stem().u8string();
+                           BrushAlpha alpha;
+                           if (!BrushAlpha::fromFile(path, std::string(stem.begin(), stem.end()), false, alpha, err,
+                                                     AlphaPool::kSide))
+                               return {false, err};
+                           alphaPool_ = (alphaPool_ ? alphaPool_ : std::make_shared<const AlphaPool>())->with(std::move(alpha));
+                       } else if (const std::string name = argString(a, "name"); !name.empty()) {
+                           BrushAlpha alpha; // (a Creature Skin one at the pool's size, not its 2048 px)
+                           const bool creature = !BrushAlpha::builtinGroup(name).empty();
+                           if (!(creature ? BrushAlpha::builtinAt(name, AlphaPool::kSide, alpha) : BrushAlpha::builtin(name, alpha)))
+                               return {false, "Unknown alpha: " + name};
+                           alphaPool_ = (alphaPool_ ? alphaPool_ : std::make_shared<const AlphaPool>())->with(std::move(alpha));
+                       } else {
+                           return {false, "Give a folder, a path or a built-in name (or clear)"};
+                       }
+                       return {true, "Alpha pool: " + std::to_string(alphaPool_->size()) + " alphas"};
                    }});
 }
 

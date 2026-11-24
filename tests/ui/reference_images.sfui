@@ -1,0 +1,95 @@
+# View > Reference images (idea by Oslen on Discord): pictures that stay in the view to sculpt against. Behind the
+# model it is fixed to the view; In the scene it is a plane that turns with the view and is gone edge-on. Adjust
+# moves and scales one; outside Adjust a stroke over it goes straight to the model; renders leave references out
+# unless "Show in renders" is on; projects keep them.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=5
+key f
+click "Render##palette.render"
+expect "Add images...##reference.add"
+expect "Front + side...##reference.pair"
+expect_text "Pictures to sculpt against"
+hold ctrl
+hover "Add images...##reference.add"
+expect_help "never take strokes"
+hold none
+
+# Dropped while the section shows: a reference behind the model.
+drop data/reference/front.png
+wait 0.1
+expect_value reference_count == 1
+expect_value reference_scene == 0
+expect_value reference_gpu_kb > 0
+run reference_set opacity=0.6
+expect "Adjust##ref.adjust"
+shot panel
+
+# Behind the model: turning the view leaves it where it is.
+remember reference_x x
+orbit 150 0
+expect_value reference_x == $x
+click "Render##palette.render"
+shot behind
+
+# Adjust: drag it left from inside (the view doesn't turn), a key scales it, Enter goes back to sculpting.
+click "Render##palette.render"
+click "Adjust##ref.adjust"
+expect_value reference_adjust == 1
+click "Render##palette.render"
+remember camera_yaw yaw
+view_drag 0.5 0.5 0.35 0.5
+expect_value reference_x < 480
+expect_value camera_yaw == $yaw
+key minus
+expect_value reference_height < 800
+shot adjust
+key enter
+expect_value reference_adjust == 0
+
+# Out of Adjust it takes nothing: a stroke over it sculpts the model.
+snapshot
+stroke 0.2 0.5 0.8 0.5
+expect_value moved > 0
+
+# Renders leave it out until "Show in renders" (covering the whole view, fully opaque: the render turns light).
+run reference_set height=20 opacity=1
+expect_value reference_render_r < 120
+run reference_set in_renders=true
+expect_value reference_render_r > 180
+run reference_remove all=true
+expect_value reference_count == 0
+
+# A front + side pair in one go: planes in the scene, each whole in its own view and gone edge-on in the other's.
+run reference_pair front=$SCRIPT_DIR/data/reference/front.png side=$SCRIPT_DIR/data/reference/side.png
+expect_value reference_count == 2
+click "Render##palette.render"
+expect_value reference_scene == 1
+expect "Side##reference.plane_side"
+shot pair_panel
+click "Render##palette.render"
+key numpad1
+expect_value reference_facing == 0
+shot pair_front
+key numpad3
+expect_value reference_facing == 1000
+shot pair_side
+camera 35 10
+shot pair_orbit
+
+# Saved in the project (embedded), back when it opens.
+run save_project path=sf_ui_reference.sfproj
+run reference_remove all=true
+run open path=sf_ui_reference.sfproj
+expect_value reference_count == 2
+click "Render##palette.render"
+expect_value reference_has_image == 1
+shot reopened
+# Embed off: the row reads "linked: front.png" (the full path in its tooltip).
+run reference_set index=0 embed=false
+shot linked
+run reference_set index=0 embed=true
+
+ui_scale 200
+hover "Adjust##ref.adjust"
+shot panel_200
+ui_scale auto

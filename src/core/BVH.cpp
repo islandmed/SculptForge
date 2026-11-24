@@ -6,6 +6,7 @@
 #include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <limits>
 #include <atomic>
 #include <cmath>
 
@@ -207,6 +208,7 @@ bool BVH::raycast(const Mesh& mesh, const glm::vec3& origin, const glm::vec3& di
         if (!rayBox(n.box, origin, invDir, best)) continue;
         if (n.count > 0) {
             for (uint32_t i = n.first; i < n.first + n.count; ++i) {
+                if (triIndices_[i] >= mesh.triangles.size()) continue; // (a stale tree over a smaller mesh: a tube drag's preview)
                 if (skipHidden && mesh.triangleHidden(triIndices_[i])) continue;
                 const auto& t = mesh.triangles[triIndices_[i]];
                 float tt;
@@ -444,6 +446,7 @@ struct SphereShape {
 struct CylinderShape {
     glm::vec3 c, a;
     float r, r2;
+    float h = std::numeric_limits<float>::infinity(); // half length along `a` (infinite: the whole line)
     float dist2(const glm::vec3& p) const {
         const glm::vec3 d = p - c;
         const glm::vec3 off = d - a * glm::dot(d, a);
@@ -452,16 +455,16 @@ struct CylinderShape {
     bool touches(const AABB& b) const { // conservative: the box's bounding sphere against the cylinder
         const glm::vec3 mid = (b.min + b.max) * 0.5f;
         const float reach = r + glm::length(b.max - mid);
-        return dist2(mid) <= reach * reach;
+        return dist2(mid) <= reach * reach && std::abs(glm::dot(mid - c, a)) <= h + glm::length(b.max - mid);
     }
     bool containsBox(const AABB& b) const {
         for (int k = 0; k < 8; ++k) {
             const glm::vec3 p((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z);
-            if (dist2(p) > r2) return false;
+            if (dist2(p) > r2 || std::abs(glm::dot(p - c, a)) > h) return false;
         }
         return true;
     }
-    bool contains(const glm::vec3& p) const { return dist2(p) <= r2; }
+    bool contains(const glm::vec3& p) const { return dist2(p) <= r2 && std::abs(glm::dot(p - c, a)) <= h; }
 };
 
 } // namespace
@@ -501,13 +504,13 @@ void BVH::queryVertices(const Mesh& mesh, const glm::vec3& center, float radius,
 }
 
 void BVH::queryVerticesCylinder(const Mesh& mesh, const glm::vec3& point, const glm::vec3& axis, float radius,
-                                std::vector<uint32_t>& out) const {
+                                std::vector<uint32_t>& out, float halfLength) const {
     const float len = glm::length(axis);
     if (!(len > 1e-12f)) {
         queryVertices(mesh, point, radius, out);
         return;
     }
-    queryVerticesIn(mesh, CylinderShape{point, axis / len, radius, radius * radius}, out);
+    queryVerticesIn(mesh, CylinderShape{point, axis / len, radius, radius * radius, halfLength}, out);
 }
 
 void BVH::refit(const Mesh& mesh, std::span<const uint32_t> movedVerts) {
@@ -520,6 +523,13 @@ void BVH::refit(const Mesh& mesh, std::span<const uint32_t> movedVerts) {
     scratchLeaves_.clear();
     leafBits_.take(scratchLeaves_);
     refitLeaves(mesh, scratchLeaves_);
+}
+
+void BVH::swapTree(BVH& other) {
+    const uint64_t next = std::max(structure_, other.structure_) + 1;
+    std::swap(*this, other);
+    structure_ = next;
+    other.structure_ = next + 1;
 }
 
 void BVH::refitQueried(const Mesh& mesh) { refitLeaves(mesh, queryLeaves_); }
@@ -760,6 +770,42 @@ void BVH::refitChanged(const Mesh& mesh) {
     refitLeaves(mesh, scratchLeaves_);
     for (uint32_t leaf : scratchLeaves_)
         if (nodes_[leaf].count > kMaxLeaf) splitLeaf(mesh, leaf);
+}
+
+void BVH::syncTopologyChange(const Mesh& mesh, std::span<const uint32_t> changedSlots, std::span<const uint32_t> movedVerts) {
+    const uint32_t nt = uint32_t(mesh.triangleCount());
+    if (nodes_.empty() || triLeaf_.empty()) {
+        build(mesh);
+        return;
+    }
+    const uint32_t old = uint32_t(triLeaf_.size());
+    for (uint32_t t : changedSlots)
+        if (t >= nt) removeTriangle(t);
+    for (uint32_t t = nt; t < old; ++t) removeTriangle(t); // (slots the list doesn't name)
+    if (nt < old) resizeTriangles(nt);
+    auto place = [&](uint32_t t) { // a live slot with no leaf yet: beside a triangle it shares a vertex with
+        uint32_t nearby = ~0u;
+        const glm::uvec3& tri = mesh.triangles[t];
+        for (int c = 0; c < 3 && nearby == ~0u; ++c)
+            for (uint32_t u : mesh.vertexTriangles(tri[c]))
+                if (u != t && u < triLeaf_.size() && triLeaf_[u] != kNoLeaf) {
+                    nearby = u;
+                    break;
+                }
+        insertTriangle(mesh, t, nearby);
+    };
+    for (uint32_t t : changedSlots) {
+        if (t >= nt) continue;
+        if (t < triLeaf_.size() && triLeaf_[t] != kNoLeaf) touchTriangle(t);
+        else place(t);
+    }
+    for (uint32_t t = old; t < nt; ++t)
+        if (t >= triLeaf_.size() || triLeaf_[t] == kNoLeaf) place(t);
+    for (uint32_t v : movedVerts)
+        if (v < mesh.vertexCount())
+            for (uint32_t t : mesh.vertexTriangles(v)) touchTriangle(t);
+    refitChanged(mesh);
+    if (degraded()) build(mesh);
 }
 
 bool BVH::degraded() const {

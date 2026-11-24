@@ -4,6 +4,8 @@
 // Widgets every panel uses, so Ctrl-hover help and UI customization come for free.
 #pragma once
 
+#include "app/Theme.h"
+
 #include <imgui.h>
 
 #include <initializer_list>
@@ -46,6 +48,10 @@ void CentredGlyph(ImDrawList* drawList, ImFont* font, ImVec2 a, ImVec2 b, ImU32 
 void ManagedBadge();
 // "Managed by your studio", or "Managed by Acme Animation" with the policy's organisation, translated.
 std::string ManagedByText();
+// The next item on the same line at `cursorPosX` (ImGui::GetCursorPosX() terms, window-relative). ImGui::SameLine(x) adds the
+// enclosing group's offset to x, and GetCursorPosX() already holds it: inside the task menus' group (beside their section
+// list) a column or a right-edge button placed with SameLine(x) landed past the panel's edge.
+void SameLineAt(float cursorPosX);
 // Ctrl-hover help for the last item.
 void HelpText(const char* title, const char* shortcut, const char* description, const char* path = nullptr);
 void HelpAction(App& app, const char* actionId);
@@ -113,6 +119,19 @@ void SetNextItemOrigin(int shelf, int index);
 // Makes the last item a Ctrl+Alt drag source in customize mode (for widgets that aren't ActionButtons).
 bool UiItemDragSource(App& app, const char* itemId, const char* label);
 
+// My Panel (Palettes.cpp): hold Alt and drag a button or a section header from any palette into it. The payload names the
+// entry as My Panel stores it ("action:<id>" / "section:<id>"); fromPanel marks one dragged out of My Panel, which
+// is removed when it is dropped anywhere but back on a My Panel.
+struct MyPanelPayload {
+    char entry[100] = "";
+    bool fromPanel = false;
+};
+inline constexpr const char* kMyPanelPayload = "SF_MYPANEL";
+// Makes the last item a drag source for My Panel while Alt (without Ctrl) is held. `section`: a header, else an action.
+bool MyPanelDragSource(const char* id, bool section, const char* label, bool fromPanel = false);
+// Alt-dragged a button or header more than a click's travel: its release was the end of a drag, not a click.
+bool MyPanelDragged();
+
 // Keyboard keycaps for a chord ("Ctrl+Shift+I", "F3 / Ctrl+Shift+P"), drawn inline as an item.
 void Keycaps(const std::string& chord);
 float KeycapsWidth(const std::string& chord);
@@ -135,6 +154,17 @@ void DrawHelp(App& app);
 const std::string& HelpShown();
 
 // Theme tokens shared by the help, palette and console (ui-spec section 10).
+// A pop-up in its role's colours (theme::Role; nothing when Preferences turns Pop-up colours off). PushRole right
+// before its ImGui::Begin / BeginPopupModal and PopRole right after, so menus and tooltips opened inside keep the plain
+// colours (Begin draws the surface, edge and title bar); then RoleStrip inside it, first thing: the strip across its
+// top and, in a title bar, the role's icon after the title. Nothing moves: only colours, the strip and the icon.
+// The surface PushRole gives a role pop-up (`lift` < 0: theme::popupLift; `wash`: how much of the role's colour), for
+// children that paint their own background.
+ImVec4 RoleSurface(theme::Role role, float lift = -1.0f, float wash = 0.05f);
+void PushRole(theme::Role role);
+void PopRole();
+void RoleStrip(theme::Role role);
+
 namespace color {
 inline ImU32 accent = IM_COL32(0xf0, 0x88, 0x2e, 0xff);
 inline ImU32 accentHover = IM_COL32(0xff, 0x9a, 0x45, 0xff);

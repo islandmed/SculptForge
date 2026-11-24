@@ -1,0 +1,23 @@
+# Preferences for two-key shortcuts (Artizmo on Discord): Input has the Two-key window slider (0.35 to 1 s), and the
+# Hotkeys conflict box says a two-key shortcut also works with both keys pressed together. Shot at 1440 and 2880.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+wait 0.5
+shot preferences_input_two_key_window
+click "Hotkeys##preferences.hotkeys"
+type "##hotkeys_filter" "Wireframe"
+wait 0.5
+click "##hkseq.view.wireframe"
+key f7
+key f8
+shot hotkeys_two_key_assigned
+type "##hotkeys_filter" "Opposite"
+wait 0.5
+click "##hkseq.view.opposite"
+key f7
+key f8
+expect_value shortcut_conflict_open == 1
+shot hotkeys_two_key_conflict
+click "Cancel##shortcut_cancel"

@@ -9,6 +9,7 @@
 #include "core/Commands.h"
 #include "core/Image.h"
 #include "core/LitSphere.h"
+#include "core/PaintLayer.h"
 #include "core/VertexPaint.h"
 #include "core/Primitives.h"
 #include "core/Trash.h"
@@ -17,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -596,6 +598,78 @@ TEST(vertexpaint_dab_follows_the_alpha) {
     d2.undo.push(d2.sculptor.endStroke());
 }
 
+TEST(vertexpaint_big_alpha_dab_covers_its_footprint_on_a_curved_surface) {
+    // #174: a big square alpha (Drag Stamp) on a curved surface leaves no gaps: every visible vertex under the stamp's
+    // footprint on the view plane is painted, however far the surface curves away from that plane.
+    Document doc = makeDoc(makeIcosphere(6));
+    Mesh& m = doc.mesh;
+    BrushAlpha solid;
+    solid.name = "Solid";
+    solid.width = solid.height = 4;
+    solid.values.assign(16, 1.0f);
+    DabParams p = paintParams({0, 0, 1}, 0.95f); // nearly the sphere's own radius
+    p.alpha = &solid;
+    p.alphaUp = {0, 1, 0};
+    p.focal = -1.0f; // flat to the corners
+    p.stampFootprint = true;
+    CHECK(doc.sculptor.beginStroke(m, "Paint"));
+    paintDab(doc.sculptor, m, doc.bvh, p, kRed, Symmetry{false, false, false});
+    size_t inside = 0, missed = 0;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        const glm::vec3 x = m.positions[v];
+        if (x.z < 0.05f || std::abs(x.x) > 0.9f || std::abs(x.y) > 0.9f) continue; // visible, under the footprint
+        ++inside;
+        missed += m.colors[v].y > 0.95f;
+    }
+    CHECK(inside > 1000);
+    CHECK(missed == 0);
+    doc.undo.push(doc.sculptor.endStroke());
+}
+
+TEST(alpha_stamp_covers_its_footprint_on_a_dense_mesh_with_a_big_brush) {
+    // #174 as reported: 1.3M polys, a large brush, any alpha. Paint and sculpt, no vertex of the visible footprint untouched.
+    Mesh base = makeIcosphere(8); // 1,310,720 faces
+    CHECK(base.triangles.size() > 1300000);
+    Document doc = makeDoc(base);
+    BrushAlpha square, cracks, cobble;
+    square.name = "Solid";
+    square.width = square.height = 8;
+    square.values.assign(64, 1.0f);
+    CHECK(BrushAlpha::builtin("Cracks", cracks));
+    CHECK(BrushAlpha::builtin("Cobblestone", cobble));
+    // Alphas with black in them leave vertices at 0 by design: the footprint to cover is where the alpha is lit.
+    const BrushAlpha* alphas[] = {&square, &cracks, &cobble};
+    for (int sculpt = 0; sculpt < 2; ++sculpt) {
+        for (const BrushAlpha* a : alphas) {
+            Mesh& m = doc.mesh;
+            const std::vector<glm::vec3> before = m.positions;
+            m.ensureColors();
+            std::fill(m.colors.begin(), m.colors.end(), glm::vec3(1.0f));
+            DabParams p = paintParams({0, 0, 1}, 0.9f); // a large brush: nearly the sphere's radius
+            p.alpha = a;
+            p.alphaUp = {0, 1, 0};
+            p.focal = -1.0f;
+            p.stampFootprint = true;
+            const glm::vec3 right = glm::cross(p.alphaUp, -p.viewDir);
+            CHECK(doc.sculptor.beginStroke(m, sculpt ? "Sculpt" : "Paint"));
+            if (sculpt) doc.sculptor.dab(m, doc.bvh, BrushType::Standard, p, Symmetry{false, false, false});
+            else paintDab(doc.sculptor, m, doc.bvh, p, kRed, Symmetry{false, false, false});
+            size_t lit = 0, missed = 0;
+            for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+                const glm::vec3 x = before[v];
+                if (x.z < 0.05f || std::abs(x.x) > 0.85f || std::abs(x.y) > 0.85f) continue;
+                if (a->sample(glm::dot(x, right) / p.radius, glm::dot(x, p.alphaUp) / p.radius) < 0.5f) continue;
+                ++lit;
+                missed += sculpt ? m.positions[v] == before[v] : m.colors[v].y > 0.95f;
+            }
+            CHECK(lit > 2000);
+            CHECK(missed == 0);
+            doc.undo.push(doc.sculptor.endStroke());
+            CHECK(doc.undo.undo(m, doc.bvh));
+        }
+    }
+}
+
 TEST(vertexpaint_dab_strength_scales_with_and_without_alpha) {
     // #164: the dab's strength (the Paint brush's Intensity) scales the colour, with an alpha (Cobblestone) and without.
     for (const bool withAlpha : {true, false}) {
@@ -615,4 +689,177 @@ TEST(vertexpaint_dab_strength_scales_with_and_without_alpha) {
         CHECK(drop[0] > 0.0);
         CHECK(drop[1] > drop[0] * 20.0);
     }
+}
+
+// --- Colour smooth (Shift with the Paint brush): paintSmoothDab ---
+
+namespace {
+
+// A noisy colour patch on a dense sphere: every vertex near +X gets a hash colour (the rest stays white).
+Document noisySphere(uint32_t& centre, float patch) {
+    Document doc = makeDoc(makeIcosphere(5));
+    Mesh& m = doc.mesh;
+    m.ensureColors();
+    centre = nearestVertex(m, {1, 0, 0});
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        if (glm::distance(m.positions[v], m.positions[centre]) > patch) continue;
+        const uint32_t h = v * 2654435761u;
+        m.colors[v] = glm::vec3(float(h & 255u), float((h >> 8) & 255u), float((h >> 16) & 255u)) / 255.0f;
+    }
+    return doc;
+}
+
+// How rough the colours are inside the patch: the mean distance between a vertex and the average of its ring.
+float colourRoughness(const Mesh& m, const std::vector<glm::vec3>& colors, uint32_t centre, float patch) {
+    double sum = 0.0;
+    size_t n = 0;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        if (glm::distance(m.positions[v], m.positions[centre]) > patch) continue;
+        glm::vec3 avg(0.0f);
+        const auto ring = m.neighbors(v);
+        for (uint32_t u : ring) avg += colors[u];
+        sum += glm::distance(colors[v], avg / float(ring.size()));
+        ++n;
+    }
+    return n ? float(sum / double(n)) : 0.0f;
+}
+
+} // namespace
+
+TEST(vertexpaint_smooth_converges_and_leaves_the_shape_alone) {
+    uint32_t centre = 0;
+    Document doc = noisySphere(centre, 0.25f);
+    Mesh& m = doc.mesh;
+    const std::vector<glm::vec3> shape = m.positions, colours = m.colors;
+    const float rough0 = colourRoughness(m, m.colors, centre, 0.2f);
+    CHECK(rough0 > 0.2f);
+
+    CHECK(doc.sculptor.beginStroke(m, "Paint"));
+    DabParams p = paintParams(m.positions[centre], 0.35f);
+    p.strength = 0.8f;
+    float last = rough0;
+    for (int i = 0; i < 6; ++i) {
+        CHECK(paintSmoothDab(doc.sculptor, m, doc.bvh, p, Symmetry{false, false, false}) > 0);
+        const float r = colourRoughness(m, m.colors, centre, 0.2f);
+        CHECK(r < last); // every dab smooths further
+        last = r;
+    }
+    doc.undo.push(doc.sculptor.endStroke());
+    std::printf("  colour roughness %.4f -> %.4f over 6 dabs\n", double(rough0), double(last));
+    CHECK(last < rough0 * 0.2f);
+    // The shape is bit-identical, the colours outside the brush are untouched.
+    CHECK(m.positions.size() == shape.size() &&
+          std::memcmp(m.positions.data(), shape.data(), shape.size() * sizeof(glm::vec3)) == 0);
+    const uint32_t far = nearestVertex(m, {-1, 0, 0});
+    CHECK(m.colors[far] == colours[far]);
+    // One stroke is one undo step, and it takes the colours back exactly.
+    CHECK(doc.undo.undo(m, doc.bvh));
+    CHECK(m.colors == colours);
+    CHECK(doc.undo.redo(m, doc.bvh));
+    CHECK(colourRoughness(m, m.colors, centre, 0.2f) < rough0 * 0.2f);
+}
+
+TEST(vertexpaint_smooth_strength_mask_and_symmetry) {
+    uint32_t centre = 0;
+    Document doc = noisySphere(centre, 0.25f);
+    Mesh& m = doc.mesh;
+    // A weak dab changes less than a strong one; strength 0 changes nothing.
+    auto roughAfter = [&](float strength) {
+        Document d = noisySphere(centre, 0.25f);
+        d.sculptor.beginStroke(d.mesh, "Paint");
+        DabParams p = paintParams(d.mesh.positions[centre], 0.35f);
+        p.strength = strength;
+        paintSmoothDab(d.sculptor, d.mesh, d.bvh, p, Symmetry{false, false, false});
+        d.undo.push(d.sculptor.endStroke());
+        return colourRoughness(d.mesh, d.mesh.colors, centre, 0.2f);
+    };
+    const float r0 = roughAfter(0.0f), rWeak = roughAfter(0.2f), rStrong = roughAfter(0.9f);
+    CHECK(rStrong < rWeak && rWeak < r0);
+    CHECK(near(glm::vec3(r0), glm::vec3(colourRoughness(m, m.colors, centre, 0.2f)), 1e-6f));
+
+    // Masked vertices keep their colour exactly; the rest of the dab smooths.
+    m.ensureMask();
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) m.mask[v] = m.positions[v].y > 0.0f ? 1.0f : 0.0f;
+    const std::vector<glm::vec3> before = m.colors;
+    doc.sculptor.beginStroke(m, "Paint");
+    DabParams p = paintParams(m.positions[centre], 0.35f);
+    p.strength = 1.0f;
+    CHECK(paintSmoothDab(doc.sculptor, m, doc.bvh, p, Symmetry{false, false, false}) > 0);
+    doc.undo.push(doc.sculptor.endStroke());
+    bool maskedKept = true, openChanged = false;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        if (m.mask[v] >= 1.0f) maskedKept = maskedKept && m.colors[v] == before[v];
+        else openChanged = openChanged || m.colors[v] != before[v];
+    }
+    CHECK(maskedKept);
+    CHECK(openChanged);
+
+    // X symmetry: the mirror patch smooths too, and the result is the mirror image.
+    Document sym = makeDoc(makeIcosphere(5));
+    Mesh& s = sym.mesh;
+    s.ensureColors();
+    const uint32_t right = nearestVertex(s, {1, 0, 0}), left = nearestVertex(s, {-1, 0, 0});
+    for (uint32_t v = 0; v < s.vertexCount(); ++v) {
+        const float d = std::min(glm::distance(s.positions[v], s.positions[right]), glm::distance(s.positions[v], s.positions[left]));
+        if (d < 0.25f) s.colors[v] = glm::vec3(float((v * 2654435761u) & 255u) / 255.0f, 0.2f, 0.4f);
+    }
+    const float roughLeft0 = colourRoughness(s, s.colors, left, 0.2f);
+    sym.sculptor.beginStroke(s, "Paint");
+    DabParams sp = paintParams(s.positions[right], 0.35f);
+    sp.strength = 0.9f;
+    paintSmoothDab(sym.sculptor, s, sym.bvh, sp, Symmetry{}); // X on by default
+    sym.undo.push(sym.sculptor.endStroke());
+    CHECK(colourRoughness(s, s.colors, left, 0.2f) < roughLeft0 * 0.7f);
+}
+
+TEST(vertexpaint_smooth_paint_layers_and_nothing_to_smooth) {
+    uint32_t centre = 0;
+    Document doc = noisySphere(centre, 0.25f);
+    Mesh& m = doc.mesh;
+    // A mesh without any vertex colour has nothing to smooth: nothing is created, nothing changes.
+    Document plain = makeDoc(makeIcosphere(4));
+    plain.sculptor.beginStroke(plain.mesh, "Paint");
+    CHECK(paintSmoothDab(plain.sculptor, plain.mesh, plain.bvh, paintParams(plain.mesh.positions[0], 0.4f), Symmetry{}) == 0);
+    plain.sculptor.endStroke();
+    CHECK(!plain.mesh.hasColors());
+
+    // On a paint layer the layer's colour and coverage smooth; Base and the shape stay.
+    addPaintLayer(m, "Dirt");
+    PaintLayer& layer = m.paintLayers[0];
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+        if (glm::distance(m.positions[v], m.positions[centre]) > 0.25f) continue;
+        const uint32_t h = v * 2654435761u;
+        layer.color[v] = glm::vec3(float(h & 255u) / 255.0f, 0.1f, 0.1f);
+        layer.alpha[v] = (h >> 8 & 1u) ? 1.0f : 0.0f; // a speckled coverage
+    }
+    compositePaintAll(m);
+    const std::vector<glm::vec3> base = m.paintBase, shape = m.positions;
+    auto coverageRough = [&] {
+        double sum = 0.0;
+        size_t n = 0;
+        for (uint32_t v = 0; v < m.vertexCount(); ++v) {
+            if (glm::distance(m.positions[v], m.positions[centre]) > 0.2f) continue;
+            float avg = 0.0f;
+            const auto ring = m.neighbors(v);
+            for (uint32_t u : ring) avg += layer.alpha[u];
+            sum += std::abs(layer.alpha[v] - avg / float(ring.size()));
+            ++n;
+        }
+        return float(sum / double(n));
+    };
+    const float before = coverageRough();
+    doc.sculptor.beginStroke(m, "Paint");
+    DabParams p = paintParams(m.positions[centre], 0.35f);
+    for (int i = 0; i < 4; ++i) paintSmoothDab(doc.sculptor, m, doc.bvh, p, Symmetry{false, false, false});
+    doc.undo.push(doc.sculptor.endStroke());
+    CHECK(coverageRough() < before * 0.5f);
+    CHECK(m.paintBase == base && m.positions == shape);
+    CHECK(near(m.colors[centre], compositePaintVertex(m, centre), 1e-6f)); // the stack is recomposited
+    // A locked layer is not smoothed.
+    layer.locked = true;
+    const std::vector<float> alpha = layer.alpha;
+    doc.sculptor.beginStroke(m, "Paint");
+    CHECK(paintSmoothDab(doc.sculptor, m, doc.bvh, p, Symmetry{false, false, false}) == 0);
+    doc.sculptor.endStroke();
+    CHECK(layer.alpha == alpha);
 }

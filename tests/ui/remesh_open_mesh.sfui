@@ -18,6 +18,7 @@ camera 0 0
 # Tool > Remesh > Voxel Remesh.
 click "Remesh##tool.remesh"
 click "Voxel Remesh##geometry.remesh"
+click "Levels/Freeze Levels and Proceed"   # the head has 3 levels: #173 asks first
 wait_idle 120
 expect_status Remeshed
 expect_value open_edges == 0

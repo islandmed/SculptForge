@@ -20,6 +20,7 @@
 //          "requireSignIn": true},
 //   "network": {"enabled": false, "allow": ["https://sw.acme.internal/"], "localNetwork": false},
 //   "mcp": {"enabled": true, "live": "never", "categories": ["info", "edit", "files"]},
+//   "render": {"bridge": "never"},
 //   "audit": {"path": "//fs01/audit/sculptforge/{user}@{host}.jsonl", "maxMB": 20, "keep": 10, "required": true},
 //   "signIn": {"issuer": "https://acme.okta.com/oauth2/default", "clientId": "0oa1...", "scopes": ["openid", "email",
 //              "offline_access"], "audience": "", "useFor": ["https://llm.acme.internal/"]},
@@ -72,6 +73,8 @@ struct Policy {
     Lock mcp = Lock::Unset;                 // mcp.enabled: Off = no MCP server (sculptforge-cli --mcp refuses)
     bool mcpLiveAllowed = true;             // mcp.live: "never" | "allowed"
     bool mayaLinkAllowed = true;            // maya.link: "never" | "allowed" (the Maya Live link, link/MayaLink.h)
+    bool pythonAllowed = true;              // python.scripts: "never" | "allowed" (Python scripting, app/Python.h)
+    bool renderBridgeAllowed = true;        // render.bridge: "never" | "allowed" (Render with..., ai/RenderBridge.h)
     std::vector<std::string> mcpCategories; // allowed categories; empty = all
 
     std::string auditPath;                  // with {user}, {host}, {date} filled in; "" = the default
@@ -119,6 +122,8 @@ bool aiEndpointAllowed(const std::string& url, std::string* why = nullptr);
 bool mcpAllowed(std::string* why = nullptr);
 bool mcpLiveAllowed(std::string* why = nullptr);
 bool mayaLinkAllowed(std::string* why = nullptr);
+bool pythonAllowed(std::string* why = nullptr);
+bool renderBridgeAllowed(std::string* why = nullptr);
 // The categories of command NAME (needs the registry's parameter names: a "path", "folder" or "file" parameter is files).
 std::vector<std::string> mcpCategories(std::string_view name, const std::vector<std::string>& paramNames);
 bool mcpToolAllowed(std::string_view name, const std::vector<std::string>& paramNames, std::string* why = nullptr);

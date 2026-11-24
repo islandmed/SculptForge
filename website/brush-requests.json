@@ -1,7 +1,7 @@
 {
  "format": "sculptforge-brush-requests",
  "version": 1,
- "updated": "2026-11-09T04:37:12Z",
+ "updated": "2026-11-22T13:37:09Z",
  "source": "https://discord.com/channels/1566592020024266812/1568787293731561483",
  "brushes": [
   {
@@ -15,12 +15,129 @@
   },
   {
    "rank": 2,
+   "title": "Brush size",
+   "votes": 1,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-07",
+   "url": "https://discord.com/channels/1566592020024266812/1568700704518832160"
+  },
+  {
+   "rank": 3,
    "title": "brushes #brushes wood detailing",
    "votes": 1,
    "shipped": false,
    "renamed": false,
    "created": "2026-11-08",
    "url": "https://discord.com/channels/1566592020024266812/1568923216314114069"
+  },
+  {
+   "rank": 4,
+   "title": "brush size preview",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-06",
+   "url": "https://discord.com/channels/1566592020024266812/1568121378601705472"
+  },
+  {
+   "rank": 5,
+   "title": "Insert brush on the shelf + chisel brushes",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-06",
+   "url": "https://discord.com/channels/1566592020024266812/1568255009135661116"
+  },
+  {
+   "rank": 6,
+   "title": "Assign brushes to modifier keys (Shift / Ctrl)",
+   "votes": 0,
+   "shipped": false,
+   "renamed": true,
+   "created": "2026-11-07",
+   "url": "https://discord.com/channels/1566592020024266812/1568645496283603014"
+  },
+  {
+   "rank": 7,
+   "title": "brush size radius should visible during increasing time !",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-08",
+   "url": "https://discord.com/channels/1566592020024266812/1568870328883617893"
+  },
+  {
+   "rank": 8,
+   "title": "brush improvement please for the primary one -move, clay , standerd...etc",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-08",
+   "url": "https://discord.com/channels/1566592020024266812/1568897761183539200"
+  },
+  {
+   "rank": 9,
+   "title": "smooth group border/mesh",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-08",
+   "url": "https://discord.com/channels/1566592020024266812/1568906864387817482"
+  },
+  {
+   "rank": 10,
+   "title": "smooth peaks brush !!!!",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-10",
+   "url": "https://discord.com/channels/1566592020024266812/1569678144829661335"
+  },
+  {
+   "rank": 11,
+   "title": "Move tool needs a buffer distance when trying to grabe and object from its sides",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-11",
+   "url": "https://discord.com/channels/1566592020024266812/1570174112855236669"
+  },
+  {
+   "rank": 12,
+   "title": "Replay strokes",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-14",
+   "url": "https://discord.com/channels/1566592020024266812/1571110009947951144"
+  },
+  {
+   "rank": 13,
+   "title": "Brush Falloff",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-14",
+   "url": "https://discord.com/channels/1566592020024266812/1571133063600013396"
+  },
+  {
+   "rank": 14,
+   "title": "🔷 Topology: Decimate and a more powerful Voxel Remesh",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-18",
+   "url": "https://discord.com/channels/1566592020024266812/1572495689722761216"
+  },
+  {
+   "rank": 15,
+   "title": "the Projection Strength slider controls the degree to which a mesh or shape is deformed toward the",
+   "votes": 0,
+   "shipped": false,
+   "renamed": false,
+   "created": "2026-11-22",
+   "url": "https://discord.com/channels/1566592020024266812/1574052555896524800"
   }
  ]
 }

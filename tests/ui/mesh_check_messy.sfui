@@ -1,0 +1,30 @@
+# Find Problems's Fix all on a messy mesh (foirgairwolf on Discord: "the problematic mesh info still occurs" after Fix): a
+# blocky remesh-like surface whose cells touch along edges. Fix all leaves no non-manifold edge; the one hole it
+# opens (a pinched solid) is listed under "Not fixed:" with why, and so is the Holes Fix that can't cap it.
+run open path=$SCRIPT_DIR/../data/check_mesh_messy.obj
+click "Geometry##tool.geometry"
+click "Check##mesh_check"
+expect_text Non-manifold edges
+shot before
+click "Fix all##mesh_fix"
+expect_status Fixed
+expect_status Left: 1 hole left open
+expect_text Not fixed:
+expect_no_text Non-manifold edges
+shot after-fix-all
+# Checking again keeps the same rows (and clears the note).
+click "Check##mesh_check"
+expect_no_text Non-manifold edges
+expect_no_text Not fixed:
+click "Fix##mesh_fix_holes"
+expect_status Nothing fixed: 1 hole couldn't be capped
+expect_text Not fixed:
+shot after-holes-fix
+# 200% (the 2880 run's shot is 1440 px of UI): the note wraps inside the tray. Shots only.
+ui_scale 200
+wait 0.3
+shot after-holes-fix-200
+ui_scale 100
+key ctrl+z
+click "Check##mesh_check"
+expect_text Non-manifold edges

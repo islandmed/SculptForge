@@ -46,6 +46,9 @@ struct BenchOptions {
     bool viewOnly = false;
     // Dynamic topology instead (--bench-dyntopo): spheres without subdivision levels, strokes that remesh.
     bool dyntopo = false;
+    // With --bench-dyntopo-uvs the sphere is a painted Part: UVs (two islands) and a 2K texture, so the strokes show
+    // what keeping the UVs costs (the renderer's sync of a textured Part under a remeshing stroke).
+    bool dyntopoUvs = false;
     // Micro-displacement levels instead (--bench-micro, core/Micro.h): sizes are micro triangles (millions), on
     // a base sphere at micro level `microLevel` (4: 256 micro triangles per base triangle).
     bool micro = false;
@@ -60,7 +63,7 @@ struct BenchOptions {
 
 // Command-line options shared by sculptforge-cli and the app: --bench, --bench-sizes 4,16,32 (millions of
 // triangles), --bench-dabs N, --bench-no-project (skip saving / opening, which needs twice the memory),
-// --bench-brushes TEXT (only the rows whose name contains TEXT), --bench-view (only the viewport's costs), --bench-dyntopo (dynamic topology strokes), --bench-micro (micro-displacement levels; --bench-micro-level N), --bench-out FILE. parseBenchArg returns true when argv[i] was one of them
+// --bench-brushes TEXT (only the rows whose name contains TEXT), --bench-view (only the viewport's costs), --bench-dyntopo (dynamic topology strokes; --bench-dyntopo-uvs on a painted Part), --bench-micro (micro-displacement levels; --bench-micro-level N), --bench-out FILE. parseBenchArg returns true when argv[i] was one of them
 // (advancing i past its value).
 struct BenchCommandLine {
     bool run = false;
@@ -87,6 +90,22 @@ Mesh makeBenchHead(size_t triangles);
 // or "" with `error`. `millions` picks the size (core-100m: 100, the same head with half the base triangles).
 std::string core200mScenePath(std::string& error, const std::function<void(const std::string&)>& log = {},
                               int millions = 200);
+// What a core scene takes, from the measured rows (core-800m: 805M micro triangles, 1.66 GB resident + 2.56 GB of graphics
+// buffers (system memory on integrated graphics) = 5.2 bytes a micro triangle, and a 0.6 GB scene file): memory at 8
+// bytes a micro triangle (the room proof mode always kept), the file at 0.8 (measured 0.76).
+inline constexpr double kCoreBytesPerMicroTriangle = 8.0;
+inline constexpr double kCoreFileBytesPerMicroTriangle = 0.8;
+struct CoreSceneNeed {
+    size_t ramBytes = 0;
+    size_t diskBytes = 0;
+};
+CoreSceneNeed coreSceneNeed(int millions);
+// "" when the scene fits, else one plain line (what it needs, what is free) and the run stops before it writes or opens
+// anything. `needDisk` false: the scene file is already there. A free figure of 0 is unknown (goes on).
+std::string coreSceneShortMessage(const std::string& name, int millions, size_t availableRam, size_t availableDisk, bool needDisk);
+// "core-<N>m" (N = 1..4000 million micro triangles: core-100m, core-200m, core-400m, ...) -> N, else 0. The 10x
+// scoreboard's ceiling search (docs/design/perf-scoreboard.md) runs the same head at every size.
+int coreSceneMillions(const std::string& name);
 // The scene itself, built in memory (what core200mScenePath saves): `baseTriangles` base triangles at `level`.
 Mesh makeCore200mMesh(size_t baseTriangles = 195313, int level = 5);
 

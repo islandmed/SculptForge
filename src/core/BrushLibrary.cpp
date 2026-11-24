@@ -2,18 +2,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/BrushLibrary.h"
 
+#include "core/DataDir.h"
+#include "core/FileReplace.h"
+
 #include "core/Commands.h"
 #include "core/Document.h"
+#include "core/LegacyNames.h"
 #include "core/Pack.h"
 #include "core/Vdm.h"
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <random>
+#include <set>
 
 namespace sf {
 
@@ -141,11 +149,28 @@ std::vector<std::string> brushFiles(const std::string& dir) {
     return out;
 }
 
+// Where the library keeps the last good copy of each brush file it replaces or deletes (never listed as brushes).
+fs::path backupDirOf(const std::string& userDir) { return utf8Path(userDir) / "backups"; }
+
+// Copies the brush file at `path` into the backups folder (a damaged file goes there as .damaged, never over the good copy). Best effort: a brush is never refused its save over a backup.
+void backupBrushFile(const std::string& path, const char* sub = "") {
+    std::error_code ec;
+    BrushRecipe probe;
+    std::string err;
+    if (!fs::is_regular_file(utf8Path(path), ec)) return;
+    const fs::path dir = backupDirOf(pathString(utf8Path(path).parent_path())) / sub;
+    fs::create_directories(dir, ec);
+    fs::path to = dir / utf8Path(path).filename();
+    if (!readBrushFile(path, probe, err)) to += ".damaged"; // kept for salvage, apart from the good copy
+    fs::copy_file(utf8Path(path), to, fs::copy_options::overwrite_existing, ec);
+}
+
 bool writeBrushFile(const std::string& path, const BrushRecipe& recipe, bool gallery, std::string& error) {
     Json j = recipe.toJson();
     j.set("format", "sfbrush");
     j.set("version", 1);
     if (gallery) j.set("source", "gallery");
+    if (!recipe.id.empty()) j.set("id", recipe.id);
     // Write next to it and rename over it, so a crash never leaves half a brush behind.
     const fs::path target = utf8Path(path);
     fs::path tmp = target;
@@ -153,6 +178,7 @@ bool writeBrushFile(const std::string& path, const BrushRecipe& recipe, bool gal
     {
         std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
         f << j.dump(true) << "\n";
+        f.close(); // (a full disk or a locked folder shows on flush/close, not on the write)
         if (!f) {
             error = "Cannot write " + path;
             std::error_code ec;
@@ -160,14 +186,19 @@ bool writeBrushFile(const std::string& path, const BrushRecipe& recipe, bool gal
             return false;
         }
     }
-    std::error_code ec;
-    fs::rename(tmp, target, ec);
-    if (ec) {
-        error = "Cannot write " + path + ": " + ec.message();
-        fs::remove(tmp, ec);
-        return false;
+    {
+        // What is on disk must read back as this brush before it replaces the good file.
+        BrushRecipe check;
+        std::string readError;
+        if (!readBrushFile(pathString(tmp), check, readError) || check.name != recipe.name) {
+            error = "Cannot write " + path + " (the saved copy didn't read back: " + readError + ")";
+            std::error_code ec;
+            fs::remove(tmp, ec);
+            return false;
+        }
     }
-    return true;
+    backupBrushFile(path); // the file being replaced, one generation back
+    return replaceFile(tmp, target, error);
 }
 
 // Where a new brush called `name` goes in the user library: its safe file name,
@@ -217,6 +248,46 @@ bool findShadowed(const std::string& name, const BrushLibraryPaths& paths, Brush
     return false;
 }
 
+std::string lowerAscii(std::string s) {
+    for (char& c : s) c = char(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+// A new random identity for a brush file (16 hex digits).
+std::string newBrushId() {
+    static std::mt19937_64 rng{std::random_device{}() ^ uint64_t(std::chrono::steady_clock::now().time_since_epoch().count())};
+    char buf[17];
+    std::snprintf(buf, sizeof buf, "%016llx", static_cast<unsigned long long>(rng()));
+    return buf;
+}
+
+// The .sfbrush files in `dir` and every folder under it (a library sorted into folders), except backups/. By path.
+std::vector<std::string> brushFilesDeep(const std::string& dir) {
+    std::vector<std::string> out;
+    std::error_code ec;
+    fs::recursive_directory_iterator it(utf8Path(dir), fs::directory_options::skip_permission_denied, ec), end;
+    for (; !ec && it != end; it.increment(ec)) {
+        std::error_code fileEc;
+        if (it->is_directory(fileEc) && it->path().filename() == "backups") {
+            it.disable_recursion_pending();
+            continue;
+        }
+        std::string ext = lowerAscii(pathString(it->path().extension()));
+        if (ext == ".sfbrush" && it->is_regular_file(fileEc)) out.push_back(pathString(it->path()));
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+// A slot's name for a brush: exactly, ASCII case aside, or as an older version's layout loader spelled it (a slot saved
+// by a version that rewrote retired words inside the names of custom brushes holds today's spelling of the brush's name).
+bool sameBrushName(const std::string& brushName, const std::string& slotName) {
+    if (slotName.empty()) return false;
+    if (brushName == slotName) return true;
+    const std::string lower = lowerAscii(slotName);
+    return lowerAscii(brushName) == lower || lowerAscii(legacy::modernize(brushName)) == lower;
+}
+
 int findBrush(const Document& doc, const std::string& name) {
     for (size_t i = 0; i < doc.brushes.size(); ++i)
         if (doc.brushes[i].name == name) return int(i);
@@ -239,16 +310,8 @@ BrushLibraryPaths& brushLibraryPaths() {
 }
 
 std::string appDataDir() {
-    // Matches SDL_GetPrefPath("SculptForge", "SculptForge"), which the app uses for its settings.
-#if defined(_WIN32)
-    const std::string base = env("APPDATA");
-    return base.empty() ? "" : base + "\\SculptForge\\SculptForge";
-#elif defined(__APPLE__)
-    return env("HOME") + "/Library/Application Support/SculptForge/SculptForge";
-#else
-    const std::string xdg = env("XDG_DATA_HOME");
-    return (xdg.empty() ? env("HOME") + "/.local/share" : xdg) + "/SculptForge/SculptForge";
-#endif
+    const DataLocation& loc = dataLocation(); // (a portable copy's data/ folder, else the per-user one)
+    return loc.portable ? loc.dir : perUserDataDir();
 }
 
 std::vector<std::string> splitSearchPath(const std::string& value) {
@@ -344,7 +407,11 @@ bool readBrushFile(const std::string& path, BrushRecipe& out, std::string& error
         return false;
     }
     const std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    return brushFromJsonText(text, out, error);
+    if (!brushFromJsonText(text, out, error)) return false;
+    Json j;
+    std::string ignored;
+    if (Json::parse(text, j, ignored) && j["id"].isString() && j["id"].asString().size() <= 64) out.id = j["id"].asString();
+    return true;
 }
 
 std::string brushFileName(const std::string& name) {
@@ -373,6 +440,10 @@ std::vector<std::string> loadBrushLibrary(Document& doc, const BrushLibraryPaths
     std::vector<std::string> messages;
     const std::string active =
         doc.activeBrush >= 0 && doc.activeBrush < int(doc.brushes.size()) ? doc.brushes[size_t(doc.activeBrush)].name : "";
+    // Brushes that live only in this session or the open project (not in any folder) survive a reload.
+    std::vector<BrushRecipe> keep;
+    for (auto& b : doc.brushes)
+        if (b.origin.source == BrushSource::Session || b.origin.source == BrushSource::Project) keep.push_back(std::move(b));
     doc.brushes = builtinBrushRecipes();
 
     for (const auto& dir : paths.studioDirs) {
@@ -415,15 +486,29 @@ std::vector<std::string> loadBrushLibrary(Document& doc, const BrushLibraryPaths
     }
 
     if (!paths.userDir.empty()) {
+        std::set<std::string> userIds;
         for (const auto& file : brushFiles(paths.userDir)) {
             BrushRecipe r;
             std::string err;
+            bool readOk = true;
             if (!readBrushFile(file, r, err)) {
-                messages.push_back("Skipped " + file + ": " + err);
-                continue;
+                readOk = false;
+                // The file is kept as it is. If its last good copy is in backups/, the brush comes back from that.
+                const std::string backup = pathString(backupDirOf(paths.userDir) / utf8Path(file).filename());
+                if (!readBrushFile(backup, r, err)) {
+                    messages.push_back("Kept " + file + " but can't read it: " + err);
+                    continue;
+                }
+                messages.push_back("Restored '" + r.name + "' from its backup (" + fileNameOf(file) + " couldn't be read; it is kept)");
             }
             r.origin.source = r.origin.source == BrushSource::Gallery ? BrushSource::Gallery : BrushSource::User;
             r.origin.path = file;
+            if (readOk && (r.id.empty() || !userIds.insert(r.id).second)) { // no identity yet, or a copied file's: give it its own
+                r.id = newBrushId();
+                userIds.insert(r.id);
+                std::string idError;
+                writeBrushFile(file, r, r.origin.source == BrushSource::Gallery, idError); // (best effort: a slot still finds it by name)
+            }
             const int i = findBrush(doc, r.name);
             if (i < 0) {
                 doc.brushes.push_back(std::move(r));
@@ -437,6 +522,8 @@ std::vector<std::string> loadBrushLibrary(Document& doc, const BrushLibraryPaths
             }
         }
     }
+    for (auto& b : keep)
+        if (findBrush(doc, b.name) < 0) doc.brushes.push_back(std::move(b));
     doc.activeBrush = active.empty() ? -1 : findBrush(doc, active);
     loadVdmLibrary(doc, paths, messages); // the VDM brush's maps (.sfvdm) live in the same folders (Vdm.cpp)
     return messages;
@@ -461,6 +548,7 @@ bool saveBrushToLibrary(Document& doc, int index, std::string& error, bool galle
     const bool inLibrary = isUserLibraryBrush(r) && insideDir(r.origin.path, paths.userDir);
     const std::string target = inLibrary ? r.origin.path : libraryPathFor(paths.userDir, r.name);
     gallery = gallery || r.origin.source == BrushSource::Gallery;
+    if (r.id.empty()) r.id = newBrushId();
     if (!writeBrushFile(target, r, gallery, error)) return false;
     if (!inLibrary) {
         BrushRecipe hidden;
@@ -469,6 +557,88 @@ bool saveBrushToLibrary(Document& doc, int index, std::string& error, bool galle
     r.origin.source = gallery ? BrushSource::Gallery : BrushSource::User;
     r.origin.path = target;
     return true;
+}
+
+int recoverBrush(Document& doc, const std::string& name, std::string& message, const BrushLibraryPaths& paths) {
+    return relinkBrush(doc, name, "", message, paths);
+}
+
+int findBrushById(const Document& doc, const std::string& id) {
+    if (id.empty()) return -1;
+    for (size_t i = 0; i < doc.brushes.size(); ++i)
+        if (doc.brushes[i].id == id) return int(i);
+    return -1;
+}
+
+int findBrushForSlot(const Document& doc, const std::string& name, const std::string& id) {
+    if (const int i = findBrushById(doc, id); i >= 0) return i;
+    if (const int i = findBrush(doc, name); i >= 0) return i;
+    for (size_t i = 0; i < doc.brushes.size(); ++i)
+        if (sameBrushName(doc.brushes[i].name, name)) return int(i);
+    return -1;
+}
+
+std::string describeMissingSlot(const Document& doc, const std::string& name, const std::string& id) {
+    auto squashed = [](const std::string& s) {
+        std::string r;
+        for (unsigned char c : s)
+            if (std::isalnum(c) || c >= 0x80) r += char(std::tolower(c));
+        return r;
+    };
+    const std::string want = squashed(name);
+    std::string close;
+    int shown = 0;
+    for (const BrushRecipe& b : doc.brushes) {
+        if (!isUserLibraryBrush(b) || shown >= 3) continue;
+        const std::string have = squashed(b.name);
+        if (have == want || (want.size() >= 4 && have.compare(0, 4, want, 0, 4) == 0)) {
+            close += (shown++ ? ", '" : " '") + b.name + "'";
+        }
+    }
+    return "Shelf slot '" + name + "' (id " + (id.empty() ? "none" : id) + ") finds no brush in the library; closest:" +
+           (shown ? close : " none");
+}
+
+int relinkBrush(Document& doc, const std::string& name, const std::string& id, std::string& message, const BrushLibraryPaths& paths) {
+    message.clear();
+    if (const int i = findBrushForSlot(doc, name, id); i >= 0) return i;
+    if (paths.userDir.empty() || (name.empty() && id.empty())) return -1;
+    // Not loaded: its file, wherever it lives now (user library with its folders, studio folders), then the last good copy.
+    struct Source {
+        std::string dir;
+        bool backup, deep;
+    };
+    std::vector<Source> sources = {{paths.userDir, false, true}};
+    for (const auto& dir : paths.studioDirs) sources.push_back({dir, false, true});
+    sources.push_back({pathString(backupDirOf(paths.userDir)), true, false});
+    for (const bool byId : {true, false}) {
+        if (byId && id.empty()) continue;
+        for (const auto& src : sources) {
+            for (const auto& file : src.deep ? brushFilesDeep(src.dir) : brushFiles(src.dir)) {
+                BrushRecipe r;
+                std::string err;
+                if (!readBrushFile(file, r, err)) continue;
+                if (byId ? r.id != id : !sameBrushName(r.name, name)) continue;
+                if (findBrush(doc, r.name) >= 0) continue; // another brush has that name now: never replaces it
+                const bool user = src.backup || insideDir(file, paths.userDir);
+                r.origin.source = !user ? BrushSource::Studio : r.origin.source == BrushSource::Gallery ? BrushSource::Gallery : BrushSource::User;
+                r.origin.path = src.backup ? "" : file;
+                doc.brushes.push_back(std::move(r));
+                const int index = int(doc.brushes.size()) - 1;
+                const std::string& found = doc.brushes[size_t(index)].name;
+                if (src.backup) {
+                    std::string saveError;
+                    if (!saveBrushToLibrary(doc, index, saveError, false, paths))
+                        message = "Found '" + found + "' in backups/ but couldn't save it again: " + saveError;
+                    else message = "Brought '" + found + "' back from its backup";
+                } else {
+                    message = "Found '" + found + "' in your brush library again";
+                }
+                return index;
+            }
+        }
+    }
+    return -1;
 }
 
 int installBrush(Document& doc, BrushRecipe recipe, std::string& error, bool gallery, const BrushLibraryPaths& paths) {
@@ -496,12 +666,14 @@ bool deleteBrush(Document& doc, int index, std::string& error, const BrushLibrar
             error = "'" + r.name + "' is not in your brush library (" + r.origin.path + ")";
             return false;
         }
+        backupBrushFile(r.origin.path, "deleted"); // Delete keeps a copy in backups/deleted (a shelf slot doesn't bring it back)
         std::error_code ec;
         fs::remove(utf8Path(r.origin.path), ec);
         if (ec) {
             error = "Cannot delete " + r.origin.path + ": " + ec.message();
             return false;
         }
+        fs::remove(backupDirOf(paths.userDir) / utf8Path(r.origin.path).filename(), ec); // (moved to backups/deleted)
     }
     BrushRecipe hidden;
     if (findShadowed(r.name, paths, hidden)) {
@@ -556,6 +728,7 @@ int renameBrush(Document& doc, int index, const std::string& newName, std::strin
     }
     const std::string oldPath = r.origin.path;
     r.name = name;
+    if (r.id.empty()) r.id = newBrushId(); // the identity stays through the rename: a shelf slot finds the brush by it
     const std::string target = libraryPathFor(paths.userDir, name);
     std::string err;
     if (!writeBrushFile(target, r, r.origin.source == BrushSource::Gallery, err)) {
@@ -566,6 +739,7 @@ int renameBrush(Document& doc, int index, const std::string& newName, std::strin
     if (!oldPath.empty() && !sameFile(oldPath, target) && insideDir(oldPath, paths.userDir)) {
         std::error_code ec;
         fs::remove(utf8Path(oldPath), ec);
+        fs::remove(backupDirOf(paths.userDir) / utf8Path(oldPath).filename(), ec); // (the brush goes on under its new name)
     }
     r.origin.path = target;
     BrushRecipe hidden;

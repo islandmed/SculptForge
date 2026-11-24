@@ -1,0 +1,50 @@
+# The Classic layout's defaults, pinned (Classic is a promise: nothing lost): what a Classic user sees the first time, so a later change that
+# moves a menu row, a shelf item, a tray panel, a colour cell or a Preference they never touched fails here unless
+# tests/ui/golden/classic_defaults.json is updated on purpose (SF_UI_GOLDEN_UPDATE=1 rewrites it; review the diff).
+# "Newer" rows (File > Render with..., Preferences > Scripts, > Render bridge) stay off in Classic by default.
+run ui_look look=classic layout=classic
+ui_scale 100
+run new_sphere subdivisions=3
+wait_idle 5
+expect_value shell_layout == 0
+expect_value left_shelf_width == 88
+expect_value colour_cell_min == 30
+
+# A click on the Level slider applies on the click itself (no wait): 3 levels, the click lands in the middle.
+run subdiv_divide
+run subdiv_divide
+expect_value subdiv_level == 3
+click "Geometry##tool.geometry"
+expect "Geometry/##level"
+remember level_switches sw0
+click "Geometry/##level"
+expect_value level_switches == $sw0+1
+expect_value subdiv_level != 3
+key escape
+
+# The menu rows, in order, with the newer ones absent (and present once Show newer menu rows is on).
+click "File##palette.file"
+expect "New Sphere##file.new_sphere"
+expect_not "Render with... (preview)##file.render_with"
+key escape
+click "Preferences##palette.preferences"
+expect_not "Scripts##preferences.scripts"
+expect_not "Render bridge##preferences.render_bridge"
+key escape
+
+dump_ui classic_defaults.json golden/classic_defaults.json
+shot classic-defaults
+
+# The SculptForge layout shows them by default; in Classic the setting does.
+expect_value newer_menu_rows == 0
+run ui_look layout=sculptforge
+expect_value newer_menu_rows == 1
+run ui_look layout=classic newer_rows=true
+expect_value newer_menu_rows == 1
+click "File##palette.file"
+expect "Render with... (preview)##file.render_with"
+key escape
+click "Preferences##palette.preferences"
+expect "Scripts##preferences.scripts"
+expect "Render bridge##preferences.render_bridge"
+key escape

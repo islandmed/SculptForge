@@ -1,0 +1,47 @@
+# What's New after an update shows every version since the last one this user saw (SF_WHATS_NEW_SINCE stands in for the
+# saved last_seen_version): "New since 0.11.1: N new things", the newest version's cards first, at most 8 of them, then
+# "and N more improvements" (the guide chapter). Pinned to 0.12.0 (SF_WHATS_NEW_VERSION), so it stays valid after releases:
+# 0.12.0 has 5 cards, 0.11.2 has 4, the versions between have none (their highlights are counted into "more").
+env SF_WHATS_NEW_VERSION 0.12.0
+env SF_WHATS_NEW_SINCE 0.11.1
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+action help.whats_new
+wait 0.6
+expect_value whats_new_open == 1
+# 9 cards in all: the cap is 8
+expect_value whats_new_cards == 8
+expect_value whats_new_more >= 1
+expect_text "New since 0.11.1"
+expect_text "new things"
+# the newest version's lead card is first
+expect_text "NEW IN 0.12.0"
+expect_text "Garments and cloth"
+expect_text "more improvement"
+shot whats-new-since
+
+# Tab moves through the cards; the ones below the first screen scroll into view.
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+wait 0.3
+expect_value whats_new_scrolled == 1
+shot whats-new-since-scrolled
+
+# The look's colours too.
+run ui_look look=forge scheme=tokyo_night layout=classic
+action help.whats_new
+wait 0.5
+shot whats-new-since-forge
+
+# "and N more improvements" opens the guide chapter.
+click "and 66 more improvements##whats_new.more"
+wait 0.3
+expect_value guide_open == 1
+expect_value whats_new_open == 0
+expect_guide whats-new.md

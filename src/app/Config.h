@@ -10,6 +10,7 @@
 #include "app/LookSchemes.h"
 #include "app/Theme.h"
 #include "core/Json.h"
+#include "core/ModifierBrush.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 
@@ -31,12 +32,14 @@ struct UiPrefs {
     bool autoCollapseLeft = true, autoCollapseRight = false; // trays collapse palettes that would overflow
     float uiScale = 0.0f;       // 0 = follow the display; otherwise applied at the next start
     bool libraryAtStartup = true;
+    bool startupSplash = true;  // the logo while a slow start-up runs (read early from ui.json: StartupSplash.h)
     std::string libraryFolder;  // "" = Documents/SculptForge
     bool alphabeticalPalettes = false; // strict A-Z palette bar (default: File, Edit first)
+    int newerMenuRows = -1;     // the menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts, > Render bridge): -1 = by layout (Classic off, SculptForge on), 0 off, 1 on
     // Preferences > Interface > Units (#148; core/Units.h ids): the unit sizes show in (brush ring, Part size, export
     // sizes, Measure), and the unit the numbers in OBJ and PLY files are read in (STL is millimetres by convention).
     std::string lengthUnit = "mm", fileUnit = "m";
-    std::string language = "en"; // Preferences > Interface: the interface language, "en", "es" or "zh-TW" (app/I18n.h)
+    std::string language = "en"; // Preferences > Interface: the interface language, "en", "es", "zh-TW", "zh-CN" or "ja" (app/I18n.h)
     int cameraNotch = 0;        // keep the UI out of a laptop's camera notch: 0 automatic, 1 always, 2 never
     // View > Orbit lock (rotation): 0 free, about the screen axes; 1 turntable (Y up); 2 about world X only; 3 about
     // world Z only (Camera::orbitAbout). Saved as "orbitLock", and "turntable" for older versions.
@@ -46,11 +49,15 @@ struct UiPrefs {
                                 // Blender's sculpt keys), 3 Maya (Input.cpp). The first-run welcome asks.
     bool inputStyleSaved = false; // ui.json named the style (not saved itself): an install from before 0.10.4
                                   // without it had the Classic sculpting keys and keeps them (PanelProject.cpp)
+    // Classic sculpting keys: F frames the active Part, F twice within this many ms frames the whole scene (a scene
+    // with one Part always frames it whole). 0: F always frames the whole scene.
+    int frameDoubleTapMs = 400;
     bool emulateNumpad = false; // Blender style: the 1-9 and 0 keys above the letters act as the numpad (laptops)
     // The order of the asset lists (core/ListSort.h ids "az", "recent", "pack"): brushes, alphas, materials, Library.
     std::string brushSort = "az", alphaSort = "az", materialSort = "az", librarySort = "az";
     std::string brushSet; // the brush set last switched to (#143): its shelf comes back at the next start; "" = none
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu (#22)
+    ModifierBrushes modifierBrushes; // the Shift and Ctrl brushes (Shift+click / Ctrl+click a shelf brush)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
     // Blender style (#77): off, as Blender 5.1+'s default keymap, Alt+left-drag on the model masks (Ctrl+Alt unmasks)
     // and turns the view only beside the model; on (Blender's Emulate 3 Button Mouse) it always turns the view.
@@ -59,9 +66,19 @@ struct UiPrefs {
     // vertical as the other styles. invertZoom turns every zoom drag around.
     bool mayaZoomHorizontal = true;
     bool invertZoom = false;
+    bool invertTwist = false; // two-finger twist rolls the view against the fingers (touch and trackpad, Preferences > Input)
+    float twoKeyWindow = 0.4f; // seconds for the second key of a two-key shortcut (0.35 to 1, Preferences > Input)
+    float keyNavSpeed = 1.0f; // the pan and zoom keys' speed, times 0.1 to 5 (Preferences > Input)
     // The mouse wheel zooms toward the surface point under the pointer (#134) instead of the view's centre. On for
     // the Maya style (set with the style, and the default when ui.json doesn't say); the other styles keep the centre.
     bool wheelZoomToPointer = false;
+    // Rotation drags that start over the model turn the view about the surface point under the pointer (and move the
+    // target to its depth); over the background, about the target as before. Every input style. On for new installs;
+    // a ui.json saved before it existed reads as off, so existing users keep the orbit they know.
+    bool orbitAtPointer = true;
+    // Mouse and trackpad rotation drags (every input style): the speed, times 0.1 to 2 (1 = as before; the pen has its
+    // own View speed in Preferences > Tablet).
+    float mouseOrbitSpeed = 1.0f;
     // Tool > Remesh (#121): Quick Remesh (Shift+R, or hold N and drag on the background, remeshes the active Part at
     // the Voxel Resolution) and Remesh after each stroke (a stroke that stretched the surface remeshes it).
     bool quickRemesh = false, remeshAfterStroke = false;
@@ -71,8 +88,12 @@ struct UiPrefs {
     // Brush falloff options (from the discussions): Connected only, View falloff (App::connectedOnly_ / viewFalloff_).
     bool connectedOnly = false;
     bool viewFalloff = false;
+    // Contact facing (DabParams::contactFacing): the surface under the cursor decides what moves; the angle, degrees.
+    bool contactFacing = false;
+    float facingAngle = 180.0f;
     // Dynamic topology: how much Smooth remeshes, 0-1 (DyntopoSettings::smoothRemesh; 1 as before).
     float dyntopoSmoothRemesh = 1.0f;
+    int slideRotateKey = 0;   // Slide Stamp (#175): the key that turns the alpha toward the cursor while sliding: 0 Shift, 1 Ctrl, 2 Alt, 3 off
     bool airStrokes = false;  // start strokes off the model (#62): a left-drag on the background sculpts once it
                               // reaches the surface instead of turning the view (off: it turns the view, classic)
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)
@@ -104,9 +125,14 @@ struct UiPrefs {
     bool floorGrid = false;
     // UV Editor > Pack > Columns x Rows (#135): the UDIM grid the last pack filled, the default for new projects.
     int uvPackColumns = 1, uvPackRows = 1;
-    // Preferences > Interface > Mask darkness (and Tool > Masking): how dark masked areas show, 0-1
+    // Preferences > Interface > Mask darkness (and Tool > Masking): how strongly masked areas show, 0-1
     // (RenderSettings::maskDarkness).
     float maskDarkness = 0.7f;
+    // Preferences > Interface > Mask colour: maskColorCustom off = the darkening look; on = masked areas blend towards
+    // maskColor (display values, sRGB) by the same amount (the opacity above).
+    bool maskColorCustom = false;
+    glm::vec3 maskColor{0.20f, 0.22f, 0.30f};
+    bool confirmRemeshLevels = true; // Voxel/Quad Remesh and Decimate ask first on a Part with levels (#173)
     bool confirmSubdivide = true; // Subdivide (removes levels) asks first on a Part with levels (Don't ask again)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
@@ -114,6 +140,12 @@ struct UiPrefs {
     int antialiasing = 4;       // samples per pixel in the 3D view: 1 (off), 2, 4 or 8
     bool fastNavigation = true; // big scenes draw without antialiasing while the view moves
     int viewResolution = 100;   // the 3D view's resolution, % of the window's (#80): 100, 75 or 50
+    // Preferences > Display > Shadows & AO, and next to the PBR controls (render/Occlusion.h): -1 = by the hardware
+    // tier (on from the Standard tier up on desktop GL, off on the Essential tier and GL ES), 0 off, 1 on. They shade
+    // the PBR view; viewOcclusionLitSphere adds them to the Lit Sphere and studio shading.
+    int viewAo = -1, viewShadows = -1;
+    float aoStrength = 0.8f, aoSoftness = 0.4f, shadowSoftness = 0.35f;
+    bool viewOcclusionLitSphere = false;
     bool multithreading = true; // brushes, normals and BVH updates on every core (off: one thread)
     // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the
     // stroke's head predicted a frame ahead (app/AsyncStroke.cpp). Off: the dabs are placed in the frame loop.
@@ -122,10 +154,17 @@ struct UiPrefs {
     // bounds of what they touched are worked out once, when the pen lifts (Sculptor::draftStrokes). Off by
     // default; meant for laptops and battery (a hardware tier will turn it on).
     bool draftStrokes = false;
+    // Keep Strokes Editable (Forge Ink, core/MicroHistory.h): strokes on a micro level keep their dabs so they can be
+    // edited or removed later, exactly. Off until it passes its checks (then the default flips on); on the floor tier
+    // with little memory the app doesn't keep them (App::keepStrokesEditable).
+    bool keepStrokesEditable = false;
     // Experimental (docs/design/perf-moonshots.md), off by default. Live Move: the GPU draws a Move drag and the
     // move is applied once when the pen lifts (SF_LIVE_MOVE=0 / 1 overrides). Background Preview: heavy meshes'
     // background dabs draw the predictive preview too (SF_BG_GHOST=0 / 1 overrides). Fast Upload: stroke uploads
     // go through persistently mapped staging buffers and a GPU copy (SF_PERSISTENT_UPLOAD=0 / 1 overrides).
+    // Forge Deck prototype (PanelDeck.cpp), Preferences > Experimental: off by default. While off the File menu has
+    // no entry for it and nothing about it runs; the Deck itself is off at every start even when this is on.
+    bool forgeDeck = false;
     bool liveMove = false;
     bool backgroundPreview = false;
     bool fastUpload = false;

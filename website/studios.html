@@ -18,7 +18,8 @@
   <meta property="og:url" content="https://sculptforge.app/studios.html">
   <link rel="canonical" href="https://sculptforge.app/studios.html">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=35">
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="style.css?v=44">
   <style>
     /* Same language as the Support page: a calm stage (words, a warm glow, a faint grid) with cards rising onto it.
        It follows the system's light or dark setting like the rest of the page. */
@@ -202,7 +203,7 @@
       .studio-page .footer { background: var(--bg-alt); }
     }
   </style>
-  <script src="motion.js?v=12" defer></script>
+  <script src="motion.js?v=15" defer></script>
   <script data-goatcounter="https://sculptforge.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body class="studio-page">
@@ -217,10 +218,12 @@
         <a href="guide/index.html">Guide</a>
         <a href="studios.html" aria-current="page">For studios</a>
         <a href="why.html">About</a>
+        <a href="labs/index.html">Labs</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=nav" rel="noopener">Shop</a>
+        <span class="nav-social"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=nav" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#facebook"/></svg></a></span>
         <a class="nav-support" href="support.html">Support</a>
         <a class="nav-dl" href="index.html#download">Download</a>
-        <a class="gh" href="https://discord.gg/gWrYkEmQhH">Discord</a>
-        <a class="gh" href="https://github.com/islandmed/SculptForge">GitHub</a>
+        <button class="nav-toggle" type="button" aria-controls="site-menu" aria-expanded="false" aria-label="Menu"><span></span><span></span><span></span></button>
       </nav>
     </div>
   </header>
@@ -298,14 +301,12 @@
           </article>
           <article class="card">
             <h3>No accounts, no telemetry, offline</h3>
-            <p>No sign-in, no licence server and nothing phones home. It works fully offline; AI features are
-              optional and talk only to the service you choose. Studio brush libraries can load from a read-only share.</p>
+            <p>No sign-in, no licence server and no telemetry. It works fully offline (the one routine request is a daily check
+              for a new version, which can be turned off); AI features are optional and talk only to the service you choose. Studio brush libraries can load from a read-only share.</p>
           </article>
         </div>
-        <p class="pipe-more">Licensing in plain terms: SculptForge is GPL-3.0-or-later. Use it on any number of
-          machines, commercially; your artwork is yours; and you can modify it in-house without publishing your
-          changes. The <a href="guide/studios.html">studio guide</a> covers deployment, Rez, brush libraries and the
-          Python API.</p>
+        <p class="pipe-more"><strong>Licensing in plain terms:</strong> SculptForge is GPL-3.0-or-later. Use it on any number of machines, commercially. Your artwork is yours, and you can modify it in-house without publishing your changes.</p>
+        <p class="pipe-more">The <a href="guide/studios.html">studio guide</a> covers deployment, Rez, brush libraries and the Python API. The <a href="studios/brief.html">technical brief</a> collects the checkable facts, each with its method and source: <a href="studios/brief.html#performance">performance</a>, <a href="studios/brief.html#platforms">platforms</a>, <a href="studios/brief.html#linux">Linux</a>, <a href="studios/brief.html#openusd">OpenUSD</a>, <a href="studios/brief.html#automation">automation</a>, <a href="studios/brief.html#security">security</a> and <a href="studios/brief.html#not-yet">what it does not do yet</a>.</p>
       </div>
     </section>
 
@@ -315,8 +316,8 @@
           <div>
             <p class="eyebrow">Studio membership</p>
             <h2 id="member-title">Your studio's own SculptForge build</h2>
-            <p class="price">$300<span>/ month</span></p>
-            <p class="per-artist">flat, for the whole studio: any number of artists</p>
+            <p class="price">Personalized quote</p>
+            <p class="per-artist">for the whole studio: any number of artists. Tell us your team size, platforms and pipeline needs.</p>
             <ul>
               <li><strong>Your own build</strong>: your brushes, alphas, Lit Spheres, keymaps, macros, preferences, paths
                 and logo built in</li>
@@ -328,7 +329,7 @@
               <li><strong>Offline signed installer</strong> with checksums for IT</li>
               <li><strong>Your own private repository and build</strong>: a branch with the features and fixes you ask
                 for, rebased onto every release</li>
-              <li><strong>Support</strong>: a first response within 2 business days (a response, not a fix), up to 3 custom items a month, and your requests first on the roadmap</li>
+              <li><strong>Support</strong>: a first response within 12 hours (a response, not a fix), up to 3 custom items a month, and your requests first on the roadmap</li>
               <li><strong>A private Discord space for your team</strong>, and a seat on the <strong>Studio steering
                 committee</strong> (one representative per studio)</li>
               <li>Everything in Member for each artist; invoiced monthly; cancel anytime (<a href="terms.html#refunds">terms and refunds</a>)</li>
@@ -336,15 +337,9 @@
           </div>
           <div class="actions">
             <a class="btn btn-hot" data-mail="SculptForge Studio membership" href="https://discord.gg/gWrYkEmQhH" rel="noopener">Start a Studio membership</a>
-            <a class="btn btn-ghost" href="https://buy.stripe.com/9B66oH8uXd9w16j2254F205" rel="noopener">Studio: $300 / month</a>
-            <a class="btn btn-ghost" href="https://buy.stripe.com/3cI00j12v5H4g1dgWZ4F204" rel="noopener">Founding Studio: $150 / month</a>
-            <p><strong>Founding Studio</strong>: the first 5 studios pay a flat $150 a month for any number of artists, locked for
-              as long as they stay subscribed. Questions first:
-              <a data-mail="SculptForge Studio question" href="https://discord.gg/gWrYkEmQhH" rel="noopener">email us</a>.
-              <noscript>(Email needs JavaScript: ask us on the <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">SculptForge Discord</a> and we'll reply privately.)</noscript>
-              <a href="guide/studios.html#your-studio-build">Your studio build</a> explains what to send. Payments go
-              through Stripe; cancel anytime in the customer portal (<a href="terms.html">membership terms</a>). SculptForge releases stay free for everyone and
-              nothing in the app is paywalled. <a href="support.html">All memberships</a>.</p>
+            <a class="btn btn-ghost" data-mail="Studio quote" href="https://discord.gg/gWrYkEmQhH" rel="noopener">Get a quote</a>
+            <p>Questions first? <a data-mail="SculptForge Studio question" href="https://discord.gg/gWrYkEmQhH" rel="noopener">Email us</a>. <noscript>(Email needs JavaScript: ask us on the <a href="https://discord.gg/gWrYkEmQhH" rel="noopener">SculptForge Discord</a> and we'll reply privately.)</noscript> <a href="guide/studios.html#your-studio-build">Your studio build</a> explains what to send.</p>
+            <p>Payments go through Stripe; cancel anytime in the customer portal (<a href="terms.html">membership terms</a>). SculptForge releases stay free for everyone and nothing in the app is paywalled. <a href="support.html">All memberships</a>.</p>
           </div>
         </div>
       </div>
@@ -391,17 +386,22 @@
       </div>
       <div class="links">
         <a href="performance/">Performance</a>
+        <a href="labs/index.html">Labs</a>
         <a href="guide/index.html">User Guide</a>
         <a href="guide/studios.html">Studio guide</a>
+        <a href="studios/brief.html">Technical brief</a>
         <a href="brushes.html">Community brushes</a>
         <a href="benchmarks/">Benchmarks: 15M and 33M</a>
         <a href="press.html">Press kit</a>
         <a href="support.html">Membership</a>
+        <a href="https://sculptforge-shop.fourthwall.com/?utm_source=site&amp;utm_medium=footer" rel="noopener">Shop</a>
         <a href="supporters.html">Members</a>
         <a href="terms.html">Terms</a>
+        <a href="privacy.html">Privacy</a>
         <a href="jobs.html">Jobs</a>
         <a href="https://github.com/islandmed/SculptForge">Source code</a>
         <a href="https://discord.gg/gWrYkEmQhH">Community Discord</a>
+        <div class="social" role="group" aria-label="Follow SculptForge"><a class="gh" href="https://discord.gg/gWrYkEmQhH" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#discord"/></svg></a><a class="gh" href="https://github.com/islandmed/SculptForge" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#github"/></svg></a><a class="gh" href="https://x.com/SculptForgeApp?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="X" title="X"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#x"/></svg></a><a class="gh" href="https://bsky.app/profile/sculptforge.bsky.social?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Bluesky" title="Bluesky"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#bluesky"/></svg></a><a class="gh" href="https://www.instagram.com/sculptforge.app?utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#instagram"/></svg></a><a class="gh" href="https://www.facebook.com/profile.php?id=61596196961617&amp;utm_source=site&amp;utm_medium=footer" rel="noopener" aria-label="Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><use href="img/social.svg#facebook"/></svg></a></div>
       </div>
       <p class="fine trademarks">SculptForge is an independent project. Product names are trademarks of their respective owners. Names
         are used only to describe compatibility and for price comparison. The site uses no cookies. Visits are

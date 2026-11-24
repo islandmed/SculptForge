@@ -5,12 +5,14 @@
 #include "core/EnvironmentMath.h"
 #include "core/LitSphere.h"
 #include "core/Mesh.h"
+#include "core/Reference.h"
 #include "core/Splats.h"
 #include "core/UploadOrder.h"
 #include "render/Camera.h"
 #include "render/Clusters.h"
 #include "render/GL.h"
 #include "render/Ghost.h"
+#include "render/Occlusion.h"
 #include "render/ScreenStroke.h"
 
 #include <cstdint>
@@ -36,11 +38,15 @@ struct RenderSettings {
     bool showTexture = true;     // with showVertex paint: a Part's painted texture (core/Texture.h) multiplies in
     bool showMask = true;        // masked areas render darker
     float maskDarkness = 0.7f;   // how dark: 0 = no tint .. 1 = darkest (Preferences > Interface > Mask darkness)
+    bool maskColorCustom = false; // masked areas blend towards maskColor (linear) instead of darkening (Mask colour)
+    glm::vec3 maskColor{0.20f, 0.22f, 0.30f};
     bool showFaceGroups = false; // colour each face group (see face groupColor)
     int litsphere = defaultLitSphere(); // built-in Lit Sphere material (core/Lit Sphere.h), Soft Clay; -1 = studio clay lighting
     bool showMesh = true;
     bool showSplats = true;
     float splatOpacity = 1.0f; // global fade for using a capture as reference
+    bool splatViewColor = true; // splats' view-dependent colour (SH degree >= 1); else their plain colour
+    bool splatShPerVertex = false; // tests only: that colour per quad corner, not by the once-a-splat pre-pass
     bool dimInactive = true;   // Parts other than the active one render slightly darker
     bool motionProxy = false;  // the view is moving (Fast Navigation): draw big meshes' lighter proxy (render/Clusters.h)
     double stillSeconds = 0.0; // how long the view has been still (0 while it moves): coarse levels give way to full detail
@@ -49,6 +55,9 @@ struct RenderSettings {
     // too slow for the still budget stays coarse while edited clusters draw in full until their levels follow, so
     // a timelapse seeking through the history flipped between the two from frame to frame (Discord, 0.11.10).
     bool fullDetail = false;
+    // Unlit (#168): every surface shows its base colour (vertex paint, texture, face groups) with no lighting, Lit Sphere
+    // or PBR shading, for judging painted colour as stored. The mask tint, wireframe and the dimming stay.
+    bool unlit = false;
     bool flatShading = false;  // the scene's shading (Material palette): faceted; Parts can override (core/Document.h)
     // Backface culling (#68, Tool > Viewport Look): back faces are never drawn, on any mesh (closed or not, from any
     // view). Off: they are skipped only where they can't show (a closed mesh seen from outside, Renderer::cull).
@@ -83,6 +92,15 @@ struct RenderSettings {
     float backgroundBlur = 0.4f;        // 0 = sharp .. 1 = the roughest level
     float pbrRoughness = 0.45f, pbrMetallic = 0.0f;
     float pbrCavity = 0.5f; // how much the sculpt's creases darken under PBR (0 = physically plain)
+    // View shadows and ambient occlusion (render/Occlusion.h): traced in the drawn view's depth, in the PBR view and,
+    // with occlusionInLitSphere, the Lit Sphere and studio shading too. The app turns them on by the hardware tier
+    // (App::applyViewEffects) and off while the view moves or a stroke runs where they would cost the frame.
+    bool ambientOcclusion = false;
+    float aoStrength = 0.8f; // 0..1
+    float aoSoftness = 0.4f;  // 0..1: the blur's width
+    bool shadows = false;     // the key light's cast shadows (PBR: the environment's brightest direction)
+    float shadowSoftness = 0.35f;
+    bool occlusionInLitSphere = false;
     // Lit Sphere and studio lighting (#80): the light turned from where the material has it, in degrees about the
     // view's up axis (yaw, + to the right) and its side axis (pitch, + up), its intensity (a multiplier) and an
     // ambient term that lifts the shadows (a share of the colour). The defaults leave the material as it is.
@@ -162,14 +180,27 @@ public:
     // The warm UI test server (app/UiServe.h): shaders linked once and kept for the next Renderer in the same GL
     // context (and the driver check init makes); false frees them.
     static void keepPrograms(bool keep);
+    // The next simpler mesh shader variant (the same feature bits meshProgram takes) for a driver that rejects one:
+    // drops the fanciest bit left, in the order ghost, PBR, normal map, texture, per-triangle data, flat. Returns
+    // `features` unchanged when nothing more can go (then the mesh isn't drawn, and the log says why).
+    static int simplerMeshFeatures(int features) {
+        for (int bit : {kGhost, kPbr, kNormalMap, kTextured, kPrim, kFlat})
+            if (features & bit) return features & ~bit;
+        return features;
+    }
     // Makes `scene` what draw() shows, in order: uploads whatever each visible
     // mesh marked dirty and clears its dirty state (a new slot uploads
     // everything), and frees the slots of ids no longer listed.
     void syncScene(const std::vector<SceneMesh>& scene);
     // True when Part `id` didn't fit in GPU memory at its last full upload (it isn't drawn until it does).
     bool outOfMemory(uint32_t id) const;
-    // Re-uploads the splats when `version` differs from the last upload.
-    void syncSplats(const SplatCloud& splats, uint64_t version);
+    // Full mesh uploads so far (a whole layout and every vertex): UI tests check that an undo sends only what it changed.
+    uint64_t fullUploads() const { return fullUploads_; }
+    // Re-uploads the splats when `version` (or `viewColor`) differs from the last upload. `viewColor` false: their SH
+    // bands 1-3 stay on the CPU (no GPU memory) and they draw in their plain colour.
+    void syncSplats(const SplatCloud& splats, uint64_t version, bool viewColor);
+    // The splats' view colour comes from the once-a-splat pre-pass (false: none needed, or per quad corner).
+    bool splatColorPrepass() const { return splatColorWidth_ > 0; }
     using Viewport = RenderViewport;
     void draw(const Camera& camera, int fbWidth, int fbHeight, const RenderSettings& settings, const Viewport& viewport = {});
     // draw() for the app's window (whose framebuffer has no multisampling): through an offscreen target with
@@ -177,6 +208,10 @@ public:
     // target (e.g. out of memory) it uses fewer samples. Returns the samples used.
     int drawView(const Camera& camera, int fbWidth, int fbHeight, const RenderSettings& settings, const Viewport& viewport,
                  int samples);
+    // Reference images (core/Reference.h) for the next draws: Behind ones over the background, In the scene ones
+    // after the Parts (depth tested, so the model hides them, never writing depth). The window's view shows every
+    // shown one; renderToImage (renders, exports, the timelapse) only those with inRenders, thumbnails none.
+    void setReferences(const std::vector<ReferenceImage>& refs); // (their GPU memory: referenceGpuBytes)
     // Offscreen render (4x MSAA) into top-down RGBA8 pixels.
     bool renderToImage(const Camera& camera, int width, int height, const RenderSettings& settings,
                        std::vector<uint8_t>& rgba, std::string& error);
@@ -184,6 +219,8 @@ public:
     // Persistent offscreen target (4x MSAA) for recording: draw between these calls.
     bool beginCapture(int width, int height, std::string& error);
     void endCapture(std::vector<uint8_t>& rgba); // top-down RGBA rows
+    // Between draw() and the interface drawn over it: the view's shadows and AO into the capture (never on the UI).
+    void captureViewDrawn();
 
     // PBR view: an environment's lighting is being built (the view shows the previous one meanwhile). `wake` is
     // called from the worker thread when it is ready (the app redraws then).
@@ -194,6 +231,11 @@ public:
 
     // GL texture of the painted texture of Part `id` as last synced (0 if none), for UI previews (rows bottom-up).
     GLuint paintTexture(uint32_t id) const;
+    // Part `id` has a painted texture (or UV checker) this GPU cannot show on the model (too many triangles for its
+    // limits): painting still goes into the texture, the model draws without it. The panel says so.
+    bool textureNotShown(uint32_t id) const;
+    // How Part `id`'s UVs reach the shader, for tests: 0 a texture buffer, N rows of N texels in a 2D texture.
+    int textureUvWidth(uint32_t id) const;
 
     // --- Strokes on heavy meshes (app/AsyncStroke.cpp) ---
     // The predictive stroke preview (render/Ghost.h) drawn on Part `id`; an empty stroke turns it off.
@@ -203,6 +245,14 @@ public:
     void setScreenStroke(const GhostStroke& stroke) { screenStroke_ = stroke; }
     // The last drawView applied the screen stroke.
     bool screenStrokeDrawn() const { return screenStrokeDrawn_; }
+    // View shadows and AO (render/Occlusion.h): the last view frame had them; false once the driver can't.
+    bool occlusionDrawn() const { return occlusionDrawn_; }
+    bool occlusionSupported() const { return !occlusion_.failed(); }
+    // `s` asks for them in its shading (and the driver hasn't refused them).
+    bool occlusionWanted(const RenderSettings& s) const {
+        return (s.ambientOcclusion || s.shadows) && (s.pbr() || s.occlusionInLitSphere) && !s.unlit && s.showMesh &&
+               !occlusion_.failed();
+    }
     // A sculpt stroke's vertex upload made in two halves: prepareStrokeUpload packs what the mesh marked dirty
     // (positions and normals only) and the culling bounds of the clusters that moved, on any thread and without
     // GL, while the GL thread keeps drawing from what it has; commitStrokeUpload sends it on the GL thread.
@@ -262,6 +312,16 @@ public:
     size_t gpuBytes() const;
     // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
     size_t microPendingShading() const;
+    size_t microPendingCoarse() const; // (MicroRenderer::pendingCoarse, all slots)
+    size_t microWidenDeferrals() const; // (MicroRenderer::widenDeferrals, all slots)
+    size_t microPendingPages() const;  // (MicroRenderer::pendingPages, all slots)
+    // Adaptive Detail tiles' delta pages alive on the GPU, all slots (MicroTilePages::pages), and their GPU bytes.
+    size_t microTilePages() const;
+    size_t microTilePageBytes() const;
+    bool microTilePagesWantFrame() const; // (MicroTilePages::wantsFrame: one more frame pages what came into view)
+    bool microShadingWantsFrame() const;  // a shown micro level's shading still drains over frames (MicroRenderer::pendingShading)
+    // Focus Detail's GPU sync time by part since the last call (MicroFocus::Part; adds into out[MicroFocus::kParts]).
+    void takeFocusSplit(double* out);
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
     size_t lastDrawnTriangles() const { return lastDrawn_; }
     bool floorGridDrawn() const { return floorGridDrawn_; } // the last draw() drew the floor grid (tests)
@@ -272,6 +332,18 @@ public:
     // Dynamic topology patches (tests): the triangles of mesh slot `id`'s uploaded patches whose indices on the GPU
     // (read back) aren't the mesh's triangles now.
     size_t patchErrors(uint32_t id, const Mesh& mesh);
+    // Full uploads of mesh slot `id` (tests): a stroke that remeshes must not send the whole Part every frame.
+    uint64_t fullUploads(uint32_t id) const {
+        for (const MeshSlot& s : slots_)
+            if (s.id == id) return s.fullUploads;
+        return 0;
+    }
+    // Syncs of mesh slot `id` that sent vertices (tests): a Gizmo drag of a whole Part sends none until its release.
+    uint64_t vertexSyncs(uint32_t id) const {
+        for (const MeshSlot& s : slots_)
+            if (s.id == id) return s.vertexSyncs;
+        return 0;
+    }
     size_t patchCount(uint32_t id) const {
         for (const MeshSlot& s : slots_)
             if (s.id == id) return s.patches.size();
@@ -320,12 +392,24 @@ public:
 private:
     void drawFloorGrid(const Camera& camera, const glm::mat4& view, const glm::mat4& proj,
                        const RenderSettings& settings);
-    void drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity);
+    // `perVertexSh`: evaluate the view colour per quad corner (tests: compares with the pre-pass's, once a splat).
+    void drawSplats(const glm::mat4& view, const glm::mat4& proj, int fbWidth, int fbHeight, float opacity, bool viewColor,
+                    bool perVertexSh);
 
     GLuint wireProgram_ = 0, wireLineProgram_ = 0, bgProgram_ = 0, splatProgram_ = 0;
     // Splats: per-splat data in a texture buffer, drawn as instanced quads in back-to-front order.
     GLuint splatVao_ = 0, splatData_ = 0, splatTexture_ = 0, splatOrder_ = 0;
     GLsizei splatCount_ = 0;
+    GLuint splatShData_ = 0, splatShTexture_ = 0; // bands 1-3 of the SH (none at degree 0)
+    int splatShDegree_ = 0, splatShTexels_ = 0;
+    bool splatShWanted_ = true;
+    glm::mat3 splatShFrame_{1.0f};
+    // The view colour pre-pass: one RGBA32F texel a splat (rows of splatColorWidth_; 0: none, evaluated per corner),
+    // for the eye it was evaluated from.
+    GLuint splatColorProgram_ = 0, splatColorFbo_ = 0, splatColorTexture_ = 0;
+    int splatColorWidth_ = 0;
+    bool splatColorFresh_ = false;
+    glm::vec3 splatColorEye_{0.0f};
     uint64_t splatVersion_ = ~uint64_t(0);
     std::vector<glm::vec3> splatCenters_;
     std::vector<uint32_t> splatSorted_;
@@ -352,9 +436,21 @@ private:
     int captureW_ = 0, captureH_ = 0;
     GLuint emptyVao_ = 0;
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)
+    std::vector<ReferenceImage> references_; // setReferences
+    struct ReferenceTexture {
+        std::shared_ptr<const Image> image; // (kept: the pointer stays the key while the texture lives)
+        GLuint tex = 0;
+    };
+    std::vector<ReferenceTexture> referenceTextures_;
+    GLuint referenceProgram_ = 0;
+    bool viewReferences_ = true; // false inside renderToImage: only the references marked for renders
+    void drawReferences(bool behind, const glm::mat4& view, const glm::mat4& proj, bool ortho, float aspect);
     // The GPU copy of one mesh (one Part), in the cluster layout of `order`.
     struct MeshSlot {
         uint32_t id = 0;
+        uint64_t fullUploads = 0; // (tests)
+        uint64_t vertexSyncs = 0; // (tests) syncs that found vertices to send (the mesh marked dirty)
+        bool remeshing = false;   // a stroke that changes this mesh's topology runs (dynamic topology)
         GLuint vao = 0, lineVao = 0;
         GLuint vertexBuffer = 0; // PackedVertex per GPU slot (render/Clusters.h)
         GLuint indexBuffer = 0;  // 16-bit, relative to each cluster's first vertex; kClusterTriangles * 3 per cluster
@@ -363,6 +459,12 @@ private:
         GLuint groupData = 0, groupTexture = 0; // face group id per drawn triangle (texture buffer, R16UI or R32UI)
         GLuint primData = 0, primTexture = 0;   // per GPU block: the first drawn triangle of its cluster (R32UI)
         GLuint uvData = 0, uvTexture = 0; // per drawn triangle corner UVs (texture buffer), meshes with a texture
+        // Past the GPU's texture buffer limit (Mali: 65536 texels, a 22k-triangle mesh): the same UVs as rows of uvWidth
+        // RG32F texels in a 2D texture (uvWidth 0: the buffer). uvsWanted: what the last upload was asked for, so a mesh
+        // that could not get UVs at all (uvsLost) is not re-uploaded every frame.
+        GLuint uvTexture2D = 0;
+        int uvWidth = 0;
+        bool uvsWanted = false, uvsLost = false;
         GLuint paintTexture = 0;          // the painted texture (sRGB, mipmapped)
         uint64_t textureSerial = 0, textureRevision = 0;
         int textureW = 0, textureH = 0;
@@ -433,6 +535,7 @@ private:
             std::vector<uint32_t> verts;     // the mesh vertex of each local index
             std::vector<uint16_t> local;     // triangles (local indices), while stale
             std::vector<uint32_t> groups;    // their face groups, while stale
+            std::vector<glm::vec2> uvs;      // their corners' UVs (3 each), while stale
             ClusterBounds bounds;
             bool stale = true;    // triangles changed: rebuild and upload everything
             bool uploaded = false;
@@ -442,8 +545,10 @@ private:
         std::vector<uint32_t> chunkCluster;           // per layout chunk of triangles: its cluster
         uint32_t layoutTriangles = 0;
         GLuint patchVao = 0, patchLineVao = 0, patchVertices = 0, patchIndices = 0, patchLines = 0, patchColors = 0,
-               patchMask = 0, patchGroupData = 0, patchGroupTexture = 0;
+               patchMask = 0, patchGroupData = 0, patchGroupTexture = 0, patchUvData = 0, patchUvTexture = 0;
         size_t patchParts = 0; // parts the patch buffers have room for
+        std::vector<glm::vec2> patchUvShadow; // the patches' UVs as the GPU holds them (3 per triangle, per part): sent in runs
+        std::vector<uint32_t> patchUvParts;   // parts whose UVs changed in this sync
         bool patchColorsOn = false, patchMaskOn = false, patchLinesOn = false;
         PositionGrid patchGrid; // the grid the patches' vertices were packed with
         size_t patchBytes = 0;
@@ -463,6 +568,8 @@ private:
     void buildLines(MeshSlot& s, const Mesh& mesh);
     void buildProxies(MeshSlot& s, const Mesh& mesh);
     bool proxyUsed_ = false; // the last draw() drew motion proxies: sync keeps them current
+    glm::vec3 prevEye_{0.0f}, prevForward_{0.0f, 0.0f, -1.0f};
+    bool cameraMoved_ = false; // this frame's camera differs from the last frame's (a micro level's shading catch-up waits)
     bool proxyPending_ = false; // (proxiesPending)
     bool proxyPrebuild_ = false; // (setProxyPrebuild)
     double proxyMsPerCluster_ = 0.0; // measured, so a frame's batches fit its budget on slow cores too
@@ -484,6 +591,14 @@ private:
     void setGhostUniforms(const MeshProgram& p);
     GhostStroke screenStroke_;
     ScreenStroke screenPass_;
+    // View shadows and AO (render/Occlusion.h): the pass, and what draw() worked out for it this frame.
+    OcclusionPass occlusion_;
+    OcclusionParams frameOcclusion_;
+    bool frameOcclusionWanted_ = false;
+    bool occlusionDrawn_ = false;
+    // The pass over the frame draw() just drew into `drawFbo` (resolved into `resolveFbo`), when it is wanted.
+    void applyOcclusion(GLuint drawFbo, GLuint resolveFbo, int width, int height);
+    void prepareOcclusion(const RenderSettings& settings, bool pbr, const glm::mat4& view);
     bool screenStrokeDrawn_ = false;
     void syncNormalMap(MeshSlot& s, const Mesh& mesh, const NormalMapView* normalMap);
     // `indicesDone`: the index buffer and drawCount are already written (a full upload writes them while
@@ -532,6 +647,7 @@ private:
     std::vector<uint32_t> coarseClusters_;
     size_t lastCoarseClusters_ = 0;
     bool previewOnly_ = false, stillWanted_ = false, stroking_ = false;
+    uint64_t fullUploads_ = 0;
     double gpuMsPerTriangle_ = 0.0; // measured (moving average), 0 = not yet
     double triangleRateM_ = 0.0;    // calibrated, million triangles a second (0 = unknown)
     std::vector<uint8_t> coarseLevel_;
@@ -554,19 +670,28 @@ private:
     glm::mat4 frameView_{1.0f}, frameProj_{1.0f};
     glm::vec4 frameViewport_{0.0f};
     CullView frameCull_;
+    glm::mat3 frameNormalFix_{1.0f}; // see normalFixFor; identity but inside drawItem
+    static glm::mat3 normalFixFor(const glm::mat3& m);
     // Mesh shader variants by feature bits (kPaint, kPrim, kTextured, kNormalMap, kFlat, kPbr), compiled on first use.
     struct MeshProgram {
         GLuint id = 0;
+        bool failed = false; // the driver rejected this variant (logged once): draws use a simpler one
+        GLint normalFix = -1;
+        GLint uvWidth = -1;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
-              showMask = -1, maskDarkness = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
-              hasPaint = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
-              lightLevels = -1, alpha = -1, microWire = -1;
+              showMask = -1, maskDarkness = -1, maskColor = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
+              hasPaint = -1, unlit = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
+              lightLevels = -1, alpha = -1, microWire = -1, occAlpha = -1, occLight = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;
-        GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
+        // The units the environment and BRDF table are bound to (meshProgram: a micro level's own buffers hold 8-15).
+        GLenum envUnit = 0x84CA, brdfUnit = 0x84CB; // GL_TEXTURE10, GL_TEXTURE11
+        GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostD = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
     };
     static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64,
                          kPbr = 128;
+    static constexpr int kFocus = kPaint; // with kMicro: a streamed level (render/MicroFocus.h; micro programs never paint)
+    static constexpr int kTiles = kPrim;  // with kMicro: Adaptive Detail tile pages (render/MicroTilePages.h; only while a Part has some)
     MeshProgram programs_[256];
     void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     std::string programError_;

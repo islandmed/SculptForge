@@ -3,6 +3,7 @@
 #include "core/TierConfig.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <atomic>
 #include <mutex>
 
@@ -23,8 +24,16 @@ size_t strokeShadeBudget(size_t points, double ms, double nsPerPoint, size_t min
     return points ? std::min(points, timed) : timed;
 }
 
+size_t coarseShadeBatch(size_t pending, double ms, double nsPerTile) {
+    if (!(ms > 0.0)) return pending;
+    return std::min(pending, nsPerTile > 0.0 ? std::max<size_t>(8, size_t(ms * 1e6 / nsPerTile)) : size_t(64));
+}
+
 size_t microShadeBudget(const TierConfig& tier, bool stroking, bool viewMoving, double nsPerPoint, size_t minPoints) {
-    const size_t points = size_t(tier.shadeBudgetPoints) / (stroking && tier.draftBrushMode ? 4 : 1);
+    // SF_SHADE_BUDGET_POINTS (tests: a backlog that outlasts the frames after the last input; read each call, a UI script's env)
+    const char* e = std::getenv("SF_SHADE_BUDGET_POINTS");
+    const size_t base = e && std::atoll(e) > 0 ? size_t(std::atoll(e)) : size_t(tier.shadeBudgetPoints);
+    const size_t points = base / (stroking && tier.draftBrushMode ? 4 : 1);
     return stroking || viewMoving ? strokeShadeBudget(points, tier.strokeShadeMs, nsPerPoint, minPoints) : points;
 }
 
@@ -115,7 +124,13 @@ Json tierConfigJson(const TierConfig& c) {
 
 namespace {
 std::mutex g_mutex;
-TierConfig g_config;
+// The config before any hardware profile is applied (tests, the CLI): the defaults with the SF_TIER_* overrides, so an
+// override reaches a run that never builds a profile (11-17: SF_TIER_MICRO_DRAW_ABOVE=0 was ignored by --ui-test).
+TierConfig g_config = [] {
+    TierConfig c;
+    applyTierBudgetEnv(c.budgets);
+    return c;
+}();
 std::atomic<uint64_t> g_revision{0};
 } // namespace
 

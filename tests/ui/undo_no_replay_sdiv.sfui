@@ -1,0 +1,67 @@
+# (Subdivision levels, as the reporter's: Level 3/3, no micro level.)
+# gh#184 (a tester, 0.13.8: "ghost strokes ... tied to undo: after undoing, the next new stroke re-shows the undone strokes").
+# The promise: undo N strokes, draw one new stroke, and the surface is the surface after undo plus that stroke, nothing
+# else (no undone stroke comes back). The same stroke drawn on a fresh mesh is the reference; on a plain mesh, and on a
+# micro level with Keep Strokes Editable off and on.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+run subdiv_divide
+run subdiv_divide
+run subdiv_divide
+expect_value sdiv_levels == 4
+camera 0 0
+key f
+wait_idle 30
+brush_size 50
+
+# The reference: the stroke alone.
+snapshot
+stroke 0.40 0.45 0.60 0.55 0.5
+wait_idle 30
+expect_value moved > 100
+remember moved ref_moved
+remember moved_sum ref_sum
+key ctrl+z
+wait_idle 30
+expect_value moved == 0
+expect_value view_stale < 0.3
+
+# Three strokes over the same place (and beside it), undone one after the other, then the stroke again.
+stroke 0.40 0.40 0.60 0.60 0.5
+wait_idle 30
+stroke 0.45 0.55 0.65 0.45 0.5
+wait_idle 30
+stroke 0.35 0.50 0.60 0.50 0.5
+wait_idle 30
+key ctrl+z
+wait_idle 30
+key ctrl+z
+wait_idle 30
+key ctrl+z
+wait_idle 30
+expect_value moved == 0
+expect_value view_stale < 0.3
+snapshot
+stroke 0.40 0.45 0.60 0.55 0.5
+wait_idle 30
+expect_value moved == $ref_moved
+expect_value view_stale < 0.3
+expect_value moved_sum > $ref_sum*0.999
+expect_value moved_sum < $ref_sum*1.001
+key ctrl+z
+wait_idle 30
+expect_value moved == 0
+expect_value view_stale < 0.3
+
+# The same without waiting between the undos and the new stroke (the next frame's upload is still on its way).
+stroke 0.40 0.40 0.60 0.60 0.5
+stroke 0.45 0.55 0.65 0.45 0.5
+key ctrl+z
+key ctrl+z
+snapshot
+stroke 0.40 0.45 0.60 0.55 0.5
+wait_idle 30
+expect_value moved == $ref_moved
+expect_value view_stale < 0.3
+expect_value moved_sum > $ref_sum*0.999
+expect_value moved_sum < $ref_sum*1.001

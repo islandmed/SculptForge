@@ -198,6 +198,12 @@ void App::registerGizmoActions() {
         "snaps. Shift+W again: back to Draw.");
     add("gizmo.reset_pivot", "Reset", ICON_LC_LOCATE_FIXED, kPath, "", [this] { resetGizmoPivot(); }, nullptr,
         "Put the gizmo back at the centre of what moves (the Part, or its unmasked part) with world axes.");
+    add("gizmo.center_origin", "Center on origin", ICON_LC_CROSSHAIR, kPath, "", [this] { originMove("center_origin"); }, nullptr,
+        "Move the Part so the centre of its bounding box sits at the world origin 0,0,0, as one undo step (with "
+        "All Parts: every visible Part together, keeping how they sit to each other).");
+    add("gizmo.drop_floor", "Drop to floor", ICON_LC_ARROW_DOWN_TO_LINE, kPath, "", [this] { originMove("drop_floor"); }, nullptr,
+        "Move the Part straight down (or up) until its lowest point rests on the floor, Y = 0, as one undo step "
+        "(with All Parts: every visible Part together).");
     add("gizmo.snap_pivot", "To Surface", ICON_LC_CROSSHAIR, kPath, "",
         [this] {
             gizmo_.snapNext = !gizmo_.snapNext;
@@ -308,6 +314,16 @@ void App::updateGizmoPivot() {
                                                c & 4 ? local.max.z : local.min.z, 1.0f)));
     }
     gizmo_.pivot = box.valid() ? box.center() : glm::vec3(0.0f);
+}
+
+// Origin tools: center_on_origin / drop_to_floor on what the gizmo moves, then the gizmo follows the Part again.
+void App::originMove(const char* which) {
+    Args args;
+    if (gizmo_.all) args["all"] = true;
+    else if (gizmo_.folder && doc_.activePartInfo().folder) args["folder"] = true;
+    runCommand(std::string(which) == "center_origin" ? "center_on_origin" : "drop_to_floor", args);
+    gizmo_.pivotPlaced = false;
+    gizmo_.centreKey = ~uint64_t(0);
 }
 
 void App::resetGizmoPivot() {
@@ -520,7 +536,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
     const GizmoHandle h = gizmoHandleAt(x, y);
     if (h == H::None) {
         RayHit hit;
-        const int st = pickPart(x, y, &hit);
+        const int st = alt ? pickPartNear(x, y, &hit) : pickPart(x, y, &hit); // (Alt+click picks as the Part click does)
         if (st >= 0 && gizmo_.snapNext) {
             snapGizmoPivot(hit, st);
             return true;
@@ -546,6 +562,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
     gizmo_.angle = gizmo_.lastAngle = 0.0f;
     gizmo_.tangent = false;
     gizmo_.current = MeshTransform{};
+    gizmo_.gridSize = 0.0f;
     gizmo_.readout.clear();
     if (gizmo_.pivotOnly && isScale(h)) {
         status_ = "Alt+drag moves the pivot (Move) or turns the axes (Rotate); scaling it does nothing";
@@ -605,7 +622,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
             }
             if (std::find(meshes.begin(), meshes.end(), s.data.get()) != meshes.end()) continue;
             meshes.push_back(s.data.get());
-            doc_.partBvh(i);
+            // (its BVH is taken at the release, where finish() refits it: a stale one is no cost at the press)
             // The active Part's mesh records into its active sculpt layer, as strokes do.
             const int layer = s.data == doc_.activePartInfo().data ? doc_.activeLayer : -1;
             TransformSession session;
@@ -625,7 +642,19 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
             return true;
         }
         playingLayer_ = -1;
+        // A whole Part moved, turned or scaled is drawn moved by one matrix while dragging (gizmo_.gpu).
+        gizmo_.gpu.assign(gizmo_.sessions.size(), 0);
+        const char* gpuEnv = std::getenv("SF_GIZMO_GPU"); // =0: every drag moves the vertices each frame (tests compare)
+        const bool byMatrix = !(gpuEnv && *gpuEnv == '0'); // (an axis scale too: the renderer corrects the normals, Renderer::normalFixFor)
+        for (size_t k = 0; k < gizmo_.sessions.size() && byMatrix; ++k) {
+            const int st = gizmo_.parts[k];
+            const auto& data = doc_.parts[size_t(st)].data;
+            const bool shared = std::count_if(doc_.parts.begin(), doc_.parts.end(), [&](const Part& o) { return o.data == data; }) > 1;
+            gizmo_.gpu[k] = !shared && gizmo_.sessions[k].wholeRigid(doc_.partMesh(st));
+        }
     }
+    gizmo_.gpuModel = glm::mat4(1.0f);
+    gizmo_.pending = false;
     drag_ = Drag::Gizmo;
     return true;
 }
@@ -639,11 +668,16 @@ void App::gizmoDragTo(float x, float y) {
     const glm::mat3& f = gizmo_.startFrame;
     const glm::vec3 c = gizmo_.startPivot;
     const int axis = axisOf(h);
-    float size = 0.0f;
-    for (int i : gizmo_.parts.empty() && gizmo_.wholeParts.empty() ? gizmoTargets() : gizmo_.parts)
-        size = std::max(size, glm::length(doc_.partBounds(i).extent()));
-    for (int i : gizmo_.wholeParts) size = std::max(size, glm::length(doc_.partBounds(i).extent()));
-    const float grid = gridStep(size);
+    // The snap grid follows the size of what moves at the press: Mesh::bounds walks every vertex, so it is read once
+    // per drag, and only when Shift asks for the grid (a 5M triangle Part made every drag frame ~5 ms slower).
+    if (snap && gizmo_.gridSize <= 0.0f) {
+        float size = 0.0f;
+        for (int i : gizmo_.parts.empty() && gizmo_.wholeParts.empty() ? gizmoTargets() : gizmo_.parts)
+            size = std::max(size, glm::length(doc_.partBounds(i).extent()));
+        for (int i : gizmo_.wholeParts) size = std::max(size, glm::length(doc_.partBounds(i).extent()));
+        gizmo_.gridSize = size;
+    }
+    const float grid = snap ? gridStep(gizmo_.gridSize) : 1.0f;
     MeshTransform t;
     t.pivot = c;
     t.frame = f;
@@ -720,7 +754,9 @@ void App::gizmoDragTo(float x, float y) {
         return;
     }
     gizmo_.current = t;
+    gizmo_.gpuModel = t.matrix();
     for (size_t i = 0; i < gizmo_.sessions.size(); ++i) {
+        if (gizmo_.gpu[i]) continue; // (drawn by gizmoDrawnTransform; the release moves the vertices)
         const Part& s = doc_.parts[size_t(gizmo_.parts[i])];
         gizmo_.sessions[i].apply(doc_.partMesh(gizmo_.parts[i]), s.moved() ? t.inSpaceOf(s.transform) : t);
     }
@@ -731,7 +767,22 @@ void App::gizmoDragTo(float x, float y) {
     }
 }
 
+void App::flushGizmoDrag() {
+    if (!gizmo_.pending) return;
+    gizmo_.pending = false;
+    if (drag_ == Drag::Gizmo) gizmoDragTo(gizmo_.pendingAt.x, gizmo_.pendingAt.y);
+}
+
+glm::mat4 App::gizmoDrawnTransform(int index) const {
+    const glm::mat4& place = doc_.parts[size_t(index)].transform;
+    if (drag_ != Drag::Gizmo || gizmo_.handle == H::None) return place;
+    for (size_t k = 0; k < gizmo_.parts.size() && k < gizmo_.gpu.size(); ++k)
+        if (gizmo_.parts[k] == index && gizmo_.gpu[k]) return gizmo_.gpuModel * place;
+    return place;
+}
+
 void App::gizmoRelease() {
+    flushGizmoDrag(); // (where the pointer was let go)
     if (gizmo_.pendingSnap) {
         gizmo_.pendingSnap = false;
         if (dist2(gizmo_.startMouse, ImVec2(mouseX_, mouseY_)) < 16.0f && gizmo_.snapPart == doc_.activePart)
@@ -747,6 +798,10 @@ void App::gizmoRelease() {
     size_t moved = 0;
     for (size_t i = 0; i < gizmo_.sessions.size(); ++i) {
         const int st = gizmo_.parts[i];
+        if (i < gizmo_.gpu.size() && gizmo_.gpu[i]) { // drawn by a matrix while dragging: now the vertices move, once
+            const Part& s = doc_.parts[size_t(st)];
+            gizmo_.sessions[i].apply(doc_.partMesh(st), s.moved() ? gizmo_.current.inSpaceOf(s.transform) : gizmo_.current);
+        }
         const size_t n = gizmo_.sessions[i].movingVertices();
         UndoRecord r = gizmo_.sessions[i].finish(doc_.partMesh(st), doc_.partBvh(st), label);
         if (r.empty()) continue;
@@ -762,6 +817,8 @@ void App::gizmoRelease() {
     }
     gizmo_.sessions.clear();
     gizmo_.parts.clear();
+    gizmo_.gpu.clear();
+    gizmo_.gpuModel = glm::mat4(1.0f);
     gizmo_.wholeParts.clear();
     gizmo_.wholeStart.clear();
     if (moved == 0) return;
@@ -965,14 +1022,20 @@ void App::drawGizmo() {
     } else {
         // Rotate: rings with their back halves dimmed, the view ring outside them. In All, a ring seen nearly
         // edge-on (a line through the centre, over the shafts) and the back halves fade further: the shafts own it.
+        // Within 15 degrees of edge-on it is faint and cannot be picked; up to 35 degrees only its rim picks (the
+        // rest is drawn fainter), so what is drawn solid is what a press takes (app/GizmoAll.h).
+        const ga::Screen sc0 = all ? gizmoAllScreen() : ga::Screen{};
         for (int i = 0; i < 3; ++i) {
             const glm::vec3 u = f[(i + 1) % 3], v = f[(i + 2) % 3];
             const H h = H(int(H::RotateX) + i);
             const bool hot = gizmo_.hover == h;
             const ImU32 col = colorFor(h, i);
             const float face = std::abs(glm::dot(f[i], toEye));
-            const float fade = all && !hot ? std::clamp(0.35f + face * 3.25f, 0.35f, 1.0f) : 1.0f;
-            const ImU32 front = withAlpha(col, fade), back = withAlpha(col, all ? 0.18f : 0.28f);
+            const ga::Screen::Axis::RingPick pickMode = all ? ga::ringPickFor(face) : ga::Screen::Axis::RingFull;
+            const bool faded = pickMode == ga::Screen::Axis::RingFaded;
+            const float fade = faded ? 0.32f : all && !hot ? std::clamp(0.35f + face * 3.25f, 0.35f, 1.0f) : 1.0f;
+            const ImU32 front = withAlpha(col, fade), back = withAlpha(col, faded ? 0.1f : all ? 0.18f : 0.28f);
+            const ImU32 rest = withAlpha(col, fade * 0.45f); // (the rim-only ring's part that does not pick)
             const float w = hot ? thick + 0.8f * s : all ? 2.2f * s : thick;
             ImVec2 prev;
             bool havePrev = false, prevFront = true;
@@ -987,8 +1050,10 @@ void App::drawGizmo() {
                 const bool isFront = glm::dot(r, toEye) > -0.02f;
                 if (havePrev) {
                     if (isFront && prevFront) {
-                        dl->AddLine(prev, p, withAlpha(shadow, fade * 0.8f), w + 2.0f * s);
-                        dl->AddLine(prev, p, front, w);
+                        const bool picks = !all || (ga::ringPointPicks(sc0, sc0.axis[i], glm::vec2(p.x, p.y)) &&
+                                                    ga::ringPointPicks(sc0, sc0.axis[i], glm::vec2(prev.x, prev.y)));
+                        if (!faded && picks) dl->AddLine(prev, p, withAlpha(shadow, fade * 0.8f), w + 2.0f * s);
+                        dl->AddLine(prev, p, picks || faded ? front : rest, faded ? 1.4f * s : w);
                     } else {
                         dl->AddLine(prev, p, back, 1.4f * s);
                     }
@@ -1038,6 +1103,12 @@ void App::drawGizmo() {
         std::sort(order, order + 3, [&](int a, int b) { return sc.axis[a].depth < sc.axis[b].depth; });
         for (int i : order) {
             const ga::Screen::Axis& ax = sc.axis[i];
+            if (ax.arrowFaded) { // pointing at the viewer: a faint hollow marker where it ends, nothing to press
+                const ImU32 ghost = withAlpha(axisColor(i, 1.0f), 0.32f);
+                if (glm::length(ax.tip - ax.from) > 1.0f) dl->AddLine(im(ax.from), im(ax.tip), ghost, 1.2f * s);
+                dl->AddCircle(im(ax.tip), 4.5f * s, ghost, 16, 1.2f * s);
+                continue;
+            }
             if (!ax.arrow) continue;
             const H h = H(int(H::MoveX) + i);
             const ImU32 col = colorFor(h, i);
@@ -1110,6 +1181,7 @@ void App::drawGizmoContents(bool compact) {
                  "moves until you place it: Alt+drag the gizmo, Alt+click the model, To Surface, or type here.",
                  kPath);
     ui::Segmented(*this, {"gizmo.reset_pivot", "gizmo.snap_pivot"});
+    ui::Segmented(*this, {"gizmo.center_origin", "gizmo.drop_floor"}); // Origin tools
     ui::Segmented(*this, {"gizmo.orient_world", "gizmo.orient_surface"});
     ui::Segmented(*this, {"gizmo.use_mask", "gizmo.folder", "gizmo.all"});
     float pct = gizmo_.falloff * 100.0f;

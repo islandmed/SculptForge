@@ -77,7 +77,11 @@ wait_ci() { # wait_ci <branch>: dispatches the full CI on the branch, waits, ret
     done
     [ -n "$id" ] || die "no CI run started for $branch"
     echo "   CI: https://github.com/$REPO/actions/runs/$id" >&2
-    gh run watch "$id" -R "$REPO" --exit-status --interval 30 >/dev/null 2>&1 && echo success || echo failure
+    gh run watch "$id" -R "$REPO" --exit-status --interval 30 >/dev/null 2>&1 && { echo success; return; }
+    # scripts/release.sh --stage exports infra_retry: a setup-step or test-step failure gets one rerun of its failed jobs (logged;
+    # a test that passes on it goes to flaky.md). Otherwise, or red again: failure.
+    if declare -F infra_retry >/dev/null && infra_retry "$id" &&
+        [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null)" = success ]; then echo success; else echo failure; fi
 }
 
 run_serial() {
@@ -185,7 +189,9 @@ land_staging() { # land_staging [--with CMD] [REF]
         pid=$!
         echo "   alongside: $with (log /tmp/merge-queue-with-${sha:0:8}.log)"
     fi
-    ci=$(wait_ci staging)
+    # SF_STAGE_CI_REUSED="<commit> <run>": release.sh --stage found that this commit only adds release paperwork to one whose
+    # full CI passed (tools/release/paperwork_only.py): the same answer, not another 20 minutes of it.
+    if [ -n "${SF_STAGE_CI_REUSED:-}" ]; then ci=success; echo "   CI: reused from ${SF_STAGE_CI_REUSED%% *} (run ${SF_STAGE_CI_REUSED##* }; paperwork only)"; else ci=$(wait_ci staging); fi
     if [ -n "$pid" ]; then wait "$pid" || local_rc=$?; tail -5 "/tmp/merge-queue-with-${sha:0:8}.log" | sed 's/^/   /'; fi
     echo "   CI on staging: $ci; local: $([ $local_rc = 0 ] && echo ok || echo "failed ($local_rc)"); $(( $(date +%s) - t0 )) s"
     [ "$ci" = success ] && [ $local_rc = 0 ] || die "staging is red: main stays at $(git rev-parse --short origin/main); fix the batch and run again"

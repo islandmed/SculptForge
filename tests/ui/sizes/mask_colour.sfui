@@ -1,0 +1,24 @@
+# (CMake: 1440 px at 100 % and 200 %.)
+# Preferences > Interface > Mask colour: the default is the darkening look; a picked colour shows on the mask and
+# is kept for the next session; Reset goes back.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+key f
+camera 0 0
+run mask_rect y0=0.2
+expect_value mask_colour_custom == 0
+shot mask_colour_default
+
+restart ../data/prefs/ui_mask_colour.json
+wait 0.2
+expect_value mask_colour_custom == 1
+expect_value mask_darkness == 90
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+expect_text "Mask colour"
+shot mask_colour_custom
+
+click "Reset##mask_colour"
+expect_value mask_colour_custom == 0
+restart
+expect_value mask_colour_custom == 0

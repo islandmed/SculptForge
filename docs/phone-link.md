@@ -141,6 +141,45 @@ requested size in metres; written with the regular GLB and USDZ exporters. Runs 
 While the phone has viewed the model in the last 10 minutes, a change to the scene re-exports it (at most every
 2.5 s, never mid-stroke); the page notices the new version and says so.
 
+## Forge Deck (prototype)
+
+The phone as a control pad for the desktop session: big brush tiles (the shelf's own thumbnails), Size and Intensity
+as drag-anywhere strips with fine control and a typed value, Undo, Redo, Mirror, and a readout of the current tool
+that follows the desktop. Code: `src/link/DeckCommands.*` (the allowlist), `PhoneLink` (`createDeckLink`,
+`receiveDeckMessage`, `pumpDeck`, `deckRelayLoop`), `src/app/PanelDeck.cpp` (window, banner, actions),
+`website/link/deck.html` (the page), `services/link-worker` (the relay's `/deck/` mailbox). Tests:
+`tests/test_deck.cpp`, `tests/ui/deck.sfui`, `services/link-worker/test/deck.test.mjs`.
+
+- **No new listener, no commands over plain HTTP.** The page is served over HTTPS by the website, like the AR page.
+  The offer, the token and the key are in the link's `#fragment` (never sent to the website), and the commands go up a
+  WebRTC data channel (DTLS) set up the same way the face and AR links are, with the same camera-first step and
+  Chrome Local Network Access prompt. The phone link's HTTP server only answers the pairing helpers it always had.
+- **Off at every start.** `PhoneLink::start()` turns the Deck off; File > Forge Deck (shown only with Preferences >
+  Experimental > Forge Deck) turns it on for the session and makes the pairing link; closing that window turns it off
+  again, closes the channel and changes the token. While off, every message is refused and no link can be made.
+- **One allowlisted command per message** (`parseDeckMessage`): `brush_use` (a tile the Deck itself showed),
+  `undo`, `redo`, `size_set` (0..1, log scale 2..800 px), `intensity_set` (0..1), `symmetry_toggle` (x, y, z).
+  Anything else, unknown fields, duplicate keys, out-of-range values or messages over 512 bytes are refused, counted,
+  shown in the status line and written to the audit log (tool `deck`). Control messages are only `hello`, `ping`,
+  `bye`. 20 commands a second, burst 20; at most 64 commands wait for the main thread. Undo, Redo and brush changes
+  wait while a stroke is running.
+- **Visible while paired.** A banner over the canvas shows the phone's name ("iPhone · Safari is driving this
+  session") with Disconnect; the kill switch (Disconnect, either window) tells the page, closes the channel, changes
+  the token and turns the Deck off. The phone has its own Disconnect.
+- **State flows back.** The desktop sends tool, size, intensity, mirror and the tile list when they change, and each
+  brush tile's PNG (at most 128 KB) once; the page answers nothing it didn't ask for.
+- **Relay fallback (owner's yes 11-12).** A phone whose browser can't reach the computer (Android Chrome without
+  Local Network Access), or whose Wi-Fi link dropped, uses the link relay's `/deck/<topic>/up|down` mailbox:
+  commands as AES-256-GCM envelopes `{"d":"p2d","s":sequence,"m":message}` under the link's key (`x` in the
+  fragment), the state back as `d2p`. The relay sees only ciphertext, and a short list of limits (1.4 KB a command,
+  64 waiting, 20 s TTL, 40 a second, deleted 5 minutes after the last message). The desktop polls only while the
+  direct link is down, for at most 5 minutes after the last sign of the page; an envelope with the wrong key or
+  direction, a sequence number that is not higher than the last, or a command off the allowlist is dropped or
+  refused exactly as on the direct channel. The tiles travel as one encrypted blob on the existing `/blob/` path.
+  A phone that reloads keeps its place for 5 minutes (the link is in `sessionStorage`, via the relay).
+- Not in the prototype: push-to-talk, pages beyond the 12 brush tiles, alphas/materials, going back from the relay to
+  the direct link without a new scan.
+
 ## What runs where
 
 - The desktop part is plain C++ on every platform. Built and tested here on Linux (aarch64); the WebRTC

@@ -42,6 +42,7 @@ cat > changes/beta-test.md <<'EOF'
 ---
 whats_new: **Beta test feature**: something new to try.
 highlight: First highlight of the beta
+member_request: true
 highlight: Second highlight of the beta
 highlight: Third highlight of the beta
 added: **Beta test feature**: something new to try.
@@ -52,6 +53,11 @@ EOF
 # The real tree's What's New may still hold {{NAME}} placeholders for numbers not measured yet; this test is about the
 # steps, so the sandbox fills them (the placeholder check itself is tested below).
 sed -i 's/{{[A-Z0-9_]*}}/measured/g' docs/guide/whats-new.md CHANGELOG.md
+# The site pages too, from the sandbox's own generator (after the placeholders above). A base whose committed
+# supporters.html or sitemap.xml trails build_site.py (automation commits site data between releases, so branches on an
+# older main carry the trail) left step bump's regeneration uncommitted, and step check stopped on "uncommitted
+# changes": this test failed on T0 for those branches (11-09).
+python3 tools/guide/build_site.py >/dev/null
 git add -A . && git commit -q -m "sandbox"
 git init -q --bare "$S/origin.git"
 git remote set-url origin "$S/origin.git"
@@ -116,6 +122,12 @@ chmod +x "$S/bin/"*
 # The public gallery as published (no GitHub API call: shared CI runners hit its rate limit): this tree's own files.
 python3 -c 'import json, sys; sys.path.insert(0, sys.argv[1]); import check_published as c; print(json.dumps(c.local_tree()))' \
     "$ROOT/tools/brush-gallery" > "$S/gallery.json"
+# A machine-wide push guard (global hooks) finds its script under $HOME; the sandbox's HOME is empty, so the guard
+# failed and refused the sandbox pushes. Where the real one exists, link it in: it still runs on every sandbox push.
+# Without one (CI) nothing changes.
+if [ -f "$HOME/Work/.sf/pre-push-guard.py" ]; then
+    mkdir -p "$S/home/Work/.sf" && ln -s "$HOME/Work/.sf/pre-push-guard.py" "$S/home/Work/.sf/pre-push-guard.py"
+fi
 export PATH="$S/bin:$PATH" HOME="$S/home" BUILD_DIR="$S/build" YES=1 SF_GALLERY_PUBLIC="$S/gallery.json"
 unset HIGHLIGHTS
 
@@ -145,7 +157,9 @@ grep -q '^## \[9.0.0\]' CHANGELOG.md && fail "beta bump made a CHANGELOG [9.0.0]
 grep -q 'Beta test feature' CHANGELOG.md || fail "beta bump: the fragment's entry is not in CHANGELOG [Unreleased]"
 grep -q '^## Version 9.0.0$' docs/guide/whats-new.md || fail "beta bump: no What's New 9.0.0"
 [ ! -e changes/beta-test.md ] || fail "beta bump: the fragment is still there"
-grep -q 'open the beta test feature' release-testers-9.0.0-beta.1.md || fail "beta bump: no testers checklist"
+tf=$HOME/Work/.sf/state/release-testers/release-testers-9.0.0-beta.1.md # outside the checkout: the promote runs elsewhere
+grep -q 'open the beta test feature' "$tf" || fail "beta bump: no testers checklist"
+[ ! -e release-testers-9.0.0-beta.1.md ] || fail "beta bump wrote the testers checklist into the checkout"
 [ "$(git rev-parse HEAD)" = "$(git -C "$S/origin.git" rev-parse main)" ] || fail "beta bump: main not pushed"
 grep -qx 'env SF_GUIDE_VERSION 9.0.0' tests/ui/whats_new.sfui && grep -qx 'expect_text "Version 9.0.0"' tests/ui/whats_new.sfui ||
     fail "beta bump didn't pin tests/ui/whats_new.sfui to 9.0.0"
@@ -165,7 +179,7 @@ grep -q 'already says' "$S/out.log" || fail "beta bump is not idempotent: $(cat 
 git diff --quiet "$start" HEAD -- website/latest.json website/index.html || fail "the beta touched the update feed or the home page"
 scripts/release.sh 9.0.0-beta.1 --only preview >/dev/null 2>&1 && fail "a beta still has a preview (public feed) step"
 quiet scripts/release.sh 9.0.0-beta.1 --only status
-grep -q 'release-testers-9.0.0-beta.1.md' "$S/out.log" || fail "beta status names no testers checklist"
+grep -qF "Testers:  $tf" "$S/out.log" || fail "beta status names no testers checklist: $(cat "$S/out.log")"
 grep -q 'sculptforge/sculptforge-insiders/releases/tag/v9.0.0-beta.1' "$S/out.log" || fail "beta status doesn't name the members' repository"
 grep -q 'scripts/release.sh 9.0.0 --yes' "$S/out.log" || fail "beta status doesn't say how to promote"
 git tag v9.0.0-beta.1 "$(git rev-parse HEAD)" # what step tag would have pushed
@@ -195,6 +209,8 @@ import json
 feed = json.load(open("website/latest.json"))
 assert feed["version"] == "9.0.0" and feed["highlights"] == ["One", "Two", "Three"], feed
 assert "preview" not in feed.get("channels", {}), "the passed beta is still on the Preview channel"
+# the beta's bump counted its member_request fragment; the stable release's feed carries it
+assert feed.get("support", {}).get("member_requests_this_release") == 1, feed.get("support")
 EOF
 
 git push -q origin main

@@ -8,8 +8,10 @@
 #include "core/Micro.h"
 #include "core/MicroStore.h"
 #include "core/ThreadPool.h"
+#include "core/Utf8Path.h"
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -46,6 +48,11 @@ uint32_t defaultCodec() {
 #else
     return kCodecPack;
 #endif
+}
+
+// [offset, offset + bytes) lies past the header and inside a file of `size` bytes (no wrap for crafted offsets).
+bool inFile(uint64_t offset, uint64_t bytes, size_t size) {
+    return offset >= kHeaderBytes && offset <= size && bytes <= size - offset;
 }
 
 uint64_t fnv1a(const uint8_t* p, size_t n) {
@@ -274,6 +281,44 @@ void shareEdges(const std::vector<glm::uvec3>& triangles, MicroMesh& mm, uint32_
 
 } // namespace
 
+void focusFillRecord(const int16_t* g, uint32_t n, uint32_t cn, int16_t* out) {
+    const uint32_t s = n / cn;
+    for (uint32_t J = 0; J <= cn; ++J)
+        for (uint32_t I = 0; I + J <= cn; ++I) out[MicroMesh::index(I, J, cn)] = g[MicroMesh::index(I * s, J * s, n)];
+    int16_t* e = out + (cn + 1) * (cn + 2) / 2;
+    for (int ed = 0; ed < 3; ++ed)
+        for (uint32_t k = 1; k < n; ++k) {
+            uint32_t i, j;
+            MicroMesh::edgePoint(ed, k, n, i, j);
+            *e++ = g[MicroMesh::index(i, j, n)];
+        }
+}
+
+int focusRecordValue(const int16_t* rec, uint32_t n, uint32_t cn, uint32_t I, uint32_t J) {
+    const uint32_t CS = (cn + 1) * (cn + 2) / 2;
+    int e = -1;
+    uint32_t k = 0;
+    if (J == 0) e = 0, k = I;
+    else if (I + J == n) e = 1, k = J;
+    else if (I == 0) e = 2, k = n - J;
+    if (e >= 0 && k > 0 && k < n) return rec[CS + uint32_t(e) * (n - 1) + k - 1];
+    const int s = int(n / cn), sh = std::countr_zero(n / cn);
+    const uint32_t ci = I >> sh, cj = J >> sh;
+    const int fi = int(I) & (s - 1), fj = int(J) & (s - 1);
+    auto C = [&](uint32_t i, uint32_t j) { return int(rec[MicroMesh::index(i, j, cn)]); };
+    int sum;
+    if (fi + fj <= s) {
+        sum = (s - fi - fj) * C(ci, cj);
+        if (fi > 0) sum += fi * C(ci + 1, cj);
+        if (fj > 0) sum += fj * C(ci, cj + 1);
+    } else {
+        sum = (fi + fj - s) * C(ci + 1, cj + 1) + (s - fi) * C(ci, cj + 1) + (s - fj) * C(ci + 1, cj);
+    }
+    const int q = sum + s / 2;
+    return q >= 0 ? q >> sh : -((-q + s - 1) >> sh);
+}
+
+
 // ---------------------------------------------------------------------------
 // Writing
 // ---------------------------------------------------------------------------
@@ -391,9 +436,11 @@ bool FocusDetail::mapFile(std::string& error) {
 #if defined(SF_FOCUS_POSIX)
     if (map_) ::munmap(const_cast<uint8_t*>(map_), mapBytes_);
     map_ = nullptr;
-    if (fd_ < 0) fd_ = ::open(path_.c_str(), O_RDWR);
+    // Read only (save() opens it for writing itself); a regular file, not through a symlink, a FIFO (nonblocking:
+    // opening one waits for a writer) or a device.
+    if (fd_ < 0) fd_ = ::open(path_.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
     struct stat st {};
-    if (fd_ < 0 || ::fstat(fd_, &st) != 0 || st.st_size < off_t(kHeaderBytes)) {
+    if (fd_ < 0 || ::fstat(fd_, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size < off_t(kHeaderBytes)) {
         error = "Can't open " + path_;
         return false;
     }
@@ -411,75 +458,70 @@ bool FocusDetail::mapFile(std::string& error) {
 #endif
 }
 
-std::shared_ptr<FocusDetail> FocusDetail::open(const std::string& path, Mesh& out, std::string& error) {
-    std::shared_ptr<FocusDetail> fd(new FocusDetail());
-    fd->path_ = path;
-    if (!fd->mapFile(error)) return nullptr;
-    const uint8_t* b = fd->map_;
+bool FocusDetail::loadIndex(std::string& error) {
+    const uint8_t* b = map_;
     Header h;
-    if (!decodeHeader(b, fd->mapBytes_, h, error)) return nullptr;
+    if (!decodeHeader(b, mapBytes_, h, error)) return false;
     const uint32_t T = h.tris, V = h.verts, chunks = (T + h.chunkTiles - 1) / h.chunkTiles;
     if (h.chunkTiles != kChunk || h.coarseLevel != uint32_t(kCoarseLevel) || h.baseBytes != uint64_t(V) * 24 + uint64_t(T) * 12 ||
-        h.baseOffset < kHeaderBytes || h.baseOffset + h.baseBytes > fd->mapBytes_ || h.dirOffset + h.dirBytes > fd->mapBytes_ ||
+        !inFile(h.baseOffset, h.baseBytes, mapBytes_) || !inFile(h.dirOffset, h.dirBytes, mapBytes_) ||
         h.dirBytes != uint64_t(T) * sizeof(Entry) + uint64_t(chunks) * sizeof(ChunkEntry) ||
         fnv1a(b + h.dirOffset, h.dirBytes) != h.dirHash) {
         error = "Detail file is damaged";
-        return nullptr;
+        return false;
     }
-    fd->level_ = int(h.level);
-    fd->n_ = 1u << h.level;
-    fd->samples_ = (fd->n_ + 1) * (fd->n_ + 2) / 2;
-    fd->coarseN_ = 1u << h.coarseLevel;
-    fd->coarseSamples_ = (fd->coarseN_ + 1) * (fd->coarseN_ + 2) / 2;
-    fd->codec_ = h.codec;
-    fd->step_ = h.step;
-    fd->generation_ = h.generation;
-    fd->garbage_ = h.garbage;
-    fd->dir_.resize(T);
-    fd->chunks_.resize(chunks);
-    std::memcpy(fd->dir_.data(), b + h.dirOffset, size_t(T) * sizeof(Entry));
-    std::memcpy(fd->chunks_.data(), b + h.dirOffset + size_t(T) * sizeof(Entry), size_t(chunks) * sizeof(ChunkEntry));
-    for (const Entry& e : fd->dir_)
-        if (e.offset < kHeaderBytes || e.offset + e.bytes > fd->mapBytes_) {
+    level_ = int(h.level);
+    n_ = 1u << h.level;
+    samples_ = (n_ + 1) * (n_ + 2) / 2;
+    coarseN_ = 1u << h.coarseLevel;
+    coarseSamples_ = (coarseN_ + 1) * (coarseN_ + 2) / 2;
+    codec_ = h.codec;
+    step_ = h.step;
+    generation_ = h.generation;
+    garbage_ = h.garbage;
+    baseOffset_ = h.baseOffset;
+    dir_.resize(T);
+    chunks_.resize(chunks);
+    std::memcpy(dir_.data(), b + h.dirOffset, size_t(T) * sizeof(Entry));
+    std::memcpy(chunks_.data(), b + h.dirOffset + size_t(T) * sizeof(Entry), size_t(chunks) * sizeof(ChunkEntry));
+    for (const Entry& e : dir_)
+        if (!inFile(e.offset, e.bytes, mapBytes_)) {
             error = "Detail file is damaged";
-            return nullptr;
+            return false;
         }
-    for (const ChunkEntry& c : fd->chunks_)
-        if (c.offset < kHeaderBytes || c.offset + c.bytes > fd->mapBytes_) {
+    for (const ChunkEntry& c : chunks_)
+        if (!inFile(c.offset, c.bytes, mapBytes_)) {
             error = "Detail file is damaged";
-            return nullptr;
+            return false;
         }
-    // The base mesh
-    Mesh m;
-    m.positions.resize(V);
-    m.normals.resize(V);
-    m.triangles.resize(T);
-    const uint8_t* base = b + h.baseOffset;
-    std::memcpy(m.positions.data(), base, size_t(V) * 12);
-    std::memcpy(m.normals.data(), base + size_t(V) * 12, size_t(V) * 12);
-    std::memcpy(m.triangles.data(), base + size_t(V) * 24, size_t(T) * 12);
-    for (const glm::uvec3& t : m.triangles)
+    tris_.resize(T);
+    std::memcpy(tris_.data(), b + h.baseOffset + size_t(V) * 24, size_t(T) * 12);
+    for (const glm::uvec3& t : tris_)
         if (t.x >= V || t.y >= V || t.z >= V) {
             error = "Detail file is damaged";
-            return nullptr;
+            return false;
         }
-    m.rebuildTopology();
-    // Coarse grids, then every tile upsampled from its coarse grid.
-    const uint32_t CS = fd->coarseSamples_, S = fd->samples_;
-    fd->coarse_.assign(size_t(T) * CS, 0);
+    baseHash_ = fnv1a(b + h.baseOffset, size_t(V) * 24);
+    // Coarse grids (always resident)
+    const uint32_t CS = coarseSamples_;
+    coarse_.assign(size_t(T) * CS, 0);
     std::atomic<bool> bad{false};
     poolFor(chunks, [&](size_t c0, size_t c1) {
         for (size_t c = c0; c < c1; ++c) {
             const uint32_t first = uint32_t(c) * kChunk, count = std::min(kChunk, T - first);
-            if (!decompressValues(fd->codec_, b + fd->chunks_[c].offset, fd->chunks_[c].bytes, count, CS,
-                                  fd->coarse_.data() + size_t(first) * CS))
+            if (!decompressValues(codec_, b + chunks_[c].offset, chunks_[c].bytes, count, CS, coarse_.data() + size_t(first) * CS))
                 bad = true;
         }
     }, 1, 1);
     if (bad) {
         error = "Detail file is damaged";
-        return nullptr;
+        return false;
     }
+    return true;
+}
+
+bool FocusDetail::attachTo(Mesh& m, std::vector<uint8_t> mask, std::string& error) {
+    const uint32_t T = uint32_t(dir_.size()), CS = coarseSamples_, S = samples_;
     MicroStore disp;
     if (microWantsOutOfCore(size_t(T) * S)) {
         std::string why;
@@ -488,25 +530,78 @@ std::shared_ptr<FocusDetail> FocusDetail::open(const std::string& path, Mesh& ou
         disp = std::vector<int16_t>(size_t(T) * S);
     }
     poolFor(T, [&](size_t t0, size_t t1) {
-        for (size_t t = t0; t < t1; ++t) upsample(fd->coarse_.data() + t * CS, fd->coarseN_, fd->n_, disp.data() + t * S);
+        for (size_t t = t0; t < t1; ++t) upsample(coarse_.data() + t * CS, coarseN_, n_, disp.data() + t * S);
     }, 64);
-    if (!microAttach(m, fd->level_, fd->step_, std::move(disp), {}, error)) return nullptr;
+    std::shared_ptr<MicroMesh> before = std::move(m.micro);
+    if (!microAttach(m, level_, step_, std::move(disp), std::move(mask), error)) {
+        m.micro = std::move(before);
+        return false;
+    }
     MicroMesh& mm = *m.micro;
     mm.rangeMax = 0;
     for (uint32_t t = 0; t < T; ++t) {
-        mm.triRange[t] = fd->dir_[t].range; // the full tile's (brushes find triangles with it)
+        mm.triRange[t] = dir_[t].range; // the full tile's (brushes find triangles with it)
         mm.rangeMax = std::max(mm.rangeMax, mm.triRange[t]);
     }
-    fd->state_.assign(T, kCoarse);
-    fd->lastWanted_.assign(T, 0);
-    fd->parked_.resize(T);
-    fd->score_.assign(T, 0.0f);
-    fd->tris_ = m.triangles;
-    fd->baseHash_ = fnv1a(base, size_t(V) * 24);
-    fd->stats_.tiles = T;
-    mm.focus = fd;
+    state_.assign(T, kCoarse);
+    lastWanted_.assign(T, 0);
+    parked_.assign(T, {});
+    score_.assign(T, 0.0f);
+    fullTiles_ = 0;
+    stats_ = {};
+    stats_.tiles = T;
+    return true;
+}
+
+std::shared_ptr<FocusDetail> FocusDetail::open(const std::string& path, Mesh& out, std::string& error) {
+    std::shared_ptr<FocusDetail> fd(new FocusDetail());
+    fd->path_ = path;
+    if (!fd->mapFile(error) || !fd->loadIndex(error)) return nullptr;
+    // The base mesh
+    Mesh m;
+    const uint8_t* base = fd->map_ + fd->baseOffset_;
+    Header h;
+    decodeHeader(fd->map_, fd->mapBytes_, h, error); // (checked by loadIndex)
+    m.positions.resize(h.verts);
+    m.normals.resize(h.verts);
+    std::memcpy(m.positions.data(), base, size_t(h.verts) * 12);
+    std::memcpy(m.normals.data(), base + size_t(h.verts) * 12, size_t(h.verts) * 12);
+    m.triangles = fd->tris_;
+    m.rebuildTopology();
+    if (!fd->attachTo(m, {}, error)) return nullptr;
+    m.micro->focus = fd;
     out = std::move(m);
     return fd;
+}
+
+std::shared_ptr<FocusDetail> FocusDetail::attach(const std::string& path, Mesh& m, std::vector<uint8_t> mask,
+                                                 std::string& error) {
+    std::shared_ptr<FocusDetail> fd(new FocusDetail());
+    fd->path_ = path;
+    if (!fd->mapFile(error) || !fd->loadIndex(error)) return nullptr;
+    if (fd->tris_ != m.triangles) {
+        error = "The detail file " + fileNameUtf8(path) + " belongs to another mesh";
+        return nullptr;
+    }
+    if (m.normals.size() != m.vertexCount()) m.recomputeAllNormals();
+    if (!fd->attachTo(m, std::move(mask), error)) return nullptr;
+    m.micro->focus = fd;
+    return fd;
+}
+
+std::shared_ptr<FocusDetail> FocusDetail::create(const std::string& path, Mesh& m, std::string& error) {
+    if (!m.micro || m.micro->focus || !microMatches(m)) {
+        error = "Nothing to stream: no micro level";
+        return nullptr;
+    }
+    const MicroMesh& mm = *m.micro;
+    const uint32_t S = mm.samples;
+    if (!write(path, m, mm.level, mm.step,
+               [&](const MicroTriangle&, uint32_t t, int16_t* out) { std::memcpy(out, mm.disp.data() + size_t(t) * S, S * 2); },
+               error))
+        return nullptr;
+    std::vector<uint8_t> mask = mm.mask;
+    return attach(path, m, std::move(mask), error);
 }
 
 // ---------------------------------------------------------------------------
@@ -581,6 +676,17 @@ void FocusDetail::ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool
     if (!need.empty()) promoteLocked(mm, need, edit, true);
 }
 
+void FocusDetail::ensureAllFull(MicroMesh& mm, bool edit) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<uint32_t> need;
+    for (uint32_t t = 0; t < uint32_t(state_.size()); ++t) {
+        lastWanted_[t] = frame_;
+        if (state_[t] == kCoarse) need.push_back(t);
+        else if (edit) state_[t] = kDirty;
+    }
+    if (!need.empty()) promoteLocked(mm, need, edit, true);
+}
+
 void FocusDetail::rescale(MicroMesh& mm, int doublings) {
     if (doublings <= 0) return;
     std::lock_guard<std::mutex> lock(mutex_);
@@ -610,7 +716,8 @@ void FocusDetail::rescale(MicroMesh& mm, int doublings) {
     }, 64);
     for (uint32_t t = 0; t < T; ++t)
         if (state_[t] != kCoarse) shareEdges(tris_, mm, t, [&](uint32_t u) { return state_[u] == kCoarse ? 1 : 0; });
-    mm.markAllDirty();
+    // (not markAllDirty: the same surface, re-rounded; widen's `rescaled` has the renderer re-send every tile's heights
+    // and keep the shading, MicroFocus::resendHeights. #184: all of it re-shaded, a 1-2 s frame on a 2.6M base.)
 }
 
 bool FocusDetail::unsaved() const {
@@ -627,73 +734,122 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     MicroMesh& mm = *m.micro;
     const uint32_t T = uint32_t(state_.size());
     std::unique_lock<std::mutex> lock(mutex_);
-    ++frame_;
-    // Frustum planes (Gribb & Hartmann) for the visibility test.
-    glm::vec4 planes[6];
-    if (view.valid) {
-        const glm::mat4 M = glm::transpose(view.viewProj);
-        planes[0] = M[3] + M[0], planes[1] = M[3] - M[0], planes[2] = M[3] + M[1];
-        planes[3] = M[3] - M[1], planes[4] = M[3] + M[2], planes[5] = M[3] - M[2];
-        for (glm::vec4& p : planes) p /= glm::length(glm::vec3(p));
-    }
-    const glm::vec3 b0 = brush.position, b1 = brush.position + brush.velocity * lookaheadSeconds;
-    const float reach = brush.radius * brushReach;
-    poolFor(T, [&](size_t s, size_t e) {
-        for (size_t t = s; t < e; ++t) {
-            // (from the base as it is now: Move on a micro level moves the base cage)
-            const glm::uvec3 tr = tris_[t];
-            const glm::vec3 a = m.positions[tr.x], b = m.positions[tr.y], cc = m.positions[tr.z];
-            const glm::vec3 c = (a + b + cc) / 3.0f;
-            const glm::vec4 bs(c, std::sqrt(std::max({glm::dot(a - c, a - c), glm::dot(b - c, b - c), glm::dot(cc - c, cc - c)})) +
-                                      mm.bulgeMax + float(mm.triRange[t]) * mm.step);
-            float score = 0.0f;
-            if (brush.present) { // distance to the brush's path ahead (and its mirror's)
-                for (int k = 0; k < (brush.mirrorX ? 2 : 1); ++k) {
-                    const glm::vec3 q = k ? glm::vec3(-c.x, c.y, c.z) : c;
-                    const glm::vec3 d = b1 - b0;
-                    const float len2 = glm::dot(d, d);
-                    const float u = len2 > 0.0f ? std::clamp(glm::dot(q - b0, d) / len2, 0.0f, 1.0f) : 0.0f;
-                    const float dist = glm::distance(q, b0 + d * u) - bs.w;
-                    if (dist < reach) score = std::max(score, 1e6f - dist);
-                }
-            }
-            if (score == 0.0f && view.valid) {
-                bool in = true;
-                for (const glm::vec4& p : planes)
-                    if (glm::dot(glm::vec3(p), c) + p.w < -bs.w) in = false;
-                if (in) {
-                    const float px = dir_[t].coarseErr * view.focalPx / std::max(glm::distance(c, view.eye) - bs.w, 1e-4f);
-                    if (px > view.errorPx) score = px;
-                }
-            }
-            score_[t] = score;
-        }
-    }, 4096);
-    scratch_.clear();
-    size_t wanted = 0;
-    for (uint32_t t = 0; t < T; ++t)
-        if (score_[t] > 0.0f) {
-            ++wanted;
-            lastWanted_[t] = frame_;
-            if (state_[t] == kCoarse) scratch_.push_back(t);
-        }
-    std::sort(scratch_.begin(), scratch_.end(), [&](uint32_t a, uint32_t b) { return score_[a] > score_[b] || (score_[a] == score_[b] && a < b); });
+    // Scoring looks at every tile (2.5M base triangles: most of a floor-tier frame, every frame, #184). The same
+    // view, brush, detail and budget, within the budget, want the same tiles: skipped (or the last list's rest promoted),
+    // but rescored every kRescore updates (a backstop: the app names base changes in view.baseRevision / baseMoving;
+    // a rescore at 2.5M base is ~30 ms on floor, so not often).
+    constexpr uint32_t kRescore = 600;
+    const auto sameView = [](const FocusView& a, const FocusView& b) {
+        return a.valid == b.valid && a.viewProj == b.viewProj && a.eye == b.eye && a.focalPx == b.focalPx && a.errorPx == b.errorPx &&
+               a.baseRevision == b.baseRevision && !a.baseMoving && !b.baseMoving;
+    };
+    const auto sameBrush = [](const FocusBrush& a, const FocusBrush& b) {
+        if (a.present != b.present) return false;
+        if (!a.present) return true;
+        const float still = 1e-3f * std::max(a.radius, 1e-12f); // (the app's smoothed velocity only tends to zero)
+        const bool stillA = glm::length(a.velocity) < still, stillB = glm::length(b.velocity) < still;
+        return a.position == b.position && a.radius == b.radius && a.mirrorX == b.mirrorX &&
+               (stillA && stillB ? true : a.velocity == b.velocity);
+    };
     const size_t maxFull = std::max<size_t>(budgetBytes / (size_t(samples_) * 2), 1);
+    const bool inBudget = fullTiles_ <= maxFull; // (else demotions wait on frames)
+    // The view moving (an orbit): demotions wait for a frame at rest unless the full tiles reach twice the budget (#184:
+    // a batch a frame cost an orbit after a long stroke ~10% of its frame rate on the floor tier).
+    const bool viewMoving = scored_.valid && !sameView(scored_.view, view);
+    const bool unchanged = scored_.valid && scored_.frames < kRescore && inBudget && !mm.stroking && scored_.revision == mm.revision &&
+                           scored_.fullTiles == fullTiles_ && scored_.budgetBytes == budgetBytes && sameView(scored_.view, view) &&
+                           sameBrush(scored_.brush, brush);
+    if (unchanged && (stats_.lastPending == 0 || scored_.stalled)) {
+        ++scored_.frames;
+        ++stats_.skippedUpdates;
+        stats_.lastUpdateMs = msSince(t0);
+        return;
+    }
+    // Still promoting what the last scoring wanted (a view after strokes: tens of thousands of tiles, a batch a
+    // frame): the rest of its list, in its order, without scoring again (a full budget demotes what it no longer wants).
+    const bool fromQueue = unchanged;
+    size_t wanted = stats_.lastWanted;
+    if (fromQueue) {
+        scratch_.erase(scratch_.begin(), scratch_.end() - std::ptrdiff_t(stats_.lastPending));
+        std::erase_if(scratch_, [&](uint32_t t) { return state_[t] != kCoarse; }); // (a brush promoted it meanwhile)
+        ++stats_.skippedUpdates;
+    } else {
+        ++frame_;
+        lruValid_ = false;
+        // Frustum planes (Gribb & Hartmann) for the visibility test.
+        glm::vec4 planes[6];
+        if (view.valid) {
+            const glm::mat4 M = glm::transpose(view.viewProj);
+            planes[0] = M[3] + M[0], planes[1] = M[3] - M[0], planes[2] = M[3] + M[1];
+            planes[3] = M[3] - M[1], planes[4] = M[3] + M[2], planes[5] = M[3] - M[2];
+            for (glm::vec4& p : planes) p /= glm::length(glm::vec3(p));
+        }
+        const glm::vec3 b0 = brush.position, b1 = brush.position + brush.velocity * lookaheadSeconds;
+        const float reach = brush.radius * brushReach;
+        poolFor(T, [&](size_t s, size_t e) {
+            for (size_t t = s; t < e; ++t) {
+                // (from the base as it is now: Move on a micro level moves the base cage)
+                const glm::uvec3 tr = tris_[t];
+                const glm::vec3 a = m.positions[tr.x], b = m.positions[tr.y], cc = m.positions[tr.z];
+                const glm::vec3 c = (a + b + cc) / 3.0f;
+                const glm::vec4 bs(c, std::sqrt(std::max({glm::dot(a - c, a - c), glm::dot(b - c, b - c), glm::dot(cc - c, cc - c)})) +
+                                          mm.bulgeMax + float(mm.triRange[t]) * mm.step);
+                float score = 0.0f;
+                if (brush.present) { // distance to the brush's path ahead (and its mirror's)
+                    for (int k = 0; k < (brush.mirrorX ? 2 : 1); ++k) {
+                        const glm::vec3 q = k ? glm::vec3(-c.x, c.y, c.z) : c;
+                        const glm::vec3 d = b1 - b0;
+                        const float len2 = glm::dot(d, d);
+                        const float u = len2 > 0.0f ? std::clamp(glm::dot(q - b0, d) / len2, 0.0f, 1.0f) : 0.0f;
+                        const float dist = glm::distance(q, b0 + d * u) - bs.w;
+                        if (dist < reach) score = std::max(score, 1e6f - dist);
+                    }
+                }
+                if (score == 0.0f && view.valid) {
+                    bool in = true;
+                    for (const glm::vec4& p : planes)
+                        if (glm::dot(glm::vec3(p), c) + p.w < -bs.w) in = false;
+                    if (in) {
+                        const float px = dir_[t].coarseErr * view.focalPx / std::max(glm::distance(c, view.eye) - bs.w, 1e-4f);
+                        if (px > view.errorPx) score = px;
+                    }
+                }
+                score_[t] = score;
+            }
+        }, 4096);
+        scratch_.clear();
+        wanted = 0;
+        for (uint32_t t = 0; t < T; ++t)
+            if (score_[t] > 0.0f) {
+                ++wanted;
+                lastWanted_[t] = frame_;
+                if (state_[t] == kCoarse) scratch_.push_back(t);
+            }
+        std::sort(scratch_.begin(), scratch_.end(), [&](uint32_t a, uint32_t b) { return score_[a] > score_[b] || (score_[a] == score_[b] && a < b); });
+    }
     // Demotion candidates: full tiles not wanted for kLinger frames, least recently wanted first (never a dirty
     // one while stroking: a dab on the solver thread may be writing it).
     constexpr uint32_t kLinger = 8;
-    std::vector<uint32_t> lru;
+    constexpr size_t kDemoteBatch = 64;
+    size_t demoted = 0; // (this update's, over all the calls below)
+    std::vector<uint32_t>& lru = lru_;
     auto demoteFor = [&](size_t room) {
         if (fullTiles_ + room <= maxFull) return true;
-        if (lru.empty()) {
+        if (viewMoving && fullTiles_ + room <= 2 * maxFull) return false; // (before the list: it scans every tile)
+        if (!lruValid_) {
+            lruValid_ = true;
+            lru.clear();
             for (uint32_t t = 0; t < T; ++t)
                 if (state_[t] != kCoarse && lastWanted_[t] + kLinger < frame_ && !(mm.stroking && state_[t] == kDirty)) lru.push_back(t);
             std::sort(lru.begin(), lru.end(), [&](uint32_t a, uint32_t b) { return lastWanted_[a] > lastWanted_[b] || (lastWanted_[a] == lastWanted_[b] && a > b); });
         }
+        // Within the frame's budget (a long stroke leaves thousands of edited tiles over it, each compressed as it
+        // goes: #184, 1.6-2.8 s in one floor frame); the rest goes on the next frames (at least a batch a frame).
         while (fullTiles_ + room > maxFull && !lru.empty()) { // (back = oldest)
+            if (demoted >= kDemoteBatch && msSince(t0) > budgetMs) break;
             const uint32_t t = lru.back();
             lru.pop_back();
-            if (state_[t] != kCoarse) demoteLocked(mm, t);
+            if (t < T && state_[t] != kCoarse) demoteLocked(mm, t), ++demoted;
         }
         return fullTiles_ + room <= maxFull;
     };
@@ -713,6 +869,7 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
         lock.lock();
     }
     demoteFor(0);
+    scored_ = {true, view, brush, mm.revision, fullTiles_, budgetBytes, fromQueue ? scored_.frames + 1 : 0, done == 0 && !scratch_.empty()};
     stats_.lastWanted = wanted;
     stats_.lastPending = scratch_.size() - done;
     stats_.lastUpdateMs = msSince(t0);
@@ -734,7 +891,7 @@ FocusStats FocusDetail::stats() const {
 // Saving: changed tiles only
 // ---------------------------------------------------------------------------
 
-bool FocusDetail::save(Mesh& m, std::string& error) {
+bool FocusDetail::save(const Mesh& m, std::string& error) {
 #if defined(SF_FOCUS_POSIX)
     if (!m.micro || m.micro->focus.get() != this) {
         error = "Not this detail file's mesh";
@@ -744,8 +901,14 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
     std::lock_guard<std::mutex> lock(mutex_);
     const uint32_t T = uint32_t(state_.size()), S = samples_, CS = coarseSamples_;
     std::vector<uint32_t> tiles;
+    uint64_t replaced = 0;
     for (uint32_t t = 0; t < T; ++t)
-        if (state_[t] == kDirty || !parked_[t].empty()) tiles.push_back(t);
+        if (state_[t] == kDirty || !parked_[t].empty()) {
+            tiles.push_back(t);
+            replaced += dir_[t].bytes;
+        }
+    // Compaction: a fresh file once the garbage would pass half of it.
+    if ((garbage_ + replaced) * 2 > mapBytes_) return saveAsLocked(m, path_, error);
     // The base cage moved (Move on a micro level): its block goes too.
     std::vector<uint8_t> baseBlock;
     if (m.normals.size() == m.vertexCount()) {
@@ -822,17 +985,27 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
     h.generation = generation_ + 1;
     h.garbage = garbage;
     h.step = step_;
+    // Written through its own descriptor, only when it is still the file we read (same inode, not a symlink).
+    struct stat was {}, now {};
+    const int wfd = ::open(path_.c_str(), O_WRONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (wfd < 0 || ::fstat(fd_, &was) != 0 || ::fstat(wfd, &now) != 0 || was.st_dev != now.st_dev || was.st_ino != now.st_ino) {
+        if (wfd >= 0) ::close(wfd);
+        error = "Can't write " + path_;
+        return false;
+    }
     auto pwriteAll = [&](const uint8_t* p, size_t size, uint64_t at) {
         while (size) {
-            const ssize_t w = ::pwrite(fd_, p, size, off_t(at));
+            const ssize_t w = ::pwrite(wfd, p, size, off_t(at));
             if (w <= 0) return false;
             p += w, size -= size_t(w), at += uint64_t(w);
         }
         return true;
     };
     const std::vector<uint8_t> head = encodeHeader(h);
-    if (!pwriteAll(tail.data(), tail.size(), offset) || ::fsync(fd_) != 0 || !pwriteAll(head.data(), head.size(), 0) ||
-        ::fsync(fd_) != 0) {
+    const bool written = pwriteAll(tail.data(), tail.size(), offset) && ::fsync(wfd) == 0 &&
+                         pwriteAll(head.data(), head.size(), 0) && ::fsync(wfd) == 0;
+    ::close(wfd);
+    if (!written) {
         error = "Saving " + path_ + " failed (disk full?)";
         return false;
     }
@@ -840,6 +1013,7 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
     chunks_ = std::move(chunkDir);
     garbage_ = garbage;
     generation_ = h.generation;
+    baseOffset_ = h.baseOffset;
     rescaled_ = false;
     if (!baseBlock.empty()) baseHash_ = fnv1a(baseBlock.data(), m.vertexCount() * 24);
     for (uint32_t t : tiles) {
@@ -848,6 +1022,138 @@ bool FocusDetail::save(Mesh& m, std::string& error) {
     }
     return mapFile(error);
 #else
+    error = "Focus Detail needs Linux or macOS for now";
+    return false;
+#endif
+}
+
+bool FocusDetail::saveAs(const Mesh& m, const std::string& path, std::string& error) {
+    if (!m.micro || m.micro->focus.get() != this) {
+        error = "Not this detail file's mesh";
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    return saveAsLocked(m, path, error);
+}
+
+bool FocusDetail::saveAsLocked(const Mesh& m, const std::string& path, std::string& error) {
+#if defined(SF_FOCUS_POSIX)
+    MicroMesh& mm = *m.micro;
+    const uint32_t T = uint32_t(state_.size()), S = samples_, CS = coarseSamples_, V = uint32_t(m.vertexCount());
+    const std::string tmp = path + ".part";
+    std::FILE* f = std::fopen(tmp.c_str(), "wb");
+    if (!f) {
+        error = "Can't write " + tmp;
+        return false;
+    }
+    Header h;
+    h.codec = codec_;
+    h.level = uint32_t(level_);
+    h.coarseLevel = kCoarseLevel;
+    h.tris = T;
+    h.verts = V;
+    h.chunkTiles = kChunk;
+    h.step = step_;
+    h.baseOffset = kHeaderBytes;
+    h.baseBytes = uint64_t(V) * 24 + uint64_t(T) * 12;
+    h.generation = generation_ + 1;
+    std::vector<glm::vec3> normals = m.normals;
+    if (normals.size() != V) {
+        Mesh copy;
+        copy.positions = m.positions;
+        copy.triangles = m.triangles;
+        copy.recomputeAllNormals();
+        normals = std::move(copy.normals);
+    }
+    bool ok = std::fwrite(encodeHeader(h).data(), 1, kHeaderBytes, f) == kHeaderBytes;
+    ok = ok && std::fwrite(m.positions.data(), 12, V, f) == V;
+    ok = ok && std::fwrite(normals.data(), 12, V, f) == V;
+    ok = ok && std::fwrite(tris_.data(), 12, T, f) == T;
+    uint64_t offset = kHeaderBytes + h.baseBytes;
+    std::vector<Entry> dir = dir_;
+    std::vector<ChunkEntry> chunkDir(chunks_.size());
+    // Tiles in batches: edited ones compressed in parallel, parked ones as they are, the rest copied as stored.
+    const uint32_t batch = kChunk * 4;
+    std::vector<std::vector<uint8_t>> blobs(batch);
+    for (uint32_t b0 = 0; ok && b0 < T; b0 += batch) {
+        const uint32_t b1 = std::min(T, b0 + batch);
+        poolFor(b1 - b0, [&](size_t b, size_t e) {
+            for (size_t k = b; k < e; ++k) {
+                const uint32_t t = b0 + uint32_t(k);
+                blobs[k].clear();
+                if (state_[t] == kDirty) {
+                    const int16_t* g = mm.disp.data() + size_t(t) * S;
+                    const TileInfo info = analyse(g, n_, S, coarseN_, step_, coarse_.data() + size_t(t) * CS);
+                    dir[t].coarseErr = info.coarseErr;
+                    dir[t].range = info.range;
+                    dir[t].shift = 0;
+                    compressTile(codec_, g, n_, S, blobs[k]);
+                } else if (!parked_[t].empty()) {
+                    dir[t].shift = 0;
+                }
+            }
+        }, 16);
+        for (uint32_t t = b0; ok && t < b1; ++t) {
+            const uint8_t* p;
+            size_t bytes;
+            if (state_[t] == kDirty) p = blobs[t - b0].data(), bytes = blobs[t - b0].size();
+            else if (!parked_[t].empty()) p = parked_[t].data(), bytes = parked_[t].size();
+            else p = map_ + dir_[t].offset, bytes = dir_[t].bytes;
+            dir[t].offset = offset;
+            dir[t].bytes = uint32_t(bytes);
+            ok = bytes && std::fwrite(p, 1, bytes, f) == bytes;
+            offset += bytes;
+        }
+    }
+    std::vector<std::vector<uint8_t>> chunkBlobs(chunks_.size());
+    poolFor(chunks_.size(), [&](size_t b, size_t e) {
+        for (size_t c = b; c < e; ++c) {
+            const uint32_t first = uint32_t(c) * kChunk, count = std::min(kChunk, T - first);
+            compressValues(codec_, coarse_.data() + size_t(first) * CS, count, CS, chunkBlobs[c]);
+        }
+    }, 1);
+    for (size_t c = 0; ok && c < chunkBlobs.size(); ++c) {
+        chunkDir[c].offset = offset;
+        chunkDir[c].bytes = uint32_t(chunkBlobs[c].size());
+        ok = std::fwrite(chunkBlobs[c].data(), 1, chunkBlobs[c].size(), f) == chunkBlobs[c].size();
+        offset += chunkBlobs[c].size();
+    }
+    std::vector<uint8_t> dirBytes(size_t(T) * sizeof(Entry) + chunkDir.size() * sizeof(ChunkEntry));
+    std::memcpy(dirBytes.data(), dir.data(), size_t(T) * sizeof(Entry));
+    std::memcpy(dirBytes.data() + size_t(T) * sizeof(Entry), chunkDir.data(), chunkDir.size() * sizeof(ChunkEntry));
+    h.dirOffset = offset;
+    h.dirBytes = dirBytes.size();
+    h.dirHash = fnv1a(dirBytes.data(), dirBytes.size());
+    ok = ok && std::fwrite(dirBytes.data(), 1, dirBytes.size(), f) == dirBytes.size();
+    ok = ok && std::fseek(f, 0, SEEK_SET) == 0 && std::fwrite(encodeHeader(h).data(), 1, kHeaderBytes, f) == kHeaderBytes;
+    ok = ok && std::fflush(f) == 0 && ::fsync(fileno(f)) == 0;
+    ok = std::fclose(f) == 0 && ok;
+    std::error_code ec;
+    if (ok) std::filesystem::rename(tmp, path, ec);
+    if (!ok || ec) {
+        std::filesystem::remove(tmp, ec);
+        error = "Writing " + path + " failed (disk full?)";
+        return false;
+    }
+    // Continue in the new file (an old one stays as it was saved).
+    unmap();
+    path_ = path;
+    if (!mapFile(error)) return false;
+    dir_ = std::move(dir);
+    chunks_ = std::move(chunkDir);
+    garbage_ = 0;
+    generation_ = h.generation;
+    baseOffset_ = h.baseOffset;
+    baseHash_ = fnv1a(map_ + h.baseOffset, size_t(V) * 24);
+    rescaled_ = false;
+    for (uint32_t t = 0; t < T; ++t) {
+        if (state_[t] == kDirty) state_[t] = kFull;
+        std::vector<uint8_t>().swap(parked_[t]);
+    }
+    return true;
+#else
+    (void)m;
+    (void)path;
     error = "Focus Detail needs Linux or macOS for now";
     return false;
 #endif
@@ -901,6 +1207,44 @@ bool focusWriteSyntheticHead(const std::string& path, size_t baseTriangles, int 
                 out[idx] = int16_t(std::clamp(std::lround(d / step), -32767L, 32767L));
             }
     }, error);
+}
+
+bool microWantsFocus(size_t microTriangles, int level) {
+#if defined(SF_FOCUS_POSIX)
+    if (level <= FocusDetail::kCoarseLevel) return false;
+    if (const char* e = std::getenv("SF_FOCUS_DETAIL"); e && *e) return e[0] == '1';
+    return microTriangles > kFocusTriangles;
+#else
+    (void)microTriangles;
+    (void)level;
+    return false;
+#endif
+}
+
+std::string focusUnsavedPath() {
+    namespace fs = std::filesystem;
+    const fs::path dir = MicroStore::swapFolder();
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    focusRemoveStaleUnsaved();
+    static std::atomic<uint32_t> serial{0};
+    const auto now = std::chrono::system_clock::now().time_since_epoch();
+    char name[96];
+    std::snprintf(name, sizeof name, "unsaved-%lld-%u.sfdetail",
+                  (long long)std::chrono::duration_cast<std::chrono::milliseconds>(now).count(), unsigned(serial++));
+    return (dir / name).string();
+}
+
+void focusRemoveStaleUnsaved() {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const auto old = fs::file_time_type::clock::now() - std::chrono::hours(24 * 7);
+    for (fs::directory_iterator it(MicroStore::swapFolder(), ec), end; !ec && it != end; it.increment(ec)) {
+        const std::string name = it->path().filename().string();
+        if (name.rfind("unsaved-", 0) != 0) continue;
+        std::error_code e2;
+        if (const auto t = it->last_write_time(e2); !e2 && t < old) fs::remove(it->path(), e2);
+    }
 }
 
 std::string focusStandard1bPath(std::string& error, const std::function<void(const std::string&)>& log) {

@@ -10,10 +10,16 @@
 #include "core/FaceGroups.h"
 #include "core/Multires.h"
 #include "core/Primitives.h"
+#include "core/Project.h"
+#include "core/VertexPaint.h"
 #include "core/Parts.h"
 #include "io/ObjIO.h"
+#include "render/Camera.h"
+
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <cmath>
+#include <filesystem>
 #include <set>
 
 using namespace sf;
@@ -94,6 +100,46 @@ TEST(part_document_basics) {
     CHECK(reg.execute(doc, "part_append").ok);
     CHECK(reg.execute(doc, "new_plane", {{"resolution", 4.0}}).ok);
     CHECK(doc.partCount() == 1 && doc.activePartInfo().name == "Plane");
+}
+
+// Solo remembers what was shown when it began and puts exactly that back (a hidden Part stays hidden).
+TEST(part_solo_restores_hidden_parts) {
+    Document doc;
+    CommandRegistry reg;
+    doc.setMesh(makeCube(4, 2.0f), "A");
+    for (const char* n : {"B", "C", "D"}) {
+        CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+        doc.activePartInfo().name = n;
+    }
+    CHECK(reg.execute(doc, "part_visibility", {{"index", 0.0}, {"visible", false}}).ok); // hide A
+    CHECK(reg.execute(doc, "part_select", {{"name", std::string("B")}}).ok);
+    CHECK(reg.execute(doc, "part_solo").ok);
+    CHECK(!doc.parts[0].visible && doc.parts[1].visible && !doc.parts[2].visible && !doc.parts[3].visible);
+
+    // The project keeps Solo's memory (save / load while in Solo).
+    const std::string path = (std::filesystem::temp_directory_path() / "sf_solo_hidden.sfproj").string();
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Document back;
+    CHECK(loadProject(path, back, err));
+    CHECK(reg.execute(back, "part_solo").ok);
+    CHECK(!back.parts[0].visible && back.parts[1].visible && back.parts[2].visible && back.parts[3].visible);
+    std::filesystem::remove(path);
+
+    // During Solo: a new Part, a rename, a delete and a selection change keep the memory.
+    CHECK(reg.execute(doc, "part_select", {{"name", std::string("C")}}).ok);
+    CHECK(reg.execute(doc, "part_rename", {{"to", std::string("Cee")}}).ok);
+    CHECK(reg.execute(doc, "part_delete", {{"name", std::string("D")}}).ok);
+    CHECK(reg.execute(doc, "part_select", {{"name", std::string("B")}}).ok);
+    CHECK(reg.execute(doc, "part_solo").ok); // soloing again after the selection moved: still B alone
+    CHECK(doc.partCount() == 3 && doc.parts[1].visible && !doc.parts[0].visible && !doc.parts[2].visible);
+    CHECK(reg.execute(doc, "part_solo").ok);
+    CHECK(!doc.parts[0].visible && doc.parts[1].visible && doc.parts[2].visible); // A still hidden
+    CHECK(reg.execute(doc, "part_solo").ok); // Solo again (A still hidden); Unhide all then ends its memory
+    CHECK(reg.execute(doc, "part_show_all").ok);
+    CHECK(reg.execute(doc, "part_solo").ok);
+    CHECK(reg.execute(doc, "part_solo").ok);
+    CHECK(doc.parts[0].visible && doc.parts[1].visible && doc.parts[2].visible); // "Unhide all" ended the old memory
 }
 
 TEST(part_cube_primitive) {
@@ -358,4 +404,127 @@ TEST(part_split_mask_threshold) {
     const auto in = trianglesIn(m, TriangleSet::Masked, &n);
     CHECK(n == 1 && in[0] == 0 && in[1] == 1);
     CHECK(trianglesIn(m, TriangleSet::Unmasked)[0] == 1);
+}
+
+// Alt+click on a Part (Discord, macOS: it often missed until the user zoomed in close): a thin Part a few points off
+// the pointer still counts, near or far, and a click that wobbles a few points is still a click.
+TEST(part_pick_near_thin_part) {
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 4.0}}).ok);
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+    doc.selectPart(0); // the sphere is the Part being sculpted; the cube becomes a thin wire (a Part's mesh, not a
+                       // scaled Part transform: those are similarities)
+    const float W = 800.0f, H = 800.0f;
+    Camera cam;
+    // A wire 2 points wide on screen at the given camera distance (a Part about as thin as a visible one gets).
+    auto placeWire = [&](float z) {
+        const float pxPerUnit = H / (2.0f * std::max(cam.distance - 1.6f, 0.5f) * std::tan(cam.fovY * 0.5f));
+        const float half = 1.0f / pxPerUnit;
+        doc.partMesh(1) = placedMesh(makeCube(2, 2.0f), glm::scale(glm::mat4(1.0f), glm::vec3(half, 0.5f, half)));
+        doc.parts[1].data->bvhDirty = true;
+        doc.parts[1].transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.3f, 0.0f, z));
+        doc.syncBvh();
+    };
+
+    for (float distance : {4.0f, 12.0f}) {
+        cam.distance = distance;
+        cam.aspect = W / H;
+        placeWire(1.6f);
+        CHECK(doc.parts[1].moved());
+        const PartRayFn rayAt = [&](float x, float y, glm::vec3& o, glm::vec3& d) { cam.screenRay(x, y, W, H, o, d); };
+        const glm::vec4 clip = cam.projection() * cam.view() * glm::vec4(0.3f, 0.0f, 1.6f, 1.0f);
+        const float px = (clip.x / clip.w * 0.5f + 0.5f) * W, py = (0.5f - clip.y / clip.w * 0.5f) * H;
+        const int sphere = pickPartAt(doc, rayAt, px + 40.0f, py, kPartPickTolerance, 0);
+        CHECK(sphere == 0); // well off the wire: the sphere under the pointer
+        CHECK(pickPartAt(doc, rayAt, px, py, 0.0f, 0) == 1); // dead on the wire: the exact pick finds it
+        // 4 points off the wire: the exact pick sees the sphere (the active Part), the tolerant one the wire.
+        RayHit hit;
+        CHECK(pickPartAt(doc, rayAt, px + 4.0f, py, 0.0f, 0) == 0);
+        CHECK(pickPartAt(doc, rayAt, px + 4.0f, py, kPartPickTolerance, 0, &hit) == 1);
+        CHECK(hit.position.z > 1.5f);
+        CHECK(pickPartAt(doc, rayAt, px - 5.0f, py + 30.0f, kPartPickTolerance, 0) == 1);
+        // Behind the sphere's edge a Part is not picked through it: hide-and-seek stays honest.
+        placeWire(-2.5f);
+        CHECK(pickPartAt(doc, rayAt, px + 4.0f, py, kPartPickTolerance, 0) == 0);
+        placeWire(1.6f);
+    }
+
+    // The press-to-release wobble that is still a click, and the drag that is not.
+    CHECK(!partClickIsDrag(3.0f, 3.0f)); // 4.2 points: a trackpad click
+    CHECK(!partClickIsDrag(5.0f, 0.0f));
+    CHECK(partClickIsDrag(6.0f, 0.0f));
+    CHECK(partClickIsDrag(4.5f, 4.5f));
+}
+
+// C (pick colour) picks from the nearest visible Part under the pointer, not only the active one (Discord, macOS 0.13.1:
+// "it used to pick from everything"), and every miss says why.
+TEST(part_pick_colour_any_visible_part) {
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 4.0}}).ok);
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+    CHECK(doc.activePart == 1); // the cube is the active Part, and unpainted
+    const glm::vec3 red(1.0f, 0.0f, 0.0f), base(0.62f, 0.58f, 0.53f);
+    paintFill(doc.partMesh(0), red); // the inactive sphere is painted
+    doc.syncBvh();
+    const glm::vec3 sphereC = doc.partMesh(0).bounds().center(), cubeC = doc.mesh.bounds().center();
+    // A camera looking down -z at a scene point (x, y): "screen" coordinates here are the scene's x and y.
+    const PartRayFn rayAt = [](float x, float y, glm::vec3& o, glm::vec3& d) {
+        o = glm::vec3(x, y, 10.0f);
+        d = glm::vec3(0.0f, 0.0f, -1.0f);
+    };
+
+    // Over the inactive, painted sphere: its colour, and the Part it came from.
+    PartColorPick p = pickPartColor(doc, rayAt, sphereC.x, sphereC.y, base);
+    CHECK(p.part == 0 && p.from == PartColorPick::From::VertexPaint);
+    CHECK(glm::distance(p.colour, red) < 1e-3f);
+    // Over the active, unpainted cube: the colour the view shows it in.
+    p = pickPartColor(doc, rayAt, cubeC.x, cubeC.y, base);
+    CHECK(p.part == 1 && p.from == PartColorPick::From::Base && p.colour == base);
+
+    // Off the model: nothing, with a message.
+    p = pickPartColor(doc, rayAt, 50.0f, 50.0f, base);
+    CHECK(p.part < 0 && p.from == PartColorPick::From::None && p.message.find("visible Part") != std::string::npos);
+
+    // A hidden Part is not picked, and the message says it is hidden.
+    doc.parts[0].visible = false;
+    p = pickPartColor(doc, rayAt, sphereC.x, sphereC.y, base);
+    CHECK(p.part < 0 && p.message.find("hidden") != std::string::npos);
+    doc.parts[0].visible = true;
+
+    // A Part moved on its own (a linked copy's transform) still gives its own colour.
+    doc.parts[0].transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 5.0f, 0.0f));
+    p = pickPartColor(doc, rayAt, sphereC.x, sphereC.y + 5.0f, base);
+    CHECK(p.part == 0 && glm::distance(p.colour, red) < 1e-3f);
+    doc.parts[0].transform = glm::mat4(1.0f);
+
+    // The nearest Part wins: a painted sphere behind the cube is not picked through it.
+    doc.parts[0].transform = glm::translate(glm::mat4(1.0f), cubeC - sphereC - glm::vec3(0.0f, 0.0f, 20.0f));
+    p = pickPartColor(doc, rayAt, cubeC.x, cubeC.y, base);
+    CHECK(p.part == 1 && p.colour == base);
+}
+
+// A Part inside another (an eyeball in its socket): the point is inside a Part only when its closed surface wraps it
+// (Frame Part says so when the camera ends up there). Negative controls: outside, inside an open mesh, hidden Part.
+TEST(part_enclosing_finds_the_head_around_a_point) {
+    Document doc;
+    doc.setMesh(makeIcosphere(4, 3.5f), "Head");
+    Mesh eye = makeIcosphere(3, 0.6f);
+    for (auto& p : eye.positions) p += glm::vec3(0.0f, 0.0f, 2.6f);
+    eye.recomputeAllNormals();
+    doc.addPart(std::move(eye), "Eye");
+    doc.selectPart(1);
+    doc.syncBvh();
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 0.7f), 1) == 0);   // the camera behind the eye: inside the head
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 0.7f), 0) == -1);  // (the head itself is not "another" Part)
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 6.0f), 1) == -1);  // in front of the face, outside both
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 2.6f)) == 1);      // inside the eye, and the head: the innermost
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 2.6f), 1) == 0);
+    doc.parts[0].visible = false;
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 0.7f), 1) == -1);  // Solo / hide: nothing around it any more
+    doc.parts[0].visible = true;
+    doc.addPart(makePlane(8, 20.0f), "Floor");                         // an open sheet wraps nothing
+    doc.syncBvh();
+    CHECK(partEnclosing(doc, glm::vec3(0.0f, 0.0f, 6.0f), 1) == -1);
 }

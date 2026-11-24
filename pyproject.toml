@@ -1,0 +1,82 @@
+# The Python package (pip install sculptforge): the engine as `import sculptforge`, built by scikit-build-core from
+# this CMake project with only the module (no app, window, network or plugin runtime). Wheels: .github/workflows/wheels.yml.
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=3.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "sculptforge"
+dynamic = ["version"]
+description = "SculptForge's sculpting engine for Python: commands, meshes as NumPy arrays, Parts, masks and exports"
+readme = "python/README.md"
+# (SPDX has no WITH form for a project-defined exception that PyPI accepts: the exception is its own LicenseRef.)
+license = "GPL-3.0-or-later AND LicenseRef-SculptForge-Scripting-Exception"
+license-files = ["LICENSE", "LICENSE-EXCEPTION.md", "THIRD_PARTY_NOTICES.md"]
+requires-python = ">=3.12"
+dependencies = ["numpy>=1.26"]
+keywords = ["sculpting", "3d", "mesh", "usd", "gltf", "pipeline"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Multimedia :: Graphics :: 3D Modeling",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://sculptforge.app"
+Documentation = "https://sculptforge.app/guide/python-package.html"
+Source = "https://github.com/islandmed/SculptForge"
+Changelog = "https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build-wheel/{wheel_tag}"
+cmake.build-type = "Release"
+build.targets = ["sculptforge_python"]
+install.components = ["python"]
+wheel.packages = []
+
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "CMakeLists.txt"
+regex = 'project\(SculptForge VERSION (?P<value>[0-9]+\.[0-9]+\.[0-9]+)'
+
+[tool.scikit-build.cmake.define]
+SCULPTFORGE_BUILD_PYTHON = "ON"
+SCULPTFORGE_BUILD_APP = "OFF"
+SCULPTFORGE_BUILD_TESTS = "OFF"
+SCULPTFORGE_APP_PYTHON = "OFF"
+SCULPTFORGE_WEBRTC = "OFF"
+SCULPTFORGE_PLUGINS = "OFF"
+SCULPTFORGE_HTTP = "OFF"
+SCULPTFORGE_UPDATE_CHECK = "OFF"
+CMAKE_DISABLE_FIND_PACKAGE_PkgConfig = "ON"
+
+[tool.cibuildwheel]
+build = "cp312-* cp313-* cp314-*"
+skip = "*-musllinux_* *-win32 *_i686"
+build-frontend = "build"
+test-requires = ["pytest"]
+# -v names each test in the log; faulthandler_timeout prints every thread's stack when one runs over 2 minutes (the
+# whole suite takes 5-15 s), so a hang under Rosetta (11-20, macOS x86_64) says where.
+test-command = "pytest -v -p no:cacheprovider -o faulthandler_timeout=120 {project}/tests/python"
+# SF_DEPS_CACHE: the pinned downloads (cmake/Fetch.cmake) once per job, not once per Python; SF_WHEEL_TEST: the
+# tests that only hold for the wheels (no HTTP).
+environment = { SF_DEPS_CACHE = ".deps", SF_WHEEL_TEST = "1" }
+test-environment = { PYTHONUNBUFFERED = "1" } # (a killed run keeps the lines pytest had printed)
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.macos]
+archs = ["universal2"]
+environment = { SF_DEPS_CACHE = ".deps", SF_WHEEL_TEST = "1", MACOSX_DEPLOYMENT_TARGET = "11.0" }
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]

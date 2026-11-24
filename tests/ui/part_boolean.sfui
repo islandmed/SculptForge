@@ -1,0 +1,31 @@
+# Booleans between Parts (core/PartBoolean.h): a Part's Boolean set from the mark in its row, the view showing the
+# result in place of its Parts, Make Boolean Mesh writing it into a new Part (sources hidden), and one undo putting
+# the scene back with the preview showing again.
+run new_cube
+click "Parts/Append"
+click "Sphere"
+expect_value parts == 2
+run transform translate=0.5,0.5,0.5
+expect_value boolean_parts == 0
+click "Parts/##boolean Sphere"
+click "Subtract"
+run part_boolean index=0 mode=add
+expect_value boolean_parts == 2
+wait_value boolean_preview > 0 30
+expect_text "Exact"
+shot preview
+click "Make Boolean Mesh"
+expect_value parts == 3
+expect_value active_part == 2
+expect_value visible_parts == 1
+expect_value open_edges == 0
+expect_value boolean_parts == 0
+expect_value boolean_preview == 0
+shot made
+key ctrl+z
+expect_value parts == 2
+expect_value visible_parts == 2
+wait_value boolean_preview > 0 30
+# Preview off: the Parts show as they are.
+click "Preview##boolean"
+expect_value boolean_preview == 0

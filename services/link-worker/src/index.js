@@ -17,6 +17,16 @@ export const MAX_MESSAGES = 4;          // per topic: the answer, and a few retr
 export const TTL_MS = 10 * 60 * 1000;
 export const MAX_BLOB_BYTES = 48 * 1024 * 1024; // an AR model (encrypted GLB), usually a few MB
 const BLOB_CHUNK = 1024 * 1024;                     // Durable Object storage values are limited to 2 MB
+// The Forge Deck's fallback (docs/phone-link.md): for a phone that can't reach the computer on the home network,
+// the page's commands go up through here and the computer's state comes down. Both are AES-256-GCM ciphertext
+// (key only in the Deck link's #fragment; direction and a rising sequence number are inside), so this relay can
+// neither read, forge nor usefully replay them. `up` is a short queue the computer drains; `down` is the latest state.
+export const MAX_DECK_UP_BYTES = 1400;        // a command is under 512 bytes of JSON; this is its ciphertext in base64url
+export const MAX_DECK_DOWN_BYTES = 16384;     // the state; the brush tiles travel as a blob
+export const MAX_DECK_QUEUE = 64;             // commands waiting for the computer
+export const DECK_UP_TTL_MS = 20 * 1000;      // a command nobody collected in 20 seconds is dropped
+export const DECK_IDLE_MS = 5 * 60 * 1000;    // the Deck's data goes 5 minutes after the last message
+export const DECK_UP_PER_SECOND = 40;         // per topic
 const MESSAGE_PATTERN = /^[A-Za-z0-9_-]+$/; // base64url: the relay carries opaque ciphertext only
 
 export class Topic {
@@ -76,6 +86,52 @@ export class Topic {
         return { meta, data };
     }
 
+    // --- Forge Deck ---
+    async deckKeepAlive() {
+        const at = Date.now() + DECK_IDLE_MS;
+        const alarm = await this.ctx.storage.getAlarm();
+        if (alarm === null || alarm < at) await this.ctx.storage.setAlarm(at);
+    }
+
+    async deckPostUp(message) {
+        const now = Date.now();
+        this.upTimes = (this.upTimes ?? []).filter((t) => now - t < 1000);
+        if (this.upTimes.length >= DECK_UP_PER_SECOND) return { error: "slow down" };
+        this.upTimes.push(now);
+        const q = (await this.ctx.storage.get("dup")) ?? { last: 0, items: [] };
+        q.items = q.items.filter((m) => now - m.at < DECK_UP_TTL_MS);
+        if (q.items.length >= MAX_DECK_QUEUE) return { error: "full" };
+        q.items.push({ n: ++q.last, at: now, message });
+        await this.ctx.storage.put("dup", q);
+        await this.deckKeepAlive();
+        return { n: q.last };
+    }
+
+    // Commands after number `after` (the computer's last), oldest first; the ones it has seen are deleted.
+    async deckGetUp(after) {
+        const now = Date.now();
+        const q = (await this.ctx.storage.get("dup")) ?? { last: 0, items: [] };
+        const fresh = q.items.filter((m) => m.n > after && now - m.at < DECK_UP_TTL_MS);
+        if (fresh.length !== q.items.length) {
+            q.items = fresh;
+            await this.ctx.storage.put("dup", q);
+        }
+        return fresh.map((m) => ({ n: m.n, message: m.message }));
+    }
+
+    async deckPutDown(message) {
+        const prev = await this.ctx.storage.get("ddown");
+        const down = { n: (prev?.n ?? 0) + 1, message };
+        await this.ctx.storage.put("ddown", down);
+        await this.deckKeepAlive();
+        return { n: down.n };
+    }
+
+    async deckGetDown(after) {
+        const down = await this.ctx.storage.get("ddown");
+        return down && down.n > after ? down : { n: down?.n ?? 0 };
+    }
+
     async alarm() {
         await this.ctx.storage.deleteAll();
     }
@@ -84,6 +140,12 @@ export class Topic {
     // "cloudflare:workers", which plain Node can't import, and the tests run this file under plain Node.
     async fetch(request) {
         const url = new URL(request.url);
+        if (url.pathname === "/deck-up" || url.pathname === "/deck-down") {
+            const up = url.pathname === "/deck-up";
+            if (request.method === "POST") return Response.json(up ? await this.deckPostUp(await request.text()) : await this.deckPutDown(await request.text()));
+            const after = Number(url.searchParams.get("after") ?? "0");
+            return Response.json(up ? await this.deckGetUp(after) : await this.deckGetDown(after));
+        }
         if (url.pathname === "/blob" || url.pathname === "/share") {
             const name = url.pathname.slice(1);
             if (request.method === "POST")
@@ -141,6 +203,30 @@ export default {
         if (request.method === "OPTIONS") return respond(null, 204, origin);
         if (url.pathname === "/" || url.pathname === "/relay" || url.pathname === "/relay/")
             return respond(HOME_PAGE, 200, origin, "text/html; charset=utf-8");
+
+        const deckMatch = url.pathname.match(/^\/deck\/([^/]+)\/(up|down)$/);
+        if (deckMatch) {
+            const [, topic, way] = deckMatch;
+            if (!TOPIC_PATTERN.test(topic)) return json({ error: "bad topic" }, 400, origin);
+            const stub = env.TOPICS.get(env.TOPICS.idFromName(topic));
+            // up: the Deck page posts, the computer collects. down: the computer posts, the page collects.
+            const posts = request.method === "POST", reads = request.method === "GET";
+            if (!posts && !reads) return json({ error: "method not allowed" }, 405, origin);
+            if (posts && way === "up" && !origin) return json({ error: "commands come from the Deck page" }, 403, origin);
+            if (posts && way === "down" && origin) return json({ error: "state comes from SculptForge" }, 403, origin);
+            if (reads && way === "up" && origin) return json({ error: "only SculptForge collects commands" }, 403, origin);
+            const after = Number(url.searchParams.get("after") ?? "0");
+            if (!Number.isSafeInteger(after) || after < 0) return json({ error: "bad after" }, 400, origin);
+            if (reads) return respond(JSON.stringify(await (await stub.fetch(new Request(`https://topic/deck-${way}?after=${after}`))).json()), 200, origin);
+            const limit = way === "up" ? MAX_DECK_UP_BYTES : MAX_DECK_DOWN_BYTES;
+            if (Number(request.headers.get("Content-Length") ?? "0") > limit) return json({ error: "too large" }, 413, origin);
+            const message = (await request.text()).trim();
+            if (message.length > limit) return json({ error: "too large" }, 413, origin);
+            if (!MESSAGE_PATTERN.test(message)) return json({ error: "the message must be base64url" }, 400, origin);
+            const result = await (await stub.fetch(new Request(`https://topic/deck-${way}`, { method: "POST", body: message }))).json();
+            if (result.error) return json({ error: result.error === "full" ? "too many commands waiting" : "too many commands a second" }, 429, origin);
+            return json(result, 200, origin);
+        }
 
         const blobMatch = url.pathname.match(/^\/blob\/([^/]+)$/);
         if (blobMatch) {

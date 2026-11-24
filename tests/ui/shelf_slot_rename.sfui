@@ -1,0 +1,21 @@
+# A bottom-shelf slot follows its brush when the brush is renamed in the library (the slot keeps the brush's stable id,
+# the name is only a hint): same tile, new label, never marked missing. Reported by @rand_gogh (slot kept, brush "lost").
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+run brush_install code=sfbrush1:eyJuYW1lIjoiU2hhcmVkIE1vc3MiLCJkZXNjcmlwdGlvbiI6IiIsImRpcmVjdGlvbiI6Im5vcm1hbCIsImRlcHRoIjowLjIsInBsYW5lIjoibm9uZSIsInBsYW5lQW1vdW50IjowLjUsInBpbmNoIjowLCJkcmFnIjowLCJzbW9vdGgiOjAsImhhcmRuZXNzIjowLCJ0aXBTaGFycG5lc3MiOjAsInBhdHRlcm4iOiJub2lzZSIsInBhdHRlcm5TY2FsZSI6MC4yLCJwYXR0ZXJuQW1vdW50IjowLjUsInNwYWNpbmciOjAsImppdHRlciI6MCwicHJlc3N1cmVDdXJ2ZSI6MSwiZnJvbnRGYWNlc09ubHkiOmZhbHNlLCJjYXZpdHlNYXNrIjowfQ
+expect_value library_files == 1
+
+click "##addbrush"
+click "Shared Moss"
+expect "Shared Moss##brush.recipe.Shared Moss"
+wait 0.4
+
+# Renamed in the library: the slot follows, it is not left on the old name.
+run brush_rename name="Shared Moss" to="Fine Moss"
+wait 0.4
+expect "Fine Moss##brush.recipe.Fine Moss"
+expect_not "Shared Moss##brush.recipe.Shared Moss"
+click "Fine Moss##brush.recipe.Fine Moss"
+expect_value custom_brush_active == 1
+wait_idle 30
+shot shelf_slot_rename

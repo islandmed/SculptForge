@@ -24,6 +24,55 @@ TEST(supporters_parse_skips_comments_and_blanks) {
     CHECK(std::string(kDiscordUrl) == "https://discord.gg/gWrYkEmQhH");
 }
 
+TEST(appeal_card_is_once_per_version_and_never_for_members) {
+    SupportCardPrefs p;
+    p.starts = 2;
+    const auto due = [&](const SupportCardPrefs& q, const char* v = "0.13.4", bool member = false, bool studio = false,
+                         bool updatesOff = false, bool test = false) { return appealDue(q, v, member, studio, updatesOff, test); };
+    CHECK(due(p));
+    SupportCardPrefs first = p;
+    first.starts = 1; // the first start belongs to the tour
+    CHECK(!due(first));
+    CHECK(!due(p, "0.13.4", true));                       // a signed-in member
+    CHECK(!due(p, "0.13.4", false, true));                // a Studio build
+    CHECK(!due(p, "0.13.4", false, false, true));         // update checks off (policy, package build, SF_NO_UPDATE_CHECK)
+    CHECK(!due(p, "0.13.4", false, false, false, true));  // tests, renders, CI
+    CHECK(!due(p, ""));
+    SupportCardPrefs member = p;
+    member.supporter = true;
+    CHECK(!due(member));
+    p.appealVersion = "0.13.4"; // shown in this version (Not now, the button or a crash): not again, but in the next
+    CHECK(!due(p));
+    CHECK(due(p, "0.13.5"));
+}
+
+TEST(update_card_owed_after_the_appeal_skips_the_week_gap) {
+    SupportCardPrefs p;
+    p.shownAt = 1000; // the appeal just showed
+    const int64_t now = 1000 + 60;
+    CHECK(!memberMomentAllowed(p, false, now, false, MemberMoment::Updated)); // normally the week gap holds it
+    p.updateOwed = true;
+    CHECK(memberMomentAllowed(p, false, now, false, MemberMoment::Updated));  // owed: it shows at the next start
+    CHECK(!memberMomentAllowed(p, false, now, false, MemberMoment::Sculpted)); // only the update card
+    CHECK(!memberMomentAllowed(p, true, now, false, MemberMoment::Updated));  // a member never
+    CHECK(!memberMomentAllowed(p, false, now, true, MemberMoment::Updated));  // tests never
+    p.supporter = true;
+    CHECK(!memberMomentAllowed(p, false, now, false, MemberMoment::Updated));
+}
+
+TEST(support_page_url_carries_the_entry_point) {
+    // The in-app asks tag the membership page so the funnel shows which one a visit came from (no new request: it is the
+    // URL the browser opens).
+    CHECK(supportPageUrl("help-menu") ==
+          "https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=help-menu");
+    for (const char* src : {"help-menu", "topbar-heart", "update-banner", "support-card", "quick-tour", "whats-new", "about"}) {
+        const std::string url = supportPageUrl(src);
+        CHECK(url.rfind(kSupportUrl, 0) == 0);
+        CHECK(url.find(std::string("utm_campaign=") + src) != std::string::npos);
+        for (char c : std::string(src)) CHECK((c >= 'a' && c <= 'z') || c == '-'); // the funnel's tag shape
+    }
+}
+
 TEST(supporters_names_are_sanitised) {
     // Control characters, escapes and invisible formatting go; the rest stays as plain text.
     CHECK(sanitizeSupporterName("Bob\x1b[31m\x07") == "Bob[31m");
@@ -141,6 +190,24 @@ TEST(founding_members_json) {
     CHECK(Json::parse(text, j, error) && j["limit"].isNumber() && j["taken"].isNumber() && j["names"].isArray());
 }
 
+TEST(social_links_are_the_websites_https_pages) {
+    // The Welcome icon row opens the same accounts as the site's socials row, over https, and nothing else.
+    std::ifstream f(std::string(SF_TEST_DATA_DIR) + "/../../website/index.html", std::ios::binary);
+    CHECK(f.good());
+    const std::string page{std::istreambuf_iterator<char>(f), {}};
+    CHECK(kSocialCount == 6);
+    for (const SocialLink& link : kSocialLinks) {
+        const std::string url = link.url, base = url.substr(0, url.find('?'));
+        CHECK(url.rfind("https://", 0) == 0);
+        if (std::string(link.name) == "Facebook") { // the page the owner gave; the site gets the same link in its own branch
+            CHECK(url.rfind("https://www.facebook.com/profile.php?id=61596196961617&", 0) == 0);
+            continue;
+        }
+        if (page.find("href=\"" + base) == std::string::npos) std::printf("  not on the site: %s\n", link.url);
+        CHECK(page.find("href=\"" + base) != std::string::npos);
+    }
+}
+
 TEST(support_card_links_match_the_website) {
     // The card opens the same Stripe checkout pages as the membership page and the studio page (never links of its own).
     auto read = [](const char* name) {
@@ -149,27 +216,28 @@ TEST(support_card_links_match_the_website) {
         return std::string{std::istreambuf_iterator<char>(f), {}};
     };
     const std::string page = read("support.html"), studios = read("studios.html");
-    for (const char* url : {kSupportUrlMember, kSupportUrlStudio}) {
+    // (the app's links carry the source tag; the site's are tagged at runtime by motion.js, so compare without the query)
+    const auto bare = [](const char* url) { return std::string(url).substr(0, std::string(url).find('?')); };
+    for (const char* url : {kSupportUrlMember}) {
         CHECK(std::string(url).rfind("https://buy.stripe.com/", 0) == 0);
-        CHECK(page.find(std::string("href=\"") + url + "\"") != std::string::npos);
+        CHECK(page.find("href=\"" + bare(url) + "\"") != std::string::npos);
     }
-    CHECK(studios.find(std::string("href=\"") + kSupportUrlStudio + "\"") != std::string::npos);
     // The yearly Member checkout: the same on both, or empty on both (the yearly choice hidden until it exists).
     const std::string yearly(kSupportUrlMemberYearly);
     CHECK(yearly.empty() || yearly.rfind("https://buy.stripe.com/", 0) == 0);
-    CHECK(page.find("data-yearly=\"" + yearly + "\"") != std::string::npos);
+    CHECK(page.find("data-yearly=\"" + bare(kSupportUrlMemberYearly) + "\"") != std::string::npos);
     CHECK(page.find(kFreeReleaseNote) != std::string::npos); // the same honest wording on both
     CHECK(page.find(std::string("href=\"") + kDiscordUrl + "\"") != std::string::npos); // the same community invite
-    // Retired: the Insider tier, one-time payments and the monthly pack, and Studio's per-artist price (owner 11-06: a flat
-    // $300 / month for any number of artists, Founding Studio a flat $150); the old wording that contradicts it is gone.
+    // Retired: the Insider tier, one-time payments and the monthly pack, Studio's per-artist price and its $300 flat rate
+    // (owner 11-16: Studio is a personalized quote, and Founding Studio is gone too); the old wording that contradicts it is gone.
     for (const std::string& p : {page, studios})
         for (const char* old : {"Insider", "One-time", "one-time", "$20", "monthly pack", "pack every month", "whole company",
-                                "no seat count", "5 custom items", "10 artists", "$25"}) {
+                                "no seat count", "5 custom items", "10 artists", "$25", "$300", "Founding Studio", "$150"}) {
             if (p.find(old) != std::string::npos) std::printf("  retired wording on the site: \"%s\"\n", old);
             CHECK(p.find(old) == std::string::npos);
         }
     for (const std::string& p : {page, studios})
-        for (const char* now : {"$300", "Founding Studio", "$150", "3 custom items", "no outside connections", "any number of artists"}) {
+        for (const char* now : {"Personalized quote", "Get a quote", "3 custom items", "no outside connections", "any number of artists"}) {
             if (p.find(now) == std::string::npos) std::printf("  missing on the site: \"%s\"\n", now);
             CHECK(p.find(now) != std::string::npos);
         }
@@ -188,11 +256,30 @@ TEST(support_card_links_match_the_website) {
 }
 
 TEST(support_card_opens_only_its_fixed_links) {
-    for (const char* url : {kSupportUrlMember, kSupportUrlMemberYearly, kSupportUrlStudio, kStudioPageUrl, kTermsUrl})
+    for (const char* url : {kSupportUrlMember, kSupportUrlMemberYearly, kStudioPageUrl, kTermsUrl})
         CHECK(url[0] == '\0' || supportLinkAllowed(url));
     for (const char* url : {"", "https://sculptforge.app/terms.html.evil.example", "https://sculptforge.app/terms.htm",
                             "file:///etc/passwd", "https://buy.stripe.com/", "javascript:alert(1)"})
         CHECK(!supportLinkAllowed(url));
+    // The checkout links carry exactly the source tag: accepted tagged, refused untagged or with anything else.
+    const std::string tag = std::string("client_reference_id=") + kSupportSourceTag;
+    CHECK(std::string(kSupportSourceTag).find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-") == std::string::npos);
+    CHECK(kSupportSourceTag[0] != '\0');
+    for (const char* url : {kSupportUrlMember, kSupportUrlMemberYearly}) {
+        const std::string u(url);
+        CHECK(u.rfind("https://buy.stripe.com/", 0) == 0);
+        CHECK(u.size() > tag.size() + 1 && u.compare(u.size() - tag.size() - 1, std::string::npos, "?" + tag) == 0); // the only query
+        CHECK(u.find('?') == u.size() - tag.size() - 1 && u.find('&') == std::string::npos && u.find('#') == std::string::npos);
+        const std::string base = u.substr(0, u.find('?'));
+        CHECK(supportLinkAllowed(u));
+        CHECK(!supportLinkAllowed(base));                                 // untagged
+        CHECK(!supportLinkAllowed(base + "?client_reference_id=other"));  // another tag
+        CHECK(!supportLinkAllowed(base + "?client_reference_id=" + kSupportSourceTag + "&email=a@b.c")); // extra params
+        CHECK(!supportLinkAllowed(base + "?prefilled_email=a@b.c&" + tag));
+        CHECK(!supportLinkAllowed(u + "x"));
+        CHECK(!supportLinkAllowed(u + "#frag"));
+        CHECK(!supportLinkAllowed(base + "?utm_source=x"));
+    }
 }
 
 TEST(support_card_timing) {

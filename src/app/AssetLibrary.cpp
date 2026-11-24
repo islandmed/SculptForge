@@ -111,6 +111,7 @@ bool isSplatFile(const std::string& path) { return anyOf(lowerExt(path), {".ply"
 bool isImageFile(const std::string& path) {
     return anyOf(lowerExt(path), {".png", ".jpg", ".jpeg", ".bmp", ".tga", ".psd", ".gif", ".webp"});
 }
+bool isAlphaImageFile(const std::string& path) { return isImageFile(path) || lowerExt(path) == ".exr"; }
 bool isBrushFile(const std::string& path) { return lowerExt(path) == ".sfbrush"; }
 bool isProjectFile(const std::string& path) { return lowerExt(path) == ".sfproj"; }
 

@@ -7,8 +7,10 @@
 #include "app/App.h"
 #include "app/NativeDialog.h"
 #include "app/Ui.h"
+#include "core/AuditLog.h"
 
 #include "link/PhoneRtc.h"
+#include "core/Utf8Path.h"
 
 #include <IconsLucide.h>
 
@@ -42,7 +44,7 @@ std::string megabytes(double bytes) {
 // The file a splat capture trains from: its one video, else the folder of photos.
 std::string splatSource(const link::PhoneEvent& e) {
     if (e.files.size() == 1) {
-        std::string ext = fs::path(std::u8string(e.files[0].begin(), e.files[0].end())).extension().string();
+        std::string ext = pathToUtf8(fs::path(std::u8string(e.files[0].begin(), e.files[0].end())).extension());
         for (char& c : ext) c = char(std::tolower(static_cast<unsigned char>(c)));
         if (ext == ".mp4" || ext == ".mov" || ext == ".m4v" || ext == ".webm" || ext == ".3gp") return e.files[0];
     }
@@ -123,6 +125,15 @@ void App::setPhoneLinkOpen(bool open) {
     if (!phone_) {
         phone_ = std::make_unique<link::PhoneLink>();
         phone_->setWake(wakeMainLoop); // the app sleeps while idle (#14): a phone message wakes it
+        phone_->setDeckLog([](const std::string& command, bool ok, const std::string& message) { // Forge Deck: audit log
+            audit::Entry e;
+            e.client = "deck";
+            e.tool = "deck";
+            e.command = command;
+            e.ok = ok;
+            e.message = message;
+            audit::record(e);
+        });
     }
     phoneError_.clear();
     if (library_.user.empty()) {
@@ -190,7 +201,7 @@ void App::handlePhoneCapture(const link::PhoneEvent& e) {
     case link::CaptureKind::Ply: {
         if (e.files.empty()) return;
         const std::string& file = e.files.front();
-        std::string ext = fs::path(std::u8string(file.begin(), file.end())).extension().string();
+        std::string ext = pathToUtf8(fs::path(std::u8string(file.begin(), file.end())).extension());
         for (char& c : ext) c = char(std::tolower(static_cast<unsigned char>(c)));
         if (ext == ".spz") {
             status_ = "Splat received (" + where + "): .spz isn't supported yet; export .ply from the scanning app";
@@ -234,10 +245,15 @@ void App::startPhoneArExport() {
 }
 
 void App::pollPhone() {
-    if (showPhone_ && (!phone_ || !phone_->running()) && phoneError_.empty()) setPhoneLinkOpen(true);
-    if (!showPhone_ && phone_ && phone_->running()) setPhoneLinkOpen(false);
-    if (!showPhone_) phoneError_.clear(); // try again the next time the window opens
-    if (!phone_ || !phone_->running()) return;
+    const bool wanted = showPhone_ || showDeck_; // the link serves while either window is open
+    if (wanted && (!phone_ || !phone_->running()) && phoneError_.empty()) setPhoneLinkOpen(true);
+    if (!wanted && phone_ && phone_->running()) setPhoneLinkOpen(false);
+    if (!wanted) phoneError_.clear(); // try again the next time the window opens
+    if (!phone_ || !phone_->running()) {
+        deckApplied_ = false;
+        return;
+    }
+    pollDeck();
 
     for (const link::PhoneEvent& e : phone_->takeEvents()) {
         using T = link::PhoneEvent::Type;

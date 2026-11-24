@@ -20,7 +20,7 @@ wait_idle
 wait 0.2
 expect_value member_card_open == 1
 expect_text Twenty minutes of sculpting. Members keep SculptForge free and moving.
-expect_text $5 a month or $48 a year
+expect_text $48 a year or $5 a month
 expect_text Member Requests
 expect_text Founding Members
 expect "Become a member##member_card.become"
@@ -42,7 +42,7 @@ expect_value member_card_open == 1
 # Become a member opens the membership page (both choices); the card goes, back in a week.
 click "Become a member##member_card.become"
 expect_value support_requests == 2
-expect_status https://sculptforge.app/support.html
+expect_status https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=support-card
 expect_value member_card_open == 0
 # Once per session: more sculpting brings nothing more.
 member_card none sculpt_seconds=5000
@@ -69,7 +69,7 @@ expect_value member_card_open == 0
 member_card updated days=15.1
 wait 0.4
 expect_value member_card_open == 1
-expect_text is here. Members get new versions early, as betas.
+expect_text is here. Members get early builds, like SculptForge for Android today.
 shot updated
 click "Not now##member_card.not_now"
 

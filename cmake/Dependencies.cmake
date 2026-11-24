@@ -20,7 +20,7 @@ endif()
 # Linux needs 3.4.18 or later: before 3.4 a Wayland pen was a new pen each time it came into range and its eraser
 # end drew as the tip (3.4.18); an older system SDL is replaced by the pinned one.
 set(SF_SDL3_MIN 3.2)
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|Android)$") # (Android: 3.4's pen and touch fixes too)
   set(SF_SDL3_MIN 3.4.18)
   set(SF_PIN_SDL3 ${SF_PIN_SDL3_linux})
 endif()
@@ -36,8 +36,14 @@ else()
   message(STATUS "Fetching SDL3")
   sf_fetch_declare(SDL3 DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
   # Static: release packages then need no separate SDL library (zlib licence allows this).
-  set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-  set(SDL_STATIC ON CACHE BOOL "" FORCE)
+  # Android: shared, as SDLActivity loads libSDL3.so itself (its JNI_OnLoad) before libmain.so.
+  if(ANDROID)
+    set(SDL_SHARED ON CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+  else()
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+  endif()
   set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
   set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
   # SDL 3.4 needs the XTest headers for X11 unless told not to; nothing here uses XTest, and the build machines
@@ -113,14 +119,137 @@ sf_imgui_patch("    if (!new_font_cfg.FontDataOwnedByAtlas)
     }
 " "    // SculptForge: FontDataOwnedByAtlas = false data is the caller's, alive while the atlas is (no copy).
 ")
+# Wrapping Japanese and Chinese: a run without spaces is cut wherever the line ends, which could start a line with 、。」 or
+# end one with 「（, or cut "Forge Spheres" in the middle of a Latin name inside a Japanese sentence. Where a word too long
+# for the line is cut: a closing mark takes the character before it down to the next line (line-start prohibition), an
+# opening mark goes down with what follows (line-end prohibition), and a run of Latin letters right after CJK text moves
+# down whole. English text (no non-ASCII character before the run) wraps exactly as before. Checked by the shots of
+# tests/ui/language_ja.sfui (wrapped help text in a narrow tray).
+sf_imgui_patch("// Simple word-wrapping for English, not full-featured. Please submit failing cases!" "// SculptForge: line-break rules for CJK (cmake/Dependencies.cmake).
+static bool SfNoLineStart(unsigned int c)
+{
+    switch (c)
+    {
+    case 0x3001: case 0x3002: case 0xFF0C: case 0xFF0E: case 0x30FB: case 0xFF1A: case 0xFF1B: case 0xFF01: case 0xFF1F:
+    case 0xFF09: case 0x3015: case 0xFF3D: case 0xFF5D: case 0x3009: case 0x300B: case 0x300D: case 0x300F: case 0x3011:
+    case 0x30FC: case 0x3005: case 0x301C: case 0x2026: case 0x2025: case 0x309B: case 0x309C: case 0x30FD: case 0x30FE:
+    case 0x309D: case 0x309E: case 0x3041: case 0x3043: case 0x3045: case 0x3047: case 0x3049: case 0x3063: case 0x3083:
+    case 0x3085: case 0x3087: case 0x308E: case 0x30A1: case 0x30A3: case 0x30A5: case 0x30A7: case 0x30A9: case 0x30C3:
+    case 0x30E3: case 0x30E5: case 0x30E7: case 0x30EE: case 0x30F5: case 0x30F6: return true;
+    default: return false;
+    }
+}
+static bool SfNoLineEnd(unsigned int c)
+{
+    switch (c)
+    {
+    case 0xFF08: case 0x3014: case 0xFF3B: case 0xFF5B: case 0x3008: case 0x300A: case 0x300C: case 0x300E: case 0x3010: return true;
+    default: return false;
+    }
+}
+static bool SfAsciiAlnum(unsigned int c) { return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+
+// Simple word-wrapping for English, not full-featured. Please submit failing cases!")
+sf_imgui_patch("    const char* word_end = text;
+    const char* prev_word_end = NULL;
+    bool inside_word = true;
+
+    const char* s = text;
+    IM_ASSERT(text_end != NULL);
+    while (s < text_end)
+    {
+        unsigned int c = (unsigned int)*s;" "    const char* word_end = text;
+    const char* prev_word_end = NULL;
+    bool inside_word = true;
+    const char* sf_prev = NULL;            // SculptForge: the character before s, and the Latin run that ends there
+    unsigned int sf_prev_c = 0;
+    const char* sf_run = NULL;             // (a run of ASCII letters and digits that follows non-ASCII text)
+
+    const char* s = text;
+    IM_ASSERT(text_end != NULL);
+    while (s < text_end)
+    {
+        unsigned int c = (unsigned int)*s;")
+sf_imgui_patch("            // Words that cannot possibly fit within an entire line will be cut anywhere.
+            if (word_width < wrap_width)
+                s = prev_word_end ? prev_word_end : word_end;
+            break;
+        }
+
+        s = next_s;" "            // Words that cannot possibly fit within an entire line will be cut anywhere.
+            if (word_width < wrap_width)
+                s = prev_word_end ? prev_word_end : word_end;
+            else if (sf_prev && sf_prev > text)
+            {
+                if (SfNoLineStart(c) || SfNoLineEnd(sf_prev_c))
+                    s = sf_prev;
+                else if (SfAsciiAlnum(c) && sf_run && sf_run > text)
+                    s = sf_run;
+            }
+            break;
+        }
+
+        if (SfAsciiAlnum(c))
+        {
+            if (!(sf_prev && SfAsciiAlnum(sf_prev_c)))
+                sf_run = (sf_prev && sf_prev_c >= 0x80) ? s : NULL;
+        }
+        else
+            sf_run = NULL;
+        sf_prev = s;
+        sf_prev_c = c;
+        s = next_s;")
 file(WRITE ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp.new "${SF_IMGUI_DRAW}")
 configure_file(${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp.new ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp COPYONLY)
+
+# imgui_widgets.cpp is built from a copy too: a slider takes a double-click to type an exact value, as ImGui's drag
+# numbers already do (Ctrl+click stays; typed values clamp as before, only with ImGuiSliderFlags_AlwaysClamp). The first click of the
+# double-click moved the value to where it landed; that one is put back first, so Esc leaves the value as it was.
+file(READ ${imgui_SOURCE_DIR}/imgui_widgets.cpp SF_IMGUI_WIDGETS)
+function(sf_imgui_widgets_patch from to)
+  string(FIND "${SF_IMGUI_WIDGETS}" "${from}" at)
+  if(at EQUAL -1)
+    message(FATAL_ERROR "imgui_widgets.cpp changed; update its patches in cmake/Dependencies.cmake:\n${from}")
+  endif()
+  string(REPLACE "${from}" "${to}" patched "${SF_IMGUI_WIDGETS}")
+  set(SF_IMGUI_WIDGETS "${patched}" PARENT_SCOPE)
+endfunction()
+sf_imgui_widgets_patch("        // Tabbing or CTRL+click on Slider turns it into an input box
+        const bool clicked = hovered && IsMouseClicked(0, ImGuiInputFlags_None, id);
+        const bool make_active = (clicked || g.NavActivateId == id);
+        if (make_active && clicked)
+            SetKeyOwner(ImGuiKey_MouseLeft, id);
+        if (make_active && temp_input_allowed)
+            if ((clicked && g.IO.KeyCtrl) || (g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_PreferInput)))
+                temp_input_is_active = true;
+"
+"        // Tabbing, CTRL+click or double-click on Slider turns it into an input box (SculptForge: the double-click)
+        static ImGuiID sf_click_id = 0;
+        static ImU64 sf_click_value = 0;
+        const bool clicked = hovered && IsMouseClicked(0, ImGuiInputFlags_None, id);
+        const bool double_clicked = clicked && g.IO.MouseClickedCount[0] == 2 && sf_click_id == id;
+        const bool make_active = (clicked || g.NavActivateId == id);
+        if (make_active && clicked)
+            SetKeyOwner(ImGuiKey_MouseLeft, id);
+        if (clicked && !double_clicked)
+        {
+            sf_click_id = id;
+            memcpy(&sf_click_value, p_data, DataTypeGetInfo(data_type)->Size);
+        }
+        if (double_clicked && temp_input_allowed)
+            memcpy(p_data, &sf_click_value, DataTypeGetInfo(data_type)->Size);
+        if (make_active && temp_input_allowed)
+            if ((clicked && g.IO.KeyCtrl) || double_clicked || (g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_PreferInput)))
+                temp_input_is_active = true;
+")
+file(WRITE ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp.new "${SF_IMGUI_WIDGETS}")
+configure_file(${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp.new ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp COPYONLY)
 
 add_library(imgui STATIC
   ${imgui_SOURCE_DIR}/imgui.cpp
   ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_draw.cpp
   ${imgui_SOURCE_DIR}/imgui_tables.cpp
-  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+  ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp
   ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
   ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
 target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
@@ -129,3 +258,10 @@ target_compile_definitions(imgui PUBLIC IMGUI_ENABLE_TEST_ENGINE)
 # Characters past U+FFFF (CJK Extension B and up, e.g. 𠀋 in a Part's name) as themselves, not U+FFFD.
 target_compile_definitions(imgui PUBLIC IMGUI_USE_WCHAR32)
 target_link_libraries(imgui PUBLIC SDL3::SDL3 ${CMAKE_DL_LIBS})
+if(SCULPTFORGE_GLES)
+  target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_ES3) # (on a desktop: its GLES headers and libGLESv2)
+  if(NOT ANDROID)
+    find_library(SF_GLESV2 GLESv2 REQUIRED)
+    target_link_libraries(imgui PUBLIC ${SF_GLESV2})
+  endif()
+endif()

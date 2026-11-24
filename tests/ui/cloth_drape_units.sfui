@@ -1,0 +1,29 @@
+# Drape in a scene modelled in centimetres (the Full Body starter: 167 units tall): Units per metre starts from the size
+# of the scene (100), so a sheet dropped over a box beside the figure falls and folds at a real-world speed, hanging over
+# the edges in folds, instead of falling as if the scene were 167 m. Simulate at the default, Pause at frame 120 and Keep
+# (a sheet over edges is not asked to rest here; 120 frames keep the test under the time budget).
+run ui_look look=classic layout=classic
+run new_starter_mesh name=full-body levels=0
+run part_append type=cube size=0.35 name=Box       # size is relative to the figure: a box 58 cm across, beside it
+run part_append type=plane size=0.5 name=Sheet     # an 83 cm square of cloth
+run transform translate=-79.1,46.7,0               # over the middle of the box, 17 cm above it: it hangs over every edge
+camera 25 -15
+look 70 100 0
+zoom 1.9
+click "Tool##palette.tool"
+click "Drape##tool.drape"
+expect "##drapescale"
+expect_value drape_scale == 100
+snapshot
+click "Simulate##drape"
+wait_value drape_running == 1 10
+wait_value drape_frame >= 120 60
+click "Pause##drape"
+click "Keep##drape"
+wait_value drape_running == 0 10
+expect_value moved > 3000
+expect_value can_undo == 1
+wait_idle 30
+shot cloth_drape_units
+key ctrl+z
+expect_value moved == 0

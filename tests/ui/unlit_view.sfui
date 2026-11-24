@@ -1,0 +1,49 @@
+# Unlit view (#168): the base colour alone. A vertex-painted sphere shows exactly the stored colour (no lighting,
+# wherever on the sphere), the Material palette and Alt+L toggle it, the status bar names it, and the project keeps it.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=4
+camera 0 0
+run set_color color=20c040
+run paint_fill color=20c040
+wait 0.3
+expect_value unlit == 0
+shot shaded
+
+# Render > Materials > Unlit turns it on (no default shelf button: the right shelf is full at 1024 x 768); the middle
+# and a point near the rim both show the stored colour (32, 192, 64).
+click "Render##menu.render"
+click "Materials##section.material"
+expect "Unlit##unlit"
+click "Unlit##unlit"
+shot material-palette
+key escape
+expect_value unlit == 1
+expect_value checked@view.unlit == 1
+expect_status "Unlit view: on"
+wait 0.3
+shot unlit
+expect_value rgb_r@0.41,0.51 >= 28
+expect_value rgb_r@0.41,0.51 <= 42
+expect_value rgb_g@0.41,0.51 >= 186
+expect_value rgb_g@0.41,0.51 <= 198
+expect_value rgb_b@0.41,0.51 >= 58
+expect_value rgb_b@0.41,0.51 <= 72
+expect_value rgb_g@0.41,0.40 >= 186
+expect_value rgb_g@0.41,0.40 <= 198
+
+# Alt+L is the shortcut; it switches back to the shaded view (the rim is darker than the stored colour).
+key alt+l
+expect_value unlit == 0
+expect_status "Unlit view: off"
+wait 0.3
+shot shaded-again
+key alt+l
+expect_value unlit == 1
+
+# Scripted, and the project keeps it.
+run save_project path=sf_ui_unlit_view.sfproj
+run set_unlit on=false
+expect_value unlit == 0
+run open path=sf_ui_unlit_view.sfproj
+expect_value unlit == 1
+run set_unlit on=false

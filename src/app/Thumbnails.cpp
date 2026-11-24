@@ -129,13 +129,36 @@ ImTextureID ThumbnailCache::request(const std::string& key, Producer produce, bo
     return ImTextureID(0);
 }
 
-ImTextureID ThumbnailCache::brush(int brushType) {
-    const std::string key = "brush|" + std::to_string(brushType) + "|" + std::to_string(kThumbnailVersion);
+std::string ThumbnailCache::lookKey(const BrushToolSettings* look) {
+    if (!look || !hasAlphaLook(*look)) return {};
+    const AlphaOptions& o = look->alphaOptions;
+    std::string k = "|look|" + look->alphaName + "|" + look->alphaPath + "|" + (look->alphaInvert ? "inv" : "pos") + "|" +
+                    std::to_string(int(look->stroke)) + "|" + (o.followStroke ? "f" : "n") + std::to_string(int(std::lround(o.angle))) +
+                    "|" + std::to_string(o.tileX) + "x" + std::to_string(o.tileY);
+    if (!look->alphaPath.empty()) { // an edited alpha file makes a new thumbnail
+        const Stat& s = stat(look->alphaPath);
+        k += "|" + std::to_string(s.size) + "|" + std::to_string(s.mtime);
+    }
+    looks_.insert(k);
+    return k;
+}
+
+std::string ThumbnailCache::brushKey(int brushType, const BrushToolSettings* look) {
+    const bool shows = look && brushType != kPaintBrush && brushTakesAlpha(BrushType(brushType));
+    const std::string k = shows ? lookKey(look) : std::string();
+    if (!k.empty()) builtinLooks_.insert(std::to_string(brushType) + k);
+    return hex64(fnv1a64("brush|" + std::to_string(brushType) + "|" + std::to_string(kThumbnailVersion) + k));
+}
+
+ImTextureID ThumbnailCache::brush(int brushType, const BrushToolSettings* look) {
+    const bool shows = look && brushType != kPaintBrush && brushTakesAlpha(BrushType(brushType)) && hasAlphaLook(*look);
+    const BrushToolSettings settings = shows ? *look : BrushToolSettings();
     return request(
-        hex64(fnv1a64(key)),
-        [brushType] {
+        brushKey(brushType, look),
+        [brushType, shows, settings] {
             Result r;
-            r.mesh = sculptBrushPreview(nullptr, brushType);
+            AlphaLook alphaLook;
+            r.mesh = sculptBrushPreview(nullptr, brushType, shows && makeAlphaLook(settings, alphaLook) ? &alphaLook : nullptr);
             r.label = "brush-" + std::to_string(brushType);
             r.yaw = 0.0f;
             r.pitch = kBallPitch;
@@ -146,13 +169,45 @@ ImTextureID ThumbnailCache::brush(int brushType) {
         true);
 }
 
-ImTextureID ThumbnailCache::recipe(const BrushRecipe& recipe) {
-    const std::string key = "recipe|" + recipe.toJson().dump() + "|" + std::to_string(kThumbnailVersion);
+void ThumbnailCache::regenerateBrush(int brushType, const BrushToolSettings* look) {
+    stats_.erase(look ? look->alphaPath : std::string()); // (the file is looked at again)
+    forgetKey(brushKey(brushType, look));
+    ++regenerated_;
+}
+
+void ThumbnailCache::forgetKey(const std::string& key) {
+    if (!cacheDir_.empty()) {
+        std::error_code ec;
+        std::filesystem::remove(fsPath(thumbnailCachePath(cacheDir_, key)), ec);
+    }
+    if (auto e = entries_.find(key); e != entries_.end() && e->second.state != State::Running) {
+        if (e->second.tex) gl::DeleteTextures(1, &e->second.tex);
+        queue_.erase(std::remove_if(queue_.begin(), queue_.end(), [&](const auto& q) { return q.first == key; }), queue_.end());
+        entries_.erase(e);
+    }
+}
+
+std::string ThumbnailCache::brushCacheFile(int brushType) const {
+    if (cacheDir_.empty()) return {};
+    const std::string path =
+        thumbnailCachePath(cacheDir_, hex64(fnv1a64("brush|" + std::to_string(brushType) + "|" + std::to_string(kThumbnailVersion))));
+    std::error_code ec;
+    return std::filesystem::is_regular_file(fsPath(path), ec) ? path : std::string();
+}
+
+std::string ThumbnailCache::recipeKey(const BrushRecipe& recipe, const BrushToolSettings* look) {
+    return hex64(fnv1a64("recipe|" + recipe.toJson().dump() + "|" + std::to_string(kThumbnailVersion) + lookKey(look)));
+}
+
+ImTextureID ThumbnailCache::recipe(const BrushRecipe& recipe, const BrushToolSettings* look) {
+    const bool shows = look && hasAlphaLook(*look);
+    const BrushToolSettings settings = shows ? *look : BrushToolSettings();
     return request(
-        hex64(fnv1a64(key)),
-        [recipe] {
+        recipeKey(recipe, look),
+        [recipe, shows, settings] {
             Result r;
-            r.mesh = sculptBrushPreview(&recipe, 0);
+            AlphaLook alphaLook;
+            r.mesh = sculptBrushPreview(&recipe, 0, shows && makeAlphaLook(settings, alphaLook) ? &alphaLook : nullptr);
             r.label = "recipe-" + recipe.name;
             r.yaw = 0.0f;
             r.pitch = kBallPitch;
@@ -160,6 +215,12 @@ ImTextureID ThumbnailCache::recipe(const BrushRecipe& recipe) {
             return r;
         },
         true);
+}
+
+void ThumbnailCache::regenerateRecipe(const BrushRecipe& recipe, const BrushToolSettings* look) {
+    stats_.erase(look ? look->alphaPath : std::string());
+    forgetKey(recipeKey(recipe, look));
+    ++regenerated_;
 }
 
 ImTextureID ThumbnailCache::vdm(const std::shared_ptr<const VectorDisplacement>& vdm) {
@@ -307,16 +368,30 @@ ImTextureID ThumbnailCache::file(const std::string& path) {
     const Stat& s = stat(path);
     if (!s.exists) return ImTextureID(0);
     const bool image = isImageFile(path), project = isProjectFile(path);
-    const std::string kind = project ? "project" : image ? "image" : "mesh";
+    const bool exr = !image && isAlphaImageFile(path); // (an EXR alpha: its grey, from BrushAlpha's reader)
+    const std::string kind = project ? "project" : image || exr ? "image" : "mesh";
     const std::string key = fileThumbnailKey(kind, path, s.size, s.mtime, kPixels);
     return request(
         key,
-        [path, image, project] {
+        [path, image, project, exr] {
             Result r;
             std::string err;
             if (image) {
                 Image full;
                 if (Image::load(path, full, err)) r.image = full.downscaled(kPixels);
+                return r;
+            }
+            if (exr) {
+                BrushAlpha a;
+                if (!BrushAlpha::fromFile(path, "", false, a, err, kPixels)) return r;
+                r.image.width = a.width;
+                r.image.height = a.height;
+                r.image.rgba.resize(a.values.size() * 4);
+                for (size_t i = 0; i < a.values.size(); ++i) {
+                    const uint8_t g = uint8_t(std::lround(a.values[i] * 255.0f));
+                    r.image.rgba[i * 4] = r.image.rgba[i * 4 + 1] = r.image.rgba[i * 4 + 2] = g;
+                    r.image.rgba[i * 4 + 3] = 255;
+                }
                 return r;
             }
             if (project && loadProjectThumbnail(path, r.image, err)) return r;
@@ -332,7 +407,7 @@ ImTextureID ThumbnailCache::file(const std::string& path) {
 void ThumbnailCache::refresh(const std::string& path) {
     auto s = stats_.find(path);
     if (s == stats_.end()) return;
-    const std::string kind = isProjectFile(path) ? "project" : isImageFile(path) ? "image" : "mesh";
+    const std::string kind = isProjectFile(path) ? "project" : isAlphaImageFile(path) ? "image" : "mesh";
     const std::string key = fileThumbnailKey(kind, path, s->second.size, s->second.mtime, kPixels);
     if (!cacheDir_.empty()) {
         std::error_code ec;

@@ -1,0 +1,17 @@
+// SculptForge for Android (android/README.md). scripts/android-build.sh builds the native code first, then this.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'SculptForge'
+include ':app'
