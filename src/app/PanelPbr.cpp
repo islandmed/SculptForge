@@ -199,11 +199,17 @@ void App::drawTextureChannelsContents() {
 
 void App::drawBrushMaterialContents() {
     const Mesh& m = doc_.mesh;
-    if (!paintsTexture(m) || !hasMaterialChannels(*m.texture)) return;
+    // Shown as soon as paint goes into a texture, with every material channel as a row: a channel the texture does not
+    // have yet is ticked on right here (a member asked, 11-22: loading the texture in Color and then going to Tool >
+    // Texture Image to tick the channels felt slow). texture_channels replaces the texture (`t` goes stale), so the
+    // channels to add wait in `addChannels` until everything is drawn.
+    if (!paintsTexture(m)) return;
     const PaintTexture& t = *m.texture;
     const ImGuiStyle& style = ImGui::GetStyle();
     ImGui::SeparatorText(tr("Material"));
     BrushMaterial& mat = doc_.paintMaterial;
+    uint32_t addChannels = 0;
+    auto needs = [&](Channel c) { return channelEnabled(t, c) ? 0u : channelBit(c); };
     // Material swatches: every enabled channel at once.
     const float sw = (ImGui::GetContentRegionAvail().x - 3 * style.ItemSpacing.x) / 4.0f;
     for (int i = 0; i < int(std::size(kMaterialSwatches)); ++i) {
@@ -217,6 +223,7 @@ void App::drawBrushMaterialContents() {
             mat.roughness = s.roughness;
             mat.metallic = s.metallic;
             mat.channels |= channelBit(Channel::BaseColor) | channelBit(Channel::Roughness) | channelBit(Channel::Metallic);
+            addChannels |= needs(Channel::Roughness) | needs(Channel::Metallic); // (a working metal brush in one click)
             swatchMemo_.applied = mat;
             swatchMemo_.color = doc_.paintColor;
             swatchMemo_.active = true;
@@ -234,13 +241,35 @@ void App::drawBrushMaterialContents() {
         if (i % 4 != 3) ImGui::SameLine();
     }
     ui::HelpText("Material swatches", nullptr,
-                 "Set the brush's colour, roughness and metallic at once, and make it paint those channels.", kColorPath);
+                 "Set the brush's colour, roughness and metallic at once, and make it paint those channels (adding "
+                 "roughness and metallic to the texture if it lacks them).",
+                 kColorPath);
 
-    // One row per channel the texture has: whether the brush paints it, quick values, and the value.
+    // One row per channel: whether the brush paints it, quick values, and the value. A channel the texture does not
+    // have yet is a greyed row; its tick adds the channel (as Tool > Texture Image > Material Channels does, undoable)
+    // and makes the brush paint it. Taking a channel off the texture stays in Texture Image (it discards paint).
     for (int ci = 0; ci < kChannelCount; ++ci) {
         const Channel c = Channel(ci);
-        if (!channelEnabled(t, c)) continue;
         ImGui::PushID(ci);
+        if (!channelEnabled(t, c)) {
+            // (a stale bit, e.g. after undoing the channel's addition, goes: the brush paints what the rows show)
+            if (!(addChannels & channelBit(c))) mat.channels &= ~channelBit(c);
+            bool add = false;
+            ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+            if (ImGui::Checkbox(channelFormat(c).label, &add)) {
+                addChannels |= channelBit(c);
+                mat.channels |= channelBit(c);
+                swatchMemo_.active = false;
+            }
+            ImGui::PopStyleColor();
+            ui::HelpText(channelFormat(c).label, nullptr,
+                         (channelHelp(c) + " Not on the texture yet: tick to add the channel (as Material Channels in Tool > "
+                                           "Texture Image does; undoable) and paint it. Costs no memory until painted.")
+                             .c_str(),
+                         kColorPath);
+            ImGui::PopID();
+            continue;
+        }
         bool paints = (mat.channels & channelBit(c)) != 0;
         if (ImGui::Checkbox(channelFormat(c).label, &paints)) mat.channels ^= channelBit(c), swatchMemo_.active = false;
         ui::HelpText(channelFormat(c).label, nullptr,
@@ -291,7 +320,20 @@ void App::drawBrushMaterialContents() {
         }
         ImGui::PopID();
     }
+    if (!hasMaterialChannels(t)) {
+        ImGui::TextDisabled("%s", tr("Tick a channel to paint more than colour"));
+        ui::HelpText("Material Channels", nullptr,
+                     "The greyed channels are not on the texture yet: tick one to add it and paint it. Tool > Texture Image > "
+                     "Material Channels lists them too, and is where a channel is taken off again.",
+                     kColorPath);
+    }
     mat.color = doc_.paintColor;
+    if (addChannels) {
+        std::string ids;
+        for (int c = 1; c < kChannelCount; ++c)
+            if (addChannels & (1u << c)) ids += (ids.empty() ? "" : ",") + std::string(channelFormat(Channel(c)).id);
+        runCommand("texture_channels", {{"enable", ids}}); // (`t` is stale from here on)
+    }
 }
 
 Args App::drawLayerChannelChips(int layer) {
@@ -338,10 +380,9 @@ Args App::drawLayerChannelChips(int layer) {
                     run = {{"index", double(layer)}, {"channel", std::string(channelFormat(c).id)},
                            {"blend", std::string(channelBlendId(uint8_t(b)))}};
             ImGui::Separator();
-            float pct = opacity * 100.0f;
+            float pct = 0.0f;
             ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10.0f);
-            ImGui::SliderFloat("##chipopacity", &pct, 0.0f, 100.0f, tr("Opacity %.0f%%"));
-            if (ImGui::IsItemDeactivatedAfterEdit())
+            if (ui::SliderOnRelease("##chipopacity", opacity * 100.0f, 0.0f, 100.0f, tr("Opacity %.0f%%"), &pct))
                 run = {{"index", double(layer)}, {"channel", std::string(channelFormat(c).id)}, {"opacity", double(pct / 100.0f)}};
             ImGui::EndPopup();
         }
@@ -408,6 +449,7 @@ double App::pbrTestValue(const std::string& name) const {
     if (name == "environment") return double(renderSettings_.environment);
     if (name == "environment_pending") return renderer_.environmentPending() ? 1.0 : 0.0;
     if (name == "texture_uv_width") return double(renderer_.textureUvWidth(doc_.meshKey(doc_.activePart)));
+    if (name == "texture_rejected") return renderer_.textureRejected(doc_.meshKey(doc_.activePart)) ? 1.0 : 0.0;
     if (name == "texture_not_shown") return renderer_.textureNotShown(doc_.meshKey(doc_.activePart)) ? 1.0 : 0.0;
     if (name == "pbr_planes") return double(renderer_.pbrPlanes(doc_.meshKey(doc_.activePart)));
     if (name == "brush_channels") return double(doc_.paintMaterial.channels);
