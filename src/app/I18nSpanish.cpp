@@ -459,6 +459,9 @@ constexpr Entry kSpanish[] = {
     {"Load Lit Sphere", "Cargar Lit Sphere"},
     {"Material picker", "Selector de materiales"},
     {"Material swatches", "Muestras de material"},
+    {"Tick a channel to paint more than colour", "Marca un canal para pintar más que el color"},
+    {"Set the brush's colour, roughness and metallic at once, and make it paint those channels (adding roughness and metallic to the texture if it lacks them).", "Establece el color, la rugosidad y el metálico del pincel a la vez, y haz que pinte esos canales (añadiendo rugosidad y metálico a la textura si carece de ellos)."},
+    {"The greyed channels are not on the texture yet: tick one to add it and paint it. Tool > Texture Image > Material Channels lists them too, and is where a channel is taken off again.", "Los canales atenuados todavía no están en la textura: marca uno para añadirlo y pintarlo. Herramienta > Imagen de textura > Canales de material también los enumera, y es donde se vuelve a quitar un canal."},
 
     // --- Script ---
     {"Console", "Consola"},
