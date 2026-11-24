@@ -2268,22 +2268,29 @@ namespace {
 // registry per row would be quadratic).
 std::string sharedKeyHolders(const ActionRegistry& reg, const Action& a) {
     static unsigned revision = ~0u;
+    static i18n::Language language = i18n::Language::English; // (the names are translated: a language switch rebuilds)
     static std::unordered_map<std::string, std::string> byId;
-    if (revision != reg.revision()) {
+    if (revision != reg.revision() || language != i18n::language()) {
         revision = reg.revision();
+        language = i18n::language();
         byId.clear();
         std::unordered_map<std::string, std::vector<const Action*>> byKey; // one alternative -> the actions that have it
         for (const Action& x : reg.all()) {
             if (!x.run) continue;
             for (const std::string& alt : shortcutAlternatives(reg.shortcutText(x.id))) byKey[alt].push_back(&x);
         }
-        for (const auto& [key, holders] : byKey) {
-            if (holders.size() < 2) continue;
-            for (const Action* mine : holders) {
-                std::string& out = byId[mine->id];
-                for (const Action* other : holders)
-                    if (other != mine) out += (out.empty() ? "" : ", ") + std::string(trAction(other->id, other->label));
-            }
+        // In the registry's order, each action's alternatives in their order: the same text every frame and run.
+        for (const Action& mine : reg.all()) {
+            if (!mine.run) continue;
+            std::string out;
+            std::vector<const Action*> named;
+            for (const std::string& alt : shortcutAlternatives(reg.shortcutText(mine.id)))
+                for (const Action* other : byKey[alt]) {
+                    if (other == &mine || std::find(named.begin(), named.end(), other) != named.end()) continue;
+                    named.push_back(other);
+                    out += (out.empty() ? "" : ", ") + std::string(trAction(other->id, other->label));
+                }
+            if (!out.empty()) byId[mine.id] = std::move(out);
         }
     }
     const auto it = byId.find(a.id);
