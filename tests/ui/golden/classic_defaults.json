@@ -304,6 +304,7 @@
     "aoStrength": 0.800000012,
     "aoSoftness": 0.400000006,
     "shadowSoftness": 0.349999994,
+    "shadowStrength": 1,
     "viewOcclusionLitSphere": false,
     "multithreading": true,
     "predictiveStrokes": false,
