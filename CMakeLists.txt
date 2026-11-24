@@ -197,6 +197,7 @@ add_library(sculptforge_core STATIC
   src/core/QuadQuality.cpp
   src/core/ForgeSpheres.cpp src/core/AgentTools.cpp src/core/DetailPass.cpp
   src/core/Tube.cpp
+  src/core/Scatter.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
   third_party/xatlas/xatlas.cpp
@@ -543,6 +544,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelGenerate3D.cpp
     src/app/PanelForgeSpheres.cpp
     src/app/PanelTube.cpp
+    src/app/PanelScatter.cpp
     src/app/PanelSplatTrain.cpp
     src/app/PanelRenderBridge.cpp
     src/app/PanelSculptable.cpp
@@ -1327,6 +1329,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     endforeach()
     sculptforge_ui_test(fill_effect_slider_keeps_1440 fill_effect_slider_keeps --size 1440x900)
     sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
+    sculptforge_ui_test(scatter_1440 scatter --size 1440x900) # Tool > Scatter, its live redo and Separate Parts over 500
+    sculptforge_ui_test(scatter_2880 scatter --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(guide_window_look_1440 guide_window_look --size 1440x900) # the guide's Learn edge, strip and surface
