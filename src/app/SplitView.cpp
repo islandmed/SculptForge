@@ -104,6 +104,7 @@ void App::splitSetMode(int mode) {
     const bool wasOff = uiPrefs_.splitView == 0;
     uiPrefs_.splitView = mode;
     if (mode == 0) { // the pointer's view stays, on the whole canvas
+        if (uiPrefs_.splitLens[splitActive_]) autoOrtho_ = camera_.ortho; // (a fixed lens's orthographic view turns back to perspective when orbited)
         splitActive_ = 0;
         updateCameraAspect();
         perf_.lastView = camera_.view();
@@ -115,9 +116,10 @@ void App::splitSetMode(int mode) {
         // framed on the scene (a Free lens keeps the view as it is: the same picture twice until you turn one).
         splitActive_ = 0;
         updateCameraAspect();
-        splitOtherFrom(otherCamera_, camera_, uiPrefs_.splitLens[1], sceneBounds());
+        const AABB scene = sceneBounds();
+        splitOtherFrom(otherCamera_, camera_, uiPrefs_.splitLens[1], scene);
         otherAutoOrtho_ = false;
-        splitOtherReady_ = true;
+        splitOtherReady_ = scene.valid(); // (no scene yet, SF_SPLIT_VIEW at start: splitSync frames it once there is one)
     } else updateCameraAspect(); // beside <-> below: the panes change shape, the views stay
     perf_.lastView = camera_.view();
     redrawIn(0.0);
@@ -236,6 +238,7 @@ void App::drawSplitViewUi() {
                 const float r = beside ? (m.x - c.x - gap * 0.5f) / std::max(c.w - gap, 1.0f) : (m.y - c.y - gap * 0.5f) / std::max(c.h - gap, 1.0f);
                 uiPrefs_.splitRatio = std::clamp(r, kSplitRatioMin, kSplitRatioMax);
                 updateCameraAspect();
+                redrawIn(0.0);
             }
             if (hot) { // the gap lit while the pointer is on it
                 ImDrawList* dl = ImGui::GetForegroundDrawList();
