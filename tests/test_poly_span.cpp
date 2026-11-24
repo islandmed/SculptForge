@@ -8,7 +8,12 @@
 #include "core/CloseHoles.h"
 #include "core/Cut.h"
 #include "core/FaceGroups.h"
+#include "core/Commands.h"
+#include "core/Document.h"
+#include "core/EdgeSelect.h"
 #include "core/MeshCheck.h"
+#include "core/PolyMode.h"
+#include "core/PolyOps.h"
 #include "core/PolySpan.h"
 #include "core/Primitives.h"
 
@@ -136,6 +141,29 @@ std::set<std::set<uint32_t>> faceSets(const Mesh& m, const std::vector<uint32_t>
 // Two tubes end to end with a gap of 2 between them (A below, B above).
 Mesh twoTubes(int segA, int segB) {
     return appendMesh(tube(segA, {0.0f, -2.0f, 0.0f}), tube(segB, {0.0f, 2.0f, 0.0f}));
+}
+
+const CommandRegistry& registry() {
+    static CommandRegistry r;
+    return r;
+}
+
+// An open edge of the Part's edge list whose ends both sit at height `y`.
+uint32_t openEdgeAt(const Mesh& m, const EdgeTopology& topo, float y) {
+    for (uint32_t e = 0; e < topo.edgeCount(); ++e)
+        if (topo.open(e) && std::abs(m.positions[topo.ends[e].x].y - y) < 1e-4f && std::abs(m.positions[topo.ends[e].y].y - y) < 1e-4f)
+            return e;
+    return kNoEdge;
+}
+
+// The lower triangle of a quad on the side of a makeCube whose centre has `axis` = sign.
+uint32_t sideFace(const Mesh& m, int axis, float sign) {
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        if (edgePolygon(m, t) != t) continue;
+        const glm::vec3 c = centroid(m, t);
+        if (std::abs(c[axis] - sign) < 1e-4f) return t;
+    }
+    return 0;
 }
 
 } // namespace
@@ -690,4 +718,100 @@ TEST(poly_span_big_loops_are_quick_and_deterministic) {
     CHECK(spanEdges(b, e, {}, rb, error));
     CHECK(a.triangles == b.triangles);
     CHECK(clean(a));
+}
+
+TEST(poly_span_op_joins_two_openings_of_a_block_as_one_undo_step) {
+    Document doc;
+    doc.setMesh(makeCube(2));
+    const CommandRegistry& reg = registry();
+    CHECK(reg.execute(doc, "poly_mode").ok);
+    CommandResult r = reg.execute(doc, "poly_op", {{"op", std::string("list")}});
+    CHECK(r.ok && r.message.find("span (edges, segments=1 [1..32], twist=0 [-8..8], flip=false)") != std::string::npos);
+    const PolyOp* op = PolyOpRegistry::instance().find("span");
+    CHECK(op && op->label == "Span" && op->anyElement && op->preview);
+    // Faces on two opposite sides (each whole side by its face group), Span with two rings: a tunnel through the block.
+    const double plus = doc.mesh.facegroupAt(sideFace(doc.mesh, 0, 1.0f)), minus = doc.mesh.facegroupAt(sideFace(doc.mesh, 0, -1.0f));
+    CHECK(plus != minus);
+    reg.execute(doc, "poly_select", {{"op", std::string("group")}, {"group", plus}});
+    CHECK(doc.polySelection.count() == 4);
+    reg.execute(doc, "poly_select", {{"op", std::string("group")}, {"group", minus}, {"add", true}});
+    CHECK(doc.polySelection.count() == 8);
+    const size_t before = doc.undo.undoCount();
+    // The preview leaves the Part alone.
+    PolyOpOutput preview;
+    std::string error;
+    CHECK(previewPolyOp(doc, "span", {{"segments", 2.0}}, preview, error));
+    CHECK(preview.mesh.triangleCount() == 48 - 16 + 32);
+    CHECK(doc.mesh.triangleCount() == 48);
+    CHECK(doc.undo.undoCount() == before);
+    r = reg.execute(doc, "poly_op", {{"op", std::string("span")}, {"segments", 2.0}});
+    CHECK(r.ok);
+    if (!r.ok) std::printf("  %s\n", r.message.c_str());
+    CHECK(r.message.find("Spanned 16 faces between the two openings") != std::string::npos);
+    CHECK(doc.mesh.triangleCount() == 48 - 16 + 32);
+    CHECK(isWatertight(doc.mesh));
+    CHECK(clean(doc.mesh));
+    CHECK(doc.undo.undoCount() == before + 1);
+    CHECK(doc.polySelection.element == PolyElement::Faces);
+    CHECK(doc.polySelection.count() == 16); // the band is selected afterwards
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.triangleCount() == 48);
+    CHECK(doc.undo.redo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.triangleCount() == 64);
+    // One side only: told how to pick two.
+    doc.undo.undo(doc.mesh, doc.bvh);
+    reg.execute(doc, "poly_select", {{"op", std::string("group")}, {"group", plus}});
+    CHECK(doc.polySelection.count() == 4);
+    r = reg.execute(doc, "poly_op", {{"op", std::string("span")}});
+    CHECK(!r.ok && r.message.find("two sides") != std::string::npos);
+    CHECK(doc.mesh.triangleCount() == 48);
+}
+
+TEST(poly_span_op_takes_two_edge_loops_or_one_to_close) {
+    Document doc;
+    doc.setMesh(twoTubes(12, 12));
+    const CommandRegistry& reg = registry();
+    CHECK(reg.execute(doc, "poly_mode", {{"element", std::string("edges")}}).ok);
+    const EdgeTopology& topo = doc.polySelection.sync(doc.mesh, doc.edgeSelection.topo);
+    const uint32_t lo = openEdgeAt(doc.mesh, topo, -1.0f), hi = openEdgeAt(doc.mesh, topo, 1.0f);
+    CHECK(lo != kNoEdge && hi != kNoEdge);
+    // No selection, then one loop: each refusal says what to pick.
+    CommandResult r = reg.execute(doc, "poly_op", {{"op", std::string("span")}});
+    CHECK(!r.ok && r.message.find("Span needs edges") != std::string::npos);
+    reg.execute(doc, "poly_select", {{"op", std::string("loop")}, {"index", double(lo)}});
+    CHECK(doc.polySelection.count() == 12);
+    const size_t nt0 = doc.mesh.triangleCount();
+    const size_t before = doc.undo.undoCount();
+    // One whole loop closes its hole (the tube's end gets a lid across its width).
+    r = reg.execute(doc, "poly_op", {{"op", std::string("span")}});
+    CHECK(r.ok);
+    CHECK(boundaryLoops(doc.mesh).size() == 3);
+    CHECK(doc.undo.undoCount() == before + 1);
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.triangleCount() == nt0);
+    // Two loops with a twist: a band of 12 quads, selected afterwards as faces (the op left the selection on Faces).
+    CHECK(doc.polySelection.element == PolyElement::Faces);
+    reg.execute(doc, "poly_mode", {{"element", std::string("edges")}});
+    reg.execute(doc, "poly_select", {{"op", std::string("loop")}, {"index", double(lo)}});
+    reg.execute(doc, "poly_select", {{"op", std::string("loop")}, {"index", double(hi)}, {"add", true}});
+    CHECK(doc.polySelection.count() == 24);
+    r = reg.execute(doc, "poly_op", {{"op", std::string("span")}, {"twist", 2.0}});
+    CHECK(r.ok);
+    if (!r.ok) std::printf("  %s\n", r.message.c_str());
+    CHECK(r.message.find("Spanned 12 faces") != std::string::npos);
+    CHECK(doc.mesh.triangleCount() == nt0 + 24);
+    CHECK(boundaryLoops(doc.mesh).size() == 2);
+    CHECK(clean(doc.mesh));
+    CHECK(doc.polySelection.element == PolyElement::Faces && doc.polySelection.count() == 12);
+    // Points of both loops work too (the edges they cover).
+    doc.undo.undo(doc.mesh, doc.bvh);
+    reg.execute(doc, "poly_mode", {{"element", std::string("edges")}});
+    reg.execute(doc, "poly_select", {{"op", std::string("loop")}, {"index", double(lo)}});
+    reg.execute(doc, "poly_select", {{"op", std::string("loop")}, {"index", double(hi)}, {"add", true}});
+    reg.execute(doc, "poly_mode", {{"element", std::string("points")}});
+    CHECK(doc.polySelection.count() == 24);
+    r = reg.execute(doc, "poly_op", {{"op", std::string("span")}, {"segments", 3.0}});
+    CHECK(r.ok);
+    CHECK(doc.mesh.triangleCount() == nt0 + 72);
+    CHECK(clean(doc.mesh));
 }

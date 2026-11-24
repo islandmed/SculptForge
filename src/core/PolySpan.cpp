@@ -10,6 +10,7 @@
 
 #include "core/FaceGroups.h"
 #include "core/PaintLayer.h"
+#include "core/PolyOps.h"
 
 #include <algorithm>
 #include <cmath>
@@ -351,8 +352,10 @@ bool spanOriented(Mesh& mesh, const EdgeUses& uses, const BorderChain& a, const 
     if (mesh.hasUvFlags()) mesh.uvFlags.resize(nt * 3, 0);
     if (mesh.hasCreases()) mesh.creases.resize(nt * 3, 0.0f);
     if (mesh.hasQuads()) mesh.quadPartners.resize(nt, Mesh::kNoQuad);
-    mesh.rebuildTopology();
-    mesh.recomputeAllNormals();
+    if (options.finish) {
+        mesh.rebuildTopology();
+        mesh.recomputeAllNormals();
+    }
     result.group = group;
     result.vertices.resize(band.newPositions.size());
     std::iota(result.vertices.begin(), result.vertices.end(), uint32_t(nv0));
@@ -526,11 +529,14 @@ bool spanEdges(Mesh& mesh, std::span<const glm::uvec2> edges, const SpanOptions&
     std::vector<BorderChain> chains;
     if (!borderChains(mesh, edges, chains, error)) return false;
     if (chains.size() == 1) {
-        if (!chains[0].closed) return fail(error, "one open chain: select two borders, or a whole loop to close a hole");
+        if (!chains[0].closed)
+            return fail(error, "needs two borders: select one edge loop, Shift+double-click the other (one whole loop "
+                               "closes its hole)");
         return spanHole(mesh, chains[0], options, result, error);
     }
     if (chains.size() != 2) {
-        error = "Span: the edges make " + std::to_string(chains.size()) + " borders: select two";
+        error = "Span: the edges make " + std::to_string(chains.size()) +
+                " borders, it needs two: select one edge loop, Shift+double-click the other";
         return false;
     }
     const EdgeUses uses(mesh);
@@ -658,8 +664,9 @@ bool spanFaces(Mesh& mesh, std::span<const uint32_t> faces, const SpanOptions& o
         patches.push_back(std::move(patch));
     }
     if (patches.size() != 2) {
-        error = patches.size() == 1 ? "Span: the faces are one piece: select faces on two sides"
-                                    : "Span: the faces make " + std::to_string(patches.size()) + " pieces: select two";
+        error = patches.size() == 1 ? "Span: the faces are one piece: select faces on two sides (Shift+click adds)"
+                                    : "Span: the faces make " + std::to_string(patches.size()) +
+                                          " pieces, it needs two: select faces on two sides only";
         return false;
     }
     BorderChain outline[2];
@@ -687,13 +694,69 @@ bool spanFaces(Mesh& mesh, std::span<const uint32_t> faces, const SpanOptions& o
     SpanResult r;
     const bool ok = spanOriented(mesh, uses, outline[0], outline[1], options, r, error);
     if (!ok) { // the removal is already done: the caller works on a copy, as every op does
-        mesh.rebuildTopology();
-        mesh.recomputeAllNormals();
+        if (options.finish) {
+            mesh.rebuildTopology();
+            mesh.recomputeAllNormals();
+        }
         return false;
     }
     r.removed = count;
     result = std::move(r);
     return true;
+}
+
+// --- Polygon mode op ---
+
+bool polySpan(const PolyOpInput& in, PolyOpOutput& out, std::string& error) {
+    SpanOptions o;
+    o.segments = int(std::lround(argNumber(in.args, "segments", 1)));
+    o.twist = int(std::lround(argNumber(in.args, "twist", 0)));
+    o.flip = argBool(in.args, "flip", false);
+    o.finish = false; // (the registry rebuilds topology and normals)
+    out.mesh = in.mesh;
+    SpanResult r;
+    bool ok;
+    if (in.element == PolyElement::Faces && !in.triangles.empty()) {
+        ok = spanFaces(out.mesh, in.triangles, o, r, error);
+    } else if (!in.edgePairs.empty()) {
+        ok = spanEdges(out.mesh, in.edgePairs, o, r, error);
+    } else {
+        error = in.element == PolyElement::Points
+                    ? "Span needs edges or faces: select the points of two border loops, or switch to Edges or Faces"
+                    : "Span needs two borders: select one edge loop, Shift+double-click the other, or faces on two sides";
+        return false;
+    }
+    if (!ok) return false;
+    out.element = PolyElement::Faces;
+    out.triangles = r.triangles;
+    const size_t faces = r.quads + r.tris;
+    out.message = "Spanned " + std::to_string(faces) + (faces == 1 ? " face" : " faces") +
+                  (r.removed ? " between the two openings" : "");
+    return true;
+}
+
+void registerPolySpanOp(PolyOpRegistry& reg) {
+    PolyOp op;
+    op.id = "span";
+    op.label = "Span";
+    op.description = "Span: join two edge loops or face selections with new faces. Two open borders (edge loops or "
+                     "chains) get a band of quads between them; faces on two sides are removed and their openings "
+                     "joined (a tunnel, a handle); one whole border loop is closed across its width. The band is a face "
+                     "group of its own.";
+    op.credit = "members' top wish (#225 and the ideas threads)";
+    op.needs = PolyElement::Edges;
+    op.anyElement = true;
+    op.preview = true;
+    op.params = {{"segments", "Segments", 1.0, 32.0, 1.0, "Rings of faces across the gap"},
+                 {"twist", "Twist", -8.0, 8.0, 0.0, "Turns the pairing of two loops by this many vertices"}};
+    PolyOpParam flip;
+    flip.name = "flip";
+    flip.label = "Flip";
+    flip.help = "Pair the second border the other way round (for a piece that is wound inside out)";
+    flip.isBool = true;
+    op.params.push_back(flip);
+    op.run = polySpan;
+    reg.add(std::move(op));
 }
 
 } // namespace sf

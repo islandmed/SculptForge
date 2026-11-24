@@ -33,6 +33,7 @@ struct SpanOptions {
     int twist = 0;        // closed loops: turns the pairing this many vertices along the second border
     bool flip = false;    // pair the second border the other way round (when a piece is wound inside out)
     bool newGroup = true; // the band gets a face group of its own (else group 0)
+    bool finish = true;   // rebuild the mesh's topology and normals at the end (off: the caller does, as the ops registry)
 };
 
 struct SpanResult {
@@ -79,5 +80,13 @@ bool spanEdges(Mesh& mesh, std::span<const glm::uvec2> edges, const SpanOptions&
 // the triangles kept keep their order.
 bool spanFaces(Mesh& mesh, std::span<const uint32_t> faces, const SpanOptions& options, SpanResult& result,
                  std::string& error);
+
+// Polygon mode's op (core/PolyOps.h): Faces picked = two face selections, Edges or Points picked = two borders or one
+// closed loop. Parameters: segments, twist, flip.
+struct PolyOpInput;
+struct PolyOpOutput;
+class PolyOpRegistry;
+bool polySpan(const PolyOpInput& in, PolyOpOutput& out, std::string& error);
+void registerPolySpanOp(PolyOpRegistry& reg);
 
 } // namespace sf

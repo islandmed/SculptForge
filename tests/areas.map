@@ -72,6 +72,7 @@ ui_forge*                   mesh
 ui_geometry_groups*         mesh
 ui_edge_select*             mesh
 ui_polygon_mode*            mesh
+ui_polygon_span*            mesh
 ui_levels_rebuild           mesh
 ui_layers_levels            mesh
 ui_multires                 mesh

@@ -72,6 +72,15 @@ delete the faces they fully cover). **Flip** turns the selected faces inside out
 (Extrude, Inset, Bevel, Edge loop, Span) land here as they ship; each has its settings under its button, and a
 slider you drag shows a live preview of the result on the model.
 
+**Span** joins two edge loops or face selections with new faces. Select the border edges of two openings (double-click
+an edge on each border; <kbd>Shift</kbd> for the second) and Span fills the gap between them with a band of quads,
+wound with the surface on both sides. Select faces on two sides instead and Span removes them and joins the two
+openings: a tunnel through a block, a handle between two shells. Select one whole border loop and Span closes it
+across its width (a slot gets a grid, not a fan). **Segments** adds rings across the gap, **Twist** turns which vertex
+pairs with which on two loops, **Flip** pairs the second border the other way round when a piece is wound inside out.
+Borders with different numbers of edges pair by distance along each border, and the odd triangles are spread evenly
+round the band; the band is a face group of its own and stays selected afterwards, ready to move or smooth.
+
 An operation that needs whole faces tells you so when only some of a face's points are selected: switch to Faces, or
 select whole faces.
 
