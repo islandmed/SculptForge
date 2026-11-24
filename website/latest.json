@@ -1,12 +1,13 @@
 {
-  "version": "0.13.12",
+  "version": "0.13.13",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Tendril pulls round, tapering horns, even with Dynamic on",
-    "Palette Knife strokes cross and stack without creasing",
-    "The Gizmo stays smooth on multi-million triangle Parts, with a clearer All mode",
-    "Nudge and Layer leave the far side alone under View falloff, and a Level slider click switches at once"
+    "Contact facing keeps your brush off the far wall of a slot or the other side of a fold",
+    "Engrave and Crease Line keep smooth walls when one stroke runs up and down the same line",
+    "Dense Micro levels show Undo, Redo and Move at once, with fewer pauses as strokes start and end",
+    "Shift with the Paint brush smooths every channel you paint, across UV seams too",
+    "Texture painting works on more Android phones and tablets"
   ],
   "support": {
     "founding": {
