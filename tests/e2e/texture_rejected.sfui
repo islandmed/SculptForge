@@ -1,0 +1,28 @@
+# Member bug (Android, Mali-G72, 0.13.13): after Paint > Texture Image > New Texture the model vanished. A driver that rejects the
+# textured draw used to leave the Part undrawn with nothing said; now the first textured draw is checked for a GL error, it is
+# logged with the call, and the Part draws without its texture (visible, still paintable) with a status and a panel note.
+# gl_limits reject_textured=1 makes that first draw count as rejected on any machine (tests only).
+run ui_look look=classic layout=classic
+gl_limits reject_textured=1
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+wait 0.5
+render_cell "textured x draw rejected (drawn without the texture)" mode=lit
+wait 0.2
+expect_value texture_rejected == 1
+action draw.paint
+run set_color color=ff0000
+stroke 0.2 0.5 0.8 0.5
+wait 0.5
+expect_value texture_painted > 1000
+render_cell "textured x draw rejected, painted" mode=lit
+# a new mesh is looked at again, and a draw the driver takes shows the texture
+gl_limits reject_textured=0
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+wait 0.5
+render_cell "textured, draw accepted" mode=lit
+wait 0.2
+expect_value texture_rejected == 0
