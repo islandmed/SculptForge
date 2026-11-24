@@ -355,10 +355,13 @@ TEST(self_update_detects_installs) {
     present.clear();
     in = detectInstall(p);
     CHECK(in.kind == InstallKind::MacApp && in.target == "/Applications/SculptForge.app" && selfUpdates(in.kind));
-    CHECK(in.asset == "SculptForge-macos.dmg" && in.stagingDir == "/Users/u/Library/Caches/SculptForge/updates");
+    CHECK(in.asset == "SculptForge-macos.dmg");
+#if !defined(_WIN32) // (the paths are joined with the host's separator; a Windows build never runs the Mac install)
+    CHECK(in.stagingDir == "/Users/u/Library/Caches/SculptForge/updates");
     CHECK(stagingPath(in, "9.0.0") == "/Users/u/Library/Caches/SculptForge/updates/.download-9.0.0-SculptForge-macos.dmg");
     CHECK(mountPath(in, "9.0.0") == "/Users/u/Library/Caches/SculptForge/updates/mount-9.0.0");
     CHECK(appExecutable(in.target) == "/Applications/SculptForge.app/Contents/MacOS/sculptforge");
+#endif
     CHECK(appExecutable("/home/u/Apps/SculptForge.AppImage") == "/home/u/Apps/SculptForge.AppImage");
     p.exePath = "/Users/u/Downloads/SculptForge.app/Contents/MacOS/sculptforge"; // anywhere the user can write
     CHECK(detectInstall(p).kind == InstallKind::MacApp && detectInstall(p).target == "/Users/u/Downloads/SculptForge.app");
@@ -926,6 +929,7 @@ int spawnTool(const std::vector<std::string>& argv) {
 fs::path makeProbeBundle(const fs::path& app, const std::string& marker) {
     std::error_code ec;
     fs::create_directories(app / "Contents" / "MacOS");
+    fs::create_directories(app / "Contents" / "Resources"); // (writeAll makes no folders: 11-24 the marker was never written)
     writeAll(app / "Contents" / "Info.plist",
              "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\"><dict>"
              "<key>CFBundleIdentifier</key><string>app.sculptforge.probe</string>"
@@ -934,6 +938,7 @@ fs::path makeProbeBundle(const fs::path& app, const std::string& marker) {
     fs::copy_file("/bin/ls", app / "Contents" / "MacOS" / "sculptforge", fs::copy_options::overwrite_existing, ec);
     writeAll(app / "Contents" / "Resources" / "marker.txt", marker); // (a resource: sealed by the signature too)
     CHECK(!ec);
+    CHECK(readAll(app / "Contents" / "Resources" / "marker.txt") == marker);
     CHECK(spawnTool({"/usr/bin/codesign", "--force", "--sign", "-", app.string()}) == 0);
     return app;
 }
@@ -952,8 +957,53 @@ TEST(self_update_mac_real_codesign) {
     CHECK(macBundleSignature(app.string(), id, team, error));
     CHECK(id == "app.sculptforge.probe" && team.empty() && error.empty()); // ad-hoc: the bundle id, no team identifier
     CHECK(runningCodeIdentity(id, team) && !id.empty());                   // this binary: whatever it is signed with
+    // A resource changed after signing (the seal covers Resources: the Python runtime lives there in a real build).
     writeAll(app / "Contents" / "Resources" / "marker.txt", "changed after signing");
     CHECK(!macBundleSignature(app.string(), id, team, error) && !error.empty());
+    if (error.empty()) std::fprintf(stderr, "self_update_mac_real_codesign: a changed resource was accepted\n");
+    fs::remove_all(dir, ec);
+}
+
+// The bar (cto 11-24): a changed resource, a changed executable, a removed _CodeSignature, an added file and a changed
+// Info.plist are each refused by BOTH checks the install runs, codesign --verify --deep --strict and the Security
+// framework, on a fresh ditto copy of the signed bundle each time (as the install copies it); the untouched copy passes both.
+TEST(self_update_mac_real_tampers) {
+    const fs::path dir = tempPath("sf_self_update_mac_tampers");
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+    const fs::path sealed = makeProbeBundle(dir / "Sealed.app", "probe");
+    struct Tamper {
+        const char* what;
+        std::function<void(const fs::path& app)> apply;
+    };
+    const std::vector<Tamper> tampers = {
+        {"untouched", [](const fs::path&) {}},
+        {"a resource changed", [](const fs::path& app) { writeAll(app / "Contents" / "Resources" / "marker.txt", "changed"); }},
+        {"the executable changed",
+         [](const fs::path& app) { std::ofstream(app / "Contents" / "MacOS" / "sculptforge", std::ios::binary | std::ios::app) << "x"; }},
+        {"_CodeSignature removed", [](const fs::path& app) { std::error_code e; fs::remove_all(app / "Contents" / "_CodeSignature", e); }},
+        {"a file added", [](const fs::path& app) { writeAll(app / "Contents" / "Resources" / "extra.txt", "added after signing"); }},
+        {"Info.plist changed", [](const fs::path& app) {
+             std::string plist = readAll(app / "Contents" / "Info.plist");
+             plist.replace(plist.find("app.sculptforge.probe"), 21, "app.sculptforge.probf");
+             writeAll(app / "Contents" / "Info.plist", plist);
+         }},
+    };
+    for (const Tamper& t : tampers) {
+        const fs::path copy = dir / "Copy.app";
+        fs::remove_all(copy, ec);
+        CHECK(spawnTool({"/usr/bin/ditto", sealed.string(), copy.string()}) == 0);
+        t.apply(copy);
+        const bool cli = spawnTool({"/usr/bin/codesign", "--verify", "--deep", "--strict", copy.string()}) == 0;
+        std::string id, team, error;
+        const bool api = macBundleSignature(copy.string(), id, team, error);
+        const bool expect = std::string(t.what) == "untouched";
+        if (cli != expect) std::fprintf(stderr, "self_update_mac_real_tampers: codesign --verify %s with %s\n", cli ? "passed" : "failed", t.what);
+        if (api != expect) std::fprintf(stderr, "self_update_mac_real_tampers: macBundleSignature %s with %s\n", api ? "passed" : "failed", t.what);
+        CHECK(cli == expect);
+        CHECK(api == expect && (expect ? error.empty() && id == "app.sculptforge.probe" : !error.empty()));
+    }
     fs::remove_all(dir, ec);
 }
 
@@ -996,8 +1046,9 @@ TEST(self_update_mac_real_install) {
     CHECK(checkPendingAtStart(s.note, "99.0.0", p, error) == StartCheck::Counting);
     CHECK(readPending(s.note, p) && rollback(p, s.note, error));
     CHECK(marker(s.install.target) == "old version" && s.applications() == std::vector<std::string>({"SculptForge.app"}));
-    // A bundle changed after signing is refused by the real codesign: the install leaves everything as it was.
-    writeAll(src / "SculptForge.app" / "Contents" / "Resources" / "marker.txt", "tampered");
+    // A bundle changed after signing (its executable, here) is refused by the real codesign: the install leaves
+    // everything as it was.
+    std::ofstream(src / "SculptForge.app" / "Contents" / "MacOS" / "sculptforge", std::ios::binary | std::ios::app) << "tampered";
     const fs::path bad = s.dir / "bad.dmg";
     CHECK(spawnTool({"/usr/bin/hdiutil", "create", "-quiet", "-srcfolder", src.string(), "-volname", "SculptForge", "-format",
                      "UDZO", bad.string()}) == 0);
