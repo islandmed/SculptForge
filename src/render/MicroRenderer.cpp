@@ -955,7 +955,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // slower CPU doesn't spend the frame the dabs or the orbit need on shading; the rest follows.
             shadeBudget = microShadeBudget(currentTierConfig(), mm.stroking, viewMoving, shadeNsPerPoint_, size_t(mm.samples) * 3);
             deferStale = mm.stroking;
-            keepPace = mm.stroking;
+            keepPace = mm.stroking && strokeShadeKeepsPace(currentTierConfig());
             // Undo, redo, a Move and a base moved by anything but a stroke show whole on this frame (#184; the same as
             // MicroFocus's shadeAll: a level without Focus Detail, Windows and macOS among them, caught up over frames).
             if (mm.shadeNow || mm.grabbing || (anyBase && !mm.stroking && !mm.strokeEnded)) shadeBudget = 0, deferStale = false;

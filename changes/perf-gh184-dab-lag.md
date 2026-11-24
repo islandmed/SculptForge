@@ -5,10 +5,14 @@ fixed: **The surface lagging a second or two behind the brush on a dense Micro l
   what it changed and the patches next to it.
 fixed: **A stroke on a Micro level showing only when released** (#184, thanks @HG4Science): on a level that isn't
   streamed (Micro 3 on a 2.6M base, for one), each frame shaded fewer patches than its dabs changed, and the surface behind
-  the brush kept its old shading until you let go. Every frame now shades what it changed, so the stroke shows as you draw.
+  the brush kept its old shading until you let go. On computers at the High or Extreme hardware tier every frame now shades
+  what it changed, so the stroke shows as you draw. On the Essential and Standard tiers that cost a fifth to a third of the
+  stroke's frame rate, so there the shading still follows the stroke and catches up when you release, with the smaller
+  per-dab shading above.
 testers:
-  - Linux or Windows, a 2M+ base at Micro 3: Clay brush, Bolt alpha, about 40 px, one long slow stroke without letting go.
-    The relief shows behind the brush while you draw, not only when you release.
+  - Linux or Windows on a High or Extreme tier computer (Preferences > Performance shows the tier), a 2M+ base at Micro 3: Clay brush,
+    Bolt alpha, about 40 px, one long slow stroke without letting go. The relief shows behind the brush while you draw,
+    not only when you release.
   - Linux, a 2M+ base at Micro 4: Standard brush, Bolt alpha, size about 90 px, one long stroke. The relief shows right behind
     the brush, not a second or two later.
   - Any OS, Micro 3: the same stroke, then orbit. No dark or flat patches at the stroke's edges.
@@ -33,3 +37,7 @@ view_stale on that scene 0.041 -> 0.0007; cost fps 44 -> 36, frame p50 22 -> 27 
 Focus Detail levels unchanged on purpose: their close view comes from pages (mid-stroke view_stale 0.00001 at Micro 4 there),
 and shading every changed coarse tile each frame cost a third of the fps on big strokes. Test: ui micro_stroke_shows_midstroke
 (squeezed budget, held live stroke: 0.647 without, 0.00007 with).
+Tier split (own commit): keepPace only on High and Extreme (TierConfig::strokeShadeKeepPace; SF_STROKE_KEEP_PACE=0|1 pins it).
+His Micro 3 flow (Clay + Bolt 39 px, 2.58M base, x3 interleaved, 30c50787 -> 206666d2): floor long fps 34 -> 26 (-24%),
+second 22 -> 14; standard long 43 -> 34 (-21%), second 27 -> 18 (-33%), frame p50 23 -> 29 ms, lag p50 58 -> 66 ms; peak RAM
+equal (1307-1318 vs 1308-1321 MB). Both over the 15% bar: off on Floor and Standard. Test: hw_tier_stroke_shading_keeps_pace_on_high_and_extreme.

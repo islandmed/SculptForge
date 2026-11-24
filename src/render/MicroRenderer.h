@@ -64,7 +64,8 @@ public:
     // Grid points of shading recomputed per sync at most (0 = no limit).
     size_t shadeBudget = size_t(3) << 20;
     // While a stroke runs: this sync's changed patches are shaded whatever the budget (#184: a frame's dab changed
-    // 20-35K patches at Micro 3, the budget took ~7K, and the stroke showed only once released).
+    // 20-35K patches at Micro 3, the budget took ~7K, and the stroke showed only once released). High and Extreme tiers
+    // (TierConfig::strokeShadeKeepPace).
     bool keepPace = false;
     // The view moves (set by the Renderer before sync: Fast Navigation's proxy frames): shading gets a time cap.
     bool viewMoving = false;
