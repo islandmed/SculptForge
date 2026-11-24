@@ -1,6 +1,6 @@
 # A monkey sequence (seed 4 on the Actions runner, 11-24) whose maybe_action ui.brush_gallery and ui.brush_lab left a floating
 # window over the model through the way out, so the final plain stroke went to the window: unlatch closes them now, and the
-# monkey's way out unlatches (the line added here; the rest as the runner wrote it, the monkey's own sequences shift with the
+# monkey's way out closes floating windows (close_floating, the line added here; the rest as the runner wrote it, the monkey's own sequences shift with the
 # registry). expect_sculpts also reads the window over the stroke where it starts, so a slow runner can't flip it.
 run ui_look look=classic layout=classic
 wait 0.3
@@ -56,7 +56,7 @@ maybe_action brush.capture_view
 release
 hold none
 key escape
-unlatch
+close_floating
 action brush.clay
 action tool.draw
 expect_latched none
