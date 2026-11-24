@@ -44,7 +44,7 @@ std::string vec3Text(const glm::vec3& v) {
 int polygonCorners(const Mesh& m, uint32_t t, uint32_t out[4]) {
     glm::uvec4 f;
     int n = m.exportFace(t, f);
-    if (n == 0) n = m.exportFace(m.quadPartnerAt(t), f);
+    if (n == 0 && m.quadPartnerAt(t) != Mesh::kNoQuad) n = m.exportFace(m.quadPartnerAt(t), f); // (the other half names the quad)
     for (int i = 0; i < n; ++i) out[i] = f[i];
     return n;
 }

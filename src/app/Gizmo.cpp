@@ -313,11 +313,10 @@ void App::updateGizmoPivot() {
     }
     if (gizmo_.pivotPlaced) return;
     AABB box;
-    for (int i : gizmoTargets()) {
+    for (int i : bySelection ? std::vector<int>{doc_.activePart} : gizmoTargets()) { // (the selection: the active Part only)
         const Mesh& m = doc_.partMesh(i);
         if (m.vertexCount() == 0) continue;
-        const AABB local = transformBounds(m, bySelection && i == doc_.activePart ? doc_.polySelection.weights(m)
-                                                                                 : transformWeights(m, gizmo_.useMask, 0.0f));
+        const AABB local = transformBounds(m, bySelection ? doc_.polySelection.weights(m) : transformWeights(m, gizmo_.useMask, 0.0f));
         const glm::mat4& t = doc_.parts[size_t(i)].transform; // (a linked copy's place in the scene)
         for (int c = 0; c < 8 && local.valid(); ++c)
             box.expand(glm::vec3(t * glm::vec4(c & 1 ? local.max.x : local.min.x, c & 2 ? local.max.y : local.min.y,
@@ -564,6 +563,11 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
         return true;
     }
 
+    // Polygon mode moves the selection and nothing else: with nothing selected a drag on a handle says so (PanelPolygon.cpp).
+    if (polyMode_ && !alt && doc_.polySelection.empty()) {
+        status_ = "Nothing selected: pick points, edges or faces first (click, Shift adds, drag a box), then move them";
+        return true;
+    }
     gizmo_.handle = h;
     gizmo_.pivotOnly = alt;
     gizmo_.startPivot = gizmo_.pivot;
