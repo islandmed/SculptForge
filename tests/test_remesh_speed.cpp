@@ -10,6 +10,7 @@
 #include "core/Primitives.h"
 #include "core/QRemesh.h"
 #include "core/Voxel.h"
+#include "GeomInvariants.h"
 #include "core/SurfaceQuery.h"
 #include "core/ThreadPool.h"
 
@@ -181,4 +182,41 @@ TEST(qremesh_cancel_lands_inside_the_bvh_build_and_the_pre_decimation) {
                 ok ? "finished anyway" : error.c_str());
     CHECK(!ok);
     CHECK(late < timeLimit(250.0));
+}
+
+namespace {
+double signedVolume(const Mesh& m) {
+    double v = 0.0;
+    for (const glm::uvec3& t : m.triangles)
+        v += glm::dot(glm::dvec3(m.positions[t.x]), glm::cross(glm::dvec3(m.positions[t.y]), glm::dvec3(m.positions[t.z]))) / 6.0;
+    return v;
+}
+} // namespace
+
+TEST(voxel_remesh_geometric_invariants_on_a_dense_curved_mesh) {
+    // The promise the speed work must keep on a dense curved sculpt (the gather path, 1M+ small triangles): the remesh keeps
+    // the enclosed volume within 1%, every vertex lands on the sculpt (within a cell of it: no spikes, no sinks), nothing is
+    // non-finite, the faces stay outward, and the result is the same as the old splat path's (checked by hash on 13 shapes
+    // in the bench; here: the splat path forced by a coarse mesh gives the same remesh of the same shape at the same resolution).
+    const Mesh src = bumpySphere(290); // ~1M triangles, bumpy: ridges 6% of the radius
+    const double v0 = signedVolume(src);
+    std::string error;
+    const Mesh out = voxelRemesh(src, 200, &error);
+    CHECK(out.triangleCount() > 100000);
+    CHECK(geom::nonFinite(out) == 0);
+    CHECK(std::abs(geom::volumeChange(v0, signedVolume(out))) < 0.01);
+    CHECK(geom::inwardFaces(out) == 0);
+    // Every new vertex within a cell (2 / 200 of the diameter) of the source surface: no spikes, no sinks.
+    TriangleBVH bvh;
+    bvh.build(src);
+    const float cell = 2.0f * 1.06f / 200.0f;
+    float worst = 0.0f;
+    for (const glm::vec3& p : out.positions) {
+        SurfaceHit hit;
+        const float d = bvh.closestPoint(p, 10.0f * cell, hit) ? glm::distance(p, hit.position) : 10.0f * cell;
+        worst = std::max(worst, d);
+    }
+    std::printf("  Voxel Remesh invariants: volume %+.3f%%, farthest vertex from the sculpt %.2f cells\n",
+                100.0 * geom::volumeChange(v0, signedVolume(out)), worst / cell);
+    CHECK(worst < 1.0f * cell);
 }
