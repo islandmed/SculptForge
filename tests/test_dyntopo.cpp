@@ -986,6 +986,79 @@ TEST(dyntopo_uv_invariants_on_a_curved_part_with_symmetry_and_undo) {
 }
 
 namespace {
+// Where a Part's charts are: every texel a UV triangle touches and two of 1024 around it (the padding painting leaves around a chart),
+// and the triangles that sample outside that (a centre or a corner a little inside: a white speck on the paint).
+constexpr int kGrid = 1024;
+std::vector<uint8_t> chartFootprint(const Mesh& m) {
+    std::vector<uint8_t> occupied(size_t(kGrid) * kGrid, 0);
+    for (uint32_t t = 0; t < m.triangleCount() && !m.uvs.empty(); ++t) {
+        const glm::vec2 a = m.uvs[size_t(t) * 3], e1 = m.uvs[size_t(t) * 3 + 1] - a, e2 = m.uvs[size_t(t) * 3 + 2] - a;
+        const int steps = std::max(8, int(std::max(glm::length(e1), glm::length(e2)) * float(kGrid)) + 1); // (a sample a pixel)
+        for (int i = 0; i <= steps; ++i)
+            for (int j = 0; i + j <= steps; ++j) {
+                const glm::vec2 q = a + e1 * (float(i) / float(steps)) + e2 * (float(j) / float(steps));
+                const int x = int(q.x * kGrid), y = int(q.y * kGrid);
+                for (int dy = -2; dy <= 2; ++dy)
+                    for (int dx = -2; dx <= 2; ++dx)
+                        if (x + dx >= 0 && x + dx < kGrid && y + dy >= 0 && y + dy < kGrid) occupied[size_t(y + dy) * kGrid + size_t(x + dx)] = 1;
+            }
+    }
+    return occupied;
+}
+size_t strayTriangles(const Mesh& m, const std::vector<uint8_t>& occupied) {
+    size_t stray = 0;
+    for (uint32_t t = 0; t < m.triangleCount() && !m.uvs.empty(); ++t) {
+        const glm::vec2 c = (m.uvs[size_t(t) * 3] + m.uvs[size_t(t) * 3 + 1] + m.uvs[size_t(t) * 3 + 2]) / 3.0f;
+        bool out = false;
+        for (int k = 0; k < 4 && !out; ++k) { // (the centre and each corner, a little inside)
+            const glm::vec2 q = k == 3 ? c : c + (m.uvs[size_t(t) * 3 + size_t(k)] - c) * 0.9f;
+            const int x = int(q.x * kGrid), y = int(q.y * kGrid);
+            out = x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)];
+        }
+        stray += out ? 1 : 0;
+    }
+    return stray;
+}
+} // namespace
+
+// A strip whose chart is bent into an arc: a long triangle across the strip's middle crosses the hollow the arc encloses, where
+// there is no paint. Coarse dabs collapse the strip's triangles into longer ones; none may end up across the hollow or turned over.
+TEST(dyntopo_uv_invariants_a_bent_chart_is_not_bridged_by_big_triangles) {
+    Document d = makeDoc(makePlane(24, 2.0f));
+    d.sculptor.dyntopo.enabled = true;
+    d.sculptor.dyntopo.detail = 0.0f;
+    Mesh& m = d.mesh;
+    m.uvs.resize(m.triangleCount() * 3);
+    for (uint32_t t = 0; t < m.triangleCount(); ++t)
+        for (int c = 0; c < 3; ++c) {
+            const glm::vec3 p = m.positions[m.triangles[t][c]]; // (x along the arc, z across it)
+            const float angle = (0.15f + 1.7f * (p.x + 1.0f) * 0.5f) * 3.14159265f, radius = 0.30f + 0.10f * (p.z + 1.0f) * 0.5f;
+            m.uvs[size_t(t) * 3 + size_t(c)] = glm::vec2(0.5f + radius * std::cos(angle), 0.5f + radius * std::sin(angle));
+        }
+    m.rebuildTopology();
+    d.bvh.build(m);
+    const std::vector<uint8_t> footprint = chartFootprint(m);
+    CHECK(strayTriangles(m, footprint) == 0);
+    auto turn = [&](uint32_t t) { // (the sign of the triangle's area in UV space)
+        const glm::vec2 e1 = m.uvs[size_t(t) * 3 + 1] - m.uvs[size_t(t) * 3], e2 = m.uvs[size_t(t) * 3 + 2] - m.uvs[size_t(t) * 3];
+        return e1.x * e2.y - e1.y * e2.x;
+    };
+    const float side = turn(0) > 0.0f ? 1.0f : -1.0f;
+    const size_t before = m.triangleCount();
+    for (int s = 0; s < 4; ++s) {
+        CHECK(d.sculptor.beginStroke(m, "Standard"));
+        for (int i = 0; i < 12; ++i) flatDab(d, 0.15f * float(i) - 0.85f + 0.04f * float(s), 0.2f * float(s) - 0.3f, 0.7f);
+        d.undo.push(d.sculptor.endStroke());
+    }
+    CHECK(invalid(m, false, 1).empty());
+    CHECK(m.triangleCount() < before * 3 / 4); // (it did simplify)
+    CHECK(strayTriangles(m, footprint) <= 4); // (a few of ~230 at the chart's thin ends; 115 of 161 before the fix)
+    size_t turned = 0;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) turned += turn(t) * side <= 0.0f ? 1 : 0;
+    CHECK(turned == 0);
+}
+
+namespace {
 // Edges whose two triangles face away from each other (a fold-over).
 size_t foldedEdges(const Mesh& m) {
     std::map<std::pair<uint32_t, uint32_t>, std::vector<glm::vec3>> e;
@@ -1019,38 +1092,8 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
         const AABB b = m.bounds();
         const glm::vec3 lo = b.min, hi = b.max, ext = hi - lo;
         const float diag = glm::length(ext);
-        // Where the charts are (every texel a UV triangle touches, and a few around it): a triangle's UVs must stay in there.
-        constexpr int kGrid = 1024;
-        std::vector<uint8_t> occupied(size_t(kGrid) * kGrid, 0);
-        auto mark = [&](const Mesh& mesh) {
-            for (uint32_t t = 0; t < mesh.triangleCount() && painted; ++t) {
-                const glm::vec2 a = mesh.uvs[size_t(t) * 3], e1 = mesh.uvs[size_t(t) * 3 + 1] - a, e2 = mesh.uvs[size_t(t) * 3 + 2] - a;
-                const int steps = std::max(8, int(std::max(glm::length(e1), glm::length(e2)) * float(kGrid)) + 1); // (a sample a pixel)
-                for (int i = 0; i <= steps; ++i)
-                    for (int j = 0; i + j <= steps; ++j) {
-                        const glm::vec2 q = a + e1 * (float(i) / float(steps)) + e2 * (float(j) / float(steps));
-                        const int x = int(q.x * kGrid), y = int(q.y * kGrid);
-                        for (int dy = -2; dy <= 2; ++dy) // (the padding painting leaves around a chart: 4 texels of 2048)
-                            for (int dx = -2; dx <= 2; ++dx)
-                                if (x + dx >= 0 && x + dx < kGrid && y + dy >= 0 && y + dy < kGrid) occupied[size_t(y + dy) * kGrid + size_t(x + dx)] = 1;
-                    }
-            }
-        };
-        mark(m);
-        auto countStray = [&]() {
-            size_t stray = 0;
-            for (uint32_t t = 0; t < m.triangleCount(); ++t) {
-                const glm::vec2 c = (m.uvs[size_t(t) * 3] + m.uvs[size_t(t) * 3 + 1] + m.uvs[size_t(t) * 3 + 2]) / 3.0f;
-                bool out = false;
-                for (int k = 0; k < 4 && !out; ++k) { // (the centre and each corner, a little inside)
-                    const glm::vec2 q = k == 3 ? c : c + (m.uvs[size_t(t) * 3 + size_t(k)] - c) * 0.9f;
-                    const int x = int(q.x * kGrid), y = int(q.y * kGrid);
-                    out = x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)];
-                }
-                stray += out ? 1 : 0;
-            }
-            return stray;
-        };
+        const std::vector<uint8_t> occupied = chartFootprint(m); // (where the charts are: a triangle's UVs must stay in there)
+        auto countStray = [&]() { return strayTriangles(m, occupied); };
         if (painted) CHECK(countStray() == 0);
         struct Stroke {
             BrushType type;

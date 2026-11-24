@@ -985,6 +985,10 @@ if(SCULPTFORGE_BUILD_TESTS)
   add_test(NAME sculptforge_tests_nightly_voxel COMMAND sculptforge_tests --nightly voxel remesh)
   set_tests_properties(sculptforge_tests_nightly_voxel PROPERTIES LABELS nightly_area TIMEOUT 900
                        ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
+  # The Dynamic topology nightlies alone (a painted Part's UVs: its strays only show in the nightly, 0.13.14).
+  add_test(NAME sculptforge_tests_nightly_dyntopo COMMAND sculptforge_tests --nightly dyntopo)
+  set_tests_properties(sculptforge_tests_nightly_dyntopo PROPERTIES LABELS nightly_area TIMEOUT 900
+                       ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly)
   # Opt-in benches: own entry, labels bench + nightly (T0, CI and the shards never run them), hard timeout.
   # SF_FIGURE_POSE_MTRIS=2,20,50 selects the sizes (tests/test_figure_pose.cpp); without it the entry does nothing.
