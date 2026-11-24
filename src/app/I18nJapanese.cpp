@@ -5242,6 +5242,8 @@ constexpr Entry kJapanese[] = {
      "UVなし: 自動UVで作成します"},
     {"This graphics chip cannot show the texture on a model this dense. Painting still goes into the texture (see it in the UV view or export it); lower the triangle count to see it on the model.",
      "このグラフィックスチップでは、これほど高密度なモデルにテクスチャを表示できません。ペイントはテクスチャに描き込まれます（UVビューで確認、または書き出し）。モデル上で見るには三角形数を減らしてください。"},
+    {"This graphics chip rejected drawing the texture on the model. Painting still goes into the texture (see it in the UV view or export it). Help > Copy log to clipboard shows what failed.",
+     "このグラフィックスチップはモデル上のテクスチャ描画を受け付けませんでした。ペイントはテクスチャに描き込まれます（UVビューで確認、または書き出し）。失敗した内容は「ヘルプ > ログをクリップボードにコピー」で確認できます。"},
     {"No UVs: Tool > Texture Image > Auto UV",
      "UVなし: ツール > テクスチャ画像 > 自動UV"},
     {"No alpha matches \"%s\"",
