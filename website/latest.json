@@ -1,18 +1,17 @@
 {
-  "version": "0.13.13",
+  "version": "0.13.14",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Contact facing keeps your brush off the far wall of a slot or the other side of a fold",
-    "Engrave and Crease Line keep smooth walls when one stroke runs up and down the same line",
-    "Dense Micro levels show Undo, Redo and Move at once, with fewer pauses as strokes start and end",
-    "Shift with the Paint brush smooths every channel you paint, across UV seams too",
-    "Texture painting works on more Android phones and tablets"
+    "Scatter covers a Part or its masked area with copies, and Keep apart stops them overlapping",
+    "Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth",
+    "Fill layer mask sliders keep the value you drag to"
   ],
   "support": {
     "founding": {
       "taken": 17,
       "limit": 100
-    }
+    },
+    "member_requests_this_release": 1
   }
 }
