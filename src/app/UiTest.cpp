@@ -1612,6 +1612,15 @@ double Demo::query(const std::string& name, bool& known) const {
     // Draw > Camera > Gizmo size and View Figure: the axes' length in unscaled px (34 at Medium), the figure shown.
     if (name == "axis_gizmo_length") return double(34.0f * app_.axisGizmoUnit() / std::max(app_.uiScale_, 0.01f));
     if (name == "view_figure") return app_.uiPrefs_.showViewFigure ? 1.0 : 0.0;
+    // Draw > Camera > Corner gizmo (CornerGizmo.cpp): the widget shows (the preference, else by layout); what the corner
+    // shows (0 hidden, 1 the axes, 2 the orientation widget); which corner and where the disc is; the dot under the
+    // pointer; an eased camera turn running.
+    if (name == "orientation_widget") return app_.uiPrefs_.showAxes && app_.orientationWidgetOn() ? 1.0 : 0.0;
+    if (name == "corner_gizmo") return !app_.uiPrefs_.showAxes ? 0.0 : app_.orientationWidgetOn() ? 2.0 : 1.0;
+    if (name == "corner_position") return double(app_.uiPrefs_.cornerPosition);
+    if (name == "axis_gizmo_x") return double(app_.axisGizmoCentre().x);
+    if (name == "nav_hover_end") return double(app_.orientationWidgetHover(mouse_.x, mouse_.y)); // the dot under the pointer, -1 none
+    if (name == "camera_moving") return app_.cameraMoving() ? 1.0 : 0.0;
     // The side view the axis gizmo names under it (0-5: +X +Y +Z -X -Y -Z, as axis_click), -1 between views.
     if (name == "axis_view") return double(axisGizmoAligned(app_.axisGizmoLayout()));
     // The model's projected bounding box against the free area framing fits it into (App::freeCanvasArea: the canvas
@@ -2614,7 +2623,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         break;
     }
     case StepVerb::AxisClick: {
-        // axis_click +x|-x|+y|-y|+z|-z: click that end of the axis gizmo (Draw > Camera > Axes, #43)
+        // axis_click +x|-x|+y|-y|+z|-z [double] [nowait]: click that end of the axis gizmo (Draw > Camera > Axes, #43), or
+        // of the orientation widget; "double": a double-click (the second press as SDL counts it). The widget turns with
+        // a 0.35 s eased move: the step settles until it ends (so the next line sees the view), "nowait" leaves it running.
         if (!need(1)) return false;
         static const char* const names[6] = {"+x", "+y", "+z", "-x", "-y", "-z"};
         const auto found = std::find_if(std::begin(names), std::end(names), [&](const char* n) { return w[1] == n; });
@@ -2629,7 +2640,26 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             *at = ImVec2(e.at.x, e.at.y);
         });
         stroke([at](float) { return *at; }, 0.2f);
+        const bool twice = std::find(w.begin() + 2, w.end(), "double") != w.end();
+        const bool nowait = std::find(w.begin() + 2, w.end(), "nowait") != w.end();
+        if (twice)
+            steps_.push_back([this](float) {
+                SDL_Event e{};
+                e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+                e.button.windowID = SDL_GetWindowID(app_.window_);
+                e.button.button = SDL_BUTTON_LEFT;
+                e.button.down = true;
+                e.button.clicks = 2;
+                e.button.x = mouse_.x;
+                e.button.y = mouse_.y;
+                app_.handleEvent(e);
+                e.type = SDL_EVENT_MOUSE_BUTTON_UP;
+                e.button.down = false;
+                app_.handleEvent(e);
+                return true;
+            });
         run([this] { SDL_SetModState(held_); });
+        if (!nowait) steps_.push_back([this](float t) { return !app_.cameraMoving() || t > 2.0f; }); // (the eased turn settles)
         wait(0.1f);
         break;
     }

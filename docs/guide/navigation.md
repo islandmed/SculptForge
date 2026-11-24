@@ -52,6 +52,15 @@ the axes.
 
 Drag on the disc between the ends to orbit.
 
+**Orientation widget** (**Sculpt > Draw & Tablet > Camera > Corner gizmo > Orientation**, the SculptForge layout's default):
+the same axes through a ball of dark glass, a dot at each end and no letters. Click a dot to look from that side
+(orthographic, like the numpad views; the dot facing you again shows the opposite side): the camera glides there in a
+short eased move (none with **Edit > Preferences > Interface > Reduce motion**). The dot under the pointer lights up in
+the accent and its side is named under the disc. Drag the ball or the disc to orbit; double-click a dot to frame the
+model. **Corner gizmo** picks the widget, the X / Y / Z axes (the Classic layout's default) or **Hidden**, and
+**Position** puts the corner gizmo (and the View Figure) at the top left or the top right; both choices are kept in
+the preferences.
+
 **Sculpt > Draw & Tablet > Camera > Gizmo size** makes the axes **Small**, **Medium** (the default) or **Large**; they grow with the
 UI scale too, and clicking an end works at every size. **View Figure** (beside **Axes**, off until you turn it on)
 adds a small shaded head in the corner that turns with the camera, so you can tell front from back at a glance.
@@ -78,7 +87,7 @@ camera.
 | Zoom | Mouse wheel (toward the middle of the view, or toward the pointer with **Edit > Preferences > Input > Wheel zooms toward the pointer**, on in the Maya style); <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; <kbd>Ctrl</kbd>+left-drag on the background when nothing is masked (not with the Classic sculpting keys) |
 | Frame the model | <kbd>F</kbd> (Blender style: <kbd>Home</kbd>), or **Frame** on the right shelf. Classic sculpting keys, several Parts: <kbd>F</kbd> frames the active Part, <kbd>F</kbd> twice quickly frames the whole scene (**Frame scene** can take a key of its own) |
 | Front, right, top view | <kbd>Numpad 1</kbd>, <kbd>Numpad 3</kbd>, <kbd>Numpad 7</kbd>; <kbd>Ctrl</kbd> for the back, left and bottom |
-| Front, side, top or bottom view with the mouse | Click an end of the axis gizmo in the canvas corner |
+| Front, side, top or bottom view with the mouse | Click an end of the axis gizmo in the canvas corner, or a dot of the orientation widget (it glides there) |
 | Orthographic on or off | <kbd>Numpad 5</kbd> |
 | Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
 | Frame the active Part | <kbd>Numpad .</kbd> (Maya style: also <kbd>Alt</kbd>+<kbd>F</kbd>) |

@@ -616,6 +616,24 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Back view", "后视图"},
     {"Left view", "左视图"},
     {"Right view", "右视图"},
+    // The orientation widget's sides (Draw > Camera > Corner gizmo; Top, Bottom, Front and Rear have entries elsewhere)
+    {"Right", "右"},
+    {"Left", "左"},
+    {"Corner gizmo", "角落操纵器"},
+    {"Orientation", "方向"},
+    {"Corner gizmo: the X / Y / Z axes in the corner of the canvas. Click an end to look from that side, drag the disc "
+     "to orbit.",
+     "角落操纵器：画布角落的 X／Y／Z 轴。点击一端从该侧观看，拖动圆盘旋转视图。"},
+    {"Corner gizmo: the orientation widget, the axes through a glass ball with a dot at each end. Click a dot to look from "
+     "that side with a short move (the dot facing you again: the opposite side), drag it to orbit, double-click to frame "
+     "the model.",
+     "角落操纵器：方向小部件，穿过一个圆球的坐标轴，每端一个圆点。点击圆点以短暂的动画从该侧观看（再点一次正对着你的圆点：对面）；拖动可旋转视图，双击可框选模型。"},
+    {"Position", "位置"},
+    {"Top left", "左上"},
+    {"Top right", "右上"},
+    {"Position: the corner gizmo and the View Figure at the top left of the canvas.", "位置：角落操纵器和视图人像位于画布左上角。"},
+    {"Position: the corner gizmo and the View Figure at the top right of the canvas.", "位置：角落操纵器和视图人像位于画布右上角。"},
+    {"Corner gizmo: nothing in the corner of the canvas.", "角落操纵器：画布角落不显示任何内容。"},
     {"Top view", "顶视图"},
     {"Bottom view", "底视图"},
     {"Opposite side", "相反侧"},

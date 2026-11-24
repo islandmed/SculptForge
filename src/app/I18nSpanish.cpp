@@ -715,6 +715,29 @@ constexpr Entry kSpanish[] = {
     {"Back view", "Vista trasera"},
     {"Left view", "Vista izquierda"},
     {"Right view", "Vista derecha"},
+    // The orientation widget's sides (Draw > Camera > Corner gizmo; Top, Bottom, Front and Rear have entries elsewhere)
+    {"Right", "Derecha"},
+    {"Left", "Izquierda"},
+    {"Corner gizmo", "Gizmo de la esquina"},
+    {"Orientation", "Orientación"},
+    {"Corner gizmo: the X / Y / Z axes in the corner of the canvas. Click an end to look from that side, drag the disc "
+     "to orbit.",
+     "Gizmo de la esquina: los ejes X / Y / Z en la esquina del lienzo. Haz clic en un extremo para mirar desde ese "
+     "lado, arrastra el disco para orbitar."},
+    {"Corner gizmo: the orientation widget, the axes through a glass ball with a dot at each end. Click a dot to look from "
+     "that side with a short move (the dot facing you again: the opposite side), drag it to orbit, double-click to frame "
+     "the model.",
+     "Gizmo de la esquina: el widget de orientación, los ejes a través de una bola de cristal con un punto en cada "
+     "extremo. Haz clic en un punto para mirar desde ese lado con un movimiento corto (el punto que te mira, otra vez: el "
+     "lado opuesto), arrástralo para orbitar, doble clic para encuadrar el modelo."},
+    {"Position", "Posición"},
+    {"Top left", "Arriba a la izquierda"},
+    {"Top right", "Arriba a la derecha"},
+    {"Position: the corner gizmo and the View Figure at the top left of the canvas.",
+     "Posición: el gizmo de la esquina y la Figura de vista arriba a la izquierda del lienzo."},
+    {"Position: the corner gizmo and the View Figure at the top right of the canvas.",
+     "Posición: el gizmo de la esquina y la Figura de vista arriba a la derecha del lienzo."},
+    {"Corner gizmo: nothing in the corner of the canvas.", "Gizmo de la esquina: nada en la esquina del lienzo."},
     {"Top view", "Vista superior"},
     {"Bottom view", "Vista inferior"},
     {"Opposite side", "Lado opuesto"},
