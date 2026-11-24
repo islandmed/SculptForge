@@ -61,6 +61,6 @@ run stencil_set x=1.8 y=1.8 size=0.2
 snapshot
 stroke 0.3 0.5 0.7 0.5
 expect_value moved == 0
-expect_status A Stencil is on
+expect_status Stencil on: only its light parts (X removes it)
 run stencil_set visible=false
 expect_sculpts
