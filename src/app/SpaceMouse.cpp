@@ -562,7 +562,7 @@ void App::drawSpaceMouseSection() {
     if (spaceMouseLog_.is_open()) {
         ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextUnformatted(spaceMouseLogPath_.c_str());
+        ImGui::TextUnformatted(tr("spacemouse-log.txt")); // (the name only: a full path may hold the account name in a screenshot)
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
     }
