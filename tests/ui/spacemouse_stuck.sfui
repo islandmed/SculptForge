@@ -49,5 +49,7 @@ click "Log device reports##spacemouse.log"
 wait 0.3
 expect_text "spacemouse-log.txt"
 shot spacemouse_log
+click "Copy log##spacemouse.log_copy"
+expect_clipboard release timeout on
 click "Log device reports##spacemouse.log"
 wait 0.3

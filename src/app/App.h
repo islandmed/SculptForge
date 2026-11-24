@@ -3540,6 +3540,7 @@ private:
     std::vector<SDL_hid_device*> spaceMouseHid_;
     void spaceMouseLogUpdate(bool latched);       // once a frame while logging: axes that changed, HID reports
     void spaceMouseLogStop();
+    std::string spaceMouseLogExcerpt(); // "Copy log": the head and the tail of the log file
     void spaceMouseLogLine(const std::string& text);
     // ---- end SpaceMouse ----
     // ---- Touch (Touch.cpp, core/TouchGesture.h, docs/guide/navigation.md) ----

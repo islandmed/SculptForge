@@ -4,4 +4,4 @@ For owners of a 3Dconnexion SpaceMouse, older models (SpaceExplorer, SpaceNaviga
 - Hold a steady push for 5 to 10 seconds, as still as you can: the view must keep moving the whole time. If it stops mid-push, switch off **Stop when the cap stops reporting** and tell us your model.
 - Push one way, then the other: the view reverses straight away, it does not just slow down.
 - With 3DxWare running, and again with it quit: the same.
-- If anything is odd: switch on **Log device reports**, repeat it for ten seconds, switch it off, and send us `spacemouse-log.txt` from the folder shown under the switch (device name, ids and the raw reports; nothing else).
+- If anything is odd: switch on **Log device reports**, repeat it for ten seconds, switch it off, click **Copy log** and paste the lines to us (device name, ids and the raw reports; nothing else).

@@ -237,10 +237,11 @@ every joystick SculptForge sees on the clipboard, with its USB ids and why it wa
 your issue.
 
 If the view drifts after you let go, or stops while you push, switch on **Log device reports** in the same place,
-repeat it for ten seconds and switch it off. SculptForge writes what the device sends (axis values, events and the raw
+repeat it for ten seconds and switch it off. SculptForge writes what the device sends (axis values and the raw
 HID reports with their report ids, with times) to `spacemouse-log.txt` in the user data folder, which the section
-shows. Attach it to the issue. The file stays on your computer until you send it; it is off again after a restart
-(or set `SF_SPACEMOUSE_LOG=1` to log from the start).
+shows. Click **Copy log** and paste the lines into your issue (the start and the end of the log, short enough for a
+chat message). The file stays on your computer until you send something; it is off again after a restart (or set
+`SF_SPACEMOUSE_LOG=1` to log from the start).
 
 SculptForge recognises 3Dconnexion devices by their USB ids: everything under 3Dconnexion's own vendor id
 (SpaceMouse Compact, Wireless, Pro, Enterprise, Module, the Universal Receiver) except the CadMouse and the

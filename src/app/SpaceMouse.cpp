@@ -153,13 +153,8 @@ void App::spaceMouseEvent(const SDL_Event& e) {
         if (a && a->run && (!a->enabled || a->enabled())) a->run();
         break;
     }
-    case SDL_EVENT_JOYSTICK_AXIS_MOTION:
-        // (axis motion is read once a frame, updateSpaceMouse; the event only wakes the loop, and goes in the log)
-        if (spaceMouseLog_.is_open() && spaceMouse_ && e.jaxis.which == spaceMouseId_)
-            spaceMouseLogLine("event axis " + std::to_string(int(e.jaxis.axis)) + " = " + std::to_string(int(e.jaxis.value)));
-        break;
     default:
-        break;
+        break; // axis motion is read once a frame (updateSpaceMouse); the event only wakes the loop
     }
 }
 
@@ -230,6 +225,24 @@ void App::updateSpaceMouse(float dt) {
 // The local device log (spacemouse-log.txt): for a reporter whose SpaceMouse misbehaves, to attach to the issue.
 // ---------------------------------------------------------------------------
 
+// What "Copy log" puts on the clipboard: the first lines (version, device, columns) and the end of the log, short enough
+// to paste into a chat message (the end is where letting go of the cap shows).
+std::string App::spaceMouseLogExcerpt() {
+    if (spaceMouseLog_.is_open()) spaceMouseLog_.flush();
+    std::ifstream in(std::filesystem::path(std::u8string(spaceMouseLogPath_.begin(), spaceMouseLogPath_.end())));
+    std::vector<std::string> lines;
+    for (std::string l; std::getline(in, l);) lines.push_back(l);
+    constexpr size_t kHead = 4, kChars = 1800;
+    std::string head, tail;
+    for (size_t i = 0; i < lines.size() && i < kHead; ++i) head += lines[i] + "\n";
+    size_t first = lines.size();
+    while (first > kHead && head.size() + tail.size() + lines[first - 1].size() + 1 <= kChars) {
+        --first;
+        tail = lines[first] + "\n" + tail;
+    }
+    return head + (first > kHead ? "...\n" : "") + tail;
+}
+
 void App::spaceMouseLogLine(const std::string& text) {
     if (!spaceMouseLog_.is_open()) return;
     const double ms = double(SDL_GetTicksNS() - spaceMouseLogStartNs_) * 1e-6;
@@ -274,8 +287,7 @@ void App::spaceMouseLogUpdate(bool latched) {
                       spaceMouseName_.c_str(), SDL_GetJoystickVendor(spaceMouse_), SDL_GetJoystickProduct(spaceMouse_),
                       spaceMouseButtonCount_, s.speed, s.deadZone, s.releaseTimeout ? "on" : "off");
         spaceMouseLogLine(head);
-        spaceMouseLogLine("columns: time ms since the log began; 'axes' = SDL's six values (x y z rx ry rz), only when one "
-                          "changed; 'event' = SDL's axis event; 'hid' = a raw report: id byte first, then its bytes");
+        spaceMouseLogLine("ms since start; axes = SDL's six values (x y z rx ry rz) when one changed; hid = raw report (id first)");
         // The raw reports, read next to SDL (a second, read-only handle; the driver and SDL keep working).
         if (SDL_hid_device_info* list = SDL_hid_enumerate(SDL_GetJoystickVendor(spaceMouse_), SDL_GetJoystickProduct(spaceMouse_))) {
             for (SDL_hid_device_info* d = list; d && spaceMouseHid_.size() < 6; d = d->next) {
@@ -549,6 +561,12 @@ void App::drawSpaceMouseSection() {
         ImGui::TextUnformatted(spaceMouseLogPath_.c_str());
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
+    }
+    if (!spaceMouseLogPath_.empty()) {
+        if (ImGui::SmallButton(tr(ICON_LC_COPY "  Copy log##spacemouse.log_copy"))) SDL_SetClipboardText(spaceMouseLogExcerpt().c_str());
+        ui::HelpText("Copy log", nullptr,
+                     "Copies the start and the end of the log, short enough for a chat message, to paste into a bug report.",
+                     path);
     }
 
     // Buttons: as many rows as the device has (at least the two side buttons), up to kSpaceMouseButtonSlots.
