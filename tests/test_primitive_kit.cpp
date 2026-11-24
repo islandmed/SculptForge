@@ -369,7 +369,6 @@ TEST(primitive_kit_append_settings_and_freshness) {
     CHECK(glm::distance(doc.mesh.bounds().center(), before) < 1e-3f);
     CHECK(reg.execute(doc, "part_primitive", {{"segments", 8.0}}).ok);
     CHECK(glm::distance(doc.mesh.bounds().center(), before) < 1e-3f);
-    CHECK(reg.execute(doc, "redo", {}).ok == false || true); // (redo after a new step: nothing to redo, either answer is fine)
     // Settings on Append itself, and an unknown type.
     CHECK(reg.execute(doc, "part_append", {{"type", std::string("torus")}, {"segments", 8.0}, {"rings", 4.0}}).ok);
     CHECK(doc.mesh.quadCount() == 32);
