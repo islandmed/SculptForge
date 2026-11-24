@@ -16,3 +16,7 @@ stroke's mean coarse-shading queue goes from 93.6K to 11.3K tiles, fps 22.9 -> 2
 Tests: micro_alpha_dab_marks_only_what_changed (fails without the fill), ui micro_alpha_stroke_shading (view_stale 0 after
 the stroke drains, at Micro 3 and 4, with and without Focus Detail). SF_STROKE_LOG adds one "micro dab:" line per dab:
 triangles changed of those in reach, the stride, and find / plane / kernel / stitch ms.
+Widen sweep (own commit): without Focus Detail, a range widen re-sent the heights and kept the shading, a step's rounding
+off (±2/255 on a few pixels, until those patches were next shaded). MicroRenderer now sweeps every patch's shading
+afterwards, as MicroFocus does: within the rest budget, only once nothing else waits and no stroke runs; pendingShading()
+counts it, so the app keeps drawing until it is done and then rests. Test: ui micro_widen_sweep.

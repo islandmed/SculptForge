@@ -54,7 +54,7 @@ public:
     size_t gpuBytes() const;
     bool closed() const { return closed_; }
     // Grid points whose shading still waits for a frame (budget), for tests and the benchmark.
-    size_t pendingShading() const { return pendingCount_ + staleCount_; }
+    size_t pendingShading() const { return pendingCount_ + staleCount_ + (sweepEnd_ - sweepNext_); }
     // Base triangles whose coarse shading waits for a frame's budget (MicroFocus: a stroke's changed tiles, a few frames' work).
     size_t pendingCoarse() const { return focus_ ? focus_->pendingCoarse() : 0; }
     // Strokes' range widens shown a frame late (sync), for tests.
@@ -106,6 +106,7 @@ private:
     void uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slots, bool all);
     void shadePending(const Mesh& mesh, bool all);
     size_t shadeSeeds(const Mesh& mesh, std::span<const uint32_t> seeds, std::vector<uint32_t>* outer);
+    void sweepShading(const Mesh& mesh, bool viewMoving);
 
     uint64_t serial_ = 0;
     uint32_t baseTriangles_ = 0, baseVertices_ = 0;
@@ -148,6 +149,10 @@ private:
     std::vector<uint32_t> outer_;
     double shadeNsPerPoint_ = 0.0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
     size_t pendingCount_ = 0;
+    // Without Focus Detail, after a range widen (MicroMesh::rescaled: the heights re-sent, the shading kept, a step's
+    // rounding off): every patch's shading again, base triangles sweepNext_ .. sweepEnd_ still to go, within the rest
+    // budget once nothing else waits and no stroke runs (MicroFocus's sweep, for Windows and macOS).
+    uint32_t sweepNext_ = 0, sweepEnd_ = 0;
     std::vector<uint32_t> scratch_, written_, stageIndex_;
     std::vector<uint8_t> clusterSeen_;
     std::vector<uint64_t> slotBits_, baseBits_;

@@ -1,0 +1,36 @@
+# gh#184: a stroke that widens a Micro level's height range re-sends the heights and keeps the shading (a step's
+# rounding off, MicroMesh::widen). Focus Detail re-shades every tile afterwards at rest; a level without it (the only
+# path Windows and macOS have) now does the same: a sweep within the rest budget once nothing else waits, the app
+# drawing until it is done (no pointer, no focus), the view then the same as the mesh sent up whole and shaded again,
+# and then the app rests. (SF_SHADE_BUDGET_POINTS makes the sweep outlast the frames after the last input; cold:
+# env is set here.)
+run ui_look look=classic layout=classic
+env SF_FOCUS_DETAIL 0
+run new_sphere subdivisions=6
+run micro_divide level=4
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+remember micro_step before
+
+click "Standard##brush.standard"
+run brush_set_alpha name=Bolt
+brush_size 120
+env SF_SHADE_BUDGET_POINTS 2000
+stroke 0.35 0.45 0.65 0.55 1.0
+stroke 0.35 0.55 0.65 0.45 1.0
+expect_value micro_step > $before
+window_focus 0
+mouse_leave
+# (past the frames any input keeps drawing: 0.75 s)
+wait_real 1.5
+expect_value micro_pending_shading > 0
+expect_value wants_frames == 1
+env SF_SHADE_BUDGET_POINTS 0
+wait_value micro_pending_shading == 0 120 # (real time: llvmpipe takes far longer than this computer)
+print view_stale
+expect_value view_stale < 0.00001
+wait_real 1.5
+expect_value wants_frames == 0
+window_focus 1
