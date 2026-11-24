@@ -137,6 +137,9 @@
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
 //                            volume with its open borders capped),
+//                            poly_mode (Tool > Polygon on), poly_element (0 Points, 1 Edges, 2 Faces), poly_selected / poly_total
+//                            (of that kind), poly_shown (drawn facing the camera), poly_hovered (the element under the cursor, -1 none),
+//                            poly_ops (operations in the registry), poly_preview (1 while an op's live preview is drawn),
 //                            edited_parts (Parts with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
@@ -438,6 +441,7 @@
 #include "core/ListSort.h"
 #include "core/Micro.h"
 #include "core/LitSphere.h"
+#include "core/PolyOps.h"
 #include "core/Multires.h"
 #include "core/MicroTiles.h"
 #include "core/PerfTrace.h"
@@ -841,6 +845,19 @@ double Demo::query(const std::string& name, bool& known) const {
         for (uint8_t v : app_.edgeOverlay_.visible) n += v;
         return double(n);
     }
+    // Polygon mode (Tool > Polygon, PanelPolygon.cpp, core/PolyMode.h)
+    if (name == "poly_mode") return app_.polyMode_ ? 1.0 : 0.0;
+    if (name == "poly_element") return double(int(app_.doc_.polySelection.element)); // 0 Points, 1 Edges, 2 Faces
+    if (name == "poly_selected") return double(app_.doc_.polySelection.count());
+    if (name == "poly_total") return app_.doc_.polySelection.topo ? double(app_.doc_.polySelection.total(m)) : 0.0;
+    if (name == "poly_shown") {
+        size_t n = 0;
+        for (uint8_t v : app_.polyOverlay_.visible) n += v;
+        return double(n);
+    }
+    if (name == "poly_hovered") return app_.polyOverlay_.hovered == ~0u ? -1.0 : double(app_.polyOverlay_.hovered);
+    if (name == "poly_ops") return double(PolyOpRegistry::instance().all().size());
+    if (name == "poly_preview") return app_.polyOverlay_.previewOk ? 1.0 : 0.0;
     if (name == "forgespheres") return double(m.forgespheres.size());
     if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
     if (name == "tube_points") return double(m.tube.points.size()); // the active Tube Part's (Tube, PanelTube.cpp)

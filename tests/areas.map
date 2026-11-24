@@ -71,6 +71,7 @@ ui_job_keeps_part           mesh
 ui_forge*                   mesh
 ui_geometry_groups*         mesh
 ui_edge_select*             mesh
+ui_polygon_mode*            mesh
 ui_levels_rebuild           mesh
 ui_layers_levels            mesh
 ui_multires                 mesh
@@ -261,6 +262,7 @@ test_decimate_valence       mesh
 test_divide_valence         mesh
 test_dyntopo                mesh
 test_edge_*                 mesh
+test_poly_*                 mesh
 test_extract_mirror         mesh
 test_face*                  mesh
 test_figure_pose            mesh
@@ -415,6 +417,8 @@ src/core/ForgeSpheres*             mesh
 src/core/FigurePose*               mesh
 src/core/ExtractMirror*            mesh
 src/core/EdgeSelect*               mesh
+src/core/Poly*                     mesh
+src/app/PanelPolygon*              mesh
 src/core/Primitives*               mesh
 src/core/Sculptable*               mesh
 src/core/SelectionSets*            mesh

@@ -157,6 +157,8 @@ add_library(sculptforge_core STATIC
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
   src/core/EdgeSelect.cpp
+  src/core/PolyMode.cpp
+  src/core/PolyOps.cpp
   src/core/Uv.cpp
   src/core/UvCommands.cpp
   src/core/UvPack.cpp
@@ -536,6 +538,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelFill.cpp
     src/app/PanelGeometry.cpp
     src/app/PanelEdges.cpp
+    src/app/PanelPolygon.cpp
     src/app/Gizmo.cpp
     src/app/PanelBake.cpp
     src/app/FocusDetailApp.cpp
@@ -1599,6 +1602,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Edges mode and creases (tests/ui/edge_select.sfui) at 1440 px of UI, 100% and 200% (#108).
     sculptforge_ui_test(edge_select_1440 edge_select --size 1440x900)
     sculptforge_ui_test(edge_select_2880 edge_select --size 2880x1800) # its 200% shots: 1440 px of UI
+    # Polygon mode (tests/ui/polygon_mode.sfui) at 1440 px of UI, 100% and 200%.
+    sculptforge_ui_test(polygon_mode_1440 polygon_mode --size 1440x900)
+    sculptforge_ui_test(polygon_mode_2880 polygon_mode --size 2880x1800)
     # The Transform gizmo's look, each mode front and 3/4, 100% and 200% (tests/ui/gizmo/look.sfui).
     sculptforge_ui_test(gizmo_look_1440 gizmo/look --size 1440x900)
     sculptforge_ui_test(gizmo_look_2880 gizmo/look --size 2880x1800)

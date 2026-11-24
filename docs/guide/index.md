@@ -57,6 +57,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
 20. [Facial shapes and live face](facial-shapes.md)
 21. [Subdivision levels](subdivision-levels.md)
     - [Edges: selecting edges for creases](edges.md)
+    - [Polygon mode: modelling with points, edges and faces](polygon-mode.md)
 22. [Micro levels: hundreds of millions of polygons](micro-levels.md)
 23. [Dynamic topology](dynamic-topology.md)
 24. [Sculpt Timeline and timelapse](timeline.md)
