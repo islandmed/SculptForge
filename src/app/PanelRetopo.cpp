@@ -642,7 +642,7 @@ std::string App::remeshSkippedNote(int reason) {
         tr("Remesh after each stroke: skipped, this Part has subdivision levels (a remesh would remove them). %s"),
         tr("Remesh after each stroke: skipped, this Part has sculpt layers (a remesh would remove them). %s"),
         tr("Remesh after each stroke: skipped, this Part has a painted texture (carrying it over takes a while). %s")};
-    const std::string key = uiPrefs_.quickRemesh ? actions_.shortcutText("geometry.quick_remesh") : std::string();
+    const std::string key = quickRemeshOn() ? actions_.shortcutText("geometry.quick_remesh") : std::string();
     char way[160], line[512];
     if (key.empty()) std::snprintf(way, sizeof way, "%s", tr("Tool > Remesh > Remesh remeshes it anyway."));
     else std::snprintf(way, sizeof way, tr("%s remeshes it anyway."), key.c_str());
@@ -656,14 +656,14 @@ void App::quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down) {
         return;
     }
     const Action* a = actions_.actionForChord(chordFromEvent(key, mods));
-    if (a && a->id == "geometry.quick_remesh_drag" && uiPrefs_.quickRemesh) quickRemeshDragKey_ = key;
+    if (a && a->id == "geometry.quick_remesh_drag" && quickRemeshOn()) quickRemeshDragKey_ = key;
 }
 
 // With the drag key held (N by default, Preferences > Hotkeys), a press on the background (no surface under it)
 // remeshes when it's let go. On the model the press stays a stroke. The key is unbound in every input style, so
 // no empty-canvas drag of any style (turn, pan, zoom, mask and hide shapes) changes.
 bool App::quickRemeshDragDown(float x, float y) {
-    if (quickRemeshDragKey_ == SDLK_UNKNOWN || !uiPrefs_.quickRemesh) return false;
+    if (quickRemeshDragKey_ == SDLK_UNKNOWN || !quickRemeshOn()) return false;
     RayHit hit;
     if (previewLod_ < 0 && pick(x, y, hit)) return false;
     drag_ = Drag::QuickRemesh;
@@ -673,8 +673,8 @@ bool App::quickRemeshDragDown(float x, float y) {
 
 void App::drawQuickRemeshContents() {
     tray::GroupLabel(*this, "Quick Remesh");
-    bool quick = uiPrefs_.quickRemesh;
-    if (ImGui::Checkbox(tr("Quick Remesh##remesh.quick"), &quick)) uiPrefs_.quickRemesh = quick;
+    bool quick = quickRemeshOn();
+    if (ImGui::Checkbox(tr("Quick Remesh##remesh.quick"), &quick)) uiPrefs_.quickRemesh = quick ? 1 : 0;
     const std::string key = actions_.shortcutText("geometry.quick_remesh");
     const std::string drag = actions_.shortcutText("geometry.quick_remesh_drag");
     const std::string help =

@@ -81,9 +81,12 @@ struct UiPrefs {
     float mouseOrbitSpeed = 1.0f;
     // Tool > Remesh (#121): Quick Remesh (Shift+R, or hold N and drag on the background, remeshes the active Part at
     // the Voxel Resolution) and Remesh after each stroke (a stroke that stretched the surface remeshes it).
-    // Quick Remesh (#121) is on by default since 0.14.0 (a member: remeshing mid-sculpt was too many clicks away): its key
-    // and the hold-and-drag gesture work without a visit to Tool > Remesh; the checkbox there turns them off.
-    bool quickRemesh = true, remeshAfterStroke = false;
+    // Quick Remesh (#121): its key and the hold-and-drag gesture without a visit to Tool > Remesh (a member, 0.14.0: remeshing
+    // mid-sculpt was too many clicks away). -1 = by layout (Classic off, as it always was; SculptForge on), 0 off, 1 on (the
+    // checkbox). Saved as the effective value plus quickRemeshOff for an explicit off: a ui.json from before 0.14.0 always carried
+    // quickRemesh=false, so only a true, or quickRemeshOff, counts when it is read back.
+    int quickRemesh = -1;
+    bool remeshAfterStroke = false;
     // Along the normal (from the discussions): 0 = with the invert key (Alt; Ctrl in the Blender and Maya styles),
     // 1 = always, 2 = never. For Move, Tendril, Elastic Tendril and KelvinGrab.
     int alongNormal = 0;

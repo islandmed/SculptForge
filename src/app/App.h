@@ -194,6 +194,7 @@ public:
     // The menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts and > Render bridge, Brush > Contact facing): off in the Classic
     // layout (its menus keep their old rows) unless Preferences > Interface > Show newer menu rows says so; on in SculptForge.
     bool newerMenuRows() const { return uiPrefs_.newerMenuRows < 0 ? uiPrefs_.shellLayout == 1 : uiPrefs_.newerMenuRows != 0; }
+    bool quickRemeshOn() const { return uiPrefs_.quickRemesh < 0 ? uiPrefs_.shellLayout != 0 : uiPrefs_.quickRemesh != 0; } // (by layout: Classic off, SculptForge on)
     ThumbnailCache& thumbnails() { return thumbs_; }
     // A brush tile clicked (bottom shelf, brush picker): with Shift / Ctrl held it becomes the Shift / Ctrl brush
     // (true) instead of the main one (ModifierBrush.cpp).

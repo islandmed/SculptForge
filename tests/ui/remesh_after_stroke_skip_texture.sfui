@@ -11,7 +11,7 @@ click "Texture Image/New Texture"
 expect_value texture_size == 2048
 remember triangles before
 click "Remesh##tool.remesh"
-expect_value quick_remesh == 1 # (on by default since 0.14.0)
+click "Quick Remesh##remesh.quick"
 click "Remesh after each stroke##remesh.after_stroke"
 expect_value remesh_skip_notes == 0
 click "Move##brush.move"

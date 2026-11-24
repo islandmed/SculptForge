@@ -49,7 +49,7 @@ expect_value triangles == $dense
 
 # Quick Remesh: N held + drag on the background, one undo step too.
 key ctrl+z
-expect_value quick_remesh == 1 # (on by default since 0.14.0)
+expect_value quick_remesh == 1 # (on by default in the SculptForge layout since 0.14.0)
 key_down n
 drag_path 0.03 0.03 0.1 0.05
 key_up n
