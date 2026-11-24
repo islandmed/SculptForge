@@ -87,6 +87,7 @@ add_library(sculptforge_core STATIC
   src/core/Commands.cpp
   src/core/CommandParse.cpp
   src/core/FaceGroups.cpp
+  src/core/PolyExtrude.cpp
   src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
   src/core/Parts.cpp
