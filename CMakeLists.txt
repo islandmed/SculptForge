@@ -1611,6 +1611,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     sculptforge_ui_test(extract_labels_1024 extract_labels --size 1024x768)
     sculptforge_ui_test(extract_labels_1440 extract_labels --size 1440x900)
+    # Make Shell on irregular plates of a dense curved surface: the rim is a smooth outline (tests/ui/extract_rim_plates.sfui).
+    sculptforge_ui_test(extract_rim_plates_1440 extract_rim_plates --size 1440x900)
+    sculptforge_ui_test(extract_rim_plates_2880 extract_rim_plates --size 2880x1800)
     # Tool > Reshape: Size, then the Stack, no duplicate sliders (tests/ui/deformation_ops.sfui, foirgairwolf on Discord).
     sculptforge_ui_test(deformation_ops_1024 deformation_ops --size 1024x768)
     sculptforge_ui_test(deformation_ops_1440 deformation_ops --size 1440x900)
