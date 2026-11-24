@@ -72,6 +72,26 @@ delete the faces they fully cover). **Flip** turns the selected faces inside out
 (Extrude, Inset, Bevel, Edge loop, Span) land here as they ship; each has its settings under its button, and a
 slider you drag shows a live preview of the result on the model.
 
+### Bevel
+
+**Bevel** rounds or chamfers the selected edges: each edge becomes a strip of faces across, and the faces on either
+side are cut back. With Faces picked, the faces' edges are bevelled; with Points picked, the points are cut off
+instead (a corner of a box becomes a triangle, or a rounded cap).
+
+- **Width**: how far each face is cut back, as a share of the Part's size, so the same slider position reads the same
+  on a small and a big Part. Drag it and the result previews on the model.
+- **Segments**: faces across the strip. 1 is a flat chamfer; 3 or more reads as a rounded edge.
+- **Profile**: the strip's shape. 0.25 is flat whatever the segments, 0.5 is round (a quarter circle on a square
+  edge), 1 hugs the original edge, below 0.25 bends inward.
+- **Limit width**: holds the width back so no two cuts meet or cross on an edge. Leave it on unless you want cuts to
+  overlap on purpose.
+- **New face group**: the bevel's faces get a face group of their own, so one double-click selects them again.
+
+Where bevelled edges meet, two join in a mitre and three or more in a rounded corner (a box corner becomes a piece
+of a sphere). A bevel that ends in the middle of a surface keeps the vertex there; one that ends at a face cuts that
+face's corner round. Open (border) edges and edges shared by more than two faces are left alone, and the status line
+counts them. Faces keep their face groups, UVs, mask and paint.
+
 An operation that needs whole faces tells you so when only some of a face's points are selected: switch to Faces, or
 select whole faces.
 

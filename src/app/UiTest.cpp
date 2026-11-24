@@ -64,6 +64,7 @@
 //   brush_size PX            set Size (the brush radius, screen pixels)
 //   reset_sliders            Size, Intensity, Colour intensity and Falloff back to their defaults
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
+//   hide_ui 0|1              hide (1) or show (0) every panel and bar: the viewport alone, for clips and beauty shots
 //   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
@@ -2121,7 +2122,7 @@ enum class StepVerb { None,
     Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
     AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
-    Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
+    Orbit, Camera, Zoom, HideUi, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
     GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
@@ -2172,7 +2173,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"release", StepVerb::Release},
         {"orbit", StepVerb::Orbit},
         {"camera", StepVerb::Camera},
-        {"zoom", StepVerb::Zoom},
+        {"zoom", StepVerb::Zoom}, {"hide_ui", StepVerb::HideUi},
         {"camera_distance", StepVerb::CameraDistance},
         {"brush_size", StepVerb::BrushSize},
         {"reset_sliders", StepVerb::ResetSliders},
@@ -2522,7 +2523,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         auto text = std::make_shared<std::string>(restOf(lineText_, 1));
         steps_.push_back([this, text](float) {
-            testKeyNow(SDLK_A, SDL_KMOD_LCTRL);
+            // Select what is there first, except in a slider's typed field, which opens with its number selected
+            // (and where the app, not the field, would take Ctrl+A: Mask All).
+            if (GImGui->TempInputId == 0 || GImGui->TempInputId != GImGui->ActiveId) testKeyNow(SDLK_A, SDL_KMOD_LCTRL);
             SDL_Event e{};
             e.type = SDL_EVENT_TEXT_INPUT;
             e.text.windowID = SDL_GetWindowID(app_.window_);
@@ -3324,6 +3327,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     case StepVerb::Zoom: { // zoom FACTOR: the camera's distance divided by FACTOR
         if (!need(1)) return false;
         run([this, f = num(1, 1)] { app_.camera_.distance /= std::max(float(f), 1e-3f); });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::HideUi: { // hide_ui 0|1: the viewport alone (clips, beauty shots)
+        if (!need(1)) return false;
+        run([this, on = num(1, 1) != 0.0] { app_.hideUi_ = on; });
         wait(0.1f);
         break;
     }
