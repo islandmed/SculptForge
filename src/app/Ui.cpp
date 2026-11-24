@@ -158,7 +158,8 @@ bool MyPanelDragEntry(const std::string& entry, const char* label, bool fromPane
     p.fromPanel = fromPanel;
     ImGui::SetDragDropPayload(kMyPanelPayload, &p, sizeof p);
     ImGui::TextUnformatted(label);
-    ImGui::TextColored(rgba(color::textDim), "%s", tr(fromPanel ? "Drop on My Panel to move, elsewhere to remove" : "Drop on My Panel to add"));
+    ImGui::TextColored(rgba(color::textDim), "%s",
+                       tr(fromPanel ? "Drop on My Panel or a shelf to move, elsewhere to remove" : "Drop on My Panel or a shelf to add"));
     ImGui::EndDragDropSource();
     return true;
 }
@@ -227,9 +228,10 @@ void pinLastItem(const std::string& key, const char* label) {
         if (g_pin.min.x > lineStart + 2.0f && g_pin.max.x >= window->WorkRect.Max.x - 2.0f) g_pin.min.x = lineStart;
         g_pin.lineX = std::min(lineStart, g_pin.min.x);
         if (g_pin.measuring) return;
-        MyPanelDragEntry(myPanelControlEntry(scope, fullKey), label, true);
-        if (ImGui::BeginPopupContextItem("##mypanel.control.ctx")) {
-            if (ImGui::MenuItem(tr("Remove from My Panel"))) g_pin.remove = true;
+        const bool panel = g_pin.host == HostMyPanel;
+        MyPanelDragEntry(myPanelControlEntry(scope, fullKey), label, panel);
+        if (ImGui::BeginPopupContextItem("##pinned.control.ctx")) {
+            if (ImGui::MenuItem(tr(panel ? "Remove from My Panel" : "Remove from shelf"))) g_pin.remove = true;
             ImGui::EndPopup();
         }
         return;
@@ -250,10 +252,11 @@ void PinSection(const char* sectionId) {
     g_pinCountSection.clear();
 }
 
-void BeginPinnedControl(const std::string& scope, const std::string& key, bool measuring) {
+void BeginPinnedControl(const std::string& scope, const std::string& key, bool measuring, int host) {
     g_pin = PinnedControl{};
     g_pin.scope = scope;
     g_pin.key = key;
+    g_pin.host = host;
     g_pin.measuring = measuring;
     g_pinActive = true;
 }

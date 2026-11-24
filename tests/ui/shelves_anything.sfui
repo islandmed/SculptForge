@@ -1,0 +1,108 @@
+# Shelves for every option (Member Request, November 2026): hold Alt and drag any checkbox, slider, choice, readout or button
+# from any palette onto a shelf, no Customize Shelves needed; a line shows where it lands. The shelf's copy is the palette's
+# own control, live both ways, and a drag that starts on a slider picks it up without changing it. Ctrl+Alt in Customize
+# Shelves moves it between shelves like the other items, right-click removes it, and it is saved with the layout. Stored as
+# "control:<scope>/<key>", the same entry My Panel uses (tests/ui/my_panel_controls.sfui).
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar
+run new_sphere subdivisions=3
+click "Parts##tool.part"                # (closed: the sections below are then in view)
+click "Viewport Look##tool.display"
+expect "Tool/Backface culling##display"
+expect_value customize == 0
+expect_value "shelf_has_control:tool.display/Backface culling" == 0
+expect_value backface_culling == 0
+# A checkbox onto the top shelf, dropped before Draw. The drag did not tick it.
+hold alt
+drag_to "Tool/Backface culling##display" "Draw##tool.draw" -30 0
+hold none
+expect_value "shelf_has_control:tool.display/Backface culling" == 1
+expect_value backface_culling == 0
+expect "Top shelf/Backface culling##display"
+expect_value "past_right:Top shelf" == 0
+# Live both ways: ticked on the shelf, the view culls and the Tool palette's box is ticked too (one value).
+click "Top shelf/Backface culling##display"
+expect_value backface_culling == 1
+click "Tool/Backface culling##display"
+expect_value backface_culling == 0
+# A button: Subdivide (Tool > Geometry) onto the right shelf, a tile like the others there.
+click "Viewport Look##tool.display"
+click "Geometry##tool.geometry"
+expect "Tool/Subdivide (removes levels)##geometry.subdivide"
+hold alt
+drag_to "Tool/Subdivide (removes levels)##geometry.subdivide" "Undo##edit.undo" 0 -22
+hold none
+expect_value shelf_has_geometry.subdivide == 1
+click "Geometry##tool.geometry"
+# A slider: the Draw palette's Size onto the bottom shelf. Alt held, the drag picks it up and the size stays; the shelf's copy works.
+click "Draw##palette.draw"
+click "Draw/##totray"
+brush_size 60
+expect "Draw/##drawsize"
+hold alt
+drag_to "Draw/##drawsize" "Clay##brush.clay" -24 0
+hold none
+expect_value "shelf_has_control:draw/Size" == 1
+expect_value draw_size == 60
+expect "Bottom shelf/##drawsize"
+drag_item "Bottom shelf/##drawsize" 40 0
+expect_value draw_size > 60
+click "Draw/##totray"                   # (out of the tray again: Preferences > Input then fits the tray)
+# Preferences > Input: Orbit around the pointer onto the left shelf (a side shelf: the column's inside width).
+click "Tool/##totray"                   # (Tool out of the tray: Preferences then starts at its top)
+click "Preferences##palette.preferences"
+click "Preferences/##totray"
+click "Input##preferences.input"
+expect "Preferences/Orbit around the pointer##input.orbit_at_pointer"
+expect_value orbit_at_pointer == 0
+hold alt
+drag_to "Preferences/Orbit around the pointer##input.orbit_at_pointer" "##tile.brush" 0 -30
+hold none
+expect_value "shelf_has_control:preferences.input/Orbit around the pointer" == 1
+expect_value orbit_at_pointer == 0
+expect "Left shelf/Orbit around the pointer##input.orbit_at_pointer"
+click "Left shelf/Orbit around the pointer##input.orbit_at_pointer"
+expect_value orbit_at_pointer == 1
+click "Left shelf/Orbit around the pointer##input.orbit_at_pointer"
+expect_value orbit_at_pointer == 0
+wait_idle 30
+shot filled
+# Customize Shelves: Ctrl+Alt moves the control from the top shelf to the right shelf like any other item.
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value customize == 1
+hold ctrl+alt
+drag_item_to "##grab.control:tool.display/Backface culling" "Undo##edit.undo" 0 -22 keep
+release
+hold none
+wait 0.3
+expect_value "shelf_has_control:tool.display/Backface culling" == 1
+expect "Right shelf/Backface culling##display"
+expect_not "Top shelf/Backface culling##display"
+key f3
+type "##Command palette" "customize shelves"
+key enter
+expect_value customize == 0
+# Right-click removes, Customize off.
+right_click "Right shelf/Backface culling##display"
+click "Remove from shelf"
+expect_value "shelf_has_control:tool.display/Backface culling" == 0
+# Kept at the next start, in their shelves, and working.
+restart
+expect_value "shelf_has_control:draw/Size" == 1
+expect_value shelf_has_geometry.subdivide == 1
+expect_value "shelf_has_control:preferences.input/Orbit around the pointer" == 1
+expect "Bottom shelf/##drawsize"
+expect "Left shelf/Orbit around the pointer##input.orbit_at_pointer"
+# The Streamlined setup: the same drag onto its top shelf.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=3
+expect "Preferences/Orbit around the pointer##input.orbit_at_pointer"
+hold alt
+drag_to "Preferences/Orbit around the pointer##input.orbit_at_pointer" "Sculpt##draw.sculpt" -30 0
+hold none
+expect_value "shelf_has_control:preferences.input/Orbit around the pointer" == 1
+expect "Top shelf/Orbit around the pointer##input.orbit_at_pointer"
+expect_value "past_right:Top shelf" == 0
+wait_idle 30
+shot streamlined

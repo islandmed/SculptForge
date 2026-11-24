@@ -265,7 +265,7 @@ When you open a Gaussian splat capture, **Render > Gaussian Splats** moves into 
 works like any other palette: put it in a tray, or open it in a window of its own for a second monitor.
 
 - **Add a button, a control or a whole section**: hold <kbd>Alt</kbd> and drag it from any palette (or a shelf) into
-  My Panel. A section keeps all its controls, live, so **Masking** or **Geometry** can sit next to the three buttons
+  My Panel. The same drag onto a shelf puts the button or control there instead (see [The shelves](#the-shelves)). A section keeps all its controls, live, so **Masking** or **Geometry** can sit next to the three buttons
   you press all day. A line shows where it will land.
 - **One control on its own**: any slider, checkbox, choice or readout comes by itself the same way: hold <kbd>Alt</kbd>
   and drag **Backface culling** (Tool > Viewport Look), the brush **Size** slider (Draw), the triangle count at the top of
@@ -286,8 +286,11 @@ What is in My Panel is saved with your layout (**Edit > Preferences > Saving & L
 ## The shelves
 
 Shelves surround the canvas and hold the controls you use all the time. Point at anything with <kbd>Ctrl</kbd>
-held to see what it does. Right-click an item for **Remove from shelf**; see [Customizing the
-interface](#customizing-the-interface) to add items.
+held to see what it does. **Any control from any palette can go on a shelf**: hold <kbd>Alt</kbd> and drag a checkbox,
+slider, choice, readout or button (**Backface culling**, the brush **Size**, **Orbit around the pointer** from
+Edit > Preferences > Input, **Subdivide**) onto the shelf you want; an orange line shows where it lands. It stays the
+palette's own control, live. Right-click an item for **Remove from shelf**; see [Customizing the
+interface](#customizing-the-interface) to move items around.
 
 ### Top shelf
 
@@ -597,7 +600,13 @@ you quit); **Save Layout** marks the layout **Revert to Saved Layout** returns t
    - off the shelves (onto the canvas, for example) to **remove** it.
 3. Turn **Customize Shelves** off when you're done, and click **Save Layout** (same palette) to keep the result.
 
-Right-clicking a shelf item and choosing **Remove from shelf** works without Customize mode.
+Right-clicking a shelf item and choosing **Remove from shelf** works without Customize mode. So does **adding any control**:
+hold <kbd>Alt</kbd> (without <kbd>Ctrl</kbd>) and drag any checkbox, slider, choice, readout or button from any palette
+onto a shelf, Customize on or off. It is the palette's own control, live both ways; while <kbd>Alt</kbd> is held a slider
+is picked up, not changed. On the top or bottom shelf it is as wide as it is in its palette; on a side shelf it takes the
+column's width. A control its palette shows only sometimes (the Levels line of a Part without levels) is hidden on the
+shelf until it is back; Customize Shelves shows it dim so you can move or remove it. The same drag puts a control into
+[My Panel](#my-panel), and an entry dragged out of My Panel onto a shelf moves there.
 
 A shelf you empty is hidden when Customize Shelves is off, and the canvas takes its room. Turn Customize Shelves
 back on and the empty shelf returns, outlined, so you can drag buttons onto it again.

@@ -1,0 +1,55 @@
+# Shelves with controls dragged onto them, for the look review at 1440 logical px (CMake: ui_shelves_anything_1440 at 100 %,
+# ui_shelves_anything_1440_200 at 200 %): a checkbox and a button on the top shelf, the Size slider on the bottom shelf, a
+# Preferences checkbox on the left shelf, in the Classic setup; then a checkbox on the Streamlined top shelf.
+logical_width 1440
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Parts##tool.part"
+click "Viewport Look##tool.display"
+hold alt
+drag_to "Tool/Backface culling##display" "Draw##tool.draw" -30 0
+hold none
+click "Viewport Look##tool.display"
+click "Geometry##tool.geometry"
+hold alt
+drag_to "Tool/Subdivide (removes levels)##geometry.subdivide" "Draw##tool.draw" -30 0
+hold none
+click "Geometry##tool.geometry"
+click "Draw##palette.draw"
+click "Draw/##totray"
+expect "Draw/##drawsize"
+hold alt
+drag_to "Draw/##drawsize" "Clay##brush.clay" -24 0
+hold none
+click "Draw/##totray"
+click "Tool/##totray"
+click "Preferences##palette.preferences"
+click "Preferences/##totray"
+click "Input##preferences.input"
+hold alt
+drag_to "Preferences/Orbit around the pointer##input.orbit_at_pointer" "##tile.brush" 0 -30
+hold none
+expect_value "shelf_has_control:tool.display/Backface culling" == 1
+expect_value shelf_has_geometry.subdivide == 1
+expect_value "shelf_has_control:draw/Size" == 1
+expect_value "shelf_has_control:preferences.input/Orbit around the pointer" == 1
+hover "Top shelf/Backface culling##display"
+wait 0.3
+shot classic
+# Alt held over a palette control: the hand says it can be picked up; the shelf's copy is a drop target's neighbour.
+hold alt
+hover "Preferences/Orbit around the pointer##input.orbit_at_pointer"
+wait 0.3
+shot classic_alt
+hold none
+# The Streamlined setup (a fresh layout): the same checkbox on its top shelf.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=3
+expect "Preferences/Orbit around the pointer##input.orbit_at_pointer"
+hold alt
+drag_to "Preferences/Orbit around the pointer##input.orbit_at_pointer" "Sculpt##draw.sculpt" -30 0
+hold none
+expect_value "shelf_has_control:preferences.input/Orbit around the pointer" == 1
+hover "Top shelf/Orbit around the pointer##input.orbit_at_pointer"
+wait 0.3
+shot streamlined

@@ -109,7 +109,7 @@ void NoteItemLabel(ImGuiID id);
 // Customize mode: shelves this payload ("SF_UIITEM") is dragged from and dropped on.
 enum Shelf { ShelfNone = -1, ShelfTop, ShelfLeft, ShelfRight, ShelfBottom };
 struct UiItemPayload {
-    char id[96] = "";
+    char id[128] = ""; // (a "control:<scope>/<key>" item can be long)
     int fromShelf = ShelfNone;
     int fromIndex = -1;
 };
@@ -119,9 +119,10 @@ void SetNextItemOrigin(int shelf, int index);
 // Makes the last item a Ctrl+Alt drag source in customize mode (for widgets that aren't ActionButtons).
 bool UiItemDragSource(App& app, const char* itemId, const char* label);
 
-// My Panel (Palettes.cpp): hold Alt and drag a button or a section header from any palette into it. The payload names the
-// entry as My Panel stores it ("action:<id>" / "section:<id>"); fromPanel marks one dragged out of My Panel, which
-// is removed when it is dropped anywhere but back on a My Panel.
+// My Panel (PanelMyPanel.cpp) and the shelves (Shell.cpp drawShelf): hold Alt and drag a button, a section header or a
+// control from any palette into My Panel, or a button or a control onto a shelf. The payload names the entry as My Panel
+// stores it ("action:<id>" / "section:<id>" / "control:<scope>/<key>"); fromPanel marks one dragged out of My Panel, which
+// is removed from it when it is dropped anywhere but back on a My Panel (on a shelf: moved there).
 struct MyPanelPayload {
     char entry[100] = "";
     bool fromPanel = false;
@@ -134,21 +135,26 @@ bool MyPanelDragEntry(const std::string& entry, const char* label, bool fromPane
 // Alt-dragged a button or header more than a click's travel: its release was the end of a drag, not a click.
 bool MyPanelDragged();
 
-// One control as a My Panel entry ("control:<scope>/<key>", UiLayout.h; PanelMyPanel.cpp draws it). HelpText and
-// HelpAction mark the control drawn just before them: while Alt (without Ctrl) is held it is a drag source for My Panel,
-// keyed by the help title (or the action id) inside the scope being drawn; while My Panel draws one control
-// (BeginPinnedControl) the one whose key matches is measured and made movable. A key repeated in a scope gets "#2", "#3".
+// One control as a My Panel or shelf entry ("control:<scope>/<key>", UiLayout.h; PanelMyPanel.cpp drawPinnedControl draws
+// it in either). HelpText and HelpAction mark the control drawn just before them: while Alt (without Ctrl) is held it is a
+// drag source for My Panel and the shelves, keyed by the help title (or the action id) inside the scope being drawn; while a
+// host draws one control (BeginPinnedControl) the one whose key matches is measured and made movable. A key repeated in a
+// scope gets "#2", "#3".
 void PinPalette(const char* paletteId); // the palette whose body is being drawn ("" when done); resets the key counts
 void PinSection(const char* sectionId); // the open section being drawn ("" at its end)
+// Who draws a pinned control: My Panel, or one of the shelves (the Shelf values, 0-3).
+enum PinnedHost { HostMyPanel = -2 };
 struct PinnedControl {
-    std::string scope, key; // what My Panel wants
+    std::string scope, key; // what the host wants
+    int host = HostMyPanel;  // My Panel: the drawn control is an Alt drag source "from the panel" (a drop elsewhere removes it)
+                             // and right-click offers Remove from My Panel; a shelf: a copy is picked up, right-click Remove from shelf
     bool measuring = false;  // the first pass only measures: no drag source, no menu
     bool found = false;
     ImVec2 min, max;         // the control's rect this frame
     float lineX = 0.0f;      // where its line starts (a control mid-row is drawn from there in My Panel)
     bool remove = false;     // its right-click menu asked for removal
 };
-void BeginPinnedControl(const std::string& scope, const std::string& key, bool measuring);
+void BeginPinnedControl(const std::string& scope, const std::string& key, bool measuring, int host = HostMyPanel);
 PinnedControl EndPinnedControl();
 // Palette bodies while Alt (without Ctrl) is held: sliders and fields are read-only, so an Alt-drag that starts on one
 // picks it up for My Panel without changing it. Returns what EndPaletteItems needs.

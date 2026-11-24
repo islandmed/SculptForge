@@ -403,6 +403,13 @@ TEST(my_panel_layout_json) {
     withControl.myPanel = {"control:tool.display/Backface culling", "action:view.wire"};
     CHECK(fromJson(toJson(withControl), back, err));
     CHECK(back.myPanel == withControl.myPanel);
+    // A shelf holds the same control entries (0.14, Alt+drag onto a shelf), next to actions, widgets and separators.
+    UiLayout shelved = standardLayout();
+    shelved.topShelf = {"tool.draw", "sep", "control:tool.display/Backface culling", "widget.draw_size"};
+    shelved.leftShelf = {"control:preferences.input/Orbit around the pointer", "widget.tile.brush"};
+    CHECK(fromJson(toJson(shelved), back, err));
+    CHECK(back.topShelf == shelved.topShelf && back.leftShelf == shelved.leftShelf);
+    CHECK(!shelfEmpty(shelved.leftShelf));
 }
 
 // ui.json keeps the layout in use ("layout", autosaved) and the one Save Layout kept ("layoutSaved", what Revert returns to).

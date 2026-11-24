@@ -2319,7 +2319,7 @@ private:
     std::map<std::string, std::string> menuSection_; // each task menu's last section (palette id)
     void drawShelf(int shelf, const CanvasRect& rect);
     void drawShelfItem(int shelf, int index, const std::string& item, bool vertical);
-    bool shelfItemShown(const std::string& item) const;
+    bool shelfItemShown(int shelf, const std::string& item) const;
     void drawTray(bool right, const CanvasRect& rect);
     void drawDivider(bool right, const CanvasRect& rect);
     void drawPaletteDropdown();
@@ -2376,12 +2376,14 @@ private:
     void finishShelfDrag();
     std::string myPanelSection_;      // while drawMyPanelScope runs: the section whose body subpalette() lets through
     bool myPanelPaletteLevel_ = false; // ... or (myPanelSection_ = a palette id) the palette's own controls, no section
-    struct MyPanelControlPlace {      // where one control sits in its scope's body, measured (PanelMyPanel.cpp)
+    struct PinnedControlPlace {       // where one control sits in its scope's body, measured (PanelMyPanel.cpp drawPinnedControl)
         bool known = false;
-        float x = 0, y = 0, w = 0, h = 0; // from the body's origin, logical px as laid out at My Panel's width
+        bool missing = false;             // measured, not there: its palette hides it in this state (a shelf then hides it too)
+        float x = 0, y = 0, w = 0, h = 0; // from the body's origin, logical px as laid out at the host's width
         float lineX = 0;                  // where its line starts: a control mid-row is drawn from there, not mid-panel
     };
-    std::unordered_map<std::string, MyPanelControlPlace> myPanelControls_; // by entry
+    std::unordered_map<std::string, PinnedControlPlace> pinnedControls_; // by host and entry (pinnedPlaceKey)
+    static std::string pinnedPlaceKey(int host, const std::string& entry) { return std::to_string(host) + '|' + entry; }
     bool myPanelFloating_ = false;    // the floating My Panel is open (ui.my_panel)
     bool myPanelPlace_ = false;       // ... and wants placing at the cursor this frame
     std::vector<std::string> myPanelFolded_; // sections folded in My Panel (session only)
@@ -2437,8 +2439,16 @@ private:
     void drawPalette_MyPanel();
     void drawMyPanelSection(const std::string& sectionId); // one palette section's body, without its header
     void drawMyPanelScope(const std::string& scope);       // ... or (a palette id) the palette's controls outside sections
-    // One control entry: its scope's body cropped to that control, live; false when it is not an entry this build knows.
-    bool drawMyPanelControl(const std::string& entry, const MyPanelEntry& e, ImRect& rect, bool& remove);
+    // One control entry, live, in My Panel (host ui::HostMyPanel) or on a shelf (host = the shelf, 0-3): its scope's body cropped
+    // to that control. layoutWidth: the width the body is laid out at; fit: the item is only as wide as the control (a horizontal
+    // shelf), else layoutWidth wide; rowH: the item's least height (the control is centred in it). false when it is not an
+    // entry this build knows. A control its palette hides now: in My Panel (and in Customize Shelves) its dim name, on a shelf
+    // otherwise nothing (shelfItemShown then skips it).
+    bool drawPinnedControl(const std::string& entry, const MyPanelEntry& e, int host, float layoutWidth, bool fit, float rowH, ImRect& rect,
+                           bool& remove);
+    // The shelf item for an Alt-dragged My Panel entry ("action:<id>": the id, a shelf button; "control:...": as it is), or
+    // empty when this build has no such action or palette (a section is My Panel's alone).
+    std::string shelfItemForEntry(const std::string& entry) const;
     void drawMyPanelFloating();
     void registerMyPanelActions();
     void finishMyPanelDrag();
