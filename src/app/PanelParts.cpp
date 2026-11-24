@@ -241,7 +241,8 @@ void App::updatePartThumbnails() {
         const UndoStack& undo = doc_.partUndo(i);
         uint64_t key = undo.revision();
         for (uint64_t part : {uint64_t(m.triangleCount()), uint64_t(m.vertexCount()), uint64_t(s.visible),
-                              uint64_t(s.shading), uint64_t(renderSettings_.litsphere + 1), uint64_t(renderSettings_.showVertexPaint)})
+                              uint64_t(s.shading), uint64_t(doc_.partLitSphere(first, renderSettings_.litsphere) + 1),
+                              uint64_t(renderSettings_.showVertexPaint)})
             key = key * 1099511628211ull ^ part;
         partThumbSchedule_.observe(mk, key, now);
         ids.push_back(mk);
@@ -422,10 +423,13 @@ void App::drawPartsContents() {
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
                     char linked[96] = "";
                     if (links > 1) std::snprintf(linked, sizeof linked, tr("\nLinked: %d Parts share this mesh"), links);
-                    ImGui::SetTooltip(tr("%s\n%zu vertices, %zu triangles%s%s%s\nClick to select, double-click to rename"),
+                    std::string material; // its own Lit Sphere material (part_material), if it has one
+                    if (s.litsphere != kLitSphereScene)
+                        material = std::string("\n") + tr("Material") + ": " + (s.litsphere < 0 ? "Studio" : litsphereName(s.litsphere)); // (material names stay as listed)
+                    ImGui::SetTooltip(tr("%s\n%zu vertices, %zu triangles%s%s%s%s\nClick to select, double-click to rename"),
                                       s.name.c_str(), doc_.partMesh(i).vertexCount(), doc_.partMesh(i).triangleCount(),
                                       subdivLevelCount(doc_.partMesh(i)) ? ", " : "",
-                                      subdivLevelText(doc_.partMesh(i)).c_str(), linked);
+                                      subdivLevelText(doc_.partMesh(i)).c_str(), linked, material.c_str());
                 }
                 if (links > 1) { // a link and the count at the name's end (#94): these Parts share one mesh
                     const std::string badge = std::string(ICON_LC_LINK) + " " + std::to_string(links);

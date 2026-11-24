@@ -1941,8 +1941,10 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
     }
     drawList_.clear();
     proxyPending_ = false;
+    activeLitSphere_ = kLitSphereScene;
     std::vector<uint32_t> synced; // linked Parts (#94): one mesh, uploaded once (as the active one, if it's one of them)
     for (const SceneMesh& m : scene) {
+        if (m.active) activeLitSphere_ = m.litsphere; // (hidden or not: the screen stroke follows the active Part's material)
         if (!m.visible || !m.mesh) continue; // hidden: keeps its dirty state until shown
         if (std::find(synced.begin(), synced.end(), m.id) == synced.end()) {
             synced.push_back(m.id);
@@ -1953,7 +1955,7 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
             ms.overlay = first->active ? first->overlay : nullptr;
             sync(ms, *first->mesh, first->normalMap, first->wireframe && first->active, first->pbr);
         }
-        drawList_.push_back({m.id, m.active, m.flat, m.model != glm::mat4(1.0f), m.model});
+        drawList_.push_back({m.id, m.active, m.flat, m.litsphere, m.model != glm::mat4(1.0f), m.model});
     }
 }
 
@@ -1973,7 +1975,7 @@ glm::mat3 Renderer::normalFixFor(const glm::mat3& m) {
 
 void Renderer::drawItem(const MeshSlot& s, const DrawItem& item, const RenderSettings& settings) {
     if (!item.moved) {
-        drawSlot(s, item.active, item.flat, settings);
+        drawSlot(s, item.active, item.flat, item.litsphere, settings);
         return;
     }
     const glm::mat4 view = frameView_;
@@ -1982,7 +1984,7 @@ void Renderer::drawItem(const MeshSlot& s, const DrawItem& item, const RenderSet
     frameNormalFix_ = normalFixFor(glm::mat3(item.model));
     frameCull_ = CullView::from(frameView_, frameProj_);
     frameCull_.backfaces = cull.backfaces;
-    drawSlot(s, item.active, item.flat, settings);
+    drawSlot(s, item.active, item.flat, item.litsphere, settings);
     frameView_ = view;
     frameNormalFix_ = glm::mat3(1.0f);
     frameCull_ = cull;
@@ -3493,7 +3495,8 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     while (samples > 1 && !viewTarget(width, height, samples)) samples /= 2;
     screenStrokeDrawn_ = false;
     // A screen stroke needs the view in a target it can read back: through the single-sample one when no AA.
-    const bool screen = !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr() && !settings.unlit;
+    const int activeLitSphere = litsphereOf(activeLitSphere_, settings); // (the active Part's own material, if it has one)
+    const bool screen = !screenStroke_.dabs.empty() && activeLitSphere >= 0 && !settings.pbr() && !settings.unlit;
     // ... and so do the view's shadows and AO (they read its depth).
     const bool occlusion = occlusionWanted(settings);
     if (samples <= 1 && !((screen || occlusion) && viewTarget(width, height, 1))) {
@@ -3511,7 +3514,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     if (occlusion) applyOcclusion(viewFbo_, viewResolveFbo_, width, height);
     if (screen)
         screenStrokeDrawn_ = screenPass_.apply(screenStroke_, viewFbo_, viewResolveFbo_, width, height, frameView_, frameProj_,
-                                               frameViewport_, litsphereTexture(settings.litsphere),
+                                               frameViewport_, litsphereTexture(activeLitSphere),
                                                lightRotation(settings.lightYaw, settings.lightPitch));
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_); // single-sample blit: may convert to the window's format
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -4273,10 +4276,14 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
     s.coarsePending.clear();
 }
 
-void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
+void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, int litsphere, const RenderSettings& settings) {
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0) |
                                        (s.micro && s.micro->focus() ? kFocus : 0) | (s.micro && s.micro->tilePagesOn() ? kTiles : 0));
     if (!p) return;
+    const int material = litsphereOf(litsphere, settings); // this Part's Lit Sphere (its own or the view's)
+    gl::ActiveTexture(kTexture2);
+    gl::BindTexture(GL_TEXTURE_2D, litsphereTexture(material));
+    gl::ActiveTexture(GL_TEXTURE0);
     gl::UseProgram(p->id);
     setPbrUniforms(*p, settings, false, s);
     gl::UniformMatrix4fv(p->view, 1, GL_FALSE, glm::value_ptr(frameView_));
@@ -4287,9 +4294,9 @@ void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const Render
     gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
     gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, s.hasColors)));
-    gl::Uniform1i(p->litsphere, litsphereTexture(settings.litsphere) ? 1 : 0);
+    gl::Uniform1i(p->litsphere, litsphereTexture(material) ? 1 : 0);
     gl::Uniform1i(p->unlit, settings.unlit ? 1 : 0);
-    const LitSphereCavity cavity = litsphereCavity(settings.litsphere);
+    const LitSphereCavity cavity = litsphereCavity(material);
     gl::Uniform2f(p->litsphereCavity, cavity.crease, cavity.ridge);
     gl::Uniform1i(p->paint, 0);
     gl::Uniform1i(p->showMask, active && settings.showMask ? 1 : 0);
@@ -4330,11 +4337,15 @@ void Renderer::setLightUniforms(const MeshProgram& p, const RenderSettings& sett
     if (occ) gl::Uniform3fv(p.occLight, 1, glm::value_ptr(glm::normalize(frameOcclusion_.light)));
 }
 
-void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
+void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, int litsphere, const RenderSettings& settings) {
     if (s.micro) {
-        drawMicro(s, active, flat, settings);
+        drawMicro(s, active, flat, litsphere, settings);
         return;
     }
+    const int material = litsphereOf(litsphere, settings); // this Part's Lit Sphere (its own or the view's)
+    gl::ActiveTexture(kTexture2);
+    gl::BindTexture(GL_TEXTURE_2D, litsphereTexture(material));
+    gl::ActiveTexture(GL_TEXTURE0);
     // The UV Editor's checker on the model.
     const bool checker = active && s.hasUvs && s.overlay && s.overlay->checker;
     // A painted texture shows through the textured program (vertex paint still multiplies it).
@@ -4368,9 +4379,9 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform2f(p->projScale, orthographic ? 1e20f : frameProj_[0][0], orthographic ? 1e20f : frameProj_[1][1]);
     gl::Uniform3fv(p->baseColor, 1, glm::value_ptr(settings.baseColor));
     gl::Uniform3fv(p->tintShift, 1, glm::value_ptr(materialTintShift(settings, s.hasColors)));
-    gl::Uniform1i(p->litsphere, litsphereTexture(settings.litsphere) ? 1 : 0);
+    gl::Uniform1i(p->litsphere, litsphereTexture(material) ? 1 : 0);
     gl::Uniform1i(p->unlit, settings.unlit ? 1 : 0);
-    const LitSphereCavity cavity = litsphereCavity(settings.litsphere);
+    const LitSphereCavity cavity = litsphereCavity(material);
     gl::Uniform2f(p->litsphereCavity, cavity.crease, cavity.ridge);
     if (textured || normalMapped) {
         gl::ActiveTexture(GL_TEXTURE3);
@@ -5020,11 +5031,12 @@ bool Renderer::renderPartThumbnail(uint32_t id, float yaw, float pitch, int size
     constexpr size_t kProxyTriangles = size_t(1) << 20; // a big mesh: its lighter proxy, where current, is plenty at this size
     thumb.motionProxy = s->drawnTriangles >= kProxyTriangles;
     bool flat = false;
+    int litsphere = kLitSphereScene;
     for (const DrawItem& item : drawList_)
-        if (item.id == id) flat = item.flat;
+        if (item.id == id) flat = item.flat, litsphere = item.litsphere;
     std::vector<DrawItem> scene;
     scene.swap(drawList_);
-    drawList_.push_back({id, false, flat}); // (not active: no ghost, draft or mask on it)
+    drawList_.push_back({id, false, flat, litsphere}); // (not active: no ghost, draft or mask on it; its own material)
     const bool proxyUsed = proxyUsed_;
     thumbnailPass_ = true;
     const bool ok = renderToImage(camera, size, size, thumb, rgba, error);

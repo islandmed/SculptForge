@@ -95,5 +95,12 @@ int findLitSphereByHash(uint64_t hash);
 std::vector<std::string> loadLitSphereFolders(const std::vector<std::string>& dirs);
 // Studio Lit Sphere folders from SCULPTFORGE_LITSPHERE_PATH (':' separated, ';' on Windows), read-only.
 std::vector<std::string> studioLitSphereDirs();
+// "litspheres/<name>.png": the name a custom Lit Sphere's PNG travels under inside a project (Document::projectFiles),
+// with the characters project attachment names allow.
+std::string litsphereAttachmentName(const std::string& name);
+
+// A Part's own material (Part::litsphere, core/Document.h): kLitSphereScene = it follows the scene's material
+// (RenderSettings::litsphere); -1 = Studio; else a Lit Sphere index.
+constexpr int kLitSphereScene = -2;
 
 } // namespace sf

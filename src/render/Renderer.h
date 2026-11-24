@@ -150,6 +150,9 @@ struct SceneMesh {
     bool wireframe = false; // keep the wireframe's edges on the GPU (built on first need; draw() falls back to
                             // outlining the triangles, quad diagonals included, until they are)
     bool flat = false;      // flat shading: each triangle shows its own face normal (faceted)
+    // The Lit Sphere it is shaded with: kLitSphereScene = the view's (RenderSettings::litsphere), else its own (a Part's
+    // material, Document::partLitSphere): -1 Studio or a Lit Sphere index.
+    int litsphere = kLitSphereScene;
     bool pbr = false;       // the view shades PBR: upload the texture's material channels and their tangents
     const MeshOverlay* overlay = nullptr; // the UV Editor's view of the active mesh (must outlive the frame)
     glm::mat4 model{1.0f}; // where the mesh is in the scene (Part::transform)
@@ -651,7 +654,11 @@ private:
     double gpuMsPerTriangle_ = 0.0; // measured (moving average), 0 = not yet
     double triangleRateM_ = 0.0;    // calibrated, million triangles a second (0 = unknown)
     std::vector<uint8_t> coarseLevel_;
-    void drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
+    // `litsphere`: the mesh's own (SceneMesh::litsphere), kLitSphereScene = settings.litsphere.
+    void drawSlot(const MeshSlot& s, bool active, bool flat, int litsphere, const RenderSettings& settings);
+    // The Lit Sphere a draw item is shaded with (its own or the view's), and the active Part's (the screen stroke's).
+    static int litsphereOf(int item, const RenderSettings& settings) { return item == kLitSphereScene ? settings.litsphere : item; }
+    int activeLitSphere_ = kLitSphereScene; // the active mesh's SceneMesh::litsphere, as of the last syncScene
     enum class DrawPart { Triangles, Lines, Proxy };
     void drawPatches(const MeshSlot& s, GLenum mode, DrawPart part, GLint primBaseLocation);
     void drawClusters(const MeshSlot& s, const std::vector<uint32_t>& clusters, GLenum mode, DrawPart part, GLint primBaseLocation);
@@ -693,7 +700,7 @@ private:
     static constexpr int kFocus = kPaint; // with kMicro: a streamed level (render/MicroFocus.h; micro programs never paint)
     static constexpr int kTiles = kPrim;  // with kMicro: Adaptive Detail tile pages (render/MicroTilePages.h; only while a Part has some)
     MeshProgram programs_[256];
-    void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
+    void drawMicro(const MeshSlot& s, bool active, bool flat, int litsphere, const RenderSettings& settings);
     std::string programError_;
     const MeshProgram* meshProgram(int features);
     bool vertexIdHasBase_ = true; // gl_VertexID includes the base vertex (checked at init; else per-cluster draws)
@@ -704,6 +711,7 @@ private:
         uint32_t id;
         bool active;
         bool flat;
+        int litsphere = kLitSphereScene; // SceneMesh::litsphere
         bool moved = false;      // drawn with `model` (a linked copy, #94)
         glm::mat4 model{1.0f};
     };

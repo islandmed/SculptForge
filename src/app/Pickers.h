@@ -61,6 +61,11 @@ struct PickerUi {
     // held or Smooth is the brush), Colour intensity or Falloff.
     enum class Slider { DrawSize, ZIntensity, RgbIntensity, FocalShift };
     static void sizePopup(App& app, Slider which);
+    // The material grid's hover preview (Scene | This Part): the material it shows as chosen (the scene's, or in This Part
+    // mode the active Part's own; while a preview runs, the one it goes back to), and ending a preview (the scene's
+    // material, or the Part's own, back to what it was).
+    static int shownMaterial(const App& app);
+    static void endMaterialPreview(App& app);
     // The open slider's knob (its current value) in window coordinates, as last drawn; false when none is open.
     static bool sliderKnob(ImVec2& knob);
     // While Size (S) or Falloff (O) is open (#138): where it opened (window coordinates), which, and the value it is

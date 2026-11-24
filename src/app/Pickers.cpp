@@ -103,6 +103,11 @@ struct State {
     // Material hover preview: the material to go back to.
     bool previewing = false;
     int savedLitSphere = -1;
+    // The material grid's Scene | This Part (part_material): a click or hover preview goes to the active Part's own
+    // material instead of the scene's. Off at start (Scene is exactly the one-material picker); kept for the session.
+    bool materialForPart = false;
+    bool previewForPart = false; // the running preview changed the Part's material (savedPartLitSphere), not the scene's
+    int savedPartLitSphere = kLitSphereScene;
     // Size / Intensity / Colour intensity / Falloff at the cursor.
     int slider = -1; // PickerUi::Slider, -1 = closed
     bool sliderSmooth = false; // Intensity of the Smooth brush (Shift was held)
@@ -1160,15 +1165,63 @@ void litsphereMenu(App& app, int index, const std::function<void()>& beforeRemov
     }
 }
 
+// The material the picker shows as chosen: the scene's, or in This Part mode the active Part's own (while a hover
+// preview runs, the one it will go back to).
+int PickerUi::shownMaterial(const App& app) {
+    const State& s = st();
+    if (s.materialForPart) return s.previewing && s.previewForPart ? s.savedPartLitSphere : app.doc_.activePartInfo().litsphere;
+    return s.previewing && !s.previewForPart ? s.savedLitSphere : app.renderSettings_.litsphere;
+}
+
+// Ends a material hover preview: the scene's material, or the Part's own, back to what it was.
+void PickerUi::endMaterialPreview(App& app) {
+    State& s = st();
+    if (!s.previewing) return;
+    if (s.previewForPart) {
+        if (app.doc_.activePart < app.doc_.partCount()) app.doc_.activePartInfo().litsphere = s.savedPartLitSphere;
+    } else {
+        app.renderSettings_.litsphere = s.savedLitSphere;
+    }
+    s.previewing = false;
+}
+
 void drawMaterialGrid(App& app, GridMode mode) {
     State& s = st();
     const bool popup = mode == GridMode::Popup;
     const float tile = 64.0f * app.uiScale_;
     const int columns = columnsFor(tile, mode);
     int column = 0;
-    int hovered = -2;
-    const int active = s.previewing ? s.savedLitSphere : app.renderSettings_.litsphere;
+    int hovered = -3; // -2 the Scene tile (This Part mode), -1 Studio, else a Lit Sphere; -3 none
     app.materialListShown(); // just opened: pick up images added to the Lit Spheres folder meanwhile
+    // Scene | This Part: which material a click sets. Scene (the start) is the one material every Part shares; This Part
+    // gives the active Part a Lit Sphere of its own (part_material), the other Parts keep the scene's.
+    {
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const float w = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
+        const auto segment = [&](const char* label, bool on) {
+            ImGui::PushStyleColor(ImGuiCol_Button, on ? style.Colors[ImGuiCol_ButtonActive] : style.Colors[ImGuiCol_FrameBg]);
+            const bool clicked = ImGui::Button(label, ImVec2(w, 0));
+            ImGui::PopStyleColor();
+            return clicked;
+        };
+        if (segment(tr("Scene##material.target_scene"), !s.materialForPart) && s.materialForPart) {
+            PickerUi::endMaterialPreview(app);
+            s.materialForPart = false;
+        }
+        ui::HelpText("Scene", nullptr, "Pick the material every Part is shaded with (Parts with a material of their own keep it).",
+                     "Material");
+        ImGui::SameLine();
+        if (segment(tr("This Part##material.target_part"), s.materialForPart) && !s.materialForPart) {
+            PickerUi::endMaterialPreview(app);
+            s.materialForPart = true;
+        }
+        ui::HelpText("This Part", nullptr,
+                     "Pick a material for the active Part alone: chrome eyes in a clay head. The other Parts keep the scene's "
+                     "material; the Scene tile puts the Part back on it. Saved in the project.",
+                     "Material");
+        if (s.materialForPart) ImGui::TextDisabled("%s", app.doc_.activePartInfo().name.c_str()); // (which Part gets it)
+    }
+    const int active = PickerUi::shownMaterial(app);
     SortMenu("materialsort", app.uiPrefs_.materialSort, false);
     std::vector<int> list; // the Lit Spheres and Studio (-1), in the chosen order (A-Z by default)
     std::vector<ListSortKey> keys;
@@ -1187,6 +1240,27 @@ void drawMaterialGrid(App& app, GridMode mode) {
         return int(std::find(groups.begin(), groups.end(), c->group) - groups.begin()) + 1;
     };
     std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return groupRank(a) < groupRank(b); });
+    // set_material / part_material for a tile: what a click does in Scene / This Part mode (and the right-click's other one).
+    const auto materialArg = [](int i) { return std::string(i == kLitSphereScene ? "scene" : i < 0 ? "studio" : litsphereName(i)); };
+    const auto useForScene = [&](int i) {
+        PickerUi::endMaterialPreview(app);
+        app.renderSettings_.litsphere = s.savedLitSphere = i; // runCommand below echoes it for scripts
+        app.runCommand("set_material", {{"name", materialArg(i)}});
+    };
+    const auto useForPart = [&](int i) {
+        PickerUi::endMaterialPreview(app);
+        app.runCommand("part_material", {{"material", materialArg(i)}});
+    };
+    if (s.materialForPart) { // the Scene tile: the Part follows the scene's material (shown on it) again
+        tileGrid(column, columns);
+        const int scene = app.renderSettings_.litsphere;
+        if (AssetTile("Scene##mat", app.thumbs_.material(scene), ICON_LC_SUN, tr("Scene"), tile, active == kLitSphereScene)) {
+            useForPart(kLitSphereScene);
+            if (popup) closePicker();
+        }
+        if (ImGui::IsItemHovered()) hovered = kLitSphereScene;
+        ui::HelpText("Scene", nullptr, "The active Part follows the scene's material again (the one shown here).", "Material");
+    }
     int shownGroup = 0;
     for (size_t o : order) {
         const int i = list[o];
@@ -1199,9 +1273,8 @@ void drawMaterialGrid(App& app, GridMode mode) {
         const char* name = i < 0 ? "Studio" : litsphereName(i);
         const ImTextureID tex = app.thumbs_.material(i);
         if (AssetTile((std::string(name) + "##mat").c_str(), tex, ICON_LC_SUN, name, tile, active == i)) {
-            s.previewing = false;
-            app.renderSettings_.litsphere = s.savedLitSphere = i; // runCommand below echoes it for scripts
-            app.runCommand("set_material", {{"name", std::string(i < 0 ? "studio" : name)}});
+            if (s.materialForPart) useForPart(i);
+            else useForScene(i);
             if (popup) closePicker();
         }
         if (ImGui::IsItemHovered()) hovered = i;
@@ -1214,27 +1287,34 @@ void drawMaterialGrid(App& app, GridMode mode) {
                      : isCustomLitSphere(i) ? "Your own Lit Sphere. Right-click to rename it, move it to a folder or remove it."
                               : "Lit Sphere material: the whole lit look in one image.",
                      "Material");
-        if (isCustomLitSphere(i) && ImGui::BeginPopupContextItem()) {
-            litsphereMenu(app, i, [&] {
-                if (popup && s.previewing) { // put the real material back before it can go
-                    app.renderSettings_.litsphere = s.savedLitSphere;
-                    s.previewing = false;
-                }
-            });
+        if (ImGui::BeginPopupContextItem()) {
+            // The other target: a material for the active Part alone, or for the whole scene (Scene | This Part above).
+            if (!s.materialForPart && ImGui::MenuItem(tr("Use for this Part only##litsphere"))) useForPart(i);
+            if (s.materialForPart && ImGui::MenuItem(tr("Use for the whole scene##litsphere"))) useForScene(i);
+            if (isCustomLitSphere(i)) {
+                ImGui::Separator();
+                litsphereMenu(app, i, [&] {
+                    if (popup && s.previewing) PickerUi::endMaterialPreview(app); // put the real material back before it can go
+                });
+            }
             ImGui::EndPopup();
         }
     }
-    // the classic "Preview Material On Mesh": hovering a material shows it on the model until the pointer leaves.
+    // the classic "Preview Material On Mesh": hovering a material shows it on the model until the pointer leaves (in
+    // This Part mode on the active Part alone).
     if (popup && st().open) {
-        if (hovered >= -1) {
+        if (hovered >= kLitSphereScene) {
+            if (s.previewing && s.previewForPart != s.materialForPart) PickerUi::endMaterialPreview(app); // (the toggle changed mid-hover)
             if (!s.previewing) {
                 s.previewing = true;
+                s.previewForPart = s.materialForPart;
                 s.savedLitSphere = app.renderSettings_.litsphere;
+                s.savedPartLitSphere = app.doc_.activePartInfo().litsphere;
             }
-            app.renderSettings_.litsphere = hovered;
+            if (s.previewForPart) app.doc_.activePartInfo().litsphere = hovered;
+            else app.renderSettings_.litsphere = hovered;
         } else if (s.previewing) {
-            app.renderSettings_.litsphere = s.savedLitSphere;
-            s.previewing = false;
+            PickerUi::endMaterialPreview(app);
         }
     }
     AssetTileHoverGlow();
@@ -1403,10 +1483,7 @@ void drawPickers(App& app) {
             }
         }
     }
-    if (!s.open && s.previewing) { // closed without picking: put the material back
-        app.renderSettings_.litsphere = s.savedLitSphere;
-        s.previewing = false;
-    }
+    if (!s.open && s.previewing) PickerUi::endMaterialPreview(app); // closed without picking: put the material back
 
     // Size (S), Intensity (U), Colour intensity (I) and Falloff (O) at the cursor.
     if (s.slider >= 0) {

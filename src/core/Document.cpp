@@ -328,6 +328,7 @@ int Document::linkedDuplicate(int i, const glm::vec3& offset) {
                            glm::translate(glm::mat4(1.0f), offset) * parts[size_t(i)].transform, i + 1);
     parts[size_t(at)].visible = parts[size_t(at - 1)].visible;
     parts[size_t(at)].shading = parts[size_t(at - 1)].shading;
+    parts[size_t(at)].litsphere = parts[size_t(at - 1)].litsphere;
     parts[size_t(at)].boolean = parts[size_t(at - 1)].boolean;
     selectPart(at);
     // One step in the shared history: undo takes the copy away again (applyPartStep).

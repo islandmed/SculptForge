@@ -7,6 +7,7 @@
 
 #include "core/Commands.h"
 #include "core/Primitives.h"
+#include "core/LitSphere.h"
 #include "core/Project.h"
 #include "core/Texture.h"
 #include "io/Zip.h"
@@ -221,6 +222,67 @@ TEST(project_part_shading) {
     Shading s = Shading::Flat;
     CHECK(!parseShading("phong", s) && s == Shading::Flat);
     CHECK(parseShading("DEFAULT", s) && s == Shading::Default);
+    std::filesystem::remove(path);
+}
+
+TEST(project_part_material) {
+    // A Lit Sphere material per Part (part_material): the scene's by default, a built-in by name, Studio, refused names;
+    // copies inherit it; an optional project key, so files without it (and older readers) are unaffected.
+    CommandRegistry reg;
+    Document doc = makeDoc(makeIcosphere(1));
+    CHECK(reg.execute(doc, "part_append", {{"type", std::string("cube")}}).ok);
+    CHECK(doc.activePartInfo().litsphere == kLitSphereScene);
+    CHECK(doc.partLitSphere(1, 3) == 3); // follows the scene's
+    CHECK(reg.execute(doc, "part_material", {{"material", std::string("Chrome")}}).ok);
+    const int chrome = findLitSphere("Chrome");
+    CHECK(chrome >= 0 && doc.parts[1].litsphere == chrome && doc.partLitSphere(1, 3) == chrome);
+    CHECK(reg.execute(doc, "part_material", {{"material", std::string("studio")}, {"index", 0.0}}).ok);
+    CHECK(doc.parts[0].litsphere == -1);
+    CHECK(!reg.execute(doc, "part_material", {{"material", std::string("Nonesuch")}}).ok);
+    CHECK(doc.parts[1].litsphere == chrome);
+    CHECK(reg.execute(doc, "part_duplicate").ok); // the copy keeps it
+    CHECK(doc.partCount() == 3 && doc.activePartInfo().litsphere == chrome);
+    doc.modified = false;
+    CHECK(reg.execute(doc, "part_material", {{"material", std::string("scene")}}).ok);
+    CHECK(doc.activePartInfo().litsphere == kLitSphereScene && doc.modified);
+    CHECK(reg.execute(doc, "part_material", {{"material", std::string("Bronze")}, {"all", true}}).ok); // every Part at once
+    CHECK(doc.parts[0].litsphere == findLitSphere("Bronze") && doc.parts[1].litsphere == findLitSphere("Bronze"));
+    CHECK(reg.execute(doc, "part_material", {{"material", std::string("scene")}, {"all", true}}).ok);
+    CHECK(doc.parts[0].litsphere == kLitSphereScene && doc.parts[1].litsphere == kLitSphereScene);
+    CHECK(reg.execute(doc, "part_material", {{"material", std::string("Chrome")}, {"index", 1.0}}).ok);
+    CHECK(reg.execute(doc, "part_material", {{"material", std::string("Red Wax")}}).ok);
+
+    // A custom Lit Sphere a Part uses travels inside the project (the app puts its PNG in projectFiles, as for the scene's)
+    // and comes back by its pixels, added for the session when this machine lacks it.
+    CustomLitSphere custom;
+    custom.name = "Part Gold";
+    custom.size = 4;
+    custom.rgba.assign(4 * 4 * 4, 200);
+    for (size_t i = 0; i < custom.rgba.size(); i += 4) custom.rgba[i] = uint8_t(i), custom.rgba[i + 3] = 255;
+    custom.hash = 0x5151u;
+    const int gold = addCustomLitSphere(custom);
+    CHECK(reg.execute(doc, "part_material", {{"material", std::string("Part Gold")}, {"index", 0.0}}).ok);
+    CHECK(doc.parts[0].litsphere == gold);
+    std::vector<uint8_t> png;
+    CHECK(encodeLitSpherePng(gold, png) && !png.empty());
+    doc.projectFiles[litsphereAttachmentName("Part Gold")] = png;
+
+    const std::string path = tempPath("sf_project_part_material.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Document back;
+    CHECK(loadProject(path, back, err));
+    CHECK(back.partCount() == 3);
+    CHECK(back.parts[0].litsphere == gold && back.parts[1].litsphere == chrome && back.parts[2].litsphere == findLitSphere("Red Wax"));
+    // The same file on a machine without Part Gold: it joins the session's Lit Spheres under its name, from the attachment.
+    clearCustomLitSpheres();
+    CHECK(findLitSphere("Part Gold") < 0);
+    Document other;
+    CHECK(loadProject(path, other, err));
+    CHECK(other.parts[0].litsphere >= 0 && isCustomLitSphere(other.parts[0].litsphere) &&
+          std::string(litsphereName(other.parts[0].litsphere)) == "Part Gold");
+    CHECK(other.parts[1].litsphere == chrome && other.parts[2].litsphere == findLitSphere("Red Wax"));
+    clearCustomLitSpheres();
     std::filesystem::remove(path);
 }
 

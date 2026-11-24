@@ -74,13 +74,6 @@ void readBool(const Json& j, const char* key, bool& v) { v = j[key].asBool(v); }
 
 // Save As dialog: a cancelled dialog is reported as an empty path so a pending
 // "save, then quit/open/new" is dropped instead of firing on a later save.
-// "lit spheres/<name>.png" with the characters project attachment names allow.
-std::string litsphereAttachmentName(const std::string& name) {
-    std::string safe;
-    for (unsigned char c : name) safe += std::isalnum(c) || c == ' ' || c == '_' || c == '-' || c >= 0x80 ? char(c) : '_';
-    return "litspheres/" + (safe.empty() ? std::string("LitSphere") : safe) + ".png";
-}
-
 void SDLCALL onProjectChosen(void* userdata, const char* const* files, int) {
     wakeMainLoop(); // a file dialog answered (maybe on another thread): redraw now
     auto* req = static_cast<App::DialogRequest*>(userdata);
@@ -538,6 +531,10 @@ void App::storeProjectSettings() {
         doc_.projectFiles[file] = std::move(png);
         render.set("litsphere_file", file);
     }
+    // ... and so does each Part's own custom Lit Sphere (part_material; core/Project.cpp names it in the Part's entry).
+    for (const Part& s : doc_.parts)
+        if (std::vector<uint8_t> png; isCustomLitSphere(s.litsphere) && encodeLitSpherePng(s.litsphere, png))
+            doc_.projectFiles[litsphereAttachmentName(litsphereName(s.litsphere))] = std::move(png);
     s.set("render", std::move(render));
 
     Json brush = Json::object();

@@ -98,6 +98,7 @@ ui_backface_culling         render
 ui_background*              render
 ui_floor_grid               render
 ui_flat_shading             render
+ui_litsphere_per_part       render
 ui_ortho_shading            render
 ui_pbr_*                    render
 ui_space_camera             render

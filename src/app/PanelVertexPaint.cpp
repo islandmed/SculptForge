@@ -89,8 +89,16 @@ void App::rescanLitSphereFolder() {
     }
     for (const auto& [path, stamp] : litsphereFolderSeen_)
         if (!now.count(path))
-            if (const int i = findLitSphereByPath(path); i >= 0 && i != renderSettings_.litsphere) removeCustomLitSphere(i);
+            if (const int i = findLitSphereByPath(path); i >= 0 && !litsphereInUse(i)) removeCustomLitSphere(i);
     litsphereFolderSeen_ = std::move(now);
+}
+
+// The view shades something with Lit Sphere `index`: the scene's material or a Part's own (part_material).
+bool App::litsphereInUse(int index) const {
+    if (renderSettings_.litsphere == index) return true;
+    for (const Part& s : doc_.parts)
+        if (s.litsphere == index) return true;
+    return false;
 }
 
 std::vector<std::string> App::litsphereSubfolders() const {
@@ -235,6 +243,8 @@ void App::registerPaintUiCommands() {
                        const bool inFolder = !path.empty() && !litsphereFolder().empty() &&
                                              fs::equivalent(u8path(path).parent_path(), u8path(litsphereFolder()), ec);
                        if (renderSettings_.litsphere == index) renderSettings_.litsphere = defaultLitSphere();
+                       for (Part& s : doc_.parts) // (a Part that had it follows the scene again)
+                           if (s.litsphere == index) s.litsphere = kLitSphereScene;
                        removeCustomLitSphere(index);
                        if (!inFolder)
                            return {true, "Removed " + shown + (path.empty() ? "" : " (its image stays at " + path + ")")};
@@ -707,6 +717,11 @@ void App::drawShadingControls() {
     ui::Segmented(*this, {"material.smooth", "material.flat"});
     ImGui::TextDisabled("%s", tr("This Part"));
     ui::Segmented(*this, {"part.shading_default", "part.shading_smooth", "part.shading_flat"});
+    // Its own material (the grid's This Part): a button that takes the Part back to the scene's material (greyed while it
+    // follows it already).
+    ImGui::BeginDisabled(doc_.activePartInfo().litsphere == kLitSphereScene);
+    ui::ActionButton(*this, "part.material_scene", ImVec2(-1, 0));
+    ImGui::EndDisabled();
 }
 
 } // namespace sf

@@ -424,12 +424,14 @@ CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, co
     const bool visible = from.visible;
     const uint32_t folder = from.folder;
     const Shading shading = from.shading;
+    const int litsphere = from.litsphere;
     const glm::mat4 place = from.transform; // (a moved linked copy, #94: the piece stays where it was seen)
     const int at = doc.addPart(std::move(piece), doc.uniquePartName(source + " " + suffix), false, doc.activePart + 1);
     Part& added = doc.parts[size_t(at)];
     added.visible = visible;
     added.folder = folder;
     added.shading = shading;
+    added.litsphere = litsphere;
     added.transform = place;
     const uint32_t id = added.id;
     const std::string name = added.name;
@@ -714,12 +716,14 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
         const bool visible = from.visible;
         const uint32_t folder = from.folder;
         const Shading shading = from.shading;
+        const int litsphere = from.litsphere;
         const glm::mat4 place = from.transform; // (a moved linked copy: the piece stays where it was placed)
         const int index = doc.addPart(std::move(piece), doc.uniquePartName(label), false, doc.activePart + 1);
         Part& added = doc.parts[size_t(index)];
         added.visible = visible;
         added.folder = folder;
         added.shading = shading;
+        added.litsphere = litsphere;
         added.transform = place;
         const std::string name = added.name;
         auto step = std::make_shared<PartStep>();
@@ -946,11 +950,13 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (i < 0) return notFound(a);
                  Mesh copy = doc.partMesh(i);
                  const Shading shading = doc.parts[size_t(i)].shading;
+                 const int litsphere = doc.parts[size_t(i)].litsphere;
                  const PartBoolean boolean = doc.parts[size_t(i)].boolean;
                  const uint32_t folder = doc.parts[size_t(i)].folder;
                  const glm::mat4 place = doc.parts[size_t(i)].transform;
                  const int added = doc.addPart(std::move(copy), doc.parts[size_t(i)].name + " copy", true, i + 1);
                  doc.parts[size_t(added)].shading = shading;
+                 doc.parts[size_t(added)].litsphere = litsphere;
                  doc.parts[size_t(added)].boolean = boolean; // (a copy of a cutter cuts too)
                  doc.parts[size_t(added)].folder = folder; // (right below it: the folder stays together)
                  doc.parts[size_t(added)].transform = place;
@@ -1035,6 +1041,41 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (s.shading != mode) doc.modified = true;
                  s.shading = mode;
                  return {true, s.name + " shading: " + shadingName(mode)};
+             }});
+
+    // A Lit Sphere material of its own (the material picker's This Part): the view shades the Part with it instead of
+    // the scene's material; the scene's shading mode (Lit Sphere / PBR), vertex paint and Unlit apply as before.
+    reg.add({"part_material",
+             "Give a Part its own Lit Sphere material, or let it follow the scene's material again (the default).",
+             {{"material", T::String, "A Lit Sphere name (as set_material), studio, or scene (the scene's material).", true},
+              {"all", T::Bool, "Every Part instead of one (scene: one material for the whole scene again). Default false.", false},
+              indexParam, nameParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const bool all = argBool(a, "all", false);
+                 const int i = all ? doc.activePart : targetPart(doc, a);
+                 if (i < 0) return notFound(a);
+                 std::string want = argString(a, "material");
+                 std::string lower = want;
+                 for (char& c : lower) c = char(std::tolower(static_cast<unsigned char>(c)));
+                 int index = kLitSphereScene;
+                 if (lower == "studio") index = -1;
+                 else if (lower != "scene" && lower != "default" && !lower.empty()) {
+                     index = findLitSphere(want);
+                     if (index < 0 || !isLitSphereListed(index)) return {false, "No Lit Sphere called '" + want + "'"};
+                 }
+                 const std::string shown = index < 0 ? std::string("Studio") : std::string(litsphereName(index));
+                 if (all) {
+                     for (Part& s : doc.parts) {
+                         if (s.litsphere != index) doc.modified = true;
+                         s.litsphere = index;
+                     }
+                     return {true, index == kLitSphereScene ? std::string("Every Part follows the scene's material") : "Every Part's material: " + shown};
+                 }
+                 Part& s = doc.parts[size_t(i)];
+                 if (s.litsphere != index) doc.modified = true;
+                 s.litsphere = index;
+                 if (index == kLitSphereScene) return {true, s.name + " material: the scene's"};
+                 return {true, s.name + " material: " + shown};
              }});
 
     // Folders (#96): group Parts in the list; hide, show and move (transform folder=true) a folder at once.

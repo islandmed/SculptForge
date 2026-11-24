@@ -212,7 +212,7 @@ turn on **Edit > Preferences > Interface > Palettes strictly A-Z (strict order)*
 | **Color** | Paint | The Paint brush, RGB while sculpting, the paint colour and swatches, Fill, Fill masked, Cavity, Clear, Line Gradient, Show vertex paint |
 | **Draw** | Sculpt > Draw & Tablet | Size, Intensity, Colour intensity, Falloff, Sculpt/Paint, Add/Sub, Rgb, Front, and the tablet options (Pressure > strength, Pressure > size) with a pen readout |
 | **Generate** | Mesh > Generate 3D (Mesh > From Image while Edit > Preferences > AI is off) | Generate 3D (image or text to 3D), Relief, Inflate and Stamp from an image, and the AI brush provider settings; with AI off only Relief, Inflate and Stamp |
-| **Material** | Render > Materials | The Lit Sphere materials (Soft Clay, the default, first), your own (**Load Lit Sphere...**) and Studio, Base colour, Smooth / Flat shading for the scene and the active Part |
+| **Material** | Render > Materials | The Lit Sphere materials (Soft Clay, the default, first), your own (**Load Lit Sphere...**) and Studio, for the scene or the active Part alone (**Scene | This Part**), Base colour, Smooth / Flat shading for the scene and the active Part |
 | **Preferences** | Edit > Preferences | Config, Interface, Input, Hotkeys, Display, Library, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
 | **Render** | View | Wireframe, Show Mesh, Show Vertex Paint, Show Mask, Show Face Groups, Floor grid, Show Splats, Background, Frame, Fullscreen |
 | **Script** | File > Script | Console, Run script file, Copy session as script, Clear console |

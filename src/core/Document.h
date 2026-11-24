@@ -7,6 +7,7 @@
 #include "core/BrushRecipe.h"
 #include "core/EdgeSelect.h"
 #include "core/Json.h"
+#include "core/LitSphere.h"
 #include "core/Mesh.h"
 #include "core/QRemeshGuides.h"
 #include "core/Reference.h"
@@ -66,6 +67,9 @@ struct Part {
     // remembered (a Part made during Solo, or Solo is off).
     int8_t shownBeforeSolo = -1;
     Shading shading = Shading::Default; // per-Part override of the scene's shading
+    // Its own Lit Sphere material (part_material, the material picker's This Part): kLitSphereScene = the scene's
+    // material (the default), -1 = Studio, else a Lit Sphere index (core/LitSphere.h). Saved in projects.
+    int litsphere = kLitSphereScene;
     PartBoolean boolean = PartBoolean::None; // its part in the scene's Boolean
     uint32_t folder = 0;                // the PartFolder it's in (its id), 0 = none
     // Where the mesh is in the scene: world = transform * mesh position. Identity unless the Part is a linked copy
@@ -198,6 +202,11 @@ struct Document {
     Document();
     int activePart = 0;
     int partCount() const { return int(parts.size()); }
+    // The Lit Sphere Part i is shaded with: its own, or `scene` (RenderSettings::litsphere) when it follows the scene.
+    int partLitSphere(int i, int scene) const {
+        const int own = parts[size_t(i)].litsphere;
+        return own == kLitSphereScene ? scene : own;
+    }
     Part& activePartInfo() { return parts[size_t(activePart)]; }
     const Part& activePartInfo() const { return parts[size_t(activePart)]; }
     // True when Part `i`'s data is the one checked out (the active Part, or a Part linked to it).

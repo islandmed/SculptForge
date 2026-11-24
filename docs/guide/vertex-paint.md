@@ -265,6 +265,27 @@ opens with the same look on another computer (or after you delete the file).
 Loading an image with the same name again replaces it. EXR images are read as linear light, so very bright highlights
 clip to white.
 
+### A material per Part
+
+One material shades the whole scene until a Part asks for its own: chrome eyes in a clay head, a bronze base under a
+wax figure. The material picker (<kbd>M</kbd>) and **Render > Materials** have a **Scene | This Part** switch at the
+top:
+
+- **Scene** (where it starts, and the picker as it always was): the material every Part is shaded with.
+- **This Part**: a material for the active Part alone; the other Parts keep the scene's. Hover previews it on that
+  Part only. The first tile, **Scene**, shows the scene's material and puts the Part back on it, as does
+  **Render > Materials > This Part > Scene material**.
+- Right-click any material for the other target: **Use for this Part only** (in Scene mode) or **Use for the whole
+  scene** (in This Part mode).
+
+The switch stays where you left it for the session, so giving the eyes, teeth and nails their materials is one click
+each. A Part's own material is saved in the project (a Lit Sphere loaded from an image travels inside it, as the
+scene's does), duplicates and linked copies inherit it, and the Parts list names it when you point at the Part. PBR
+viewport shading ignores Lit Spheres as before; vertex paint multiplies whichever material the Part has.
+
+Scripts, Python and the AI assistant use `part_material material=Chrome` (`studio`, or `scene` to follow the scene
+again), with `index=` or `name=` for a Part other than the active one.
+
 ## Smooth and flat shading
 
 **Smooth** shading (the default) blends the light across polygons, so the surface reads as one form. **Flat**

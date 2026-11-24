@@ -22,6 +22,7 @@ wait 0.3
 render_cell "Lit Sphere x small" mode=lit
 render_cell "PBR x small" mode=pbr
 render_cell "flat x small" mode=flat
+render_cell "part x small" mode=part
 render_cell "wire x small" mode=wire
 # (face groups: a second group in front, Show Face Groups on)
 run mask_by_facing x=0 y=0 z=1 angle=50
@@ -68,6 +69,7 @@ wait 0.3
 render_cell "Lit Sphere x dense Micro" mode=lit
 render_cell "PBR x dense Micro" mode=pbr
 render_cell "flat x dense Micro" mode=flat
+render_cell "part x dense Micro" mode=part
 render_cell "wire x dense Micro" mode=wire
 run mask_by_facing x=0 y=0 z=1 angle=50
 run facegroup_from_mask
@@ -97,6 +99,7 @@ wait 0.3
 render_cell "Lit Sphere x small, over the buffer limit" mode=lit
 render_cell "PBR x small, over the buffer limit" mode=pbr
 render_cell "flat x small, over the buffer limit" mode=flat
+render_cell "part x small, over the buffer limit" mode=part
 render_cell "wire x small, over the buffer limit" mode=wire
 gl_limits texels=0
 

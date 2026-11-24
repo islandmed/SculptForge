@@ -3504,6 +3504,7 @@ void App::runCommand(const std::string& name, const Args& args) {
         name != "export_unreal" && name.rfind("unreal_", 0) != 0 && name != "save_obj" && name != "save_project" &&
         name != "mesh_info" && name.rfind("brush_", 0) != 0 && name.rfind("splat_", 0) != 0 && name != "mesh_to_splats" &&
         name != "set_color" && name != "set_material" && name != "load_litsphere" && name != "set_shading" && name != "part_shading" &&
+        name != "part_material" &&
         name != "viewport_shading" &&
         name != "export_ply" && name != "face_weights" &&
         name != "face_preset" && name.rfind("face_take", 0) != 0 && name != "face_landmarks_detect" &&
@@ -3774,6 +3775,7 @@ void App::syncScene() {
         const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
         const uint32_t key = doc_.meshKey(i); // (linked Parts, #94: one GPU mesh, drawn where each is)
         scene.push_back({key, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
+        scene.back().litsphere = s.litsphere; // its own material (part_material), or the view's (kLitSphereScene)
         scene.back().model = gizmoDrawnTransform(i);
         scene.back().pbr = renderSettings_.pbr();
         if (active && &shown == &doc_.mesh) scene.back().overlay = uvEditorOverlay(s.id); // the UV Editor's colours

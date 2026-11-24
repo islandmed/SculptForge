@@ -1,6 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Project.h"
+
+#include "core/LitSphere.h"
 #include "core/FileReplace.h"
 #include "core/LegacyNames.h"
 #include "core/FocusDetail.h"
@@ -884,6 +886,10 @@ struct LoadedPart {
     bool visible = true;
     int8_t shownBeforeSolo = -1;
     Shading shading = Shading::Default;
+    // Its own material (Part::litsphere): `ownMaterial` with the Lit Sphere's name ("" = Studio) and, for a custom one the
+    // project carries, its attachment; resolved once the attachments are read (the pass after them in loadProject).
+    bool ownMaterial = false;
+    std::string litsphere, litsphereFile;
     PartBoolean boolean = PartBoolean::None;
     int folder = -1; // index into the manifest's part_folders (#96)
     int activeLayer = -1;
@@ -983,6 +989,12 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         st.set("visible", savedVisible(s));
         if (s.shownBeforeSolo >= 0) st.set("shown_before_solo", s.shownBeforeSolo != 0); // (optional: Solo in progress)
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
+        if (s.litsphere != kLitSphereScene) { // its own material (optional, as shading): the name, "" for Studio
+            st.set("litsphere", s.litsphere < 0 ? std::string() : std::string(litsphereName(s.litsphere)));
+            // A custom Lit Sphere travels inside the project when the app put its PNG in projectFiles (App::saveProjectTo).
+            if (isCustomLitSphere(s.litsphere) && doc.projectFiles.count(litsphereAttachmentName(litsphereName(s.litsphere))))
+                st.set("litsphere_file", litsphereAttachmentName(litsphereName(s.litsphere)));
+        }
         if (s.boolean != PartBoolean::None) st.set("boolean", partBooleanName(s.boolean)); // (optional, as shading)
         if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", folderIndex[size_t(f)]); // (#96: optional, as shading)
         if (s.moved()) {
@@ -1233,6 +1245,11 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.visible = sj["visible"].asBool(true);
             if (sj["shown_before_solo"].isBool()) s.shownBeforeSolo = sj["shown_before_solo"].asBool(true) ? 1 : 0;
             if (sj["shading"].isString()) parseShading(sj["shading"].asString(), s.shading); // unknown: Default
+            if (sj["litsphere"].isString()) { // its own material; one this machine lacks: the scene's (the pass after the attachments)
+                s.ownMaterial = true;
+                s.litsphere = sj["litsphere"].asString();
+                s.litsphereFile = sj["litsphere_file"].isString() ? legacy::modernize(sj["litsphere_file"].asString()) : std::string();
+            }
             if (sj["boolean"].isString()) parsePartBoolean(sj["boolean"].asString(), s.boolean); // unknown: None
             s.folder = int(sj["folder"].asNumber(-1));
             s.bridgeName = sj["bridge_name"].asString();
@@ -1437,6 +1454,31 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         if (r.bytes(f["data"], "attachment", n, bytes)) doc.projectFiles[name] = std::move(bytes);
     }
     r.error.clear();
+    // Each Part's own material (Parts load in order: LoadedPart i is doc.parts[i]): a built-in or loaded Lit Sphere by
+    // name; a custom one the project carries by its pixels, added for the session when this machine lacks it (renamed
+    // when another Lit Sphere here has its name); unknown: the scene's material, as if it had none.
+    for (size_t i = 0; i < parts.size() && i < doc.parts.size(); ++i) {
+        if (!parts[i].ownMaterial) continue;
+        const std::string& name = parts[i].litsphere;
+        int index = name.empty() ? -1 : kLitSphereScene;
+        if (!name.empty()) {
+            if (const auto file = doc.projectFiles.find(parts[i].litsphereFile); file != doc.projectFiles.end()) {
+                CustomLitSphere m;
+                std::string err;
+                if (decodeLitSphereImage(file->second.data(), file->second.size(), m, err)) {
+                    index = findLitSphereByHash(m.hash);
+                    if (index < 0) {
+                        m.name = name;
+                        for (int n = 2; findLitSphere(m.name) >= 0; ++n) m.name = name + " " + std::to_string(n);
+                        index = addCustomLitSphere(std::move(m));
+                    }
+                }
+            }
+            if (index == kLitSphereScene)
+                if (const int found = findLitSphere(name); found >= 0 && isLitSphereListed(found)) index = found;
+        }
+        doc.parts[i].litsphere = index;
+    }
     // Reference images: like attachments, one that can't be read is left out rather than failing the file.
     doc.references.clear();
     for (const Json& j : manifest["references"].items()) {

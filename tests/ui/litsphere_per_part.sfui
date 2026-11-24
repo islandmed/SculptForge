@@ -1,0 +1,75 @@
+# A Lit Sphere material per Part (part_material): the material picker's Scene | This Part, the Scene tile that puts a
+# Part back on the scene's material, the right-click "Use for this Part only", and projects that keep it. Scene stays the
+# default: with the toggle on Scene the picker is the one-material picker it was. Files go to the working directory.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+run part_append type=sphere size=0.5
+expect_value parts == 2
+expect_value part_material == -2
+camera 20 10
+
+# The picker (M) opens on Scene: a click sets the scene's material for every Part, as before.
+key m
+expect "Scene##material.target_scene"
+expect "This Part##material.target_part"
+expect_not "Scene##mat"
+click "Chrome##mat"
+expect_value part_material == -2
+expect_status "Material: Chrome"
+shot scene-chrome
+
+# This Part: the appended sphere (active) gets Red Wax of its own; the other Part keeps the scene's Chrome.
+key m
+click "This Part##material.target_part"
+expect "Scene##mat"
+click "Red Wax##mat"
+expect_value part_material != -2
+expect_status "material: Red Wax"
+expect_value dirty == 1
+shot part-red-wax
+
+# The toggle is kept for the session: the picker opens again on This Part; the Scene tile puts the Part back.
+key m
+expect "Scene##mat"
+click "Scene##mat"
+expect_value part_material == -2
+expect_status "material: the scene's"
+
+# Right-click on Scene mode: Use for this Part only.
+key m
+click "Scene##material.target_scene"
+right_click "Skin##mat"
+click "Use for this Part only##litsphere"
+expect_value part_material != -2
+key escape
+shot part-skin-context
+
+# The Material palette has the same toggle; Material > This Part > Scene material takes the Part back.
+click "Material##palette.material"
+expect "This Part##material.target_part"
+expect "Scene material##part.material_scene"
+click "Scene material##part.material_scene"
+expect_value part_material == -2
+key escape
+
+# Scripted, as a Python or MCP client would: by name, Studio, and an unknown name refused.
+run part_material material=Bronze
+expect_value part_material != -2
+run part_material material=studio index=0
+run part_select index=0
+expect_value part_material == -1
+run part_select index=1
+
+# Projects keep each Part's material (the scene's stays separate); a new scene starts clean.
+run save_project path=sf_ui_litsphere_per_part.sfproj
+run new_sphere subdivisions=2
+expect_value part_material == -2
+run open path=sf_ui_litsphere_per_part.sfproj
+expect_value parts == 2
+expect_value part_material != -2
+run part_select index=0
+expect_value part_material == -1
+run part_material material=scene
+expect_value part_material == -2
+expect_value dirty == 1
+shot reopened

@@ -106,6 +106,7 @@
 //                            can_undo, newer_menu_rows (1 while the menu rows added after 0.13.0 show), level_switches (the Level slider's switches), typing (1 while a slider's number is typed), dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
 //                            detached_panels (in windows of their own), flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
 //                            background_r / background_g / background_b (the flat colour, 0-255), part_shading (0 Scene, 1 Smooth, 2 Flat),
+//                            material (the scene's Lit Sphere index, -1 Studio), part_material (the active Part's own: -2 the scene's, -1 Studio, else its index),
 //                            custom_lit spheres (Lit Spheres loaded from images), material_custom (1 when the view uses
 //                            one), lit sphere_files (images in the library's Lit Spheres folder),
 //                            support_requests (times Support SculptForge was clicked; never opens a browser in tests),
@@ -1256,6 +1257,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "background_r" || name == "background_g" || name == "background_b") // 0-255, display values
         return std::round(app_.renderSettings_.backgroundColor[name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2] * 255.0f);
     if (name == "part_shading") return double(int(app_.doc_.activePartInfo().shading));
+    if (name == "part_material") return double(app_.doc_.activePartInfo().litsphere); // -2 the scene's, -1 Studio, else the index
+    if (name == "material") return double(app_.renderSettings_.litsphere);            // the scene's: -1 Studio, else the index
     if (name == "shelves") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "left_tray") return app_.layout_.leftTrayOpen ? double(app_.layout_.leftTray.size()) : -1.0;
     if (name == "right_tray") return app_.layout_.rightTrayOpen ? double(app_.layout_.rightTray.size()) : -1.0;

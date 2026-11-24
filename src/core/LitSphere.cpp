@@ -477,4 +477,10 @@ std::vector<uint8_t> generateLitSphere(int index, int size) {
     return rgba;
 }
 
+std::string litsphereAttachmentName(const std::string& name) {
+    std::string safe;
+    for (unsigned char c : name) safe += std::isalnum(c) || c == ' ' || c == '_' || c == '-' || c >= 0x80 ? char(c) : '_';
+    return "litspheres/" + (safe.empty() ? std::string("LitSphere") : safe) + ".png";
+}
+
 } // namespace sf

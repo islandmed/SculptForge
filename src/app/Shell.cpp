@@ -715,6 +715,23 @@ void App::registerShellActions() {
                    "The active Part always shades smooth, whatever the scene's shading. Saved in the project.");
     partShading("part.shading_flat", "Flat", Shading::Flat,
                    "The active Part always shades flat (faceted), whatever the scene's shading. Saved in the project.");
+    // Its own Lit Sphere material (part_material): the material picker's This Part gives it one; this takes it back.
+    add({"part.material_scene", "Scene material", ICON_LC_SUN,
+         "The active Part follows the scene's material again (the material picker's Scene | This Part gives a Part a Lit "
+         "Sphere of its own). Saved in the project.",
+         "Material > This Part", "", "part_material",
+         [this] { runCommand("part_material", {{"material", std::string("scene")}}); },
+         [this] { return doc_.activePartInfo().litsphere == kLitSphereScene; }, nullptr});
+    add({"part.material_scene_all", "Scene material for every Part", ICON_LC_SUN,
+         "Every Part follows the scene's material again: one material for the whole scene, as before any Part had its own.",
+         "Material > This Part", "", "part_material",
+         [this] { runCommand("part_material", {{"material", std::string("scene")}, {"all", true}}); },
+         [this] {
+             for (const Part& s : doc_.parts)
+                 if (s.litsphere != kLitSphereScene) return false;
+             return true;
+         },
+         nullptr});
     flag("view.mesh", "Show Mesh", ICON_LC_BOX, "Render", "", &renderSettings_.showMesh, "Draw the sculpt.");
     add({"view.fullscreen", "Fullscreen", ICON_LC_MAXIMIZE, "Fill the screen with SculptForge (again: back to a window).",
          "Render", "F11", "",
