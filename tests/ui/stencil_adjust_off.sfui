@@ -1,0 +1,66 @@
+# Stencil Adjust (#bug-reports: "turn Adjust off and sculpting stops"): however Adjust ends (its button, Enter, Esc, Esc in the
+# middle of a drag), the next plain stroke sculpts; a stroke the Stencil holds back says why and how to remove it.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+key f
+click "Standard##brush.standard"
+run brush_set_alpha name=cobblestone
+run stencil_load alpha=true reset=true
+run brush_set_alpha name=round
+wait 0.1
+run stencil_set size=0.9
+
+# Adjust on, move and turn it, off with the button.
+click "Alpha##palette.alpha"
+click "Adjust##stencil.adjust"
+expect_value stencil_adjust == 1
+click "Alpha##palette.alpha"
+drag_path 0.5 0.5 0.45 0.5
+key comma
+click "Alpha##palette.alpha"
+click "Adjust##stencil.adjust"
+expect_value stencil_adjust == 0
+click "Alpha##palette.alpha"
+expect_latched none
+expect_sculpts
+
+# Esc ends it, Enter ends it.
+action stencil.adjust
+expect_value stencil_adjust == 1
+key escape
+expect_value stencil_adjust == 0
+expect_latched none
+expect_sculpts
+action stencil.adjust
+key enter
+expect_value stencil_adjust == 0
+expect_sculpts
+
+# Adjust ends in the middle of a drag (the button still down): the rest of the drag ends with it, the next stroke sculpts.
+action stencil.adjust
+drag_path 0.5 0.5 0.45 0.5 keep
+key escape
+drag_path 0.45 0.5 0.4 0.5 keep
+release
+expect_value stencil_adjust == 0
+expect_latched none
+expect_sculpts
+
+# The same with the pen.
+action stencil.adjust
+pen_press 0.5 0.5 0.5
+pen_sample 0.45 0.5 0.5
+key escape
+pen_sample 0.4 0.5 0.5
+pen_lift
+expect_latched none
+expect_sculpts
+
+# A Stencil off the model holds every stroke back: the status line says so, and Show off lets it through.
+run stencil_set x=1.8 y=1.8 size=0.2
+snapshot
+stroke 0.3 0.5 0.7 0.5
+expect_value moved == 0
+expect_status A Stencil is on
+run stencil_set visible=false
+expect_sculpts

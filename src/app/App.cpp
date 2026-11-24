@@ -3343,6 +3343,8 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
         p.stencil.stencil = &st.stencil;
         p.stencil.viewProj = cam.projection() * cam.view();
         p.stencil.canvasAspect = cr.h > 0.0f ? cr.w / cr.h : 1.0f;
+        if (!haveLastDab_ && p.stencil.weight(p.center) < 0.05f) // (a stroke that starts where the image is dark or off it)
+            status_ = "A Stencil is on: strokes reach only its light parts (Alpha > Stencil: X)";
     }
     p.strokeDelta = haveLastDab_ ? hit.position - lastDabHit_ : glm::vec3(0.0f);
     lastDabHit_ = hit.position;
