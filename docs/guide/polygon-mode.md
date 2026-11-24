@@ -72,6 +72,22 @@ delete the faces they fully cover). **Flip** turns the selected faces inside out
 (Extrude, Inset, Bevel, Edge loop, Span) land here as they ship; each has its settings under its button, and a
 slider you drag shows a live preview of the result on the model.
 
+### Inset
+
+**Inset** shrinks the selected faces inward and fills the gap with a rim of quads: the classic way to cut a panel
+line, a frame or a sunken button into a flat side.
+
+| Setting | Does |
+| --- | --- |
+| **Thickness** | How far the border moves in, as a fraction of the Part's size. Held below the point where a face would turn inside out (the status line says so). |
+| **Depth** | How far the inner faces move along their normal: negative sinks them into the surface, positive raises them. |
+| **Each face** | Every selected face is inset by itself instead of the selection as one shape. |
+| **Rim group** | The rim joins one new face group instead of its faces' groups, so a double-click selects the rim alone afterwards. |
+
+The inner faces stay selected, so a second Inset, an Extrude or a Gizmo move continues from them. The rim keeps the
+face group of the face it came from, UVs stay continuous (a painted texture follows), and a crease or UV seam on the
+old border stays on it. A selection that is a whole closed Part has no border to inset from; use **Each face** there.
+
 An operation that needs whole faces tells you so when only some of a face's points are selected: switch to Faces, or
 select whole faces.
 
@@ -83,5 +99,5 @@ Polygon mode is driven by three commands (the console shows every click as one o
 | --- | --- |
 | `poly_mode` | whether the active Part can enter Polygon mode and its counts; `element=points` / `edges` / `faces` picks what is selected |
 | `poly_select` | `op=point` / `edge` / `face` with `index=N`; `loop` / `ring` with an edge's index; `group` with `group=N`; `rect` with `x0 y0 x1 y1` (-1..1 under `view_proj`, `eye` for the facing side); `grow`, `shrink`, `all`, `none`, `invert`, `info`; `add` / `remove` instead of replacing |
-| `poly_op` | `op=list` names the operations and their parameters; `op=delete`, `op=flip`, ...; parameters as `name=value` |
+| `poly_op` | `op=list` names the operations and their parameters; `op=delete`, `op=flip`, `op=inset thickness=0.1 depth=-0.05 individual=false rim_group=false`, ...; parameters as `name=value` |
 | `transform` | `selection=true` moves only the selection (what a gizmo drag runs) |

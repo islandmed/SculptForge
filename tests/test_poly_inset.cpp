@@ -1,15 +1,19 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Inset faces (core/PolyInset.h): shapes (a cell of a plane, a cube side, a cylinder cap, an icosphere, a curved
+// Inset faces (core/PolyInset.h and its Polygon mode op): shapes (a cell of a plane, a cube side, a cylinder cap, an icosphere, a curved
 // cap, an L, two cells touching at a corner, a whole open plane), the thickness clamp, attributes (face groups,
 // UVs, seams, creases, paint, mask, sculpt and paint layers), refusals and bad input.
 #include "TestHarness.h"
 
+#include "core/Commands.h"
+#include "core/EdgeSelect.h"
 #include "core/FaceGroups.h"
 #include "core/MeshCheck.h"
 #include "core/PaintLayer.h"
 #include "core/PolyInset.h"
+#include "core/PolyMode.h"
+#include "core/PolyOps.h"
 #include "core/Primitives.h"
 #include "core/Uv.h"
 
@@ -47,8 +51,13 @@ bool clean(const Mesh& before, const InsetResult& r) {
             std::printf("  %s: %zu before, %zu after\n", meshIssueName(i), b.count[int(i)], a.count[int(i)]);
             ok = false;
         }
-    for (size_t i = 0; i + 1 < r.rim.size(); i += 2) ok &= m.quadPartnerAt(r.rim[i]) == r.rim[i + 1];
-    ok &= m.triangleCount() == before.triangleCount() + r.rim.size();
+    for (size_t i = 0; i < r.rim.size(); ++i) { // a rim quad's halves are adjacent and paired; a merged corner leaves a triangle
+        const uint32_t u = m.quadPartnerAt(r.rim[i]);
+        if (u != Mesh::kNoQuad) ok &= (i + 1 < r.rim.size() && u == r.rim[i + 1]) || (i > 0 && u == r.rim[i - 1]);
+    }
+    ok &= m.triangleCount() <= before.triangleCount() + r.rim.size();
+    ok &= r.selection.size() <= before.triangleCount();
+    for (uint32_t t : r.selection) ok &= t < m.triangleCount();
     ok &= m.vertexCount() == before.vertexCount() + r.newVertices;
     return ok;
 }
@@ -173,8 +182,9 @@ TEST(poly_inset_whole_open_plane_insets_along_its_border) {
     CHECK(r.newVertices == 12); // the 12 border vertices of a 3x3 grid
     CHECK(r.rim.size() == 24);
     CHECK(issue(r.mesh, MeshIssue::Holes) == 1); // still one open border, the same one
-    // Border vertices stay where they were; the new ring is 0.1 inside the border.
-    for (uint32_t v = 0; v < plane.vertexCount(); ++v) CHECK(r.mesh.positions[v] == plane.positions[v]);
+    // Border vertices stay where they were (the interior follows the new ring); the new ring is 0.1 inside the border.
+    for (uint32_t v = 0; v < plane.vertexCount(); ++v)
+        if (std::max(std::abs(plane.positions[v].x), std::abs(plane.positions[v].z)) > 0.99f) CHECK(r.mesh.positions[v] == plane.positions[v]);
     for (uint32_t v = uint32_t(plane.vertexCount()); v < r.mesh.vertexCount(); ++v) {
         const glm::vec3 p = r.mesh.positions[v];
         CHECK(std::max(std::abs(p.x), std::abs(p.z)) < 0.9f + 1e-5f);
@@ -563,6 +573,93 @@ TEST(poly_inset_degenerate_and_open_input_never_crashes) {
     CHECK(big.clamped && normal(big.mesh, 0).z > 0.999f);
 }
 
+TEST(poly_inset_deep_inset_of_a_gridded_side_flows_corners_in) {
+    // A 10 x 10 side of a cube inset by three cells: without merging, the edges beside each corner would fold the rim
+    // over (the corner's new vertex passes its neighbours'); with it they flow into the corner and the inner panel is
+    // a clean 7 x 7-ish grid, the interior rings having followed the border.
+    const Mesh cube = makeCube(10); // cells 0.2 wide
+    const std::vector<uint32_t> side = group(cube, 3); // +Y
+    CHECK(side.size() == 200);
+    InsetOptions o;
+    o.thickness = 0.6f;
+    o.depth = -0.1f;
+    const InsetResult r = insetFaces(cube, side, o);
+    CHECK(clean(cube, r));
+    CHECK(!r.clamped);
+    CHECK(issue(r.mesh, MeshIssue::Holes) == 0);
+    CHECK(issue(r.mesh, MeshIssue::Flipped) == 0);
+    // The new border ring is the square 0.6 in from the side's edges (|x|, |z| <= 0.4), 0.1 down.
+    size_t atCorner = 0;
+    for (uint32_t v = uint32_t(cube.vertexCount()); v < r.mesh.vertexCount(); ++v) {
+        const glm::vec3 p = r.mesh.positions[v];
+        CHECK(std::abs(p.y - 0.9f) < 1e-4f);
+        CHECK(std::max(std::abs(p.x), std::abs(p.z)) < 0.4f + 1e-3f);
+        CHECK(std::max(std::abs(p.x), std::abs(p.z)) > 0.4f - 1e-3f);
+        atCorner += std::abs(std::abs(p.x) - 0.4f) < 1e-3f && std::abs(std::abs(p.z) - 0.4f) < 1e-3f;
+    }
+    CHECK(r.newVertices < 40);  // the 40 border vertices less the merged ones beside the corners
+    CHECK(atCorner == 4);        // one vertex per corner, the merged ones are no extras
+    // Every inner face faces up and has area; the interior rings moved in with the border (no vertex of the inner
+    // panel is left outside the new ring).
+    float worstOut = 0.0f;
+    uint32_t worstV = 0;
+    int badNormals = 0;
+    for (uint32_t t : r.selection) {
+        badNormals += normal(r.mesh, t).y > 0.999f ? 0 : 1;
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t v = r.mesh.triangles[t][k];
+            const glm::vec3 p = r.mesh.positions[v];
+            if (std::max(std::abs(p.x), std::abs(p.z)) > worstOut) {
+                worstOut = std::max(std::abs(p.x), std::abs(p.z));
+                worstV = v;
+            }
+            CHECK(std::abs(p.y - 0.9f) < 1e-4f);
+        }
+    }
+    std::printf("  inner faces with a tilted normal: %d; farthest inner vertex %u (%s) at %.3f from the centre line\n", badNormals, worstV,
+                worstV < cube.vertexCount() ? "original" : "new", worstOut);
+    CHECK(badNormals == 0);
+    CHECK(worstOut < 0.4f + 1e-3f);
+    CHECK(r.selection.size() < side.size()); // the cells that collapsed into the corners are gone
+    CHECK(r.selection.size() > side.size() / 2);
+    // The other sides did not move at all.
+    for (uint32_t v = 0; v < cube.vertexCount(); ++v)
+        if (cube.positions[v].y < 0.999f) CHECK(r.mesh.positions[v] == cube.positions[v]);
+    // The limit of the side as one shape is half its width, not one cell.
+    const float maxT = insetMaxThickness(cube, side, false);
+    CHECK(maxT > 0.9f && maxT <= 1.0f + 1e-3f);
+}
+
+TEST(poly_inset_interior_follows_the_border_evenly) {
+    const Mesh plane = makePlane(8); // cells 0.25 wide
+    InsetOptions o;
+    o.thickness = 0.5f; // two cells
+    const InsetResult r = insetFaces(plane, all(plane), o);
+    CHECK(clean(plane, r));
+    CHECK(!r.clamped);
+    // The inner grid is close to the 8 x 8 grid scaled by 0.5 (interior vertex (i, j) near ((i / 8 - 0.5), (j / 8 - 0.5))):
+    // exact along the middle, pulled a little toward the corners beside them (the border vertices beside each corner
+    // merged into it), and never crossing: x grows along every row, z along every column.
+    float worstMiddle = 0.0f, worstAll = 0.0f;
+    for (int j = 1; j < 8; ++j)
+        for (int i = 1; i < 8; ++i) {
+            const uint32_t v = uint32_t(j * 9 + i);
+            const glm::vec3 p = r.mesh.positions[v];
+            const glm::vec3 want((float(i) / 8.0f - 0.5f), 0.0f, (float(j) / 8.0f - 0.5f));
+            const float off = glm::length(p - want);
+            worstAll = std::max(worstAll, off);
+            if (i >= 3 && i <= 5 && j >= 3 && j <= 5) worstMiddle = std::max(worstMiddle, off);
+            CHECK(std::max(std::abs(p.x), std::abs(p.z)) < 0.5f - 0.02f);
+            if (i > 1) CHECK(p.x > r.mesh.positions[uint32_t(j * 9 + i - 1)].x + 0.02f);
+            if (j > 1) CHECK(p.z > r.mesh.positions[uint32_t((j - 1) * 9 + i)].z + 0.02f);
+        }
+    std::printf("  interior off the evenly shrunk grid by at most %.4f in the middle, %.4f beside the corners (cell 0.25)\n", worstMiddle, worstAll);
+    CHECK(worstMiddle < 0.03f);
+    CHECK(worstAll < 0.15f);
+    for (uint32_t t : r.selection) CHECK(normal(r.mesh, t).y > 0.999f);
+    for (uint32_t t : r.rim) CHECK(normal(r.mesh, t).y > 0.999f);
+}
+
 TEST(poly_inset_speed_on_a_medium_mesh) {
     const Mesh plane = makePlane(300); // 180k triangles, 90k quads
     InsetOptions o;
@@ -582,4 +679,91 @@ TEST(poly_inset_speed_on_a_medium_mesh) {
     std::printf("  inset of the whole plane as one region: %.0f ms\n", ms2);
     CHECK(s.ok && s.newVertices == 1200);
     CHECK(ms2 < timeLimit(2500.0));
+}
+
+// --- The Polygon mode op (core/PolyOps.h) ---
+
+namespace {
+
+const CommandRegistry& registry() {
+    static CommandRegistry r;
+    return r;
+}
+
+// The lower triangle of a quad on the +Z side of a cube from makeCube.
+uint32_t frontFace(const Mesh& m) {
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3& tri = m.triangles[t];
+        if (edgePolygon(m, t) != t) continue;
+        if (m.positions[tri.x].z > 0.9f && m.positions[tri.y].z > 0.9f && m.positions[tri.z].z > 0.9f) return t;
+    }
+    return 0;
+}
+
+} // namespace
+
+TEST(poly_inset_op_runs_through_poly_op_as_one_undo_step) {
+    Document doc;
+    doc.setMesh(makeCube(2)); // size 2: the diagonal is 2 sqrt(3) = 3.46
+    const CommandRegistry& reg = registry();
+    const size_t tris = doc.mesh.triangleCount(), verts = doc.mesh.vertexCount();
+    // Listed with its parameters.
+    CommandResult r = reg.execute(doc, "poly_op", {{"op", std::string("list")}});
+    CHECK(r.ok);
+    CHECK(r.message.find("inset") != std::string::npos);
+    CHECK(r.message.find("thickness") != std::string::npos);
+    // Nothing selected: the registry says what to select.
+    r = reg.execute(doc, "poly_op", {{"op", std::string("inset")}});
+    CHECK(!r.ok);
+    CHECK(r.message.find("Inset needs") != std::string::npos);
+    // One face, the defaults: 0.05 of the diagonal in, no depth; the inner face stays selected; one whole-mesh undo step.
+    reg.execute(doc, "poly_select", {{"op", std::string("face")}, {"index", double(frontFace(doc.mesh))}});
+    CHECK(doc.polySelection.count() == 1);
+    const size_t undos = doc.undo.undoCount();
+    r = reg.execute(doc, "poly_op", {{"op", std::string("inset")}});
+    CHECK(r.ok);
+    CHECK(r.message.find("Inset 1 face") != std::string::npos);
+    CHECK(doc.mesh.triangleCount() == tris + 8);
+    CHECK(doc.mesh.vertexCount() == verts + 4);
+    CHECK(doc.undo.undoCount() == undos + 1);
+    CHECK(doc.undo.lastUndo() && doc.undo.lastUndo()->mesh); // the topology changed: a whole-mesh step
+    CHECK(doc.polySelection.count() == 1);
+    CHECK(issue(doc.mesh, MeshIssue::NonManifold) == 0 && issue(doc.mesh, MeshIssue::Holes) == 0);
+    const float expected = 0.05f * glm::length(makeCube(2).bounds().extent());
+    float lo = 1e9f, hi = -1e9f; // the inset face (a 1 x 1 face of the side) spans 1 - 2 expected in x
+    for (size_t v = verts; v < doc.mesh.vertexCount(); ++v) {
+        lo = std::min(lo, doc.mesh.positions[v].x);
+        hi = std::max(hi, doc.mesh.positions[v].x);
+        CHECK(std::abs(doc.mesh.positions[v].z - 1.0f) < 1e-5f); // no depth
+    }
+    CHECK(std::abs((hi - lo) - (1.0f - 2.0f * expected)) < 1e-4f);
+    // Undo puts the cube back.
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    CHECK(doc.mesh.triangleCount() == tris && doc.mesh.vertexCount() == verts);
+    // Parameters: a depth and Each face on the whole cube (a closed Part has no border as one shape).
+    reg.execute(doc, "poly_select", {{"op", std::string("all")}});
+    r = reg.execute(doc, "poly_op", {{"op", std::string("inset")}, {"thickness", 0.3}, {"depth", -0.02}});
+    CHECK(!r.ok);
+    CHECK(r.message.find("no border") != std::string::npos);
+    r = reg.execute(doc, "poly_op", {{"op", std::string("inset")}, {"thickness", 0.3}, {"depth", -0.02}, {"individual", true}});
+    CHECK(r.ok);
+    CHECK(r.message.find("Inset 24 faces") != std::string::npos);
+    CHECK(r.message.find("held") != std::string::npos); // 0.3 of the diagonal is more than a 1 x 1 face allows
+    CHECK(doc.mesh.triangleCount() == tris + 24 * 8);
+    CHECK(issue(doc.mesh, MeshIssue::Flipped) == 0 && issue(doc.mesh, MeshIssue::Holes) == 0);
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh));
+    // The preview never touches the Part.
+    reg.execute(doc, "poly_select", {{"op", std::string("face")}, {"index", double(frontFace(doc.mesh))}});
+    PolyOpOutput out;
+    std::string err;
+    CHECK(previewPolyOp(doc, "inset", {{"thickness", 0.1}}, out, err));
+    CHECK(out.mesh.triangleCount() == tris + 8 && doc.mesh.triangleCount() == tris);
+    CHECK(out.triangles.size() == 2);
+    // Rim group: the rim gets a new group, the inner face keeps the side's.
+    r = reg.execute(doc, "poly_op", {{"op", std::string("inset")}, {"rim_group", true}});
+    CHECK(r.ok);
+    const uint32_t side = makeCube(2).facegroupAt(frontFace(makeCube(2)));
+    CHECK(doc.mesh.facegroupAt(frontFace(doc.mesh)) == side);
+    CHECK(nextFaceGroupId(doc.mesh) == 8);
+    for (size_t t = tris; t < doc.mesh.triangleCount(); ++t) CHECK(doc.mesh.facegroupAt(uint32_t(t)) == 7);
 }
