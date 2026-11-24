@@ -399,6 +399,7 @@ public:
     bool dragSlide = dragSlideDefault();
     // Dabs whose drag moved the vertices with the clay after all (slideBack could not put them all back; the tests count them).
     size_t dragSlideFallbacks = 0;
+    static constexpr float kStartDeep = 0.6f; // (Clay's start-position weights: the height below the plane, in radii, where they begin)
     static constexpr size_t kAdaptiveMinVertices = 150'000;
     static constexpr size_t kAreaSamples = 65'536;
     // Whether adaptive dabs moved leaves whose exact normals are still to come, and catching up with up to

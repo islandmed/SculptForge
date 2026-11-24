@@ -98,7 +98,9 @@ Ribs slotPasses(const Mesh& start, BrushType type, int passes, float radius, flo
                     std::printf("pass %d a %.3f move |%.3f| (%.3f %.3f %.3f) frame n (%.2f %.2f %.2f) ac-c %.3f\n", pass, a, glm::length(m), m.x, m.y, m.z, fr.normal.x, fr.normal.y, fr.normal.z, glm::dot(fr.areaCenter - p.center, fr.normal)), lastm = m;
             }
         }
+        if (startWeights && type == BrushType::Clay && radius > 0.1f && gapOf > 0.1f) CHECK(d.sculptor.pinchStateBytes() > 0); // (a leaning wall: kept)
         d.undo.push(d.sculptor.endStroke());
+        CHECK(d.sculptor.pinchStateBytes() == 0);
     }
     // Over what the strokes reached (within the radius of a dab): peak = the largest move, rib = the 99th percentile of the
     // displacement's second difference along the stroke, worst = its largest.
@@ -196,6 +198,7 @@ TEST(clay_ribs_even_mesh_unchanged) {
                 p.viewDir = glm::vec3(0.0f, 0.0f, -1.0f), p.radius = 0.2f, p.strength = 0.5f;
                 d.sculptor.dab(d.mesh, d.bvh, t, p, none);
             }
+            CHECK(d.sculptor.pinchStateBytes() == 0); // (an ordinary stroke keeps no start positions: no 16 bytes a vertex)
             d.undo.push(d.sculptor.endStroke());
             for (size_t v = 0; v < before.size(); ++v) moved[on].push_back(d.mesh.positions[v] - before[v]);
         }

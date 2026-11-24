@@ -1441,8 +1441,8 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     // the next dab pulled it further, a runaway x1.5 a dab at the edge of the reach that left ribs along it. On a surface that bends
     // away gently (a head under a big brush: up to half the radius at the edge) the weights are what they were. (The exact path
     // only: the adaptive and the early-normals paths weigh by where a vertex is.)
-    const bool startWeights = !analyticEarly && clayStartWeights && type == BrushType::Clay && !adaptiveDab_ &&
-                              !useAlpha && !useStencil && !p.viewFalloff && !dynTopo_.active() && !draft_;
+    const bool startWanted = !analyticEarly && clayStartWeights && type == BrushType::Clay && !adaptiveDab_ &&
+                             !useAlpha && !useStencil && !p.viewFalloff && !dynTopo_.active() && !draft_;
     earlyNormals_ = false;
     const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
 
@@ -1510,6 +1510,20 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     plane.invert = p.invert;
     plane.viewFalloff = p.viewFalloff;
 
+    // The stroke's start positions (16 bytes a vertex) are kept from the first dab that reaches a vertex far below its plane: an
+    // ordinary stroke never allocates them.
+    bool startWeights = startWanted;
+    if (startWeights && pinchStamp_.size() != mesh.vertexCount()) {
+        float kk;
+        const glm::vec3 planeAt = plane.clayPlane(kk);
+        std::atomic<bool> deepFound{false};
+        poolFor(verts_.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e && !deepFound.load(std::memory_order_relaxed); ++i)
+                if (std::abs(glm::dot(pos[verts_[i]] - planeAt, areaNormal)) > kStartDeep * p.radius) deepFound.store(true, std::memory_order_relaxed);
+        }, 65536);
+        startWeights = deepFound.load();
+    }
+
     // Inflate swells along each vertex's own normal, unless the dab reaches a groove or a packed grid (see inflateAlongNormals).
     bool inflateAlongNormals = true;
     if (type == BrushType::Inflate) {
@@ -1560,7 +1574,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         if (startWeights) {
             float kk;
             const float deep = std::abs(glm::dot(pinchStart_[v] - plane.clayPlane(kk), areaNormal)) / r;
-            const float t = std::clamp((deep - 0.6f) * 4.0f, 0.0f, 1.0f);
+            const float t = std::clamp((deep - kStartDeep) * 4.0f, 0.0f, 1.0f);
             if (t > 0.0f) xw = x + (pinchStart_[v] - x) * (t * t * (3.0f - 2.0f * t));
         }
         const glm::vec3 o = xw - p.center;
