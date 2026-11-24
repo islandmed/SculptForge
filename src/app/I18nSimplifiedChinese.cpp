@@ -4309,6 +4309,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "没有 UV：Auto UV 会生成"},
     {"This graphics chip cannot show the texture on a model this dense. Painting still goes into the texture (see it in the UV view or export it); lower the triangle count to see it on the model.",
      "此显卡无法在如此高密度的模型上显示纹理。绘制仍会写入纹理（可在 UV 视图中查看或导出）；降低三角面数即可在模型上看到。"},
+    {"This graphics chip rejected drawing the texture on the model. Painting still goes into the texture (see it in the UV view or export it). Help > Copy log to clipboard shows what failed.",
+     "此显卡拒绝在模型上绘制纹理。绘制仍会写入纹理（可在 UV 视图中查看或导出）。帮助 > 复制日志到剪贴板 可查看失败原因。"},
     {"No UVs: Tool > Texture Image > Auto UV",
      "没有 UV：工具 > 纹理图像 > Auto UV"},
     {"No alpha matches \"%s\"",

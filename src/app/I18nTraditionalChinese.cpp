@@ -4307,6 +4307,8 @@ constexpr Entry kTraditionalChinese[] = {
      "沒有 UV：Auto UV 會建立"},
     {"This graphics chip cannot show the texture on a model this dense. Painting still goes into the texture (see it in the UV view or export it); lower the triangle count to see it on the model.",
      "此顯示晶片無法在如此高密度的模型上顯示紋理。繪製仍會寫入紋理（可在 UV 檢視中查看或匯出）；降低三角面數即可在模型上看到。"},
+    {"This graphics chip rejected drawing the texture on the model. Painting still goes into the texture (see it in the UV view or export it). Help > Copy log to clipboard shows what failed.",
+     "此顯示晶片無法在模型上繪製紋理。繪製仍會寫入紋理（可在 UV 檢視中查看或匯出）。說明 > 複製記錄檔到剪貼簿 可查看失敗原因。"},
     {"No UVs: Tool > Texture Image > Auto UV",
      "沒有 UV：工具 > 紋理影像 > Auto UV"},
     {"No alpha matches \"%s\"",
