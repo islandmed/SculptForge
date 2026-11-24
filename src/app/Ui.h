@@ -84,6 +84,11 @@ bool HoverAnimating();
 // null. For a press before ImGui's next frame: its hover is a frame behind, and the press of a pointer that jumps
 // there (a pen landing, a tap, a click in the same batch of events as the move) must not reach the canvas (#161).
 const char* FloatingWindowAt(ImVec2 p);
+// A text field has the keyboard (an InputText, a slider's typed number, the command palette's search): no app shortcut
+// may fire, whatever its key (Ctrl+A selects the field's text, B types a B). Live: ImGui's io.WantTextInput only
+// updates at the start of the next frame, and a key that arrives right after the click that opened the field is
+// handled before it (Ctrl+A ran Mask All, 11-23).
+bool TextFieldFocused();
 // For UI tests: the rings and lifted tiles drawn in the last frame.
 int HoverRingsShown();
 int HoverLiftsShown();
