@@ -1,0 +1,55 @@
+# Boolean blend (core/BooleanBlend.h): the Blend slider under the Parts list's Boolean row sets the active Part's fillet
+# radius (kept on the Part: the boolean_blend hook reads it back), the preview shows the rounded seam, Make Boolean Mesh
+# applies it (a Union with a blend holds more volume than the sharp one), and 0 is sharp again. Sizes:
+# ui_boolean_blend_1440 / _2880 (CMake).
+run new_cube
+click "Parts/Append"
+click "Sphere"
+expect_value parts == 2
+# (Append puts the sphere beside the cube: move it through the +x face, half out)
+run transform translate=-0.3,0,0
+run part_boolean index=0 mode=add
+# The base Part (the first with a Boolean) has no blend of its own: the slider is off for it.
+run part_select index=0
+expect_value boolean_parts == 1
+run part_select index=1
+run part_boolean index=1 mode=add
+expect_value boolean_parts == 2
+# (a three-quarter view onto the +x face, where the seam is)
+camera 40 20
+wait_value boolean_preview > 0 30
+shot sharp
+# Type a radius into the slider: the Part keeps it and the preview runs again with the fillet.
+double_click "Parts/Blend##boolean"
+expect_value typing == 1
+type_here 0.25
+key enter
+expect_value boolean_blend == 0.25
+wait_real 2
+wait_value boolean_preview > 0 30
+expect_text "Exact"
+# (the pointer off the slider: its tooltip would cover the view)
+hover_window 0.5 0.97
+shot blended
+click "Make Boolean Mesh"
+expect_value parts == 3
+expect_value active_part == 2
+expect_value open_edges == 0
+remember solid_volume soft
+hover_window 0.5 0.97
+shot made
+key ctrl+z
+expect_value parts == 2
+# Back to 0: the sharp mesh holds less (the fillet filled the crease).
+run part_select index=1
+expect_value boolean_blend == 0.25
+double_click "Parts/Blend##boolean"
+expect_value typing == 1
+type_here 0
+key enter
+expect_value boolean_blend == 0
+click "Make Boolean Mesh"
+expect_value parts == 3
+expect_value solid_volume < $soft
+key ctrl+z
+expect_value parts == 2

@@ -36,6 +36,11 @@ struct BooleanOptions {
     // failing.
     bool voxelFallback = true;
     int voxelResolution = 256; // the voxel path's cells across the operands' longest side (32-512)
+    // Blend: a soft fillet of this radius (scene units) along the seam where the operands meet (core/BooleanBlend.h):
+    // a Union fills the crease, a Subtract or Intersect rounds the rim. 0 = sharp. `blendSegments`: triangles across
+    // the fillet (fewer for a quick preview).
+    double blend = 0.0;
+    int blendSegments = 6;
 };
 
 struct BooleanInfo {
@@ -43,6 +48,7 @@ struct BooleanInfo {
     std::string exactError; // with `voxel`: why the exact path couldn't run
     size_t cutTriangles = 0; // exact: operand triangles split along the cut
     int attempts = 0;        // exact: runs it took (each after a nudge)
+    size_t blendMoved = 0;   // exact, with a blend: vertices the fillet moved
 };
 
 // The exact boolean of `a` and `b` (Subtract: a minus b), both in the same space. Each output triangle keeps the face
@@ -52,9 +58,10 @@ struct BooleanInfo {
 bool booleanExact(const Mesh& a, const Mesh& b, BooleanOp op, Mesh& out, std::string& error,
                   const BooleanOptions& options = {}, BooleanInfo* info = nullptr);
 
-// The voxel boolean of `a` and `b` at `resolution` (32-512). False with `error` when an operand has holes too big
-// to close or the result is empty.
-bool booleanVoxel(const Mesh& a, const Mesh& b, BooleanOp op, int resolution, Mesh& out, std::string& error);
+// The voxel boolean of `a` and `b` at `resolution` (32-512), its seam blended over `blend` scene units (a smooth
+// minimum of the two fields). False with `error` when an operand has holes too big to close or the result is empty.
+bool booleanVoxel(const Mesh& a, const Mesh& b, BooleanOp op, int resolution, Mesh& out, std::string& error,
+                  double blend = 0.0);
 
 // booleanExact, then (with options.voxelFallback, when the exact path couldn't run on this input) booleanVoxel.
 bool booleanMeshes(const Mesh& a, const Mesh& b, BooleanOp op, Mesh& out, std::string& error,

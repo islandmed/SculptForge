@@ -133,6 +133,7 @@ add_library(sculptforge_core STATIC
   src/core/EnginePresets.cpp
   src/core/Masking.cpp
   src/core/Cut.cpp
+  src/core/BooleanBlend.cpp
   src/core/MeshBoolean.cpp
   src/core/PartBoolean.cpp
   src/core/CloseHoles.cpp
@@ -1450,6 +1451,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(whats_new_since_phone whats_new_since --size 800x1280)
     sculptforge_ui_test(selection_space_1440 selection_space --size 1440x900)
     sculptforge_ui_test(selection_space_2880 selection_space --size 2880x1800)
+    # The Boolean blend slider and the rounded seam it previews and makes (tests/ui/boolean_blend.sfui), at the review sizes.
+    sculptforge_ui_test(boolean_blend_1440 boolean_blend --size 1440x900)
+    sculptforge_ui_test(boolean_blend_2880 boolean_blend --size 2880x1800)
     # The Remesh palette's Voxel Resolution slider dropped on a shelf (tests/ui/shelf_value_drop.sfui, #191), at the review sizes.
     sculptforge_ui_test(shelf_value_drop_1440 shelf_value_drop --size 1440x900)
     sculptforge_ui_test(shelf_value_drop_2880 shelf_value_drop --size 2880x1800)

@@ -25,6 +25,7 @@ struct BooleanSceneOptions : BooleanOptions {
 struct BooleanOperand {
     Mesh mesh;
     PartBoolean mode = PartBoolean::Add;
+    float blend = 0.0f; // the Part's Boolean blend: the fillet where it meets what the ones above it made
     uint32_t partId = 0;
     std::string name;
 };

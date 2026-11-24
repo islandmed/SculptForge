@@ -67,6 +67,9 @@ struct Part {
     int8_t shownBeforeSolo = -1;
     Shading shading = Shading::Default; // per-Part override of the scene's shading
     PartBoolean boolean = PartBoolean::None; // its part in the scene's Boolean
+    // The Boolean's blend where this Part meets what the Parts above it made (core/BooleanBlend.h): the radius of
+    // the soft fillet in scene units, 0 = sharp. Saved in projects.
+    float booleanBlend = 0.0f;
     uint32_t folder = 0;                // the PartFolder it's in (its id), 0 = none
     // Where the mesh is in the scene: world = transform * mesh position. Identity unless the Part is a linked copy
     // moved on its own (or was one: Make Unique keeps it). A similarity (rotation, translation, uniform scale).

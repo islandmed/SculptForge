@@ -191,6 +191,23 @@ or keep only where they overlap.
 
 ![A cube with a sphere and a slot set to Subtract: the Parts list with the Boolean marks, the result in the view](images/booleans.jpg)
 
+### Blend: a soft seam
+
+A Boolean seam is sharp by default. The **Blend** slider under the **Boolean** row gives the active Part a soft fillet
+where it meets the Parts above it, the way distance-field modellers round a merge or a cut:
+
+- The value is the fillet's radius in scene units; 0 is sharp. Drag it with **Preview** on and the view follows.
+- **Add** fills the crease between the shapes; **Subtract** and **Intersect** round the rim of the cut. Each Part below
+  the base has a blend of its own, so a bolt can merge softly while a slot stays crisp. (The base, the first Part with
+  a Boolean, has nothing above it to blend with: its slider is off.)
+- **Make Boolean Mesh** applies it: the faces near the seam are refined so the fillet reads at any radius, and moved onto
+  the rounded surface; everything farther than the radius from the seam is left exactly as it was, face groups, vertex
+  paint and UVs included. The result stays watertight.
+- Only creases are rounded: where two faces lie flat on each other (a box standing on a floor, a sphere resting on a
+  slab) the join stays flat, and a Part's own sharp edges stay sharp through the blend.
+- The blend is saved in the project with the Part's Boolean, and a duplicate keeps it. Scripts: `part_boolean` and
+  `boolean_parts` take `blend`.
+
 The **...** button beside **Make Boolean Mesh** holds its options:
 
 | Option | What it does |

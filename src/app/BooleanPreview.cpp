@@ -49,6 +49,11 @@ void App::updateBooleanPreview() {
         const Mesh& m = doc_.partMesh(i);
         sig = mix(sig, s.id);
         sig = mix(sig, uint64_t(s.boolean));
+        {
+            uint32_t bits;
+            std::memcpy(&bits, &s.booleanBlend, sizeof bits);
+            sig = mix(sig, bits);
+        }
         sig = mix(sig, doc_.partUndo(i).revision());
         sig = mix(sig, m.vertexCount() * 31 + m.triangleCount());
         for (int c = 0; c < 4; ++c)
@@ -79,6 +84,7 @@ void App::updateBooleanPreview() {
     BooleanSceneOptions o = booleanOptions_;
     o.weld = true;
     o.voxelResolution = 128; // (the preview's fallback: quick)
+    o.blendSegments = 4;     // (the fillet: coarser than Make Boolean Mesh's, quick)
     std::vector<uint32_t> ids;
     for (int i : parts) ids.push_back(doc_.parts[size_t(i)].id);
     p.job = std::async(std::launch::async, [ops = std::move(ops), o, sig, ids = std::move(ids)]() mutable {

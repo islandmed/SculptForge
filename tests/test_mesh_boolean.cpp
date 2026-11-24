@@ -376,6 +376,27 @@ TEST(nightly_boolean_bench) {
             std::printf("  %-9s %8.1f ms  -> %zu triangles, %zu cut, %d run(s)\n", booleanOpName(op), best, tris,
                         info.cutTriangles, info.attempts);
         }
+        // The blend (core/BooleanBlend.h): a Subtract with a fillet a tenth of the radius, as Make Boolean Mesh and the
+        // preview (4 segments) run it.
+        for (const int segments : {6, 4}) {
+            double bestBlend = 1e30;
+            size_t tris = 0, moved = 0;
+            for (int k = 0; k < 3; ++k) {
+                Mesh out;
+                std::string error;
+                BooleanOptions o;
+                o.blend = 0.2;
+                o.blendSegments = segments;
+                BooleanInfo info;
+                const auto t0 = std::chrono::steady_clock::now();
+                CHECK(booleanExact(a, b, BooleanOp::Subtract, out, error, o, &info));
+                bestBlend = std::min(bestBlend, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+                tris = out.triangleCount();
+                moved = info.blendMoved;
+                CHECK(isWatertight(out));
+            }
+            std::printf("  blend/%d   %8.1f ms  -> %zu triangles, %zu vertices moved\n", segments, bestBlend, tris, moved);
+        }
         // The preview's path: copies of the shapes, combined (Subtract).
         double best = 1e30;
         for (int k = 0; k < 3; ++k) {

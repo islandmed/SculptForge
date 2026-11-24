@@ -947,11 +947,13 @@ void registerPartCommands(CommandRegistry& reg) {
                  Mesh copy = doc.partMesh(i);
                  const Shading shading = doc.parts[size_t(i)].shading;
                  const PartBoolean boolean = doc.parts[size_t(i)].boolean;
+                 const float blend = doc.parts[size_t(i)].booleanBlend;
                  const uint32_t folder = doc.parts[size_t(i)].folder;
                  const glm::mat4 place = doc.parts[size_t(i)].transform;
                  const int added = doc.addPart(std::move(copy), doc.parts[size_t(i)].name + " copy", true, i + 1);
                  doc.parts[size_t(added)].shading = shading;
                  doc.parts[size_t(added)].boolean = boolean; // (a copy of a cutter cuts too)
+                 doc.parts[size_t(added)].booleanBlend = blend;
                  doc.parts[size_t(added)].folder = folder; // (right below it: the folder stays together)
                  doc.parts[size_t(added)].transform = place;
                  return {true, "Duplicated as " + doc.parts[size_t(added)].name};

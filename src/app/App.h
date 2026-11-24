@@ -2247,6 +2247,7 @@ private:
     bool booleanPreviewDrawn(uint32_t partId) const; // Part `partId` is drawn as part of the shown result
     Mesh* booleanPreviewMesh();          // the result to draw (null: none, or the Parts are shown as they are)
     void drawBooleanSection();           // the Parts panel's Boolean row (PanelParts.cpp)
+    void drawBooleanBlendSlider();       // the active Part's Boolean blend, under the Boolean row (PanelParts.cpp)
     Args booleanArgs() const;            // booleanOptions_ as make_boolean_mesh's arguments
     void updatePartThumbnails();  // after syncScene, GL current
     void clearPartThumbnails();

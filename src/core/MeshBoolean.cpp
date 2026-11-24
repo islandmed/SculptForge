@@ -17,6 +17,7 @@
 #include "core/MeshBoolean.h"
 
 #include "core/Arrangement.h"
+#include "core/BooleanBlend.h"
 #include "core/CloseHoles.h"
 #include "core/ThreadPool.h"
 #include "core/Voxel.h"
@@ -290,6 +291,7 @@ struct Solver {
     std::vector<XPt> pts;                        // id = nv[0] + nv[1] + i
     std::vector<std::array<uint32_t, 3>> outTris; // global ids
     std::vector<int64_t> outParent;               // triangle of mesh 0, or nt[0] + triangle of mesh 1
+    std::vector<std::array<uint32_t, 2>> seam;    // the crossing segments (point ids): the seam the blend rounds
     size_t cutTriangles = 0;
     std::string error; // a run that fails for a reason a nudge can't fix
 
@@ -545,6 +547,7 @@ struct Solver {
         pts.clear();
         outTris.clear();
         outParent.clear();
+        seam.clear();
         cutTriangles = 0;
         // Candidate pairs: triangle boxes that touch.
         // (Only b's triangles in a's box go into the tree: where the operands are apart, nothing is looked up.)
@@ -628,6 +631,7 @@ struct Solver {
             }
             segA.push_back({po.ta, {p, q, po.tb}});
             segB.push_back({po.tb, {p, q, po.ta}});
+            seam.push_back({p, q});
         }
         std::vector<std::pair<uint32_t, Seg>>* segsOf[2] = {&segA, &segB};
         trace()("points");
@@ -919,6 +923,25 @@ bool booleanExact(const Mesh& a, const Mesh& b, BooleanOp op, Mesh& out, std::st
         }
     }
     trace()("attributes");
+    if (options.blend > 0.0) {
+        std::vector<std::array<glm::vec3, 2>> seam;
+        seam.reserve(s.seam.size());
+        for (const auto& sg : s.seam) seam.push_back({glm::vec3(s.outPos(sg[0])), glm::vec3(s.outPos(sg[1]))});
+        std::vector<uint8_t> side(m.triangles.size());
+        std::vector<uint32_t> parent(m.triangles.size());
+        for (size_t t = 0; t < m.triangles.size(); ++t) {
+            side[t] = s.outParent[t] < int64_t(s.nt[0]) ? 0 : 1;
+            parent[t] = uint32_t(side[t] ? s.outParent[t] - int64_t(s.nt[0]) : s.outParent[t]);
+        }
+        BooleanBlendOptions bo;
+        bo.radius = options.blend;
+        bo.segments = options.blendSegments;
+        bo.relax = options.weld;
+        BooleanBlendStats bs;
+        blendBooleanSeam(m, side, parent, a, b, op, seam, bo, &bs);
+        if (info) info->blendMoved = bs.moved;
+        trace()("blend");
+    }
     m.rebuildTopology();
     m.recomputeAllNormals();
     m.sanitizeAttributes();
@@ -927,7 +950,7 @@ bool booleanExact(const Mesh& a, const Mesh& b, BooleanOp op, Mesh& out, std::st
     return true;
 }
 
-bool booleanVoxel(const Mesh& a, const Mesh& b, BooleanOp op, int resolution, Mesh& out, std::string& error) {
+bool booleanVoxel(const Mesh& a, const Mesh& b, BooleanOp op, int resolution, Mesh& out, std::string& error, double blend) {
     if (a.triangleCount() == 0 || b.triangleCount() == 0) {
         error = "Boolean: a Part is empty";
         return false;
@@ -940,6 +963,9 @@ bool booleanVoxel(const Mesh& a, const Mesh& b, BooleanOp op, int resolution, Me
         error = "Boolean: the voxel grid would be too big";
         return false;
     }
+    // The blend in cells: the fields must be exact that far from the surfaces (capped at 8 cells: every triangle visits
+    // the samples within the band, so a wide band costs time; the voxel path is the fallback, not the fillet's home).
+    const float blendCells = blend > 0.0 ? std::min(float(blend / grid.cell), 8.0f) : 0.0f;
     std::vector<float> field[2];
     for (int k = 0; k < 2; ++k) {
         // An open operand (a neck, a cut) gets its borders capped first, as Voxel Remesh does.
@@ -967,12 +993,15 @@ bool booleanVoxel(const Mesh& a, const Mesh& b, BooleanOp op, int resolution, Me
                     " Part is open (a sheet, or holes too big to close), so it has no inside to combine. Close its holes first";
             return false;
         }
-        field[k] = insideDistanceField(m, grid, solid, 3.0f);
+        field[k] = insideDistanceField(m, grid, solid, 3.0f + blendCells);
     }
     std::vector<float>& f = field[0];
     for (size_t i = 0; i < f.size(); ++i) {
         const float x = f[i], y = field[1][i];
-        f[i] = op == BooleanOp::Union ? std::max(x, y) : op == BooleanOp::Subtract ? std::min(x, -y) : std::min(x, y);
+        // (positive inside: a Union is the smooth maximum, a cut or an overlap the smooth minimum)
+        f[i] = op == BooleanOp::Union      ? -float(smoothMin(-x, -y, blendCells))
+               : op == BooleanOp::Subtract ? float(smoothMin(x, -y, blendCells))
+                                           : float(smoothMin(x, y, blendCells));
     }
     Mesh m = meshFromField(grid, f, 0.0f, 2);
     if (m.triangleCount() == 0) {
@@ -996,7 +1025,7 @@ bool booleanMeshes(const Mesh& a, const Mesh& b, BooleanOp op, Mesh& out, std::s
         error = why;
         return false;
     }
-    if (!booleanVoxel(a, b, op, options.voxelResolution, out, error)) {
+    if (!booleanVoxel(a, b, op, options.voxelResolution, out, error, options.blend)) {
         error += " (" + why + ")";
         return false;
     }

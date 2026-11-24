@@ -913,6 +913,45 @@ void App::drawBooleanSection() {
         }
     }
     if (fontSmall_) ImGui::PopFont();
+    drawBooleanBlendSlider();
+}
+
+// The active Part's Boolean blend (core/BooleanBlend.h): a soft fillet where it meets the Parts above it. The slider sets
+// the Part's radius as it is dragged (the preview follows); letting go runs part_boolean, so scripts see the value.
+void App::drawBooleanBlendSlider() {
+    if (doc_.activePart < 0 || doc_.activePart >= doc_.partCount()) return;
+    const std::vector<int> parts = booleanPartIndices(doc_);
+    Part& active = doc_.parts[size_t(doc_.activePart)];
+    const bool takes = std::find(parts.begin(), parts.end(), doc_.activePart) != parts.end();
+    const bool base = takes && parts.front() == doc_.activePart;
+    const AABB box = doc_.visibleBounds();
+    const float size = box.valid() ? std::max({box.extent().x, box.extent().y, box.extent().z}) : 2.0f;
+    const float maxBlend = std::max(size * 0.25f, active.booleanBlend);
+    float blend = active.booleanBlend;
+    ImGui::BeginDisabled(!takes || base);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.6f);
+    if (ImGui::SliderFloat(tr("Blend##boolean"), &blend, 0.0f, maxBlend, "%.3f", ImGuiSliderFlags_AlwaysClamp) &&
+        active.booleanBlend != blend) {
+        active.booleanBlend = std::max(0.0f, blend);
+        doc_.modified = true;
+    }
+    const bool released = ImGui::IsItemDeactivatedAfterEdit();
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal)) {
+        if (!takes)
+            ImGui::SetTooltip("%s", tr("Blend: a soft fillet where the active Part meets the Parts above it. Give it a "
+                                       "Boolean first (the mark in its row)"));
+        else if (base)
+            ImGui::SetTooltip("%s", tr("Blend: a soft fillet where a Part meets the Parts above it. This Part is the base "
+                                       "(the first with a Boolean): set the blend on the Parts below it"));
+        else
+            ImGui::SetTooltip(tr("Blend: a soft fillet of this radius (scene units) where %s meets the Parts above it. "
+                                 "0 is sharp. Add fills the crease; Subtract and Intersect round the rim. Saved in the "
+                                 "project; Make Boolean Mesh applies it"),
+                              active.name.c_str());
+    }
+    if (released)
+        runCommand("part_boolean", {{"mode", std::string(partBooleanName(active.boolean))}, {"blend", double(active.booleanBlend)}});
 }
 
 std::string App::partFolderName(uint32_t id) const {

@@ -10,6 +10,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <cstdio>
 
 namespace sf {
 
@@ -33,6 +35,7 @@ BooleanOperand operandOf(const Document& doc, int i, PartBoolean mode, bool ligh
         o.mesh.uvs = placed.uvs;
     }
     o.mode = mode;
+    o.blend = doc.parts[size_t(i)].booleanBlend;
     o.partId = doc.parts[size_t(i)].id;
     o.name = doc.parts[size_t(i)].name;
     return o;
@@ -71,7 +74,7 @@ CommandResult addBooleanPart(Document& doc, std::vector<BooleanOperand> operands
     doc.modified = true;
     std::string msg = std::string(label) + ": " + std::to_string(count) + " Parts -> " + doc.activePartInfo().name + ", " +
                       countText(triangles);
-    msg += info.voxel ? " (voxel: " + info.exactError + ")" : " (exact)";
+    msg += info.voxel ? " (voxel: " + info.exactError + ")" : info.blendMoved > 0 ? " (exact, blended)" : " (exact)";
     return {true, msg};
 }
 
@@ -146,7 +149,9 @@ bool combineOperands(std::vector<BooleanOperand> operands, const BooleanSceneOpt
     for (size_t k = 1; k < operands.size(); ++k) {
         Mesh result;
         std::string why;
-        if (!booleanMeshes(current, operands[k].mesh, opFor(operands[k].mode), result, why, options, &last)) {
+        BooleanOptions step = options;
+        step.blend = std::max(0.0f, operands[k].blend);
+        if (!booleanMeshes(current, operands[k].mesh, opFor(operands[k].mode), result, why, step, &last)) {
             error = why + " (at " + operands[k].name + ")";
             return false;
         }
@@ -190,7 +195,10 @@ void registerBooleanCommands(CommandRegistry& reg) {
              "make_boolean_mesh turns it into a new Part.",
              {{"mode", T::String, "none, add, subtract or intersect.", true},
               {"index", T::Number, "Part index (0 = top of the list). Default: the active one.", false},
-              {"name", T::String, "Part name (instead of index).", false}},
+              {"name", T::String, "Part name (instead of index).", false},
+              {"blend", T::Number, "The blend where this Part meets the Parts above it: the radius of the soft fillet in "
+                                   "scene units (0 = sharp, the default). An Add fills the crease, a Subtract or "
+                                   "Intersect rounds the rim. Kept until changed.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  int i = doc.activePart;
                  if (a.contains("name")) i = doc.findPart(argString(a, "name"));
@@ -203,15 +211,29 @@ void registerBooleanCommands(CommandRegistry& reg) {
                      p.boolean = mode;
                      doc.modified = true;
                  }
+                 std::string blendText;
+                 if (a.contains("blend")) {
+                     const double blend = argNumber(a, "blend", 0.0);
+                     if (!(blend >= 0.0) || !std::isfinite(blend)) return {false, "Boolean: blend is 0 or more (scene units)"};
+                     if (p.booleanBlend != float(blend)) {
+                         p.booleanBlend = float(blend);
+                         doc.modified = true;
+                     }
+                     char buf[48];
+                     std::snprintf(buf, sizeof buf, ", blend %.3g", blend);
+                     blendText = buf;
+                 }
                  const size_t n = booleanPartIndices(doc).size();
-                 return {true, p.name + ": Boolean " + partBooleanName(mode) + " (" + std::to_string(n) + " shown Part" +
+                 return {true, p.name + ": Boolean " + partBooleanName(mode) + blendText + " (" + std::to_string(n) + " shown Part" +
                                    (n == 1 ? "" : "s") + " take part)"};
              }});
 
     std::vector<ParamSpec> pairParams = {
         {"op", T::String, "union, subtract or intersect (subtract: a minus b).", true},
         {"a", T::String, "The first Part: its name or list index.", true},
-        {"b", T::String, "The second Part: its name or list index.", true}};
+        {"b", T::String, "The second Part: its name or list index.", true},
+        {"blend", T::Number, "A soft fillet of this radius (scene units) where the two meet; default b's own Boolean "
+                             "blend (part_boolean), 0 = sharp.", false}};
     pairParams.insert(pairParams.end(), optionParams.begin(), optionParams.end());
     reg.add({"boolean_parts",
              "Boolean of two Parts into a new Part (made active; the two are left as they are, hidden). Exact: the "
@@ -232,6 +254,11 @@ void registerBooleanCommands(CommandRegistry& reg) {
                  std::vector<BooleanOperand> ops;
                  ops.push_back(operandOf(doc, ia, PartBoolean::Add, false));
                  ops.push_back(operandOf(doc, ib, mode, false));
+                 if (a.contains("blend")) {
+                     const double blend = argNumber(a, "blend", 0.0);
+                     if (!(blend >= 0.0) || !std::isfinite(blend)) return {false, "Boolean: blend is 0 or more (scene units)"};
+                     ops.back().blend = float(blend);
+                 }
                  const char* label = op == BooleanOp::Union ? "Boolean Union" : op == BooleanOp::Subtract ? "Boolean Subtract"
                                                                                                          : "Boolean Intersect";
                  return addBooleanPart(doc, std::move(ops), {ia, ib}, o, label);
