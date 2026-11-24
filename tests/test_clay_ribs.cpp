@@ -51,6 +51,8 @@ struct Ribs {
     float worst = 0.0f, med = 0.0f;
     float spread = 0.0f; // the largest spread of the displacement among wall vertices at one radius (it should not depend on the azimuth)
     float peak = 0.0f; // the largest displacement along the stroke
+    double dabMs = 0.0; // the time in Sculptor::dab, summed
+    int dabs = 0;
     float rib = 0.0f;  // the largest departure of the displacement from its running mean over `window` dab spacings (a rib at the dab spacing)
     
 };
@@ -58,12 +60,13 @@ struct Ribs {
 // `passes` Clay (or `type`) strokes along an arc of the slot sphere at height y0, dabs `spacing` radii apart. Measured on the
 // vertices of the slot's upper wall and floor within the stroke's reach, binned by azimuth: the displacement as a function of
 // the angle should be smooth; a rib is a bin that differs from its neighbours.
-Ribs slotPasses(const Mesh& start, BrushType type, int passes, float radius, float spacing, float y0, float strength = 0.5f, bool startWeights = true, bool dump = false, float gapOf = 0.04f) {
+Ribs slotPasses(const Mesh& start, BrushType type, int passes, float radius, float spacing, float y0, float strength = 0.5f, bool startWeights = true, bool dump = false, float gapOf = 0.04f, uint32_t budget = 0) {
     geom::Fixture f;
     f.mesh = start;
     f.bvh.build(f.mesh);
     Document d = geom::docFrom(f);
     d.sculptor.clayStartWeights = startWeights;
+    if (budget) d.sculptor.clayStartBudget = budget;
     const std::vector<glm::vec3> before = d.mesh.positions;
     std::vector<glm::vec3> centers;
     glm::vec3 lastm(0.0f);
@@ -84,7 +87,9 @@ Ribs slotPasses(const Mesh& start, BrushType type, int passes, float radius, flo
             p.strokeDelta = prev == glm::vec3(0.0f) ? glm::vec3(0.0f) : p.center - prev;
             prev = p.center;
             centers.push_back(p.center);
+            const auto t0 = std::chrono::steady_clock::now();
             d.sculptor.dab(d.mesh, d.bvh, type, p, none);
+            r.dabMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(), ++r.dabs;
             if (dump) {
                 static uint32_t tv = UINT32_MAX;
                 if (tv == UINT32_MAX) {
@@ -98,7 +103,7 @@ Ribs slotPasses(const Mesh& start, BrushType type, int passes, float radius, flo
                     std::printf("pass %d a %.3f move |%.3f| (%.3f %.3f %.3f) frame n (%.2f %.2f %.2f) ac-c %.3f\n", pass, a, glm::length(m), m.x, m.y, m.z, fr.normal.x, fr.normal.y, fr.normal.z, glm::dot(fr.areaCenter - p.center, fr.normal)), lastm = m;
             }
         }
-        if (startWeights && type == BrushType::Clay && radius > 0.1f && gapOf > 0.1f) {
+        if (startWeights && !budget && type == BrushType::Clay && radius > 0.1f && gapOf > 0.1f) {
             const size_t kept = d.sculptor.pinchStateBytes(); // (a leaning wall: kept, and only for the vertices that are deep: a quarter of 16 bytes a vertex at most)
             CHECK(kept > 0);
             CHECK(kept < d.mesh.vertexCount() * 4);
@@ -181,6 +186,36 @@ TEST(clay_ribs_slot) {
                 }
             }
         }
+    }
+}
+
+// A stroke that spends its budget of kept start positions (a rough mesh, a big brush) starts afresh, and with none where one dab alone is
+// over it: every deep vertex of a dab is weighed alike, never a mix of kept and not. A budget under what a dab finds deep leaves the
+// runaway; one a stroke keeps spending cuts it only in part (the history is lost at each restart).
+TEST(clay_ribs_budget) {
+    const Mesh slot = slotSphere(7, 0.2f);
+    const Ribs off = slotPasses(slot, BrushType::Clay, 4, 0.2f, 0.1f, 0.035f, 0.5f, false, false, 0.2f);
+    const Ribs none = slotPasses(slot, BrushType::Clay, 4, 0.2f, 0.1f, 0.035f, 0.5f, true, false, 0.2f, 40);
+    const Ribs small = slotPasses(slot, BrushType::Clay, 4, 0.2f, 0.1f, 0.035f, 0.5f, true, false, 0.2f, 700);
+    const Ribs full = slotPasses(slot, BrushType::Clay, 4, 0.2f, 0.1f, 0.035f, 0.5f, true, false, 0.2f);
+    std::printf("budget: spread %.1f%% of peak with the weights off, %.1f%% with a budget of 40, %.1f%% of 700, %.1f%% of the default\n", 100.0f * off.spread / off.peak,
+                100.0f * none.spread / none.peak, 100.0f * small.spread / small.peak, 100.0f * full.spread / full.peak);
+    CHECK(none.spread > 0.25f * none.peak); // (a budget under what a dab finds deep: the runaway stays)
+    CHECK(small.spread < off.spread);        // (a budget a stroke keeps spending: history is lost at each restart, so a part of the cure)
+}
+
+// The time a dab takes on the slot (printed, not held: a timing in a test run is noisy): without and with the start weights, the
+// best of five strokes of 4 passes.
+TEST(clay_ribs_dab_cost) {
+    for (float gap : {0.04f, 0.2f}) {
+        const Mesh slot = slotSphere(7, gap);
+        double best[2] = {1e9, 1e9};
+        for (int rep = 0; rep < 5; ++rep)
+            for (int on = 0; on < 2; ++on) {
+                const Ribs r = slotPasses(slot, BrushType::Clay, 4, 0.2f, 0.1f, 0.035f, 0.5f, on != 0, false, gap);
+                best[on] = std::min(best[on], r.dabMs / r.dabs);
+            }
+        std::printf("dab cost gap %.2f Clay: %.3f ms without the start weights, %.3f ms with (%+.1f%%)\n", gap, best[0], best[1], 100.0 * (best[1] / best[0] - 1.0));
     }
 }
 

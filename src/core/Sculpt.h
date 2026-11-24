@@ -325,6 +325,7 @@ public:
     SculptTimings timings;
     // Clay and Clay Block weigh a vertex by where the stroke first found it (Sculpt.cpp, dabSingle); off = by where it is now (the test compares).
     bool clayStartWeights = true;
+    uint32_t clayStartBudget = 1u << 18; // (test hook: the vertices a stroke keeps start positions for, at most; 262144 = 8 MB with their hash)
     // The brush's frame on the surface at the last dab's first (unmirrored) pass: the dab centre, the area normal
     // and the area centre its kernel used (the predictive stroke preview estimates the next dabs from it).
     struct DabFrame {
@@ -500,7 +501,6 @@ private:
         std::vector<uint32_t> keys;      // (vertex + 1; 0 = empty slot)
         std::vector<glm::vec3> starts;
         uint32_t count = 0;
-        bool full() const { return count >= kMaxSlots / 2; }
         bool find(uint32_t v, glm::vec3& out) const {
             if (!(bits[v >> 6] >> (v & 63) & 1u)) return false;
             const uint32_t mask = uint32_t(keys.size()) - 1;

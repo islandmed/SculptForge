@@ -1519,26 +1519,33 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         float kk;
         const glm::vec3 planeAt = plane.clayPlane(kk);
         const float deepAt = kStartDeep * p.radius;
-        const bool fresh = clayStart_.bits.empty();
-        if (!clayStart_.full()) { // (the vertices this dab finds deep and the stroke has not kept yet)
+        // The deep vertices of the dab (those the stroke has kept not counted when `all` is off), gathered in parallel.
+        const auto gather = [&](bool all) {
             std::vector<uint32_t> found;
             std::mutex foundLock;
             poolFor(verts_.size(), [&](size_t b, size_t e) {
                 std::vector<uint32_t> mine;
                 for (size_t i = b; i < e; ++i) {
                     const uint32_t v = verts_[i];
-                    if (std::abs(glm::dot(pos[v] - planeAt, areaNormal)) > deepAt && (fresh || !(clayStart_.bits[v >> 6] >> (v & 63) & 1u))) mine.push_back(v);
+                    if (std::abs(glm::dot(pos[v] - planeAt, areaNormal)) > deepAt && (all || !(clayStart_.bits[v >> 6] >> (v & 63) & 1u))) mine.push_back(v);
                 }
                 if (!mine.empty()) {
                     std::lock_guard<std::mutex> lk(foundLock);
                     found.insert(found.end(), mine.begin(), mine.end());
                 }
             }, 65536);
-            if (!found.empty() && fresh) clayStart_.bits.assign((mesh.vertexCount() + 63) / 64, 0);
-            for (const uint32_t v : found) {
-                if (clayStart_.full()) break;
-                clayStart_.insert(v, pos[v]);
-            }
+            return found;
+        };
+        const size_t kBudget = clayStartBudget;
+        std::vector<uint32_t> found = gather(clayStart_.bits.empty());
+        if (clayStart_.count + found.size() > kBudget) { // (the budget is spent: start afresh with this dab's own, or none if they alone are over it, so
+            clayStart_ = StartStore();                   // that every deep vertex of a dab is weighed alike, never a mix of kept and not)
+            found = gather(true);
+            if (found.size() > kBudget) found.clear();
+        }
+        if (!found.empty()) {
+            if (clayStart_.bits.empty()) clayStart_.bits.assign((mesh.vertexCount() + 63) / 64, 0);
+            for (const uint32_t v : found) clayStart_.insert(v, pos[v]);
         }
         startWeights = clayStart_.count > 0;
     }
