@@ -26,7 +26,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the release tags
       # The online guide is the latest release's guide, the one inside the app people can download, not main's:
@@ -117,13 +117,13 @@ jobs:
           else
             echo "No jobs-data branch yet: main's snapshot"
           fi
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: website
           include-hidden-files: true # website/.well-known/ (security.txt); nothing else under website/ is hidden
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
       # Tell Bing and the other IndexNow search engines about the pages straight away (key file in website/).
       - name: IndexNow
         continue-on-error: true
@@ -141,7 +141,7 @@ jobs:
   mirror:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the release tags
       # The online guide is the latest release's guide, the one inside the app people can download, not main's:
