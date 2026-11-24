@@ -257,6 +257,7 @@ test_render_clusters        render
 test_video_drivers          render
 test_space_camera           render
 test_close_holes            mesh
+test_poly_inset             mesh
 test_cut                    mesh
 test_decimate_valence       mesh
 test_divide_valence         mesh
