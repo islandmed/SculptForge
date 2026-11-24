@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <iterator>
 #include <limits>
+#include <mutex>
 #include <queue>
 #include <unordered_map>
 
@@ -1172,6 +1173,7 @@ UndoRecord Sculptor::endStroke() {
     // A pinching recipe's per-stroke state (24 bytes a vertex: 120 MB on a 5M mesh) goes with the stroke, not with the mesh.
     std::vector<uint32_t>().swap(pinchStamp_), std::vector<glm::vec3>().swap(pinchStart_);
     std::vector<uint32_t>().swap(pinchDabStamp_), std::vector<float>().swap(pinchTaper_);
+    clayStart_ = StartStore();
     clearRecorded();
     active_ = false;
     grabVerts_.clear();
@@ -1513,15 +1515,32 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     // The stroke's start positions (16 bytes a vertex) are kept from the first dab that reaches a vertex far below its plane: an
     // ordinary stroke never allocates them.
     bool startWeights = startWanted;
-    if (startWeights && pinchStamp_.size() != mesh.vertexCount()) {
+    if (startWeights) {
         float kk;
         const glm::vec3 planeAt = plane.clayPlane(kk);
-        std::atomic<bool> deepFound{false};
-        poolFor(verts_.size(), [&](size_t b, size_t e) {
-            for (size_t i = b; i < e && !deepFound.load(std::memory_order_relaxed); ++i)
-                if (std::abs(glm::dot(pos[verts_[i]] - planeAt, areaNormal)) > kStartDeep * p.radius) deepFound.store(true, std::memory_order_relaxed);
-        }, 65536);
-        startWeights = deepFound.load();
+        const float deepAt = kStartDeep * p.radius;
+        const bool fresh = clayStart_.bits.empty();
+        if (!clayStart_.full()) { // (the vertices this dab finds deep and the stroke has not kept yet)
+            std::vector<uint32_t> found;
+            std::mutex foundLock;
+            poolFor(verts_.size(), [&](size_t b, size_t e) {
+                std::vector<uint32_t> mine;
+                for (size_t i = b; i < e; ++i) {
+                    const uint32_t v = verts_[i];
+                    if (std::abs(glm::dot(pos[v] - planeAt, areaNormal)) > deepAt && (fresh || !(clayStart_.bits[v >> 6] >> (v & 63) & 1u))) mine.push_back(v);
+                }
+                if (!mine.empty()) {
+                    std::lock_guard<std::mutex> lk(foundLock);
+                    found.insert(found.end(), mine.begin(), mine.end());
+                }
+            }, 65536);
+            if (!found.empty() && fresh) clayStart_.bits.assign((mesh.vertexCount() + 63) / 64, 0);
+            for (const uint32_t v : found) {
+                if (clayStart_.full()) break;
+                clayStart_.insert(v, pos[v]);
+            }
+        }
+        startWeights = clayStart_.count > 0;
     }
 
     // Inflate swells along each vertex's own normal, unless the dab reaches a groove or a packed grid (see inflateAlongNormals).
@@ -1571,11 +1590,12 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             if (reachFade <= 0.0f) return glm::vec3(0.0f);
         }
         glm::vec3 xw = x; // (where the falloff weighs it)
-        if (startWeights) {
+        glm::vec3 st;
+        if (startWeights && clayStart_.find(v, st)) {
             float kk;
-            const float deep = std::abs(glm::dot(pinchStart_[v] - plane.clayPlane(kk), areaNormal)) / r;
+            const float deep = std::abs(glm::dot(st - plane.clayPlane(kk), areaNormal)) / r;
             const float t = std::clamp((deep - kStartDeep) * 4.0f, 0.0f, 1.0f);
-            if (t > 0.0f) xw = x + (pinchStart_[v] - x) * (t * t * (3.0f - 2.0f * t));
+            if (t > 0.0f) xw = x + (st - x) * (t * t * (3.0f - 2.0f * t));
         }
         const glm::vec3 o = xw - p.center;
         float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
@@ -1688,19 +1708,6 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         }
         return d * reachFade;
     };
-    if (startWeights) {
-        if (pinchStamp_.size() != mesh.vertexCount()) {
-            pinchStamp_.assign(mesh.vertexCount(), 0);
-            pinchStart_.assign(mesh.vertexCount(), glm::vec3(0.0f));
-        }
-        const uint32_t stamp = uint32_t(strokeId_);
-        poolFor(verts_.size(), [&](size_t begin, size_t end) { // (each vertex once: verts_ holds no repeats)
-            for (size_t i = begin; i < end; ++i) {
-                const uint32_t v = verts_[i];
-                if (pinchStamp_[v] != stamp) pinchStamp_[v] = stamp, pinchStart_[v] = pos[v];
-            }
-        });
-    }
     if (!adaptiveDab_ && !analyticEarly) {
         poolFor(verts_.size(), [&](size_t begin, size_t end) {
             for (size_t i = begin; i < end; ++i) scratch_[i] = offset(i, verts_[i], pos[verts_[i]]);

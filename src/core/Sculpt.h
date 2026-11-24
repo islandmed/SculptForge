@@ -491,6 +491,45 @@ private:
     // stroke's laps over one line don't keep squeezing the walls: the sideways pull is bounded against that start (Sculpt.cpp, kPinchReach).
     std::vector<uint32_t> pinchStamp_;
     std::vector<glm::vec3> pinchStart_;
+    // A Clay stroke's start positions (see kStartDeep): kept only for the vertices a dab found far below its plane, in a hash
+    // (16 bytes a slot, at most half of kMaxSlots: 8 MB) with a bit a vertex in front of it, so a stroke on a rough mesh holds a few MB, never
+    // 16 bytes for the whole mesh. A vertex is in it from the dab that first found it deep; the others weigh by where they are.
+    struct StartStore {
+        static constexpr uint32_t kMaxSlots = 1u << 19;
+        std::vector<uint64_t> bits;      // (one per vertex: is it in the hash)
+        std::vector<uint32_t> keys;      // (vertex + 1; 0 = empty slot)
+        std::vector<glm::vec3> starts;
+        uint32_t count = 0;
+        bool full() const { return count >= kMaxSlots / 2; }
+        bool find(uint32_t v, glm::vec3& out) const {
+            if (!(bits[v >> 6] >> (v & 63) & 1u)) return false;
+            const uint32_t mask = uint32_t(keys.size()) - 1;
+            for (uint32_t i = (v * 2654435761u) & mask;; i = (i + 1) & mask)
+                if (keys[i] == v + 1) return out = starts[i], true;
+        }
+        void insert(uint32_t v, const glm::vec3& at) {
+            if (keys.empty()) keys.assign(1u << 12, 0), starts.resize(1u << 12);
+            if (count * 2 >= keys.size()) { // (grow: half full)
+                std::vector<uint32_t> oldKeys;
+                std::vector<glm::vec3> oldStarts;
+                oldKeys.swap(keys), oldStarts.swap(starts);
+                keys.assign(oldKeys.size() * 2, 0), starts.resize(oldKeys.size() * 2);
+                for (size_t j = 0; j < oldKeys.size(); ++j)
+                    if (oldKeys[j]) place(oldKeys[j] - 1, oldStarts[j]);
+            }
+            place(v, at);
+            ++count;
+        }
+        void place(uint32_t v, const glm::vec3& at) {
+            const uint32_t mask = uint32_t(keys.size()) - 1;
+            uint32_t i = (v * 2654435761u) & mask;
+            while (keys[i]) i = (i + 1) & mask;
+            keys[i] = v + 1, starts[i] = at;
+            bits[v >> 6] |= uint64_t(1) << (v & 63);
+        }
+        size_t bytes() const { return bits.capacity() * 8 + keys.capacity() * 4 + starts.capacity() * sizeof(glm::vec3); }
+    };
+    StartStore clayStart_;
     std::vector<uint32_t> pinchDabStamp_; // (the dab that worked out pinchTaper_: every copy of a symmetry's dab shares it)
     std::vector<float> pinchTaper_;
     uint32_t pinchDab_ = 0;
@@ -498,7 +537,7 @@ public:
     // The bytes a pinching recipe's stroke holds (0 between strokes: endStroke frees them).
     size_t pinchStateBytes() const {
         return pinchStamp_.capacity() * sizeof(uint32_t) + pinchStart_.capacity() * sizeof(glm::vec3) + pinchDabStamp_.capacity() * sizeof(uint32_t) +
-               pinchTaper_.capacity() * sizeof(float);
+               pinchTaper_.capacity() * sizeof(float) + clayStart_.bytes();
     }
 
 private:

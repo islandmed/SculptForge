@@ -98,7 +98,11 @@ Ribs slotPasses(const Mesh& start, BrushType type, int passes, float radius, flo
                     std::printf("pass %d a %.3f move |%.3f| (%.3f %.3f %.3f) frame n (%.2f %.2f %.2f) ac-c %.3f\n", pass, a, glm::length(m), m.x, m.y, m.z, fr.normal.x, fr.normal.y, fr.normal.z, glm::dot(fr.areaCenter - p.center, fr.normal)), lastm = m;
             }
         }
-        if (startWeights && type == BrushType::Clay && radius > 0.1f && gapOf > 0.1f) CHECK(d.sculptor.pinchStateBytes() > 0); // (a leaning wall: kept)
+        if (startWeights && type == BrushType::Clay && radius > 0.1f && gapOf > 0.1f) {
+            const size_t kept = d.sculptor.pinchStateBytes(); // (a leaning wall: kept, and only for the vertices that are deep: a quarter of 16 bytes a vertex at most)
+            CHECK(kept > 0);
+            CHECK(kept < d.mesh.vertexCount() * 4);
+        }
         d.undo.push(d.sculptor.endStroke());
         CHECK(d.sculptor.pinchStateBytes() == 0);
     }
