@@ -5222,8 +5222,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Edges mode selects edges of the base level", "邊模式選取基礎層級的邊"},
     // --- Tool > Polygon (Polygon mode, PanelPolygon.cpp) ---
     {"By Group", "依群組選取"},
-    {"Extend each selected edge to its edge loop: across the quads, on through every vertex with four edges, until it comes back round or meets a pole or a border (a double-click on an edge does the same).", "將每條選取的邊延伸為它的邊循環：跨過四邊形，經過每個有四條邊的頂點，直到繞回起點或遇到極點或邊界（在邊上按兩下效果相同）。"},
-    {"Extend each selected edge to its edge ring: the edges across the quads beside it, on until the ring comes back round or meets a triangle or a border (what an added edge loop would cut through).", "將每條選取的邊延伸為它的邊環：相鄰四邊形對面的邊，依序前進，直到環繞回起點或遇到三角形或邊界（即新增的邊循環會切過的位置）。"},
+    {"Extend each selected edge to its edge loop: across the quads, on through every vertex with four edges, until it comes back round or meets a pole or a border (a double-click on an edge does the same).", "將每條選取的邊延伸為它的邊循環：跨過四邊形，經過每個有四條邊的頂點，直到繞回起點或碰到極點或邊界（在邊上按兩下效果相同）。"},
+    {"Extend each selected edge to its edge ring: the edges across the quads beside it, on until the ring comes back round or meets a triangle or a border (what an added edge loop would cut through).", "將每條選取的邊延伸為它的邊環：相鄰四邊形對面的邊，依序前進，直到環繞回起點或碰到三角形或邊界（即新增的邊循環會切過的位置）。"},
     {"Extend the selection to the whole face groups the selected faces are in (a double-click on a face does the same).", "將選取範圍擴展到所選面所在的整個面群組（在面上按兩下效果相同）。"},
     {"Model with polygons: select Points, Edges or Faces of the Part on the model (click, Shift adds, Ctrl removes, drag a box; double-click an edge for its loop, a face for its face group), move them with the Transform gizmo and run the operations below on them. For low and medium-density meshes without subdivision or Micro levels. Esc, the button or any brush goes back to sculpting.", "用多邊形建模：在模型上選取部件的點、邊或面（點一下選取，Shift 加入，Ctrl 移除，拖曳框選；在邊上按兩下選其循環，在面上按兩下選其面群組），用變換操縱器移動它們，並對其執行下方的操作。適用於沒有細分層級或 Micro 層級的中低密度網格。按 Esc、此按鈕或任何筆刷返回雕刻。"},
     {"Operations", "操作"},

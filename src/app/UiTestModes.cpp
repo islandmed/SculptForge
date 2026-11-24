@@ -717,6 +717,10 @@ bool Demo::buildMonkey(int line, uint64_t seed, int count, std::string& error) {
         if (neverRun(a.id) || !a.run || !a.checked) continue;
         // (known=FILE: actions whose modes have filed failures are left out: the monkey looks for new ones)
         if (std::any_of(known_.begin(), known_.end(), [&](const auto& k) { return k.first.rfind(a.id + " | ", 0) == 0; })) continue;
+        // A toggle that opens a floating window over the model (the Community brushes gallery) is no mode: Esc and a brush
+        // leave it open, and the final stroke lands on the window instead of the model (seed 9 once Polygon mode's
+        // toggles shifted the sequences). The mode matrix covers it as "opens a window: not a mode".
+        if (a.id == "ui.brush_gallery") continue;
         (a.id.rfind("brush.", 0) == 0 ? brushes : toggles).push_back(a.id);
     }
     if (brushes.empty()) {
