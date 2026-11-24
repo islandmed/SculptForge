@@ -136,6 +136,7 @@ add_library(sculptforge_core STATIC
   src/core/MeshBoolean.cpp
   src/core/PartBoolean.cpp
   src/core/CloseHoles.cpp
+  src/core/PolySpan.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/CreatureSkin.cpp
