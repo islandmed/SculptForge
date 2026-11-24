@@ -1788,6 +1788,15 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "light_pitch") return double(app_.renderSettings_.lightPitch);
     if (name == "light_intensity") return double(app_.renderSettings_.lightIntensity);
     if (name == "light_ambient") return double(app_.renderSettings_.lightAmbient);
+    if (name == "light_count") return double(app_.renderSettings_.lights.size()); // added lights (Material > Light > Lights)
+    if (name == "added_light_yaw") return app_.renderSettings_.lights.empty() ? 0.0 : double(app_.renderSettings_.lights.back().yaw);
+    if (name == "added_light_intensity") return app_.renderSettings_.lights.empty() ? 0.0 : double(app_.renderSettings_.lights.back().intensity);
+    if (name == "shadow_strength") return double(app_.renderSettings_.shadowStrength);
+    if (name == "shadow_light_count") { // added lights that cast the shadows (0 or 1)
+        int n = 0;
+        for (const ViewLight& l : app_.renderSettings_.lights) n += l.shadows ? 1 : 0;
+        return double(n);
+    }
     if (name == "render_aspect") return double(app_.renderAspect_);
     if (name == "draw_ms") return app_.benchmarkDrawMs(30); // the 3D view drawn 30 times: ms per frame
     if (name == "drawn_triangles") { // the 3D view drawn once more now: the triangles it drew

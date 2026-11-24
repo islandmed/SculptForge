@@ -155,6 +155,7 @@ Json toJson(const UiPrefs& p) {
     j.set("aoStrength", double(p.aoStrength));
     j.set("aoSoftness", double(p.aoSoftness));
     j.set("shadowSoftness", double(p.shadowSoftness));
+    j.set("shadowStrength", double(p.shadowStrength));
     j.set("viewOcclusionLitSphere", p.viewOcclusionLitSphere);
     j.set("multithreading", p.multithreading);
     j.set("predictiveStrokes", p.predictiveStrokes);
@@ -288,6 +289,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.aoStrength = std::clamp(float(j["aoStrength"].asNumber(p.aoStrength)), 0.0f, 1.0f);
     p.aoSoftness = std::clamp(float(j["aoSoftness"].asNumber(p.aoSoftness)), 0.0f, 1.0f);
     p.shadowSoftness = std::clamp(float(j["shadowSoftness"].asNumber(p.shadowSoftness)), 0.0f, 1.0f);
+    p.shadowStrength = std::clamp(float(j["shadowStrength"].asNumber(p.shadowStrength)), 0.0f, 2.0f);
     p.viewOcclusionLitSphere = j["viewOcclusionLitSphere"].asBool(p.viewOcclusionLitSphere);
     p.multithreading = j["multithreading"].asBool(p.multithreading);
     p.predictiveStrokes = j["predictiveStrokes"].asBool(p.predictiveStrokes);

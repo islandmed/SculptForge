@@ -101,6 +101,20 @@ the light, emissive glows.
 - **Roughness** and **Metallic** apply to Parts without a material texture (their colour comes from vertex paint
   or the base colour), so you can judge a sculpt as metal or clay too.
 - **Cavity** darkens the sculpt's creases a little so fine detail reads under even light; 0 is plain PBR.
+- **Shadows & AO**: cast shadows and ambient occlusion from the drawn view, with **Shadow strength** (1 is the
+  light's own share of the darkness, towards 2 the shadows go black), **Shadow softness**, **AO strength** and
+  **AO softness** ([Performance](performance.md) has the Auto rule by hardware tier).
+
+### Lights of your own
+
+**Render > Materials > Light > Lights** adds up to four directional lights on top of the environment (and of the
+material's light in the Lit Sphere and studio views): a **Key** (warm, from the upper left in front), a **Fill**
+(cool and soft, from the right) or a **Rim** (from behind and above, along the silhouette). Each has its own ball
+to drag the direction on (past the edge sends the light round the back, where it shows as a ring; double-click
+puts it back where its role starts), a colour, an intensity and a **Shadows** tick: the ticked light is the one the
+cast shadows come from. In the PBR view they light the material channels with their roughness and metallic; the
+lights turn with the view, like the material's light. None are there until you add one, and they are saved with
+the project (`lights add=key`, `lights light=1 color=ff8040 intensity=1.5`, `lights remove=all`).
 
 ![The environment behind the model: Outdoor Sky with the AgX tone map](images/pbr-environment.jpg)
 

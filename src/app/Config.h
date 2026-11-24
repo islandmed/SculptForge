@@ -145,6 +145,7 @@ struct UiPrefs {
     // the PBR view; viewOcclusionLitSphere adds them to the Lit Sphere and studio shading.
     int viewAo = -1, viewShadows = -1;
     float aoStrength = 0.8f, aoSoftness = 0.4f, shadowSoftness = 0.35f;
+    float shadowStrength = 1.0f; // times the light's own share: 1 = the shipped darkness, 2 = black (RenderSettings::shadowStrength)
     bool viewOcclusionLitSphere = false;
     bool multithreading = true; // brushes, normals and BVH updates on every core (off: one thread)
     // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the
