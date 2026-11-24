@@ -981,6 +981,15 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
                 folderIndex[size_t(f)] = int(keptFolders.size());
                 keptFolders.push_back(&doc.partFolders[size_t(f)]);
             }
+    // A custom Lit Sphere a saved Part uses travels inside the project (as the scene's does, App::storeProjectSettings):
+    // its PNG, encoded here when the app hasn't already put it in projectFiles (a headless or Python save, Save Visible Parts).
+    std::map<std::string, std::vector<uint8_t>> extraFiles;
+    for (int i : kept)
+        if (const int m = doc.parts[size_t(i)].litsphere; isCustomLitSphere(m) && isLitSphereListed(m)) {
+            const std::string file = litsphereAttachmentName(litsphereName(m));
+            if (std::vector<uint8_t> png; !doc.projectFiles.count(file) && !extraFiles.count(file) && encodeLitSpherePng(m, png))
+                extraFiles[file] = std::move(png);
+        }
     for (int i : kept) {
         const Part& s = doc.parts[size_t(i)];
         const bool active = doc.checkedOut(i);
@@ -991,9 +1000,9 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
         if (s.litsphere != kLitSphereScene) { // its own material (optional, as shading): the name, "" for Studio
             st.set("litsphere", s.litsphere < 0 ? std::string() : std::string(litsphereName(s.litsphere)));
-            // A custom Lit Sphere travels inside the project when the app put its PNG in projectFiles (App::saveProjectTo).
-            if (isCustomLitSphere(s.litsphere) && doc.projectFiles.count(litsphereAttachmentName(litsphereName(s.litsphere))))
-                st.set("litsphere_file", litsphereAttachmentName(litsphereName(s.litsphere)));
+            if (const std::string file = litsphereAttachmentName(litsphereName(std::max(s.litsphere, 0)));
+                isCustomLitSphere(s.litsphere) && (doc.projectFiles.count(file) || extraFiles.count(file)))
+                st.set("litsphere_file", file); // (its PNG: an attachment below)
         }
         if (s.boolean != PartBoolean::None) st.set("boolean", partBooleanName(s.boolean)); // (optional, as shading)
         if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", folderIndex[size_t(f)]); // (#96: optional, as shading)
@@ -1114,15 +1123,17 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         manifest.set("splats", std::move(splats));
     }
 
-    if (!doc.projectFiles.empty()) { // (no format change: optional, older readers ignore it)
+    if (!doc.projectFiles.empty() || !extraFiles.empty()) { // (no format change: optional, older readers ignore it)
         Json files = Json::array();
-        for (const auto& [name, bytes] : doc.projectFiles) {
-            if (!validAttachmentName(name)) continue;
+        const auto attach = [&](const std::string& name, const std::vector<uint8_t>& bytes) {
+            if (!validAttachmentName(name)) return;
             Json f = Json::object();
             f.set("name", name);
             f.set("data", w.bytes("attachments/" + name, bytes));
             files.push(std::move(f));
-        }
+        };
+        for (const auto& [name, bytes] : doc.projectFiles) attach(name, bytes);
+        for (const auto& [name, bytes] : extraFiles) attach(name, bytes); // (the Parts' custom Lit Spheres, above)
         manifest.set("attachments", std::move(files));
     }
 

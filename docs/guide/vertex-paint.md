@@ -332,6 +332,7 @@ often.
 | `set_background mode=flat color=60,70,80` | The view's background: `gradient` (the default) or `flat` with a colour (`#rrggbb`, `r,g,b` or a name); see [The background](interface.md#the-background) (desktop app only) |
 | `set_shading mode=flat` | The scene's shading: `smooth` (the default) or `flat` (desktop app only) |
 | `part_shading mode=smooth name=Eyes` | A Part's own shading: `default` (follow the scene), `smooth` or `flat`; `index` or `name` picks the Part (default: the active one) |
+| `part_material material=Chrome name=Eyes` | A Part's own material: a Lit Sphere name, `studio`, or `scene` (follow the scene's material again); `all=true` sets every Part; `index` or `name` as above |
 
 ```text
 set_color color="#d9b38c"; paint_fill; paint_from_cavity strength=0.5

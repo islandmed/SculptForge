@@ -40,6 +40,7 @@ and they catch up a moment after you stop changing a Part (not during a stroke).
 | Hide or show it | Click the eye at the end of the row |
 | Combine it with other Parts | Click the mark after the triangle count and pick **Add**, **Subtract** or **Intersect**; see [Booleans](#booleans) |
 | Shade it smooth or flat | Click the mark left of the eye: it goes from **as the scene** (dim) to **Smooth** (a disc) to **Flat** (a faceted hexagon) and back. Only this Part changes; the scene's own setting is **Render > Materials > Shading** |
+| Give it a material of its own | Select it, open the material picker (<kbd>M</kbd>) or **Render > Materials**, switch **Scene | This Part** and click a material: chrome eyes in a clay head. Pointing at the row names it; see [A material per Part](vertex-paint.md#a-material-per-part) |
 | Duplicate or delete it | Right-click the row > **Duplicate** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) or **Delete...** |
 | Make a copy that shares the mesh | Right-click the row > **Linked Duplicate**, or the **Linked Duplicate** button; see [Linked Duplicates](linked-duplicates.md) |
 | See its vertex and triangle counts | Point at the row for a moment |
@@ -343,6 +344,7 @@ used.
 | `part_split_groups` / `part_split_parts` | Split |
 | `part_split_hidden` / `part_split_masked` / `part_split_unmasked` | Split off into a new Part (undoable; `keep=true` copies and leaves the source as it is) |
 | `part_shading mode=flat` | Shade a Part `default` (as the scene), `smooth` or `flat` |
+| `part_material material=Chrome` | A Part's own Lit Sphere material (`studio`, or `scene` to follow the scene's again); `all=true` for every Part |
 | `part_boolean name=Bolt mode=subtract` | Set a Part's Boolean: `none`, `add`, `subtract` or `intersect` |
 | `make_boolean_mesh` | Make Boolean Mesh; `weld=`, `keep_groups=`, `cut_group=` (all `true` by default); `voxel_fallback=false` fails instead of using voxels; `resolution=` (32-512, default 256) for the voxels |
 | `boolean_parts op=subtract a=Body b=Bolt` | The Boolean of two Parts into a new Part, whatever their marks (`union`, `subtract`, `intersect`; `a` and `b` are names or list indices); the same options |

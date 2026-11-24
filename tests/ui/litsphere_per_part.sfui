@@ -22,6 +22,8 @@ shot scene-chrome
 key m
 click "This Part##material.target_part"
 expect "Scene##mat"
+expect_text "Sphere 2"                         # (the Part the material goes to, named under the toggle)
+shot picker-this-part
 click "Red Wax##mat"
 expect_value part_material != -2
 expect_status "material: Red Wax"
@@ -49,6 +51,7 @@ shot part-skin-context
 click "Material##palette.material"
 expect "This Part##material.target_part"
 expect "Scene material##part.material_scene"
+shot material-palette
 click "Scene material##part.material_scene"
 expect_value part_material == -2
 key escape

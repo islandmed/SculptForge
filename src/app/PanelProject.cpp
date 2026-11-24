@@ -531,10 +531,7 @@ void App::storeProjectSettings() {
         doc_.projectFiles[file] = std::move(png);
         render.set("litsphere_file", file);
     }
-    // ... and so does each Part's own custom Lit Sphere (part_material; core/Project.cpp names it in the Part's entry).
-    for (const Part& s : doc_.parts)
-        if (std::vector<uint8_t> png; isCustomLitSphere(s.litsphere) && encodeLitSpherePng(s.litsphere, png))
-            doc_.projectFiles[litsphereAttachmentName(litsphereName(s.litsphere))] = std::move(png);
+    // (each Part's own custom Lit Sphere, part_material, is embedded by core/Project.cpp's saveProject itself)
     s.set("render", std::move(render));
 
     Json brush = Json::object();

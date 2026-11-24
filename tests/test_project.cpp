@@ -259,13 +259,11 @@ TEST(project_part_material) {
     custom.size = 16; // (the smallest a Lit Sphere image may be)
     custom.rgba.assign(16 * 16 * 4, 200);
     for (size_t i = 0; i < custom.rgba.size(); i += 4) custom.rgba[i] = uint8_t(i), custom.rgba[i + 3] = 255;
-    custom.hash = 0x5151u;
+    custom.hash = 0; // (addCustomLitSphere hashes the pixels: the project finds the Lit Sphere again by them)
     const int gold = addCustomLitSphere(custom);
     CHECK(reg.execute(doc, "part_material", {{"material", std::string("Part Gold")}, {"index", 0.0}}).ok);
     CHECK(doc.parts[0].litsphere == gold);
-    std::vector<uint8_t> png;
-    CHECK(encodeLitSpherePng(gold, png) && !png.empty());
-    doc.projectFiles[litsphereAttachmentName("Part Gold")] = png;
+    // (saveProject embeds its PNG itself: nothing in projectFiles here, as a headless or Python save)
 
     const std::string path = tempPath("sf_project_part_material.sfproj");
     std::string err;

@@ -5033,7 +5033,11 @@ bool Renderer::renderPartThumbnail(uint32_t id, float yaw, float pitch, int size
     bool flat = false;
     int litsphere = kLitSphereScene;
     for (const DrawItem& item : drawList_)
-        if (item.id == id) flat = item.flat, litsphere = item.litsphere;
+        if (item.id == id) { // (linked Parts, #94: the first one shown, as App::updatePartThumbnails keys it)
+            flat = item.flat;
+            litsphere = item.litsphere;
+            break;
+        }
     std::vector<DrawItem> scene;
     scene.swap(drawList_);
     drawList_.push_back({id, false, flat, litsphere}); // (not active: no ghost, draft or mask on it; its own material)
