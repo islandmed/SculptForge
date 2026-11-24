@@ -421,6 +421,8 @@ bool App::init(const AppOptions& options) {
     }
     initHardwareProfile(); // the cached hardware profile, or calibration over the first frames (PanelPerformanceProfile.cpp)
     timer.step("hardware profile");
+    if (const char* v = std::getenv("SF_SPLIT_VIEW"); v && *v) // SF_SPLIT_VIEW=1 (beside) / 2 (below): split from the start (benchmarks, tests)
+        splitSetMode(std::atoi(v));
     splashCheckpoint();
     initialised_ = true;
     return true;
@@ -781,11 +783,11 @@ int App::runUiTest(int w, int h, int fps) {
             SDL_Log("%s", err.c_str());
             return 1;
         }
-        renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        drawSceneCapture(w, h);
         // (a streamed level's detail pages come a frame after the first draw that shows them: a shot waits as a window would)
         for (int k = 0; k < 24 && !shot.empty() && renderer_.microPendingPages() > 0; ++k) {
             syncScene();
-            renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+            drawSceneCapture(w, h);
         }
         renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -1002,7 +1004,7 @@ int App::runRecording() {
             SDL_Log("%s", err.c_str());
             break;
         }
-        renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        drawSceneCapture(w, h);
         renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
@@ -1573,6 +1575,7 @@ int App::run() {
         syncScene();
         mark();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
+        splitSync(); // Split view: fixed lenses hold, aspects follow the panes (before the view is compared for motion)
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
         noteStillness();
@@ -1582,7 +1585,7 @@ int App::run() {
         if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops
             renderSettings_.resolutionScale = std::min(renderSettings_.resolutionScale, turbo_ ? std::min(motionResolution(), 0.75f) : motionResolution());
         hardwareProfileDrawStart();
-        perf_.samplesUsed = renderer_.drawView(camera_, fbW, fbH, renderSettings_, canvasViewport(fbW, fbH), samples);
+        drawSceneViews(fbW, fbH, samples); // the view, or both panes of a split view (SplitView.cpp)
         if (snapshotEnv && *snapshotEnv && (sm.moving || sm.releasing)) {
             // Three points of the stroke, and the end (the frame the last dab reached the screen).
             const double u = sm.moving ? (seconds() - sm.start) / double(options_.measureStroke) : 2.0;
@@ -2057,6 +2060,10 @@ void App::dispatchEvent(const SDL_Event& event) {
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
         ++penDiag_.wheel;
         if (penInProximity_) ++penDiag_.wheelPenInRange;
+        if (uiPrefs_.splitView && drag_ == Drag::None && !io.WantCaptureMouse) { // (the wheel zooms the pane under the pointer)
+            const int pane = splitPaneAt(e.wheel.mouse_x, e.wheel.mouse_y);
+            if (pane >= 0) splitActivate(pane);
+        }
         if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y) &&
             !ui::FloatingWindowAt(ImVec2(e.wheel.mouse_x, e.wheel.mouse_y)))
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
@@ -2216,6 +2223,10 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     cancelCameraMove(); // the orientation widget's eased turn ends where it is: a stroke or drag never runs under a moving view
     mouseX_ = x;
     mouseY_ = y;
+    if (uiPrefs_.splitView && drag_ == Drag::None && !ImGui::GetIO().WantCaptureMouse) { // (a press with no move before it: a tap)
+        const int pane = splitPaneAt(x, y);
+        if (pane >= 0) splitActivate(pane);
+    }
     const SDL_Keymod mod = inputMods();
     const SDL_Keymod nav = inputMods(false); // (navigation ignores the stroke popup's latched Smooth / Mask / Select)
     // A pen button is already driving the view: touching down with the tip keeps navigating.
@@ -2416,6 +2427,11 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         mouseY_ = y;
         return;
     }
+    // Split view: the pane the pointer moves into is the working view (not in the middle of a drag or stroke, nor over the UI).
+    if (uiPrefs_.splitView && drag_ == Drag::None && !ImGui::GetIO().WantCaptureMouse) {
+        const int pane = splitPaneAt(x, y);
+        if (pane >= 0) splitActivate(pane);
+    }
     // (A driver's stray mouse events beside the pen's never get here: strayMouseMotion.) A pen that went quiet
     // without saying it left (some drivers never do) hands the cursor back to the mouse.
     // A view drag a mouse button began (a compositor that maps the pen's barrel buttons to a right / middle click, KDE's
@@ -2589,6 +2605,9 @@ void App::resetView() {
 }
 
 void App::orbitBy(float x, float y, float dx, float dy, bool mouse) {
+    // Split view: a pane with a fixed lens (Front, Right, Top) keeps its direction; the drag turns nothing (not even about a
+    // pivot, which would slide the target).
+    if (uiPrefs_.splitView && uiPrefs_.splitLens[splitActive_]) return;
     if (autoOrtho_) { // an axis view turned: back to perspective (Blender's Auto Perspective)
         camera_.ortho = false;
         autoOrtho_ = false;
@@ -3968,6 +3987,7 @@ void App::drawUi() {
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     drawGradientOverlay();   // Line Gradient: the line and its end handles (LineGradient.cpp)
     if (uiPrefs_.showAxes) drawCornerGizmo(); // X / Y / Z or the orientation widget in the canvas corner (#31, CornerGizmo.cpp)
+    drawSplitViewUi();                        // the divider and the lens chips of a split view (SplitView.cpp)
     if (uiPrefs_.showViewFigure) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
     drawViewportToast();
@@ -4506,7 +4526,7 @@ void App::drawBrushLab() {
     const float scale = uiScale_;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     // First use: the canvas's top-left corner, clear of the model.
-    const CanvasRect canvas = canvasRect();
+    const CanvasRect canvas = wholeCanvasRect();
     ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + canvas.x + 16 * scale, vp->Pos.y + canvas.y + 16 * scale), ImGuiCond_FirstUseEver);
     if (!beginPanel(tr("Brush Lab"), &showBrushLab_, 420 * scale)) {
         ImGui::End();
@@ -4778,7 +4798,7 @@ void App::drawComfyUi() {
 void App::drawImageTo3D() {
     const float scale = uiScale_;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
-    const CanvasRect canvas = canvasRect(); // first use: the canvas's top-right corner
+    const CanvasRect canvas = wholeCanvasRect(); // first use: the canvas's top-right corner
     ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + canvas.x + canvas.w - 306 * scale, vp->Pos.y + canvas.y + 16 * scale),
                             ImGuiCond_FirstUseEver);
     if (!beginPanel(tr("Generate 3D"), &showImageTo3D_, 290 * scale)) {

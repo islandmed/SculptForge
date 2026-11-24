@@ -263,6 +263,28 @@ Type a name (or leave it empty for "View 1", "View 2" ...) and click **Save View
 Click a name to go back to that view, or press <kbd>Numpad 0</kbd> for the one used last; **x** forgets it. Saved
 views are kept in the project.
 
+## Split view
+
+**View > Split view** (or <kbd>Shift</kbd>+<kbd>V</kbd>) shows two live views of the same scene, **Beside** each
+other or one **Below** the other. Each view has its own camera, so you can sculpt in a perspective view while a front
+view beside it follows every stroke, or work in the front view and watch the perspective one.
+
+The view under the pointer is the one you work in: strokes, orbit, pan, zoom, <kbd>F</kbd> and the axis keys all go
+to it, and the brush cursor and the axis gizmo move with it. The other view redraws as you sculpt. Drag the divider
+between the views to give one more room.
+
+Each view has a direction, shown on the small chip at its top right (click it to change, swap the views or go back
+to one view; **View > Split view** has the same choices):
+
+| Direction | What it does |
+|---|---|
+| **Free** | Turns like any view: perspective, or orthographic with <kbd>Numpad 5</kbd> |
+| **Front**, **Right**, **Top** | Holds that side, orthographic; pan and zoom still work, orbiting leaves it where it is |
+
+New installs start with a Free view beside a Front one. The split, its directions and the divider are saved with your
+preferences; the cameras themselves are not. While a stroke runs or a view moves, the other view draws at a lower
+resolution (half of it on the Essential tier) and comes back sharp as soon as you stop.
+
 ## Display toggles that help navigation
 
 These live on the right shelf and in the **View** menu:

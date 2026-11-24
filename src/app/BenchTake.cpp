@@ -259,7 +259,7 @@ void App::drawTakeHud() {
     if (t.stage == TakeState::Stage::Done) return;
     // As proof mode's (burned into the video: it is part of the frame).
     const float sc = uiScale_;
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     ImFont* font = ImGui::GetFont();
     const float bigSize = ImGui::GetFontSize() * 1.35f, smallSize = ImGui::GetFontSize() * 1.05f;

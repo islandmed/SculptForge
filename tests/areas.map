@@ -94,6 +94,7 @@ ui_deformation_ops*         mesh
 ui_deform_panel*            mesh
 ui_auto_uv_worker           mesh
 ui_radial_symmetry          mesh
+ui_split_view*              render
 ui_view_*                   render
 ui_viewport_cursor          render
 ui_backface_culling         render

@@ -252,7 +252,10 @@
 //                            their own curve), dab_error_px (the last stroke's dab furthest from its cursor
 //                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
 //                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable, orbit_lock (0 free, 1 Y, 2 X, 3 Z),
-//                            camera_ortho, checked@ACTION (1 when the toggle shows on), size_slider_ring (a Size slider's ring: 1 while it drags, then fading),
+//                            camera_ortho, split_view (0 off, 1 beside, 2 below) / split_active (the pointer's pane, 0 left or top) /
+//                            split_lens_first / split_lens_second (0 free, 1 front, 2 right, 3 top) / split_ratio /
+//                            split_first_u, split_first_v, split_second_u, split_second_v (a pane's middle, window fractions),
+//                            checked@ACTION (1 when the toggle shows on), size_slider_ring (a Size slider's ring: 1 while it drags, then fading),
 //                            right_column_clipped (right shelf items past its bottom), right_shelf_changes (frames that folded,
 //                            unfolded or resized it; steady = no change), right_shelf_folded, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
@@ -1142,6 +1145,19 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "turntable") return app_.uiPrefs_.orbitLock == 1 ? 1.0 : 0.0;
     if (name == "orbit_lock") return double(app_.uiPrefs_.orbitLock);
     if (name == "camera_ortho") return app_.camera_.ortho ? 1.0 : 0.0;
+    // Split view (SplitView.cpp): the mode, the pointer's pane, each pane's lens, the divider's share, and where the
+    // second pane's middle is in window fractions (to hover or stroke there).
+    if (name == "split_view") return double(app_.uiPrefs_.splitView);
+    if (name == "split_active") return double(app_.splitActive_);
+    if (name == "split_lens_first") return double(app_.uiPrefs_.splitLens[0]);
+    if (name == "split_lens_second") return double(app_.uiPrefs_.splitLens[1]);
+    if (name == "split_ratio") return double(app_.uiPrefs_.splitRatio);
+    if (name == "split_second_u" || name == "split_second_v" || name == "split_first_u" || name == "split_first_v") {
+        const CanvasRect r = app_.splitPaneRect(name.find("second") != std::string::npos ? 1 : 0);
+        int ww = 0, wh = 0;
+        SDL_GetWindowSize(app_.window_, &ww, &wh);
+        return name.back() == 'u' ? double((r.x + r.w * 0.5f) / float(std::max(ww, 1))) : double((r.y + r.h * 0.5f) / float(std::max(wh, 1)));
+    }
     if (name == "mask_brush") return app_.maskBrushActive() ? 1.0 : 0.0;
     if (name == "brush_sets") return double(app_.brushSets().size()); // brush sets in the library (#143)
     if (name == "brush_set_active") return double(app_.matchingBrushSet()); // the set the bottom shelf is, -1 none

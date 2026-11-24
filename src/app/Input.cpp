@@ -278,6 +278,7 @@ void App::registerInputActions() {
                        return {ok, status_};
                    }});
     registerViewActions();
+    registerSplitViewActions();   // SplitView.cpp
     registerStrokePopupActions(); // StrokePopup.cpp
     applyInputStyle();
 }
@@ -1165,7 +1166,7 @@ void App::drawAirStrokeIndicator() {
     if (!uiPrefs_.airStrokes) return;
     // (below a top timeline; Don't show again and Preferences > Hints hide it, U11)
     drawViewportHint("air_strokes", tr("Strokes start off the model"), theme::u32(theme::accent),
-                     canvasRect().y + timelineTopInset_ + 8.0f * uiScale_);
+                     wholeCanvasRect().y + timelineTopInset_ + 8.0f * uiScale_);
 }
 
 } // namespace sf

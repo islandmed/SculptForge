@@ -516,6 +516,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelMasking.cpp
     src/app/PanelCut.cpp
     src/app/PanelView.cpp
+    src/app/SplitView.cpp
     src/app/PanelFaceGroups.cpp
     src/app/PanelSelectionSets.cpp
     src/app/Selection.cpp
@@ -1338,6 +1339,8 @@ if(SCULPTFORGE_BUILD_TESTS)
       get_filename_component(name ${script} NAME_WE)
       sculptforge_ui_test(${name} ${name})
     endforeach()
+    sculptforge_ui_test(split_view_1440 split_view --size 1440x900) # View > Split view: both panes, the divider, the chips
+    sculptforge_ui_test(split_view_2880 split_view --size 2880x1800)
     sculptforge_ui_test(color_material_entries_1440 color_material_entries --size 1440x900) # Color > Material rows before any channel is on
     sculptforge_ui_test(color_material_entries_2880 color_material_entries --size 2880x1800)
     sculptforge_ui_test(fill_effect_slider_keeps_1440 fill_effect_slider_keeps --size 1440x900)
