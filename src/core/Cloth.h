@@ -114,7 +114,7 @@ struct ClothSettings {
     float turbulence = 0.0f;
     float frameSeconds = 1.0f / 60.0f;
     int substeps = 12;
-    int iterations = 1; // constraint passes per substep (the brush uses more: its soft pins pull every substep)
+    int iterations = 1; // constraint passes per substep (the brush uses more: its soft pins pull every substep; wind at least 2)
     // At rest: every particle's mean position over `restFrames` frames moved from the last such window's mean less than
     // half as far as this speed (m/s) would take it, and none went faster than ten times it over any two frames.
     float restSpeed = 0.01f;

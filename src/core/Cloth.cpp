@@ -408,7 +408,8 @@ void ClothSim::substep(float h) {
     }, 8192);
     // Constraints, one colour at a time.
     const float h2inv = 1.0f / (h * h);
-    for (int it = 0; it < std::max(1, settings_.iterations); ++it) {
+    // (wind drives the cloth harder than gravity, a 6 m/s wind on cotton at 144 m/s^2: one pass left edges 8-28% long)
+    for (int it = 0; it < std::max(settings_.iterations, windy ? 2 : 1); ++it) {
         for (size_t c = 0; c + 1 < colourOffset_.size(); ++c) {
             const uint32_t b0 = colourOffset_[c], e0 = colourOffset_[c + 1];
             poolFor(e0 - b0, [&](size_t b, size_t e) {
