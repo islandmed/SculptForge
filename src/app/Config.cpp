@@ -2211,8 +2211,7 @@ void drawInterfaceSection(App& app) {
                                              int(std::lround(kMaxUiScale * 100.0f)), "%d%%", ImGuiSliderFlags_AlwaysClamp);
         const bool typing = ImGui::TempInputIsActive(ImGui::GetItemID());
         if (ImGui::IsItemActive()) {
-            if (edited && !typing && ImGui::IsMouseDown(ImGuiMouseButton_Left))
-                pct = int(std::lround(snapUiScale(float(pct) / 100.0f) * 100.0f));
+            if (edited && !typing) pct = int(std::lround(snapUiScale(float(pct) / 100.0f) * 100.0f)); // dragged or arrow keys: 5 % steps
             pending = pct;
             letGo = -1; // (a second click: the first one's value is not applied)
         } else {
