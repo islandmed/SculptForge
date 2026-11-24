@@ -364,6 +364,9 @@ TEST(primitive_kit_append_settings_and_freshness) {
     CHECK(reg.execute(doc, "undo", {}).ok); // the rotate + scale
     CHECK(primitiveFresh(doc, 1));
     CHECK(glm::distance(doc.mesh.bounds().center(), moved) < 1e-3f); // (a rotation about the centre, scaled: same centre)
+    CHECK(reg.execute(doc, "undo", {}).ok); // the segments=6 rebuild (still translated)
+    CHECK(primitiveFresh(doc, 1));
+    CHECK(glm::distance(doc.mesh.bounds().center(), before + glm::vec3(0.0f, 1.0f, 0.0f)) < 1e-3f);
     CHECK(reg.execute(doc, "undo", {}).ok); // the translate
     CHECK(primitiveFresh(doc, 1));
     CHECK(glm::distance(doc.mesh.bounds().center(), before) < 1e-3f);
