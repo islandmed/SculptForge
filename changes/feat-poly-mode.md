@@ -25,10 +25,13 @@ added: **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. 
   (a box corner becomes a sphere piece), a bevel ending at a face cuts that face's corner round, and two bevels running
   through a vertex join into one strip. Selected points are cut off instead, flat or as a rounded cap. The width is a
   share of the Part's size and is held back so no two cuts meet (Limit width). Faces keep their groups, UVs, mask and
-  paint; the bevel faces get a face group of their own. Open and non-manifold edges are left alone and counted. **Inset**: shrinks the selected faces inward by a Thickness and moves them in or out by a Depth (both as a fraction of
-  the Part's size; a slider drag previews the result), the selection as one shape or Each face by itself. The rim of quads
+  paint; the bevel faces get a face group of their own. Open and non-manifold edges are left alone and counted. **Inset**: shrinks the selected faces inward by a Thickness and moves them in or out by a Depth (the Thickness as a
+  share of the most the selected faces can take, so a short drag is a clear inset on a Part of any density and the end of
+  the slider is as deep as it goes; the Depth as a fraction of the Part's size; a slider drag previews the result), the
+  selection as one shape or Each face by itself. The rim of quads
   between the old border and the new one keeps the faces' groups (or joins one new Rim group), UVs stay continuous,
-  creases and UV seams stay on the old edge, and the thickness is held below the point where a face would turn inside out. Commands: `poly_mode`, `poly_select`,
+  creases and UV seams stay on the old edge, and the thickness is held a fifth short of the point where the inner faces would
+  meet, so an inset is never a fan of slivers. Commands: `poly_mode`, `poly_select`,
   `poly_op`, and `transform selection=true` (`edge_loop` and `edge_select op=ring` do the same from Edges mode for scripts). Nothing changes for sculpting: the mode is off until you turn it on.
   Members' top wish (#225 and the ideas threads).
 member_request: true
@@ -53,7 +56,7 @@ testers:
   - Any OS: Polygon mode on a box, Edges, All, Bevel with Width 0.05 and Segments 4: a rounded box with sphere corners and no
     cracks (Tool > Geometry > Find Problems is clean); Ctrl+Z takes it back in one step. Drag Width with one edge
     selected: the preview follows; 1 segment is a flat chamfer whose ends cut the neighbouring faces' corners.
-  - Any OS: Polygon mode on a cube, double-click a side (its face group), Inset with Thickness 0.1 and Depth -0.05: a sunken
+  - Any OS: Polygon mode on a cube, double-click a side (its face group), Inset with Thickness 0.3 and Depth -0.05: a sunken
     panel with a quad rim, no gaps, one Ctrl+Z puts the cube back. Then All, Each face on, Inset: every face shrinks evenly,
     none turns inside out even at Thickness 0.5.
   - Any OS: paint a texture, then Inset a few faces: the paint stays where it was on the inner faces and the rim.

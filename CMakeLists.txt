@@ -195,6 +195,7 @@ add_library(sculptforge_core STATIC
   src/core/SurfaceQuery.cpp
   src/core/QRemesh.cpp
   src/core/GeneratedRemesh.cpp
+  src/core/AiProvenance.cpp
   src/core/MeshPreview.cpp
   src/core/Backdrop.cpp
   src/core/QRemeshGuides.cpp
@@ -1355,6 +1356,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(keep_strokes_editable_checkbox_2880 keep_strokes_editable_checkbox --size 2880x1800)
     sculptforge_ui_test(undo_no_replay_lod_1440 undo_no_replay_lod --size 1440x900) # gh#184: the view after undo + a stroke
     sculptforge_ui_test(undo_no_replay_lod_2880 undo_no_replay_lod --size 2880x1800)
+    sculptforge_ui_test(generate_candidates_1440 generate_candidates --size 1440x900) # Generate 3D's Result choice + the AI tag (0.14)
+    sculptforge_ui_test(generate_candidates_2880 generate_candidates --size 2880x1800)
     # (gh#184, the stroke thread: settings read once at startup, so these run cold with their environment set here)
     sculptforge_ui_test(async_stroke_undo_view_1440 async_stroke_undo_view --size 1440x900)
     sculptforge_ui_test(async_stroke_undo_view_2880 async_stroke_undo_view --size 2880x1800)
