@@ -2268,11 +2268,11 @@ namespace {
 // registry per row would be quadratic).
 std::string sharedKeyHolders(const ActionRegistry& reg, const Action& a) {
     static unsigned revision = ~0u;
-    static i18n::Language language = i18n::Language::English; // (the names are translated: a language switch rebuilds)
+    static Language language = Language::English; // (the names are translated: a language switch rebuilds)
     static std::unordered_map<std::string, std::string> byId;
-    if (revision != reg.revision() || language != i18n::language()) {
+    if (revision != reg.revision() || language != sf::language()) {
         revision = reg.revision();
-        language = i18n::language();
+        language = sf::language();
         byId.clear();
         std::unordered_map<std::string, std::vector<const Action*>> byKey; // one alternative -> the actions that have it
         for (const Action& x : reg.all()) {
