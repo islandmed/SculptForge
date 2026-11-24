@@ -2198,21 +2198,36 @@ void drawInterfaceSection(App& app) {
                      "Follow the display the window is on (Windows: Settings > Display > Scale, per monitor; macOS and Wayland: "
                      "the display's scaling; X11: the desktop's font DPI). Untick, or move the slider, to choose a size.",
                      "Preferences > Interface");
-        static int pending = -1; // the value while the slider is held or typed into; applied when it is let go
+        // The value while the slider is held or typed into (pending), and the one let go of, applied a third of a second
+        // later unless a second click follows: the first click of a double-click (which opens the typed field) must not
+        // rebuild the UI under the second. A typed value applies the moment it is entered.
+        static int pending = -1, letGo = -1;
+        static double applyAt = 0.0;
+        static bool wasTyping = false;
         const int currentPct = int(std::lround((automatic ? app.uiScale() : pref) * 100.0f));
-        int pct = pending >= 0 ? pending : currentPct;
+        int pct = pending >= 0 ? pending : letGo >= 0 ? letGo : currentPct;
         ImGui::SetNextItemWidth(-FLT_MIN);
         const bool edited = ImGui::SliderInt("##ui_scale", &pct, int(std::lround(kMinUiScale * 100.0f)),
                                              int(std::lround(kMaxUiScale * 100.0f)), "%d%%", ImGuiSliderFlags_AlwaysClamp);
+        const bool typing = ImGui::TempInputIsActive(ImGui::GetItemID());
         if (ImGui::IsItemActive()) {
-            if (edited && ImGui::IsMouseDown(ImGuiMouseButton_Left)) pct = int(std::lround(snapUiScale(float(pct) / 100.0f) * 100.0f));
+            if (edited && !typing && ImGui::IsMouseDown(ImGuiMouseButton_Left))
+                pct = int(std::lround(snapUiScale(float(pct) / 100.0f) * 100.0f));
             pending = pct;
-        } else if (ImGui::IsItemDeactivatedAfterEdit()) {
-            app.setUiScalePreference(float(pct) / 100.0f);
-            pending = -1;
+            letGo = -1; // (a second click: the first one's value is not applied)
         } else {
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                letGo = pct;
+                applyAt = wasTyping ? 0.0 : ImGui::GetTime() + 0.35;
+                app.redrawIn(0.35);
+            }
             pending = -1;
+            if (letGo >= 0 && ImGui::GetTime() >= applyAt) {
+                app.setUiScalePreference(float(letGo) / 100.0f);
+                letGo = -1;
+            }
         }
+        wasTyping = typing;
         ui::HelpText("UI scale", nullptr,
                      "Size of text and controls, 70% to 300%, applied when you let the slider go (double-click it to type a "
                      "value). Below 100% the buttons keep a little more room around their text, so they stay easy to hit. "

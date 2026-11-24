@@ -12,8 +12,9 @@ expect "Automatic##ui_scale_auto"
 expect "##ui_scale"
 shot prefs_scale_auto
 
-# Typed: 80 %, entered.
+# Typed: 80 %, entered (the first click of the double-click lands on the slider, its value is not applied).
 double_click "##ui_scale"
+expect_value typing == 1
 type_here 80
 key enter
 wait 0.3
@@ -34,6 +35,7 @@ expect "##ui_scale"
 
 # Typed below the range: held at 70 %.
 double_click "##ui_scale"
+expect_value typing == 1
 type_here 40
 key enter
 wait 0.3
@@ -45,12 +47,14 @@ shot prefs_scale_70
 # Dragged: pressing the slider puts it where the pointer is, a glide far past its left end holds it at 70 %, and the
 # UI follows once it is let go (ui_scale is still 80 while the pointer is down: pending, not applied).
 double_click "##ui_scale"
+expect_value typing == 1
 type_here 80
 key enter
 wait 0.3
 expect_value ui_scale == 80
 drag_to "##ui_scale" "##ui_scale" -3000 0 0.6
-wait 0.3
+expect_value ui_scale == 80
+wait 0.8
 expect_value ui_scale == 70
 shot prefs_scale_dragged_70
 
