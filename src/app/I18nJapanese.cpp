@@ -6312,7 +6312,7 @@ constexpr Entry kJapanese[] = {
     {"By Group",
      "グループで選択"},
     {"Extend each selected edge to its edge loop: across the quads, on through every vertex with four edges, until it comes back round or meets a pole or a border (a double-click on an edge does the same).",
-     "選択した各エッジをそのエッジループに広げます。四角形をまたいで、エッジが4本の頂点を通り、一周して戻るか、極や境界に達するまで続きます（エッジのダブルクリックでも同じです）。"},
+     "選択した各エッジをそのエッジループに広げます。四角形をまたいで、エッジが4本の頂点を通り、一周して戻るか、ポールや境界に達するまで続きます（エッジのダブルクリックでも同じです）。"},
     {"Extend each selected edge to its edge ring: the edges across the quads beside it, on until the ring comes back round or meets a triangle or a border (what an added edge loop would cut through).",
      "選択した各エッジをそのエッジリングに広げます。隣の四角形の向かい側のエッジへと進み、一周して戻るか、三角形や境界に達するまで続きます（追加したエッジループが切り通す場所です）。"},
     {"Extend the selection to the whole face groups the selected faces are in (a double-click on a face does the same).",

@@ -5224,8 +5224,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Edges mode selects edges of the base level", "边模式选择基础级别的边"},
     // --- Tool > Polygon (Polygon mode, PanelPolygon.cpp) ---
     {"By Group", "按组选择"},
-    {"Extend each selected edge to its edge loop: across the quads, on through every vertex with four edges, until it comes back round or meets a pole or a border (a double-click on an edge does the same).", "将每条选中的边扩展为它的边循环：跨过四边形，经过每个有四条边的顶点，直到绕回起点或遇到极点或边界（双击一条边效果相同）。"},
-    {"Extend each selected edge to its edge ring: the edges across the quads beside it, on until the ring comes back round or meets a triangle or a border (what an added edge loop would cut through).", "将每条选中的边扩展为它的边环：相邻四边形对面的边，依次向前，直到环绕回起点或遇到三角形或边界（即新增的边循环会切过的位置）。"},
+    {"Extend each selected edge to its edge loop: across the quads, on through every vertex with four edges, until it comes back round or meets a pole or a border (a double-click on an edge does the same).", "将每条选中的边扩展为它的边循环：跨过四边形，经过每个有四条边的顶点，直到绕回起点或碰到极点或边界（双击一条边效果相同）。"},
+    {"Extend each selected edge to its edge ring: the edges across the quads beside it, on until the ring comes back round or meets a triangle or a border (what an added edge loop would cut through).", "将每条选中的边扩展为它的边环：相邻四边形对面的边，依次向前，直到环绕回起点或碰到三角形或边界（即新增的边循环会切过的位置）。"},
     {"Extend the selection to the whole face groups the selected faces are in (a double-click on a face does the same).", "将选区扩展到所选面所在的整个面组（双击一个面效果相同）。"},
     {"Model with polygons: select Points, Edges or Faces of the Part on the model (click, Shift adds, Ctrl removes, drag a box; double-click an edge for its loop, a face for its face group), move them with the Transform gizmo and run the operations below on them. For low and medium-density meshes without subdivision or Micro levels. Esc, the button or any brush goes back to sculpting.", "用多边形建模：在模型上选择部件的点、边或面（单击选择，Shift 添加，Ctrl 移除，拖动框选；双击一条边选其循环，双击一个面选其面组），用变换操纵器移动它们，并对其运行下方的操作。适用于没有细分级别或 Micro 级别的中低密度网格。按 Esc、此按钮或任意画笔返回雕刻。"},
     {"Operations", "操作"},
