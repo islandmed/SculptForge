@@ -85,7 +85,15 @@ std::string readAll(const fs::path& p) {
     return std::string(std::istreambuf_iterator<char>(f), {});
 }
 
-void writeAll(const fs::path& p, const std::string& s) { std::ofstream(p, std::ios::binary | std::ios::trunc) << s; }
+// Writes the whole file; a missing folder or a failed write is a failed check, never a silent no-op (11-24: a probe
+// bundle's marker was never written and a tamper test passed vacuously).
+void writeAll(const fs::path& p, const std::string& s) {
+    std::ofstream f(p, std::ios::binary | std::ios::trunc);
+    f << s;
+    f.close();
+    if (!f) std::fprintf(stderr, "writeAll: can't write %s\n", p.string().c_str());
+    CHECK(f.good() && readAll(p) == s);
+}
 
 // Serves release files from a map, in 4 KiB pieces, like the network would; records every URL asked for.
 struct FakeReleases {
@@ -976,18 +984,27 @@ TEST(self_update_mac_real_tampers) {
     struct Tamper {
         const char* what;
         std::function<void(const fs::path& app)> apply;
+        std::function<bool(const fs::path& app)> tookEffect; // asserted before the checks: a tamper that changed nothing is a red test
     };
+    const auto exe = [](const fs::path& app) { return app / "Contents" / "MacOS" / "sculptforge"; };
+    const auto marker = [](const fs::path& app) { return app / "Contents" / "Resources" / "marker.txt"; };
     const std::vector<Tamper> tampers = {
-        {"untouched", [](const fs::path&) {}},
-        {"a resource changed", [](const fs::path& app) { writeAll(app / "Contents" / "Resources" / "marker.txt", "changed"); }},
-        {"the executable changed",
-         [](const fs::path& app) { std::ofstream(app / "Contents" / "MacOS" / "sculptforge", std::ios::binary | std::ios::app) << "x"; }},
-        {"_CodeSignature removed", [](const fs::path& app) { std::error_code e; fs::remove_all(app / "Contents" / "_CodeSignature", e); }},
-        {"a file added", [](const fs::path& app) { writeAll(app / "Contents" / "Resources" / "extra.txt", "added after signing"); }},
+        {"untouched", [](const fs::path&) {}, [&](const fs::path& app) { return readAll(marker(app)) == "probe"; }},
+        {"a resource changed", [&](const fs::path& app) { writeAll(marker(app), "changed"); },
+         [&](const fs::path& app) { return readAll(marker(app)) == "changed" && readAll(marker(sealed)) == "probe"; }},
+        {"the executable changed", [&](const fs::path& app) { std::ofstream(exe(app), std::ios::binary | std::ios::app) << "x"; },
+         [&](const fs::path& app) { return readAll(exe(app)) == readAll(exe(sealed)) + "x"; }},
+        {"_CodeSignature removed", [](const fs::path& app) { std::error_code e; fs::remove_all(app / "Contents" / "_CodeSignature", e); },
+         [&](const fs::path& app) { return !fs::exists(app / "Contents" / "_CodeSignature") && fs::exists(sealed / "Contents" / "_CodeSignature"); }},
+        {"a file added", [](const fs::path& app) { writeAll(app / "Contents" / "Resources" / "extra.txt", "added after signing"); },
+         [&](const fs::path& app) { return fs::exists(app / "Contents" / "Resources" / "extra.txt") && !fs::exists(sealed / "Contents" / "Resources" / "extra.txt"); }},
         {"Info.plist changed", [](const fs::path& app) {
              std::string plist = readAll(app / "Contents" / "Info.plist");
              plist.replace(plist.find("app.sculptforge.probe"), 21, "app.sculptforge.probf");
              writeAll(app / "Contents" / "Info.plist", plist);
+         }, [&](const fs::path& app) {
+             const std::string plist = readAll(app / "Contents" / "Info.plist");
+             return plist.find("app.sculptforge.probf") != std::string::npos && plist != readAll(sealed / "Contents" / "Info.plist");
          }},
     };
     for (const Tamper& t : tampers) {
@@ -995,6 +1012,8 @@ TEST(self_update_mac_real_tampers) {
         fs::remove_all(copy, ec);
         CHECK(spawnTool({"/usr/bin/ditto", sealed.string(), copy.string()}) == 0);
         t.apply(copy);
+        if (!t.tookEffect(copy)) std::fprintf(stderr, "self_update_mac_real_tampers: %s changed nothing\n", t.what);
+        CHECK(t.tookEffect(copy));
         const bool cli = spawnTool({"/usr/bin/codesign", "--verify", "--deep", "--strict", copy.string()}) == 0;
         std::string id, team, error;
         const bool api = macBundleSignature(copy.string(), id, team, error);
@@ -1048,7 +1067,10 @@ TEST(self_update_mac_real_install) {
     CHECK(marker(s.install.target) == "old version" && s.applications() == std::vector<std::string>({"SculptForge.app"}));
     // A bundle changed after signing (its executable, here) is refused by the real codesign: the install leaves
     // everything as it was.
-    std::ofstream(src / "SculptForge.app" / "Contents" / "MacOS" / "sculptforge", std::ios::binary | std::ios::app) << "tampered";
+    const fs::path srcExe = src / "SculptForge.app" / "Contents" / "MacOS" / "sculptforge";
+    const std::string sealedExe = readAll(srcExe);
+    std::ofstream(srcExe, std::ios::binary | std::ios::app) << "tampered";
+    CHECK(readAll(srcExe) == sealedExe + "tampered");
     const fs::path bad = s.dir / "bad.dmg";
     CHECK(spawnTool({"/usr/bin/hdiutil", "create", "-quiet", "-srcfolder", src.string(), "-volname", "SculptForge", "-format",
                      "UDZO", bad.string()}) == 0);
