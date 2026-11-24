@@ -28,7 +28,6 @@ ui_e2e_cloth_*              cloth
 ui_e2e_extract_*            mesh
 ui_e2e_curves_*             mesh
 ui_e2e_voxel_*              mesh
-ui_e2e_dynamic_*            mesh
 ui_e2e_parts_*              mesh
 ui_e2e_export_*             io
 ui_e2e_prefs_*              io

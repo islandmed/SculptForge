@@ -3417,10 +3417,11 @@ constexpr Entry kTraditionalChinese[] = {
      "筆刷從表面減去。按住 Alt 可在單一筆畫中增加。"},
     {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
      "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
-     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles; UVs and the "
-     "painted texture are kept.",
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
+     "are dropped (Undo brings them back).",
      "動態拓樸：筆刷在需要細節處加入三角面，不需要處則移除，讓你拉出角或手指而不會拉伸。「細節」設定三角面的大小；拉"
-     "近視圖或縮小筆刷可得到更細的三角面。需要沒有細分層級的網格；筆刷下的四邊面會變成三角面，UV 與繪製的貼圖會保留。"},
+     "近視圖或縮小筆刷可得到更細的三角面。需要沒有細分層級的網格；筆刷下的四邊面會變成三角面，UV 會被捨棄（復原可找回"
+     "）。"},
     {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
      "sculpting.",
      "Lit Sphere 著色（預設）：所選的材質球或攝影棚燈光，便於雕刻時判讀形體。"},
