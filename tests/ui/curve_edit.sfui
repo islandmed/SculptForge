@@ -78,9 +78,10 @@ expect_value tube_last_radius_x1000 > $r0
 key ctrl+z
 expect_value tube_last_radius_x1000 == $r0
 key q
-# Q (Draw) goes back to the Part sculpted before the curve, as a brush does: pick the curve again.
-run part_select index=1
+# Q (Draw) leaves the gizmo and stays on the curve (a brush or Esc goes back to the Part sculpted before it).
+expect_value gizmo_mode == 0
 expect_value tube_curve == 1
+expect_value tube_points == 5
 # Snap points to surface puts the points on the model (or says they are on it already).
 action tube.snap_points
 expect_status "Snap"

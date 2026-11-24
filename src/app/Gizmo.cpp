@@ -250,12 +250,13 @@ void App::registerGizmoActions() {
 
 void App::setGizmoMode(GizmoMode mode) {
     if (drag_ == Drag::Gizmo) return;
-    // Draw / Move / Scale / Rotate leave Draw Tube and Append > Insert. The gizmo edits a Tube Part's points, so it
-    // stays on that Part (a brush still goes back to the Part sculpted before it).
+    // Draw / Move / Scale / Rotate leave Draw Tube and Append > Insert. The gizmo edits a Tube Part's points, so
+    // entering it, and leaving it with Q, stays on that Part (artist-qa 11-24: Q used to drop back to the sculpted
+    // Part and hide the curve's controls); a brush or Esc still goes back to the Part sculpted before it.
     const int keepReturn = tubeReturnPart_;
-    if (tubeActive() && mode != GizmoMode::Off) tubeReturnPart_ = -1;
+    if (tubeActive()) tubeReturnPart_ = -1;
     const std::string left = leaveDrawModes();
-    if (tubeActive() && mode != GizmoMode::Off) tubeReturnPart_ = keepReturn;
+    if (tubeActive()) tubeReturnPart_ = keepReturn;
     gizmo_.mode = mode;
     gizmo_.snapNext = false;
     gizmo_.hover = GizmoHandle::None;
