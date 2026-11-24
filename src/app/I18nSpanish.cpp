@@ -1604,7 +1604,7 @@ constexpr Entry kSpanish[] = {
     {"Save the layout, shortcuts and interface preferences to a file you can share.",
      "Guarda el diseño, los atajos y las preferencias de la interfaz en un archivo que puedes compartir."},
     {"Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it. (At any time, Customize off too, hold Alt and drag any button, checkbox, slider or choice from a palette onto a shelf.)",
-     "Reorganiza los estantes: Ctrl+Alt+arrastra cualquier botón a un estante para añadirlo o moverlo, o fuera de los estantes para quitarlo. (En cualquier momento, también con Personalizar desactivado, mantén Alt y arrastra cualquier botón, casilla, deslizador u opción de una paleta a un estante.)"}
+     "Reorganiza los estantes: Ctrl+Alt+arrastra cualquier botón a un estante para añadirlo o moverlo, o fuera de los estantes para quitarlo. (En cualquier momento, también con Personalizar desactivado, mantén Alt y arrastra cualquier botón, casilla, deslizador u opción de una paleta a un estante.)"},
     {"The short notes SculptForge shows over the 3D view (a mode that is on, the next step of a tool). Off hides them "
      "all; each also has its own Don't show again.",
      "Las notas breves que SculptForge muestra sobre la vista 3D (un modo activado, el siguiente paso de una "

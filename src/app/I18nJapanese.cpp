@@ -2297,7 +2297,7 @@ constexpr Entry kJapanese[] = {
     {"Save the layout, shortcuts and interface preferences to a file you can share.",
      "レイアウト、ショートカット、インターフェースの環境設定を共有可能なファイルに保存します。"},
     {"Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it. (At any time, Customize off too, hold Alt and drag any button, checkbox, slider or choice from a palette onto a shelf.)",
-     "シェルフを並べ替えます：ボタンをシェルフへCtrl+Alt+ドラッグして追加または移動、シェルフの外へドラッグして削除します。（いつでも、カスタマイズがオフのときも、Altを押しながらパレットのボタン、チェックボックス、スライダー、選択肢をシェルフへドラッグできます。）"}
+     "シェルフを並べ替えます：ボタンをシェルフへCtrl+Alt+ドラッグして追加または移動、シェルフの外へドラッグして削除します。（いつでも、カスタマイズがオフのときも、Altを押しながらパレットのボタン、チェックボックス、スライダー、選択肢をシェルフへドラッグできます。）"},
     {"The short notes SculptForge shows over the 3D view (a mode that is on, the next step of a tool). Off hides them all; each also has its own Don't show again.",
      "SculptForgeが3Dビュー上に表示する短い通知（有効なモード、ツールの次の手順など）です。オフにするとすべて非表示になります。各通知に「今後表示しない」もあります。"},
     {"Customize Shelves",
