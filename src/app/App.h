@@ -3459,6 +3459,7 @@ private:
     } radialEdit_;
     struct CentreClick { // Alt+middle press that hasn't moved past kRightClickSlop: a click centres the view on release
         bool pending = false; // (the drag itself goes on as usual from the press: a pan or, with Blender keys, an orbit)
+        bool release = false; // the release being handled is the middle button's own (not another button's, a pen's or a touch's)
         float x = 0.0f, y = 0.0f;
         float dx = 0.0f, dy = 0.0f; // the motion since the press
     } centreClick_;

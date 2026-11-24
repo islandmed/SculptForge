@@ -276,7 +276,8 @@ struct Document {
     // A name not used by any Part yet ("Eye", "Eye 2", ...).
     std::string uniquePartName(const std::string& wanted) const;
     // The name for a copy of the Part called `source`: numbered, "Head" -> "Head.01", "Head.02", ... (the lowest number
-    // not in use; a source that is itself numbered, "Head.01", counts from its base, so copies of copies never stack).
+    // not in use; a source that is itself numbered, "Head.01", counts from its base, so copies of copies never stack;
+    // a wider number, "Cube.001", keeps its width).
     std::string duplicatePartName(const std::string& source) const;
     // Bounds of every visible Part (in the scene: transforms applied).
     AABB visibleBounds() const;

@@ -2046,7 +2046,9 @@ void App::dispatchEvent(const SDL_Event& event) {
         // A right click that didn't drag: the QuickMenu (#22). (SDL's click for a pen button doesn't count: a pen
         // button opens it only when set to Right click, in penButton.)
         if (e.button.button == SDL_BUTTON_RIGHT && e.button.which != SDL_PEN_MOUSEID) rightClickRelease();
+        centreClick_.release = e.button.button == SDL_BUTTON_MIDDLE; // (only its own release centres the view)
         onMouseUp();
+        centreClick_.release = false;
         break;
     case SDL_EVENT_MOUSE_MOTION:
         pointerEventNs_ = e.motion.timestamp; // (the pen predictor's sample time: a batch is handled all at once)
@@ -2730,8 +2732,9 @@ void App::onMouseUp() {
     rollSideways_ = false;
     rightClick_.pending = rightClick_.down = false;
     if (centreClick_.pending) { // Alt+middle click: pressed and let go without moving
+        const bool fire = centreClick_.release; // another button's, a pen's or a touch's release only drops it
         centreClick_.pending = false;
-        centreViewOnPointer(mouseX_, mouseY_);
+        if (fire) centreViewOnPointer(mouseX_, mouseY_);
     }
     zsMenu_.armed = false;
     orbitStarted_ = false;

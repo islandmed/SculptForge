@@ -240,6 +240,9 @@ TEST(part_duplicate_numbered) { // Discord ask: "Head.01, Head.02", never "copy 
     CHECK(doc.duplicatePartName("v1.2") == "v1.2.01");   // one digit after the dot is part of the name
     CHECK(doc.duplicatePartName("Mk.II") == "Mk.II.01");
     CHECK(doc.duplicatePartName(".01") == "Part.01");
+    // A wider number (a Blender-style "Cube.001") keeps its width.
+    doc.addPart(Mesh(), "Cube.001", false);
+    CHECK(doc.duplicatePartName("Cube.001") == "Cube.002");
     // Past 99 the number just grows.
     Document many;
     CHECK(many.duplicatePartName("Eye") == "Eye.01");
