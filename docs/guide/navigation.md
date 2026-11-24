@@ -194,6 +194,10 @@ pen while they turn the view, and that works best, but you don't have to.
 - **Hold during strokes** (on by default): while you sculpt, paint or mask, the SpaceMouse leaves the view alone and
   its buttons do nothing, so a hand resting on the cap never moves the model under the pen. Turn it off to turn
   the view mid-stroke.
+- **Stop when the cap stops reporting** (on by default): some older models never tell the computer that the cap
+  was let go, which would leave the view drifting at the last speed. A cap whose six axes have not changed at all
+  for a third of a second counts as let go. Turn it off only if a very steady push stops the view.
+- **Log device reports**: for a bug report, see below.
 - **Dominant axis**: only the direction you push the most moves the view, so a twist doesn't also pan a little.
 - **Invert**: reverse any of the six moves (Pan X, Zoom, Pan Y, Tilt, Roll, Spin). If a direction feels wrong on
   your model of SpaceMouse, flip it here.
@@ -231,6 +235,12 @@ cap moving itself; if Preferences doesn't show the SpaceMouse moving, quit 3DxWa
 **To report a problem**, open **Edit > Preferences > Input > SpaceMouse** and click **Copy device report** (shown until the cap has moved the view): it puts
 every joystick SculptForge sees on the clipboard, with its USB ids and why it was or wasn't used. Paste it into
 your issue.
+
+If the view drifts after you let go, or stops while you push, switch on **Log device reports** in the same place,
+repeat it for ten seconds and switch it off. SculptForge writes what the device sends (axis values, events and the raw
+HID reports with their report ids, with times) to `spacemouse-log.txt` in the user data folder, which the section
+shows. Attach it to the issue. The file stays on your computer until you send it; it is off again after a restart
+(or set `SF_SPACEMOUSE_LOG=1` to log from the start).
 
 SculptForge recognises 3Dconnexion devices by their USB ids: everything under 3Dconnexion's own vendor id
 (SpaceMouse Compact, Wireless, Pro, Enterprise, Module, the Universal Receiver) except the CadMouse and the

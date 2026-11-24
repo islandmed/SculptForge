@@ -282,6 +282,12 @@ private:
     bool spaceMouseEcho_ = false, spaceMouseScrollEcho_ = false;
     float scrollMomentum_ = 0.0f, scrollMomentumLeft_ = 0.0f;
     std::array<float, 6> virtualAxes_{};
+    // A hand holding the cap never keeps all six axes bit-identical: the simulated cap shivers by one count every other
+    // frame while pushed (spacemouse_jitter on, the default). Off, a held value stays exactly as set: a model that
+    // never reports its release (the app counts the cap as let go after kSpaceMouseReportTimeout).
+    bool spaceMouseJitter_ = true;
+    unsigned spaceMouseFrame_ = 0;
+    void writeVirtualAxes();
     void spaceMouseEchoFrame(float dt);
     static constexpr SDL_MouseID kDriverMouse = 7; // the driver's own mouse device
     // `snapshot` saves the active mesh; moved* values compare against it. `remember` keeps values for $NAME.

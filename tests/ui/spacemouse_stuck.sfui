@@ -1,0 +1,53 @@
+# A SpaceMouse that never reports its release (a SpaceExplorer, 046d:c627, on Windows: the view kept moving at the last
+# speed after the cap was let go, an opposite push only slowed it). Replayed with a virtual cap that holds its last
+# value exactly (spacemouse_jitter off): the view stops once nothing has changed for a third of a second, an opposite
+# push moves it the other way at once, and a held cap that shivers by a count, as a hand's does, keeps moving.
+run ui_look look=classic layout=classic        # (the Classic look has Preferences in the palette bar)
+run new_sphere subdivisions=4
+camera 0 0
+spacemouse 0 0 0 0 0 0 0.1                     # plugged in, cap at rest
+spacemouse_jitter off
+
+# Push, and "let go" without a zero report: the last value stays.
+spacemouse_hold 0 0 0 0 0 0.8
+wait 0.15
+expect_value spacemouse_moving == 1
+wait 0.8
+expect_value spacemouse_moving == 0
+remember camera_yaw y1
+expect_value camera_yaw > 10
+wait 1.0
+expect_value camera_yaw >= $y1-0.0001
+expect_value camera_yaw <= $y1+0.0001
+
+# An opposite push is a new report: the view turns back at once.
+spacemouse_hold 0 0 0 0 0 -0.6
+wait 0.15
+expect_value spacemouse_moving == 1
+expect_value camera_yaw < $y1-1
+spacemouse_hold 0 0 0 0 0 0
+
+# A hand holding the cap steady shivers a count now and then: the view keeps moving for as long as it is held.
+spacemouse_jitter on
+camera 0 0
+spacemouse_hold 0 0 0 0 0 0.8
+wait 1.0
+expect_value spacemouse_moving == 1
+remember camera_yaw y2
+wait 0.3
+expect_value camera_yaw > $y2+3
+spacemouse_hold 0 0 0 0 0 0
+wait 0.2
+expect_value spacemouse_moving == 0
+
+# Preferences > Input > SpaceMouse: the new switches; the device log starts and stops with its checkbox.
+click "Preferences##palette.preferences"
+click "Input##preferences.input"
+hover "Log device reports##spacemouse.log"
+expect_text "Stop when the cap stops reporting"
+click "Log device reports##spacemouse.log"
+wait 0.3
+expect_text "spacemouse-log.txt"
+shot spacemouse_log
+click "Log device reports##spacemouse.log"
+wait 0.3

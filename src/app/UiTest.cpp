@@ -395,6 +395,8 @@
 //   spacemouse_hold TX TY TZ RX RY RZ  hold the cap there until the next spacemouse step (for steps in between,
 //                            e.g. a pen stroke while the view turns); spacemouse_hold 0 0 0 0 0 0 lets go
 //   spacemouse_button N      press and release button N (1 = left side button, 2 = right)
+//   spacemouse_jitter on|off a held cap shivers by one count every other frame, as a hand's does (default on); off holds
+//                            the exact value, as a model that never reports its release leaves it
 //   spacemouse_echo on|off   while the cap is pushed, the system pointer drifts and the wheel scrolls every frame, as
 //                            a SpaceMouse driver does for an app it doesn't know (3DxWare's defaults; fenix 11-06);
 //                            scroll: only the wheel, from the cap's first stir (inside the dead zone) and on for a
@@ -2113,7 +2115,7 @@ enum class StepVerb { None,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
     PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
-    SpacemouseEcho, PenRest, ViewTrace, Shot,
+    SpacemouseEcho, SpacemouseJitter, PenRest, ViewTrace, Shot,
 };
 static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
     static const std::unordered_map<std::string_view, StepVerb> verbs = {
@@ -2241,7 +2243,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"pen_press", StepVerb::PenPress},
         {"pen_sample", StepVerb::PenSample},
         {"pen_lift", StepVerb::PenLift},
-        {"spacemouse_echo", StepVerb::SpacemouseEcho},
+        {"spacemouse_echo", StepVerb::SpacemouseEcho}, {"spacemouse_jitter", StepVerb::SpacemouseJitter},
         {"pen_rest", StepVerb::PenRest}, {"view_trace", StepVerb::ViewTrace},
         {"shot", StepVerb::Shot},
     };
@@ -4781,8 +4783,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         auto setAxes = [this](const std::array<float, 6>& a) {
             virtualAxes_ = a;
-            for (int i = 0; i < 6; ++i)
-                SDL_SetJoystickVirtualAxis(virtualSpaceMouseHandle_, i, Sint16(std::lround(a[size_t(i)] * 32767.0f)));
+            writeVirtualAxes();
         };
         if (hold) {
             run([setAxes, v] { setAxes(v); });
@@ -4890,6 +4891,11 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             penPressure(0.0f);
         });
         wait(0.1f);
+        break;
+    }
+    case StepVerb::SpacemouseJitter: {
+        if (!need(1)) return false;
+        run([this, on = w[1] != "off"] { spaceMouseJitter_ = on; });
         break;
     }
     case StepVerb::SpacemouseEcho: {
@@ -5146,6 +5152,15 @@ void Demo::penRestNoise() {
     e.paxis.axis = SDL_PEN_AXIS_XTILT;
     e.paxis.value = 20.0f + jitter;
     app_.handleEvent(e);
+}
+
+void Demo::writeVirtualAxes() {
+    if (!virtualSpaceMouseHandle_) return;
+    for (int i = 0; i < 6; ++i) {
+        int v = int(std::lround(virtualAxes_[size_t(i)] * 32767.0f));
+        if (spaceMouseJitter_ && v != 0 && (spaceMouseFrame_ & 1)) v += v < 32767 ? 1 : -1;
+        SDL_SetJoystickVirtualAxis(virtualSpaceMouseHandle_, i, Sint16(v));
+    }
 }
 
 void Demo::spaceMouseEchoFrame(float dt) {

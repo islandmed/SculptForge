@@ -158,6 +158,7 @@ TEST(spacemouse_settings_json) {
     CHECK(s.enabled && s.holdWhileStroking && s.buttons[0] == "view.frame" && s.buttons[1] == "view.front");
     s.enabled = false;
     s.holdWhileStroking = false;
+    s.releaseTimeout = false;
     s.speed = 2.25f;
     s.deadZone = 0.2f;
     s.invert[2] = s.invert[5] = true;
@@ -171,6 +172,7 @@ TEST(spacemouse_settings_json) {
     std::string err;
     CHECK(Json::parse(toJson(s).dump(), parsed, err));
     fromJson(parsed, r);
+    CHECK(!r.releaseTimeout && SpaceMouseSettings().releaseTimeout);
     CHECK(!r.enabled && !r.holdWhileStroking && near(r.speed, 2.25f) && near(r.deadZone, 0.2f) && r.turntable && r.dominant);
     for (int i = 0; i < kSmAxes; ++i) CHECK(r.invert[size_t(i)] == (i == 2 || i == 5));
     CHECK(r.buttons[0] == "view.top" && r.buttons[1].empty() && r.buttons[3] == "edit.undo");
@@ -219,4 +221,102 @@ TEST(spacemouse_tilt_only_turns_and_stirs_early) {
     CHECK(spaceMouseStirred(a, s));
     s.enabled = false; // SpaceMouse off: its driver's scrolling is the user's to keep
     CHECK(!spaceMouseStirred(a, s));
+}
+
+// lauterkunst (Discord #bug-reports, Space Explorer 046d:c627, Windows): after letting go of the cap the view kept
+// moving at the last speed. A model that never sends its all-zero report leaves SDL showing the last push for ever.
+// Each "frame" below reads the axes as the app does (60 per second), through the report watch, into the view's move.
+namespace {
+struct Replay {
+    SpaceMouseSettings s;
+    SpaceMouseReportWatch watch;
+    float t = 0.0f;
+    float spinTotal = 0.0f, panTotal = 0.0f;
+    // One frame at 60 Hz with the axes as the device reports them now.
+    SpaceMouseMotion frame(const std::array<float, kSmAxes>& raw) {
+        const float dt = 1.0f / 60.0f;
+        t += dt;
+        const SpaceMouseMotion m = spaceMouseMotion(watch.update(raw, dt, s.releaseTimeout), dt, s);
+        spinTotal += m.spin;
+        panTotal += m.panX;
+        return m;
+    }
+    void frames(const std::array<float, kSmAxes>& raw, float seconds) {
+        for (int n = int(seconds * 60.0f + 0.5f); n > 0; --n) frame(raw);
+    }
+};
+} // namespace
+
+TEST(spacemouse_no_zero_report_stops_the_view) {
+    Replay r;
+    r.s.speed = 0.55f;
+    r.s.deadZone = 0.15f; // the reporter's settings
+    // A push on the cap that comes in as a few changing reports, then nothing: the device never says "zero".
+    r.frame(axes(0, 0, 0, 0, 0, 0));
+    for (float v : {0.2f, 0.45f, 0.7f, 0.82f}) r.frames(axes(0, 0, 0, 0, 0, v), 0.05f);
+    r.frames(axes(0, 0, 0, 0, 0, 0.82f), 0.1f); // held a moment: still moving
+    CHECK(r.frame(axes(0, 0, 0, 0, 0, 0.82f)).any());
+    // The cap is let go; the last value stays latched. The view stops within the timeout and stays stopped.
+    r.frames(axes(0, 0, 0, 0, 0, 0.82f), kSpaceMouseReportTimeout + 0.05f);
+    CHECK(!r.frame(axes(0, 0, 0, 0, 0, 0.82f)).any());
+    const float stopped = r.spinTotal;
+    r.frames(axes(0, 0, 0, 0, 0, 0.82f), 5.0f);
+    CHECK(near(r.spinTotal, stopped, 1e-7f));
+    // An opposite push is a new report: the view moves the other way at once, not "slower".
+    const SpaceMouseMotion back = r.frame(axes(0, 0, 0, 0, 0, -0.6f));
+    CHECK(back.spin > 0.0f); // (Rz > 0 turns the model the other way)
+    r.frames(axes(0, 0, 0, 0, 0, -0.6f), 3.0f);
+    CHECK(!r.frame(axes(0, 0, 0, 0, 0, -0.6f)).any()); // ...and that push latches too, then stops
+    // And a real zero report still works the normal way.
+    CHECK(!r.frame(axes(0, 0, 0, 0, 0, 0)).any());
+}
+
+TEST(spacemouse_steady_hold_keeps_moving) {
+    // A hand holds the cap: values jitter by one count (1/350) now and then, or are perfectly identical for a while
+    // (dead zone and quantisation). Anything shorter than the timeout must keep the view moving.
+    Replay r;
+    std::array<float, kSmAxes> a = axes(0.5f, 0, 0, 0, 0, 0);
+    r.frame(a);
+    for (int i = 0; i < 180; ++i) { // 3 seconds, a one-count change every 0.2 s
+        if (i % 12 == 0) a[kSmTx] += (i % 24 == 0 ? 1.0f : -1.0f) / 350.0f;
+        CHECK(r.frame(a).panX > 0.0f);
+    }
+    // Identical for just under the timeout, then a change: no stop in between.
+    Replay q;
+    const std::array<float, kSmAxes> hold = axes(0.5f, 0, 0, 0, 0, 0);
+    for (int i = 0; i < 4; ++i) {
+        for (int n = 0; n < int((kSpaceMouseReportTimeout - 0.05f) * 60.0f); ++n) CHECK(q.frame(hold).panX > 0.0f);
+        std::array<float, kSmAxes> next = hold;
+        next[kSmTx] += float(i + 1) / 350.0f;
+        CHECK(q.frame(next).panX > 0.0f);
+    }
+    // With the timeout setting off a latched cap behaves as before (nothing is guessed).
+    Replay off;
+    off.s.releaseTimeout = false;
+    off.frames(hold, 5.0f);
+    CHECK(off.frame(hold).panX > 0.0f);
+}
+
+TEST(spacemouse_split_report_ids) {
+    // Older models send the move on report 1 and the turn on report 2. SDL merges them into one axis set; the
+    // reports arrive at different moments. One report's axes unchanged while the other's keep changing is a live cap.
+    Replay r;
+    std::array<float, kSmAxes> a = axes(0.6f, 0, 0, 0, 0, 0); // report 1: translation
+    r.frame(a);
+    for (int i = 0; i < 120; ++i) { // 2 s: only report 2 (rotation) comes in, each 0.1 s
+        if (i % 6 == 0) a[kSmRz] = 0.3f + 0.01f * float(i / 6);
+        const SpaceMouseMotion m = r.frame(a);
+        CHECK(m.panX > 0.0f);
+    }
+    // Report 1 sends its zero (release of the translation) but report 2 never does: the turn stays latched.
+    a[kSmTx] = 0.0f;
+    CHECK(r.frame(a).spin != 0.0f);
+    r.frames(a, kSpaceMouseReportTimeout + 0.05f);
+    CHECK(!r.frame(a).any());
+    // Peeking between frames agrees with the frame (the echo filter reads the axes this way).
+    CHECK(r.watch.peek(a, true) == axes(0, 0, 0, 0, 0, 0));
+    CHECK(r.watch.peek(axes(0, 0, 0, 0, 0, 0.5f), true) == axes(0, 0, 0, 0, 0, 0.5f));
+    CHECK(r.watch.latched());
+    r.watch.reset();
+    CHECK(!r.watch.latched() && r.watch.peek(a, true) == a);
 }

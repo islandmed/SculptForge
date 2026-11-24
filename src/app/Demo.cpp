@@ -281,6 +281,8 @@ void Demo::update(float dt) {
     stride_ = 1;
     if (penResting_) penRestNoise(); // (UiTest.cpp)
     if (spaceMouseEcho_ || spaceMouseScrollEcho_) spaceMouseEchoFrame(dt);
+    ++spaceMouseFrame_;
+    if (spaceMouseJitter_) writeVirtualAxes(); // (a held cap shivers by a count every other frame)
     {
         const auto now = std::chrono::steady_clock::now();
         if (lastFrame_.time_since_epoch().count() != 0)

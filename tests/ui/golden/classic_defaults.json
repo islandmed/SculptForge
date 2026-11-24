@@ -285,6 +285,7 @@
       "turntable": false,
       "dominant": false,
       "holdWhileStroking": true,
+      "releaseTimeout": true,
       "buttons": [
         "view.frame",
         "view.front",

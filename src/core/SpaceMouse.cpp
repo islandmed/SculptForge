@@ -78,6 +78,7 @@ Json toJson(const SpaceMouseSettings& s) {
     j.set("turntable", s.turntable);
     j.set("dominant", s.dominant);
     j.set("holdWhileStroking", s.holdWhileStroking);
+    j.set("releaseTimeout", s.releaseTimeout);
     Json buttons = Json::array();
     for (const std::string& b : s.buttons) buttons.push(b);
     j.set("buttons", buttons);
@@ -96,9 +97,26 @@ void fromJson(const Json& j, SpaceMouseSettings& s) {
     s.turntable = j["turntable"].asBool(s.turntable);
     s.dominant = j["dominant"].asBool(s.dominant);
     s.holdWhileStroking = j["holdWhileStroking"].asBool(s.holdWhileStroking);
+    s.releaseTimeout = j["releaseTimeout"].asBool(s.releaseTimeout);
     if (const Json& b = j["buttons"]; b.isArray())
         for (size_t i = 0; i < s.buttons.size() && i < b.size(); ++i)
             if (b[i].isString()) s.buttons[i] = b[i].asString();
+}
+
+std::array<float, kSmAxes> SpaceMouseReportWatch::update(const std::array<float, kSmAxes>& axes, float dt, bool timeoutOn) {
+    if (axes != last_) {
+        last_ = axes;
+        still_ = 0.0f;
+    } else if (dt > 0.0f && std::isfinite(dt)) {
+        still_ = std::min(still_ + dt, 1e6f);
+    }
+    latched_ = timeoutOn && still_ > kSpaceMouseReportTimeout && axes != std::array<float, kSmAxes>{};
+    return latched_ ? std::array<float, kSmAxes>{} : axes;
+}
+
+std::array<float, kSmAxes> SpaceMouseReportWatch::peek(const std::array<float, kSmAxes>& axes, bool timeoutOn) const {
+    if (timeoutOn && axes == last_ && still_ > kSpaceMouseReportTimeout) return {};
+    return axes;
 }
 
 float spaceMouseDeadZone(float value, float deadZone) {

@@ -47,6 +47,10 @@ struct SpaceMouseSettings {
     // While a pen or mouse stroke runs the view holds still and the buttons do nothing, so a hand on the cap (or a
     // noisy cap) never moves the model under the pen (phoenix, Discord 11-05). Off: the view turns mid-stroke.
     bool holdWhileStroking = true;
+    // Some older models (SpaceExplorer, 046d:c627: lauterkunst, Discord) never send the all-zero report when the cap
+    // is let go, so the last push stays latched and the view drifts on. On: a cap whose six axes have not changed at
+    // all for kSpaceMouseReportTimeout counts as let go. A hand never holds all six still that long (see ReportWatch).
+    bool releaseTimeout = true;
     // The action each button runs ("" = nothing): the two side buttons default to Frame and Front view.
     std::array<std::string, kSpaceMouseButtonSlots> buttons{"view.frame", "view.front"};
 };
@@ -81,6 +85,28 @@ constexpr float kSpaceMouseMaxStep = 0.1f;   // seconds: a stalled frame doesn't
 // same id). Longer only if a real driver's scroll is seen to go on after the cap rests.
 constexpr float kSpaceMouseEchoHold = 0.3f; // seconds
 bool spaceMouseStirred(const std::array<float, kSmAxes>& axes, const SpaceMouseSettings& s);
+
+// How long all six axes may stay bit-identical before the cap counts as let go. A hand holding the cap steadily still
+// jitters at least one count of the sensor well within this; 0.3 s is far longer than any gap between real reports.
+constexpr float kSpaceMouseReportTimeout = 0.3f; // seconds
+
+// Finds a latched cap: a device that never reports its release leaves SDL showing the last push for ever. Fed the axes
+// as read each frame; once they have not changed for the timeout, the rest of the frames see a cap at rest until
+// any axis changes again (a new push, or a real zero report).
+class SpaceMouseReportWatch {
+public:
+    // The axes the frame should use: `axes`, or zeros when they have been still too long. `dt` seconds since the last call.
+    std::array<float, kSmAxes> update(const std::array<float, kSmAxes>& axes, float dt, bool timeoutOn);
+    // The same without moving the clock: what update() would give for `axes` now (a read between two frames).
+    std::array<float, kSmAxes> peek(const std::array<float, kSmAxes>& axes, bool timeoutOn) const;
+    bool latched() const { return latched_; } // the last update() treated the cap as let go
+    void reset() { *this = SpaceMouseReportWatch(); }
+
+private:
+    std::array<float, kSmAxes> last_{};
+    float still_ = 0.0f;
+    bool latched_ = false;
+};
 
 // An axis value (-1 .. 1) after the dead zone: 0 inside it, rescaled so the rest of the travel still reaches 1.
 float spaceMouseDeadZone(float value, float deadZone);

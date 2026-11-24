@@ -12,6 +12,7 @@
 #include "app/App.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "app/UserData.h"
 
 #include <IconsLucide.h>
 
@@ -19,6 +20,8 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <filesystem>
 #include <string>
 
 namespace sf {
@@ -92,6 +95,7 @@ void App::spaceMouseScan(bool retry) {
         spaceMouseName_ = name && *name ? name : "SpaceMouse";
         spaceMouseButtonCount_ = std::max(SDL_GetNumJoystickButtons(j), 0);
         spaceMouseAxes_ = {};
+        spaceMouseWatch_.reset();
         spaceMouseReported_ = false;
         SDL_Log("SpaceMouse: %s (%04x:%04x, %d buttons)", spaceMouseName_.c_str(), SDL_GetJoystickVendor(j),
                 SDL_GetJoystickProduct(j), spaceMouseButtonCount_);
@@ -106,6 +110,8 @@ void App::spaceMouseClose() {
     spaceMouseName_.clear();
     spaceMouseButtonCount_ = 0;
     spaceMouseAxes_ = {};
+    spaceMouseWatch_.reset();
+    spaceMouseLogStop();
     spaceMouseMoving_ = spaceMousePushed_ = false;
 }
 
@@ -120,7 +126,8 @@ std::array<float, kSmAxes> readAxes(SDL_Joystick* j) {
 
 bool App::spaceMouseDeflected() const {
     if (!spaceMouse_) return false;
-    return spaceMouseMotion(readAxes(spaceMouse_), 1.0f / 60.0f, uiPrefs_.spaceMouse).any();
+    const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
+    return spaceMouseMotion(spaceMouseWatch_.peek(readAxes(spaceMouse_), s.releaseTimeout), 1.0f / 60.0f, s).any();
 }
 
 void App::spaceMouseEvent(const SDL_Event& e) {
@@ -146,8 +153,13 @@ void App::spaceMouseEvent(const SDL_Event& e) {
         if (a && a->run && (!a->enabled || a->enabled())) a->run();
         break;
     }
+    case SDL_EVENT_JOYSTICK_AXIS_MOTION:
+        // (axis motion is read once a frame, updateSpaceMouse; the event only wakes the loop, and goes in the log)
+        if (spaceMouseLog_.is_open() && spaceMouse_ && e.jaxis.which == spaceMouseId_)
+            spaceMouseLogLine("event axis " + std::to_string(int(e.jaxis.axis)) + " = " + std::to_string(int(e.jaxis.value)));
+        break;
     default:
-        break; // axis motion is read once a frame (updateSpaceMouse); the event only wakes the loop
+        break;
     }
 }
 
@@ -171,10 +183,21 @@ void App::updateSpaceMouse(float dt) {
         }
         return;
     }
-    spaceMouseAxes_ = readAxes(spaceMouse_);
-    if (spaceMouseStirred(spaceMouseAxes_, uiPrefs_.spaceMouse)) spaceMouseQuiet_ = 0.0f;
-    for (float v : spaceMouseAxes_) spaceMouseReported_ = spaceMouseReported_ || v != 0.0f;
     const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
+    const std::array<float, kSmAxes> raw = readAxes(spaceMouse_);
+    for (float v : raw) spaceMouseReported_ = spaceMouseReported_ || v != 0.0f;
+    // What the device last said, unless it has said nothing at all for so long that the cap must have been let go.
+    spaceMouseAxes_ = spaceMouseWatch_.update(raw, dt, s.releaseTimeout);
+    static const bool logFromEnv = [] {
+        const char* v = std::getenv("SF_SPACEMOUSE_LOG");
+        return v && *v && std::string(v) != "0";
+    }();
+    if (spaceMouseLogOn_ || logFromEnv) spaceMouseLogUpdate(spaceMouseWatch_.latched());
+    else {
+        spaceMouseLogFull_ = false;
+        if (spaceMouseLog_.is_open()) spaceMouseLogStop();
+    }
+    if (spaceMouseStirred(spaceMouseAxes_, s)) spaceMouseQuiet_ = 0.0f;
     const SpaceMouseMotion m = spaceMouseMotion(spaceMouseAxes_, dt, s);
     spaceMousePushed_ = m.any();
     if (spaceMouseHeld()) return; // (the axes above still show in Preferences)
@@ -201,6 +224,106 @@ void App::updateSpaceMouse(float dt) {
     // next sample sculpts where the pen now points on the turned model. A grab instead stays where it is: a pen
     // held still while the view turns moves nothing (fenix, Discord 11-06: the model flew off).
     regrabAfterViewMove();
+}
+
+// ---------------------------------------------------------------------------
+// The local device log (spacemouse-log.txt): for a reporter whose SpaceMouse misbehaves, to attach to the issue.
+// ---------------------------------------------------------------------------
+
+void App::spaceMouseLogLine(const std::string& text) {
+    if (!spaceMouseLog_.is_open()) return;
+    const double ms = double(SDL_GetTicksNS() - spaceMouseLogStartNs_) * 1e-6;
+    char t[32];
+    std::snprintf(t, sizeof t, "%10.2f  ", ms);
+    spaceMouseLog_ << t << text << '\n';
+    if (spaceMouseLog_.tellp() > std::streampos(4 * 1024 * 1024)) { // a runaway log stops itself
+        spaceMouseLog_ << "log full, stopped\n";
+        spaceMouseLog_.close();
+        spaceMouseLogFull_ = true;
+    }
+}
+
+void App::spaceMouseLogStop() {
+    if (spaceMouseLog_.is_open()) {
+        spaceMouseLogLine("log closed");
+        spaceMouseLog_.close();
+    }
+    for (SDL_hid_device* d : spaceMouseHid_) SDL_hid_close(d);
+    spaceMouseHid_.clear();
+}
+
+void App::spaceMouseLogUpdate(bool latched) {
+    if (!spaceMouse_) return;
+    if (!spaceMouseLog_.is_open()) {
+        if (spaceMouseLogFull_) return; // (a log that filled up stays closed until logging is switched off and on)
+        const std::string dir = userDataDir();
+        if (dir.empty()) return;
+        spaceMouseLogPath_ = dir + "spacemouse-log.txt";
+        spaceMouseLog_.open(std::filesystem::path(std::u8string(spaceMouseLogPath_.begin(), spaceMouseLogPath_.end())),
+                            std::ios::out | std::ios::trunc);
+        if (!spaceMouseLog_) return;
+        spaceMouseLogStartNs_ = SDL_GetTicksNS();
+        spaceMouseLogRaw_ = {};
+        spaceMouseLogLatched_ = false;
+        const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
+        spaceMouseLogLine(std::string("SculptForge ") + SCULPTFORGE_VERSION + ", " + SDL_GetPlatform() + ", SDL " +
+                          std::to_string(SDL_MAJOR_VERSION) + "." + std::to_string(SDL_MINOR_VERSION) + "." +
+                          std::to_string(SDL_MICRO_VERSION));
+        char head[256];
+        std::snprintf(head, sizeof head, "device %s (%04x:%04x), %d buttons; speed %.2f, dead zone %.2f, release timeout %s",
+                      spaceMouseName_.c_str(), SDL_GetJoystickVendor(spaceMouse_), SDL_GetJoystickProduct(spaceMouse_),
+                      spaceMouseButtonCount_, s.speed, s.deadZone, s.releaseTimeout ? "on" : "off");
+        spaceMouseLogLine(head);
+        spaceMouseLogLine("columns: time ms since the log began; 'axes' = SDL's six values (x y z rx ry rz), only when one "
+                          "changed; 'event' = SDL's axis event; 'hid' = a raw report: id byte first, then its bytes");
+        // The raw reports, read next to SDL (a second, read-only handle; the driver and SDL keep working).
+        if (SDL_hid_device_info* list = SDL_hid_enumerate(SDL_GetJoystickVendor(spaceMouse_), SDL_GetJoystickProduct(spaceMouse_))) {
+            for (SDL_hid_device_info* d = list; d && spaceMouseHid_.size() < 6; d = d->next) {
+                SDL_hid_device* h = d->path ? SDL_hid_open_path(d->path) : nullptr;
+                char info[320];
+                std::snprintf(info, sizeof info, "hid interface %d usage page %04x usage %04x: %s", d->interface_number,
+                              unsigned(d->usage_page), unsigned(d->usage), h ? "open" : "cannot open (no raw reports from it)");
+                spaceMouseLogLine(info);
+                if (h) {
+                    SDL_hid_set_nonblocking(h, 1);
+                    spaceMouseHid_.push_back(h);
+                }
+            }
+            SDL_hid_free_enumeration(list);
+        } else {
+            spaceMouseLogLine("hid: no raw device found");
+        }
+    }
+    std::array<Sint16, kSmAxes> now{};
+    bool changed = false;
+    for (int i = 0; i < kSmAxes; ++i) {
+        now[size_t(i)] = SDL_GetJoystickAxis(spaceMouse_, i);
+        changed = changed || now[size_t(i)] != spaceMouseLogRaw_[size_t(i)];
+    }
+    if (changed) {
+        spaceMouseLogRaw_ = now;
+        char b[160];
+        std::snprintf(b, sizeof b, "axes %d %d %d %d %d %d", now[0], now[1], now[2], now[3], now[4], now[5]);
+        spaceMouseLogLine(b);
+    }
+    if (latched != spaceMouseLogLatched_) {
+        spaceMouseLogLatched_ = latched;
+        spaceMouseLogLine(latched ? "no change for a while: the cap counts as let go (view stops)" : "axes changed again");
+    }
+    for (size_t k = 0; k < spaceMouseHid_.size(); ++k) {
+        unsigned char buf[96];
+        for (int n = 0; n < 16; ++n) { // (a burst per frame at most)
+            const int len = SDL_hid_read(spaceMouseHid_[k], buf, sizeof buf);
+            if (len <= 0) break;
+            std::string line = "hid " + std::to_string(k) + " id " + std::to_string(int(buf[0])) + " len " + std::to_string(len) + ":";
+            char byte[8];
+            for (int i = 0; i < len; ++i) {
+                std::snprintf(byte, sizeof byte, " %02x", buf[i]);
+                line += byte;
+            }
+            spaceMouseLogLine(line);
+        }
+    }
 }
 
 bool App::spaceMouseHeld() const {
@@ -253,7 +376,8 @@ bool App::spaceMouseEcho(const SDL_Event& e) const {
     // (The cap as it is now, too: the echo of its first push comes in the same batch of events as the push, before
     // the frame reads the axes.)
     if (!spaceMouse_) return false;
-    if (spaceMousePushed_ || spaceMouseStirred(readAxes(spaceMouse_), uiPrefs_.spaceMouse)) return true;
+    const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
+    if (spaceMousePushed_ || spaceMouseStirred(spaceMouseWatch_.peek(readAxes(spaceMouse_), s.releaseTimeout), s)) return true;
     // Only the scrolling may trail the cap: a mouse picked up as the cap is let go moves the cursor at once.
     if (e.type != SDL_EVENT_MOUSE_WHEEL) return false;
     // (Plus the time since that read: a loop that slept while idle reads the cap again only after this event.)
@@ -366,6 +490,12 @@ void App::drawSpaceMouseSection() {
                  "While you sculpt, paint or mask, the SpaceMouse leaves the view alone and its buttons do nothing, so "
                  "a hand resting on the cap never moves the model under the pen. Off: the view turns mid-stroke.",
                  path);
+    ui::Checkbox("Stop when the cap stops reporting##spacemouse.release_timeout", &s.releaseTimeout);
+    ui::HelpText("Stop when the cap stops reporting", nullptr,
+                 "Some older models never report that the cap was let go, so the view would drift on at the last speed. "
+                 "On: a cap that has not changed at all for a third of a second counts as let go. Off: the last report is "
+                 "trusted for ever.",
+                 path);
     ui::Checkbox("Dominant axis##spacemouse.dominant", &s.dominant);
     ui::HelpText("Dominant axis", nullptr,
                  "Only the direction you push the most moves the view: a twist doesn't also pan a little.", path);
@@ -404,6 +534,21 @@ void App::drawSpaceMouseSection() {
         ui::HelpText("Live axes", nullptr,
                      "What the SpaceMouse reports now: Pan X, Zoom, Pan Y, Tilt, Roll, Spin. Grey: inside the dead zone.",
                      path);
+    }
+
+    // For a bug report: what the device sends, on this computer only.
+    if (ui::Checkbox("Log device reports##spacemouse.log", &spaceMouseLogOn_) && !spaceMouseLogOn_) spaceMouseLogStop();
+    ui::HelpText("Log device reports", nullptr,
+                 "Writes what the SpaceMouse sends (its raw reports and axis values, with times) to spacemouse-log.txt in "
+                 "the SculptForge data folder, to attach to a bug report. It stays on this computer. Off again when you "
+                 "restart.",
+                 path);
+    if (spaceMouseLog_.is_open()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(spaceMouseLogPath_.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::PopStyleColor();
     }
 
     // Buttons: as many rows as the device has (at least the two side buttons), up to kSpaceMouseButtonSlots.

@@ -80,6 +80,7 @@
 #include "render/Renderer.h"
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_hidapi.h>
 #include <imgui.h>
 
 #include <array>
@@ -87,6 +88,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <fstream>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -3522,6 +3524,23 @@ private:
     float spaceMouseQuiet_ = 1e9f;
     Uint64 spaceMouseReadNs_ = 0;
     bool spaceMouseEcho(const SDL_Event& e) const;
+    // A model that never reports its release leaves the last push latched in SDL: the watch (core/SpaceMouse.h) sees
+    // the axes stand bit-identical for kSpaceMouseReportTimeout and then reads the cap as let go.
+    SpaceMouseReportWatch spaceMouseWatch_;
+    // Local debug log of what the device sends (Preferences > Input > SpaceMouse > Log device reports, or the
+    // environment variable SF_SPACEMOUSE_LOG): axis events and values with times, and the raw HID reports with their
+    // report ids, in spacemouse-log.txt in the user data folder. Nothing leaves the computer.
+    bool spaceMouseLogOn_ = false; // the Preferences toggle (not saved: off again after a restart)
+    std::ofstream spaceMouseLog_;
+    std::string spaceMouseLogPath_;
+    Uint64 spaceMouseLogStartNs_ = 0;
+    std::array<Sint16, kSmAxes> spaceMouseLogRaw_{};
+    bool spaceMouseLogLatched_ = false;
+    bool spaceMouseLogFull_ = false;
+    std::vector<SDL_hid_device*> spaceMouseHid_;
+    void spaceMouseLogUpdate(bool latched);       // once a frame while logging: axes that changed, HID reports
+    void spaceMouseLogStop();
+    void spaceMouseLogLine(const std::string& text);
     // ---- end SpaceMouse ----
     // ---- Touch (Touch.cpp, core/TouchGesture.h, docs/guide/navigation.md) ----
     // Two fingers on a touch screen pan, pinch-zoom and twist the view; on a trackpad they pinch-zoom and twist
