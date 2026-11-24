@@ -76,6 +76,9 @@ std::vector<std::string> App::latchedForTest() const {
     add(strokeLatch() == StrokeLatch::Mask, "mode: Mask latch");
     add(strokeLatch() == StrokeLatch::Select, "mode: Select latch");
     add(guidesMode_, "mode: QRemesh Guides");
+    // Polygon mode holds the viewport (clicks and drags select; PanelPolygon.cpp) except while a gizmo mode is on, which is
+    // named above and works inside it (W / E / R move the selection; Draw, Esc and a brush leave both).
+    add(polyMode_ && gizmo_.mode == GizmoMode::Off, "mode: Polygon");
     add(maskBrushActive(), "mode: Mask brush");
     add(stencil_.adjust, "mode: Stencil adjust");
     add(!cutPolyline_.empty(), "mode: Cut Polyline points");
@@ -111,6 +114,7 @@ void App::unlatchForTest() {
     gizmo_.hover = GizmoHandle::None;
     strokeLatch_ = {};
     guidesMode_ = false;
+    if (polyMode_) setPolyMode(false); // (restores the wireframe toggle too)
     maskBrush_.on = false;
     stencil_.adjust = false;
     cutPolyline_.clear();
