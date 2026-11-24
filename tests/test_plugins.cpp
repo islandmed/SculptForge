@@ -200,6 +200,36 @@ TEST(plugin_reader_refuses_bad_modules) {
     CHECK(!readPlugin(noMemory, m, err) && contains(err, "memory"));
 }
 
+// The sandbox links nothing for a guest to call: no WASI (files, clock, random, environment), no host functions. Even
+// past the reader (which refuses imports), the runner must refuse a module that imports WASI or a host function, in
+// every WASI flavour, so a runtime update or a future change can't quietly hand a plugin the host (GHSA-f2pq-268w-886c).
+TEST(plugin_runner_never_links_wasi) {
+    if (!pluginRuntimeAvailable()) return;
+    const PluginInput in = sphereInput();
+    PluginManifest m;
+    std::string err;
+    CHECK(readPlugin(plugin(kSame), m, err));
+    for (const char* imp : {R"((import "wasi_snapshot_preview1" "path_open" (func (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32))))",
+                            R"((import "wasi_snapshot_preview1" "fd_write" (func (param i32 i32 i32 i32) (result i32))))",
+                            R"((import "wasi_snapshot_preview1" "clock_time_get" (func (param i32 i64 i32) (result i32))))",
+                            R"((import "wasi:filesystem/preopens@0.2.0" "get-directories" (func (result i32))))",
+                            R"((import "env" "now" (func (result f64))))"}) {
+        const auto w = pluginWithManifest(wat("(module " + std::string(imp) + " (memory (export \"memory\") 1) " + kAlloc +
+                                              " (func (export \"sf_run\") (param $in i32) (result i32) (i32.const 0)))"),
+                                          manifestJson("test-plugin"));
+        CHECK(!w.empty());
+        PluginRunOptions o;
+        PluginOutput out;
+        CHECK(runPlugin(w, m, in, o, out, err) == PluginFailure::BadModule);
+        CHECK(contains(err, "imports from outside"));
+        CHECK(out.positions.empty());
+    }
+    // And the runtime's component model stays off: a component (a WASI preview 2 guest) is not a module.
+    const std::vector<uint8_t> component = {0x00, 0x61, 0x73, 0x6d, 0x0d, 0x00, 0x01, 0x00};
+    PluginOutput out;
+    CHECK(runPlugin(component, m, in, PluginRunOptions{}, out, err) == PluginFailure::BadModule);
+}
+
 TEST(plugin_noise_displacer_sample) {
     if (!pluginRuntimeAvailable()) return;
     const auto wasm = noisePlugin();

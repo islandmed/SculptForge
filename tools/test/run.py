@@ -54,7 +54,7 @@ READS = {
     "blender_exchange": ["addons/blender", "tests/blender"], "blender_addon_package": ["addons/blender"],
     "maya_shelf_script": ["integrations/maya", "tests/maya"], "link_worker": ["services/link-worker"],
     "release_smoke": ["tests/release_smoke.py", "tests/ui/release_smoke.sfui"],
-    "else_if_chains": ["src"],
+    "else_if_chains": ["src"], "gles_shaders": ["src/render"],
 }
 APP_READS = ["assets", "tests/ui/data", "docs/guide"]  # the app loads these at run time (docs/guide: Help)
 UNIT_READS = ["tests/data"]
@@ -245,6 +245,11 @@ def rerun_args(args):
             keep.append(x)
         i += 1
     return keep
+
+
+def alone_args(name, args):
+    """One test again, alone: with the main run's -C (a multi-config build, Windows, says "Not Run" without it)."""
+    return ["-R", f"^{re.escape(name)}$", *rerun_args(args)]
 
 
 def without_nightly(args):
@@ -488,7 +493,7 @@ def run_tests(argv=None):
             for d, n in list(slow):
                 if n.startswith("sculptforge_tests"):
                     continue
-                ctest(build, ["-R", f"^{re.escape(n)}$"], os.path.join(tmp2, "alone.xml"))
+                ctest(build, alone_args(n, args), os.path.join(tmp2, "alone.xml"))
                 s2, d2 = results(os.path.join(tmp2, "alone.xml")).get(n, ("fail", d))
                 limit = 1.5 * known[n] * scale if n in known else a.budget
                 if s2 == "pass" and d2 <= limit:
@@ -599,6 +604,8 @@ def self_test():
     assert parallel_jobs(["-j10"]) == 10 and parallel_jobs(["-C", "Release", "-j", "4"]) == 4 and parallel_jobs([]) == 1
     assert rerun_args(["-C", "Release", "-j", "4", "-L", "ui"]) == ["-C", "Release", "-j", "4"]
     assert rerun_args(["-j10", "-CRelease", "-R", "x"]) == ["-j10", "-CRelease"] and rerun_args(["-j"]) == ["-j"]
+    assert alone_args("ci_x", ["-C", "Release", "-j4", "-L", "ui"]) == ["-R", "^ci_x$", "-C", "Release", "-j4"]
+    assert alone_args("a.b", []) == ["-R", "^a\\.b$"]
     print("run.py self-test passed")
     return 0
 

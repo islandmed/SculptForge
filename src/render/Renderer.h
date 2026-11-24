@@ -234,6 +234,8 @@ public:
     // Part `id` has a painted texture (or UV checker) this GPU cannot show on the model (too many triangles for its
     // limits): painting still goes into the texture, the model draws without it. The panel says so.
     bool textureNotShown(uint32_t id) const;
+    // The GPU rejected drawing the texture (a GL error at its first textured draw, logged): the Part draws plain, with a status.
+    bool textureRejected(uint32_t id) const;
     // How Part `id`'s UVs reach the shader, for tests: 0 a texture buffer, N rows of N texels in a 2D texture.
     int textureUvWidth(uint32_t id) const;
 
@@ -435,6 +437,9 @@ private:
     bool persistentUpload() const;  // the preference, SF_PERSISTENT_UPLOAD=0 / 1 overrides; needs GL_ARB_buffer_storage
     int captureW_ = 0, captureH_ = 0;
     GLuint emptyVao_ = 0;
+    // The textured program's two UV samplers (a buffer and a 2D texture) always have a complete texture of their own type
+    // bound, the unused one a single texel: a driver that checks every sampler (Mali) never meets an empty unit in the geometry shader.
+    GLuint dummyUvBufferData_ = 0, dummyUvBufferTexture_ = 0, dummyUv2D_ = 0;
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)
     std::vector<ReferenceImage> references_; // setReferences
     struct ReferenceTexture {
@@ -465,6 +470,8 @@ private:
         GLuint uvTexture2D = 0;
         int uvWidth = 0;
         bool uvsWanted = false, uvsLost = false;
+        // The first textured draw checks for a GL error (drawSlot): the driver rejected it, and the Part draws without the texture.
+        mutable bool texturedChecked = false, texturedFailed = false;
         GLuint paintTexture = 0;          // the painted texture (sRGB, mipmapped)
         uint64_t textureSerial = 0, textureRevision = 0;
         int textureW = 0, textureH = 0;
@@ -535,6 +542,7 @@ private:
             std::vector<uint32_t> verts;     // the mesh vertex of each local index
             std::vector<uint16_t> local;     // triangles (local indices), while stale
             std::vector<uint32_t> groups;    // their face groups, while stale
+            std::vector<glm::vec2> uvs;      // their corners' UVs (3 each), while stale
             ClusterBounds bounds;
             bool stale = true;    // triangles changed: rebuild and upload everything
             bool uploaded = false;
@@ -544,8 +552,10 @@ private:
         std::vector<uint32_t> chunkCluster;           // per layout chunk of triangles: its cluster
         uint32_t layoutTriangles = 0;
         GLuint patchVao = 0, patchLineVao = 0, patchVertices = 0, patchIndices = 0, patchLines = 0, patchColors = 0,
-               patchMask = 0, patchGroupData = 0, patchGroupTexture = 0;
+               patchMask = 0, patchGroupData = 0, patchGroupTexture = 0, patchUvData = 0, patchUvTexture = 0;
         size_t patchParts = 0; // parts the patch buffers have room for
+        std::vector<glm::vec2> patchUvShadow; // the patches' UVs as the GPU holds them (3 per triangle, per part): sent in runs
+        std::vector<uint32_t> patchUvParts;   // parts whose UVs changed in this sync
         bool patchColorsOn = false, patchMaskOn = false, patchLinesOn = false;
         PositionGrid patchGrid; // the grid the patches' vertices were packed with
         size_t patchBytes = 0;

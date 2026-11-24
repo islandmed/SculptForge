@@ -1,0 +1,25 @@
+# Make Shell on irregular plates of a dense curved surface (a member's vest: Edge Smooth 5, Thickness 0.015): the shell's
+# outline is a smooth line, not a raised, ridged, jagged rim. Close-ups at a grazing angle show the rim; the shell must be a
+# closed surface with 3 face groups.
+run new_sphere subdivisions=7
+camera 0 0
+key f
+run mask_lasso points="-0.55 0.35 -0.2 0.55 0.1 0.45 0.35 0.2 0.25 -0.05 0.05 -0.1 -0.15 -0.35 -0.5 -0.2 -0.35 0.05"
+run mask_lasso points="0.45 -0.55 0.6 -0.3 0.75 -0.25 0.7 -0.5"
+run mask_lasso points="-0.1 -0.7 0.05 -0.5 0.3 -0.45 0.5 -0.6 0.15 -0.8"
+expect_value masked > 0
+click "Extract/Make Shell"
+expect_value extract_preview == 1
+zoom 2.5
+camera 0 40
+shot plates_overview
+camera 25 20
+shot plates_closeup
+camera -20 60
+shot plates_rim
+click "Extract/Accept"
+run mask_clear
+run part_select index=1
+expect_value open_edges == 0
+expect_value groups == 3
+expect_mesh_valid

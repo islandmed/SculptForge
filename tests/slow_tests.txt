@@ -55,3 +55,4 @@ ui_language_panels                                                 16  22.6 s on
 ui_e2e_voxel_remesh                                                34  45.4 s alone on the PC in the 0.12.5 stage: Voxel Remesh at 2M triangles is the point; a smaller remesh or nightly if it grows
 ui_key_nav_loop                                                    20  24.4 s alone on the PC in the 0.12.6 stage: drives the real app loop (--measure-key-nav); shorten its holds
 bench_pack_run                                                     50  49.3 s on the PC in the 0.13.7 stage: two full pack runs (normal + floor) at 1 s each; split normal/floor if it grows
+ci_no_revert                                                       20  150.9 s on the Windows runner in the 0.13.13 stage (no_revert.py --self-test builds git repos): share one fixture repo across cases

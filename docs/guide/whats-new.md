@@ -5,6 +5,83 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.13.14
+
+```features
+date: 2026-11-24
+tagline: Scatter covers a Part with copies and Keep apart stops them overlapping, Dynamic keeps a painted Part's texture, and Trim keeps the far wall of thin Parts.
+highlight: Scatter covers a Part or its masked area with copies, and Keep apart stops them overlapping
+highlight: Sculpting with Dynamic on no longer erases the texture of a painted Part
+highlight: Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth
+highlight: Fill layer mask sliders keep the value you drag to
+title: Scatter
+line: Tool > Scatter covers a Part, or its masked area, with copies of a pebble, a cube, a hex or any other Part; Keep apart stops them overlapping.
+action: guide:scatter.md
+title: Dynamic keeps your paint
+line: Sculpt with Dynamic on over a painted Part and the texture stays, through Undo, Redo and reopening the file.
+action: guide:texture-painting.md
+```
+
+- **Scatter** (Tool > Scatter): copies of a pebble, a cube, a hex or any other Part over a Part or its masked area,
+  each at a random size and turn. **Keep apart** slides them over the surface until no two overlap.
+- **Dynamic** keeps a painted Part's texture: on 0.13.11 to 0.13.13, sculpting with Dynamic on could erase the
+  paint. If you lost paint to this, we are sorry; it won't happen again.
+- **Trim** no longer tears holes in thin walls: on a shell or a thin wing it trims the side you see and stops short
+  of the wall behind it, and along a thin edge it no longer saws the rim into spikes.
+- **Make Shell** rims come out smooth, with no spikes or ridged walls.
+- **Fill layers**: mask effect sliders (Noise, Levels, Blur...) and the material sliders keep the value you drag to.
+- **Android**: if a graphics driver can't draw a texture, the model stays visible without it and the status bar
+  says so.
+
+## Version 0.13.13
+
+```features
+date: 2026-11-23
+tagline: Contact facing keeps your brush off the far wall of a slot, Engrave walls stay smooth, dense Micro levels shade Undo and Move at once, and Shift smooths every painted channel.
+highlight: Contact facing keeps your brush off the far wall of a slot or the other side of a fold
+highlight: Engrave and Crease Line keep smooth walls when one stroke runs up and down the same line
+highlight: Dense Micro levels show Undo, Redo and Move at once, with fewer pauses as strokes start and end
+highlight: Shift with the Paint brush smooths every channel you paint, across UV seams too
+highlight: Texture painting works on more Android phones and tablets
+title: Contact facing
+line: A new brush falloff option: sculpt one side of a narrow slot or fold and the far wall stays put.
+action: guide:sculpting.md
+title: Smooth carved walls
+line: Engrave, Crease Line and the other pinching carve brushes keep clean walls on strokes that go back and forth.
+action: guide:sculpting.md
+title: Instant shading on Micro levels
+line: Undo, Redo and Move on a dense Micro level show their new shading on the next frame.
+action: guide:micro-levels.md
+```
+
+- **Contact facing** (Sculpt > Brush, off at first): the surface under the cursor decides what moves, so the far
+  wall of a narrow slot or the other side of a fold stays put. In the Classic layout it shows with **Show newer menu rows**.
+- **Carving brushes** that pinch (Engrave, Crease Line, Panel Groove...) keep smooth walls when one stroke goes up
+  and down the same line.
+- **Dense Micro levels**: Undo, Redo and Move show the new shading at once, and strokes pause less as they start and
+  end (#184). Reported by @HG4Science.
+- **Texture painting**: Shift with the Paint brush smooths Roughness, Metallic, Normal and Height strokes as well as
+  colour, across UV seams too. Reported by Fenix on Discord.
+- **Android**: texture painting works on phones and tablets with small texture buffers; where a chip still can't
+  show a texture, the status bar says so.
+- **Brush thumbnails** stay put after you pick a brush that carries its own alpha (Hard Cut, Flat Plane, Engrave...).
+- **Focus Detail**: opening a detail file shows its fine detail at once, and **Open** lists .sfdetail files.
+- **Chinese, Japanese and Korean** Part and layer names are readable in the title strip's info line.
+- **Move** honours **Front faces only**: with View falloff on, the far side of a one-piece model stays put.
+- **Tendril** is now its name everywhere, and old saved brushes still load.
+- **Plugin sandbox updated**: plugins now run on wasmtime 51.0.0. Nothing changes for plugins or their limits.
+- "**Contact facing**: a new brush falloff option. The surface under the cursor decides what moves, so the far wall of
+  a narrow slot or the other side of a fold stays put while you sculpt one side. Reported on Discord."
+- **Texture painting on Android**: a Part with many triangles can now show its texture on phones and tablets whose
+  graphics chips have small texture buffers (it went dark and strokes left nothing). Where a chip still cannot show
+  it, the status bar and the Texture Image panel say so.
+- **Chinese, Japanese and Korean names**: a Part or layer named in those scripts is readable in the title strip's info
+  line (it is drawn in the regular size, not the small one).
+- "**Move** honours **Front faces only**: with View falloff on, Move now leaves the far side of a one-piece model
+  alone when Front faces only is on."
+- **Shift smooths every channel you paint**: with the Paint brush, Shift now softens Roughness, Metallic, Normal and
+  Height strokes as well as the colour, across UV seams too.
+
 ## Version 0.13.12
 
 ```features
