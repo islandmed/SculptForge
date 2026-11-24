@@ -192,7 +192,11 @@ bool App::drawPinnedControl(const std::string& entry, const MyPanelEntry& e, int
     ImGui::SetNextWindowContentSize(ImVec2(width + shift, 0.0f));
     ImGui::SetNextWindowScroll(ImVec2(shift, 0.0f)); // (every frame: a row that stops being one keeps no stale scroll)
     ui::PinnedControl r;
-    const bool drawn = ImGui::BeginChild(("##pinned.control." + entry).c_str(), ImVec2(itemW, place.h), ImGuiChildFlags_None, flags);
+    // A shelf in Customize Shelves with Ctrl+Alt held: the control is grabbed through a button the shelf lays over it (Shell.cpp
+    // drawShelfItem), so its child takes no input, or the pointer would hover the child and the shelf's press never lands.
+    const bool inert = !panel && layout_.customize && ui::CtrlHeld() && ui::AltHeld();
+    const bool drawn = ImGui::BeginChild(("##pinned.control." + entry).c_str(), ImVec2(itemW, place.h), ImGuiChildFlags_None,
+                                         flags | (inert ? ImGuiWindowFlags_NoInputs : 0));
     if (drawn) {
         const ImVec2 origin(childMin.x - shift, childMin.y - place.y);
         const float left = childMin.x + place.x - shift;
