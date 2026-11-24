@@ -48,6 +48,7 @@ Read it inside SculptForge (**Help > User Guide**, or <kbd>Shift</kbd>+<kbd>F1</
     - [Garments: sewing patterns at real size](garments.md)
 14. [Forge Spheres](forge-spheres.md)
     - [Tube: draw in 3D space](tube.md)
+    - [Scatter: copies over a surface](scatter.md)
 15. [Vertex Paint and materials](vertex-paint.md)
 16. [Texture painting](texture-painting.md)
 17. [UV Editor](uv-editor.md)

@@ -3801,8 +3801,11 @@ void App::syncScene() {
     // A texture the GPU cannot show on this model (renderer: past its limits): say so once, rather than leave a model
     // that paints nothing and no word why.
     {
-        const bool notShown = hasTexture(doc_.mesh) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart));
-        if (notShown && !textureNoticeShown_)
+        const bool rejected = hasTexture(doc_.mesh) && renderer_.textureRejected(doc_.meshKey(doc_.activePart));
+        const bool notShown = rejected || (hasTexture(doc_.mesh) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart)));
+        if (rejected && !textureNoticeShown_)
+            status_ = "This graphics chip rejected drawing the texture: painting goes into the texture (see the UV view); Help > Copy log to clipboard shows what failed";
+        else if (notShown && !textureNoticeShown_)
             status_ = "This graphics chip can't show the texture on a model this dense: painting goes into the texture (see the UV view), lower the triangle count to see it";
         textureNoticeShown_ = notShown;
     }
