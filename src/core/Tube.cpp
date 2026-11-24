@@ -943,10 +943,13 @@ bool tubeClosestSurface(Document& doc, const vec3& p, float maxDistance, vec3& o
         // Nearest triangle: the triangles whose boxes touch a sphere round q, the sphere doubled until one is found
         // (then the closest point within that radius is the closest there is; a bigger sphere adds nothing nearer).
         const float reach = glm::distance(q, box.center()) + glm::length(box.extent());
-        float r = std::max(1e-4f * glm::length(box.extent()), 1e-9f);
+        const float rmin = std::max(1e-4f * glm::length(box.extent()), 1e-9f);
+        float r = rmin;
         if (std::isfinite(best)) { // (not nearer than the best so far: that much is enough)
             const float scale = o.moved() ? glm::length(vec3(inv[0])) : 1.0f;
-            if (best * scale < r) r = best * scale;
+            const float gap = glm::length(glm::max(glm::max(box.min - q, q - box.max), vec3(0.0f))); // q to the box
+            if (gap > best * scale) continue; // this Part can't be nearer than what is found already
+            r = std::max(best * scale, rmin); // (never 0: the point may lie on the last Part exactly, reviewer 11-24)
         }
         const BVH& bvh = doc.partBvh(i);
         for (; r <= 2.0f * reach; r *= 2.0f) {

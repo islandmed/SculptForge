@@ -1282,6 +1282,39 @@ TEST(tube_snap_points_to_other_surfaces) {
     CHECK(tubeClosestSurface(doc, vec3(10.0f, 0, 1.5f), 0.0f, on, nrm) && std::abs(glm::length(on - vec3(10, 0, 0)) - 1.0f) < 0.01f);
 }
 
+// Reviewer 11-24: a point lying exactly on the first other Part (distance 0) shrank the search sphere for the next
+// Part to 0, and the doubling loop never grew it: the app froze. Two other Parts, the point on a flat face of the
+// first, snapped twice.
+TEST(tube_snap_points_on_a_face_already_with_two_other_parts) {
+    Document doc;
+    CommandRegistry reg;
+    doc.replaceActiveMesh(makeCube(2, 2.0f)); // a box from -1 to 1: flat faces at x = 1, vertices at the corners
+    doc.addPart(makeQuadSphere(8, 1.0f), "Ball", false); // another visible Part, centred at the origin
+    for (vec3& p : doc.partMesh(1).positions) p += vec3(6.0f, 0.0f, 0.0f);
+    doc.partMesh(1).topologyDirty = true;
+    doc.partBvh(1).build(doc.partMesh(1));
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("1,0.2,0.1 1,-0.3,0.2 1,1,1 3,0,0")}, {"radius", 0.05}, {"curve", true}}).ok);
+    const int curve = doc.findPart("Curve"); // (added right after the active box: the ball moved to index 2)
+    CHECK(curve > 0 && doc.partCount() == 3);
+    doc.selectPart(curve);
+    CHECK(doc.mesh.tube.curve && doc.mesh.tube.points.size() == 4);
+    if (doc.mesh.tube.points.size() != 4) return;
+    // Points 0 and 1 lie on the face x = 1, point 2 on the corner (1, 1, 1): distance 0 to the box, the ball 5 away.
+    for (int k = 0; k < 2; ++k) { // (the second pass starts from points that are exactly on the surface)
+        const auto t0 = std::chrono::steady_clock::now();
+        const CommandResult r = reg.execute(doc, "tube_snap_points");
+        CHECK(r.ok);
+        CHECK(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < 5.0);
+        CHECK(std::abs(doc.mesh.tube.points[0].position.x - 1.0f) < 1e-5f && std::abs(doc.mesh.tube.points[1].position.x - 1.0f) < 1e-5f);
+        CHECK(glm::distance(doc.mesh.tube.points[2].position, vec3(1, 1, 1)) < 1e-5f);
+        CHECK(std::abs(doc.mesh.tube.points[3].position.x - 1.0f) < 1e-5f); // (3, 0, 0): the box face is 2 away, the ball 2 as well: either, not stuck
+    }
+    // The same with the ball first in the Part list (the zero-distance Part comes second): still not stuck.
+    vec3 on, nrm;
+    CHECK(tubeClosestSurface(doc, vec3(6.0f, 0.0f, 1.0f), 0.0f, on, nrm) && std::abs(glm::length(on - vec3(6, 0, 0)) - 0.5f) < 0.02f); // (the ball has radius 0.5)
+    CHECK(tubeClosestSurface(doc, vec3(1.0f, 0.0f, 0.0f), 0.0f, on, nrm) && glm::distance(on, vec3(1, 0, 0)) < 1e-5f);
+}
+
 TEST(tube_repeat_along_a_straight_polyline) {
     Document doc;
     CommandRegistry reg;
