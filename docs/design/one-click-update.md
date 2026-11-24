@@ -73,8 +73,9 @@ releases (the checksum-list key is an Actions secret there); a developer-signed 
   equal the running app's own (`SecCodeCopySelf`, read at run time). Neither identifier is stored, hard-coded or shown.
   Today's builds are ad-hoc signed (`cmake/MacSign.cmake`, no `SCULPTFORGE_CODESIGN_IDENTITY` in CI): both sides have no
   team identifier, so this step proves the bundle's integrity (every file matches its signature) but not who made it;
-  the signed checksum list carries that. A future Developer ID build makes the team check bite: an app with a team
-  identifier refuses a download with another one or none.
+  the checksum list adds only that the files are the ones the release build published (see above: not proof against
+  someone who controls the project's GitHub releases). A future Developer ID build makes the team check bite: an app
+  with a team identifier refuses a download with another one or none.
 - **Swap**: `update_pending.json`, then `renamex_np(new, target, RENAME_SWAP)` (APFS: one atomic step; the target path
   is always a whole bundle), the old bundle becomes `SculptForge.app.old`. Elsewhere two renames, the second undone on
   failure. No privileges are asked for: a folder this user can't write to is an error and nothing changes.
