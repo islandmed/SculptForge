@@ -6,6 +6,7 @@
 #include "TestHarness.h"
 
 #include "core/Benchmark.h"
+#include "core/BrushAlpha.h"
 #include "core/BrushRecipe.h"
 #include "core/Commands.h"
 #include "core/Micro.h"
@@ -1333,6 +1334,38 @@ TEST(micro_dab_marks_only_what_changed) {
     CHECK(changed > 100);
     CHECK(missed == 0);
     CHECK(marked <= changed + changed / 10); // (the ones changed, give or take a stitched edge)
+    CHECK(watertight(doc.mesh));
+}
+
+TEST(micro_alpha_dab_marks_only_what_changed) {
+    // #184: an alpha's dab looks at every patch in reach of its square's corners, and a sparse one (Bolt: a washer and a
+    // bolt head) changes well under half of them. Marking them all re-shaded the rest for nothing, and a long stroke's
+    // shading on a 2.6M base fell 1-2 s behind the brush.
+    Document doc = microDoc(2, 200000);
+    doc.sculptor.microBaseDabs = false;
+    MicroMesh& mm = *doc.mesh.micro;
+    BrushAlpha alpha;
+    CHECK(BrushAlpha::builtin("Bolt", alpha));
+    Symmetry sym;
+    sym.x = false;
+    doc.sculptor.beginStroke(doc.mesh, "Standard");
+    const std::vector<int16_t> before = mm.disp;
+    mm.clearDirty();
+    DabParams p = dabAt(glm::vec3(0, 0, 1), 0.3f);
+    p.alpha = &alpha;
+    doc.sculptor.dab(doc.mesh, doc.bvh, BrushType::Standard, p, sym);
+    doc.undo.push(doc.sculptor.endStroke());
+    const uint32_t S = mm.samples;
+    size_t changed = 0, marked = 0, missed = 0;
+    for (uint32_t t = 0; t < mm.baseTriangles; ++t) {
+        const bool moved = !std::equal(before.begin() + size_t(t) * S, before.begin() + size_t(t + 1) * S, mm.disp.begin() + size_t(t) * S);
+        const bool dirty = mm.dirtyBits[t >> 6] >> (t & 63) & 1;
+        changed += moved, marked += dirty, missed += moved && !dirty;
+    }
+    std::printf("  bolt dab: %zu patches changed, %zu marked\n", changed, marked);
+    CHECK(changed > 100);
+    CHECK(missed == 0);
+    CHECK(marked <= changed + changed / 10);
     CHECK(watertight(doc.mesh));
 }
 

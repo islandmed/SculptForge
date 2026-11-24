@@ -28,6 +28,8 @@
 #include <chrono>
 #include <thread>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 namespace sf {
 
@@ -502,7 +504,8 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
         mm.maskDirty = true;
     }
     touch(mm, cand_);
-    findMs += lapMs(clock);
+    const double dabFindMs = lapMs(clock);
+    findMs += dabFindMs;
 
     // The kernel's stride (step 3).
     const float microEdge = baseEdge_ / float(n);
@@ -632,6 +635,8 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
             areaNormal = len > 1e-12 ? glm::vec3(total.nrm / len) : -viewDir;
         }
     }
+    const double dabPlaneMs = lapMs(clock);
+    kernelMs += dabPlaneMs;
     glm::vec3 up = projectOnPlane(alphaUp, areaNormal);
     if (glm::length(up) < 1e-6f)
         up = projectOnPlane(std::abs(areaNormal.x) < 0.9f ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0), areaNormal);
@@ -685,6 +690,9 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     std::vector<float> clipped((cand_.size() + 7) / 8, 0.0f); // per block: the largest |d| that didn't fit
     const float invStep = 1.0f / mm.step;
     const PinchSampler pinchSampler{m, mm, snap_.data(), snapOf_.data()};
+    // Which candidates the kernel writes (#184): the stitch marks only those (and the ones it changes) dirty. Marking every
+    // candidate re-shaded the whole square an alpha reaches, most of it untouched, and the stroke's shading fell seconds behind.
+    changed_.assign(cand_.size(), 0);
     poolFor(cand_.size(), [&](size_t b, size_t e) {
         thread_local std::vector<int16_t> before;
         thread_local std::vector<float> coarse, baseFree;
@@ -845,6 +853,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                     any = any || delta != 0.0f;
                 }
             if (!any) continue;
+            changed_[ci] = 1;
             // Write: every grid point gets the change interpolated from the coarse points around it (stride 1: its own).
             int triMax = mm.triRange[t];
             auto apply = [&](uint32_t idx, float delta) {
@@ -910,7 +919,8 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
         clipped[b / 8] = over;
     }, 8, 2);
     for (uint64_t c : visited) points += c;
-    kernelMs += lapMs(clock);
+    const double dabKernelMs = lapMs(clock);
+    kernelMs += dabKernelMs;
     float over = 0.0f;
     for (float c : clipped) over = std::max(over, c);
 
@@ -920,7 +930,14 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
     // 4. Stitch the shared points.
     stitch(m, mm, cand_, maskBrush ? nullptr : changed_.data());
     if (over > 0.0f) widen(mm, over * 1.5f);
-    stitchMs += lapMs(clock);
+    const double dabStitchMs = lapMs(clock);
+    stitchMs += dabStitchMs;
+    // SF_STROKE_LOG: one line per dab, where its time went (the app's line per frame sums these)
+    static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
+    if (log)
+        std::fprintf(stderr, "micro dab: %zu of %zu triangles changed, stride %u: find %.1f, plane %.1f, kernel %.1f, stitch %.1f ms\n",
+                     size_t(std::count(changed_.begin(), changed_.end(), uint8_t(1))), cand_.size(), stride, dabFindMs, dabPlaneMs,
+                     dabKernelMs, dabStitchMs);
 }
 
 bool MicroStroke::dabTiles(Mesh& m, BrushType type, const glm::vec3& center, float r, float s, bool invert, float focal,
