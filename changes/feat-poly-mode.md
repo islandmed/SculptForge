@@ -7,8 +7,13 @@ added: **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. 
   face group; Grow, Shrink, All, None, Invert, Loop, Ring, By Group), see the selection drawn over the model, move it with
   the Transform gizmo (W / E / R) as one undo step, and run operations on it from the panel, each one undo step: Delete
   and Flip ship with the mode, the modelling operations (Extrude, Inset, Bevel, Edge loop, Span) plug into the same
-  registry. Commands: `poly_mode`, `poly_select`, `poly_op`, and `transform selection=true`. Nothing changes for
-  sculpting: the mode is off until you turn it on. Members' top wish (#225 and the ideas threads).
+  registry. **Edge loop** is the first of them: new loops of edges across the ring of quads through the selected edge (or
+  every ring the selected edges are on), Loops per ring evenly spaced, Position across the quads with a live preview; the
+  loop runs round the model or stops at a border, a triangle (split in two) or a quad it already crossed, keeps face groups,
+  UVs, seams, creases, paint and mask, and the new loops stay selected. Commands: `poly_mode`, `poly_select`, `poly_op`
+  (`poly_op op=edge_loop count=2 position=0.3`), `transform selection=true`; `edge_loop` and `edge_select op=ring` do
+  the same from Edges mode for scripts. Nothing changes for sculpting: the mode is off until you turn it on. Members' top
+  wish (#225 and the ideas threads).
 member_request: true
 testers:
   - Any OS: Tool > Polygon > Polygon mode on a cube (Tool > Parts > Append > Cube). Click a face, Shift+click another, Ctrl+click
@@ -18,6 +23,10 @@ testers:
     back to how it was.
   - Any OS: a Part with subdivision levels (Tool > Geometry > Add Level), then Polygon mode: the status line says to Delete
     Higher first, nothing else changes.
+  - Any OS: Polygon mode on a cube, Edges, click one edge, Ring (the ring goes round the cube), Loops 3, drag Position (the
+    three new loops preview as you drag), Edge loop: they are inserted and selected; Ctrl+Z takes them back in one step.
+  - Any OS: a cylinder (Tool > Parts > Append), Edges, click a rim edge, Edge loop: the loop runs down the side and splits the
+    two cap triangles it reaches, no hole.
 ---
 Foundation branch: the selection model, overlay, gizmo path and ops registry (src/core/PolyMode.h, src/core/PolyOps.h). The
 op branches (poly-extrude, poly-inset, poly-bevel, poly-edge-loop, poly-bridge) register one op each in

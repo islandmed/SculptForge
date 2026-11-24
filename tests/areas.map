@@ -260,6 +260,7 @@ test_close_holes            mesh
 test_cut                    mesh
 test_decimate_valence       mesh
 test_edge_loop_insert       mesh
+test_poly_edge_loop         mesh
 test_divide_valence         mesh
 test_dyntopo                mesh
 test_edge_*                 mesh
