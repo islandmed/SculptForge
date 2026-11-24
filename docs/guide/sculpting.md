@@ -852,7 +852,16 @@ which also holds the Cloth brush's settings):
 **Resume** stop and continue, **Keep** stops and keeps where it got to, **Reset** puts the Part back. Sculpting or
 running a command while it moves keeps where it got to first.
 
-The result is a normal Part: sculpt it, or give it thickness with Extract. From a script: `cloth_drape fabric=denim`.
+The result is a normal Part: sculpt it, or give it thickness with Extract. From a script: `cloth_drape fabric=denim`,
+with wind `cloth_drape fabric=silk wind=6 heading=90 lift=10 gusts=0.5 frames=600`.
+
+## Tool > Cloth
+
+Everything cloth in one place: **Tool > Cloth** shows the [Cloth brush](#cloth-brush)'s settings (mode, fabric,
+gravity, reach, steps, soft body, collisions) and [Drape](#drape) (fabric, wind, units per metre, pins, Simulate)
+one under the other, with a line on what each part does. They are the same controls as in **Sculpt > Brush > Cloth**
+and **Tool > Drape**, not copies: a fabric picked here is the fabric there. **Cloth settings...** under the Cloth
+brush's settings and under Drape opens it.
 
 ## Capture an alpha or a VDM from the model
 
