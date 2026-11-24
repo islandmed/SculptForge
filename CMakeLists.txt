@@ -987,7 +987,7 @@ if(SCULPTFORGE_BUILD_TESTS)
                        ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
   # The Dynamic topology nightlies alone (a painted Part's UVs: its strays only show in the nightly, 0.13.14).
   add_test(NAME sculptforge_tests_nightly_dyntopo COMMAND sculptforge_tests --nightly dyntopo)
-  set_tests_properties(sculptforge_tests_nightly_dyntopo PROPERTIES LABELS nightly_area TIMEOUT 900
+  set_tests_properties(sculptforge_tests_nightly_dyntopo PROPERTIES LABELS nightly_area TIMEOUT 1800
                        ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly)
   # Opt-in benches: own entry, labels bench + nightly (T0, CI and the shards never run them), hard timeout.

@@ -1200,12 +1200,6 @@ bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3&
     // (Two vertices with one UV each, drop inside the mesh: no outline or plan to judge. Most candidates are like that.)
     const bool judged = !m.uvs.empty() && p == m.positions[keep] && (seamVertex(drop) || seamVertex(keep) || openVertex(drop));
     if (judged && (!outlineStaysInChart(keep, drop) || !collapseUvPlan(keep, drop, tris, n, uvPlan_))) return false;
-    // (A sliver is what a collapse repairs: leaving it folds the surface, which shows more than a texel of padding.)
-    bool sliver = false;
-    for (int i = 0; i < n; ++i) {
-        const glm::uvec3& st = m.triangles[tris[i]];
-        sliver = sliver || quality(m.positions[st.x], m.positions[st.y], m.positions[st.z]) < 0.05f;
-    }
     if (!m.uvs.empty()) { // (no triangle turns over in UV: a big one across a chart's notch would sample unpainted texels)
         const bool midpoint = p != m.positions[keep];
         const glm::vec2 merged = midpoint ? (cornerUv(tris[0], keep) + cornerUv(tris[0], drop)) * 0.5f : cornerUv(tris[0], keep);
@@ -1223,7 +1217,7 @@ bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3&
                         if (pt == t)
                             for (int c = 0; c < 3; ++c)
                                 if (tri[c] == drop) now[c] = uv;
-                if (!keepsUvTurn(old, now) || (!sliver && !uvInChart(now[0], now[1], now[2]))) return false;
+                if (!keepsUvTurn(old, now) || !uvInChart(now[0], now[1], now[2])) return false;
             }
         }
     }
