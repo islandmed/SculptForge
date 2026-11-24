@@ -75,7 +75,7 @@ type "##Command palette" "customize shelves"
 key enter
 expect_value customize == 1
 hold ctrl+alt
-drag_item_to "##grab.control:tool.display/Backface culling" "Undo##edit.undo" 0 -22 keep
+drag_item_to "##grab.control:tool.display/Backface culling" "Undo##edit.undo" keep
 release
 hold none
 wait 0.3
