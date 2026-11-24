@@ -6,7 +6,7 @@ key f
 camera 0 0
 remember triangles before
 
-# Off by default: Shift+R only says where to turn it on.
+# Off by default in the Classic layout (on in the SculptForge layout since 0.14.0): Shift+R only says where to turn it on.
 click "Remesh##tool.remesh"
 expect_value quick_remesh == 0
 expect_value remesh_after_stroke == 0

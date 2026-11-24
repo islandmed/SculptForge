@@ -195,6 +195,7 @@ public:
     // The menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts and > Render bridge, Brush > Contact facing): off in the Classic
     // layout (its menus keep their old rows) unless Preferences > Interface > Show newer menu rows says so; on in SculptForge.
     bool newerMenuRows() const { return uiPrefs_.newerMenuRows < 0 ? uiPrefs_.shellLayout == 1 : uiPrefs_.newerMenuRows != 0; }
+    bool quickRemeshOn() const { return uiPrefs_.quickRemesh < 0 ? uiPrefs_.shellLayout != 0 : uiPrefs_.quickRemesh != 0; } // (by layout: Classic off, SculptForge on)
     ThumbnailCache& thumbnails() { return thumbs_; }
     // A brush tile clicked (bottom shelf, brush picker): with Shift / Ctrl held it becomes the Shift / Ctrl brush
     // (true) instead of the main one (ModifierBrush.cpp).
@@ -1697,8 +1698,10 @@ private:
         int resolution = 200;
         bool keepMasked = false, keepTexture = true;
         bool allowSwap = false; // the person agreed to a remesh past the free memory (MemoryTier::NeedsSwap)
+        int restarts = 0;       // quick ones: how often this job started again because the Part changed meanwhile
     };
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
+    int voxelRemeshRestarts_ = 0; // the restart count the next startVoxelRemesh gives its job (pollVoxelRemesh sets it)
     // Resolution above 512: the estimate under the slider, a one-time confirmation with it
     // (again after going back to 512 or less), and a refusal when it won't fit in the free memory (PanelRetopo.cpp).
     // Customize Shelves, Ctrl+Alt: sliders that can be picked up and dropped on a shelf (PanelRetopo.cpp); compact: the shelf's copy,

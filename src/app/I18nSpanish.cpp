@@ -1942,6 +1942,8 @@ constexpr Entry kSpanish[] = {
      "visibility).",
      "Muestra solo el grupo de caras bajo el cursor; otra vez, con él aislado, lo muestra todo (Blender: alternar "
      "visibilidad)."},
+    {"Permanently delete the hidden part of the mesh (one undo step). What stays keeps its mask, paint, face groups, UVs and sculpt layers.",
+     "Elimina permanentemente la parte oculta de la malla (un paso de deshacer). Lo que queda conserva su máscara, pintura, grupos de caras, UVs y capas de esculpido."},
     {"Show every hidden part of the mesh.", "Muestra todas las partes ocultas de la malla."},
     {"Look at the model from the front (orthographic).", "Mira el modelo desde el frente (ortográfica)."},
     {"Look at the model from behind (orthographic).", "Mira el modelo desde atrás (ortográfica)."},
@@ -3948,14 +3950,11 @@ constexpr Entry kSpanish[] = {
     {"Rebuild as an even, watertight surface (like Voxel Remesh): merges parts, fixes scans and generated models.",
      "Reconstruye como superficie uniforme y estanca (como Remallado vóxel): une partes, arregla escaneos y "
      "modelos generados."},
-    {"With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background.",
-     "Con Herramienta > Remallado > Remallado rápido activado: remalla la Pieza activa a la resolución de Remallado "
-     "por vóxeles, en segundo plano."},
+    {"Remesh the active Part at the Voxel Remesh resolution, in the background (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
+     "Remalla la Pieza activa a la resolución de Remallado por vóxeles, en segundo plano (activado por defecto en la disposición SculptForge, desactivado en Classic; Herramienta > Remallado > Remallado rápido lo cambia)."},
     {"Quick Remesh (hold and drag)", "Remallado rápido (mantén y arrastra)"},
-    {"With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to "
-     "remesh the active Part.",
-     "Con Herramienta > Remallado > Remallado rápido activado: mantén esta tecla y haz clic o arrastra sobre el "
-     "fondo (no sobre el modelo) para remallar la Pieza activa."},
+    {"Hold this key and click or drag on the background (not on the model) to remesh the active Part (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
+     "Mantén esta tecla y haz clic o arrastra sobre el fondo (no sobre el modelo) para remallar la Pieza activa (activado por defecto en la disposición SculptForge, desactivado en Classic; Herramienta > Remallado > Remallado rápido lo cambia)."},
     {"Turn the sculpt into Gaussian splats.", "Convierte la escultura en splats gaussianos."},
     {"Fill the unmasked area with the colour.", "Rellena la zona sin máscara con el color."},
     {"Hide or show the shelves and trays around the canvas.",

@@ -267,6 +267,15 @@ void App::registerInputActions() {
         [this] { hideGroupUnderCursor(true); });
     add("visibility.show_all", "Show all", ICON_LC_EYE, "Tool > Visibility", "", "Show every hidden part of the mesh.",
         [this] { runCommand("show_all"); });
+    // Remove Hidden (the Face Groups panel's button) as an action: a key in the SculptForge style (applyInputStyle) and a
+    // Quick Menu button, so deleting the hidden part never needs the palette (a member, 0.14.0). Classic keeps no key.
+    add("visibility.delete_hidden", "Remove Hidden", ICON_LC_EYE_OFF, "Tool > Face Groups", "",
+        "Permanently delete the hidden part of the mesh (one undo step). What stays keeps its mask, paint, face groups, "
+        "UVs and sculpt layers.",
+        [this] {
+            runCommand("delete_hidden");
+            if (lastCommandOk_) status_ += " (" + actions_.shortcutText("edit.undo") + " undoes it)";
+        });
 
     commands_.add({"blender_keymap_import",
                    "Use the keys of a keymap exported from Blender (Preferences > Keymap > Export, a .py file): "
@@ -463,6 +472,7 @@ void App::applyInputStyle() {
         {"visibility.hide_group", {"", "", "H"}},
         {"visibility.isolate_group", {"", "", "Shift+H"}},
         {"visibility.show_all", {"", "", "Alt+H"}},
+        {"visibility.delete_hidden", {"", "Ctrl+Shift+H", ""}}, // (Ctrl+H is View Mask; the Classic and Blender keys stay as they were)
     };
     for (const Keys& k : kKeys) actions_.setDefaultShortcut(k.id, k.keys[style]);
     // Maya's own view keys on top of the Classic sculpting keys (#134): Alt+F frames the Part, Alt+H resets the view.
@@ -1104,6 +1114,16 @@ void App::drawQuickMenu() {
         ui::ActionButton(*this, "draw.rgb");
         ImGui::SameLine();
         ui::ActionButton(*this, "transform.symmetry_x");
+        if (uiPrefs_.shellLayout != 0) {
+            // Remesh and Remove Hidden one right click away (a member, 0.14.0): Quick Remesh (the Voxel Remesh at Tool >
+            // Remesh's Resolution, in the background), Quad Remesh and Remove Hidden. The Classic layout's menu is as it was.
+            const float third = (width - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f; // (the rows above)
+            ui::ActionButton(*this, "geometry.quick_remesh", ImVec2(third, 0));
+            ImGui::SameLine();
+            ui::ActionButton(*this, "geometry.qremesh", ImVec2(third, 0));
+            ImGui::SameLine();
+            ui::ActionButton(*this, "visibility.delete_hidden", ImVec2(third, 0));
+        }
         const bool clicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
         const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
         if (clicked && !hovered && ImGui::GetFrameCount() > quickMenu_.openedFrame + 1) close = true;

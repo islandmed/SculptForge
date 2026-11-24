@@ -770,20 +770,20 @@ void App::registerShellActions() {
     // Quick Remesh (#121): Shift+R, and N held while clicking or dragging on the background (quickRemeshDragDown).
     // Neither key is taken in any input style (Input.cpp applyInputStyle).
     add({"geometry.quick_remesh", "Quick Remesh", nullptr,
-         "With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background.",
+         "Remesh the active Part at the Voxel Remesh resolution, in the background (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
          "Tool > Remesh", "Shift+R", "",
          [this] {
-             if (uiPrefs_.quickRemesh) quickRemesh(RemeshTrigger::Quick);
+             if (quickRemeshOn()) quickRemesh(RemeshTrigger::Quick);
              else status_ = "Quick Remesh is off: turn it on in Tool > Remesh";
          },
          nullptr, nullptr});
     add({"geometry.quick_remesh_drag", "Quick Remesh (hold and drag)", nullptr,
-         "With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to "
-         "remesh the active Part.",
+         "Hold this key and click or drag on the background (not on the model) to remesh the active Part (on by default in the "
+         "SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
          "Tool > Remesh", "N", "",
          [this] {
              const std::string key = actions_.shortcutText("geometry.quick_remesh_drag");
-             status_ = !uiPrefs_.quickRemesh ? "Quick Remesh is off: turn it on in Tool > Remesh"
+             status_ = !quickRemeshOn() ? "Quick Remesh is off: turn it on in Tool > Remesh"
                        : key.empty()         ? "Quick Remesh: give this a key in Preferences > Hotkeys, then hold it and drag on the background"
                                              : "Quick Remesh: hold " + key + " and click or drag on the background";
          },

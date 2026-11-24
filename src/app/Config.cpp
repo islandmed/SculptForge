@@ -134,7 +134,10 @@ Json toJson(const UiPrefs& p) {
     j.set("invertTwist", p.invertTwist);
     j.set("keyNavSpeed", p.keyNavSpeed);
     j.set("twoKeyWindow", p.twoKeyWindow);
-    j.set("quickRemesh", p.quickRemesh);
+    // The effective value as before (the Classic golden file keeps its quickRemesh=false); an explicit off is its own key,
+    // since quickRemesh=false is also what every pre-0.14 file says (read as: by layout).
+    j.set("quickRemesh", p.quickRemesh < 0 ? p.shellLayout != 0 : p.quickRemesh != 0);
+    if (p.quickRemesh == 0) j.set("quickRemeshOff", true);
     j.set("remeshAfterStroke", p.remeshAfterStroke);
     j.set("alongNormal", std::string(p.alongNormal == 1 ? "always" : p.alongNormal == 2 ? "never" : "invert_key"));
     j.set("connectedOnly", p.connectedOnly);
@@ -254,7 +257,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.invertTwist = j["invertTwist"].asBool(p.invertTwist);
     p.twoKeyWindow = std::clamp(float(j["twoKeyWindow"].asNumber(p.twoKeyWindow)), kKeySequenceMin, kKeySequenceMax);
     p.keyNavSpeed = std::clamp(float(j["keyNavSpeed"].asNumber(p.keyNavSpeed)), 0.1f, 5.0f);
-    p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
+    p.quickRemesh = j["quickRemeshOff"].asBool(false) ? 0 : j["quickRemesh"].asBool(false) ? 1 : -1;
     p.remeshAfterStroke = j["remeshAfterStroke"].asBool(p.remeshAfterStroke);
     if (j["alongNormal"].isString()) {
         const std::string a = j["alongNormal"].asString();

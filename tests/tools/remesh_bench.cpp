@@ -31,7 +31,12 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/resource.h>
+#endif
 
 using namespace sf;
 
@@ -140,6 +145,66 @@ uint64_t meshHash(const Mesh& m) {
     return h;
 }
 
+// Peak resident memory of this process so far, in MB (the high-water mark: run one size per process for a
+// per-size number). 0 where the platform has no getrusage.
+double peakRssMb() {
+#if defined(__unix__) || defined(__APPLE__)
+    rusage ru{};
+    if (getrusage(RUSAGE_SELF, &ru) == 0) {
+#if defined(__APPLE__)
+        return double(ru.ru_maxrss) / (1024.0 * 1024.0);
+#else
+        return double(ru.ru_maxrss) / 1024.0;
+#endif
+    }
+#endif
+    return 0.0;
+}
+
+// Poles (interior vertices of valence != 4) on the symmetry plane and within 3 mean edge lengths of it: with Symmetry
+// the half is remeshed with the cut as a feature line and mirrored, and a weak seam shows up as poles along it.
+size_t seamPoles(const Mesh& mesh, int axis, size_t* near) {
+    if (near) *near = 0;
+    if (axis < 0) return 0;
+    std::vector<int> valence(mesh.vertexCount(), 0);
+    std::vector<uint8_t> open(mesh.vertexCount(), 0);
+    std::unordered_map<uint64_t, int> edges;
+    double lsum = 0.0;
+    for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
+        glm::uvec4 f;
+        const int n = mesh.exportFace(t, f);
+        if (n < 3) continue;
+        for (int k = 0; k < n; ++k) {
+            const uint32_t a = f[k], b = f[(k + 1) % n];
+            ++edges[a < b ? (uint64_t(a) << 32) | b : (uint64_t(b) << 32) | a];
+        }
+    }
+    for (auto [key, uses] : edges) {
+        const uint32_t a = uint32_t(key >> 32), b = uint32_t(key & 0xffffffffu);
+        ++valence[a], ++valence[b];
+        if (uses == 1) open[a] = open[b] = 1;
+        lsum += double(glm::length(mesh.positions[a] - mesh.positions[b]));
+    }
+    const float meanEdge = edges.empty() ? 0.0f : float(lsum / double(edges.size()));
+    if (std::getenv("SF_QREMESH_TIMING")) { // the valences on the plane (a seam vertex has 2 quads a side when all is well: 4)
+        std::vector<size_t> hist(10, 0);
+        for (uint32_t v = 0; v < mesh.vertexCount(); ++v)
+            if (valence[v] > 0 && !open[v] && std::abs(mesh.positions[v][axis]) < 1e-3f * meanEdge) ++hist[size_t(std::min(valence[v], 9))];
+        std::fprintf(stderr, "  seam valences:");
+        for (size_t k = 2; k < hist.size(); ++k)
+            if (hist[k]) std::fprintf(stderr, " %zu x%zu", k, hist[k]);
+        std::fprintf(stderr, "\n");
+    }
+    size_t on = 0;
+    for (uint32_t v = 0; v < mesh.vertexCount(); ++v) {
+        if (valence[v] == 0 || open[v] || valence[v] == 4) continue;
+        const float d = std::abs(mesh.positions[v][axis]);
+        if (d < 1e-3f * meanEdge) ++on;
+        else if (near && d < 3.0f * meanEdge) ++*near;
+    }
+    return on;
+}
+
 std::vector<long> parseList(const char* s) {
     std::vector<long> v;
     std::stringstream ss(s);
@@ -152,7 +217,7 @@ std::vector<long> parseList(const char* s) {
 
 int main(int argc, char** argv) {
     int runs = 5, target = 5000, voxelRes = 200, cancelAfter = -1, holes = 0;
-    float noise = 0.0f;
+    float noise = 0.0f, adaptive = -1.0f; // (adaptive < 0: the option's default)
     std::string detail;
     int symmetry = -1;
     bool bumpy = false;
@@ -170,6 +235,7 @@ int main(int argc, char** argv) {
         else if (a == "--shape" && more) shape = argv[++i];
         else if (a == "--cancel-after" && more) cancelAfter = std::atoi(argv[++i]);
         else if (a == "--noise" && more) noise = float(std::atof(argv[++i]));
+        else if (a == "--adaptive" && more) adaptive = float(std::atof(argv[++i]));
         else if (a == "--holes" && more) holes = std::atoi(argv[++i]);
         else if (a == "--detail" && more)
             detail = argv[++i];
@@ -185,7 +251,7 @@ int main(int argc, char** argv) {
     }
     // A compact summary at the end (median, min, max per path and size), for logs that keep only the tail.
     std::vector<std::string> summary;
-    std::printf("path,tris,run,total_ms,stages,out_tris,hausdorff_pct,mean_pct,poles,angle_dev,angle_p99,edge_cv,hash\n");
+    std::printf("path,tris,run,total_ms,stages,out_tris,hausdorff_pct,mean_pct,poles,angle_dev,angle_p99,edge_cv,hash,max_gap_ms,seam_poles,near_seam_poles\n");
     for (long n : sizes) {
         Mesh src = noise > 0.0f || holes > 0 ? roughen(sphere(size_t(n), bumpy, shape), noise, holes)
                                              : sphere(size_t(n), bumpy, shape);
@@ -220,10 +286,17 @@ int main(int argc, char** argv) {
                         cancelAt = Clock::now();
                         cancel = true;
                     });
+                // The longest silence between two progress calls is the Cancel latency bound (the job notices a Cancel at
+                // its next call). Marks at every 0.05 of progress keep the stage columns short now that a stage reports
+                // its way through.
+                auto lastCall = t0;
+                double maxGap = 0.0;
                 auto mark = [&](float f) {
                     if (cancel) return false;
                     const auto now = Clock::now();
-                    if (f != lastF) {
+                    maxGap = std::max(maxGap, ms(lastCall, now));
+                    lastCall = now;
+                    if (f != lastF && (std::floor(f * 20.0f + 1e-4f) != std::floor(lastF * 20.0f + 1e-4f) || f >= 1.0f)) {
                         char b[48];
                         std::snprintf(b, sizeof b, "%s%.2f:%.1f", stages.empty() ? "" : " ", f, ms(last, now));
                         stages += b;
@@ -242,6 +315,7 @@ int main(int argc, char** argv) {
                     QRemeshOptions o; // the UI defaults (App::startQRemesh with retopo_ untouched)
                     o.method = std::string(path) == "legacy" ? QRemeshMethod::Legacy : QRemeshMethod::V2;
                     o.targetQuads = target;
+                    if (adaptive >= 0.0f) o.adaptive = adaptive;
                     o.symmetryAxis = symmetry >= 0 && symmetry <= 2 ? symmetry : -1;
                     QRemeshStats st;
                     ok = qremesh(src, o, out, error, mark, &st);
@@ -257,8 +331,9 @@ int main(int argc, char** argv) {
                 const double total = ms(t0, Clock::now());
                 if (canceller.joinable()) {
                     canceller.join();
-                    std::printf("CANCEL %s %zu: asked at %.0f ms, returned %.0f ms later (%s)\n", path, src.triangleCount(),
-                                ms(t0, cancelAt), total - ms(t0, cancelAt), ok ? "finished anyway" : error.c_str());
+                    std::printf("CANCEL %s %zu: asked at %.0f ms, returned %.0f ms later (%s); longest silence %.0f ms\n", path,
+                                src.triangleCount(), ms(t0, cancelAt), total - ms(t0, cancelAt), ok ? "finished anyway" : error.c_str(),
+                                maxGap);
                     std::fflush(stdout);
                     continue;
                 }
@@ -267,19 +342,22 @@ int main(int argc, char** argv) {
                     continue;
                 }
                 if (!q.measured) q = quadQuality(out, &src); // (voxel: measured here, outside its time)
-                std::printf("%s,%zu,%d,%.1f,%s,%zu,%.4f,%.4f,%zu,%.2f,%.2f,%.3f,%016llx\n", path, src.triangleCount(), run, total,
+                size_t nearSeam = 0;
+                const size_t onSeam = std::string(path) == "voxel" ? 0 : seamPoles(out, symmetry, &nearSeam);
+                std::printf("%s,%zu,%d,%.1f,%s,%zu,%.4f,%.4f,%zu,%.2f,%.2f,%.3f,%016llx,%.1f,%zu,%zu\n", path, src.triangleCount(), run, total,
                             stages.c_str(), out.triangleCount(), q.hausdorff, q.meanDistance, q.poles, q.angleDeviation,
-                            q.angleDeviationMax, q.edgeLengthCv, (unsigned long long)meshHash(out));
+                            q.angleDeviationMax, q.edgeLengthCv, (unsigned long long)meshHash(out), maxGap, onSeam, nearSeam);
                 std::fflush(stdout);
                 totals.push_back(total);
                 lastQuality = q;
+                std::fprintf(stderr, "PEAK_RSS %s %zu %d %.0f MB\n", path, src.triangleCount(), run, peakRssMb());
             }
             if (totals.empty()) continue;
             std::sort(totals.begin(), totals.end());
             char b[160];
-            std::snprintf(b, sizeof b, "SUMMARY %s %zu: median %.0f ms (%.0f..%.0f), Hausdorff %.4f%%, poles %zu", path,
-                          src.triangleCount(), totals[totals.size() / 2], totals.front(), totals.back(),
-                          lastQuality.hausdorff, lastQuality.poles);
+            std::snprintf(b, sizeof b, "SUMMARY %s %zu: median %.0f ms (%.0f..%.0f), Hausdorff %.4f%%, poles %zu, peak RSS %.0f MB",
+                          path, src.triangleCount(), totals[totals.size() / 2], totals.front(), totals.back(),
+                          lastQuality.hausdorff, lastQuality.poles, peakRssMb());
             summary.push_back(b);
         }
     }
