@@ -1,6 +1,6 @@
 # ctest build_stamp: cmake/BuildStamp.cmake follows the commit at BUILD time. In a scratch git repo: stamp, commit, stamp again
 # (the file shows the new commit), stamp with nothing new (the file is not touched, so a no-op build stays a no-op), a tracked
-# edit (dirty flag), and SF_DEV=OFF (a release build: no dev stamp). Run: cmake -DSF_SCRIPT=... -DSF_WORK=... -P this file.
+# edit (dirty flag), SF_DEV=OFF (a release build: no dev stamp) and a tree without .git (a tarball: empty commit, exit 0). Run: cmake -DSF_SCRIPT=... -DSF_WORK=... -P this file.
 find_package(Git QUIET)
 if(NOT GIT_FOUND)
   message(STATUS "build_stamp: no git, skipped")
@@ -68,4 +68,16 @@ expect_in("buildDirty() { return 1 != 0; }")
 stamp(OFF)
 expect_in("devCommit() { return \"\"; }")
 expect_in("buildCommit() { return \"${c2}\"; }")
+# A tarball (AUR, brew, Flatpak: no .git) still stamps: the script exits 0 and the commit is empty, dev stamp included.
+set(tarball "${SF_WORK}/tarball")
+file(MAKE_DIRECTORY "${tarball}")
+file(WRITE "${tarball}/a.txt" "one\n")
+file(REMOVE "${SF_WORK}/BuildStamp.cpp")
+execute_process(COMMAND ${CMAKE_COMMAND} -DSF_SRC=${tarball} -DSF_OUT=${SF_WORK}/BuildStamp.cpp -DSF_DEV=ON -P ${SF_SCRIPT}
+                RESULT_VARIABLE rc)
+if(NOT rc EQUAL 0)
+  message(FATAL_ERROR "BuildStamp.cmake failed without a .git")
+endif()
+expect_in("buildCommit() { return \"\"; }")
+expect_in("devCommit() { return \"\"; }")
 message(STATUS "build_stamp: ok")
