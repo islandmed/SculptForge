@@ -17,6 +17,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <map>
@@ -1116,6 +1117,8 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
         const std::vector<uint8_t> occupied = chartFootprint(m); // (where the charts are: a triangle's UVs must stay in there)
         auto countStray = [&]() { return strayTriangles(m, occupied); };
         if (painted) CHECK(countStray() == 0);
+        double dabMs = 0.0;
+        int dabs = 0;
         struct Stroke {
             BrushType type;
             float radius; // of the head's size
@@ -1133,7 +1136,10 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
                 p.viewDir = glm::vec3(0, 0, -1);
                 p.radius = s.radius * diag;
                 p.strength = 0.5f;
+                const auto t0 = std::chrono::steady_clock::now();
                 d.sculptor.dab(m, d.bvh, s.type, p, Symmetry{});
+                dabMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+                ++dabs;
             }
             d.undo.push(d.sculptor.endStroke());
         }
@@ -1148,11 +1154,17 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
                 p.viewDir = glm::vec3(0, 0, -1);
                 p.radius = s2.radius * diag;
                 p.strength = 0.5f;
+                const auto t0 = std::chrono::steady_clock::now();
                 d.sculptor.dab(m, d.bvh, s2.type, p, Symmetry{});
+                dabMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+                ++dabs;
             }
             d.undo.push(d.sculptor.endStroke());
         }
-        CHECK(invalid(m, false, 0).empty());
+        const std::string broken = invalid(m, false, 0);
+        if (!broken.empty()) std::printf("  mesh invalid: %s\n", broken.c_str());
+        CHECK(broken.empty());
+        std::printf("  %s: %d dabs, %.2f ms per dab\n", painted ? "painted" : "plain", dabs, dabMs / double(std::max(dabs, 1)));
         folds[painted] = foldedEdges(m);
         if (!painted) continue;
         CHECK(m.uvs.size() == m.triangleCount() * 3);

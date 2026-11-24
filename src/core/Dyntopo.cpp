@@ -482,18 +482,23 @@ void DynamicTopology::prepareUvMask() {
 
 bool DynamicTopology::uvInChart(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c) const {
     if (uvMask_.empty()) return true; // (no UVs, or tiles outside 0..1)
-    // Every cell the triangle covers (a lattice a cell apart, a little inside its edge): a long one across a chart's hollow or along a
-    // chart's bending edge samples unpainted texels even with its corners and centre on the paint.
     const glm::vec2 centre = (a + b + c) / 3.0f;
-    const float longest = std::max(glm::length(b - a), std::max(glm::length(c - b), glm::length(a - c))) * float(kUvMaskSize);
-    const int steps = std::clamp(int(longest) + 1, 2, 20);
-    for (int i = 0; i <= steps; ++i)
-        for (int j = 0; i + j <= steps; ++j) {
-            const glm::vec2 p = a * (float(i) / float(steps)) + b * (float(j) / float(steps)) + c * (float(steps - i - j) / float(steps));
-            const glm::vec2 q = centre + (p - centre) * 0.97f;
-            const int x = int(q.x * float(kUvMaskSize)), y = int(q.y * float(kUvMaskSize));
-            if (!(q.x >= 0.0f && q.y >= 0.0f) || x >= kUvMaskSize || y >= kUvMaskSize || !uvMask_[size_t(y) * kUvMaskSize + size_t(x)]) return false;
-        }
+    auto covered = [&](const glm::vec2& p) {
+        const glm::vec2 q = centre + (p - centre) * 0.97f; // (a little inside the edge)
+        const int x = int(q.x * float(kUvMaskSize)), y = int(q.y * float(kUvMaskSize));
+        return q.x >= 0.0f && q.y >= 0.0f && x < kUvMaskSize && y < kUvMaskSize && uvMask_[size_t(y) * kUvMaskSize + size_t(x)];
+    };
+    // The corners and the centre first (nearly every refusal), then along the three edges a cell apart: a long triangle along a
+    // chart's bending edge or across its hollow has its corners and centre on the paint and an edge over unpainted texels. The cost
+    // follows the perimeter, not the area (the inside of a triangle with its edges on the paint is the paint's: charts have no islands).
+    if (!covered(a) || !covered(b) || !covered(c) || !covered(centre)) return false;
+    const glm::vec2 corner[3] = {a, b, c};
+    for (int e = 0; e < 3; ++e) {
+        const glm::vec2 p = corner[e], q = corner[(e + 1) % 3];
+        const int steps = std::clamp(int(glm::length(q - p) * float(kUvMaskSize)) + 1, 2, 48);
+        for (int i = 1; i < steps; ++i)
+            if (!covered(p + (q - p) * (float(i) / float(steps)))) return false;
+    }
     return true;
 }
 
@@ -1374,7 +1379,11 @@ void DynamicTopology::collapsePass() {
         bool ok = true;
         for (const auto& [x, y] : edges) {
             Plan pl;
-            if (locked(x) || locked(y) || !collapseTarget(x, y, pl.keep, pl.drop, pl.p) || !canCollapse(pl.keep, pl.drop, pl.p)) {
+            if (locked(x) || locked(y) || !collapseTarget(x, y, pl.keep, pl.drop, pl.p)) {
+                ok = false;
+                break;
+            }
+            if (!canCollapse(pl.keep, pl.drop, pl.p)) {
                 ok = false;
                 break;
             }
