@@ -291,10 +291,14 @@ void App::spaceMouseLogUpdate(bool latched) {
         // The raw reports, read next to SDL (a second, read-only handle; the driver and SDL keep working).
         if (SDL_hid_device_info* list = SDL_hid_enumerate(SDL_GetJoystickVendor(spaceMouse_), SDL_GetJoystickProduct(spaceMouse_))) {
             for (SDL_hid_device_info* d = list; d && spaceMouseHid_.size() < 6; d = d->next) {
-                SDL_hid_device* h = d->path ? SDL_hid_open_path(d->path) : nullptr;
+                // Only the interface with the cap's axes is opened: a device or receiver may also expose a keyboard
+                // (isSpaceMouseAxesInterface), and nothing typed is ever read.
+                const bool axes = isSpaceMouseAxesInterface(d->usage_page, d->usage);
+                SDL_hid_device* h = axes && d->path ? SDL_hid_open_path(d->path) : nullptr;
                 char info[320];
                 std::snprintf(info, sizeof info, "hid interface %d usage page %04x usage %04x: %s", d->interface_number,
-                              unsigned(d->usage_page), unsigned(d->usage), h ? "open" : "cannot open (no raw reports from it)");
+                              unsigned(d->usage_page), unsigned(d->usage),
+                              !axes ? "skipped (not the SpaceMouse's axes)" : h ? "open" : "cannot open (no raw reports from it)");
                 spaceMouseLogLine(info);
                 if (h) {
                     SDL_hid_set_nonblocking(h, 1);
@@ -551,9 +555,9 @@ void App::drawSpaceMouseSection() {
     // For a bug report: what the device sends, on this computer only.
     if (ui::Checkbox("Log device reports##spacemouse.log", &spaceMouseLogOn_) && !spaceMouseLogOn_) spaceMouseLogStop();
     ui::HelpText("Log device reports", nullptr,
-                 "Writes what the SpaceMouse sends (its raw reports and axis values, with times) to spacemouse-log.txt in "
-                 "the SculptForge data folder, to attach to a bug report. It stays on this computer. Off again when you "
-                 "restart.",
+                 "Writes what the SpaceMouse sends (its axis values and the raw reports of its axes interface, with times) "
+                 "to spacemouse-log.txt in the SculptForge data folder, to paste into a bug report as text. Nothing typed "
+                 "is ever read. It stays on this computer and is off again when you restart.",
                  path);
     if (spaceMouseLog_.is_open()) {
         ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));

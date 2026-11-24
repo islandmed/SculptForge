@@ -239,8 +239,9 @@ your issue.
 If the view drifts after you let go, or stops while you push, switch on **Log device reports** in the same place (it
 is off unless you switch it on, and it stays on your computer), repeat it for ten seconds and switch it off.
 SculptForge writes what the device sends to `spacemouse-log.txt` in the user data folder, which the section shows:
-the device name, its USB ids, the axis values and the raw HID reports with their report ids, with times. Nothing
-else: no paths, user names or file names. Copy the lines from the file (the first 50 are enough; **Copy log** copies a
+the device name, its USB ids, the axis values and the raw HID reports of the SpaceMouse's own axes interface with
+their report ids, with times. Nothing else: no paths, user names or file names, and nothing typed is ever read (a
+keyboard or other interface the device may also have is not opened). Copy the lines from the file (the first 50 are enough; **Copy log** copies a
 short excerpt) and paste them into your issue as text. The log is off again after a restart (or set
 `SF_SPACEMOUSE_LOG=1` to log from the start).
 

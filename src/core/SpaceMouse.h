@@ -32,6 +32,12 @@ enum SpaceMouseAxis { kSmTx, kSmTy, kSmTz, kSmRx, kSmRy, kSmRz, kSmAxes };
 // a SpaceMouse (SpaceNavigator...), any vendor when the name says 3Dconnexion (#104).
 bool isSpaceMouseDevice(uint16_t vendor, uint16_t product, const std::string& name = {});
 
+// The raw-report log (App::spaceMouseLogUpdate) opens only the interface that carries the cap's axes: HID usage page 0x01
+// (generic desktop) with usage 0x08 (multi-axis controller), or 0x04 / 0x05 (joystick, gamepad: what older models under
+// Logitech's vendor id report). Everything else a device may expose (keyboard, keypad, mouse, consumer control, vendor
+// pages) is never opened, so nothing typed can be read. 0 / 0 (a backend that does not report usages) is not opened either.
+bool isSpaceMouseAxesInterface(uint16_t usagePage, uint16_t usage);
+
 // A SpaceMouse the system lists but SDL cannot open (3DxWare holds it) is tried again this often (#110).
 constexpr float kSpaceMouseRetrySeconds = 3.0f;
 

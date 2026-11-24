@@ -67,6 +67,10 @@ bool isSpaceMouseDevice(uint16_t vendor, uint16_t product, const std::string& na
     return false;
 }
 
+bool isSpaceMouseAxesInterface(uint16_t usagePage, uint16_t usage) {
+    return usagePage == 0x01 && (usage == 0x08 || usage == 0x04 || usage == 0x05);
+}
+
 Json toJson(const SpaceMouseSettings& s) {
     Json j = Json::object();
     j.set("enabled", s.enabled);

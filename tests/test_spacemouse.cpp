@@ -320,3 +320,18 @@ TEST(spacemouse_split_report_ids) {
     r.watch.reset();
     CHECK(!r.watch.latched() && r.watch.peek(a, true) == a);
 }
+
+// The device log reads raw HID reports, but only from the interface with the cap's axes: never a keyboard, keypad, mouse,
+// consumer-control or vendor interface the same device (or a receiver) may also expose (reviewer security pass).
+TEST(spacemouse_log_opens_only_the_axes_interface) {
+    CHECK(isSpaceMouseAxesInterface(0x01, 0x08));  // multi-axis controller: the SpaceMouse's own
+    CHECK(isSpaceMouseAxesInterface(0x01, 0x04));  // joystick (older models, Logitech ids)
+    CHECK(isSpaceMouseAxesInterface(0x01, 0x05));  // gamepad
+    CHECK(!isSpaceMouseAxesInterface(0x01, 0x06)); // keyboard
+    CHECK(!isSpaceMouseAxesInterface(0x01, 0x07)); // keypad
+    CHECK(!isSpaceMouseAxesInterface(0x01, 0x02)); // mouse
+    CHECK(!isSpaceMouseAxesInterface(0x0C, 0x01)); // consumer control (media keys)
+    CHECK(!isSpaceMouseAxesInterface(0x07, 0x08)); // keyboard page, a usage that happens to be 8
+    CHECK(!isSpaceMouseAxesInterface(0xFF00, 0x08)); // vendor page
+    CHECK(!isSpaceMouseAxesInterface(0, 0));       // usages not reported: not opened
+}
