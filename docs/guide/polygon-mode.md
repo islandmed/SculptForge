@@ -5,7 +5,7 @@
 > **In short:**
 > - **Tool > Polygon > Polygon mode** turns a Part into a cage you edit polygon by polygon.
 > - Pick **Points**, **Edges** or **Faces**, select them on the model, and move them with the Gizmo.
-> - The operations under the selection (Delete, Flip, and the modelling ones as they land) run on what is selected, each as one undo step.
+> - The operations under the selection (Delete, Flip, Edge loop, and the modelling ones as they land) run on what is selected, each as one undo step.
 
 Sculpting shapes a surface; Polygon mode builds one. It is for the low and medium-density meshes hard-surface
 work starts from: a box, a cylinder, a Quad Remesh result, an imported cage. You select the polygons' points,
@@ -75,6 +75,21 @@ slider you drag shows a live preview of the result on the model.
 An operation that needs whole faces tells you so when only some of a face's points are selected: switch to Faces, or
 select whole faces.
 
+### Edge loop
+
+**Edge loop** adds new loops of edges across the ring of quads through the selected edge, the quickest way to put more
+polygons where a model needs them (a knuckle, a neck, a hard edge about to be rounded). In **Edges**, click one edge
+(**Ring** shows the ring it would cut through) and click **Edge loop**: every quad of the ring is split and the new
+loop is selected, so a <kbd>W</kbd> drag moves it at once.
+
+- **Loops** is how many loops go into each quad of the ring, evenly spaced.
+- **Position** is where across the quads they go: 0.5 is centred, towards 0 or 1 they move close to either side of the
+  ring. Dragging the slider previews the loops on the model.
+- The loop runs round the model, or stops where the ring ends: at an open border (that edge is split too), at a triangle
+  (it is split in two, so a cylinder's cap stays closed) or at a quad the ring already crossed.
+- Face groups, UVs, seams, creases, vertex paint and the mask carry over to the new polygons.
+- Edges on several rings cut every one of them in one step; a face or point selection is refused with a pointer to Edges.
+
 ## Scripting
 
 Polygon mode is driven by three commands (the console shows every click as one of them):
@@ -83,5 +98,5 @@ Polygon mode is driven by three commands (the console shows every click as one o
 | --- | --- |
 | `poly_mode` | whether the active Part can enter Polygon mode and its counts; `element=points` / `edges` / `faces` picks what is selected |
 | `poly_select` | `op=point` / `edge` / `face` with `index=N`; `loop` / `ring` with an edge's index; `group` with `group=N`; `rect` with `x0 y0 x1 y1` (-1..1 under `view_proj`, `eye` for the facing side); `grow`, `shrink`, `all`, `none`, `invert`, `info`; `add` / `remove` instead of replacing |
-| `poly_op` | `op=list` names the operations and their parameters; `op=delete`, `op=flip`, ...; parameters as `name=value` |
+| `poly_op` | `op=list` names the operations and their parameters; `op=delete`, `op=flip`, `op=edge_loop count=2 position=0.3`, ...; parameters as `name=value` |
 | `transform` | `selection=true` moves only the selection (what a gizmo drag runs) |
