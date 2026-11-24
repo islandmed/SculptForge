@@ -92,3 +92,44 @@ key ctrl+z
 expect_value layer_roughness_opacity == $op_old
 key ctrl+shift+z
 expect_value layer_roughness_opacity == $op_new
+
+# One slider from each other effect type: Levels (Gamma), Blur (Radius), a Generator (Level).
+run fill_layer action=effect kind=levels
+run fill_layer action=effect kind=blur
+run fill_layer action=effect generator=edge_wear
+wait_value mesh_maps_busy == 0 300
+wheel_item "Fill layer" 0 -30
+wait 0.2
+remember fill_levels_gamma gamma_old
+drag_item "Paint Layers/##gamma" 60 0
+wait 0.3
+expect_value fill_levels_gamma != $gamma_old
+remember fill_levels_gamma gamma_new
+wait 0.3
+expect_value fill_levels_gamma == $gamma_new
+key ctrl+z
+expect_value fill_levels_gamma == $gamma_old
+key ctrl+shift+z
+expect_value fill_levels_gamma == $gamma_new
+remember fill_blur_radius radius_old
+drag_item "Paint Layers/##radius" 60 0
+wait 0.3
+expect_value fill_blur_radius != $radius_old
+remember fill_blur_radius radius_new
+wait 0.3
+expect_value fill_blur_radius == $radius_new
+key ctrl+z
+expect_value fill_blur_radius == $radius_old
+key ctrl+shift+z
+expect_value fill_blur_radius == $radius_new
+remember fill_generator_level level_old
+drag_item "Paint Layers/##level" -60 0
+wait 0.3
+expect_value fill_generator_level != $level_old
+remember fill_generator_level level_new
+wait 0.3
+expect_value fill_generator_level == $level_new
+key ctrl+z
+expect_value fill_generator_level == $level_old
+key ctrl+shift+z
+expect_value fill_generator_level == $level_new

@@ -355,6 +355,16 @@ double App::fillTestValue(const std::string& name) const {
     }
     if (name == "layer_roughness_opacity") // the active layer's Roughness channel opacity, 0-1 (the channel chip's menu)
         return tex ? layerChannelOpacity(*m.texture, m.texture->activeLayer, Channel::Roughness) : 0.0;
+    if (name == "fill_levels_gamma" || name == "fill_blur_radius" || name == "fill_generator_level") {
+        // The active Fill layer's first Levels / Blur / Generator effect value.
+        if (!tex || !isFillLayer(*m.texture, m.texture->activeLayer)) return 0.0;
+        const FillLayer& f = *m.texture->layers[size_t(m.texture->activeLayer)].fill;
+        const MaskEffectKind want = name == "fill_levels_gamma" ? MaskEffectKind::Levels
+                                    : name == "fill_blur_radius" ? MaskEffectKind::Blur : MaskEffectKind::Generator;
+        for (const MaskEffect& e : f.effects)
+            if (e.kind == want) return name == "fill_levels_gamma" ? e.gamma : name == "fill_blur_radius" ? e.radius : e.level;
+        return 0.0;
+    }
     if (name == "fill_noise_scale" || name == "fill_noise_contrast" || name == "fill_fill_value" || name == "fill_roughness") {
         // The active Fill layer's first Noise / Fill effect value, or its roughness (the sliders' stored values).
         if (!tex || !isFillLayer(*m.texture, m.texture->activeLayer)) return 0.0;
