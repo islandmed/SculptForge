@@ -986,10 +986,10 @@ TEST(dyntopo_uv_invariants_on_a_curved_part_with_symmetry_and_undo) {
 }
 
 namespace {
-// Where a Part's charts are: every texel a UV triangle touches and two of 1024 around it (the padding painting leaves around a chart),
+// Where a Part's charts are: every texel a UV triangle touches and `pad` of 1024 around it (two: the padding painting leaves around a chart),
 // and the triangles that sample outside that (a centre or a corner a little inside: a white speck on the paint).
 constexpr int kGrid = 1024;
-std::vector<uint8_t> chartFootprint(const Mesh& m) {
+std::vector<uint8_t> chartFootprint(const Mesh& m, int pad = 2) {
     std::vector<uint8_t> occupied(size_t(kGrid) * kGrid, 0);
     for (uint32_t t = 0; t < m.triangleCount() && !m.uvs.empty(); ++t) {
         const glm::vec2 a = m.uvs[size_t(t) * 3], e1 = m.uvs[size_t(t) * 3 + 1] - a, e2 = m.uvs[size_t(t) * 3 + 2] - a;
@@ -998,8 +998,8 @@ std::vector<uint8_t> chartFootprint(const Mesh& m) {
             for (int j = 0; i + j <= steps; ++j) {
                 const glm::vec2 q = a + e1 * (float(i) / float(steps)) + e2 * (float(j) / float(steps));
                 const int x = int(q.x * kGrid), y = int(q.y * kGrid);
-                for (int dy = -2; dy <= 2; ++dy)
-                    for (int dx = -2; dx <= 2; ++dx)
+                for (int dy = -pad; dy <= pad; ++dy)
+                    for (int dx = -pad; dx <= pad; ++dx)
                         if (x + dx >= 0 && x + dx < kGrid && y + dy >= 0 && y + dy < kGrid) occupied[size_t(y + dy) * kGrid + size_t(x + dx)] = 1;
             }
     }
@@ -1015,6 +1015,25 @@ size_t strayTriangles(const Mesh& m, const std::vector<uint8_t>& occupied) {
             const int x = int(q.x * kGrid), y = int(q.y * kGrid);
             out = x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)];
         }
+        stray += out ? 1 : 0;
+    }
+    return stray;
+}
+// The same, for the whole triangle: any of a lattice of points over its area (a little inside its edge) outside the footprint. A long
+// triangle along a chart's bending edge or across its hollow has its centre and corners on the paint and white texels between them.
+size_t strictStrayTriangles(const Mesh& m, const std::vector<uint8_t>& occupied) {
+    size_t stray = 0;
+    const int n = 24;
+    for (uint32_t t = 0; t < m.triangleCount() && !m.uvs.empty(); ++t) {
+        const glm::vec2 a = m.uvs[size_t(t) * 3], b = m.uvs[size_t(t) * 3 + 1], c = m.uvs[size_t(t) * 3 + 2], centre = (a + b + c) / 3.0f;
+        bool out = false;
+        for (int i = 0; i <= n && !out; ++i)
+            for (int j = 0; i + j <= n && !out; ++j) {
+                const glm::vec2 p = a * (float(i) / float(n)) + b * (float(j) / float(n)) + c * (float(n - i - j) / float(n));
+                const glm::vec2 q = centre + (p - centre) * 0.97f;
+                const int x = int(q.x * kGrid), y = int(q.y * kGrid);
+                out = x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)];
+            }
         stray += out ? 1 : 0;
     }
     return stray;
@@ -1037,7 +1056,7 @@ TEST(dyntopo_uv_invariants_a_bent_chart_is_not_bridged_by_big_triangles) {
         }
     m.rebuildTopology();
     d.bvh.build(m);
-    const std::vector<uint8_t> footprint = chartFootprint(m);
+    const std::vector<uint8_t> footprint = chartFootprint(m), tight = chartFootprint(m, 1);
     CHECK(strayTriangles(m, footprint) == 0);
     auto turn = [&](uint32_t t) { // (the sign of the triangle's area in UV space)
         const glm::vec2 e1 = m.uvs[size_t(t) * 3 + 1] - m.uvs[size_t(t) * 3], e2 = m.uvs[size_t(t) * 3 + 2] - m.uvs[size_t(t) * 3];
@@ -1053,6 +1072,7 @@ TEST(dyntopo_uv_invariants_a_bent_chart_is_not_bridged_by_big_triangles) {
     CHECK(invalid(m, false, 1).empty());
     CHECK(m.triangleCount() < before * 3 / 4); // (it did simplify)
     CHECK(strayTriangles(m, footprint) <= 4); // (a few of ~230 at the chart's thin ends; 115 of 161 before the fix)
+    CHECK(strictStrayTriangles(m, tight) <= 4);
     size_t turned = 0;
     for (uint32_t t = 0; t < m.triangleCount(); ++t) turned += turn(t) * side <= 0.0f ? 1 : 0;
     CHECK(turned == 0);
@@ -1089,6 +1109,7 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
         Mesh& m = d.mesh;
         if (painted) m.texture = makeTexture(2048, 2048); // (its size sets how far a UV may stray: the padding is 4 texels)
         d.bvh.build(m);
+        const std::vector<uint8_t> tight = chartFootprint(m, 1); // (the painted area and one cell round it)
         const AABB b = m.bounds();
         const glm::vec3 lo = b.min, hi = b.max, ext = hi - lo;
         const float diag = glm::length(ext);
@@ -1144,6 +1165,9 @@ TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_o
         CHECK(outliers == 0);
         const size_t stray = countStray();
         std::printf("  %zu triangles, %zu with UVs outside every chart\n", m.triangleCount(), stray);
+        const size_t strict = strictStrayTriangles(m, tight);
+        std::printf("  %zu of them reach past one cell of padding (a triangle's whole UV area, not just its centre and corners)\n", strict);
+        CHECK(strict <= 50); // (before the fix: 545 on one build, 192 with the centre-and-corners check)
         CHECK(stray <= 100); // (of ~25000, simplified from 135000: a corner just past the padding of a chart is a white speck on the paint)
     }
     std::printf("  folded edges: %zu without UVs, %zu with\n", folds[0], folds[1]);

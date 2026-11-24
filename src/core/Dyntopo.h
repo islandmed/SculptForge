@@ -269,7 +269,7 @@ private:
     size_t ops_ = 0, maxOps_ = 0;
     mutable std::vector<uint32_t> scratch_, scratch2_, ringA_, ringB_, ringC_, lockScratch_;
     mutable std::vector<uint32_t> openScratch_;
-    // The texels the charts cover and two of 1024 around them (the padding painting leaves), from the UVs a Part had before Dynamic
+    // The cells of 1024 x 1024 the charts cover and one around them, from the UVs a Part had before Dynamic
     // first changed them: a collapse may not put a triangle's samples outside. Kept from stroke to stroke while the UVs are the
     // ones the last stroke left (rebuilt each stroke it would let each one's strays become the next one's charts), else built again.
     std::vector<uint8_t> uvMask_;

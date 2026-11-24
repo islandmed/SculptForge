@@ -462,7 +462,7 @@ void DynamicTopology::prepareUvMask() {
                 raw[size_t(y) * kUvMaskSize + size_t(x)] = 1;
             }
     }
-    // Two texels around every chart, as two box passes.
+    // One cell (two texels of 2048) around every chart, as two box passes.
     std::vector<uint8_t> tmp(raw.size(), 0);
     uvMask_.assign(raw.size(), 0);
     for (int pass = 0; pass < 2; ++pass) {
@@ -471,7 +471,7 @@ void DynamicTopology::prepareUvMask() {
         for (int y = 0; y < kUvMaskSize; ++y)
             for (int x = 0; x < kUvMaskSize; ++x) {
                 uint8_t any = 0;
-                for (int d = -2; d <= 2 && !any; ++d) {
+                for (int d = -1; d <= 1 && !any; ++d) {
                     const int xx = pass == 0 ? x + d : x, yy = pass == 0 ? y : y + d;
                     if (xx >= 0 && xx < kUvMaskSize && yy >= 0 && yy < kUvMaskSize) any = from[size_t(yy) * kUvMaskSize + size_t(xx)];
                 }
@@ -482,14 +482,18 @@ void DynamicTopology::prepareUvMask() {
 
 bool DynamicTopology::uvInChart(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c) const {
     if (uvMask_.empty()) return true; // (no UVs, or tiles outside 0..1)
-    // As the paint is looked at: the centre and each corner, a little inside (a corner just past a chart's padding samples white).
+    // Every cell the triangle covers (a lattice a cell apart, a little inside its edge): a long one across a chart's hollow or along a
+    // chart's bending edge samples unpainted texels even with its corners and centre on the paint.
     const glm::vec2 centre = (a + b + c) / 3.0f;
-    const glm::vec2 points[4] = {a, b, c, centre};
-    for (const glm::vec2& p : points) {
-        const glm::vec2 q = centre + (p - centre) * 0.9f;
-        const int x = int(q.x * float(kUvMaskSize)), y = int(q.y * float(kUvMaskSize));
-        if (!(q.x >= 0.0f && q.y >= 0.0f) || x >= kUvMaskSize || y >= kUvMaskSize || !uvMask_[size_t(y) * kUvMaskSize + size_t(x)]) return false;
-    }
+    const float longest = std::max(glm::length(b - a), std::max(glm::length(c - b), glm::length(a - c))) * float(kUvMaskSize);
+    const int steps = std::clamp(int(longest) + 1, 2, 20);
+    for (int i = 0; i <= steps; ++i)
+        for (int j = 0; i + j <= steps; ++j) {
+            const glm::vec2 p = a * (float(i) / float(steps)) + b * (float(j) / float(steps)) + c * (float(steps - i - j) / float(steps));
+            const glm::vec2 q = centre + (p - centre) * 0.97f;
+            const int x = int(q.x * float(kUvMaskSize)), y = int(q.y * float(kUvMaskSize));
+            if (!(q.x >= 0.0f && q.y >= 0.0f) || x >= kUvMaskSize || y >= kUvMaskSize || !uvMask_[size_t(y) * kUvMaskSize + size_t(x)]) return false;
+        }
     return true;
 }
 
