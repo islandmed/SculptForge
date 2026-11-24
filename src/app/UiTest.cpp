@@ -2036,7 +2036,7 @@ void Demo::testClick(int line, const std::string& label, int button, bool double
         if (std::abs(to.x - last->x) > 3.0f || std::abs(to.y - last->y) > 3.0f) {
             if (last->x >= 0.0f && !*moved) {
                 *moved = true;
-                std::printf("  click \"%s\": the item moved %.0f px down between frames (layout settling after the step before)\n",
+                std::printf("  click \"%s\": the item moved %.0f px (y, down is positive) between frames (layout settling after the step before)\n",
                             label.c_str(), double(to.y - last->y));
             }
             *last = to;
