@@ -191,7 +191,11 @@ bool signerAcceptable(const MacTools& tools, const std::string& identifier, cons
 std::string bundleInMount(const std::string& mountDir, const std::string& name);
 // Puts `fresh` in the target's place and the target at `backup`, in one atomic swap where the file system can
 // (macOS renamex_np RENAME_SWAP), else two renames (the second undone when it fails). `backup` is removed first.
-bool swapDirectories(const std::string& fresh, const std::string& target, const std::string& backup, std::string& error);
+// False: nothing changed and `fresh` is still the new bundle, except when `targetIsNew` is set true: the swap held
+// but could not be undone after the backup step failed, so the target IS the new bundle and `fresh` holds the old
+// one (the caller must keep both).
+bool swapDirectories(const std::string& fresh, const std::string& target, const std::string& backup, std::string& error,
+                     bool* targetIsNew = nullptr);
 // The folder the image is mounted at, beside the download: "<staging folder>/mount-<version>".
 std::string mountPath(const Install& install, const std::string& version);
 // Checks the staged .dmg's hash again, mounts it read-only (hdiutil attach -nobrowse -readonly -noautoopen -noverify: the
@@ -206,8 +210,9 @@ bool installMacApp(const Install& install, const Download& d, const std::string&
 // The Security framework's view of a bundle: SecStaticCodeCheckValidity with kSecCSStrictValidate | kSecCSCheckNestedCode |
 // kSecCSCheckAllArchitectures, then the identifiers out of its signing information. (MacTools::signature.)
 bool macBundleSignature(const std::string& bundle, std::string& identifier, std::string& teamId, std::string& error);
-// This process's own identifiers (SecCodeCopySelf); both "" when it is unsigned, the team "" when ad-hoc signed.
-void runningCodeIdentity(std::string& identifier, std::string& teamId);
+// This process's own identifiers (SecCodeCopySelf + SecCodeCopyStaticCode); the team "" when ad-hoc signed. False
+// when they can't be read at all: the caller then refuses to update (nothing to compare against is not "anything goes").
+bool runningCodeIdentity(std::string& identifier, std::string& teamId);
 #endif
 
 // Linux AppImage: the process at procDir (/proc/<pid>) is an earlier SculptForge run from the same AppImage file:

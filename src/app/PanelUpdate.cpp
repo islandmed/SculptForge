@@ -309,7 +309,9 @@ bool App::installSelfUpdate(bool relaunch, std::string& error) {
     const bool dryRun = updateDryRun();
     if (install.kind == update::InstallKind::AppImage || install.kind == update::InstallKind::MacApp) {
         if (install.kind == update::InstallKind::AppImage) {
-            if (dryRun) {
+            if (dryRun) { // (the download goes too: a dry run leaves nothing behind)
+                std::error_code ec;
+                fs::remove(fsPath(selfUpdate_->staged), ec);
                 status_ = "Dry run: SculptForge " + selfUpdateVersion_ + " would replace " + install.target + "; nothing was changed.";
                 return true;
             }
@@ -320,7 +322,12 @@ bool App::installSelfUpdate(bool relaunch, std::string& error) {
             update::MacTools tools;
             tools.run = runTool;
             tools.signature = update::macBundleSignature;
-            update::runningCodeIdentity(tools.runningIdentifier, tools.runningTeamId); // compared below, never shown or kept
+            if (!update::runningCodeIdentity(tools.runningIdentifier, tools.runningTeamId)) { // compared below, never shown or kept
+                std::error_code ec;
+                fs::remove(fsPath(selfUpdate_->staged), ec);
+                error = "can't read this app's own code signature, so the new one can't be compared with it";
+                return false;
+            }
             if (!update::installMacApp(install, *selfUpdate_, selfUpdateVersion_, appFullVersion(), updateNotePath(), tools, dryRun,
                                        error))
                 return false;
@@ -349,6 +356,8 @@ bool App::installSelfUpdate(bool relaunch, std::string& error) {
 #if defined(_WIN32)
     if (install.kind == update::InstallKind::WindowsInstaller || install.kind == update::InstallKind::WindowsPortable) {
         if (dryRun) {
+            std::error_code ec;
+            fs::remove(fsPath(selfUpdate_->staged), ec);
             status_ = "Dry run: SculptForge " + selfUpdateVersion_ + " would replace " + install.target + "; nothing was changed.";
             return true;
         }

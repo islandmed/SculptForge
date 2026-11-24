@@ -487,7 +487,7 @@ bool rollback(const Pending& p, const std::string& notePath, std::string& error)
         fs::remove(fsPath(notePath), ec);
         return false;
     }
-    if (fs::is_directory(backup, ec)) { // a Windows portable folder: the failed one is set aside first
+    if (fs::is_directory(backup, ec) && fs::exists(target, ec)) { // a folder (Windows portable, a .app): the failed one is set aside first
         const fs::path failed = fsPath(p.target + ".failed");
         fs::remove_all(failed, ec);
         fs::rename(target, failed, ec);
@@ -595,20 +595,26 @@ std::string mountPath(const Install& install, const std::string& version) {
     return pathString(fsPath(stagingPath(install, version)).parent_path() / ("mount-" + version));
 }
 
-bool swapDirectories(const std::string& fresh, const std::string& target, const std::string& backup, std::string& error) {
+bool swapDirectories(const std::string& fresh, const std::string& target, const std::string& backup, std::string& error,
+                     bool* targetIsNew) {
     std::error_code ec;
     const fs::path f = fsPath(fresh), t = fsPath(target), b = fsPath(backup);
+    if (targetIsNew) *targetIsNew = false;
     fs::remove_all(b, ec);
     if (!fs::is_directory(f, ec) || !fs::is_directory(t, ec)) {
         error = "nothing to swap";
         return false;
     }
 #if defined(__APPLE__)
-    // One step: the target path is the old bundle or the new one, never missing or half of either.
+    // One step: the target path is the old bundle or the new one, never missing or half of either. (A file system
+    // without RENAME_SWAP for folders answers an error and the two renames below do it.)
     if (::renamex_np(fresh.c_str(), target.c_str(), RENAME_SWAP) == 0) {
         fs::rename(f, b, ec); // (the old bundle, now under the .new name)
-        if (ec) error = "the new version is in place but the old one couldn't be kept as a backup: " + ec.message();
-        return !ec;
+        if (!ec) return true;
+        error = "the old version couldn't be kept as a backup: " + ec.message();
+        if (::renamex_np(fresh.c_str(), target.c_str(), RENAME_SWAP) == 0) return false; // swapped back: as before
+        if (targetIsNew) *targetIsNew = true; // the new one is in place, the old one under .new: both are kept
+        return false;
     }
 #endif
     fs::rename(t, b, ec);
@@ -645,24 +651,27 @@ bool installMacApp(const Install& install, const Download& d, const std::string&
     const std::string mnt = mountPath(install, version);
     bool mounted = false;
     const auto detach = [&] {
-        if (!mounted) return;
-        if (tools.run({"/usr/bin/hdiutil", "detach", mnt, "-quiet"}) != 0) tools.run({"/usr/bin/hdiutil", "detach", mnt, "-force", "-quiet"});
+        if (!mounted) return true;
+        if (tools.run({"/usr/bin/hdiutil", "detach", mnt, "-quiet"}) != 0 &&
+            tools.run({"/usr/bin/hdiutil", "detach", mnt, "-force", "-quiet"}) != 0)
+            return false; // still mounted: its folder is left alone (never removed through a mount)
         mounted = false;
+        return true;
     };
     const auto fail = [&](const std::string& why) {
-        detach();
         std::error_code e;
         fs::remove_all(fsPath(fresh), e);
         fs::remove(staged, e);
-        fs::remove_all(fsPath(mnt), e);
+        if (detach()) fs::remove_all(fsPath(mnt), e);
         error = why;
         return false;
     };
-    // The copy goes beside the target (the same volume: the swap is a rename). A folder this user can't write to
-    // (an administrator's /Applications) is the end of it: no privileges are asked for.
+    // The copy goes beside the target (the same volume: the swap is a rename); ditto makes the bundle's root itself.
+    // A folder this user can't write to (an administrator's /Applications) is the end of it: no privileges are asked for.
     fs::remove_all(fsPath(fresh), ec);
     fs::create_directories(fsPath(fresh), ec);
     if (ec) return fail("can't write to " + pathString(target.parent_path()) + ": " + ec.message());
+    fs::remove_all(fsPath(fresh), ec);
     fs::remove_all(fsPath(mnt), ec);
     fs::create_directories(fsPath(mnt), ec);
     if (ec) return fail("can't create " + mnt + ": " + ec.message());
@@ -674,8 +683,7 @@ bool installMacApp(const Install& install, const Download& d, const std::string&
     const std::string bundle = bundleInMount(mnt, pathString(target.filename()));
     if (bundle.empty()) return fail("the disk image doesn't hold " + pathString(target.filename()));
     if (tools.run({"/usr/bin/ditto", bundle, fresh}) != 0) return fail("couldn't copy the new version out of the disk image");
-    detach();
-    fs::remove_all(fsPath(mnt), ec);
+    if (detach()) fs::remove_all(fsPath(mnt), ec);
     // The copy must carry a valid signature over all of its code, from the same developer as the running app.
     if (tools.run({"/usr/bin/codesign", "--verify", "--deep", "--strict", fresh}) != 0)
         return fail("the new app's code signature doesn't check out: nothing was installed");
@@ -688,8 +696,14 @@ bool installMacApp(const Install& install, const Download& d, const std::string&
     }
     Pending p{version, fromVersion, install.target, backup, 0};
     if (!writePending(notePath, p)) return fail("can't write the update note");
-    if (!swapDirectories(fresh, install.target, backup, why)) {
+    bool targetIsNew = false;
+    if (!swapDirectories(fresh, install.target, backup, why, &targetIsNew)) {
         fs::remove(fsPath(notePath), ec);
+        if (targetIsNew) { // the new version is in place and the old one is under .new: nothing is deleted
+            fs::remove(staged, ec);
+            error = why + "; the previous version is kept as " + fresh;
+            return false;
+        }
         return fail(why);
     }
     fs::remove(staged, ec);
@@ -764,14 +778,17 @@ bool macBundleSignature(const std::string& bundle, std::string& identifier, std:
     return identityOf(code, identifier, teamId, error);
 }
 
-void runningCodeIdentity(std::string& identifier, std::string& teamId) {
+bool runningCodeIdentity(std::string& identifier, std::string& teamId) {
     identifier.clear();
     teamId.clear();
     SecCodeRef self = nullptr;
-    if (SecCodeCopySelf(kSecCSDefaultFlags, &self) != errSecSuccess || !self) return;
-    CfRef holder(self);
+    if (SecCodeCopySelf(kSecCSDefaultFlags, &self) != errSecSuccess || !self) return false;
+    CfRef selfHolder(self);
+    SecStaticCodeRef code = nullptr; // the on-disk code behind this process, as SecStaticCode* calls want it
+    if (SecCodeCopyStaticCode(self, kSecCSDefaultFlags, &code) != errSecSuccess || !code) return false;
+    CfRef codeHolder(code);
     std::string error;
-    identityOf(self, identifier, teamId, error); // (a SecCodeRef is a SecStaticCodeRef)
+    return identityOf(code, identifier, teamId, error);
 }
 
 #endif

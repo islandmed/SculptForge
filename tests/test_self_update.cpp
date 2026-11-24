@@ -25,6 +25,13 @@
 #if defined(__linux__)
 #include <unistd.h>
 #endif
+#if defined(__APPLE__)
+#include <fcntl.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+extern char** environ;
+#endif
 
 using namespace sf;
 using namespace sf::update;
@@ -635,7 +642,7 @@ struct FakeMacTools {
     std::string teamId, runningTeamId;
     std::vector<std::vector<std::string>> calls;
     bool mounted = false;
-    int attachRc = 0, dittoRc = 0;
+    int attachRc = 0, dittoRc = 0, detachRc = 0;
     MacTools tools() {
         MacTools t;
         t.runningIdentifier = runningIdentifier;
@@ -660,6 +667,7 @@ struct FakeMacTools {
             }
             if (tool == "/usr/bin/hdiutil" && argv.at(1) == "detach") {
                 CHECK(mounted);
+                if (detachRc) return detachRc;
                 mounted = false;
                 return 0;
             }
@@ -671,7 +679,7 @@ struct FakeMacTools {
             }
             if (tool == "/usr/bin/codesign") {
                 CHECK(argv.size() == 5 && argv[1] == "--verify" && argv[2] == "--deep" && argv[3] == "--strict");
-                CHECK(!mounted); // the image is let go before the long checks
+                CHECK(!mounted || detachRc); // the image is let go before the long checks (unless it refused to)
                 CHECK(fs::exists(fs::path(argv[4]) / "Contents" / "MacOS" / "sculptforge"));
                 return codesignRc;
             }
@@ -801,6 +809,18 @@ TEST(self_update_mac_downloads_and_installs) {
     for (int i = 1; i <= kMaxUnconfirmedStarts; ++i) CHECK(checkPendingAtStart(s.note, "99.0.0", p, error) == StartCheck::Counting);
     CHECK(checkPendingAtStart(s.note, "99.0.0", p, error) == StartCheck::RolledBack);
     CHECK(s.exe() == "new version" && s.applications() == std::vector<std::string>({"SculptForge.app"}) && !fs::exists(s.note));
+
+    // The image won't detach: the install still goes through, and its mount folder is left alone (never removed
+    // through a mount), nothing else is left in the cache.
+    Download d4;
+    downloadUpdate("99.0.0", s.install, k, f.fetch(), d4);
+    FakeMacTools t4;
+    t4.detachRc = 1;
+    CHECK(installMacApp(s.install, d4, "99.0.0", "1.0.0", s.note, t4.tools(), false, error) && t4.mounted);
+    CHECK(fs::exists(mountPath(s.install, "99.0.0")) && s.cached() == 1 && !fs::exists(d4.staged));
+    // A rollback whose target is already gone still brings the backup back.
+    fs::remove_all(s.install.target);
+    CHECK(readPending(s.note, p) && rollback(p, s.note, error) && s.exe() == "new version" && !fs::exists(s.note));
 }
 
 TEST(self_update_mac_refuses) {
@@ -881,29 +901,111 @@ TEST(self_update_mac_refuses) {
 }
 
 #if defined(__APPLE__)
-// On a Mac the real checks run against a bundle made here: ad-hoc signed by codesign, it passes; one file changed
-// afterwards, it fails. The running test binary's team identifier is read without error (empty for an unsigned build).
-TEST(self_update_mac_real_codesign) {
-    const fs::path dir = tempPath("sf_self_update_mac_codesign");
+namespace {
+
+// The real tools, as the app runs them: by absolute path, no shell, stdin closed; the exit code.
+int spawnTool(const std::vector<std::string>& argv) {
+    std::vector<char*> av;
+    for (const std::string& a : argv) av.push_back(const_cast<char*>(a.c_str()));
+    av.push_back(nullptr);
+    posix_spawn_file_actions_t actions;
+    posix_spawn_file_actions_init(&actions);
+    posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0);
+    posix_spawn_file_actions_addopen(&actions, 1, "/dev/null", O_WRONLY, 0);
+    posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0);
+    pid_t pid = 0;
+    const int rc = posix_spawn(&pid, av[0], &actions, nullptr, av.data(), environ);
+    posix_spawn_file_actions_destroy(&actions);
+    if (rc != 0) return -1;
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0) return -1;
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+
+// An ad-hoc signed probe bundle (any Mach-O inside), as a Mac release's app is signed today.
+fs::path makeProbeBundle(const fs::path& app, const std::string& marker) {
     std::error_code ec;
-    fs::remove_all(dir, ec);
-    const fs::path app = dir / "Probe.app";
     fs::create_directories(app / "Contents" / "MacOS");
     writeAll(app / "Contents" / "Info.plist",
              "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\"><dict>"
              "<key>CFBundleIdentifier</key><string>app.sculptforge.probe</string>"
-             "<key>CFBundleExecutable</key><string>probe</string>"
+             "<key>CFBundleExecutable</key><string>sculptforge</string>"
              "<key>CFBundlePackageType</key><string>APPL</string></dict></plist>\n");
-    fs::copy_file("/bin/ls", app / "Contents" / "MacOS" / "probe", ec); // any Mach-O
+    fs::copy_file("/bin/ls", app / "Contents" / "MacOS" / "sculptforge", fs::copy_options::overwrite_existing, ec);
+    writeAll(app / "Contents" / "Resources" / "marker.txt", marker); // (a resource: sealed by the signature too)
     CHECK(!ec);
-    CHECK(std::system(("/usr/bin/codesign --force --sign - " + app.string() + " >/dev/null 2>&1").c_str()) == 0);
+    CHECK(spawnTool({"/usr/bin/codesign", "--force", "--sign", "-", app.string()}) == 0);
+    return app;
+}
+
+} // namespace
+
+// On a Mac the real checks run against a bundle made here: ad-hoc signed by codesign, it passes; one file changed
+// afterwards, it fails. The running test binary's identity is read without error.
+TEST(self_update_mac_real_codesign) {
+    const fs::path dir = tempPath("sf_self_update_mac_codesign");
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+    const fs::path app = makeProbeBundle(dir / "Probe.app", "probe");
     std::string id, team, error;
     CHECK(macBundleSignature(app.string(), id, team, error));
     CHECK(id == "app.sculptforge.probe" && team.empty() && error.empty()); // ad-hoc: the bundle id, no team identifier
-    runningCodeIdentity(id, team);                                         // no crash, whatever this binary is signed with
-    writeAll(app / "Contents" / "Info.plist", "changed after signing");
+    CHECK(runningCodeIdentity(id, team) && !id.empty());                   // this binary: whatever it is signed with
+    writeAll(app / "Contents" / "Resources" / "marker.txt", "changed after signing");
     CHECK(!macBundleSignature(app.string(), id, team, error) && !error.empty());
     fs::remove_all(dir, ec);
+}
+
+// End to end with the real tools (hdiutil, ditto, codesign, the Security framework, renamex_np): a disk image made
+// here holding a signed probe bundle replaces an "installed" one; dry run first, then the install, confirm, rollback.
+TEST(self_update_mac_real_install) {
+    MacSandbox s("sf_self_update_mac_real");
+    std::error_code ec;
+    // The "installed" app is a signed bundle too; the image holds the new one.
+    fs::remove_all(s.install.target, ec);
+    makeProbeBundle(s.install.target, "old version");
+    const fs::path src = s.dir / "image-src";
+    makeProbeBundle(src / "SculptForge.app", "new version");
+    const fs::path dmg = s.dir / "SculptForge-99.0.0-darwin-universal.dmg";
+    CHECK(spawnTool({"/usr/bin/hdiutil", "create", "-quiet", "-srcfolder", src.string(), "-volname", "SculptForge", "-format",
+                     "UDZO", dmg.string()}) == 0);
+    // Staged as the download would be, with its hash.
+    Download d;
+    d.staged = stagingPath(s.install, "99.0.0");
+    fs::copy_file(dmg, d.staged, ec);
+    CHECK(!ec);
+    d.sha256 = sha256Hex(readAll(d.staged));
+    d.ok = true;
+    MacTools tools;
+    tools.run = spawnTool;
+    tools.signature = macBundleSignature;
+    tools.runningIdentifier = "app.sculptforge.probe"; // (what the installed probe is signed as; this test binary isn't)
+    const auto marker = [&](const std::string& bundle) { return readAll(fs::path(bundle) / "Contents" / "Resources" / "marker.txt"); };
+    std::string error;
+    CHECK(installMacApp(s.install, d, "99.0.0", "1.0.0", s.note, tools, true, error) && error.empty()); // dry run
+    CHECK(marker(s.install.target) == "old version" && s.applications() == std::vector<std::string>({"SculptForge.app"}));
+    CHECK(!fs::exists(d.staged) && s.cached() == 0 && !fs::exists(s.note));
+    fs::copy_file(dmg, d.staged, ec);
+    CHECK(installMacApp(s.install, d, "99.0.0", "1.0.0", s.note, tools, false, error) && error.empty());
+    CHECK(marker(s.install.target) == "new version" && marker(s.install.target + ".old") == "old version");
+    CHECK(s.applications() == std::vector<std::string>({"SculptForge.app", "SculptForge.app.old"}) && s.cached() == 0);
+    std::string id, team;
+    CHECK(macBundleSignature(s.install.target, id, team, error) && id == "app.sculptforge.probe"); // the copy is intact
+    Pending p;
+    CHECK(checkPendingAtStart(s.note, "99.0.0", p, error) == StartCheck::Counting);
+    CHECK(readPending(s.note, p) && rollback(p, s.note, error));
+    CHECK(marker(s.install.target) == "old version" && s.applications() == std::vector<std::string>({"SculptForge.app"}));
+    // A bundle changed after signing is refused by the real codesign: the install leaves everything as it was.
+    writeAll(src / "SculptForge.app" / "Contents" / "Resources" / "marker.txt", "tampered");
+    const fs::path bad = s.dir / "bad.dmg";
+    CHECK(spawnTool({"/usr/bin/hdiutil", "create", "-quiet", "-srcfolder", src.string(), "-volname", "SculptForge", "-format",
+                     "UDZO", bad.string()}) == 0);
+    fs::copy_file(bad, d.staged, fs::copy_options::overwrite_existing, ec);
+    d.sha256 = sha256Hex(readAll(d.staged));
+    CHECK(!installMacApp(s.install, d, "99.0.0", "1.0.0", s.note, tools, false, error) && !error.empty());
+    CHECK(marker(s.install.target) == "old version" && s.applications() == std::vector<std::string>({"SculptForge.app"}));
+    CHECK(!fs::exists(d.staged) && s.cached() == 0 && !fs::exists(s.note));
 }
 #endif
 

@@ -80,7 +80,8 @@ hash), then a fourth check before the swap:
   the new version confirms after 5 s (the `.old` bundle goes), else the old one is put back and the `.failed` bundle is
   removed so Finder never shows it. Later installs at quit.
 - **Dry run**: `SF_UPDATE_DRY_RUN=1` does everything up to and including the signature checks, then removes the copy
-  and the download; the status line says what would have happened. Linux/Windows: the same variable skips the install.
+  and the download; the status line says what would have happened. Linux/Windows: the same variable skips the install
+  and removes the download.
 - **Quarantine**: the app's own HTTP client sets no `com.apple.quarantine` attribute (as `curl -O` doesn't), so the
   copied bundle opens without Gatekeeper's first-launch prompt; what it opens is exactly the bytes the signed list names.
 
