@@ -44,6 +44,20 @@ expect_value camera_ortho == 1
 hover_window $lu $lv
 expect_value split_active == 0
 
+# The corner gizmo (the axes, or the orientation widget) sits in the pointer's pane and acts on that pane's camera:
+# its +X end turns the left (Free) pane to the right side view; the right pane keeps its Front lens.
+expect_value split_active == 0
+axis_click +x
+expect_value split_active == 0
+expect_value camera_yaw >= 89
+expect_value camera_yaw <= 91
+hover_window $ru $rv
+expect_value split_active == 1
+expect_value camera_yaw >= -1
+expect_value camera_yaw <= 1
+hover_window $lu $lv
+expect_value split_active == 0
+
 # Below: the panes change shape, the views stay. Swap: the lenses trade places.
 action view.split_below
 expect_value split_view == 2
