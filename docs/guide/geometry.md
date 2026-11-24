@@ -133,7 +133,9 @@ To remesh several Parts into one, first combine them with **Merge visible...** o
 
 ### Quick Remesh
 
-Remesh as you sculpt, without going to the palette (#121). Turn on **Tool > Remesh > Quick Remesh**, then:
+Remesh as you sculpt, without going to the palette (#121). Quick Remesh is on by default in the SculptForge layout and
+off in the Classic layout; in Classic, turn it on with **Tool > Remesh > Quick Remesh**. The keys below work only while it
+is on:
 
 - press <kbd>Shift</kbd>+<kbd>R</kbd>, or
 - hold <kbd>N</kbd> and click or drag on the background (anywhere off the model; on the model it stays a brush
