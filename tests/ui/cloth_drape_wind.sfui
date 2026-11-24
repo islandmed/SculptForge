@@ -22,6 +22,7 @@ drag_item "##drapeheading" 60 0           # a heading to the right
 wait_value drape_heading > 30 5
 drag_item "##drapegusts" 80 0
 wait_value drape_gusts > 0 5
+snapshot
 click "Simulate##drape"
 wait_value drape_running == 1 10
 wait_value drape_frame > 30 30

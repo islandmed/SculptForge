@@ -841,7 +841,8 @@ which also holds the Cloth brush's settings):
   into the scene), its **Lift** up or down from level, and **Gusts**: how much it varies from place to place and
   moment to moment. Wind pushes on the cloth's face and skims along its edge, so a sheet side-on to it barely moves.
   You can change all of it while the simulation runs. In gusts the cloth ripples and never quite settles: press
-  **Keep** at the frame you like (it stops by itself after a minute).
+  **Keep** at the frame you like (it stops by itself after a minute). A steady wind holds a pose, though its folds
+  may keep fluttering, as a flag's do; the simulation then stops at its frame cap and keeps the pose.
 - **Units per metre**: how big the sculpt is in real life. Cloth falls by real size, so a sculpt modelled at real
   size (a SculptForge unit is a metre) uses 1; a body 2 units tall that should be a 1.8 m person uses 1.11.
 - **Pins from mask**: masked areas hold still, like pins: mask a waistband or a collar to hang the cloth from it.

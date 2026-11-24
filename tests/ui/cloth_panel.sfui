@@ -1,5 +1,6 @@
 # Tool > Cloth: the Cloth brush settings and Drape in one section; "Cloth settings..." in Brush > Cloth and in
-# Tool > Drape opens it. The controls are the same state as Brush > Cloth (a mode set there shows here).
+# Tool > Drape opens it. The controls are the same state as Brush > Cloth and Tool > Drape (a mode set there shows
+# here, a wind set there shows here).
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 wait_idle 30
@@ -13,12 +14,16 @@ click "Cloth settings...##brush"
 wait_idle 10
 expect "Simulate##drape"
 expect "##clothfabric"
+expect "##drapewind"
+expect_not "##drapegusts"                 # (no wind yet: its heading, lift and gusts stay hidden)
+wait_idle 10
+shot cloth_panel
 click "##clothmode"
 click "Grab##clothmode"
 wait_value cloth_mode == 3 5
-# Wind: a speed above 0 shows its heading, From view, lift and gusts.
-expect "##drapewind"
-expect_not "##drapegusts"
+# Tool > Drape alone (one sub-palette open): a wind set there is the same wind in Tool > Cloth.
+click "Drape##tool.drape"
+wait_idle 10
 drag_item "##drapewind" 120 0
 wait_value drape_wind > 0 5
 expect "##drapeheading"
@@ -26,9 +31,7 @@ expect "From view##drapewind"
 expect "##drapelift"
 drag_item "##drapegusts" 100 0
 wait_value drape_gusts > 0 5
-shot cloth_panel
-# From Drape: the link opens the same section.
-click "Drape##tool.drape"
 click "Cloth settings...##drape"
 wait_idle 10
 expect "Simulate##drape"
+expect "##drapegusts"
