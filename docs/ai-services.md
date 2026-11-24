@@ -10,8 +10,9 @@ or the picture or text you give Generate 3D) goes to the service you picked.
 ## Provenance tag on AI output
 
 A Part that Generate 3D (or `image_to_3d` / `text_to_3d`) made carries a small tag: the public **provider**
-(`Hugging Face`, `fal.ai`, `Meshy`, `Hyper3D`, `Tripo`, `ComfyUI` or `Your generator command`), the **model** where the
-provider names one (for example `Hunyuan3D 2.1 (Tencent)` or `fal-ai/trellis-2`), the local **date**, the SculptForge
+(`Hugging Face`, `fal.ai`, `Meshy`, `Hyper3D`, `Tripo`, `ComfyUI` or `Your generator command`), the **model** when it is
+one of the built-in choices (for example `Hunyuan3D 2.1 (Tencent)` or `fal-ai/trellis-2`; a model id you typed yourself
+is left out), the local **date**, the SculptForge
 version (**app**) and the **pass** (`generated`, `sculpting base` or `reference`). It is shown when you hover the Part in
 the Parts list and by `scene_overview`, follows Duplicate, Split and linked copies, is saved in the project
 (`ai_provenance`, see [project files](project-format.md)) and kept on export where the format has a place for it: glTF

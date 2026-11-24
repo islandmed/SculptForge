@@ -11,7 +11,7 @@ added: **Generate 3D > Result**: one clear choice for what the picked candidate 
   copy) moved under **Advanced**; **Use as sculpting base** remains to do it again after Undo or for a pick made as a
   reference. Existing services only; nothing new is sent anywhere.
 added: **AI provenance tag**: a Part made by Generate 3D (or `image_to_3d` / `text_to_3d`) records the public provider
-  (Hugging Face, fal.ai, Meshy, Hyper3D, Tripo, ComfyUI, your generator command), the model where the provider names one,
+  (Hugging Face, fal.ai, Meshy, Hyper3D, Tripo, ComfyUI, your generator command), the model when it is a built-in choice,
   the local date, the SculptForge version and the pass (generated, sculpting base, reference); never a host, URL, path,
   workflow or key name. It shows in the Parts list
   tooltip and `scene_overview`, follows Duplicate, Split and linked copies, is saved in projects (`ai_provenance`, an

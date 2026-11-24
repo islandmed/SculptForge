@@ -176,6 +176,30 @@ TEST(ai_provenance_names_the_public_provider_and_model_of_the_settings) {
     CHECK(ai::generateProvenance(s, true).model == ai::falTextModel("fal-ai/trellis-2")); // text runs another model
     s.generatorService = "tripo";
     CHECK(ai::generateProvenance(s, false).provider == "Tripo" && ai::generateProvenance(s, false).model.rfind("Tripo ", 0) == 0);
+    s.generatorService = "hyper3d";
+    CHECK(ai::generateProvenance(s, false).model == "Hyper3D Rodin " + s.hyper3dTier); // the default tier is a listed one
+    s.generatorService = "meshy";
+    CHECK(ai::generateProvenance(s, false).model == "Meshy (latest)");
+    // A model id the user typed may be their own deployment (reviewer-2 11-24): only ids from the built-in lists are written.
+    s.generatorService = "fal";
+    s.falEndpoint = "https://fal.my-studio.example";
+    s.falModel = "my-studio/owl-gen";
+    p = ai::generateProvenance(s, false);
+    CHECK(p.provider == "fal.ai" && p.model.empty() && p.line().find("owl-gen") == std::string::npos);
+    CHECK(ai::generateProvenance(s, true).model == ai::falTextModel("")); // text: the fixed built-in model runs instead
+    s.falModel = "my-studio/rodin-clone"; // (not a Rodin id either: still the fixed text model)
+    CHECK(ai::generateProvenance(s, true).model == ai::falTextModel("") && ai::generateProvenance(s, true).line().find("rodin-clone") == std::string::npos);
+    s.falEndpoint = "https://queue.fal.run";
+    s.generatorService = "meshy";
+    s.meshyModel = "my-studio-meshy-7";
+    CHECK(ai::generateProvenance(s, false).model.empty() && ai::generateProvenance(s, false).line().find("my-studio") == std::string::npos);
+    s.meshyModel = "latest";
+    s.generatorService = "hyper3d";
+    s.hyper3dTier = "my-private-tier";
+    CHECK(ai::generateProvenance(s, false).model.empty());
+    s.generatorService = "tripo";
+    s.tripoModel = "my-studio-tripo";
+    CHECK(ai::generateProvenance(s, false).model.empty() && ai::generateProvenance(s, false).line().find("my-studio") == std::string::npos);
     // Never a host, URL, path, workflow or key name (input 11-24): a custom fal.ai endpoint, a LAN ComfyUI and its workflow
     // file, the user's command stay out of the tag.
     s.generatorService = "fal";
@@ -207,6 +231,12 @@ TEST(ai_provenance_of_a_private_server_stays_out_of_exports) {
     doc.activePartInfo().name = "Generated";
     doc.activePartInfo().ai = ai::generateProvenance(s, false);
     CHECK(!doc.activePartInfo().ai.empty());
+    s.generatorService = "fal"; // a second Part from a custom fal.ai endpoint with the user's own model id
+    s.falEndpoint = "https://fal.my-studio.example";
+    s.falModel = "my-studio/owl-gen";
+    doc.addPart(makeCube(2, 1.0f), "Generated 2");
+    doc.activePartInfo().ai = ai::generateProvenance(s, false);
+    CHECK(doc.activePartInfo().ai.provider == "fal.ai" && doc.activePartInfo().ai.model.empty());
     CommandRegistry commands;
     const std::string glb = tempPath("sf_ai_private.glb"), usd = tempPath("sf_ai_private.usda"), obj = tempPath("sf_ai_private.obj");
     CHECK(commands.execute(doc, "export_glb", {{"path", glb}}).ok);
@@ -215,9 +245,9 @@ TEST(ai_provenance_of_a_private_server_stays_out_of_exports) {
     for (const std::string& path : {glb, usd, obj}) {
         const std::string text = slurp(path);
         CHECK(text.find("sculptforge_ai") != std::string::npos); // the tag is there ...
-        for (const char* never : {"192.168", "8188", "http", "owl", "workflows", "/home", "hf_secret", ".json"}) // no host, URL, path, workflow, key
+        for (const char* never : {"192.168", "8188", "http", "owl", "workflows", "/home", "hf_secret", ".json", "my-studio"}) // no host, URL, path, workflow, key, own model id
             CHECK(text.find(never) == std::string::npos);
-        CHECK(text.find("ComfyUI") != std::string::npos && text.find(appVersion()) != std::string::npos);
+        CHECK(text.find("ComfyUI") != std::string::npos && text.find("fal.ai") != std::string::npos && text.find(appVersion()) != std::string::npos);
         std::filesystem::remove(path);
     }
 }
