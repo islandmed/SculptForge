@@ -323,6 +323,8 @@ public:
     void moveVertices(Mesh& mesh, BVH& bvh, std::span<const uint32_t> verts, std::span<const glm::vec3> d);
 
     SculptTimings timings;
+    // Clay and Clay Block weigh a vertex by where the stroke first found it (Sculpt.cpp, dabSingle); off = by where it is now (the test compares).
+    bool clayStartWeights = true;
     // The brush's frame on the surface at the last dab's first (unmirrored) pass: the dab centre, the area normal
     // and the area centre its kernel used (the predictive stroke preview estimates the next dabs from it).
     struct DabFrame {

@@ -1435,6 +1435,14 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const bool analyticEarly = earlyNormals_ && !adaptiveDab_ && isPlaneKernelBrush(type) && !p.viewFalloff && !useAlpha && !useStencil && !facing &&
                                !dynTopo_.active() && !draft_ && mesh.normals.size() == mesh.vertexCount() &&
                                mesh.mask.size() != mesh.vertexCount() && !mesh.hasHidden();
+    // Clay weighs a vertex that lies far below its plane (more than 0.6 of the radius: the foot of a wall, at the edge of the reach) by
+    // where it stood when the stroke first reached it (pinchStart_): each dab pulls a vertex along the area normal to the plane, and
+    // where a wall leans away from that normal (the lip of a squeezed band) the pull moved it toward the dab, its falloff rose, and
+    // the next dab pulled it further, a runaway x1.5 a dab at the edge of the reach that left ribs along it. On a surface that bends
+    // away gently (a head under a big brush: up to half the radius at the edge) the weights are what they were. (The exact path
+    // only: the adaptive and the early-normals paths weigh by where a vertex is.)
+    const bool startWeights = !analyticEarly && clayStartWeights && type == BrushType::Clay && !adaptiveDab_ &&
+                              !useAlpha && !useStencil && !p.viewFalloff && !dynTopo_.active() && !draft_;
     earlyNormals_ = false;
     const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
 
@@ -1548,9 +1556,16 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                         viewDepthFade(x, p.center, p.viewDir, r);
             if (reachFade <= 0.0f) return glm::vec3(0.0f);
         }
-        const glm::vec3 o = x - p.center;
+        glm::vec3 xw = x; // (where the falloff weighs it)
+        if (startWeights) {
+            float kk;
+            const float deep = std::abs(glm::dot(pinchStart_[v] - plane.clayPlane(kk), areaNormal)) / r;
+            const float t = std::clamp((deep - 0.6f) * 4.0f, 0.0f, 1.0f);
+            if (t > 0.0f) xw = x + (pinchStart_[v] - x) * (t * t * (3.0f - 2.0f * t));
+        }
+        const glm::vec3 o = xw - p.center;
         float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
-                           : brushFalloff(brushDistance(p, x), r, p.focal);
+                           : brushFalloff(brushDistance(p, xw), r, p.focal);
         if (useStencil && f > 0.0f) f *= stencil.weight(x);
         glm::vec3 d(0.0f);
 
@@ -1659,6 +1674,19 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         }
         return d * reachFade;
     };
+    if (startWeights) {
+        if (pinchStamp_.size() != mesh.vertexCount()) {
+            pinchStamp_.assign(mesh.vertexCount(), 0);
+            pinchStart_.assign(mesh.vertexCount(), glm::vec3(0.0f));
+        }
+        const uint32_t stamp = uint32_t(strokeId_);
+        poolFor(verts_.size(), [&](size_t begin, size_t end) { // (each vertex once: verts_ holds no repeats)
+            for (size_t i = begin; i < end; ++i) {
+                const uint32_t v = verts_[i];
+                if (pinchStamp_[v] != stamp) pinchStamp_[v] = stamp, pinchStart_[v] = pos[v];
+            }
+        });
+    }
     if (!adaptiveDab_ && !analyticEarly) {
         poolFor(verts_.size(), [&](size_t begin, size_t end) {
             for (size_t i = begin; i < end; ++i) scratch_[i] = offset(i, verts_[i], pos[verts_[i]]);
