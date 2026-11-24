@@ -121,8 +121,8 @@ frame or a sunken button into a flat side.
 
 | Setting | Does |
 | --- | --- |
-| **Thickness** | How far the border moves in, as a fraction of the Part's size. Held below the point where a face would turn inside out (the status line says so). |
-| **Depth** | How far the inner faces move along their normal: negative sinks them into the surface, positive raises them. |
+| **Thickness** | How far the border moves in, as a share from 0 to 1 of the most the selected faces can take (0.25 by default). At 1 the inner faces keep a fifth of their size, never thinner, so a face can't turn inside out. With **Each face**, each polygon's own share. |
+| **Depth** | How far the inner faces move along their normal, as a fraction of the Part's size: negative sinks them into the surface, positive raises them. |
 | **Each face** | Every selected face is inset by itself instead of the selection as one shape. |
 | **Rim group** | The rim joins one new face group instead of its faces' groups, so a double-click selects the rim alone afterwards. |
 
@@ -130,7 +130,7 @@ The inner faces stay selected, so a second Inset, an Extrude or a gizmo move con
 face group of the face it came from, UVs stay continuous (a painted texture follows), and a crease or UV seam on the
 old border stays on it.
 
-**Tip:** select a side with a double-click, Inset with a small Thickness and a negative Depth for a sunken panel, then
+**Tip:** select a side with a double-click, Inset with a Thickness of 0.1 to 0.25 and a negative Depth for a sunken panel, then
 Inset again for a second frame inside the first.
 
 **Limit:** a selection that is a whole closed Part has no border to inset from; turn on **Each face** there.

@@ -87,6 +87,7 @@ add_library(sculptforge_core STATIC
   src/core/Commands.cpp
   src/core/CommandParse.cpp
   src/core/FaceGroups.cpp
+  src/core/PolyExtrude.cpp
   src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
   src/core/Parts.cpp
@@ -136,6 +137,9 @@ add_library(sculptforge_core STATIC
   src/core/MeshBoolean.cpp
   src/core/PartBoolean.cpp
   src/core/CloseHoles.cpp
+  src/core/PolySpan.cpp
+  src/core/PolyBevel.cpp
+  src/core/PolyInset.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/CreatureSkin.cpp
@@ -157,6 +161,10 @@ add_library(sculptforge_core STATIC
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
   src/core/EdgeSelect.cpp
+  src/core/PolyMode.cpp
+  src/core/PolyOps.cpp
+  src/core/EdgeLoopInsert.cpp
+  src/core/PolyEdgeLoop.cpp
   src/core/Uv.cpp
   src/core/UvCommands.cpp
   src/core/UvPack.cpp
@@ -536,6 +544,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelFill.cpp
     src/app/PanelGeometry.cpp
     src/app/PanelEdges.cpp
+    src/app/PanelPolygon.cpp
     src/app/Gizmo.cpp
     src/app/PanelBake.cpp
     src/app/FocusDetailApp.cpp
@@ -1599,6 +1608,18 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Edges mode and creases (tests/ui/edge_select.sfui) at 1440 px of UI, 100% and 200% (#108).
     sculptforge_ui_test(edge_select_1440 edge_select --size 1440x900)
     sculptforge_ui_test(edge_select_2880 edge_select --size 2880x1800) # its 200% shots: 1440 px of UI
+    # Polygon mode (tests/ui/polygon_mode.sfui) at 1440 px of UI, 100% and 200%.
+    sculptforge_ui_test(polygon_mode_1440 polygon_mode --size 1440x900)
+    sculptforge_ui_test(polygon_mode_2880 polygon_mode --size 2880x1800)
+    # Extrude in Polygon mode (tests/ui/polygon_extrude.sfui): faces as a region, individual, undo, then open border edges.
+    sculptforge_ui_test(polygon_extrude_1440 polygon_extrude --size 1440x900)
+    sculptforge_ui_test(polygon_extrude_2880 polygon_extrude --size 2880x1800)
+    # Span (tests/ui/polygon_span.sfui): the same two sizes.
+    sculptforge_ui_test(polygon_span_1440 polygon_span --size 1440x900)
+    sculptforge_ui_test(polygon_span_2880 polygon_span --size 2880x1800)
+    # Bevel (tests/ui/polygon_bevel.sfui): the op's panel entry, preview and result at 100% and 200%.
+    sculptforge_ui_test(polygon_bevel_1440 polygon_bevel --size 1440x900)
+    sculptforge_ui_test(polygon_bevel_2880 polygon_bevel --size 2880x1800)
     # The Transform gizmo's look, each mode front and 3/4, 100% and 200% (tests/ui/gizmo/look.sfui).
     sculptforge_ui_test(gizmo_look_1440 gizmo/look --size 1440x900)
     sculptforge_ui_test(gizmo_look_2880 gizmo/look --size 2880x1800)

@@ -150,8 +150,10 @@ std::string vertexCountText(size_t n);
 // Transforms Part `index` of `doc` (active or not) as one undoable step on that Part (a linked copy as a whole
 // unless masked: partMovesWhole); on the active Part's mesh it records into the active sculpt layer
 // (doc.activeLayer). Returns the number of vertices that moved.
+// `weights` (optional): per-vertex weights to use instead of the mask's (Polygon mode's selection,
+// PolySelection::weights): the mesh's vertices move by them, whatever the mask or the Part's links.
 size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useMask, float falloff, Symmetry mirror,
-                        const std::string& label);
+                        const std::string& label, const std::vector<float>* weights = nullptr);
 
 // transform (translate, rotate, scale, pivot, orient, masked, falloff, symmetry, all).
 void registerTransformCommands(CommandRegistry& registry);

@@ -8,6 +8,7 @@
 #include "core/EdgeSelect.h"
 #include "core/Json.h"
 #include "core/Mesh.h"
+#include "core/PolyMode.h"
 #include "core/QRemeshGuides.h"
 #include "core/Reference.h"
 #include "core/Sculpt.h"
@@ -169,6 +170,8 @@ struct Document {
     UvSelection uvSelection;
     // Edges selected on the active Part's base level (core/EdgeSelect.h, Geometry > Edges); dropped like uvSelection.
     EdgeSelection edgeSelection;
+    // Polygon mode's points / edges / faces on the active Part (core/PolyMode.h, Tool > Polygon); dropped like the others.
+    PolySelection polySelection;
 
     void syncBvh() {
         if (bvhDirty) bvh.build(mesh);
