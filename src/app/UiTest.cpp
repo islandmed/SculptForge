@@ -127,7 +127,8 @@
 //                            "SculptForge has a new look" card),
 //                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
 //                            index, -1 none), high_detail_part (its hidden copy's index, -1 none, -2 shown),
-//                            subdiv_levels (the active Part's, 0 none),
+//                            subdiv_levels (the active Part's, 0 none), ai_provenance (the active Part's AI tag: 0 none,
+//                            1 generated, 2 sculpting base, 3 reference),
 //                            brush_looks (different alpha + stroke looks the brush thumbnails were asked for, #208),
 //                            thumbnails_regenerated (brush thumbnails remade by right-click > Regenerate thumbnail),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
@@ -141,6 +142,7 @@
 //                            poly_mode (Tool > Polygon on), poly_element (0 Points, 1 Edges, 2 Faces), poly_selected / poly_total
 //                            (of that kind), poly_shown (drawn facing the camera), poly_hovered (the element under the cursor, -1 none),
 //                            poly_ops (operations in the registry), poly_preview (1 while an op's live preview is drawn),
+//                            poly_selected_min_edge (the shortest edge of the selected faces, scene units: a sliver check after Inset),
 //                            edited_parts (Parts with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
@@ -193,7 +195,7 @@
 //                            stroking (1 while a stroke is open), cursor_x / cursor_y (the brush cursor, pixels),
 //                            surface_cursor (1 when the brush ring last drawn lay on the surface, #25),
 //                            size_ring_preview / size_ring_px (the ring the S / O pop-up shows where it opened, #138),
-//                            front_faces_tag (1 while the brush cursor carries the "Front faces only" tag),
+//                            front_faces_tag (1 while the brush cursor carries the "Front faces only" tag), smooth_borders_tag (the same for "Smooth face group borders only" on a mesh without face groups), smooth_colour_tag (Shift held in Paint mode),
 //                            cursor_ring (1 when the last brush cursor drawn had its ring; 0: the dot only, #88),
 //                            hide_ring_while_stroking (Preferences > Cursor, 1 on),
 //                            cursor_follows_surface (Preferences > Input, 1 on),
@@ -462,6 +464,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <limits>
 #include <cstring>
 #include <utility>
 #include <thread>
@@ -862,6 +865,19 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "poly_hovered") return app_.polyOverlay_.hovered == ~0u ? -1.0 : double(app_.polyOverlay_.hovered);
     if (name == "poly_ops") return double(PolyOpRegistry::instance().all().size());
     if (name == "poly_preview") return app_.polyOverlay_.previewOk ? 1.0 : 0.0;
+    if (name == "poly_selected_min_edge") { // the shortest polygon edge of the selected faces (quad diagonals skipped), scene units; 0 with none
+        const std::vector<uint8_t>& faces = app_.doc_.polySelection.faces;
+        double best = std::numeric_limits<double>::infinity();
+        for (uint32_t t = 0; t < m.triangleCount() && t < faces.size(); ++t) {
+            if (!faces[t]) continue;
+            const glm::uvec3& tri = m.triangles[t];
+            const uint32_t u = m.quadPartnerAt(t);
+            const int diag = u != Mesh::kNoQuad && u < m.triangleCount() ? m.quadDiagonal(t, u) : -1;
+            for (int k = 0; k < 3; ++k)
+                if (k != diag) best = std::min(best, double(glm::length(m.positions[tri[k]] - m.positions[tri[(k + 1) % 3]])));
+        }
+        return std::isfinite(best) ? best : 0.0;
+    }
     if (name == "forgespheres") return double(m.forgespheres.size());
     if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
     if (name == "tube_points") return double(m.tube.points.size()); // the active Tube Part's (Tube, PanelTube.cpp)
@@ -1431,6 +1447,10 @@ double Demo::query(const std::string& name, bool& known) const {
         return i < 0 ? -1.0 : app_.doc_.parts[size_t(i)].visible ? -2.0 : double(i);
     }
     if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
+    if (name == "ai_provenance") { // the active Part's AI provenance tag: 0 none, 1 generated, 2 sculpting base, 3 reference
+        const AiProvenance& ai = app_.doc_.activePartInfo().ai;
+        return ai.empty() ? 0.0 : ai.role == AiProvenance::kSculptingBase ? 2.0 : ai.role == AiProvenance::kReference ? 3.0 : 1.0;
+    }
     if (name == "language_bar_open") return app_.languageBar_ ? 1.0 : 0.0; // the first start's "SculptForge is in..." note
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
     if (name == "welcome_close_hidden_px" || name == "welcome_x_hidden_px" || name == "welcome_scroll_px" || name == "welcome_scrolled_px") {
@@ -1973,6 +1993,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
     if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
     if (name == "size_ring_value") return std::round(double(app_.sizeRingPreviewValue_) * 100.0) / 100.0;
+    if (name == "smooth_colour_tag") return app_.smoothColourTagShown_ ? 1.0 : 0.0;
+    if (name == "smooth_borders_tag") return app_.smoothBordersTagShown_ ? 1.0 : 0.0;
     if (name == "front_faces_tag") return app_.frontFacesTagShown_ ? 1.0 : 0.0;
     if (name == "cursor_ring") return app_.ringShown_ ? 1.0 : 0.0;
     if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;

@@ -27,7 +27,7 @@ expect_value triangles == $tris
 click_part Box 0.5 0.5 2
 expect_value poly_selected > 1
 remember poly_selected side
-run poly_op op=inset thickness=0.04 depth=-0.03
+run poly_op op=inset thickness=0.3 depth=-0.03
 expect_status "Inset 1 face"
 expect_value undo_steps == $base+1
 expect_value triangles > $tris
@@ -54,14 +54,14 @@ expect_value triangles == $tris
 expect_value undo_steps == $base
 expect_value open_edges == 0
 
-# Every face by itself, more thickness than a face can take: held, nothing inside out, every face still selected.
+# Every face by itself at the end of the slider (as deep as it goes): nothing inside out, every face still selected.
 click "Polygon/All"
 expect_value poly_selected == $total
 run_fails poly_op op=inset thickness=0.5
 expect_status "no border"
 expect_value triangles == $tris
-run poly_op op=inset thickness=0.5 individual=true
-expect_status "held to the faces' size"
+run poly_op op=inset thickness=1 individual=true
+expect_status "Inset"
 expect_value triangles > $tris
 expect_value poly_selected == $total
 expect_value undo_steps == $base+1
@@ -93,6 +93,31 @@ expect_status "Inset 1 face"
 expect_value undo_steps == $typed+1
 expect_value poly_selected == 1
 expect_value triangles > $tris
+key ctrl+z
+expect_value triangles == $tris
+
+# A short slider drag (the Thickness is a share of what the face can take, not of the Part): the inner face is still a
+# real face, its shortest edge a good part of the original's, never a fan of slivers.
+click "Polygon/None"
+click_part Box 0.5 0.5 1
+expect_value poly_selected == 1
+remember poly_selected_min_edge edge
+remember undo_steps dragged
+drag_item "##thickness" 12 0
+click "Polygon/Inset"
+expect_status "Inset 1 face"
+expect_value undo_steps == $dragged+1
+expect_value poly_selected == 1
+expect_value open_edges == 0
+expect_value poly_selected_min_edge > $edge*0.25
+shot polygon-inset-short-drag
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-inset-short-drag-200
+ui_scale 100
+key f
+zoom 0.7
 key ctrl+z
 expect_value triangles == $tris
 key escape

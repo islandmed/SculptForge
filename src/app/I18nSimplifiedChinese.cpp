@@ -310,6 +310,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Pressure > Size", "笔压 > 大小"},
     {"Pressure > Strength", "笔压 > 强度"},
     {"Front faces only", "仅限正面"},
+    {"Shift smooths the colour; Sculpt mode smooths the shape", "Shift 平滑颜色；雕刻模式平滑形状"},
     {"Front faces only is ON", "仅限正面已开启"},
     {"Turn off", "关闭"},
     {"Brushes skip surfaces that face away from you: the hidden inside of a thin or Extract-made Part, and its far side. Smooth cannot reach spikes there. Untick Front faces only below to reach them.",
@@ -424,6 +425,9 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Load Lit Sphere", "加载 Lit Sphere"},
     {"Material picker", "材质选择器"},
     {"Material swatches", "材质色板"},
+    {"Tick a channel to paint more than colour", "勾选通道以绘制颜色以外的内容"},
+    {"Set the brush's colour, roughness and metallic at once, and make it paint those channels (adding roughness and metallic to the texture if it lacks them).", "一次设置画笔的颜色、粗糙度和金属度，并使其绘制这些通道（如果纹理没有粗糙度和金属度，则添加到纹理中）。"},
+    {"The greyed channels are not on the texture yet: tick one to add it and paint it. Tool > Texture Image > Material Channels lists them too, and is where a channel is taken off again.", "灰显的通道尚未在纹理上：勾选一个以添加并绘制它。工具 > 纹理图像 > 材质通道 也列出了它们，且可以在此处再次移除通道。"},
     // --- Script ---
     {"Console", "控制台"},
     {"Run script file", "运行脚本文件"},
@@ -3449,10 +3453,11 @@ constexpr Entry kSimplifiedChinese[] = {
      "笔刷从表面减去。按住 Alt 可在单一笔触中增加。"},
     {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
      "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
-     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles; UVs and the "
-     "painted texture are kept.",
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
+     "are dropped (Undo brings them back).",
      "动态拓扑：笔刷在需要细节处加入三角面，不需要处则移除，让你拉出角或手指而不会拉伸。“细节”设置三角面的大小；拉"
-     "近视图或缩小笔刷可得到更细的三角面。需要没有细分层级的网格；笔刷下的四边面会变成三角面，UV 与绘制的贴图会保留。"},
+     "近视图或缩小笔刷可得到更细的三角面。需要没有细分层级的网格；笔刷下的四边面会变成三角面，UV 会被丢弃（可撤销恢复"
+     "）。"},
     {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
      "sculpting.",
      "Lit Sphere 着色（默认）：所选的材质球或摄影棚灯光，便于雕刻时判读形体。"},
@@ -5238,6 +5243,35 @@ constexpr Entry kSimplifiedChinese[] = {
      "接着四边形重拓扑"},
     {"Use as sculpting base",
      "用作雕刻底模"},
+    // Generate 3D: the Result choice and the AI provenance tag (PanelGenerate3D.cpp, PanelParts.cpp, Ui.cpp)
+    {"AI: %s",
+     "AI：%s"},
+    {"Advanced",
+     "高级"},
+    {"Generate a model and pick one: it stays exactly as generated.",
+     "生成模型并挑选一个：它会保持生成时的原样。"},
+    {"Rebuilds the picked model as a sculpting base. A pick does this on its own; the button does it again, after Undo or for a model picked as a reference.",
+     "把挑选的模型重建成雕刻底模。挑选时会自动进行；此按钮用于再做一次，例如撤销之后，或对作为参考挑选的模型。"},
+    {"Reference",
+     "参考"},
+    {"High fidelity, exactly as generated",
+     "高保真，保持生成时的原样"},
+    {"Moderate density, clean quads",
+     "中等密度，干净的四边形"},
+    {"The AI gives the form; SculptForge gives the topology. Choose what the model you pick becomes:",
+     "AI 给出形体，SculptForge 给出拓扑。选择挑选的模型会变成什么："},
+    {"The model exactly as the service made it, every triangle. Sculpt on a base of your own and Project Detail from it, or export it as it is.",
+     "服务生成的原样模型，保留每一个三角形。在自己的底模上雕刻并用 Project Detail 从它转移细节，或原样导出。"},
+    {"Voxel Remesh, then Quad Remesh: about %d quads with one subdivision level, ready to divide and sculpt. The model as generated stays hidden as a Reference for Project Detail.",
+     "体素重新网格化，接着四边形重拓扑：约 %d 个四边面加 1 个细分级别，可以直接细分和雕刻。生成时的原样模型隐藏保留为参考，供 Project Detail 使用。"},
+    {"Voxel Remesh: one even, watertight surface of about %d triangles. The model as generated stays hidden as a Reference for Project Detail.",
+     "体素重新网格化：约 %d 个三角形的均匀水密表面。生成时的原样模型隐藏保留为参考，供 Project Detail 使用。"},
+    {"generated",
+     "已生成"},
+    {"reference",
+     "参考"},
+    {"sculpting base",
+     "雕刻底模"},
     {"Voxel Remesh first makes one even, watertight surface. Quad Remesh then turns it into clean quads with one subdivision level holding the detail, ready to divide and sculpt. Off: the even triangle surface.",
      "体素重新网格化先做出一个均匀、封闭的表面，接着四边形重拓扑把它转成干净的四边面，并以一个细分级别保留细节，可直接细分并雕刻。关闭：保留均匀的三角面表面。"},
     {"Ready",

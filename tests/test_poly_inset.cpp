@@ -20,6 +20,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <limits>
+#include <span>
 
 using namespace sf;
 
@@ -79,6 +81,24 @@ std::vector<uint32_t> cell(int n, int i, int j) {
 glm::vec3 normal(const Mesh& m, uint32_t t) {
     const glm::uvec3& tri = m.triangles[t];
     return glm::normalize(glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]));
+}
+
+glm::vec3 triangleArea(const Mesh& m, uint32_t t) { // twice the area, along the normal
+    const glm::uvec3& tri = m.triangles[t];
+    return glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]);
+}
+
+// The shortest polygon edge of `triangles` (quad diagonals skipped): a sliver check.
+float minEdge(const Mesh& m, std::span<const uint32_t> triangles) {
+    float best = std::numeric_limits<float>::infinity();
+    for (uint32_t t : triangles) {
+        const glm::uvec3& tri = m.triangles[t];
+        const uint32_t u = m.quadPartnerAt(t);
+        const int diag = u != Mesh::kNoQuad ? m.quadDiagonal(t, u) : -1;
+        for (int k = 0; k < 3; ++k)
+            if (k != diag) best = std::min(best, glm::length(m.positions[tri[k]] - m.positions[tri[(k + 1) % 3]]));
+    }
+    return std::isfinite(best) ? best : 0.0f;
 }
 
 std::vector<uint32_t> all(const Mesh& m) {
@@ -280,7 +300,7 @@ TEST(poly_inset_clamp_matches_the_inradius) {
     const InsetResult r = insetFaces(plane, one, o);
     CHECK(clean(plane, r));
     CHECK(r.clamped);
-    CHECK(r.thickness < 0.25f && r.thickness > 0.2f);
+    CHECK(std::abs(r.thickness - insetCollapseCap() * 0.25f) < 2e-3f);
     for (uint32_t t : r.selection) {
         CHECK(normal(r.mesh, t).y > 0.999f);
         const glm::uvec3& tri = r.mesh.triangles[t];
@@ -290,6 +310,84 @@ TEST(poly_inset_clamp_matches_the_inradius) {
     std::vector<uint32_t> two = cell(4, 0, 0);
     for (uint32_t t : cell(4, 1, 0)) two.push_back(t);
     CHECK(std::abs(insetMaxThickness(plane, two, false) - 0.25f) < 1e-4f);
+}
+
+TEST(poly_inset_collapse_cap_keeps_a_fifth_of_the_face) {
+    // Asked for more than a face can take, the inset stops at 0.8 of the collapse: the inner face is a fifth of the
+    // original, never a sliver (held at 95% of the collapse, a short slider drag on a dense Part left a fan of slivers).
+    const Mesh plane = makePlane(4); // square cells 0.5 wide: collapse at 0.25
+    const std::vector<uint32_t> one = cell(4, 0, 0);
+    CHECK(std::abs(insetCollapseCap() - 0.8f) < 1e-6f);
+    const float cap = insetCollapseCap() * 0.25f;
+    InsetOptions o;
+    o.individual = true;
+    for (float asked : {10.0f, 0.249f, 0.21f}) { // far beyond, just under the collapse, between the cap and the collapse
+        o.thickness = asked;
+        const InsetResult r = insetFaces(plane, one, o);
+        CHECK(clean(plane, r));
+        CHECK(r.clamped);
+        CHECK(std::abs(r.thickness - cap) < 2e-3f);
+        CHECK(std::abs(minEdge(r.mesh, r.selection) - 0.5f * (1.0f - insetCollapseCap())) < 5e-3f);
+        for (uint32_t t : r.selection) CHECK(normal(r.mesh, t).y > 0.999f);
+    }
+    o.thickness = 0.19f; // under the cap: as asked
+    const InsetResult r = insetFaces(plane, one, o);
+    CHECK(clean(plane, r));
+    CHECK(!r.clamped && std::abs(r.thickness - 0.19f) < 1e-6f);
+}
+
+TEST(poly_inset_relative_thickness_is_a_share_of_what_the_faces_can_take) {
+    // The slider's unit: 1 is the cap (a fifth short of the collapse), 0.5 half of it; a short drag from the default
+    // (0.25 to 0.3) is a clear rim on a cell of any size.
+    const Mesh plane = makePlane(4);
+    const std::vector<uint32_t> one = cell(4, 0, 0);
+    InsetOptions o;
+    o.relative = true;
+    o.individual = true;
+    for (float f : {0.25f, 0.3f, 0.5f, 1.0f}) {
+        o.thickness = f;
+        const InsetResult r = insetFaces(plane, one, o);
+        CHECK(clean(plane, r));
+        CHECK(!r.clamped);
+        CHECK(std::abs(r.maxThickness - 0.25f) < 1e-3f);
+        CHECK(std::abs(r.thickness - f * insetCollapseCap() * 0.25f) < 1e-3f);
+        CHECK(std::abs(minEdge(r.mesh, r.selection) - (0.5f - 2.0f * r.thickness)) < 5e-3f);
+    }
+    o.thickness = 3.0f; // beyond the slider: the cap, flagged
+    const InsetResult over = insetFaces(plane, one, o);
+    CHECK(clean(plane, over));
+    CHECK(over.clamped && std::abs(over.thickness - insetCollapseCap() * 0.25f) < 1e-3f);
+    // Pieces of different sizes together: the smallest sets the unit, every piece gets the same thickness, none collapses.
+    std::vector<uint32_t> mixed = cell(4, 0, 0); // one cell (collapse 0.25) and a 2 x 2 block (collapse 0.5)
+    for (int i = 2; i < 4; ++i)
+        for (int j = 2; j < 4; ++j)
+            for (uint32_t t : cell(4, i, j)) mixed.push_back(t);
+    o.individual = false;
+    o.thickness = 1.0f;
+    const InsetResult m = insetFaces(plane, mixed, o);
+    CHECK(clean(plane, m));
+    CHECK(!m.clamped && m.regions == 2);
+    CHECK(std::abs(m.maxThickness - 0.25f) < 1e-3f && std::abs(m.thickness - insetCollapseCap() * 0.25f) < 1e-3f);
+    CHECK(minEdge(m.mesh, m.selection) > 0.09f);
+    // Each face: every polygon by its own share, so a big face and a small one both keep a fifth (an icosphere's
+    // triangles differ a little in size: each inner one is a fifth of ITS original, not of the smallest).
+    o.individual = true;
+    const InsetResult e = insetFaces(plane, mixed, o);
+    CHECK(clean(plane, e));
+    CHECK(!e.clamped && e.regions == 5);
+    CHECK(std::abs(minEdge(e.mesh, e.selection) - 0.5f * (1.0f - insetCollapseCap())) < 5e-3f);
+    // Every triangle of an icosphere by itself at the end of the slider: inner triangles a fifth of their size, same facing.
+    const Mesh sphere = makeIcosphere(1);
+    o.individual = true;
+    const InsetResult s = insetFaces(sphere, all(sphere), o);
+    CHECK(clean(sphere, s));
+    CHECK(!s.clamped && s.regions == sphere.triangleCount());
+    CHECK(minEdge(s.mesh, s.selection) > 0.15f * minEdge(sphere, all(sphere)));
+    for (uint32_t t : s.selection) {
+        CHECK(glm::dot(normal(s.mesh, t), normal(sphere, t)) > 0.99f);
+        const float scale = std::sqrt(glm::length(triangleArea(s.mesh, t)) / glm::length(triangleArea(sphere, t)));
+        CHECK(std::abs(scale - (1.0f - insetCollapseCap())) < 0.02f); // each a fifth of its own original
+    }
 }
 
 TEST(poly_inset_two_cells_touching_at_a_corner_get_two_vertices_there) {
@@ -679,6 +777,18 @@ TEST(poly_inset_speed_on_a_medium_mesh) {
     std::printf("  inset of the whole plane as one region: %.0f ms\n", ms2);
     CHECK(s.ok && s.newVertices == 1200);
     CHECK(ms2 < timeLimit(2500.0));
+    // The slider's path (a share of what the faces can take) bisects the collapse of every piece first.
+    o.relative = true;
+    o.thickness = 0.25f;
+    for (bool individual : {true, false}) {
+        o.individual = individual;
+        const auto t2 = std::chrono::steady_clock::now();
+        const InsetResult u = insetFaces(plane, all(plane), o);
+        const double ms3 = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t2).count();
+        std::printf("  the slider's share, %s: %.0f ms\n", individual ? "90k quads individually" : "one region", ms3);
+        CHECK(u.ok && !u.clamped && u.maxThickness > 0.0f);
+        CHECK(ms3 < timeLimit(4000.0));
+    }
 }
 
 // --- The Polygon mode op (core/PolyOps.h) ---
@@ -716,7 +826,8 @@ TEST(poly_inset_op_runs_through_poly_op_as_one_undo_step) {
     r = reg.execute(doc, "poly_op", {{"op", std::string("inset")}});
     CHECK(!r.ok);
     CHECK(r.message.find("Inset needs") != std::string::npos);
-    // One face, the defaults: 0.05 of the diagonal in, no depth; the inner face stays selected; one whole-mesh undo step.
+    // One face, the defaults: a quarter of the most the face can take in, no depth; the inner face stays selected; one
+    // whole-mesh undo step.
     reg.execute(doc, "poly_select", {{"op", std::string("face")}, {"index", double(frontFace(doc.mesh))}});
     CHECK(doc.polySelection.count() == 1);
     const size_t undos = doc.undo.undoCount();
@@ -729,7 +840,7 @@ TEST(poly_inset_op_runs_through_poly_op_as_one_undo_step) {
     CHECK(doc.undo.lastUndo() && doc.undo.lastUndo()->mesh); // the topology changed: a whole-mesh step
     CHECK(doc.polySelection.count() == 1);
     CHECK(issue(doc.mesh, MeshIssue::NonManifold) == 0 && issue(doc.mesh, MeshIssue::Holes) == 0);
-    const float expected = 0.05f * glm::length(makeCube(2).bounds().extent());
+    const float expected = 0.25f * insetCollapseCap() * 0.5f; // a 1 x 1 face collapses at 0.5
     float lo = 1e9f, hi = -1e9f; // the inset face (a 1 x 1 face of the side) spans 1 - 2 expected in x
     for (size_t v = verts; v < doc.mesh.vertexCount(); ++v) {
         lo = std::min(lo, doc.mesh.positions[v].x);
@@ -745,10 +856,15 @@ TEST(poly_inset_op_runs_through_poly_op_as_one_undo_step) {
     r = reg.execute(doc, "poly_op", {{"op", std::string("inset")}, {"thickness", 0.3}, {"depth", -0.02}});
     CHECK(!r.ok);
     CHECK(r.message.find("no border") != std::string::npos);
-    r = reg.execute(doc, "poly_op", {{"op", std::string("inset")}, {"thickness", 0.3}, {"depth", -0.02}, {"individual", true}});
+    r = reg.execute(doc, "poly_op", {{"op", std::string("inset")}, {"thickness", 1.0}, {"depth", -0.02}, {"individual", true}});
     CHECK(r.ok);
     CHECK(r.message.find("Inset 24 faces") != std::string::npos);
-    CHECK(r.message.find("held") != std::string::npos); // 0.3 of the diagonal is more than a 1 x 1 face allows
+    CHECK(r.message.find("held") == std::string::npos); // the end of the slider is the cap, nothing to hold
+    { // every inner face a fifth of its 1 x 1 original: no slivers
+        std::vector<uint32_t> inner;
+        for (uint32_t t = 0; t < tris; ++t) inner.push_back(t);
+        CHECK(std::abs(minEdge(doc.mesh, inner) - (1.0f - insetCollapseCap())) < 5e-3f);
+    }
     CHECK(doc.mesh.triangleCount() == tris + 24 * 8);
     CHECK(issue(doc.mesh, MeshIssue::Flipped) == 0 && issue(doc.mesh, MeshIssue::Holes) == 0);
     CHECK(doc.undo.undo(doc.mesh, doc.bvh));

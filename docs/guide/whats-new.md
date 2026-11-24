@@ -9,23 +9,20 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-24
-tagline: Scatter covers a Part with copies and Keep apart stops them overlapping, Dynamic keeps a painted Part's texture, and Trim keeps the far wall of thin Parts.
+tagline: Scatter covers a Part with copies and Keep apart stops them overlapping, Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth.
 highlight: Scatter covers a Part or its masked area with copies, and Keep apart stops them overlapping
-highlight: Sculpting with Dynamic on no longer erases the texture of a painted Part
 highlight: Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth
 highlight: Fill layer mask sliders keep the value you drag to
 title: Scatter
 line: Tool > Scatter covers a Part, or its masked area, with copies of a pebble, a cube, a hex or any other Part; Keep apart stops them overlapping.
 action: guide:scatter.md
-title: Dynamic keeps your paint
-line: Sculpt with Dynamic on over a painted Part and the texture stays, through Undo, Redo and reopening the file.
-action: guide:texture-painting.md
+title: Trim on thin Parts
+line: On a shell or a thin wing, Trim trims the side you see and leaves the wall behind it alone.
+action: guide:sculpting.md
 ```
 
 - **Scatter** (Tool > Scatter): copies of a pebble, a cube, a hex or any other Part over a Part or its masked area,
   each at a random size and turn. **Keep apart** slides them over the surface until no two overlap.
-- **Dynamic** keeps a painted Part's texture: on 0.13.11 to 0.13.13, sculpting with Dynamic on could erase the
-  paint. If you lost paint to this, we are sorry; it won't happen again.
 - **Trim** no longer tears holes in thin walls: on a shell or a thin wing it trims the side you see and stops short
   of the wall behind it, and along a thin edge it no longer saws the rim into spikes.
 - **Make Shell** rims come out smooth, with no spikes or ridged walls.

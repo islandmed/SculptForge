@@ -441,10 +441,6 @@ bool parseBenchArg(int argc, char** argv, int& i, BenchCommandLine& cl) {
     } else if (a == "--bench-dyntopo") {
         cl.options.dyntopo = true;
         cl.options.projectRoundTrip = false;
-    } else if (a == "--bench-dyntopo-uvs") {
-        cl.options.dyntopo = true;
-        cl.options.dyntopoUvs = true;
-        cl.options.projectRoundTrip = false;
     } else if (a == "--bench-micro") {
         cl.run = true;
         cl.options.micro = true;
@@ -526,21 +522,11 @@ std::string runDyntopoBenchmark(const BenchOptions& o, const BenchGpu* gpu) {
         doc.mesh.rebuildTopology();
         doc.bvh.build(doc.mesh);
         Mesh& m = doc.mesh;
-        if (o.dyntopoUvs) { // a painted Part: the upper and lower half are two UV islands (planar maps), with a 2K texture
-            m.uvs.resize(m.triangleCount() * 3);
-            for (size_t t = 0; t < m.triangleCount(); ++t) {
-                const glm::uvec3 tri = m.triangles[t];
-                const bool upper = m.positions[tri.x].y + m.positions[tri.y].y + m.positions[tri.z].y > 0.0f;
-                for (int c = 0; c < 3; ++c)
-                    m.uvs[t * 3 + size_t(c)] = glm::vec2(m.positions[tri[c]].x, m.positions[tri[c]].z) * 0.25f + glm::vec2(upper ? 0.25f : 0.75f, 0.5f);
-            }
-            m.texture = makeTexture(2048, 2048);
-        }
         const double nt = double(m.triangleCount()), nv = double(m.vertexCount());
         if (gpu && gpu->upload) gpu->upload(m);
         UploadOrder order;
         order.build(m);
-        md << "### " << millions(nt) << " triangles (" << millions(nv) << " vertices, no subdivision levels" << (o.dyntopoUvs ? ", UVs and a texture" : "") << ")\n\n";
+        md << "### " << millions(nt) << " triangles (" << millions(nv) << " vertices, no subdivision levels)\n\n";
         md << "| Stroke | remesh | kernel | normals | BVH | " << (gpu ? "GPU upload | " : "")
            << "**dab total** | triangles after | stroke end | undo | redo | undo step |\n";
         md << "|---|---:|---:|---:|---:|" << (gpu ? "---:|" : "") << "---:|---:|---:|---:|---:|---:|\n";

@@ -341,6 +341,7 @@ constexpr Entry kSpanish[] = {
     {"Pressure > Size", "Presión > Tamaño"},
     {"Pressure > Strength", "Presión > Fuerza"},
     {"Front faces only", "Solo caras frontales"},
+    {"Shift smooths the colour; Sculpt mode smooths the shape", "Shift suaviza el color; el modo Esculpir suaviza la forma"},
     {"Front faces only is ON", "Solo caras frontales está ACTIVADO"},
     {"Turn off", "Desactivar"},
     {"Brushes skip surfaces that face away from you: the hidden inside of a thin or Extract-made Part, and its far side. Smooth cannot reach spikes there. Untick Front faces only below to reach them.",
@@ -468,6 +469,9 @@ constexpr Entry kSpanish[] = {
     {"Load Lit Sphere", "Cargar Lit Sphere"},
     {"Material picker", "Selector de materiales"},
     {"Material swatches", "Muestras de material"},
+    {"Tick a channel to paint more than colour", "Marca un canal para pintar más que el color"},
+    {"Set the brush's colour, roughness and metallic at once, and make it paint those channels (adding roughness and metallic to the texture if it lacks them).", "Establece el color, la rugosidad y el metálico del pincel a la vez, y haz que pinte esos canales (añadiendo rugosidad y metálico a la textura si carece de ellos)."},
+    {"The greyed channels are not on the texture yet: tick one to add it and paint it. Tool > Texture Image > Material Channels lists them too, and is where a channel is taken off again.", "Los canales atenuados todavía no están en la textura: marca uno para añadirlo y pintarlo. Herramienta > Imagen de textura > Canales de material también los enumera, y es donde se vuelve a quitar un canal."},
 
     // --- Script ---
     {"Console", "Consola"},
@@ -3892,12 +3896,12 @@ constexpr Entry kSpanish[] = {
      "Los pinceles restan a la superficie. Mantén Alt para sumar durante un trazo."},
     {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
      "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
-     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles; UVs and the "
-     "painted texture are kept.",
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
+     "are dropped (Undo brings them back).",
      "Topología dinámica: los pinceles añaden triángulos donde necesitan detalle y los quitan donde no, para sacar "
      "cuernos o dedos sin estirar. Detalle fija lo pequeños que son los triángulos; acerca la vista o reduce el "
      "pincel para hacerlos más finos. Necesita una malla sin niveles de subdivisión; los quads bajo el pincel pasan "
-     "a triángulos; las UV y la textura pintada se conservan."},
+     "a triángulos y las UV se descartan (Deshacer las recupera)."},
     {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
      "sculpting.",
      "Sombreado Lit Sphere (por defecto): la esfera de material elegida o las luces de estudio, pensado para leer "
@@ -5728,6 +5732,35 @@ constexpr Entry kSpanish[] = {
      "Después Quad Remesh"},
     {"Use as sculpting base",
      "Usar como base de esculpido"},
+    // Generate 3D: the Result choice and the AI provenance tag (PanelGenerate3D.cpp, PanelParts.cpp, Ui.cpp)
+    {"AI: %s",
+     "IA: %s"},
+    {"Advanced",
+     "Avanzado"},
+    {"Generate a model and pick one: it stays exactly as generated.",
+     "Genera un modelo y elige uno: se queda exactamente como se generó."},
+    {"Rebuilds the picked model as a sculpting base. A pick does this on its own; the button does it again, after Undo or for a model picked as a reference.",
+     "Reconstruye el modelo elegido como base de esculpido. Al elegir ya se hace solo; el botón lo repite, tras Deshacer o para un modelo elegido como referencia."},
+    {"Reference",
+     "Referencia"},
+    {"High fidelity, exactly as generated",
+     "Alta fidelidad, exactamente como se generó"},
+    {"Moderate density, clean quads",
+     "Densidad moderada, cuadriláteros limpios"},
+    {"The AI gives the form; SculptForge gives the topology. Choose what the model you pick becomes:",
+     "La IA da la forma; SculptForge da la topología. Elige en qué se convierte el modelo que elijas:"},
+    {"The model exactly as the service made it, every triangle. Sculpt on a base of your own and Project Detail from it, or export it as it is.",
+     "El modelo exactamente como lo hizo el servicio, con todos sus triángulos. Esculpe sobre una base propia y usa Project Detail desde él, o expórtalo tal cual."},
+    {"Voxel Remesh, then Quad Remesh: about %d quads with one subdivision level, ready to divide and sculpt. The model as generated stays hidden as a Reference for Project Detail.",
+     "Remallado vóxel y después Quad Remesh: unos %d cuadriláteros con un nivel de subdivisión, listos para dividir y esculpir. El modelo tal como se generó queda oculto como Referencia para Project Detail."},
+    {"Voxel Remesh: one even, watertight surface of about %d triangles. The model as generated stays hidden as a Reference for Project Detail.",
+     "Remallado vóxel: una superficie uniforme y cerrada de unos %d triángulos. El modelo tal como se generó queda oculto como Referencia para Project Detail."},
+    {"generated",
+     "generado"},
+    {"reference",
+     "referencia"},
+    {"sculpting base",
+     "base de esculpido"},
     {"Voxel Remesh first makes one even, watertight surface. Quad Remesh then turns it into clean quads with one subdivision level holding the detail, ready to divide and sculpt. Off: the even triangle surface.",
      "Remallado vóxel crea primero una superficie uniforme y cerrada. Luego Quad Remesh la convierte en cuadriláteros limpios con un nivel de subdivisión que guarda el detalle, lista para dividir y esculpir. Desactivado: la superficie uniforme de triángulos."},
     {"Ready",

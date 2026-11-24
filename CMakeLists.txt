@@ -195,6 +195,7 @@ add_library(sculptforge_core STATIC
   src/core/SurfaceQuery.cpp
   src/core/QRemesh.cpp
   src/core/GeneratedRemesh.cpp
+  src/core/AiProvenance.cpp
   src/core/MeshPreview.cpp
   src/core/Backdrop.cpp
   src/core/QRemeshGuides.cpp
@@ -1340,6 +1341,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     endforeach()
     sculptforge_ui_test(split_view_1440 split_view --size 1440x900) # View > Split view: both panes, the divider, the chips
     sculptforge_ui_test(split_view_2880 split_view --size 2880x1800)
+    sculptforge_ui_test(color_material_entries_1440 color_material_entries --size 1440x900) # Color > Material rows before any channel is on
+    sculptforge_ui_test(color_material_entries_2880 color_material_entries --size 2880x1800)
     sculptforge_ui_test(fill_effect_slider_keeps_1440 fill_effect_slider_keeps --size 1440x900)
     sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
     sculptforge_ui_test(scatter_1440 scatter --size 1440x900) # Tool > Scatter, its live redo and Separate Parts over 500
@@ -1359,6 +1362,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(keep_strokes_editable_checkbox_2880 keep_strokes_editable_checkbox --size 2880x1800)
     sculptforge_ui_test(undo_no_replay_lod_1440 undo_no_replay_lod --size 1440x900) # gh#184: the view after undo + a stroke
     sculptforge_ui_test(undo_no_replay_lod_2880 undo_no_replay_lod --size 2880x1800)
+    sculptforge_ui_test(generate_candidates_1440 generate_candidates --size 1440x900) # Generate 3D's Result choice + the AI tag (0.14)
+    sculptforge_ui_test(generate_candidates_2880 generate_candidates --size 2880x1800)
     # (gh#184, the stroke thread: settings read once at startup, so these run cold with their environment set here)
     sculptforge_ui_test(async_stroke_undo_view_1440 async_stroke_undo_view --size 1440x900)
     sculptforge_ui_test(async_stroke_undo_view_2880 async_stroke_undo_view --size 2880x1800)
@@ -1393,12 +1398,6 @@ if(SCULPTFORGE_BUILD_TESTS)
       endif()
       sculptforge_ui_test(e2e_${name} ../e2e/${name})
       set_tests_properties(ui_e2e_${name} PROPERTIES LABELS "ui;e2e")
-    endforeach()
-    # The Dynamic-on-a-painted-Part scenario at the shots bar's sizes too (the stills of the paint surviving the stroke).
-    foreach(size 1440x900 2880x1800)
-      string(REGEX REPLACE "x.*" "" w ${size})
-      sculptforge_ui_test(e2e_dynamic_keeps_texture_${w} ../e2e/dynamic_keeps_texture --size ${size})
-      set_tests_properties(ui_e2e_dynamic_keeps_texture_${w} PROPERTIES LABELS "ui;e2e")
     endforeach()
     if(NOT WIN32 AND Python3_Interpreter_FOUND AND TARGET sf_fake_splat_tools)
       # Quitting the app, every way, with a trainer child running: nothing outside it is signalled (#183).

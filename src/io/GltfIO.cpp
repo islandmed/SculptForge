@@ -166,6 +166,9 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
             for (int i = 0; i < 16; ++i) m << (i ? "," : "") << glm::value_ptr(objects[oi].transform)[i];
             nodes << ",\"matrix\":[" << m.str() << "]";
         }
+        if (const AiProvenance& ai = objects[oi].ai; !ai.empty()) // the AI provenance tag (core/AiProvenance.h): extras, as glTF allows
+            nodes << ",\"extras\":{\"sculptforge_ai\":{\"provider\":\"" << jsonEscape(ai.provider) << "\",\"model\":\"" << jsonEscape(ai.model)
+                  << "\",\"date\":\"" << jsonEscape(ai.date) << "\",\"app\":\"" << jsonEscape(ai.app) << "\",\"role\":\"" << jsonEscape(ai.role) << "\"}}";
         nodes << "}";
     };
     for (size_t oi = 0; oi < objects.size(); ++oi) {

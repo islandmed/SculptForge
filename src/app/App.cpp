@@ -1940,7 +1940,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
     if (tierCardEvent(e)) return;     // the first-run tier card's buttons and keys (PanelHardwareTier.cpp)
-    if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !e.key.repeat && !ImGui::GetIO().WantTextInput &&
+    if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !e.key.repeat && !ui::TextFieldFocused() &&
         closeTopPopupOnEscape())
         return; // Esc closes the top context menu or combo list and nothing else sees it (#210; the Library's Esc would close it)
     pressSpent_ = closePopupsOnPressOutside(e); // a press outside open menus and popups acts, not only closes them (Shell.cpp)
@@ -2069,6 +2069,13 @@ void App::dispatchEvent(const SDL_Event& event) {
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
+        // While a text field has the keyboard (live: io's flags are a frame behind) the keys are the field's alone: ImGui
+        // has them, no shortcut, camera key or Space menu runs (Ctrl+A is Select All there, B types a B). The one key that
+        // still works is the console's own, which closes it while typing (the console's field only filters it a few frames in).
+        if (ui::TextFieldFocused()) {
+            const Action* act = io.WantTextInput ? nullptr : actions_.actionForKey(e.key.key, e.key.mod);
+            if (!(act && act->id == "ui.console" && layout_.consoleOpen && !e.key.repeat)) break;
+        }
         if (!isModifierKey(e.key.key) && std::none_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == e.key.key; }))
             keysDown_.emplace_back(e.key.key, e.key.mod);
         if (e.key.key == SDLK_SPACE && drag_ == Drag::Select && !io.WantTextInput) { // #214: slide the shape
@@ -3371,6 +3378,8 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
         p.stencil.stencil = &st.stencil;
         p.stencil.viewProj = cam.projection() * cam.view();
         p.stencil.canvasAspect = cr.h > 0.0f ? cr.w / cr.h : 1.0f;
+        if (!haveLastDab_ && p.stencil.weight(p.center) < 0.05f) // (a stroke that starts where the image is dark or off it)
+            status_ = "Stencil on: only its light parts (X removes it)";
     }
     p.strokeDelta = haveLastDab_ ? hit.position - lastDabHit_ : glm::vec3(0.0f);
     lastDabHit_ = hit.position;
@@ -5482,17 +5491,26 @@ void App::drawBrushCursor() {
             dl->AddCircle(c, rr, IM_COL32(255, 255, 255, 230), 64, 1.5f * uiScale_);
         }
     }
-    // Front faces only is easy to leave on and then wonder why Smooth and the other brushes skip the inner side of
-    // a thin Part (an Extract's inside, #bug-reports): say so by the cursor while it is on.
+    // Options that are easy to leave on and then wonder why Smooth and the other brushes do nothing (Front faces only skips the
+    // inner side of a thin Part, #bug-reports; Smooth face group borders only moves nothing on a mesh without borders and is saved
+    // with the scene; Shift in Paint mode smooths the colour, not the shape): say so by the cursor while it applies.
     frontFacesTagShown_ = frontFacesOnly_ && !masking && !sizeRingPreview_;
-    if (frontFacesTagShown_) {
-        const char* label = tr("Front faces only");
+    smoothBordersTagShown_ = smoothGroupBorders_ && shownBrush == BrushType::Smooth && !doc_.mesh.hasFaceGroups() && !masking &&
+                             !sizeRingPreview_;
+    smoothColourTagShown_ = paintMode_ && shownBrush == BrushType::Smooth && !masking && !sizeRingPreview_;
+    const char* tags[3] = {frontFacesTagShown_ ? tr("Front faces only") : nullptr,
+                           smoothBordersTagShown_ ? tr("Smooth face group borders only") : nullptr,
+                           smoothColourTagShown_ ? tr("Shift smooths the colour; Sculpt mode smooths the shape") : nullptr};
+    float tagY = c.y + r + 6.0f * uiScale_;
+    for (const char* label : tags) {
+        if (!label) continue;
         const ImVec2 size = ImGui::CalcTextSize(label);
         const float pad = 3.0f * uiScale_;
-        const ImVec2 at0(c.x - size.x * 0.5f, c.y + r + 6.0f * uiScale_);
+        const ImVec2 at0(c.x - size.x * 0.5f, tagY);
         dl->AddRectFilled(ImVec2(at0.x - pad, at0.y - pad), ImVec2(at0.x + size.x + pad, at0.y + size.y + pad),
                           IM_COL32(20, 20, 24, 190), 3.0f * uiScale_);
         dl->AddText(at0, IM_COL32(255, 210, 130, 255), label);
+        tagY += size.y + 2.0f * pad + 2.0f * uiScale_;
     }
     if (!sizeRingPreview_) drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp; the pop-up shows the size itself)
 }

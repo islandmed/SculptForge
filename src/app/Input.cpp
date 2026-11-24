@@ -513,7 +513,7 @@ void App::tickKeySequence(float dt) {
 // speed over kKeyNavEaseSeconds and back down after its release, moving the view by speed * time: smooth, the same
 // distance at any frame rate, and nothing to do with the OS's key repeat.
 void App::updateKeyNav(float dt) {
-    const bool blocked = ImGui::GetIO().WantCaptureKeyboard || !capturingShortcut_.empty() || shortcutConflictOpen();
+    const bool blocked = ImGui::GetIO().WantCaptureKeyboard || ui::TextFieldFocused() || !capturingShortcut_.empty() || shortcutConflictOpen();
     // (a hitch of a frame is not a jump of the view; and the frame a press wakes the idle loop with has waited since the
     // last one: it counts as one 60 Hz frame)
     dt = std::min(dt, keyNavMoving_ ? 0.1f : 1.0f / 60.0f);

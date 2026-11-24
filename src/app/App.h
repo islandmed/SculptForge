@@ -344,6 +344,8 @@ private:
     bool sizeRingPreviewIntensity_ = false;   // an Intensity pop-up's preview: a disc in the ring
     std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
+    bool smoothColourTagShown_ = false;  // the last cursor drawn carried the Shift-in-Paint-mode tag (smooth_colour_tag)
+    bool smoothBordersTagShown_ = false; // the last cursor drawn carried the "Smooth: face group borders only" tag (UI tests: smooth_borders_tag)
     bool frontFacesTagShown_ = false; // the last cursor drawn carried the "Front faces only" tag (UI tests: front_faces_tag)
     bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
     void updateTitle();
@@ -877,6 +879,7 @@ private:
     // side (a thumbnail and a silhouette each); the one picked becomes a Part; "Use as sculpting base" then remeshes it.
     struct GeneratedCandidate {
         ai::GeneratorResult result;
+        AiProvenance ai;            // host, model, date (core/AiProvenance.h): the Part it becomes carries it
         std::shared_ptr<Mesh> mesh; // as generated, in one piece, its flat background dropped; null: it failed (error)
         BackdropRemoval backdrop;
         std::string error;
@@ -891,6 +894,10 @@ private:
     int candidateCount_ = 3;     // free and local services
     int paidCandidateCount_ = 1; // services billed per generation (fal.ai, Meshy, Hyper3D): one unless asked
     bool keepOtherCandidates_ = false; // the ones not picked stay as hidden Parts
+    // Generate 3D's one choice (areas/ai.md #2): what the pick becomes. Base: remeshed at once (Voxel, then Quad Remesh
+    // unless turned off under Advanced), the model as generated kept hidden as the Reference. Reference: as generated.
+    enum class GeneratedResult { SculptingBase, Reference };
+    int generatedResult_ = int(GeneratedResult::SculptingBase);
     bool keepHighDetail_ = true;       // the sculpting base keeps the generated model as a hidden Part to Project Detail from
     uint32_t generatedPart_ = 0;       // the picked candidate's Part (0: none)
     uint32_t highDetailPart_ = 0;      // its hidden high-detail copy, once the sculpting base is made
