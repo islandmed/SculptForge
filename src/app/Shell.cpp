@@ -501,6 +501,7 @@ void App::registerShellActions() {
             paintMode_ = false;
             const std::string guides = leaveGuides(); // leaves the QRemesh Guides brush
             edgesMode_ = false;  // and Edges mode
+            if (polyMode_) setPolyMode(false); // and Polygon mode (PanelPolygon.cpp)
             maskBrush_.on = false;
             // and Draw Tube / Append > Insert, the same brush picked again too; the status says what was left
             if (leaveDrawModesStatus().empty() && !guides.empty()) status_ = "Left " + guides + ": brushes sculpt again";

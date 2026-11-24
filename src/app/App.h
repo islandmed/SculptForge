@@ -995,7 +995,7 @@ private:
     static bool isCircleShape(SelectShape s) { return s == SelectShape::Circle || s == SelectShape::CutCircle; }
     static SelectShape selectShapeOf(StrokeShape shape); // the stroke popup's shapes (StrokePopup.cpp)
     bool strokeShapeOn(StrokeShape shape) const;         // its latch is on with this shape
-    enum class SelectTarget { Hide, Mask };
+    enum class SelectTarget { Hide, Mask, Poly }; // Poly: Polygon mode's box select (PanelPolygon.cpp)
     void beginSelection(float x, float y, SelectTarget target, SelectShape shape);
     void selectionMove(float x, float y);
     void selectionMouseUp();
@@ -1790,7 +1790,37 @@ private:
         BrushType brush = BrushType::Standard;
         int recipe = -1;
         bool paint = false;
-    } guidesFrom_, edgesFrom_;
+    } guidesFrom_, edgesFrom_, polyFrom_;
+    // Polygon mode (PanelPolygon.cpp, core/PolyMode.h, core/PolyOps.h): clicks and box drags on the model select
+    // points, edges or faces of the active Part; the Transform gizmo moves the selection; the operations (Tool >
+    // Polygon) run on it. Picking a brush or Esc leaves it; the gizmo works inside it.
+    void registerPolygonUiActions();
+    void setPolyMode(bool on);
+    void syncPolyMode();                                   // leaves the mode when another brush was picked
+    bool polyMouseDown(float x, float y, SDL_Keymod mod);  // true if it took the click (a box drag starts)
+    void polySelectMouseUp();                              // the box, or the click's element
+    // The element of the picked kind under a window point, or false off the model.
+    bool polyElementAt(float x, float y, uint32_t& index, RayHit* hit = nullptr);
+    void polyRunOp(const std::string& id);                 // poly_op with the panel's slider values
+    void drawPolyOverlay();                                // the selection over the model, the hovered element, a preview
+    void drawPolygonContents();                            // Tool > Polygon
+    bool polyMode_ = false;
+    bool polyWireBefore_ = false;                          // the wireframe toggle as it was before the mode turned it on
+    int polyPressClicks_ = 1;                              // the click count at the press (a double-click selects a loop / group)
+    std::map<std::string, Args> polyOpValues_;             // per op: the panel's parameter values
+    struct PolyOverlay {
+        const void* topo = nullptr;
+        uint64_t revision = 0, visibleKey = 0;
+        PolyElement element = PolyElement::Faces;
+        std::vector<uint32_t> items;  // the selected elements of the picked kind (faces: one half per polygon)
+        std::vector<uint8_t> visible; // per item: facing the camera
+        uint32_t hovered = ~0u;
+        // A live preview of an op while its slider moves: the result mesh's selected faces' edges.
+        std::string previewOp;
+        Args previewArgs;
+        std::vector<std::pair<glm::vec3, glm::vec3>> previewEdges;
+        bool previewOk = false;
+    } polyOverlay_;
     std::vector<glm::vec3> guidePath_; // the curve being drawn (points on the surface)
     float guidePathLast_[2] = {0.0f, 0.0f};
     float curvesStrength_ = 50.0f;     // Guide Strength 0-100 (QRemeshOptions::guideStrength x 100)

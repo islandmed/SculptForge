@@ -1,0 +1,80 @@
+# Tool > Polygon > Edge loop (the first modelling op of Polygon mode): Edges, one clicked edge, Ring shows the ring the
+# op cuts, Edge loop inserts a loop across it (one undo step, the new loop selected), Loops + Position typed into the
+# sliders insert three loops towards one side, Ctrl+Z takes each back; the status line says what was cut.
+run new_sphere subdivisions=1
+run part_append type=cube name=Box
+run part_delete index=0
+# A coarse quad cage (the dense block is sculpting resolution): Quad Remesh keeps the six sides as face groups.
+run qremesh target=600 detect_edges=true keep_groups=true adaptive=0 quality=false
+wait_idle 60
+orbit 120 -60
+key f
+zoom 0.7
+click "Polygon##tool.polygon"
+expect_value poly_ops >= 3
+click "Polygon/Polygon mode"
+expect_value poly_mode == 1
+click "Polygon/Edges"
+expect_value poly_element == 1
+remember triangles tris0
+remember vertices verts0
+remember undo_steps base
+
+# One edge, then its ring: it goes round the cage.
+click_part Box 0.5 0.5 1
+expect_value poly_selected == 1
+click "Polygon/Ring"
+expect_value poly_selected > 2
+remember poly_selected ring
+shot poly-edge-loop-ring
+
+# Edge loop: one loop of as many edges as the ring, selected afterwards, one undo step; the cage gains a vertex per ring edge.
+click "Polygon/Edge loop"
+expect_status "Edge loop: 1 loop of"
+expect_value poly_element == 1
+expect_value poly_selected == $ring
+expect_value vertices > $verts0
+expect_value triangles > $tris0
+expect_value undo_steps > $base
+shot poly-edge-loop-one
+ui_scale 200
+key f
+zoom 0.6
+shot poly-edge-loop-one-200
+ui_scale 100
+key f
+zoom 0.7
+key ctrl+z
+expect_value vertices == $verts0
+expect_value triangles == $tris0
+expect_value undo_steps == $base
+
+# Three loops towards one side: Loops and Position typed into the op's sliders, then the button.
+click_part Box 0.5 0.5 1
+click "Polygon/Ring"
+expect_value poly_selected == $ring
+double_click "##count"
+type_here 3
+key enter
+double_click "##position"
+type_here 0.2
+key enter
+# (type_here's select-all also fires Mask All, Ctrl+A, one undo step of its own: counted from here)
+remember undo_steps typed
+click "Polygon/Edge loop"
+expect_status "Edge loop: 3 loops of"
+expect_value poly_selected > $ring
+expect_value undo_steps > $typed
+shot poly-edge-loop-three
+key ctrl+z
+expect_value vertices == $verts0
+expect_value undo_steps == $typed
+
+# The command form, with the loop through a given edge, and leaving the mode.
+run poly_select op=edge index=0
+run poly_op op=edge_loop count=2 position=0.5
+expect_status "Edge loop: 2 loops of"
+key ctrl+z
+expect_value vertices == $verts0
+key escape
+expect_value poly_mode == 0

@@ -107,6 +107,8 @@ void App::selectionMouseUp() {
         cutMouseUp(); // PanelCut.cpp
     else if (selectTarget_ == SelectTarget::Hide)
         facegroupMouseUp();
+    else if (selectTarget_ == SelectTarget::Poly)
+        polySelectMouseUp(); // PanelPolygon.cpp
     else
         maskSelectMouseUp();
     selectPath_.clear();
@@ -159,6 +161,10 @@ void App::drawSelectionOverlay() {
     if (selectTarget_ == SelectTarget::Hide) {
         line = alt ? IM_COL32(255, 110, 110, 230) : IM_COL32(120, 230, 140, 230);
         fill = alt ? IM_COL32(255, 110, 110, 40) : IM_COL32(120, 230, 140, 30);
+    } else if (selectTarget_ == SelectTarget::Poly) { // Polygon mode: orange like its selection, red while Ctrl removes
+        const bool ctrl = (inputMods() & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0;
+        line = ctrl ? IM_COL32(255, 96, 80, 230) : IM_COL32(255, 168, 48, 230);
+        fill = ctrl ? IM_COL32(255, 96, 80, 30) : IM_COL32(255, 168, 48, 30);
     } else {
         line = alt ? IM_COL32(120, 200, 255, 230) : IM_COL32(230, 230, 230, 230);
         fill = alt ? IM_COL32(120, 200, 255, 35) : IM_COL32(0, 0, 0, 70);

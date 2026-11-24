@@ -250,7 +250,12 @@ void App::registerGizmoActions() {
 
 void App::setGizmoMode(GizmoMode mode) {
     if (drag_ == Drag::Gizmo) return;
-    const std::string left = leaveDrawModes(); // Draw / Move / Scale / Rotate leave Draw Tube and Append > Insert
+    std::string left = leaveDrawModes(); // Draw / Move / Scale / Rotate leave Draw Tube and Append > Insert
+    // Polygon mode stays on for Move / Scale / Rotate (they move its selection); Draw is back to sculpting (PanelPolygon.cpp).
+    if (mode == GizmoMode::Off && polyMode_) {
+        setPolyMode(false);
+        left += left.empty() ? "Polygon mode" : " and Polygon mode";
+    }
     gizmo_.mode = mode;
     gizmo_.snapNext = false;
     gizmo_.hover = GizmoHandle::None;
@@ -290,6 +295,9 @@ void App::updateGizmoPivot() {
     if (gizmo_.all || gizmo_.folder)
         for (int i = 0; i < doc_.partCount(); ++i)
             key = key * 1099511628211ull ^ doc_.partUndo(i).revision() ^ (doc_.parts[size_t(i)].visible ? 1u : 0u);
+    // Polygon mode: the selection is what moves (PanelPolygon.cpp), so a new selection is a new centre.
+    const bool bySelection = polyMode_ && !doc_.polySelection.empty();
+    if (bySelection) key = key * 1099511628211ull ^ (doc_.polySelection.revision * 2654435761ull + 17u);
     if (key == gizmo_.centreKey) return;
     gizmo_.centreKey = key;
     // A new mask (or another Part) means a new part to move: follow its centre again.
@@ -298,16 +306,17 @@ void App::updateGizmoPivot() {
     double sum = 0.0;
     for (size_t v = 0; v < mask.size(); v += 1 + mask.size() / 65536) sum += double(mask[v]) * double(v % 97 + 1);
     maskKey = maskKey * 1000003u ^ uint64_t(sum * 1024.0) ^ uint64_t(mask.size()) << 40;
+    if (bySelection) maskKey ^= doc_.polySelection.revision * 0x9e3779b97f4a7c15ull;
     if (maskKey != gizmo_.maskKey) {
         gizmo_.maskKey = maskKey;
         gizmo_.pivotPlaced = false;
     }
     if (gizmo_.pivotPlaced) return;
     AABB box;
-    for (int i : gizmoTargets()) {
+    for (int i : bySelection ? std::vector<int>{doc_.activePart} : gizmoTargets()) { // (the selection: the active Part only)
         const Mesh& m = doc_.partMesh(i);
         if (m.vertexCount() == 0) continue;
-        const AABB local = transformBounds(m, transformWeights(m, gizmo_.useMask, 0.0f));
+        const AABB local = transformBounds(m, bySelection ? doc_.polySelection.weights(m) : transformWeights(m, gizmo_.useMask, 0.0f));
         const glm::mat4& t = doc_.parts[size_t(i)].transform; // (a linked copy's place in the scene)
         for (int c = 0; c < 8 && local.valid(); ++c)
             box.expand(glm::vec3(t * glm::vec4(c & 1 ? local.max.x : local.min.x, c & 2 ? local.max.y : local.min.y,
@@ -554,6 +563,11 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
         return true;
     }
 
+    // Polygon mode moves the selection and nothing else: with nothing selected a drag on a handle says so (PanelPolygon.cpp).
+    if (polyMode_ && !alt && doc_.polySelection.empty()) {
+        status_ = "Nothing selected: pick points, edges or faces first (click, Shift adds, drag a box), then move them";
+        return true;
+    }
     gizmo_.handle = h;
     gizmo_.pivotOnly = alt;
     gizmo_.startPivot = gizmo_.pivot;
@@ -611,10 +625,12 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
     gizmo_.wholeStart.clear();
     if (!gizmo_.pivotOnly) {
         std::vector<const PartData*> meshes; // a mesh linked Parts share is edited once
-        for (int i : gizmoTargets()) {
+        // Polygon mode: the selected points / edges / faces of the active Part move, nothing else (PanelPolygon.cpp).
+        const bool bySelection = polyMode_ && !doc_.polySelection.empty();
+        for (int i : bySelection ? std::vector<int>{doc_.activePart} : gizmoTargets()) {
             Mesh& m = doc_.partMesh(i);
             const Part& s = doc_.parts[size_t(i)];
-            if (partMovesWhole(doc_, i, gizmo_.useMask)) { // a linked copy: its transform (#94)
+            if (!bySelection && partMovesWhole(doc_, i, gizmo_.useMask)) { // a linked copy: its transform (#94)
                 if (m.vertexCount() == 0) continue;
                 gizmo_.wholeParts.push_back(i);
                 gizmo_.wholeStart.push_back(s.transform);
@@ -627,7 +643,9 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
             const int layer = s.data == doc_.activePartInfo().data ? doc_.activeLayer : -1;
             TransformSession session;
             const glm::vec3 pivot = s.moved() ? glm::vec3(glm::inverse(s.transform) * glm::vec4(gizmo_.pivot, 1.0f)) : gizmo_.pivot;
-            if (!session.begin(m, transformWeights(m, gizmo_.useMask, gizmo_.falloff), symmetry_, pivot, layer)) continue;
+            if (!session.begin(m, bySelection ? doc_.polySelection.weights(m) : transformWeights(m, gizmo_.useMask, gizmo_.falloff),
+                               bySelection ? Symmetry{false, false, false} : symmetry_, pivot, layer))
+                continue;
             if (i == doc_.activePart && figurePoseEditing(doc_)) session.keepOp(); // a Pose Mesh move (core/FigurePose.h)
             gizmo_.parts.push_back(i);
             gizmo_.sessions.push_back(std::move(session));
@@ -635,6 +653,7 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
         if (gizmo_.sessions.empty() && gizmo_.wholeParts.empty()) {
             status_ = TransformSession::layerWeightZero(doc_.mesh, doc_.activeLayer)
                           ? "Active layer weight is 0 - raise it to transform into the layer"
+                      : bySelection ? "Nothing to move: the selected points are hidden"
                       : gizmo_.useMask && doc_.mesh.hasMask() ? "Nothing to move: everything is masked (Ctrl+click the "
                                                               "background to invert the mask)"
                                                             : "Nothing to move: the Part is hidden or empty";
@@ -849,6 +868,7 @@ void App::gizmoRelease() {
     if (!sym.empty() && doc_.mesh.hasMask() && gizmo_.useMask) args["symmetry"] = sym;
     if (gizmo_.all) args["all"] = true;
     else if (gizmo_.folder && doc_.activePartInfo().folder) args["folder"] = true;
+    if (polyMode_ && !doc_.polySelection.empty()) args["selection"] = true; // Polygon mode moved the selection
     status_ = std::string(label) + " " + readout + ": " + vertexCountText(moved);
     consoleEcho("transform", args, {true, status_});
     updateTitle();

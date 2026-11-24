@@ -64,6 +64,7 @@
 //   brush_size PX            set Size (the brush radius, screen pixels)
 //   reset_sliders            Size, Intensity, Colour intensity and Falloff back to their defaults
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
+//   hide_ui 0|1              hide (1) or show (0) every panel and bar: the viewport alone, for clips and beauty shots
 //   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
@@ -137,6 +138,9 @@
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
 //                            volume with its open borders capped),
+//                            poly_mode (Tool > Polygon on), poly_element (0 Points, 1 Edges, 2 Faces), poly_selected / poly_total
+//                            (of that kind), poly_shown (drawn facing the camera), poly_hovered (the element under the cursor, -1 none),
+//                            poly_ops (operations in the registry), poly_preview (1 while an op's live preview is drawn),
 //                            edited_parts (Parts with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
@@ -441,6 +445,7 @@
 #include "core/ListSort.h"
 #include "core/Micro.h"
 #include "core/LitSphere.h"
+#include "core/PolyOps.h"
 #include "core/Multires.h"
 #include "core/MicroTiles.h"
 #include "core/PerfTrace.h"
@@ -844,6 +849,19 @@ double Demo::query(const std::string& name, bool& known) const {
         for (uint8_t v : app_.edgeOverlay_.visible) n += v;
         return double(n);
     }
+    // Polygon mode (Tool > Polygon, PanelPolygon.cpp, core/PolyMode.h)
+    if (name == "poly_mode") return app_.polyMode_ ? 1.0 : 0.0;
+    if (name == "poly_element") return double(int(app_.doc_.polySelection.element)); // 0 Points, 1 Edges, 2 Faces
+    if (name == "poly_selected") return double(app_.doc_.polySelection.count());
+    if (name == "poly_total") return app_.doc_.polySelection.topo ? double(app_.doc_.polySelection.total(m)) : 0.0;
+    if (name == "poly_shown") {
+        size_t n = 0;
+        for (uint8_t v : app_.polyOverlay_.visible) n += v;
+        return double(n);
+    }
+    if (name == "poly_hovered") return app_.polyOverlay_.hovered == ~0u ? -1.0 : double(app_.polyOverlay_.hovered);
+    if (name == "poly_ops") return double(PolyOpRegistry::instance().all().size());
+    if (name == "poly_preview") return app_.polyOverlay_.previewOk ? 1.0 : 0.0;
     if (name == "forgespheres") return double(m.forgespheres.size());
     if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
     if (name == "tube_points") return double(m.tube.points.size()); // the active Tube Part's (Tube, PanelTube.cpp)
@@ -2129,7 +2147,7 @@ enum class StepVerb { None,
     Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
     AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
-    Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
+    Orbit, Camera, Zoom, HideUi, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
     GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
@@ -2180,7 +2198,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"release", StepVerb::Release},
         {"orbit", StepVerb::Orbit},
         {"camera", StepVerb::Camera},
-        {"zoom", StepVerb::Zoom},
+        {"zoom", StepVerb::Zoom}, {"hide_ui", StepVerb::HideUi},
         {"camera_distance", StepVerb::CameraDistance},
         {"brush_size", StepVerb::BrushSize},
         {"reset_sliders", StepVerb::ResetSliders},
@@ -2530,7 +2548,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         auto text = std::make_shared<std::string>(restOf(lineText_, 1));
         steps_.push_back([this, text](float) {
-            testKeyNow(SDLK_A, SDL_KMOD_LCTRL);
+            // Select what is there first, except in a slider's typed field, which opens with its number selected
+            // (and where the app, not the field, would take Ctrl+A: Mask All).
+            if (GImGui->TempInputId == 0 || GImGui->TempInputId != GImGui->ActiveId) testKeyNow(SDLK_A, SDL_KMOD_LCTRL);
             SDL_Event e{};
             e.type = SDL_EVENT_TEXT_INPUT;
             e.text.windowID = SDL_GetWindowID(app_.window_);
@@ -3137,12 +3157,32 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         const float dx = num(2, 0), dy = num(3, 0), seconds = w.size() > 4 && w[4] != "keep" ? num(4, 0.4f) : 0.4f;
         auto from = std::make_shared<ImVec2>();
         steps_.push_back([this, line, label, from](float t) {
-            if (findItem(label, *from)) {
-                mouseMotion(from->x, from->y);
-                return true;
+            // Find the item; scrolled out of its panel, wheel the panel towards it first, as click does (a slider
+            // below the fold of a long section: Tool > Polygon with every op's settings).
+            bool visible = false;
+            if (!findItem(label, *from, &visible)) {
+                if (t > 3.0f) fail(line, notFound(label));
+                return t > 3.0f;
             }
-            if (t > 3.0f) fail(line, notFound(label));
-            return t > 3.0f;
+            if (!visible) {
+                ImVec4 clip;
+                findItem(label, *from, &visible, &clip);
+                if (clip.z > clip.x && clip.w > clip.y && t <= 2.0f) {
+                    mouseMotion((clip.x + clip.z) * 0.5f, (clip.y + clip.w) * 0.5f);
+                    SDL_Event e{};
+                    e.type = SDL_EVENT_MOUSE_WHEEL;
+                    e.wheel.windowID = SDL_GetWindowID(app_.window_);
+                    e.wheel.y = from->y > clip.w ? -1.0f : 1.0f;
+                    e.wheel.mouse_x = mouse_.x;
+                    e.wheel.mouse_y = mouse_.y;
+                    app_.handleEvent(e);
+                    return false;
+                }
+                if (t > 1.0f) fail(line, "\"" + label + "\" is not visible (off screen or scrolled out of view)");
+                return t > 1.0f;
+            }
+            mouseMotion(from->x, from->y);
+            return true;
         });
         steps_.push_back([this, from, dx, dy, seconds, keep](float t) {
             if (t == 0.0f) return false; // a frame of hover first
@@ -3353,6 +3393,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     case StepVerb::Zoom: { // zoom FACTOR: the camera's distance divided by FACTOR
         if (!need(1)) return false;
         run([this, f = num(1, 1)] { app_.camera_.distance /= std::max(float(f), 1e-3f); });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::HideUi: { // hide_ui 0|1: the viewport alone (clips, beauty shots)
+        if (!need(1)) return false;
+        run([this, on = num(1, 1) != 0.0] { app_.hideUi_ = on; });
         wait(0.1f);
         break;
     }

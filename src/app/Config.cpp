@@ -875,6 +875,7 @@ void App::initActions() {
                 paintMode_ = false;
                 guidesMode_ = false; // leaves the QRemesh Guides brush
                 edgesMode_ = false;  // and Edges mode
+                if (polyMode_) setPolyMode(false); // and Polygon mode (PanelPolygon.cpp)
                 maskBrush_.on = false;
                 leaveDrawModesStatus(); // and Draw Tube / Append > Insert
             },
@@ -1035,6 +1036,7 @@ void App::initActions() {
     registerGarmentActions();   // Tool > Garments, the Pattern window (PanelGarments.cpp)
     registerRetopoUiActions(); // Geometry > QRemesh, Part > ProjectAll (PanelRetopo.cpp)
     registerEdgeUiActions();   // Geometry > Edges (PanelEdges.cpp)
+    registerPolygonUiActions(); // Tool > Polygon (PanelPolygon.cpp)
     registerForgeSphereUiActions(); // Tool > Forge Spheres (PanelForge Spheres.cpp)
     registerTubeUiActions();        // Tool > Tube (PanelTube.cpp)
     registerSplatTrainUi();    // Splats > Train from capture (PanelSplatTrain.cpp)
