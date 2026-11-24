@@ -14,9 +14,10 @@ click "Floor grid##render"
 expect "Floor grid at Y=0##render"
 shot view-menu
 key escape
+# (The camera stays aimed at the origin from above, a little further back: both the grid and the moved model in view.)
 run transform translate=0,-3,0 masked=false
-key f
 camera 30 -20
+camera_distance 11
 wait 0.3
 expect_value floor_grid_drawn == 1
 expect_value floor_height < -3.9
@@ -34,14 +35,10 @@ shot fixed-below
 
 # Moving the model does not move the grid any more.
 run transform translate=0,5,0 masked=false
-key f
-camera 30 -20
 wait 0.3
 expect_value floor_height == 0
 shot fixed-above
 key ctrl+z
-key f
-camera 30 -20
 wait 0.3
 expect_value floor_height == 0
 
