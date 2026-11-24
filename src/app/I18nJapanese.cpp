@@ -1126,6 +1126,23 @@ constexpr Entry kJapanese[] = {
      "左面ビュー"},
     {"Right view",
      "右面ビュー"},
+    // The orientation widget's sides (Draw > Camera > Corner gizmo; Top, Bottom, Front and Rear have entries elsewhere)
+    {"Right",
+     "右"},
+    {"Left",
+     "左"},
+    {"Corner gizmo",
+     "コーナーギズモ"},
+    {"Orientation",
+     "方向"},
+    {"Corner gizmo: the X / Y / Z axes in the corner of the canvas. Click an end to look from that side, drag the disc "
+     "to orbit.",
+     "コーナーギズモ: キャンバスの隅の X / Y / Z 軸。端をクリックするとその側から見ます。ディスクをドラッグすると回転します。"},
+    {"Corner gizmo: the orientation widget, a small cube that turns with the view. Click a face, edge or corner to turn "
+     "the camera there with a short move, drag it to orbit, double-click to frame the model.",
+     "コーナーギズモ: 方向ウィジェット。ビューと一緒に回る小さな立方体です。面・辺・角をクリックするとカメラが短い動きでそこへ向きます。ドラッグで回転、ダブルクリックでモデルをフレームに収めます。"},
+    {"Corner gizmo: nothing in the corner of the canvas.",
+     "コーナーギズモ: キャンバスの隅に何も表示しません。"},
     {"Top view",
      "上面ビュー"},
     {"Bottom view",

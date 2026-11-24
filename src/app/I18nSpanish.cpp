@@ -715,6 +715,21 @@ constexpr Entry kSpanish[] = {
     {"Back view", "Vista trasera"},
     {"Left view", "Vista izquierda"},
     {"Right view", "Vista derecha"},
+    // The orientation widget's sides (Draw > Camera > Corner gizmo; Top, Bottom, Front and Rear have entries elsewhere)
+    {"Right", "Derecha"},
+    {"Left", "Izquierda"},
+    {"Corner gizmo", "Gizmo de la esquina"},
+    {"Orientation", "Orientación"},
+    {"Corner gizmo: the X / Y / Z axes in the corner of the canvas. Click an end to look from that side, drag the disc "
+     "to orbit.",
+     "Gizmo de la esquina: los ejes X / Y / Z en la esquina del lienzo. Haz clic en un extremo para mirar desde ese "
+     "lado, arrastra el disco para orbitar."},
+    {"Corner gizmo: the orientation widget, a small cube that turns with the view. Click a face, edge or corner to turn "
+     "the camera there with a short move, drag it to orbit, double-click to frame the model.",
+     "Gizmo de la esquina: el widget de orientación, un pequeño cubo que gira con la vista. Haz clic en una cara, "
+     "arista o esquina para girar la cámara hasta allí con un movimiento corto, arrástralo para orbitar, doble clic "
+     "para encuadrar el modelo."},
+    {"Corner gizmo: nothing in the corner of the canvas.", "Gizmo de la esquina: nada en la esquina del lienzo."},
     {"Top view", "Vista superior"},
     {"Bottom view", "Vista inferior"},
     {"Opposite side", "Lado opuesto"},

@@ -517,9 +517,10 @@ void App::drawPalette_Draw() {
             std::snprintf(label, sizeof label, "%.0f##focal%d", presets[i], i);
             if (ImGui::Button(label, ImVec2(w, 0))) camera_.fovY = toFov(presets[i]);
         }
-        ui::Checkbox("Axes##draw.axes", &uiPrefs_.showAxes);
-        ui::HelpText("Axes", nullptr, "Show the X / Y / Z directions in the corner of the canvas.", "Draw > Camera");
-        ImGui::SameLine();
+        // The corner gizmo (CornerGizmo.cpp): the X / Y / Z axes (the Classic layout's default), the orientation
+        // widget (the SculptForge layout's), or hidden. The View Figure sits under either.
+        hint(*this, "Corner gizmo");
+        segmented(*this, {"view.corner_axes", "view.corner_widget", "view.corner_off"});
         ui::Checkbox("View Figure##draw.view_figure", &uiPrefs_.showViewFigure);
         ui::HelpText("View Figure", nullptr,
                      "Show a small shaded head in the corner of the canvas that turns with the view. Click it to look "

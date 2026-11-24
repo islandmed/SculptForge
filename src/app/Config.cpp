@@ -139,6 +139,7 @@ Json toJson(const UiPrefs& p) {
     j.set("showAxes", p.showAxes);
     j.set("axisGizmoSize", std::string(p.axisGizmoSize == 0 ? "small" : p.axisGizmoSize == 2 ? "large" : "medium"));
     j.set("showViewFigure", p.showViewFigure);
+    if (p.cornerWidget >= 0) j.set("cornerGizmo", std::string(p.cornerWidget == 1 ? "orientation" : "axes"));
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     if (p.newerMenuRows >= 0) j.set("newerMenuRows", p.newerMenuRows != 0); // (unset = by layout)
     lookToJson(p, j);
@@ -262,6 +263,7 @@ void fromJson(const Json& j, UiPrefs& p) {
         p.axisGizmoSize = size == "small" ? 0 : size == "large" ? 2 : 1;
     }
     p.showViewFigure = j["showViewFigure"].asBool(p.showViewFigure);
+    if (j["cornerGizmo"].isString()) p.cornerWidget = j["cornerGizmo"].asString() == "orientation" ? 1 : 0;
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     if (j["newerMenuRows"].isBool()) p.newerMenuRows = j["newerMenuRows"].asBool() ? 1 : 0;
     // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the Classic layout,

@@ -317,6 +317,27 @@ void App::registerViewActions() {
             "the UI scale.",
             [this, i] { uiPrefs_.axisGizmoSize = i; },
             [this, i] { return uiPrefs_.axisGizmoSize == i; });
+    // Draw > Camera > Corner gizmo: the X / Y / Z axes, the orientation widget (a cube: click a face, edge or corner
+    // to turn there, drag to orbit, double-click to frame; OrientationWidget.h) or nothing. The default follows the
+    // layout: the Classic layout keeps the axes, the SculptForge layout shows the widget.
+    add("view.corner_axes", "Axes", "",
+        "Corner gizmo: the X / Y / Z axes in the corner of the canvas. Click an end to look from that side, drag the "
+        "disc to orbit.",
+        [this] {
+            uiPrefs_.showAxes = true;
+            uiPrefs_.cornerWidget = 0;
+        },
+        [this] { return uiPrefs_.showAxes && !orientationWidgetOn(); });
+    add("view.corner_widget", "Orientation", "",
+        "Corner gizmo: the orientation widget, a small cube that turns with the view. Click a face, edge or corner to "
+        "turn the camera there with a short move, drag it to orbit, double-click to frame the model.",
+        [this] {
+            uiPrefs_.showAxes = true;
+            uiPrefs_.cornerWidget = 1;
+        },
+        [this] { return uiPrefs_.showAxes && orientationWidgetOn(); });
+    add("view.corner_off", "Hidden", "", "Corner gizmo: nothing in the corner of the canvas.",
+        [this] { uiPrefs_.showAxes = false; }, [this] { return !uiPrefs_.showAxes; });
     add("view.ortho", "Orthographic", "Numpad 5",
         "Switch between a perspective and an orthographic view (no foreshortening: sizes don't shrink with depth).",
         [this] {
@@ -460,6 +481,7 @@ void App::applyInputStyle() {
 // ---------------------------------------------------------------------------
 
 void App::viewAxis(float yawDegrees, float pitchDegrees) {
+    cancelCameraMove(); // (the orientation widget's eased turn, if one runs: this view wins)
     camera_.yaw = glm::radians(yawDegrees);
     camera_.pitch = glm::radians(pitchDegrees);
     camera_.roll = 0.0f;

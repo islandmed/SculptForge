@@ -1076,6 +1076,7 @@ bool App::focusKeepsDrawing(double now) const {
 
 bool App::wantsFrames(double now) const {
     return now < activeUntil_ || focusKeepsDrawing(now) || drag_ != Drag::None || ui::HoverAnimating() || // a hover ring easing in or out
+           cameraMoving() || // the orientation widget's eased turn
            doc_.sculptor.strokeActive() ||
            proofRunning() || takeRunning() || // (not a keep-alive from the last frame: building a scene takes longer than any timeout)
            !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
@@ -2205,6 +2206,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         return;
     }
     if (strokeFinishing_) endStroke(); // (a stroke ending on this thread)
+    cancelCameraMove(); // the orientation widget's eased turn ends where it is: a stroke or drag never runs under a moving view
     mouseX_ = x;
     mouseY_ = y;
     const SDL_Keymod mod = inputMods();
@@ -2269,7 +2271,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     if (blenderStyle() && blenderNavigationDown(button)) return; // middle / Alt+left / right drags navigate
     if (mayaStyle() && mayaNavigationDown(button)) return;       // Alt+left / middle / right: orbit / pan / zoom
     if (button == SDL_BUTTON_LEFT) {
-        if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
+        if (cornerGizmoMouseDown(x, y)) return; // the axis gizmo's ends snap to a side view (#43); the orientation widget (CornerGizmo.cpp)
         if (forgesphereMouseDown(x, y, mod)) return; // a Forge Sphere Part takes clicks on it (PanelForge Spheres.cpp)
         if (tubeMouseDown(x, y, mod)) return;        // Draw Tube, a Tube Part's points (PanelTube.cpp)
         if (referenceMouseDown(x, y, nav)) return; // Adjust Reference: move, scale it (ReferenceImages.cpp)
@@ -2415,7 +2417,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     // carried twice (#216). (A pointer that never moves, a driver's click only: the pen's samples are the drag.) The pen
     // is not gone for that pointer (it would let go of the side buttons held), the drag goes by the pointer's position,
     // not SDL's steps (which the pen's own mouse events may have moved on), and at the pen's view speed.
-    const bool viewDrag = drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom || drag_ == Drag::Roll;
+    const bool viewDrag = drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom || drag_ == Drag::Roll || drag_ == Drag::NavWidget;
     const bool pointerDrag = viewDrag && !dragFromPen_;
     const bool withPen = !fromPen && pointerDrag && penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
     if (!fromPen && penInProximity_ && !withPen) penLeft();
@@ -2491,6 +2493,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
     case Drag::Orbit: orbitBy(x, y, dx, dy, !(fromPen || withPen)); break;
+    case Drag::NavWidget: navWidgetMove(x, y, dx, dy, fromPen || withPen); break; // the orientation widget: a click until it moves
     case Drag::Roll:
         if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
         else rollBy(x, y, dx, dy);
@@ -2709,6 +2712,7 @@ void App::onMouseUp() {
     orbitPivotPicked_ = false;
     orbitPivot_.reset();
     panFromAlt_ = false;
+    if (drag_ == Drag::NavWidget) navWidgetRelease(); // the orientation widget: a click (turn there) or a double-click (frame)
     if (drag_ == Drag::Select) selectionMouseUp();
     if (drag_ == Drag::QuickRemesh) quickRemesh(RemeshTrigger::Quick);
     if (drag_ == Drag::Insert) {
@@ -3812,6 +3816,7 @@ void App::setLayerWeight(int index, float weight) {
 
 void App::animateLayers(float dt) {
     animateFaceTake(dt); // (PanelFace.cpp)
+    animateCameraMove(dt); // the orientation widget's eased turn (CornerGizmo.cpp)
     if (playingLayer_ < 0 || playingLayer_ >= int(doc_.mesh.layers.size())) {
         playingLayer_ = -1;
         return;
@@ -3940,7 +3945,7 @@ void App::drawUi() {
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     drawGradientOverlay();   // Line Gradient: the line and its end handles (LineGradient.cpp)
-    if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
+    if (uiPrefs_.showAxes) drawCornerGizmo(); // X / Y / Z or the orientation widget in the canvas corner (#31, CornerGizmo.cpp)
     if (uiPrefs_.showViewFigure) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
     drawViewportToast();
@@ -5228,10 +5233,11 @@ bool App::axisGizmoMouseDown(float x, float y) {
     // the side view nearest the current one.
     const auto ends = axisGizmoLayout();
     const float unit = axisGizmoUnit();
-    int hit = uiPrefs_.showAxes ? axisGizmoSnapEnd(ends, axisGizmoHit(ends, x, y, kAxisGizmoHitRadius * unit)) : -1;
+    const bool axes = uiPrefs_.showAxes && !orientationWidgetOn(); // (the orientation widget takes the disc's presses itself)
+    int hit = axes ? axisGizmoSnapEnd(ends, axisGizmoHit(ends, x, y, kAxisGizmoHitRadius * unit)) : -1;
     // Only a plain press: Alt / Ctrl / Shift drags starting there keep their meaning (pan, mask, roll...).
     const bool plain = !((SDL_GetModState() | keyMods()) & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
-    if (hit < 0 && plain && uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
+    if (hit < 0 && plain && axes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
         drag_ = Drag::Orbit;
         orbitPivotPicked_ = true; // (about the target: the gizmo's disc is not a point on the model)
         rightClick_.pending = false;
@@ -5267,19 +5273,15 @@ void App::drawAxisGizmo() {
     const int aligned = axisGizmoAligned(ends);
     const AxisGizmoEnd hovered = hover >= 0 ? ends[size_t(hover)] : AxisGizmoEnd{};
 
-    // The disc: lighter than a dark background, darker than a light one; a hairline edge gives it a shape.
-    const ImU32 tint = light ? IM_COL32(0, 0, 0, 0) : IM_COL32(255, 255, 255, 0);
+    drawNavDisc(dl, c, discR, onDisc, light); // (the orientation widget shares it, CornerGizmo.cpp)
     auto withAlpha = [](ImU32 col, float a) {
         return (col & 0x00ffffffu) | (ImU32(std::clamp(a, 0.0f, 1.0f) * 255.0f + 0.5f) << 24);
     };
-    dl->AddCircleFilled(centre, discR, withAlpha(tint, onDisc ? 0.17f : light ? 0.08f : 0.07f), 48);
-    dl->AddCircle(centre, discR, withAlpha(tint, onDisc ? 0.22f : 0.10f), 48, 1.0f * uiScale_);
 
     static constexpr ImU32 colours[3] = {IM_COL32(236, 84, 92, 255), IM_COL32(124, 196, 64, 255), IM_COL32(64, 140, 236, 255)};
     static constexpr const char* names[3] = {"X", "Y", "Z"};
     // The locked axis, end to end through the disc (as long as it looks from here: a dot when it points at you).
-    static constexpr int lockAxes[4] = {-1, 1, 0, 2}; // UiPrefs::orbitLock: free, Y, X, Z
-    const int lockAxis = lockAxes[std::clamp(forceTurntable_ ? 1 : uiPrefs_.orbitLock, 0, 3)];
+    const int lockAxis = navLockAxis();
     if (lockAxis >= 0)
         for (const AxisGizmoEnd& e : ends)
             if (e.axis == lockAxis && !e.negative) {
@@ -5322,31 +5324,10 @@ void App::drawAxisGizmo() {
     }
 
     // The view's name on an exact side view ("Front view"), small, under the disc.
-    if (aligned >= 0) {
-        const AxisGizmoView v = axisGizmoView(aligned % 3, aligned >= 3);
-        const char* text = tr(v.label);
-        const float size = ImGui::GetFontSize() * 0.85f;
-        const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, text);
-        const ImVec2 at(std::round(c.x - ts.x * 0.5f), std::round(c.y + discR + 4.0f * uiScale_));
-        dl->AddText(ImGui::GetFont(), size, ImVec2(at.x + 1.0f, at.y + 1.0f), light ? IM_COL32(255, 255, 255, 110) : IM_COL32(0, 0, 0, 150), text);
-        dl->AddText(ImGui::GetFont(), size, at, light ? IM_COL32(30, 30, 34, 230) : IM_COL32(232, 232, 236, 220), text);
-    }
+    if (aligned >= 0) drawNavName(dl, c, discR, tr(axisGizmoView(aligned % 3, aligned >= 3).label), light);
 
     // The orbit lock's badge: a lock and the axis letter in its colour, on a pill at the disc's lower right.
-    if (lockAxis >= 0) {
-        const float size = ImGui::GetFontSize() * 0.8f;
-        ImFont* f = ImGui::GetFont();
-        const ImVec2 iconSize = f->CalcTextSizeA(size, FLT_MAX, 0.0f, ICON_LC_LOCK);
-        const ImVec2 nameSize = font->CalcTextSizeA(size, FLT_MAX, 0.0f, names[lockAxis]);
-        const float gap = 2.0f * uiScale_, padX = 4.0f * uiScale_, padY = 1.0f * uiScale_;
-        const float w = iconSize.x + gap + nameSize.x + 2.0f * padX, h = std::max(iconSize.y, nameSize.y) + 2.0f * padY;
-        const ImVec2 a(std::round(c.x + discR * 0.62f), std::round(c.y + discR * 0.62f));
-        dl->AddRectFilled(a, ImVec2(a.x + w, a.y + h), light ? IM_COL32(255, 255, 255, 200) : IM_COL32(20, 20, 24, 190), h * 0.5f);
-        dl->AddRect(a, ImVec2(a.x + w, a.y + h), withAlpha(colours[lockAxis], 0.8f), h * 0.5f, 0, 1.0f * uiScale_);
-        dl->AddText(f, size, ImVec2(a.x + padX, a.y + padY), light ? IM_COL32(30, 30, 34, 230) : IM_COL32(232, 232, 236, 230),
-                    ICON_LC_LOCK);
-        dl->AddText(font, size, ImVec2(a.x + padX + iconSize.x + gap, a.y + padY), colours[lockAxis], names[lockAxis]);
-    }
+    if (lockAxis >= 0) drawNavLockBadge(dl, c, discR, lockAxis, light);
 }
 
 void App::drawViewFigure() {

@@ -616,6 +616,18 @@ constexpr Entry kTraditionalChinese[] = {
     {"Back view", "後視圖"},
     {"Left view", "左視圖"},
     {"Right view", "右視圖"},
+    // The orientation widget's sides (Draw > Camera > Corner gizmo; Top, Bottom, Front and Rear have entries elsewhere)
+    {"Right", "右"},
+    {"Left", "左"},
+    {"Corner gizmo", "角落操縱器"},
+    {"Orientation", "方向"},
+    {"Corner gizmo: the X / Y / Z axes in the corner of the canvas. Click an end to look from that side, drag the disc "
+     "to orbit.",
+     "角落操縱器：畫布角落的 X／Y／Z 軸。點擊一端從該側觀看，拖曳圓盤旋轉視圖。"},
+    {"Corner gizmo: the orientation widget, a small cube that turns with the view. Click a face, edge or corner to turn "
+     "the camera there with a short move, drag it to orbit, double-click to frame the model.",
+     "角落操縱器：方向小工具，一個隨視圖轉動的小立方體。點擊面、邊或角，相機會以短暫的動畫轉到該視角；拖曳可旋轉視圖，雙擊可框選模型。"},
+    {"Corner gizmo: nothing in the corner of the canvas.", "角落操縱器：畫布角落不顯示任何內容。"},
     {"Top view", "頂視圖"},
     {"Bottom view", "底視圖"},
     {"Opposite side", "相反側"},
