@@ -1,3 +1,10 @@
+# Testers: Android, New Texture on a Mali tablet or phone
+The model vanished (or showed only its wireframe) after Texture Image > New Texture on a Mali-G72 tablet. Any Android device helps; Mali first.
+- **Sphere**, 5-6 subdivisions (60k+ triangles); **Texture Image > Auto UV**; **New Texture** (2K); paint one stroke. Good: the sphere stays visible and the stroke shows.
+- If the sphere shows without the texture, the status bar says the graphics chip rejected it. Either way, right after the stroke: **Help > Copy log to clipboard**, paste it to us. The lines with "GL error", "GL driver message" or "Texture not shown" say which call failed.
+- Turn **Wire** on and off, and switch Vertex paint / Texture in **Paint into**: the model must never disappear.
+- Tell us the device model, Android version and GPU (the log's "GL vendor" line has the GPU).
+
 # Testers: My Panel, Alt+drag into every way of opening it (0.13.7)
 Needs a real desktop with the panel in a window of its own (the automated tests only have a stand-in for the second window). Windows, macOS and Linux each, please.
 - **Edit > My Panel...** opens it as a drop-down. Hold **Alt** and drag a shelf button (Wire, say) onto it: does the drop-down stay open, and does Wire appear in it? The status bar says "Added to My Panel".

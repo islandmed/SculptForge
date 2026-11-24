@@ -1936,7 +1936,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
     if (tierCardEvent(e)) return;     // the first-run tier card's buttons and keys (PanelHardwareTier.cpp)
-    if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !e.key.repeat && !ImGui::GetIO().WantTextInput &&
+    if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !e.key.repeat && !ui::TextFieldFocused() &&
         closeTopPopupOnEscape())
         return; // Esc closes the top context menu or combo list and nothing else sees it (#210; the Library's Esc would close it)
     pressSpent_ = closePopupsOnPressOutside(e); // a press outside open menus and popups acts, not only closes them (Shell.cpp)
@@ -2061,6 +2061,13 @@ void App::dispatchEvent(const SDL_Event& event) {
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
+        // While a text field has the keyboard (live: io's flags are a frame behind) the keys are the field's alone: ImGui
+        // has them, no shortcut, camera key or Space menu runs (Ctrl+A is Select All there, B types a B). The one key that
+        // still works is the console's own, which closes it while typing (the console's field only filters it a few frames in).
+        if (ui::TextFieldFocused()) {
+            const Action* act = io.WantTextInput ? nullptr : actions_.actionForKey(e.key.key, e.key.mod);
+            if (!(act && act->id == "ui.console" && layout_.consoleOpen && !e.key.repeat)) break;
+        }
         if (!isModifierKey(e.key.key) && std::none_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == e.key.key; }))
             keysDown_.emplace_back(e.key.key, e.key.mod);
         if (e.key.key == SDLK_SPACE && drag_ == Drag::Select && !io.WantTextInput) { // #214: slide the shape
@@ -3801,8 +3808,11 @@ void App::syncScene() {
     // A texture the GPU cannot show on this model (renderer: past its limits): say so once, rather than leave a model
     // that paints nothing and no word why.
     {
-        const bool notShown = hasTexture(doc_.mesh) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart));
-        if (notShown && !textureNoticeShown_)
+        const bool rejected = hasTexture(doc_.mesh) && renderer_.textureRejected(doc_.meshKey(doc_.activePart));
+        const bool notShown = rejected || (hasTexture(doc_.mesh) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart)));
+        if (rejected && !textureNoticeShown_)
+            status_ = "This graphics chip rejected drawing the texture: painting goes into the texture (see the UV view); Help > Copy log to clipboard shows what failed";
+        else if (notShown && !textureNoticeShown_)
             status_ = "This graphics chip can't show the texture on a model this dense: painting goes into the texture (see the UV view), lower the triangle count to see it";
         textureNoticeShown_ = notShown;
     }
