@@ -53,13 +53,40 @@ Fail at any step: the temporary file is deleted, nothing in place changes, nothi
 - Key loss or leak: ship a release with a new key (old apps then fall back to the Download button for releases
   signed with a key they don't know).
 
-## macOS (plan only)
+## macOS
 
-The app is ad-hoc signed, so Gatekeeper treats each new bundle as new: replacing `/Applications/SculptForge.app`
-in place would trip quarantine/translocation and could leave a bundle that won't open. Safe path, once there is a
-Developer ID and notarization: download the `.dmg` (same chain), `hdiutil attach -nobrowse`, `ditto` the bundle to
-`SculptForge.app.new` beside the old one, verify `codesign --verify --deep --strict` and the Team ID, swap with
-`rename`, relaunch with `open -n`. Until then: Download (and `brew upgrade --cask sculptforge` for Homebrew).
+The same chain (feed, fixed GitHub URLs, signed `SHA256SUMS.txt`, versioned name `SculptForge-<v>-darwin-universal.dmg`,
+hash), then a fourth check before the swap:
+
+- **Where**: the bundle the running executable is in (`<...>/SculptForge.app/Contents/MacOS/sculptforge`), wherever the
+  user keeps it. Not self-updated: a Homebrew cask (`brew upgrade --cask sculptforge`), a bundle Gatekeeper runs from a
+  read-only translocation copy (`/AppTranslocation/`), a build folder. The `.dmg` is downloaded to
+  `~/Library/Caches/SculptForge/updates/`, never into `/Applications`.
+- **Open, copy** (`installMacApp`): the staged image's hash is checked again, then `/usr/bin/hdiutil attach -nobrowse
+  -readonly -noautoopen -mountpoint <our folder>` (read-only, nothing opened or run from it; our images have no licence
+  prompt and the child's stdin is /dev/null), the image must hold exactly one `.app`, named `SculptForge.app`;
+  `/usr/bin/ditto` copies it to `SculptForge.app.new` beside the old bundle (same volume: the swap is a rename); detach.
+- **Code signature**: `/usr/bin/codesign --verify --deep --strict SculptForge.app.new` must exit 0, and the Security
+  framework (`SecStaticCodeCheckValidity` strict + nested code + all architectures) must agree; its team identifier must
+  equal the running app's own (`SecCodeCopySelf`, read at run time). Neither identifier is stored, hard-coded or shown.
+  Today's builds are ad-hoc signed (`cmake/MacSign.cmake`, no `SCULPTFORGE_CODESIGN_IDENTITY` in CI): both sides have no
+  team identifier, so this step proves the bundle's integrity (every file matches its signature) but not who made it;
+  the signed checksum list carries that. A future Developer ID build makes the team check bite: an app with a team
+  identifier refuses a download with another one or none.
+- **Swap**: `update_pending.json`, then `renamex_np(new, target, RENAME_SWAP)` (APFS: one atomic step; the target path
+  is always a whole bundle), the old bundle becomes `SculptForge.app.old`. Elsewhere two renames, the second undone on
+  failure. No privileges are asked for: a folder this user can't write to is an error and nothing changes.
+- **Relaunch, rollback**: as Linux. Restart now starts `Contents/MacOS/sculptforge` of the new bundle and watches it;
+  the new version confirms after 5 s (the `.old` bundle goes), else the old one is put back and the `.failed` bundle is
+  removed so Finder never shows it. Later installs at quit.
+- **Dry run**: `SF_UPDATE_DRY_RUN=1` does everything up to and including the signature checks, then removes the copy
+  and the download; the status line says what would have happened. Linux/Windows: the same variable skips the install.
+- **Quarantine**: the app's own HTTP client sets no `com.apple.quarantine` attribute (as `curl -O` doesn't), so the
+  copied bundle opens without Gatekeeper's first-launch prompt; what it opens is exactly the bytes the signed list names.
+
+Tests: `tests/test_self_update.cpp` (`self_update_mac_*`): the tools stood in for on every platform (order of the calls,
+every refusal leaves Applications as it was, the download gone, the image detached), and on a macOS runner a real
+ad-hoc signed probe bundle through `macBundleSignature` (passes; fails once a file is changed).
 
 ## Member builds (src/core/MemberBuilds.*, src/core/Keychain.*)
 

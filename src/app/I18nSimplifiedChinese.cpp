@@ -2838,6 +2838,12 @@ constexpr Entry kSimplifiedChinese[] = {
      "此笔触的显示强度：1 = 雕刻时的样子，0 = 消失，2 = 两倍强。之后的笔触不会重做：与此笔触重叠之处会保留它们自己的"
      "位移在上方。"},
     // --- PanelUpdate.cpp (tools/i18n/coverage.py) ---
+    {"SculptForge %s (%.0f MB) is downloaded from github.com/islandmed/SculptForge releases and checked.",
+     "SculptForge %s (%.0f MB) 已从 github.com/islandmed/SculptForge releases 下载并完成检查。"},
+    {"Restart now replaces %s after its code signature is checked too.",
+     "立即重启将在其代码签名也完成检查后替换 %s。"},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection; its checksum must be in the release's signed list, and the app inside must pass macOS's code signature check and come from the same developer as this one. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "通过已检查的连接从 SculptForge 的 GitHub releases 下载新版本；其校验和必须位于该发布的已签名列表中，且其中的应用程序必须通过 macOS 的代码签名检查并来自与当前版本相同的开发者。在替换任何内容前需由您确认；当前版本将保留至新版本启动为止。"},
     {"Downloading the update...", "正在下载更新..."},
     {"It installs when you quit.", "退出程序时安装。"},
     {"Restart now", "立即重新启动"},

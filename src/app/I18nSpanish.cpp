@@ -3186,6 +3186,12 @@ constexpr Entry kSpanish[] = {
      "Cuánto se ve este trazo: 1 = tal como se esculpió, 0 = nada, 2 = el doble de fuerte. Los trazos posteriores no "
      "se rehacen: donde se solapan con este conservan su propio desplazamiento encima."},
     // --- PanelUpdate.cpp (tools/i18n/coverage.py) ---
+    {"SculptForge %s (%.0f MB) is downloaded from github.com/islandmed/SculptForge releases and checked.",
+     "SculptForge %s (%.0f MB) se descarga desde los lanzamientos de github.com/islandmed/SculptForge y se comprueba."},
+    {"Restart now replaces %s after its code signature is checked too.",
+     "Reiniciar ahora reemplaza %s después de que su firma de código también sea comprobada."},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection; its checksum must be in the release's signed list, and the app inside must pass macOS's code signature check and come from the same developer as this one. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "Descargue la nueva versión desde los lanzamientos de GitHub de SculptForge a través de una conexión verificada; su suma de comprobación debe estar en la lista firmada del lanzamiento, y la aplicación interna debe pasar la comprobación de firma de código de macOS y provenir del mismo desarrollador que esta. Usted confirma antes de que se reemplace nada; la versión actual se mantiene hasta que se haya iniciado la nueva."},
     {"Downloading the update...", "Descargando la actualización..."},
     {"It installs when you quit.", "Se instala al salir."},
     {"Restart now", "Reiniciar ahora"},

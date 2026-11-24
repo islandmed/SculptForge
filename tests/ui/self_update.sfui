@@ -21,6 +21,17 @@ click "Cancel##update.cancel"
 expect "Update##update.update"
 expect "Skip this version"
 
+# A macOS app bundle has Update too (the .dmg's bundle replaces the app after its code signature is checked).
+env SF_UPDATE_TEST_INSTALL macapp
+wait 0.2
+expect "Update##update.update"
+expect "Download"
+shot update-mac
+click "Update##update.update"
+expect_text "Downloading the update..."
+click "Cancel##update.cancel"
+expect "Update##update.update"
+
 env SF_UPDATE_TEST_INSTALL pacman
 wait 0.2
 expect_text "Update with your package manager (pacman)"

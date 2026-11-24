@@ -294,8 +294,8 @@ Nothing about you or your computer is sent. **Help > Check for updates** asks ri
 **Edit > Preferences > Updates** turns the daily check off (and picks the update channel: **Stable**, or **Preview**
 for early builds).
 
-**One-click update.** The Linux AppImage and the Windows installer and portable zip also get an **Update** button
-on the banner. It downloads the new version in the background (with a progress bar and **Cancel**), checks it, and
+**One-click update.** The Linux AppImage, the Windows installer and portable zip, and the macOS app also get an
+**Update** button on the banner. It downloads the new version in the background (with a progress bar and **Cancel**), checks it, and
 then asks: **Restart now** installs it and starts the new version; **Later** installs it when you quit, so the
 next start is the new version. If you have unsaved changes, Restart now asks first, as quitting does.
 
@@ -305,8 +305,15 @@ download must match its checksum. If any of that fails, nothing is changed and n
 says what went wrong and **Download** still opens the release page.
 
 The current version is kept beside the new one (the AppImage as `<name>.AppImage.old`, the portable folder as
-`<folder>.old`) until the new version has started once, then removed; if the new version doesn't start, the old one is
-put back. The Windows installer asks for permission to change Program Files, as installing does.
+`<folder>.old`, the Mac app as `SculptForge.app.old`) until the new version has started once, then removed; if the new
+version doesn't start, the old one is put back. The Windows installer asks for permission to change Program Files, as
+installing does.
+
+On a Mac the download is the release's disk image, kept in `~/Library/Caches/SculptForge/updates` until it is installed.
+Before anything is replaced, the app inside it must also pass macOS's own code signature check (`codesign --verify
+--deep --strict`) and come from the same developer as the SculptForge you are running. SculptForge never asks for an
+administrator password: if your Applications folder isn't yours to write to, the banner says so and **Download** still
+works. A SculptForge installed with Homebrew is updated with `brew upgrade --cask sculptforge` instead.
 
 **Member builds.** Members get each release early. In **Edit > Preferences > Updates > Member builds**, click
 **Sign in with GitHub**: SculptForge shows a short code; open **github.com/login/device**, sign in with the GitHub
