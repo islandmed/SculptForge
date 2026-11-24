@@ -426,6 +426,11 @@ bool Demo::parseModeStep(int line, const std::vector<std::string>& w, std::strin
     } else if (verb == "unlatch") {
         run([this] { app_.unlatchForTest(); });
         wait(0.05f);
+    } else if (verb == "close_floating") {
+        // close_floating: only the floating windows a person would close (Community brushes, AI Brush, the new-pack
+        // window), nothing else: a latch that survives Esc still shows up in expect_latched / expect_sculpts.
+        run([this] { app_.showBrushGallery_ = app_.showBrushLab_ = app_.packs_.newOpen = false; });
+        wait(0.05f);
     } else if (verb == "snapshot_start") {
         run([this] {
             start_ = {app_.doc_.partCount(), app_.doc_.activePart, app_.doc_.mesh.positions, app_.doc_.mesh.triangles,
@@ -764,7 +769,7 @@ bool Demo::buildMonkey(int line, uint64_t seed, int count, std::string& error) {
         }
     }
     // The way out, then the invariants.
-    for (const char* l : {"release", "hold none", "key escape", "unlatch", "action brush.clay", "action tool.draw", "expect_latched none",
+    for (const char* l : {"release", "hold none", "key escape", "close_floating", "action brush.clay", "action tool.draw", "expect_latched none",
                           "expect_mesh_valid", "expect_sculpts", "undo_all", "expect_restored", "expect_mesh_valid"})
         lines.emplace_back(l);
     return addCase(line, "monkey " + std::to_string(seed), nullptr, lines, error);
