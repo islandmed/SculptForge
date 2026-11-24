@@ -56,7 +56,7 @@ expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
 expect_text "Version 0.13.14"
-expect_text "Sculpting with Dynamic on no longer erases the texture of a painted Part."
+expect_text "Scatter covers a Part with copies and Keep apart stops them overlapping, Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth."
 expect_text "Version 0.13.13"
 expect_text "Contact facing keeps your brush off the far wall of a slot, Engrave walls stay smooth, dense Micro levels shade Undo and Move at once, and Shift smooths every painted channel."
 expect_text "Version 0.13.12"

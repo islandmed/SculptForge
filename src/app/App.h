@@ -342,6 +342,8 @@ private:
     bool sizeRingPreviewIntensity_ = false;   // an Intensity pop-up's preview: a disc in the ring
     std::vector<glm::vec3> cursorRing_, cursorInner_; // scratch, kept to avoid allocating per frame
     bool surfaceCursorShown_ = false; // the last cursor drawn lay on the surface (UI tests: surface_cursor)
+    bool smoothColourTagShown_ = false;  // the last cursor drawn carried the Shift-in-Paint-mode tag (smooth_colour_tag)
+    bool smoothBordersTagShown_ = false; // the last cursor drawn carried the "Smooth: face group borders only" tag (UI tests: smooth_borders_tag)
     bool frontFacesTagShown_ = false; // the last cursor drawn carried the "Front faces only" tag (UI tests: front_faces_tag)
     bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
     void updateTitle();
@@ -1851,6 +1853,8 @@ private:
     enum class TubeDepth { Surface, Pivot, Fixed };
     void registerTubeUiActions();
     void drawTubeContents();                                // Tool > Tube
+    void drawScatterContents();                             // Tool > Scatter (PanelScatter.cpp)
+    void runScatter();                                      // ... with the settings below (a setting changed: redoes the last one)
     void drawTubeShapeControls(float width);                // its Shape group
     bool tubeMouseDown(float x, float y, SDL_Keymod mod);   // true if it took the click
     void tubeDragTo(float x, float y);
@@ -1889,6 +1893,22 @@ private:
     uint32_t tubeRepeatPart_ = 0;   // Repeat along curve: the Part to repeat (its id; 0 = none picked)
     float tubeRepeatSpacing_ = 1.0f, tubeRepeatTurn_ = 0.0f; // ... how far apart the copies are, how far each is turned
     bool tubeBakeUniform_ = false; // Bake re-sweeps with even edges (dynamic topology)
+    // Tool > Scatter (PanelScatter.cpp, core/Scatter.h): the piece (a Part's id, 0 = the built-in shape) and the settings.
+    uint32_t scatterPiece_ = 0;
+    int scatterShape_ = 0;         // index into the built-in shapes (Pebble first)
+    float scatterSize_ = 0.04f;    // a built-in shape's size, a fraction of the surface's
+    int scatterCount_ = 200, scatterSeed_ = 1;
+    float scatterScaleMin_ = 1.0f, scatterScaleMax_ = 1.0f, scatterTurn_ = 180.0f, scatterTilt_ = 0.0f, scatterOffset_ = 0.0f;
+    bool scatterAlign_ = true, scatterFlat_ = false, scatterMasked_ = false, scatterSeparate_ = false;
+    bool scatterKeepApart_ = true, scatterTight_ = true;
+    float scatterSpacing_ = 0.0f;
+    // The last Scatter: the undo revision after it, its surface Part and the Part it made (ids). While it is the last step
+    // and its surface is active, a changed setting redoes it (one undo step stays); `ms`: how long it took (a slider held
+    // re-runs it as it moves only while that is quick).
+    uint64_t scatterRevision_ = 0;
+    uint32_t scatterTarget_ = 0, scatterMade_ = 0;
+    double scatterMs_ = 0.0;
+    std::string scatterResult_; // its result line (or why it was refused), shown under the buttons
     int tubeSelected_ = -1;
     float tubeRadiusEdit_ = -1.0f; // the selected point's Radius slider while it is held
     int tubeRadiusEditPoint_ = -1;

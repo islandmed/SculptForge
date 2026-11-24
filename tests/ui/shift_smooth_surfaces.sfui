@@ -1,0 +1,111 @@
+# Shift smooths with whatever brush is picked (0.13.12 member report: "hold Shift to smooth isn't working"). On a subdivision level, a sculpt layer, a Micro level and with Dynamic on.
+# Each case: a bump made with Standard, then six Shift strokes over it with the brush named; the bump (the surface's distance
+# from the pristine sphere, moved_sum) must come down, as it does under the Smooth brush itself.
+run ui_look look=classic layout=classic
+# sublevel
+run new_sphere subdivisions=4
+input_style sculptforge
+camera 0 0
+key x
+expect_value symmetry_x == 0
+brush_size 70
+run subdiv_divide
+run subdiv_divide
+snapshot
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+wait_idle 60
+action brush.standard
+remember moved_sum bump
+hold shift
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+hold none
+wait_idle 60
+remember moved_sum after
+expect_value moved_sum < $bump*0.97
+
+# layer
+run new_sphere subdivisions=6
+input_style sculptforge
+camera 0 0
+brush_size 70
+run layer_add name=L1
+snapshot
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+wait_idle 60
+action brush.standard
+remember moved_sum bump
+hold shift
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+hold none
+wait_idle 60
+remember moved_sum after
+expect_value moved_sum < $bump*0.97
+
+# micro
+run new_sphere subdivisions=4
+input_style sculptforge
+camera 0 0
+brush_size 70
+run micro_divide level=2
+snapshot
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+wait_idle 60
+action brush.standard
+snapshot
+remember micro_moved bump
+hold shift
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+hold none
+wait_idle 60
+remember micro_moved after
+expect_value micro_moved > $bump*1.05
+
+# dynamic
+run new_sphere subdivisions=5
+input_style sculptforge
+camera 0 0
+brush_size 70
+run dyntopo enabled=true detail=60
+snapshot
+action brush.standard
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+wait_idle 60
+action brush.standard
+remember triangles bump
+hold shift
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.5 0.7 0.5
+hold none
+wait_idle 60
+remember triangles after
+expect_value triangles < $bump*0.99

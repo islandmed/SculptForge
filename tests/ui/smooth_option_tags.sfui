@@ -1,0 +1,54 @@
+# Two things that make Shift (or the Smooth brush) look dead say so by the cursor while they apply (0.13.12 member reports):
+# "Smooth face group borders only" (saved with the scene; moves nothing on a mesh without face groups) and Shift in Paint mode
+# (smooths the colour, never the shape). Each tag shows only when it applies: option on + Smooth held, Paint mode + Shift held.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+input_style classic
+camera 0 0
+key x
+expect_value symmetry_x == 0
+expect_value groups == 1
+hover_model 0.5 0.5
+
+# Group borders only: off = no tag; on with Shift held = the tag, and Shift moves nothing on this one-group sphere.
+hold shift
+hover_model 0.52 0.5
+expect_value smooth_borders_tag == 0
+hold none
+click "Brush##palette.brush"
+click "Smooth face group borders only##smooth_group_borders"
+expect_value smooth_group_borders == 1
+click "Brush##palette.brush"
+hover_model 0.5 0.5
+expect_value smooth_borders_tag == 0
+snapshot
+hold shift
+hover_model 0.52 0.5
+expect_value smooth_borders_tag == 1
+shot borders-tag
+stroke 0.3 0.5 0.7 0.5
+hold none
+expect_value moved == 0
+hover_model 0.5 0.5
+expect_value smooth_borders_tag == 0
+click "Brush##palette.brush"
+click "Smooth face group borders only##smooth_group_borders"
+click "Brush##palette.brush"
+expect_value smooth_group_borders == 0
+
+# Paint mode: Shift smooths the colour; the tag says so while Shift is held, and not in Sculpt mode.
+action draw.paint
+hover_model 0.5 0.5
+expect_value smooth_colour_tag == 0
+hold shift
+hover_model 0.52 0.5
+expect_value smooth_colour_tag == 1
+shot colour-tag
+hold none
+hover_model 0.5 0.5
+expect_value smooth_colour_tag == 0
+action draw.sculpt
+hold shift
+hover_model 0.52 0.5
+expect_value smooth_colour_tag == 0
+hold none
