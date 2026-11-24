@@ -1,0 +1,63 @@
+# My Panel with single controls for the look review at 1440 logical px (CMake: ui_my_panel_controls_1440 at 100 %,
+# ui_my_panel_controls_1440_200 at 200 %): a checkbox, a slider, a readout and a Preferences choice dragged in with Alt,
+# in the Classic setup and then in the Streamlined one.
+logical_width 1440
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Edit##palette.edit"
+click "My Panel...##edit.mypanel"
+hold shift
+click "My Panel/##totray"
+hold none
+click "Parts##tool.part"
+click "Viewport Look##tool.display"
+hold alt
+drag_to "Tool/##part.tris" "My Panel/##totray" 0 100
+hold none
+hold alt
+drag_to "Backface culling##display" "My Panel/##totray" 0 100
+hold none
+click "Draw##palette.draw"
+click "Draw/##totray"
+expect "Draw/##drawsize"
+hold alt
+drag_to "Draw/##drawsize" "My Panel/##totray" 0 100
+hold none
+click "Draw/##totray"                   # (out of the tray again: Preferences > Input then fits the tray at 900 px)
+click "Tool/##totray"                   # (Tool out of the tray: Preferences then starts at its top, Rotation in view)
+click "Preferences##palette.preferences"
+click "Preferences/##totray"
+click "Input##preferences.input"
+expect "Preferences/##rotation_input"
+hold alt
+drag_to "Preferences/##rotation_input" "My Panel/##totray" 0 100
+hold none
+expect_value mypanel_entries == 4
+hover "My Panel/##drawsize"
+wait 0.3
+shot classic
+# Alt held over a control: the hand says it can be picked up (the slider is read-only meanwhile).
+hold alt
+hover "Preferences/Orbit around the pointer##input.orbit_at_pointer"
+wait 0.3
+shot classic_alt
+hold none
+# The Streamlined setup (a fresh layout: My Panel starts empty): the floating panel on its key takes two Preferences
+# controls, the choice and the checkbox.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=3
+hover_window 0.5 0.5
+key f4
+wait 0.3
+expect_value mypanel_floating == 1
+expect "Preferences/##rotation_input"
+hold alt
+drag_to "Preferences/##rotation_input" "My Panel###mypanel.floating" 0 40
+hold none
+hold alt
+drag_to "Preferences/Orbit around the pointer##input.orbit_at_pointer" "My Panel###mypanel.floating" 0 40
+hold none
+expect_value mypanel_entries == 2
+hover "My Panel/##rotation_input"
+wait 0.3
+shot streamlined

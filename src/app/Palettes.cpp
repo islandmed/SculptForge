@@ -202,6 +202,7 @@ Section::~Section() {
     const float s = ImGui::GetFontSize() / 15.0f;
     ImGui::Unindent(kSectionInset * s);
     ImGui::Dummy(ImVec2(0, 4.0f * s));
+    ui::PinSection(""); // controls after it belong to the palette (My Panel entries, Ui.h)
     if (capture_) ImGui::GetCurrentWindow()->SkipItems = true; // the rest of the palette body is not wanted
 }
 
@@ -254,7 +255,9 @@ bool SliderInt(const char* id, int* v, int lo, int hi, const char* format, ImGui
 } // namespace tray
 
 bool App::subpalette(const char* id, const char* englishTitle) {
+    ui::PinSection(""); // (set below while the section is open; its Section object clears it)
     if (!myPanelSection_.empty()) { // My Panel draws this section's body and nothing else of the palette
+        if (myPanelPaletteLevel_) return false; // ... or only the palette's own controls, outside every section
         const bool mine = myPanelSection_ == id;
         if (mine) {
             auto& title = myPanelTitles_[id];
@@ -263,6 +266,7 @@ bool App::subpalette(const char* id, const char* englishTitle) {
         const bool draw = mine && !myPanelProbe_;
         ImGui::GetCurrentWindow()->SkipItems = !draw;
         g_captureNext = draw;
+        if (draw) ui::PinSection(id);
         return draw;
     }
     const char* title = tr(englishTitle); // the interface language (I18n.h); the id keeps the item's identity
@@ -345,6 +349,7 @@ bool App::subpalette(const char* id, const char* englishTitle) {
         isOpen = !isOpen;
     }
     if (isOpen) ImGui::Dummy(ImVec2(0, 2.0f * s));
+    if (isOpen) ui::PinSection(id);
     return isOpen;
 }
 
@@ -905,7 +910,9 @@ void App::drawPalette_Tool() {
         char tris[64];
         std::snprintf(tris, sizeof tris, "%zu tris", doc_.mesh.triangleCount());
         ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(tris).x);
-        ImGui::TextDisabled("%s", tris);
+        ui::Readout("##part.tris", tris);
+        ui::HelpText("Triangle count", nullptr, "How many triangles the active Part has at its current level. Hold Alt and drag it into My Panel to keep it in view.",
+                     "Tool");
         // The Part's size, width x height x depth, in the Units preference (#148).
         if (const AABB b = sizeBounds().part; b.valid()) {
             ImGui::TextDisabled("%s", formatSize(b.extent(), lengthUnit()).c_str());

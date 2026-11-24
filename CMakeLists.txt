@@ -1745,6 +1745,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # My Panel (Member Request), for the look review at 1440 px, 100 % and 200 %.
     sculptforge_ui_test(my_panel_1440 sizes/my_panel --size 1440x900)
     sculptforge_ui_test(my_panel_1440_200 sizes/my_panel --size 2880x1800)
+    sculptforge_ui_test(my_panel_controls_1440 sizes/my_panel_controls --size 1440x900)
+    sculptforge_ui_test(my_panel_controls_1440_200 sizes/my_panel_controls --size 2880x1800)
     sculptforge_ui_test(my_panel_paths_1440 sizes/my_panel_paths --size 1440x900)
     sculptforge_ui_test(my_panel_paths_1440_200 sizes/my_panel_paths --size 2880x1800)
     # A crash leaves a note in the log file (#16). Needs no window.

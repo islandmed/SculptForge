@@ -5803,7 +5803,7 @@ constexpr Entry kSpanish[] = {
     {"Hold Alt and drag a button, or a section's title, from any palette into this panel. Right-click an entry to remove it.", "Mantén Alt y arrastra un botón, o el título de una sección, desde cualquier paleta hasta este panel. Clic derecho en una entrada para quitarla."},
     {"My Panel", "Mi panel"},
     {"Remove from My Panel", "Quitar de Mi panel"},
-    {"Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "Tu propio panel, flotando junto al cursor: los botones y secciones que arrastraste a él (mantén Alt y arrastra desde cualquier paleta). Pulsa la tecla otra vez, o Esc, para cerrarlo. También es una paleta (Editar > Mi panel) para una bandeja, y puede pasar a una ventana propia."},
+    {"Your own panel, floating at the cursor: the buttons, controls and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "Tu propio panel, flotando junto al cursor: los botones, controles y secciones que arrastraste a él (mantén Alt y arrastra desde cualquier paleta). Pulsa la tecla otra vez, o Esc, para cerrarlo. También es una paleta (Editar > Mi panel) para una bandeja, y puede pasar a una ventana propia."},
     {"Add images...",
      "Añadir imágenes..."},
     {"Adjust Reference",
@@ -6084,6 +6084,13 @@ constexpr Entry kSpanish[] = {
      "no configurado"},
     {"system default",
      "predeterminado del sistema"},
+    {"Hold Alt and drag a button, a slider, a checkbox or a section's title from any palette into this panel. Right-click an entry to remove it.", "Mantén Alt y arrastra un botón, un deslizador, una casilla o el título de una sección desde cualquier paleta hasta este panel. Clic derecho en una entrada para quitarla."},
+    {"(not shown now)", "(no se muestra ahora)"},
+    {"Its palette does not show this control right now (it depends on the Part or the mode). It comes back when it does.", "Su paleta no muestra este control ahora mismo (depende de la parte o del modo). Vuelve cuando lo haga."},
+    {"Triangle count", "Recuento de triángulos"},
+    {"How many triangles the active Part has at its current level. Hold Alt and drag it into My Panel to keep it in view.", "Cuántos triángulos tiene la parte activa en su nivel actual. Mantén Alt y arrástralo a Mi panel para tenerlo a la vista."},
+    {"Subdivision levels", "Niveles de subdivisión"},
+    {"The level you are on, how many the Part has, and the triangles of the lowest and highest. Hold Alt and drag it into My Panel to keep it in view.", "El nivel en el que estás, cuántos tiene la parte y los triángulos del más bajo y del más alto. Mantén Alt y arrástralo a Mi panel para tenerlo a la vista."},
 };
 
 } // namespace

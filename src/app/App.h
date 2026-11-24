@@ -107,6 +107,7 @@ namespace sf::ai {
 class ChildProcess; // ai/Process.h (the updater's restart)
 }
 
+struct ImRect; // imgui_internal.h
 namespace sf {
 
 struct AppOptions {
@@ -2373,7 +2374,14 @@ private:
     void fillPanelHost(ImGuiWindowFlags& flags);
     void registerPanelActions();
     void finishShelfDrag();
-    std::string myPanelSection_;      // while drawMyPanelSection runs: the section whose body subpalette() lets through
+    std::string myPanelSection_;      // while drawMyPanelScope runs: the section whose body subpalette() lets through
+    bool myPanelPaletteLevel_ = false; // ... or (myPanelSection_ = a palette id) the palette's own controls, no section
+    struct MyPanelControlPlace {      // where one control sits in its scope's body, measured (PanelMyPanel.cpp)
+        bool known = false;
+        float x = 0, y = 0, w = 0, h = 0; // from the body's origin, logical px as laid out at My Panel's width
+        float lineX = 0;                  // where its line starts: a control mid-row is drawn from there, not mid-panel
+    };
+    std::unordered_map<std::string, MyPanelControlPlace> myPanelControls_; // by entry
     bool myPanelFloating_ = false;    // the floating My Panel is open (ui.my_panel)
     bool myPanelPlace_ = false;       // ... and wants placing at the cursor this frame
     std::vector<std::string> myPanelFolded_; // sections folded in My Panel (session only)
@@ -2428,6 +2436,9 @@ private:
     // like the others, or floating at the cursor on a key (ui.my_panel).
     void drawPalette_MyPanel();
     void drawMyPanelSection(const std::string& sectionId); // one palette section's body, without its header
+    void drawMyPanelScope(const std::string& scope);       // ... or (a palette id) the palette's controls outside sections
+    // One control entry: its scope's body cropped to that control, live; false when it is not an entry this build knows.
+    bool drawMyPanelControl(const std::string& entry, const MyPanelEntry& e, ImRect& rect, bool& remove);
     void drawMyPanelFloating();
     void registerMyPanelActions();
     void finishMyPanelDrag();

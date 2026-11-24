@@ -5316,7 +5316,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Hold Alt and drag a button, or a section's title, from any palette into this panel. Right-click an entry to remove it.", "按住 Alt，將任何面板中的按鈕或分區標題拖到此面板。右鍵點擊項目可將其移除。"},
     {"My Panel", "我的面板"},
     {"Remove from My Panel", "從「我的面板」移除"},
-    {"Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "屬於你自己的面板，浮動在游標處：包含你拖入的按鈕和分區（按住 Alt 從任何面板拖曳）。再按一次該按鍵或 Esc 即可關閉。它也是一個可放入側欄的面板（編輯 > 我的面板），還可以移到獨立視窗。"},
+    {"Your own panel, floating at the cursor: the buttons, controls and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "屬於你自己的面板，浮動在游標處：包含你拖入的按鈕、控制項和分區（按住 Alt 從任何面板拖曳）。再按一次該按鍵或 Esc 即可關閉。它也是一個可放入側欄的面板（編輯 > 我的面板），還可以移到獨立視窗。"},
     {"Add images...",
      "加入圖片..."},
     {"Adjust Reference",
@@ -5597,6 +5597,13 @@ constexpr Entry kTraditionalChinese[] = {
      "未設定"},
     {"system default",
      "系統預設"},
+    {"Hold Alt and drag a button, a slider, a checkbox or a section's title from any palette into this panel. Right-click an entry to remove it.", "按住 Alt，將任何面板中的按鈕、滑桿、核取方塊或分區標題拖到此面板。右鍵點擊項目可將其移除。"},
+    {"(not shown now)", "（目前未顯示）"},
+    {"Its palette does not show this control right now (it depends on the Part or the mode). It comes back when it does.", "它所在的面板目前未顯示此控制項（取決於部件或模式）。顯示時會自動回來。"},
+    {"Triangle count", "三角形數量"},
+    {"How many triangles the active Part has at its current level. Hold Alt and drag it into My Panel to keep it in view.", "作用中部件在目前層級的三角形數量。按住 Alt 將它拖進「我的面板」，隨時看得到。"},
+    {"Subdivision levels", "細分層級"},
+    {"The level you are on, how many the Part has, and the triangles of the lowest and highest. Hold Alt and drag it into My Panel to keep it in view.", "你所在的層級、部件共有幾層，以及最低與最高層級的三角形數量。按住 Alt 將它拖進「我的面板」，隨時看得到。"},
 };
 
 } // namespace

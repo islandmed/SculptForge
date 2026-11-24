@@ -2478,7 +2478,11 @@ void App::drawPaletteBody(const std::string& id) {
     const PaletteDef* def = findPalette(id);
     if (!def) return;
     ImGui::PushID(def->id);
+    ui::PinPalette(def->id); // its controls are My Panel entries (Ui.h)
+    const bool readOnly = ui::BeginPaletteItems();
     (this->*(def->draw))();
+    ui::EndPaletteItems(readOnly);
+    ui::PinPalette("");
     ImGui::PopID();
 }
 

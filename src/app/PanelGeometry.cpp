@@ -97,10 +97,14 @@ void App::drawGeometrySection() {
         std::snprintf(info, sizeof info, "Level %d of %d - base %s, top %s tris", current + 1, levels,
                       triangleCount(subdivLevelTriangles(m, 0)).c_str(),
                       triangleCount(subdivLevelTriangles(m, levels - 1)).c_str());
-        ImGui::TextDisabled("%s", info);
+        ui::Readout("##levels.info", info);
     } else {
-        ImGui::TextDisabled("%s", tr("No subdivision levels - Add Level adds them"));
+        ui::Readout("##levels.info", tr("No subdivision levels - Add Level adds them"));
     }
+    ui::HelpText("Subdivision levels", nullptr,
+                 "The level you are on, how many the Part has, and the triangles of the lowest and highest. Hold Alt and drag it "
+                 "into My Panel to keep it in view.",
+                 "Tool > Geometry");
     drawEdgesSection(); // Edges: Edges mode, Select by Angle (PanelEdges.cpp)
 
     // Micro: displacement levels above the highest level (core/Micro.h), in a group of its own: Add Level and Remove
