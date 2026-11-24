@@ -1,0 +1,13 @@
+# The title strip's readout ("Verts ... Part NAME ... Layer ...") is the small 12 px face for Latin text, but a Part or
+# Layer named in Chinese, Japanese or Korean is drawn in the regular 15 px face: a dense character at 12 px is a grey smudge.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=2 ; part_rename to=Body
+wait 0.1
+expect_value info_font_px < 13
+run part_rename to=中文
+wait 0.1
+expect_value info_font_px > 14
+shot cjk-1x
+run part_rename to=Body
+wait 0.1
+expect_value info_font_px < 13

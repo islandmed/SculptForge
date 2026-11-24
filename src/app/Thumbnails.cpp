@@ -145,8 +145,9 @@ std::string ThumbnailCache::lookKey(const BrushToolSettings* look) {
 
 std::string ThumbnailCache::brushKey(int brushType, const BrushToolSettings* look) {
     const bool shows = look && brushType != kPaintBrush && brushTakesAlpha(BrushType(brushType));
-    return hex64(fnv1a64("brush|" + std::to_string(brushType) + "|" + std::to_string(kThumbnailVersion) +
-                         (shows ? lookKey(look) : std::string())));
+    const std::string k = shows ? lookKey(look) : std::string();
+    if (!k.empty()) builtinLooks_.insert(std::to_string(brushType) + k);
+    return hex64(fnv1a64("brush|" + std::to_string(brushType) + "|" + std::to_string(kThumbnailVersion) + k));
 }
 
 ImTextureID ThumbnailCache::brush(int brushType, const BrushToolSettings* look) {

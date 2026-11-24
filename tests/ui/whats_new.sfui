@@ -2,10 +2,10 @@
 # block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
 # three versions in full and folds the older ones into groups.
 # The window is pinned to 0.12.0's five cards (SF_WHATS_NEW_VERSION; the chapter starts at 0.11.0), so this stays valid
-# after each release; the guide chapter below is pinned to 0.13.12 (SF_GUIDE_VERSION), so it checks 0.13.12's section
+# after each release; the guide chapter below is pinned to 0.13.14 (SF_GUIDE_VERSION), so it checks 0.13.14's section
 # before and after the release.
 env SF_WHATS_NEW_VERSION 0.12.0
-env SF_GUIDE_VERSION 0.13.12
+env SF_GUIDE_VERSION 0.13.14
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
@@ -55,12 +55,12 @@ wait 0.3
 expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.13.14"
+expect_text "Sculpting with Dynamic on no longer erases the texture of a painted Part."
+expect_text "Version 0.13.13"
+expect_text "Contact facing keeps your brush off the far wall of a slot, Engrave walls stay smooth, dense Micro levels shade Undo and Move at once, and Shift smooths every painted channel."
 expect_text "Version 0.13.12"
 expect_text "Tendril pulls round horns with Dynamic on, Palette Knife strokes cross without creasing, the Gizmo stays smooth on heavy Parts, and Nudge and Layer stay off the far side."
-expect_text "Version 0.13.11"
-expect_text "Forge Sphere chains stay smooth while you drag, Shift blends colour on textured Parts, View falloff stays off the far side, and pen orbit is steady again."
-expect_text "Version 0.13.10"
-expect_text "Sculpt layers travel to Blender and back as shape keys, Shift blends colour with the Paint brush, long Clay strokes respond faster on dense Micro levels, and 16 new Creature Skin brushes arrive."
 expect_value whats_new_contents == 6   # 3 versions in full, then the groups of older versions (the chapter starts at 0.11.0)
 expect_value whats_new_expanded == 1
 shot whats-new-guide

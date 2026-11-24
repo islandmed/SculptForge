@@ -444,7 +444,7 @@ void App::applyInputStyle() {
     static const std::pair<BrushType, const char*> kBlenderBrushes[] = {
         {BrushType::Standard, "V"}, {BrushType::Smooth, "S"},        {BrushType::Pinch, "P"},
         {BrushType::Inflate, "I"},  {BrushType::Move, "G"},          {BrushType::Flatten, "Shift+T"},
-        {BrushType::ClayBlock, "C"}, {BrushType::Crease, "Shift+C"}, {BrushType::SnakeHook, "K"},
+        {BrushType::ClayBlock, "C"}, {BrushType::Crease, "Shift+C"}, {BrushType::Tendril, "K"},
     };
     for (int i = 0; i < int(BrushType::Count); ++i) {
         std::string key = sf && i < 10 ? (i < 9 ? std::to_string(i + 1) : "0") : "";

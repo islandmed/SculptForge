@@ -921,6 +921,17 @@ bool isProjectPath(const std::string& path) {
 }
 
 bool saveProject(const std::string& path, const Document& doc, std::string& error, bool autosave, bool visibleOnly) {
+    if (!autosave) { // Save As into a folder that doesn't exist yet: make it (the detail file and the project go in it)
+        std::error_code ec;
+        const std::filesystem::path folder = fsPath(path).parent_path();
+        if (!folder.empty() && !std::filesystem::exists(folder, ec)) {
+            std::filesystem::create_directories(folder, ec);
+            if (ec) {
+                error = "Can't create the folder " + pathToUtf8(folder) + ": " + ec.message();
+                return false;
+            }
+        }
+    }
     Writer w;
     Json manifest = Json::object();
     manifest.set("format", kFormatName);

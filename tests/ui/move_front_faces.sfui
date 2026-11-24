@@ -1,0 +1,39 @@
+# Move with View falloff reaches through the model (the back of a sphere moves with the front); Front faces only keeps
+# it to the surface facing the camera, which is the way out on a one-piece head (Connected only can't separate its
+# back from its front). Off again, the grab is the one it was, vertex for vertex.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+camera 0 0
+click "Move##brush.move"
+click "Brush##palette.brush"
+click "View falloff##draw.view_falloff"
+click "Brush##palette.brush"
+expect_value view_falloff == 1
+
+# View falloff alone: the far side goes along.
+snapshot
+stroke 0.44 0.5 0.56 0.5
+remember moved through
+expect_value moved > 0
+camera 150 10
+shot move-through-before
+camera 0 0
+key ctrl+z
+expect_value moved == 0
+
+# Front faces only: the same drag moves the near side, nothing facing away.
+action draw.front_faces
+stroke 0.44 0.5 0.56 0.5
+expect_value moved > 0
+expect_value moved < $through*0.7
+camera 150 10
+shot move-front-only-after
+camera 0 0
+shot move-front-only-front
+key ctrl+z
+expect_value moved == 0
+
+# Off again: as before, bit for bit.
+action draw.front_faces
+stroke 0.44 0.5 0.56 0.5
+expect_value moved == $through

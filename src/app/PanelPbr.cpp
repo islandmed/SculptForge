@@ -338,10 +338,9 @@ Args App::drawLayerChannelChips(int layer) {
                     run = {{"index", double(layer)}, {"channel", std::string(channelFormat(c).id)},
                            {"blend", std::string(channelBlendId(uint8_t(b)))}};
             ImGui::Separator();
-            float pct = opacity * 100.0f;
+            float pct = 0.0f;
             ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10.0f);
-            ImGui::SliderFloat("##chipopacity", &pct, 0.0f, 100.0f, tr("Opacity %.0f%%"));
-            if (ImGui::IsItemDeactivatedAfterEdit())
+            if (ui::SliderOnRelease("##chipopacity", opacity * 100.0f, 0.0f, 100.0f, tr("Opacity %.0f%%"), &pct))
                 run = {{"index", double(layer)}, {"channel", std::string(channelFormat(c).id)}, {"opacity", double(pct / 100.0f)}};
             ImGui::EndPopup();
         }
@@ -407,6 +406,8 @@ double App::pbrTestValue(const std::string& name) const {
     if (name == "view_pbr") return renderSettings_.pbr() ? 1.0 : 0.0;
     if (name == "environment") return double(renderSettings_.environment);
     if (name == "environment_pending") return renderer_.environmentPending() ? 1.0 : 0.0;
+    if (name == "texture_uv_width") return double(renderer_.textureUvWidth(doc_.meshKey(doc_.activePart)));
+    if (name == "texture_not_shown") return renderer_.textureNotShown(doc_.meshKey(doc_.activePart)) ? 1.0 : 0.0;
     if (name == "pbr_planes") return double(renderer_.pbrPlanes(doc_.meshKey(doc_.activePart)));
     if (name == "brush_channels") return double(doc_.paintMaterial.channels);
     if (name == "roughness_painted") {

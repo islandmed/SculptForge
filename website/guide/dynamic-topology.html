@@ -102,7 +102,7 @@
 <strong>Quads</strong> under the brush become triangles. The rest of the mesh keeps its quads.
 </li>
 <li>
-<strong>UVs are dropped</strong> the first time a stroke remeshes a Part (the status bar says so), since the new triangles have none. Undo brings them back. Unwrap again with <strong>Auto UV</strong> when you are done.
+<strong>UVs and the painted texture are kept.</strong> New triangles get UVs from the ones they split, so paint stays where you put it and the texture itself is never touched. Along a UV seam the remesh is careful (its vertices merge only along it and are not relaxed, a seam edge is never flipped), so a seam can stay a little finer than the rest. Undo brings back the exact UVs.
 </li>
 </ul>
 <h2 id="subdivision-levels">Subdivision levels<a class="anchor" href="#subdivision-levels" aria-label="Link to this section">#</a></h2>

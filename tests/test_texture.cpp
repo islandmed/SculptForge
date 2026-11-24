@@ -897,6 +897,29 @@ TEST(texture_smooth_dab_is_interactive_at_4k_on_a_million_triangles) {
         CHECK(texels[1] > 0);
         CHECK(ms[1] < timeLimit(60.0));
     }
+    // The same with every material channel on and ticked (Shift smooths each channel the brush paints): ms per dab.
+    for (Channel c : {Channel::Roughness, Channel::Metallic, Channel::Normal, Channel::Height})
+        setChannelEnabled(*m.texture, c, true);
+    for (float radius : {0.08f, 0.25f}) {
+        p.radius = radius;
+        TexturePainter painter;
+        CHECK(painter.begin(m, channelBit(Channel::BaseColor) | channelBit(Channel::Roughness) | channelBit(Channel::Metallic) |
+                                   channelBit(Channel::Normal) | channelBit(Channel::Height)));
+        auto t0 = std::chrono::steady_clock::now();
+        double firstMs = 0.0;
+        size_t texels = 0;
+        for (int i = 0; i < 20; ++i) {
+            p.center = glm::normalize(glm::vec3(-0.3f + 0.03f * float(i), 0.1f, 1.0f));
+            texels += painter.smoothDab(m, bvh, p, Symmetry{true, false, false});
+            if (i == 0) firstMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        }
+        const double ms = (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() - firstMs) / 19.0;
+        std::printf("    r %.2f, five channels: first dab %.1f ms, then %.2f ms per dab (%zu texels)\n", double(radius), firstMs, ms, texels / 20);
+        UndoRecord rec;
+        painter.end(rec);
+        CHECK(texels > 0);
+        CHECK(ms < timeLimit(250.0));
+    }
 }
 
 TEST(texture_smooth_crosses_a_uv_seam_and_not_into_unrelated_islands) {

@@ -32,6 +32,7 @@ bool copyUploads() {
 }
 
 void setTestTexelLimit(uint32_t texels) { g_testTexelLimit = texels; }
+bool testTinyGpu() { return g_testTexelLimit != 0 && g_testTexelLimit <= 256; }
 
 GLint maxTextureBufferTexels() {
     GLint texels = 0;

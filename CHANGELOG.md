@@ -6,6 +6,95 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.14] - 2026-11-23
+
+### Fixed
+- Dynamic topology no longer erases a Part's painted texture: the UVs are kept through the stroke (new triangles get
+  UVs from the ones they split; at a UV seam the remesh merges and relaxes only along the seam), so the paint stays in
+  place and Undo restores the UVs exactly.
+
+## [0.13.13] - 2026-11-23
+
+### Added
+- "**Contact facing** (Sculpt > Brush, beside Connected only and View falloff; off at first): the falloff is measured
+  along the surface, so what a brush reaches only round a fold stays put, and surface turned away from the one under
+  the cursor fades past half of the **Facing angle** (180 at first). A stroke along the edge of a narrow slot no
+  longer moves the opposite wall (Standard, Clay, Smooth, Inflate: none of it, where it moved 82 to 100% as far as the
+  side under the cursor), while the rim follows smoothly; smooth forms move exactly as without it, and so do shallow
+  folds facing the way the surface under the cursor does (Clay over an eye or the lips smooths over them as before).
+  On plain meshes and Micro levels (the surface distance on the base mesh). Move and Grab still reach everything.
+  Saved with the preferences and the project; in Classic it shows with Show newer menu rows. Reported on Discord."
+
+### Changed
+- "**Tendril**: the brush is called Tendril everywhere inside the program too (code, tests, scripts). Brush settings,
+  shelves, radial menus, scripts and projects saved by older versions under its old name still load. The Forge Deck
+  guide pictures show the Tendril tile."
+- `SF_FRAME_LOG=100` (start SculptForge with it set) now also logs, for a streamed Micro level, where a slow frame's
+  Micro work went and how many tiles still wait for shading, to help find rare freezes.
+
+### Fixed
+- Windows: Preferences > Performance no longer promises bigger Focus Detail caches; Focus Detail streams on Linux and
+  macOS for now.
+- **Texture painting on Android GPUs with small texture buffers** (Mali, 65536 texels): a Part over about 21,800
+  triangles got no UVs on the GPU, so a new texture showed nothing and strokes left no paint, and the mesh was re-sent
+  to the GPU every frame. The UVs now go in a 2D texture past the limit, nothing is re-sent, a mesh past even that
+  says "this graphics chip can't show the texture" in the status bar and the Texture Image panel, and the log names
+  the GL call behind any error.
+- "**Brush thumbnails and alphas after picking a brush that carries its own alpha**: after you clicked a library or
+  pack brush with its own alpha (Hard Cut, Flat Plane, Engrave...), each plain brush you clicked next for the first
+  time (Clay, Clay Block, Sharp Crease, Inflate, Pinch...) took that alpha along, so its thumbnail turned into a
+  scrambled alpha preview and it really stroked with the alpha. A brush's own alpha now stays with it; a brush starts
+  plain. Brush-pack and library brushes (Clay Strip, Flat Plane, Hard Cut...) also keep the same thumbnail before and
+  after you pick them. If a brush still shows an alpha you did not pick, **Brush > Reset Brush to Default** puts the
+  shipped settings back."
+- Carving brushes that pull the surface toward the stroke (Engrave, Crease Line, Panel Groove and the others in the
+  Brush Lab packs) left a ruffled, sawtooth wall when one stroke went up and down the same line a few times (a
+  member's report): every pass pulled the walls closer until the triangles crossed. A vertex now slides toward the
+  stroke only so far in one stroke (about 0.15 of the brush radius, easing off from there), so more passes deepen the
+  groove without squeezing it. A line or two looks as before.
+- The title strip's readout ("Verts ... Part ... Layer ...") drew a Part or layer name in Chinese, Japanese or Korean
+  as a grey smudge at 12 px (the small face); with such text the readout now uses the regular face. Latin names are
+  unchanged, pixel for pixel.
+- **Focus Detail**: a scene opened from a `.sfdetail` file, or reopened from its project, drew its fine shading detail
+  (pores) only after the next stroke or edit when nothing else kept the viewport drawing; the viewport now keeps
+  drawing until the detail's shading is in. The detail itself was never lost: the project's `.sfdetail` copy holds
+  every tile (tested byte for byte).
+- **Focus Detail**: the script command `open` takes a `.sfdetail` file (it said "No faces found"), and File > Open
+  lists `.sfdetail` among the files it shows.
+- **Save As** into a folder that doesn't exist yet makes the folder (a project with a streamed detail file failed with
+  "Can't write ... .sfdetail.part"); a folder that can't be made says so.
+- **Undo, Redo and Move on a dense Micro level show patches of stale shading** (#184, thanks @HG4Science): since
+  0.13.10 their shading caught up over several frames, the way a long Clay stroke's does, so undone strokes and moved
+  areas kept their old shading for up to a few seconds. Undo, Redo and Move now show the new shading on the next
+  frame, on Windows and macOS levels as well as streamed ones; only a Clay-type stroke's own shading still catches up
+  within the per-frame budget.
+- "**Move** ignored **Front faces only** (a member's report): with View falloff on, a Move drag on a one-piece head
+  also pulled the back of it, and Connected only could not help there. Move now takes only the surface facing the
+  camera when Front faces only is on, on plain meshes and Micro levels alike (its pull eases off toward the silhouette
+  and toward any surface facing away, such as an ear's back, so the surface there bends instead of tearing); with it
+  off nothing changes. The guide's View falloff row says which to use."
+- Texture painting: Shift with the Paint brush (smooth) only softened Base Color, so a stroke painted with Roughness,
+  Metallic, Normal or Height ticked kept hard, streaky edges that Shift could not blend. It now smooths every channel
+  the brush paints (Paint > Material), on layers by their coverage; a Normal is turned into the neighbouring UV
+  island's tangent frame before it is blended and renormalised after.
+- **Freezes at the start and end of strokes on a dense streamed Micro level** (#184, thanks @HG4Science): letting go
+  of a stroke held the window for up to a second or more while its undo step was packed, the first Draw stroke on a
+  new Micro level froze for one to two seconds while every tile's shading was redone, and with Tool > Geometry open
+  every stroke re-counted Merge by Distance over the whole base mesh. The undo step is now packed in the background
+  (Undo right after still restores it exactly), the shading catches up tile by tile within the frame's budget, and
+  Merge by Distance counts again only when the base mesh changes.
+- After a long stroke on a streamed Micro level, the edited detail leaving memory no longer stalls the next frames for
+  seconds on lower-spec computers: it goes a little each frame (#184).
+- Big brushes on a high Micro level lag less: each dab no longer reads and writes the whole of every triangle it
+  touches, only the part under the brush (#184).
+- No pause in the middle of a long stroke on a streamed Micro level when the stroke grows the level's height range:
+  the work is spread over two frames (#184).
+
+### Security
+- Plugin sandbox runtime updated: wasmtime 50.0.2 to 51.0.0 (#235), which includes the fix for an upstream Windows
+  filesystem-sandbox escape in its WASI layer. SculptForge links no WASI and gives plugins no files, network or host
+  functions, so plugins could not reach it; plugin limits (memory, fuel, time) are unchanged.
+
 ## [0.13.12] - 2026-11-22
 
 ### Added

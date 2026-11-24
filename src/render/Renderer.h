@@ -231,6 +231,11 @@ public:
 
     // GL texture of the painted texture of Part `id` as last synced (0 if none), for UI previews (rows bottom-up).
     GLuint paintTexture(uint32_t id) const;
+    // Part `id` has a painted texture (or UV checker) this GPU cannot show on the model (too many triangles for its
+    // limits): painting still goes into the texture, the model draws without it. The panel says so.
+    bool textureNotShown(uint32_t id) const;
+    // How Part `id`'s UVs reach the shader, for tests: 0 a texture buffer, N rows of N texels in a 2D texture.
+    int textureUvWidth(uint32_t id) const;
 
     // --- Strokes on heavy meshes (app/AsyncStroke.cpp) ---
     // The predictive stroke preview (render/Ghost.h) drawn on Part `id`; an empty stroke turns it off.
@@ -308,10 +313,13 @@ public:
     // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
     size_t microPendingShading() const;
     size_t microPendingCoarse() const; // (MicroRenderer::pendingCoarse, all slots)
+    size_t microWidenDeferrals() const; // (MicroRenderer::widenDeferrals, all slots)
+    size_t microPendingPages() const;  // (MicroRenderer::pendingPages, all slots)
     // Adaptive Detail tiles' delta pages alive on the GPU, all slots (MicroTilePages::pages), and their GPU bytes.
     size_t microTilePages() const;
     size_t microTilePageBytes() const;
     bool microTilePagesWantFrame() const; // (MicroTilePages::wantsFrame: one more frame pages what came into view)
+    bool microShadingWantsFrame() const;  // a shown micro level's shading still drains over frames (MicroRenderer::pendingShading)
     // Focus Detail's GPU sync time by part since the last call (MicroFocus::Part; adds into out[MicroFocus::kParts]).
     void takeFocusSplit(double* out);
     // Triangles the last draw() sent to the GPU (after culling), for the benchmark.
@@ -451,6 +459,12 @@ private:
         GLuint groupData = 0, groupTexture = 0; // face group id per drawn triangle (texture buffer, R16UI or R32UI)
         GLuint primData = 0, primTexture = 0;   // per GPU block: the first drawn triangle of its cluster (R32UI)
         GLuint uvData = 0, uvTexture = 0; // per drawn triangle corner UVs (texture buffer), meshes with a texture
+        // Past the GPU's texture buffer limit (Mali: 65536 texels, a 22k-triangle mesh): the same UVs as rows of uvWidth
+        // RG32F texels in a 2D texture (uvWidth 0: the buffer). uvsWanted: what the last upload was asked for, so a mesh
+        // that could not get UVs at all (uvsLost) is not re-uploaded every frame.
+        GLuint uvTexture2D = 0;
+        int uvWidth = 0;
+        bool uvsWanted = false, uvsLost = false;
         GLuint paintTexture = 0;          // the painted texture (sRGB, mipmapped)
         uint64_t textureSerial = 0, textureRevision = 0;
         int textureW = 0, textureH = 0;
@@ -521,6 +535,7 @@ private:
             std::vector<uint32_t> verts;     // the mesh vertex of each local index
             std::vector<uint16_t> local;     // triangles (local indices), while stale
             std::vector<uint32_t> groups;    // their face groups, while stale
+            std::vector<glm::vec2> uvs;      // their corners' UVs (3 each), while stale
             ClusterBounds bounds;
             bool stale = true;    // triangles changed: rebuild and upload everything
             bool uploaded = false;
@@ -530,8 +545,10 @@ private:
         std::vector<uint32_t> chunkCluster;           // per layout chunk of triangles: its cluster
         uint32_t layoutTriangles = 0;
         GLuint patchVao = 0, patchLineVao = 0, patchVertices = 0, patchIndices = 0, patchLines = 0, patchColors = 0,
-               patchMask = 0, patchGroupData = 0, patchGroupTexture = 0;
+               patchMask = 0, patchGroupData = 0, patchGroupTexture = 0, patchUvData = 0, patchUvTexture = 0;
         size_t patchParts = 0; // parts the patch buffers have room for
+        std::vector<glm::vec2> patchUvShadow; // the patches' UVs as the GPU holds them (3 per triangle, per part): sent in runs
+        std::vector<uint32_t> patchUvParts;   // parts whose UVs changed in this sync
         bool patchColorsOn = false, patchMaskOn = false, patchLinesOn = false;
         PositionGrid patchGrid; // the grid the patches' vertices were packed with
         size_t patchBytes = 0;
@@ -660,6 +677,7 @@ private:
         GLuint id = 0;
         bool failed = false; // the driver rejected this variant (logged once): draws use a simpler one
         GLint normalFix = -1;
+        GLint uvWidth = -1;
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, maskDarkness = -1, maskColor = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
               hasPaint = -1, unlit = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,

@@ -12,7 +12,7 @@ namespace sf {
 
 GhostKind ghostKindForBrush(int brushType) {
     // core/Sculpt.h BrushType order: Standard, Clay, Smooth, Move, Inflate, Crease, Flatten, Pinch, Sharp Crease,
-    // Clay Block, SnakeHook, Trim, Layer, Nudge, Vdm.
+    // Clay Block, Tendril, Trim, Layer, Nudge, Vdm.
     switch (brushType) {
     case 0: return GhostKind::Standard;
     case 1: return GhostKind::Clay;
