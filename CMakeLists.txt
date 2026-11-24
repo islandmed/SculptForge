@@ -1333,6 +1333,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
     sculptforge_ui_test(scatter_1440 scatter --size 1440x900) # Tool > Scatter, its live redo and Separate Parts over 500
     sculptforge_ui_test(scatter_2880 scatter --size 2880x1800)
+    sculptforge_ui_test(stop_at_mesh_depth_1440 stop_at_mesh_depth --size 1440x900) # Crease Line ten laps over one line: no sawtooth; Stop at mesh depth
+    sculptforge_ui_test(stop_at_mesh_depth_2880 stop_at_mesh_depth --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(guide_window_look_1440 guide_window_look --size 1440x900) # the guide's Learn edge, strip and surface

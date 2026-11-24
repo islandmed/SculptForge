@@ -71,6 +71,9 @@ struct BrushRecipe {
     bool frontFacesOnly = false;
     // Falloff options (DabParams::connectedOnly / viewFalloff), on with the app's own or on their own. Written to
     // the recipe's JSON only when on, so other recipes' files stay as they were.
+    // Pinching carves (Crease Line, Engrave...): the groove stops deepening and tightening once the mesh can't hold it (Sculpt.cpp,
+    // kGrooveSoft). Off: it cuts on, to the model's far side. Written to the JSON only when off. Not with Dynamic on.
+    bool stopAtMeshDepth = true;
     bool connectedOnly = false;
     bool viewFalloff = false;
     // Hard-surface planes (Crisp Flatten; thanks _tfx on Discord). Written to the JSON only when on.

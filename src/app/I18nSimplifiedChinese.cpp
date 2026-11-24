@@ -1800,6 +1800,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Connected only", "仅限相连"},
     {"Lock plane", "锁定平面"},
     {"Crisp edge", "锐利边缘"},
+    {"Stop at mesh depth", "在网格深度停止"},
+    {"A pinching cut stops deepening and tightening once the mesh can't hold its groove (about a brush radius deep): repeated passes no longer saw the walls into teeth. Untick it, or turn on Dynamic, to cut on.", "收缩刻划在网格撑不住沟槽时（约一个笔刷半径深）就停止加深与收紧：重复描绘不再把沟壁锯成锯齿。取消勾选，或开启 Dynamic，即可继续刻深。"},
     {"Keep the plane the stroke starts on for the whole stroke.", "整个笔触都保持笔触起点的平面。"},
     {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "硬而干净的笔尖边缘并完全压平，用于硬表面平面。"},
     {"View falloff", "视图衰减"},

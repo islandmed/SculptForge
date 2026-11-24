@@ -16,6 +16,7 @@
 
 #include "core/Benchmark.h"
 #include "core/BrushPacks.h"
+#include "core/Dyntopo.h"
 #include "core/Micro.h"
 #include "core/PathStroke.h"
 
@@ -23,6 +24,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <unordered_map>
 
 using namespace sf;
 
@@ -46,9 +48,10 @@ std::vector<BrushRecipe> pinchers() {
 }
 
 // `passes` laps, down and up the middle of a sphere facing +z (the view looks into it; a groove 0.8 long) at Intensity 50.
-void stroke(Document& doc, const BrushRecipe& r, float radius, int passes, bool mirror) {
+void stroke(Document& doc, const BrushRecipe& r, float radius, int passes, bool mirror, bool lift = false, float x0 = 0.0f, bool facing = false) {
     PathStroke s;
-    for (int i = 0; i <= 8; ++i) s.points.push_back(glm::normalize(glm::vec3(0.0f, -0.4f + 0.1f * float(i), 1.0f)) * 1.2f);
+    s.contactFacing = facing; // (Brush > Contact facing at its Facing angle 180)
+    for (int i = 0; i <= 8; ++i) s.points.push_back(glm::normalize(glm::vec3(x0, -0.4f + 0.1f * float(i), 1.0f)) * 1.2f);
     if (const double wobble = envNumber("SF_CARVE_WOBBLE", 0.0); wobble > 0.0) { // (by hand: a pen's path, dense samples with a shaky hand)
         s.points.clear();
         uint32_t seed = 12345;
@@ -67,7 +70,7 @@ void stroke(Document& doc, const BrushRecipe& r, float radius, int passes, bool 
     s.symmetry = Symmetry{mirror, false, false};
     std::string err;
     CHECK(BrushAlpha::builtin(r.alpha, doc.brushAlpha) || r.alpha.empty());
-    if (!std::getenv("SF_CARVE_SEPARATE")) { // (all the laps in ONE stroke, the pen never lifted: how the report was drawn)
+    if (!lift && !std::getenv("SF_CARVE_SEPARATE")) { // (all the laps in ONE stroke, the pen never lifted: how the report was drawn)
         std::vector<glm::vec3> lap = s.points;
         s.points.clear();
         for (int pass = 0; pass < passes; ++pass) {
@@ -93,10 +96,11 @@ struct Cut {
 };
 
 // One recipe, `laps` laps of one stroke at `radius` on the 81.9k starter sphere.
-Cut carve(const BrushRecipe& r, float radius, int laps, bool mirror) {
+Cut carve(const BrushRecipe& r, float radius, int laps, bool mirror, bool lift = false, float x0 = 0.0f, bool facing = false) {
     Document doc = makeDoc(makeBenchSphere(size_t(envNumber("SF_CARVE_TRIS", 81920))));
+    doc.mesh.recomputeAllNormals(); // (the app's mesh has its normals; Contact facing and the groove's depth read them)
     const std::vector<glm::vec3> before = doc.mesh.positions;
-    stroke(doc, r, radius, laps, mirror);
+    stroke(doc, r, radius, laps, mirror, lift, x0, facing);
     CHECK(doc.mesh.vertexCount() == before.size());
     Cut c;
     for (uint32_t v = 0; v < before.size(); ++v) {
@@ -157,6 +161,93 @@ TEST(pinching_recipes_keep_the_mirror_seam_clean) {
             CHECK(c.flipped * 1000 <= c.triangles);
         }
     }
+}
+
+// Crease Line dug up and down one line ten times (the report: "pinching feels stronger", then serrated walls inside the groove, with
+// the mirror on, the default, and Contact facing on or off: it never cut here, its weights are all 1 on such a groove). The mesh
+// holds a groove only so deep: dug on past that, the walls' rows overlapped in a sawtooth. Now the dig and the pinch fade out at about
+// a brush radius under the rim: the groove stops deepening, and ten laps fold (almost) nothing, lifted or not, mirrored or not, with
+// Contact facing on or off.
+TEST(crease_line_ten_laps_keep_a_clean_groove) {
+    BrushRecipe crease;
+    for (const BrushRecipe& r : builtinBrushRecipes())
+        if (r.name == "Crease Line") crease = r;
+    CHECK(crease.name == "Crease Line");
+    const float radius = 0.236f;
+    const Cut first = carve(crease, radius, 1, false);
+    CHECK(first.sink > 0.08f); // (the first laps dig as they did: 0.09, 0.18, 0.24 against 0.09, 0.18, 0.27 before)
+    CHECK(carve(crease, radius, 2, false).sink > 0.16f);
+    CHECK(carve(crease, radius, 3, false).sink > 0.22f);
+    for (const bool mirror : {false, true})
+        for (const bool lift : {false, true})
+            for (const bool facing : {false, true}) {
+                const Cut six = carve(crease, radius, 6, mirror, lift, 0.0f, facing), ten = carve(crease, radius, 10, mirror, lift, 0.0f, facing);
+                CHECK(ten.folded * 10000 <= ten.triangles); // (8 of 84k at most)
+                CHECK(ten.flipped * 1000 <= ten.triangles);
+                CHECK(ten.sink < 0.35f);                     // (a brush radius and a quarter, where the rows overlap past it)
+                CHECK(ten.sink - six.sink < 0.03f);          // (it has stopped deepening)
+                CHECK(ten.rise < 0.002f);
+            }
+}
+
+// Dynamic on: the groove adds triangles as it deepens, so the dig is not capped (ten laps go as deep as the pen takes them: Stop at mesh
+// depth off does the same on a plain mesh), and the pinch still stops tightening: no folds. Folded neighbours counted on the mesh as it
+// ends (it has more vertices than it began).
+size_t foldedNow(const Mesh& m) {
+    std::unordered_map<uint64_t, uint32_t> first;
+    size_t folds = 0;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3 f = m.triangles[t];
+        const glm::vec3 n = glm::normalize(glm::cross(m.positions[f.y] - m.positions[f.x], m.positions[f.z] - m.positions[f.x]));
+        const uint32_t c[3] = {f.x, f.y, f.z};
+        for (int k = 0; k < 3; ++k) {
+            const uint64_t key = (uint64_t(std::min(c[k], c[(k + 1) % 3])) << 32) | std::max(c[k], c[(k + 1) % 3]);
+            auto it = first.find(key);
+            if (it == first.end()) { first.emplace(key, t); continue; }
+            const glm::uvec3 g = m.triangles[it->second];
+            const glm::vec3 o = glm::normalize(glm::cross(m.positions[g.y] - m.positions[g.x], m.positions[g.z] - m.positions[g.x]));
+            if (glm::dot(n, o) < -0.5f) ++folds;
+        }
+    }
+    return folds;
+}
+float deepestNow(const Mesh& m) {
+    float deepest = 0.0f;
+    for (const glm::vec3& p : m.positions) deepest = std::max(deepest, 1.0f - glm::length(p));
+    return deepest;
+}
+TEST(crease_line_goes_deeper_with_dynamic_or_stop_at_mesh_depth_off) {
+    BrushRecipe crease;
+    for (const BrushRecipe& r : builtinBrushRecipes())
+        if (r.name == "Crease Line") crease = r;
+    CHECK(crease.name == "Crease Line");
+    float capped = 0.0f;
+    for (int mode = 0; mode < 3; ++mode) { // 0: capped, 1: Dynamic on, 2: Stop at mesh depth off
+        Document doc = makeDoc(makeIcosphere(6, 1.0f)); // (no subdivision levels: Dynamic works on it)
+        doc.mesh.recomputeAllNormals();
+        BrushRecipe r = crease;
+        r.stopAtMeshDepth = mode != 2;
+        doc.sculptor.dyntopo.enabled = mode == 1;
+        doc.sculptor.dyntopo.detail = 0.8f;
+        stroke(doc, r, 0.236f, 10, false, true);
+        const float deep = deepestNow(doc.mesh);
+        std::printf("  mode %d: %zu vertices, deepest %.3f, folded %zu\n", mode, doc.mesh.vertexCount(), deep, foldedNow(doc.mesh));
+        if (mode == 0) capped = deep;
+        else CHECK(deep > capped + 0.15f);
+        if (mode == 1) CHECK(foldedNow(doc.mesh) * 10000 <= doc.mesh.triangleCount());
+    }
+}
+
+// A stroke on the mirror plane is one dab with both copies' weight: as deep as one beside the plane (where the two copies are
+// two dabs a little apart that overlap on the plane), within 10%.
+TEST(pinching_recipe_on_the_mirror_plane_digs_as_deep_as_beside_it) {
+    BrushRecipe crease;
+    for (const BrushRecipe& r : builtinBrushRecipes())
+        if (r.name == "Crease Line") crease = r;
+    CHECK(crease.name == "Crease Line");
+    const Cut on = carve(crease, 0.236f, 1, true, true, 0.0f), beside = carve(crease, 0.236f, 1, true, true, 0.03f);
+    CHECK(on.sink > 0.1f);
+    CHECK(std::fabs(on.sink - beside.sink) < 0.1f * beside.sink);
 }
 
 // The per-stroke state of a pinching recipe (24 bytes a vertex) is the stroke's, not the mesh's: held while the stroke runs, gone

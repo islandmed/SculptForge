@@ -1,0 +1,99 @@
+# e2e: Crease Line dug up and down one line ten times (Discord, 0.13.13: "crease pinching feels stronger on repeated up/down strokes", then
+# serrated walls inside the groove). The mesh holds a groove only so deep; dug on past that, the walls' rows overlapped in a sawtooth. Stop at
+# mesh depth (Brush > Edit recipe, on by default) fades the dig and the pinch out at about a brush radius under the rim: ten laps stay a clean
+# groove with Mirror X on (the default: the line sits on the seam), Contact facing off and on. Unticked: the same laps cut on, as before.
+run ui_look look=classic layout=classic
+wait 0.3
+run new_sphere subdivisions=6
+camera 0 0
+key f
+zoom 1.6
+run brush_use name="Crease Line"
+brush_size 150
+# Classic keeps the row (added after 0.13.14) out unless Show newer menu rows is on.
+click "Brush##palette.brush"
+click "Edit recipe: Crease Line"
+expect_not "Stop at mesh depth##recipe"
+click "Brush##palette.brush"
+run ui_look look=classic layout=classic newer_rows=true
+wait 0.3
+click "Brush##palette.brush" # (the recipe stays open from the first look)
+expect "Stop at mesh depth##recipe"
+shot recipe
+click "Brush##palette.brush"
+snapshot
+stroke 0.5 0.3 0.5 0.7
+shot on_pass01
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+shot on_pass03
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+stroke 0.5 0.7 0.5 0.3
+shot on_pass10
+expect_value moved_max < 0.8
+remember moved_max capped
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+expect_value moved == 0
+# Contact facing on: its weights are all 1 on this groove, so the same result.
+action draw.contact_facing
+expect_value contact_facing == 1
+stroke 0.5 0.3 0.5 0.7
+shot facing_pass01
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+shot facing_pass03
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+stroke 0.5 0.7 0.5 0.3
+shot facing_pass10
+expect_value moved_max < 0.8
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+action draw.contact_facing
+expect_value contact_facing == 0
+# Stop at mesh depth off: it cuts on, deeper than the cap.
+click "Brush##palette.brush"
+click "Stop at mesh depth##recipe"
+click "Brush##palette.brush"
+stroke 0.5 0.3 0.5 0.7
+shot off_pass01
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+shot off_pass03
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+stroke 0.5 0.7 0.5 0.3
+stroke 0.5 0.3 0.5 0.7
+stroke 0.5 0.7 0.5 0.3
+shot off_pass10
+expect_value moved_max > $capped*1.5

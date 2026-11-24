@@ -148,6 +148,7 @@ Json BrushRecipe::toJson() const {
     if (viewFalloff) j.set("viewFalloff", true);
     if (planeLock) j.set("planeLock", true);
     if (crispEdge) j.set("crispEdge", true);
+    if (!stopAtMeshDepth) j.set("stopAtMeshDepth", false);
     if (!alpha.empty()) j.set("alpha", alpha);
     if (alphaFollow) j.set("alphaFollow", true);
     if (alphaAngle != 0.0f) j.set("alphaAngle", std::round(double(alphaAngle) * 1000.0) / 1000.0);
@@ -176,6 +177,7 @@ void BrushRecipe::applyJson(const Json& j) {
     if (j["viewFalloff"].isBool()) viewFalloff = j["viewFalloff"].asBool();
     if (j["planeLock"].isBool()) planeLock = j["planeLock"].asBool();
     if (j["crispEdge"].isBool()) crispEdge = j["crispEdge"].asBool();
+    if (j["stopAtMeshDepth"].isBool()) stopAtMeshDepth = j["stopAtMeshDepth"].asBool();
     if (j["alphaFollow"].isBool()) alphaFollow = j["alphaFollow"].asBool();
     if (j["alphaAngle"].isNumber()) alphaAngle = float(j["alphaAngle"].asNumber());
     if (j["alphaAngleJitter"].isNumber()) alphaJitter = float(j["alphaAngleJitter"].asNumber());

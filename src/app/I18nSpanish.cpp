@@ -2040,6 +2040,8 @@ constexpr Entry kSpanish[] = {
     {"Connected only", "Solo conectado"},
     {"Lock plane", "Fijar plano"},
     {"Crisp edge", "Borde nítido"},
+    {"Stop at mesh depth", "Parar a la profundidad de la malla"},
+    {"A pinching cut stops deepening and tightening once the mesh can't hold its groove (about a brush radius deep): repeated passes no longer saw the walls into teeth. Untick it, or turn on Dynamic, to cut on.", "Un corte con pellizco deja de profundizar y estrecharse cuando la malla ya no sostiene su surco (a un radio de pincel de profundidad): los pasos repetidos ya no serran las paredes en dientes. Desmárcalo, o activa Dynamic, para seguir cortando."},
     {"Keep the plane the stroke starts on for the whole stroke.", "Mantiene el plano donde empieza el trazo durante todo el trazo."},
     {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "Un borde de punta duro y limpio y un aplanado completo, para planos de superficie dura."},
     {"View falloff", "Ver atenuación"},

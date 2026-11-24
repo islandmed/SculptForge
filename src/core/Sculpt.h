@@ -495,6 +495,7 @@ private:
     std::vector<uint32_t> pinchDabStamp_; // (the dab that worked out pinchTaper_: every copy of a symmetry's dab shares it)
     std::vector<float> pinchTaper_;
     uint32_t pinchDab_ = 0;
+    float dupWeight_ = 1.0f; // (copies of a pinching recipe's dab on one spot: the first does them all, this many times over)
 public:
     // The bytes a pinching recipe's stroke holds (0 between strokes: endStroke frees them).
     size_t pinchStateBytes() const {

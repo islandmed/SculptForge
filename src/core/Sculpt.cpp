@@ -347,6 +347,12 @@ constexpr float kMaxDragSqueeze = 0.35f;
 // recipe's Pinch (in brush radii) from where the stroke found it. Laps over one line (the pen never lifted) deepen the groove, but
 // don't keep squeezing its walls together until they cross (a ruffled, sawtooth wall); a lap or two is far inside it.
 constexpr float kPinchReach = 0.15f;
+// A pinching carve stops tightening once its groove is this deep under the rim of the dab's brush, in brush radii (full to kGrooveSoft,
+// none from kGrooveHard), and with it stops deepening (Stop at mesh depth, and Dynamic off: it adds the triangles a deeper groove needs): a
+// mesh holds a groove about a brush radius deep, and one dug on past that, pass after pass, ends in walls of needle triangles whose rows
+// overlap (a sawtooth wall). Laps of one line deepen it as before until then. The rim is looked for kGrooveReach radii round the dab: a
+// groove a radius deep has its rim just outside the brush, and one in and out of reach read as shallow again, and the dig went on.
+constexpr float kGrooveSoft = 0.8f, kGrooveHard = 1.15f, kGrooveReach = 1.8f;
 constexpr float kTendrilRingEdges = 2.0f; // Tendril with Dynamic on: its horn never pinches thinner than this many edges of radius
 constexpr float kTendrilDepth = 0.5f;     // Tendril under View falloff: full strength to 0.75 radii of depth from the tip, none beyond 1.5
 constexpr float kRelaxLambda = 0.6f; // (the share of the way to the middle of its neighbours a dragged vertex slides, per round)
@@ -2333,10 +2339,21 @@ void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const 
     ++pinchDab_;
     for (size_t k = 0; k < all.size(); ++k) {
         const SymCopy& m = all[k];
+        // A pinching recipe's copies on one spot (a stroke along the mirror plane) are one dab with their weight: the second of two
+        // done after the first would work on what it moved, and the groove's walls tear into a sawtooth.
+        dupWeight_ = 1.0f;
+        if (recipe.pinch != 0.0f) {
+            const auto same = [&](size_t j) { return glm::distance(crispCopyCenters_[j], crispCopyCenters_[k]) < 0.05f * base.radius; };
+            bool later = false;
+            for (size_t j = 0; j < k; ++j) later |= same(j);
+            if (later) continue;
+            for (size_t j = k + 1; j < all.size(); ++j) dupWeight_ += same(j) ? 1.0f : 0.0f;
+        }
         frameWanted_ = m.identity(); // (the unmirrored pass records lastFrame)
         const DabParams mp = m.identity() ? base : transformed(base, m);
         dabRecipeSingle(mesh, bvh, recipe, mp, k, m);
     }
+    dupWeight_ = 1.0f;
     if (!slideVerts_.empty()) slideBack(mesh, bvh);
     if (!dabVerts_.empty() || !dabLeaves_.empty() || lastLazyLeaves_.empty()) updateDabNormals(mesh, bvh); // (as dab)
     repairDab(mesh, bvh);
@@ -2391,7 +2408,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     if (p.contactFacing && verts_.empty()) return;
 
     const float rad = p.radius;
-    const float s = std::clamp(p.strength, 0.0f, 1.0f) * p.pressure;
+    const float s = std::clamp(p.strength, 0.0f, 1.0f) * p.pressure * dupWeight_;
     const float sign = p.invert ? -1.0f : 1.0f;
 
     // Per-vertex weight: tip shape, cavity mask and pattern.
@@ -2564,6 +2581,22 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
     float strokeLen = glm::length(strokeDir);
     strokeDir = strokeLen > 1e-12f ? strokeDir / strokeLen : glm::vec3(0.0f);
 
+    // The rim of the groove a pinching carve is in: the highest point of a ring round the dab, along the dab's normal and along the view
+    // (where the normal turns on a groove's sloping end, the view still reads its depth). The ring reaches past the brush: a groove a
+    // radius deep has its rim just outside it, and the rim in and out of reach read as a shallow groove again, and the dig went on.
+    const glm::vec3 grooveAxis[2] = {areaNormal, -p.viewDir};
+    float rimHeight[2] = {0.0f, 0.0f};
+    bool capGroove = false;
+    if (r.stopAtMeshDepth && r.pinch != 0.0f && r.depth < 0.0f && r.direction == BrushRecipe::Direction::Normal && !crispMax &&
+        r.pattern == BrushRecipe::Pattern::None && r.alpha.empty() && !useAlpha) {
+        brushVertices(mesh, bvh, p.center, kGrooveReach * rad, wideVerts_);
+        rimHeight[0] = rimHeight[1] = -std::numeric_limits<float>::max();
+        for (uint32_t v : wideVerts_)
+            if (brushDistance(p, pos[v]) > 0.7f * rad)
+                for (int k = 0; k < 2; ++k) rimHeight[k] = std::max(rimHeight[k], glm::dot(pos[v] - areaCenter, grooveAxis[k]));
+        capGroove = rimHeight[0] > -std::numeric_limits<float>::max();
+    }
+
     // A drag moves a vertex by its stroke step times its weight, so neighbours at the steepest part of the tip's falloff
     // move apart or together by (step x slope) of their distance: a long step on a hard tip (a quarter of the brush on a
     // Palette Knife) squeezes the triangles there to a fifth of their area in one dab. Such a step drags less.
@@ -2637,7 +2670,13 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
                                         (r.direction == BrushRecipe::Direction::Normal || r.direction == BrushRecipe::Direction::Inflate)
                                     ? viewAdditiveFade(x, p.center, p.viewDir, rad)
                                     : 1.0f;
-        glm::vec3 d = dir * (sign * r.depth * 0.12f * rad * s * f * depthFade);
+        float grooveFade = 1.0f;
+        if (capGroove) {
+            const float under = std::max(rimHeight[0] - h, rimHeight[1] - glm::dot(x - areaCenter, grooveAxis[1])) / rad;
+            const float t = std::clamp((under - kGrooveSoft) / (kGrooveHard - kGrooveSoft), 0.0f, 1.0f);
+            grooveFade = 1.0f - t * t * (3.0f - 2.0f * t);
+        }
+        glm::vec3 d = dir * (sign * r.depth * 0.12f * rad * s * f * depthFade * (dyntopo.enabled ? 1.0f : grooveFade));
 
         // Crisp edge: a Flatten plane only cuts (a member's ask: it never raises or adds clay, at any depth; the
         // regular Flatten brush is the one that fills). A point below the plane stays where it is, so no dip is
@@ -2692,7 +2731,7 @@ void Sculptor::dabRecipeSingle(Mesh& mesh, BVH& bvh, const BrushRecipe& r, const
         if (r.pinch != 0.0f) {
             glm::vec3 pull = projectOnPlane(p.center - x, areaNormal);
             pull -= strokeDir * glm::dot(pull, strokeDir); // (across the stroke only, as Sharp Crease's: along it a lap's turn pulled the surface into the end's point)
-            pull *= r.pinch * 0.25f * s * f;
+            pull *= r.pinch * 0.25f * s / dupWeight_ * f * grooveFade;
             if (pinchBound && f > 0.0f) { // (the pull from where the stroke found the vertex stays within pinchCap)
                 if (pinchStamp_[v] != stamp) pinchStamp_[v] = stamp, pinchStart_[v] = x;
                 // (the taper is worked out once a dab, from where the dab found the vertex: the copies of a symmetry reach it one
