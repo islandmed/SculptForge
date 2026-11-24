@@ -21,8 +21,10 @@ constexpr uint32_t kNone = ~0u;
 // A border vertex's offset per unit of thickness is at most this (a corner sharper than about 29 degrees would
 // otherwise shoot its new vertex far across the face).
 constexpr float kMaxMiter = 4.0f;
-// The thickness stays this far below the one that collapses a piece.
-constexpr float kClampFraction = 0.95f;
+// The thickness never passes this fraction of the one that collapses a piece (its inner faces meet): the inner faces
+// keep a fifth of their size and the rim quads stay quads, so a held inset is never a fan of slivers (a short slider
+// drag on a dense Part used to land at 95% of the collapse, 11-24).
+constexpr float kCollapseCap = 0.8f;
 
 struct UnionFind {
     std::vector<uint32_t> parent;
@@ -375,6 +377,28 @@ float holdingFraction(const Loops& loops, uint32_t piece, float t, std::vector<L
     return lo;
 }
 
+// The thickness at which `piece` collapses (its inner faces meet): bisected over its loops' extent. 0 for a piece
+// with no extent.
+float collapseThickness(const Loops& loops, uint32_t piece, std::vector<LoopOffset>& scratch) {
+    AABB box;
+    for (uint32_t l : loops.ofPiece[piece])
+        for (const glm::vec3& p : loops.geos[l].P) box.expand(p);
+    const float span = glm::length(box.extent());
+    if (!(span > 0.0f)) return 0.0f;
+    return span * holdingFraction(loops, piece, span, scratch);
+}
+
+// The smallest collapse thickness over the pieces: what the whole selection can take. 0 when nothing can be inset.
+float selectionCollapse(const Analysis& a, const Loops& loops, std::vector<LoopOffset>& scratch) {
+    float best = std::numeric_limits<float>::infinity();
+    for (uint32_t r = 0; r < a.regionCount; ++r) {
+        if (loops.ofPiece[r].empty()) continue;
+        const float t = collapseThickness(loops, r, scratch);
+        if (t > 0.0f) best = std::min(best, t);
+    }
+    return std::isfinite(best) ? best : 0.0f;
+}
+
 // Barycentric coordinates of `p` in the plane of triangle (p0, p1, p2); false when the triangle is degenerate.
 bool barycentric(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p, glm::vec3& out) {
     const glm::dvec3 e0 = glm::dvec3(p1 - p0), e1 = glm::dvec3(p2 - p0), q = glm::dvec3(p - p0);
@@ -488,18 +512,10 @@ float insetMaxThickness(const Mesh& mesh, std::span<const uint32_t> triangles, b
     if (!analyse(mesh, triangles, individual, a)) return 0.0f;
     const Loops loops = buildLoops(mesh, a);
     std::vector<LoopOffset> scratch(loops.geos.size());
-    float best = std::numeric_limits<float>::infinity();
-    for (uint32_t r = 0; r < a.regionCount; ++r) {
-        if (loops.ofPiece[r].empty()) continue;
-        AABB box;
-        for (uint32_t l : loops.ofPiece[r])
-            for (const glm::vec3& p : loops.geos[l].P) box.expand(p);
-        const float span = glm::length(box.extent());
-        if (!(span > 0.0f)) continue;
-        best = std::min(best, span * holdingFraction(loops, r, span, scratch));
-    }
-    return std::isfinite(best) ? best : 0.0f;
+    return selectionCollapse(a, loops, scratch);
 }
+
+float insetCollapseCap() { return kCollapseCap; }
 
 InsetResult insetFaces(const Mesh& mesh, std::span<const uint32_t> triangles, const InsetOptions& options) {
     InsetResult res;
@@ -511,13 +527,35 @@ InsetResult insetFaces(const Mesh& mesh, std::span<const uint32_t> triangles, co
     const uint32_t nv0 = uint32_t(mesh.vertexCount()), nt0 = uint32_t(mesh.triangleCount());
     const Loops loops = buildLoops(mesh, a);
 
-    // The border of every piece, offset by the thickness; a piece that cannot take it gets as much as it holds.
+    // The thickness in scene units: as asked, or the slider's share of the most the selection can take (one shape:
+    // the smallest piece sets it, every piece gets the same rim; Each face: every polygon's own, so a big face and a
+    // small one shrink by the same share and none bottlenecks the rest).
     std::vector<LoopOffset> offsets(loops.geos.size());
+    std::vector<float> collapse;
+    if (options.relative) {
+        collapse.assign(a.regionCount, 0.0f);
+        float best = std::numeric_limits<float>::infinity();
+        for (uint32_t r = 0; r < a.regionCount; ++r) {
+            if (loops.ofPiece[r].empty()) continue;
+            collapse[r] = collapseThickness(loops, r, offsets);
+            if (collapse[r] > 0.0f) best = std::min(best, collapse[r]);
+        }
+        res.maxThickness = std::isfinite(best) ? best : 0.0f;
+        res.clamped = std::abs(options.thickness) > 1.0f;
+    }
+    const float share = std::clamp(options.thickness, -1.0f, 1.0f) * kCollapseCap;
+    // The border of every piece, offset by the thickness, held at the cap: a piece whose offset fails at t / cap would
+    // end nearer to meeting than the cap allows (one extra offset in the common case, the bisection only when held).
+    // A piece that cannot take even that (an outset that folds, no extent) gets as much as it holds.
     for (uint32_t r = 0; r < a.regionCount; ++r) {
         if (loops.ofPiece[r].empty()) continue;
-        float t = options.thickness;
+        float t = options.relative ? share * (options.individual ? collapse[r] : res.maxThickness) : options.thickness;
+        if (!options.relative && t > 0.0f && !offsetPiece(loops, r, t / kCollapseCap, offsets)) {
+            t = std::min(t, kCollapseCap * collapseThickness(loops, r, offsets));
+            res.clamped = true;
+        }
         if (!offsetPiece(loops, r, t, offsets)) {
-            t *= kClampFraction * holdingFraction(loops, r, t, offsets);
+            t *= kCollapseCap * holdingFraction(loops, r, t, offsets);
             offsetPiece(loops, r, t, offsets);
             res.clamped = true;
         }
@@ -710,7 +748,8 @@ InsetResult insetFaces(const Mesh& mesh, std::span<const uint32_t> triangles, co
 bool polyInset(const PolyOpInput& in, PolyOpOutput& out, std::string& error) {
     InsetOptions o;
     const float size = glm::length(in.mesh.bounds().extent());
-    o.thickness = float(argNumber(in.args, "thickness", 0.05)) * size;
+    o.relative = true; // a fraction of what the selection can take: one slider fits a Part of any density
+    o.thickness = float(argNumber(in.args, "thickness", 0.25));
     o.depth = float(argNumber(in.args, "depth", 0.0)) * size;
     o.individual = argBool(in.args, "individual", false);
     o.rimGroup = argBool(in.args, "rim_group", false);
@@ -738,7 +777,7 @@ void registerPolyInsetOp(PolyOpRegistry& reg) {
     op.credit = "#225 and the ideas threads (polygon modelling)";
     op.needs = PolyElement::Faces;
     op.preview = true;
-    op.params = {{"thickness", "Thickness", 0.0, 0.5, 0.05, "How far the border moves in, as a fraction of the Part's size; held below the point where a face would turn inside out"},
+    op.params = {{"thickness", "Thickness", 0.0, 1.0, 0.25, "How far the border moves in, as a share of the most the selected faces can take: at 1 the inner faces are a fifth of their size, never thinner"},
                  {"depth", "Depth", -0.5, 0.5, 0.0, "How far the inner faces move along their normal, as a fraction of the Part's size (negative: into the surface)"},
                  {"individual", "Each face", 0.0, 1.0, 0.0, "Inset every face by itself instead of the selection as one shape", true},
                  {"rim_group", "Rim group", 0.0, 1.0, 0.0, "The rim joins one new face group instead of its faces' groups", true}};
