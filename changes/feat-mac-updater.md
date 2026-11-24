@@ -19,4 +19,3 @@ testers:
     write there; nothing changed, Download still opens the page.
   - Windows and Linux: Update unchanged (progress, Restart now, Later).
 ---
-Attack-surface notes and the signing decision for the owner: REPORT.md in the worktree (not shipped).
