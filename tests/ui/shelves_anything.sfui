@@ -53,17 +53,17 @@ click "Preferences##palette.preferences"
 click "Preferences/##totray"
 click "Input##preferences.input"
 expect "Preferences/Orbit around the pointer##input.orbit_at_pointer"
-expect_value orbit_at_pointer == 0
+remember orbit_at_pointer orbit0           # (on by default; the drag must not flip it)
 hold alt
 drag_to "Preferences/Orbit around the pointer##input.orbit_at_pointer" "##tile.brush" 0 -30
 hold none
 expect_value "shelf_has_control:preferences.input/Orbit around the pointer" == 1
-expect_value orbit_at_pointer == 0
+expect_value orbit_at_pointer == $orbit0
 expect "Left shelf/Orbit around the pointer##input.orbit_at_pointer"
 click "Left shelf/Orbit around the pointer##input.orbit_at_pointer"
-expect_value orbit_at_pointer == 1
+expect_value orbit_at_pointer != $orbit0
 click "Left shelf/Orbit around the pointer##input.orbit_at_pointer"
-expect_value orbit_at_pointer == 0
+expect_value orbit_at_pointer == $orbit0
 wait_idle 30
 shot filled
 # Customize Shelves: Ctrl+Alt moves the control from the top shelf to the right shelf like any other item.
