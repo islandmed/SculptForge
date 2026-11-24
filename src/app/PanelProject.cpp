@@ -10,6 +10,7 @@
 #include "app/NativeDialog.h"
 #include "app/Support.h"
 #include "app/BigMeshTip.h"
+#include "core/BuildStamp.h"
 #include "app/LookSchemes.h"
 #include "core/ManagedPolicy.h"
 #include "app/CrashLog.h"
@@ -951,16 +952,14 @@ void App::drawProjectPopups() {
 #ifndef SCULPTFORGE_PRERELEASE
 #define SCULPTFORGE_PRERELEASE ""
 #endif
-#ifndef SF_DEV_COMMIT // a developer's build: the commit it was configured at (CMakeLists.txt, SCULPTFORGE_DEV_BUILD)
-#define SF_DEV_COMMIT ""
-#endif
 
 const char* App::appPrerelease() { return SCULPTFORGE_PRERELEASE; }
 std::string App::appFullVersion() {
     return std::string(SCULPTFORGE_VERSION) + (*SCULPTFORGE_PRERELEASE ? std::string("-") + SCULPTFORGE_PRERELEASE : "");
 }
 std::string App::appVersionLabel() { return versionLabel(SCULPTFORGE_VERSION, SCULPTFORGE_PRERELEASE); }
-ShownVersion App::appShownVersion() { return shownVersion(SCULPTFORGE_VERSION, SCULPTFORGE_PRERELEASE, SF_DEV_COMMIT); }
+// (a developer's build adds the commit it was built at, core/BuildStamp.h)
+ShownVersion App::appShownVersion() { return shownVersion(SCULPTFORGE_VERSION, SCULPTFORGE_PRERELEASE, devCommit()); }
 
 void App::startUpdateCheck(bool manual) {
     if (updateJob_) return; // one at a time
