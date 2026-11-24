@@ -1716,14 +1716,24 @@ float App::targetUiScale() const {
     return resolveUiScale(uiScalePreference(), automatic);
 }
 
+// The display's name and its size in physical pixels (its mode's size times its pixel density: 3840x2160 for a 4K
+// monitor whether Windows runs it at 150 % or macOS at 2x), so the key is the monitor's, not the window's.
 std::string App::displayScaleKey() const {
     if (!window_) return "";
     const SDL_DisplayID display = SDL_GetDisplayForWindow(window_);
-    SDL_Rect bounds{};
-    if (!display || !SDL_GetDisplayBounds(display, &bounds)) return "";
-    const float density = SDL_GetWindowPixelDensity(window_);
-    const float d = density > 0.0f && std::isfinite(density) ? density : 1.0f;
-    return sf::displayScaleKey(SDL_GetDisplayName(display), int(std::lround(bounds.w * d)), int(std::lround(bounds.h * d)));
+    if (!display) return "";
+    int w = 0, h = 0;
+    if (const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(display); mode && mode->w > 0 && mode->h > 0) {
+        const float d = mode->pixel_density > 0.0f && std::isfinite(mode->pixel_density) ? mode->pixel_density : 1.0f;
+        w = int(std::lround(mode->w * d));
+        h = int(std::lround(mode->h * d));
+    } else {
+        SDL_Rect bounds{};
+        if (!SDL_GetDisplayBounds(display, &bounds)) return "";
+        w = bounds.w;
+        h = bounds.h;
+    }
+    return sf::displayScaleKey(SDL_GetDisplayName(display), w, h);
 }
 
 float App::uiScalePreference() const {

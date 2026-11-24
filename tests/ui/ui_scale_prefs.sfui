@@ -23,6 +23,15 @@ expect_value font_height <= 12.5
 expect "Automatic##ui_scale_auto"
 shot prefs_scale_80
 
+# Saved: a restart (ui.json written and read back, uiScale + uiScaleByDisplay) comes up at 80 %.
+restart
+expect_value ui_scale == 80
+expect_value font_height >= 11.5
+expect_value font_height <= 12.5
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+expect "##ui_scale"
+
 # Typed below the range: held at 70 %.
 double_click "##ui_scale"
 type_here 40
