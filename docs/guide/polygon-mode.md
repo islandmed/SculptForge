@@ -15,8 +15,9 @@ stays undoable, and any brush takes you back to sculpting the result.
 ## Turning it on
 
 Click **Polygon mode** in **Tool > Polygon** (the button again, <kbd>Esc</kbd> or any brush goes back to
-sculpting). The wireframe comes on while the mode is on, so the polygons show, and goes back to how it was when you
-leave.
+sculpting). While the mode is on, the Part is drawn with its wireframe and with flat faces, so the polygons, hard
+edges and bevels read as built; both go back to how they were when you leave (the Part's own shading setting is
+untouched).
 
 Polygon mode works on a plain mesh. It says why when a Part can't enter it, and what to do:
 

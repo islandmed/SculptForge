@@ -3776,7 +3776,11 @@ void App::syncScene() {
         Mesh* mesh = doc_.checkedOut(i) ? &shown : &s.data->mesh;
         // Solo channel view (channel_view): the texture's shown texels follow before the renderer uploads them.
         if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
-        const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
+        // Polygon mode (PanelPolygon.cpp): its Part is drawn with flat faces while the mode is on, so a cage's hard edges,
+        // bevels and extrusions read as built instead of as smooth-shaded gradients and bands; display only, the Part's own
+        // shading setting is untouched and comes back when the mode exits.
+        const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading) ||
+                          (polyMode_ && active);
         const uint32_t key = doc_.meshKey(i); // (linked Parts, #94: one GPU mesh, drawn where each is)
         scene.push_back({key, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
         scene.back().model = gizmoDrawnTransform(i);

@@ -5,7 +5,8 @@ highlight: Polygon mode: model with points, edges and faces
 added: **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. Turn a Part into a cage (plain meshes up to
   2 million triangles; Parts with subdivision or Micro levels are told what to do first), pick Points, Edges or Faces and
   select them on the model (click, Shift adds, Ctrl removes, drag a box; double-click an edge for its loop, a face for its
-  face group; Grow, Shrink, All, None, Invert, Loop, Ring, By Group), see the selection drawn over the model, move it with
+  face group; Grow, Shrink, All, None, Invert, Loop, Ring, By Group), see the selection drawn over the model (the Part shows
+  its wireframe and flat faces while the mode is on, its own shading comes back after), move it with
   the Transform gizmo (W / E / R) as one undo step, and run operations on it from the panel, each one undo step: Delete
   and Flip ship with the mode, the modelling operations (Extrude, Inset, Bevel, Edge loop, Span) plug into the same
   registry. **Extrude**: the selected faces move out along their normals (in, with a negative Distance) and get quad
