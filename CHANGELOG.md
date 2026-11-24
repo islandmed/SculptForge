@@ -6,6 +6,13 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.13.14] - 2026-11-23
+
+### Fixed
+- Dynamic topology no longer erases a Part's painted texture: the UVs are kept through the stroke (new triangles get
+  UVs from the ones they split; at a UV seam the remesh merges and relaxes only along the seam), so the paint stays in
+  place and Undo restores the UVs exactly.
+
 ## [0.13.13] - 2026-11-23
 
 ### Added
