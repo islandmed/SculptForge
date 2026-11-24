@@ -726,7 +726,7 @@ TEST(poly_span_op_joins_two_openings_of_a_block_as_one_undo_step) {
     const CommandRegistry& reg = registry();
     CHECK(reg.execute(doc, "poly_mode").ok);
     CommandResult r = reg.execute(doc, "poly_op", {{"op", std::string("list")}});
-    CHECK(r.ok && r.message.find("span (edges, segments=1 [1..32], twist=0 [-8..8], flip=false)") != std::string::npos);
+    CHECK(r.ok && r.message.find("span (edges, segments=1 [1..32], twist=0 [-8..8], reverse=false)") != std::string::npos);
     const PolyOp* op = PolyOpRegistry::instance().find("span");
     CHECK(op && op->label == "Span" && op->anyElement && op->preview);
     // Faces on two opposite sides (each whole side by its face group), Span with two rings: a tunnel through the block.

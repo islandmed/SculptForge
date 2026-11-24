@@ -77,7 +77,7 @@ an edge on each border; <kbd>Shift</kbd> for the second) and Span fills the gap 
 wound with the surface on both sides. Select faces on two sides instead and Span removes them and joins the two
 openings: a tunnel through a block, a handle between two shells. Select one whole border loop and Span closes it
 across its width (a slot gets a grid, not a fan). **Segments** adds rings across the gap, **Twist** turns which vertex
-pairs with which on two loops, **Flip** pairs the second border the other way round when a piece is wound inside out.
+pairs with which on two loops, **Reverse** pairs the second border the other way round when a piece is wound inside out.
 Borders with different numbers of edges pair by distance along each border, and the odd triangles are spread evenly
 round the band; the band is a face group of its own and stays selected afterwards, ready to move or smooth.
 

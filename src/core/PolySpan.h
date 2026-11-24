@@ -82,7 +82,7 @@ bool spanFaces(Mesh& mesh, std::span<const uint32_t> faces, const SpanOptions& o
                  std::string& error);
 
 // Polygon mode's op (core/PolyOps.h): Faces picked = two face selections, Edges or Points picked = two borders or one
-// closed loop. Parameters: segments, twist, flip.
+// closed loop. Parameters: segments, twist, reverse.
 struct PolyOpInput;
 struct PolyOpOutput;
 class PolyOpRegistry;

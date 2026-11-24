@@ -13,7 +13,7 @@ added: **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. 
   neighbours; Even thickness moves every face the full distance where the selection bends, Keep shape moves a region
   along one direction, Inset narrows the cap first; in Edges, selected open border edges extrude into a strip that
   extends the surface (or stands on it). The slider shows a live preview. **Span** joins two edge loops or two face selections with new faces: two open borders get a band of quads
-  (Segments adds rings across, Twist turns the pairing, Flip for a piece wound inside out), faces on two sides are
+  (Segments adds rings across, Twist turns the pairing, Reverse for a piece wound inside out), faces on two sides are
   removed and their openings joined (a tunnel through a block, a handle between two shells), and one whole border loop is
   closed across its width. Borders of different lengths pair by distance along each, with the odd triangles spread
   evenly; the band is a face group of its own and stays selected afterwards. **Edge loop**: new loops of edges across the ring of quads through the selected edge (or
