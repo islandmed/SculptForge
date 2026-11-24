@@ -1399,9 +1399,15 @@ constexpr Entry kSimplifiedChinese[] = {
      "停留与焦点的醒目提示只改变颜色：没有缓动，图块也不会浮起或放大。"},
     {"Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
      "关闭：调色板栏中“文件”与“编辑”在最前、“帮助”在最后，其余按 A 至 Z 排列。开启：所有调色板按 A 至 Z 排列。"},
-    {"Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: Settings > "
-     "Display > Scale, per monitor).",
-     "文本与控件的大小，立即应用。“自动”会按窗口所在的显示器而定（Windows：设置 > 显示器 > 缩放，按各显示器）。"},
+    {"Follow the display the window is on (Windows: Settings > Display > Scale, per monitor; macOS and Wayland: the "
+     "display's scaling; X11: the desktop's font DPI). Untick, or move the slider, to choose a size.",
+     "跟随窗口所在的显示器（Windows：设置 > 显示器 > 缩放，按各显示器；macOS 和 Wayland：显示器的缩放；X11：桌面的字体 DPI）。取消勾选，或移动滑块，以选择大小。"},
+    {"Size of text and controls, 70% to 300%, applied when you let the slider go (double-click it to type a value). "
+     "Below 100% the buttons keep a little more room around their text, so they stay easy to hit. The size is "
+     "remembered for the monitor the window is on, so a laptop screen and a 4K monitor can each have their own.",
+     "文本与控件的大小，70% 至 300%，在释放滑块时应用（双击可输入数值）。低于 100% 时，按钮文本周围会保留稍多的空间，以便于点击。大小会按窗口所在的显示器记住，因此笔记本屏幕和 4K "
+     "显示器可以各有自己的大小。"},
+    {"Aa Bb 123", "Aa 文字 123"},
     {"Free: dragging turns the model about the screen's axes and can roll it over the top; press Shift while rotating "
      "to snap to the nearest front, side, top or bottom view. Turntable: the model stays upright and turns about its "
      "vertical axis, as in Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",

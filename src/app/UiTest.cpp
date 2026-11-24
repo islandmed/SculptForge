@@ -3624,10 +3624,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     case StepVerb::UiScale: { // ui_scale 175 | auto: as Preferences > Interface > UI scale picks it (#87)
         if (!need(1)) return false;
         const float v = w[1] == "auto" ? 0.0f : num(1, 100) / 100.0f;
-        run([this, v] {
-            app_.uiPrefs_.uiScale = v;
-            app_.requestUiScale();
-        });
+        run([this, v] { app_.setUiScalePreference(v); });
         wait(0.2f);
         break;
     }

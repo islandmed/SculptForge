@@ -8,6 +8,7 @@
 #pragma once
 
 #include "app/LookSchemes.h"
+#include "app/UiScale.h"
 #include "app/Theme.h"
 #include "core/Json.h"
 #include "core/ModifierBrush.h"
@@ -30,7 +31,8 @@ struct UiPrefs {
     bool reduceMotion = false;  // hover highlights change colour only: no easing, no lifting tiles (Ui.h)
     bool oneSubpalette = true;  // opening a sub-palette closes the others (Shift+click opens more)
     bool autoCollapseLeft = true, autoCollapseRight = false; // trays collapse palettes that would overflow
-    float uiScale = 0.0f;       // 0 = follow the display; otherwise applied at the next start
+    float uiScale = 0.0f;       // 0 = follow the display (Automatic); 0.7-3.0 otherwise, applied live (UiScale.h)
+    DisplayScales uiScaleByDisplay; // the choice per monitor the window has been on (displayScaleKey): wins over uiScale there
     bool libraryAtStartup = true;
     bool startupSplash = true;  // the logo while a slow start-up runs (read early from ui.json: StartupSplash.h)
     std::string libraryFolder;  // "" = Documents/SculptForge

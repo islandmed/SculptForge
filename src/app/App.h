@@ -209,6 +209,12 @@ public:
     static void glWindowAttributes(); // OpenGL 3.3 core, before a window is made
     void setInterfaceLanguage(Language lang); // live and remembered in ui.json (Preferences > Interface, the welcome, the bar)
     void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
+    // Preferences > Interface > UI scale, for the monitor the window is on: 0 = Automatic, else 0.7-3.0 (UiScale.h). The
+    // setter remembers it for this monitor (uiScaleByDisplay) and as the general choice, and rebuilds the UI live.
+    float uiScalePreference() const;
+    void setUiScalePreference(float scale);
+    float uiScale() const { return uiScale_; } // the scale the UI is built at now (0.7-3.0)
+    std::string displayScaleKey() const; // the window's display (name + pixel size), "" without a window
 
     enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, SaveVisibleParts, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, InsertSet, Count };
     struct DialogRequest {

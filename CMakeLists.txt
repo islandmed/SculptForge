@@ -1666,6 +1666,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # UI scale (#87) at 1600x900, where Automatic in a test is exactly 100 %; label "dpi": release.sh step check runs them before the tag.
     sculptforge_ui_test(ui_scale_900 ui_scale --size 1600x900)
     set_tests_properties(ui_ui_scale_900 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
+    # The UI scale slider (70-300 %, Automatic tick) at 1440 and 2880 px (Automatic = 100 / 200 % there).
+    sculptforge_ui_test(ui_scale_prefs_1440 ui_scale_prefs --size 1440x900)
+    sculptforge_ui_test(ui_scale_prefs_2880 ui_scale_prefs --size 2880x1800)
+    set_tests_properties(ui_ui_scale_prefs_1440 ui_ui_scale_prefs_2880 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     if(TEST ui_ui_scale)
       set_tests_properties(ui_ui_scale PROPERTIES LABELS "ui;dpi")
     endif()

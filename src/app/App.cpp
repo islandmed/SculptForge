@@ -1713,7 +1713,29 @@ float App::targetUiScale() const {
     if (displayScaleOverride_ > 0.0f) automatic = displayScaleOverride_; // UI tests: display_scale
     else if (!options_.recordPath.empty() || !options_.uiTest.empty()) automatic = float(options_.height) / 900.0f;
     else if (window_) automatic = automaticUiScale(SDL_GetWindowDisplayScale(window_), SDL_GetWindowPixelDensity(window_));
-    return resolveUiScale(uiPrefs_.uiScale, automatic);
+    return resolveUiScale(uiScalePreference(), automatic);
+}
+
+std::string App::displayScaleKey() const {
+    if (!window_) return "";
+    const SDL_DisplayID display = SDL_GetDisplayForWindow(window_);
+    SDL_Rect bounds{};
+    if (!display || !SDL_GetDisplayBounds(display, &bounds)) return "";
+    const float density = SDL_GetWindowPixelDensity(window_);
+    const float d = density > 0.0f && std::isfinite(density) ? density : 1.0f;
+    return sf::displayScaleKey(SDL_GetDisplayName(display), int(std::lround(bounds.w * d)), int(std::lround(bounds.h * d)));
+}
+
+float App::uiScalePreference() const {
+    const std::string key = displayScaleKey();
+    return key.empty() ? uiPrefs_.uiScale : displayScaleFor(uiPrefs_.uiScaleByDisplay, key, uiPrefs_.uiScale);
+}
+
+void App::setUiScalePreference(float scale) {
+    scale = scale > 0.0f ? std::clamp(scale, kMinUiScale, kMaxUiScale) : 0.0f;
+    uiPrefs_.uiScale = scale;
+    if (const std::string key = displayScaleKey(); !key.empty()) setDisplayScale(uiPrefs_.uiScaleByDisplay, key, scale);
+    requestUiScale();
 }
 
 // Live, between frames (the atlas can't change inside one): the fonts rasterised again at the new size, the style

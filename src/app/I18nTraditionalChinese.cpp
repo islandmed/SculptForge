@@ -1399,9 +1399,15 @@ constexpr Entry kTraditionalChinese[] = {
      "停留與焦點的醒目提示只改變顏色：沒有緩動，圖塊也不會浮起或放大。"},
     {"Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
      "關閉：調色盤列中「檔案」與「編輯」在最前、「說明」在最後，其餘依 A 至 Z 排列。開啟：所有調色盤依 A 至 Z 排列。"},
-    {"Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: Settings > "
-     "Display > Scale, per monitor).",
-     "文字與控制項的大小，立即套用。「自動」會依視窗所在的顯示器而定（Windows：設定 > 顯示器 > 縮放，依各顯示器）。"},
+    {"Follow the display the window is on (Windows: Settings > Display > Scale, per monitor; macOS and Wayland: the "
+     "display's scaling; X11: the desktop's font DPI). Untick, or move the slider, to choose a size.",
+     "跟隨視窗所在的顯示器（Windows：設定 > 顯示器 > 縮放，依各顯示器；macOS 與 Wayland：顯示器的縮放比例；X11：桌面的字型 DPI）。取消勾選，或移動滑桿，以選擇大小。"},
+    {"Size of text and controls, 70% to 300%, applied when you let the slider go (double-click it to type a value). "
+     "Below 100% the buttons keep a little more room around their text, so they stay easy to hit. The size is "
+     "remembered for the monitor the window is on, so a laptop screen and a 4K monitor can each have their own.",
+     "文字與控制項的大小，70% 至 300%，於放開滑桿時套用（按兩下可輸入數值）。低於 100% 時，按鈕文字周圍會保留稍多的空間，以保持易於點擊。大小會依視窗所在的顯示器記住，因此筆記型電腦的螢幕與 4K "
+     "顯示器可以各自擁有自己的大小。"},
+    {"Aa Bb 123", "Aa 文字 123"},
     {"Free: dragging turns the model about the screen's axes and can roll it over the top; press Shift while rotating "
      "to snap to the nearest front, side, top or bottom view. Turntable: the model stays upright and turns about its "
      "vertical axis, as in Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",

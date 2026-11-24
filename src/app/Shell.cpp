@@ -1651,7 +1651,18 @@ void App::applyLook() {
     ImGui::GetStyle() = ImGuiStyle();
     ImGui::GetStyle().HoverDelayNormal = hoverDelay;
     theme::applyLook(uiPrefs_.look, &message);
-    ImGui::GetStyle().ScaleAllSizes(uiScale_);
+    {
+        ImGuiStyle& st = ImGui::GetStyle();
+        const ImGuiStyle unscaled = st;
+        st.ScaleAllSizes(uiScale_);
+        if (uiScale_ < 1.0f) { // below 100 %: the room around the text shrinks less than the text (UiScale.h)
+            const float pad = compactPadScale(uiScale_);
+            st.FramePadding = ImVec2(std::round(unscaled.FramePadding.x * pad), std::round(unscaled.FramePadding.y * pad));
+            st.ScrollbarSize = std::round(unscaled.ScrollbarSize * pad);
+            st.GrabMinSize = std::round(unscaled.GrabMinSize * pad);
+            st.TouchExtraPadding = ImVec2(std::round(unscaled.TouchExtraPadding.x * pad), std::round(unscaled.TouchExtraPadding.y * pad));
+        }
+    }
     const bool mono = theme::look.monoLabels || theme::look.monoAll;
     if (fontInterSmall_) {
         fontSmall_ = mono && fontMonoSmall_ ? fontMonoSmall_ : fontInterSmall_;
