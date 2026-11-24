@@ -141,6 +141,7 @@
 //                            poly_mode (Tool > Polygon on), poly_element (0 Points, 1 Edges, 2 Faces), poly_selected / poly_total
 //                            (of that kind), poly_shown (drawn facing the camera), poly_hovered (the element under the cursor, -1 none),
 //                            poly_ops (operations in the registry), poly_preview (1 while an op's live preview is drawn),
+//                            poly_selected_min_edge (the shortest edge of the selected faces, scene units: a sliver check after Inset),
 //                            edited_parts (Parts with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
@@ -459,6 +460,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <limits>
 #include <cstring>
 #include <utility>
 #include <thread>
@@ -859,6 +861,19 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "poly_hovered") return app_.polyOverlay_.hovered == ~0u ? -1.0 : double(app_.polyOverlay_.hovered);
     if (name == "poly_ops") return double(PolyOpRegistry::instance().all().size());
     if (name == "poly_preview") return app_.polyOverlay_.previewOk ? 1.0 : 0.0;
+    if (name == "poly_selected_min_edge") { // the shortest polygon edge of the selected faces (quad diagonals skipped), scene units; 0 with none
+        const std::vector<uint8_t>& faces = app_.doc_.polySelection.faces;
+        double best = std::numeric_limits<double>::infinity();
+        for (uint32_t t = 0; t < m.triangleCount() && t < faces.size(); ++t) {
+            if (!faces[t]) continue;
+            const glm::uvec3& tri = m.triangles[t];
+            const uint32_t u = m.quadPartnerAt(t);
+            const int diag = u != Mesh::kNoQuad && u < m.triangleCount() ? m.quadDiagonal(t, u) : -1;
+            for (int k = 0; k < 3; ++k)
+                if (k != diag) best = std::min(best, double(glm::length(m.positions[tri[k]] - m.positions[tri[(k + 1) % 3]])));
+        }
+        return std::isfinite(best) ? best : 0.0;
+    }
     if (name == "forgespheres") return double(m.forgespheres.size());
     if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
     if (name == "tube_points") return double(m.tube.points.size()); // the active Tube Part's (Tube, PanelTube.cpp)
