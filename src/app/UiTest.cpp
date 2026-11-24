@@ -3111,12 +3111,32 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         const float dx = num(2, 0), dy = num(3, 0), seconds = w.size() > 4 && w[4] != "keep" ? num(4, 0.4f) : 0.4f;
         auto from = std::make_shared<ImVec2>();
         steps_.push_back([this, line, label, from](float t) {
-            if (findItem(label, *from)) {
-                mouseMotion(from->x, from->y);
-                return true;
+            // Find the item; scrolled out of its panel, wheel the panel towards it first, as click does (a slider
+            // below the fold of a long section: Tool > Polygon with every op's settings).
+            bool visible = false;
+            if (!findItem(label, *from, &visible)) {
+                if (t > 3.0f) fail(line, notFound(label));
+                return t > 3.0f;
             }
-            if (t > 3.0f) fail(line, notFound(label));
-            return t > 3.0f;
+            if (!visible) {
+                ImVec4 clip;
+                findItem(label, *from, &visible, &clip);
+                if (clip.z > clip.x && clip.w > clip.y && t <= 2.0f) {
+                    mouseMotion((clip.x + clip.z) * 0.5f, (clip.y + clip.w) * 0.5f);
+                    SDL_Event e{};
+                    e.type = SDL_EVENT_MOUSE_WHEEL;
+                    e.wheel.windowID = SDL_GetWindowID(app_.window_);
+                    e.wheel.y = from->y > clip.w ? -1.0f : 1.0f;
+                    e.wheel.mouse_x = mouse_.x;
+                    e.wheel.mouse_y = mouse_.y;
+                    app_.handleEvent(e);
+                    return false;
+                }
+                if (t > 1.0f) fail(line, "\"" + label + "\" is not visible (off screen or scrolled out of view)");
+                return t > 1.0f;
+            }
+            mouseMotion(from->x, from->y);
+            return true;
         });
         steps_.push_back([this, from, dx, dy, seconds, keep](float t) {
             if (t == 0.0f) return false; // a frame of hover first

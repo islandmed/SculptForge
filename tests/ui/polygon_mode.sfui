@@ -148,7 +148,7 @@ click "Polygon/Faces"
 click "Polygon/None"
 click_part Box 0.5 0.5 1
 expect_value poly_selected == 1
-click "Polygon/Flip"
+click "Polygon/Flip##polygon.op.flip"
 expect_status "Flipped 1 face"
 expect_value undo_steps == $base+1
 expect_value poly_selected == 1
