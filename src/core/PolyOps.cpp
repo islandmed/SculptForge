@@ -3,6 +3,7 @@
 //
 // Polygon mode's operations registry and the two built-in ops; see core/PolyOps.h.
 #include "core/PolyOps.h"
+#include "core/PolySpan.h"
 
 #include "core/Document.h"
 #include "core/FaceGroups.h"
@@ -205,6 +206,7 @@ void registerBuiltinPolyOps(PolyOpRegistry& reg) {
     // The modelling ops register here, one line each (core/PolyExtrude.cpp, PolyInset.cpp, PolyBevel.cpp,
     // PolyEdgeLoop.cpp, PolySpan.cpp).
     registerPolyExtrudeOp(reg);
+    registerPolySpanOp(reg);
 }
 
 Args polyOpArgs(const PolyOp& op, const Args& args) {

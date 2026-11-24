@@ -137,6 +137,7 @@ add_library(sculptforge_core STATIC
   src/core/MeshBoolean.cpp
   src/core/PartBoolean.cpp
   src/core/CloseHoles.cpp
+  src/core/PolySpan.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/CreatureSkin.cpp
@@ -1609,6 +1610,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Extrude in Polygon mode (tests/ui/polygon_extrude.sfui): faces as a region, individual, undo, then open border edges.
     sculptforge_ui_test(polygon_extrude_1440 polygon_extrude --size 1440x900)
     sculptforge_ui_test(polygon_extrude_2880 polygon_extrude --size 2880x1800)
+    # Span (tests/ui/polygon_span.sfui): the same two sizes.
+    sculptforge_ui_test(polygon_span_1440 polygon_span --size 1440x900)
+    sculptforge_ui_test(polygon_span_2880 polygon_span --size 2880x1800)
     # The Transform gizmo's look, each mode front and 3/4, 100% and 200% (tests/ui/gizmo/look.sfui).
     sculptforge_ui_test(gizmo_look_1440 gizmo/look --size 1440x900)
     sculptforge_ui_test(gizmo_look_2880 gizmo/look --size 2880x1800)

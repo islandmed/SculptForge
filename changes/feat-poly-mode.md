@@ -11,7 +11,11 @@ added: **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. 
   side walls in a face group of their own, as one connected region or face by face (Individual) with a groove between
   neighbours; Even thickness moves every face the full distance where the selection bends, Keep shape moves a region
   along one direction, Inset narrows the cap first; in Edges, selected open border edges extrude into a strip that
-  extends the surface (or stands on it). The slider shows a live preview. Commands: `poly_mode`, `poly_select`,
+  extends the surface (or stands on it). The slider shows a live preview. **Span** joins two edge loops or two face selections with new faces: two open borders get a band of quads
+  (Segments adds rings across, Twist turns the pairing, Flip for a piece wound inside out), faces on two sides are
+  removed and their openings joined (a tunnel through a block, a handle between two shells), and one whole border loop is
+  closed across its width. Borders of different lengths pair by distance along each, with the odd triangles spread
+  evenly; the band is a face group of its own and stays selected afterwards. Commands: `poly_mode`, `poly_select`,
   `poly_op`, and `transform selection=true`. Nothing changes for sculpting: the mode is off until you turn it on.
   Members' top wish (#225 and the ideas threads).
 member_request: true
@@ -26,6 +30,9 @@ testers:
   - Any OS: Polygon mode on a cube, double-click a side (its face group), Extrude: the side stands out as a block with quad
     walls; drag Distance below zero and it sinks in; Individual gives four separate blocks; Ctrl+Z takes each back in one step.
   - Any OS: Delete a side, switch to Edges, All, Extrude: only the hole's border edges grow a strip; the rest are left alone.
+  - Any OS: Span on a cube: double-click a face (its whole side), orbit round, Shift+double-click the opposite side, Span:
+    a tunnel through the block, one undo step, the new faces selected. Drag Segments while watching: the preview
+    follows. Select only one side and Span: the status line says to pick two.
 ---
 Foundation branch: the selection model, overlay, gizmo path and ops registry (src/core/PolyMode.h, src/core/PolyOps.h). The
 op branches (poly-extrude, poly-inset, poly-bevel, poly-edge-loop, poly-bridge) register one op each in
