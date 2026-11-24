@@ -259,3 +259,89 @@ TEST(mcp_history_tools_are_listed) {
     }
     CHECK(found == 4);
 }
+
+namespace {
+// What a failed restore must leave alone: the scene, the history's depth both ways, and which Part is active.
+struct Snapshot {
+    uint64_t hash;
+    size_t undoDepth, redoDepth;
+    int active, parts;
+    bool operator==(const Snapshot&) const = default;
+};
+Snapshot snapshotOf(const Document& d) {
+    return {sceneHash(d), d.undo.undoCount(), d.undo.redoCount(), d.activePart, d.partCount()};
+}
+} // namespace
+
+TEST(mcp_failed_checkpoint_restore_changes_nothing) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"old"})")));
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"now"})")));
+    // The memory budget drops every step but the newest: "old" is no longer in the undo history.
+    d.undo.byteBudget = 1;
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(d.undo.undoCount() == 1);
+    const Snapshot before = snapshotOf(d);
+    const uint64_t revision = d.undo.revision();
+
+    for (int attempt = 0; attempt < 3; ++attempt) { // repeated failures don't drift
+        const Json r = call(reg, d, "checkpoint_restore", R"({"name":"old"})");
+        CHECK(failed(r));
+        CHECK(text(r).find("checkpoint no longer in undo history") != std::string::npos);
+        CHECK(text(r).find("not changed") != std::string::npos);
+        CHECK(structured(r)["scene_unchanged"].asBool(false));
+        CHECK(snapshotOf(d) == before);
+        CHECK(d.undo.revision() == revision); // nothing was undone or redone, not even to be put back
+    }
+    // The newest step is still ordinary: one undo takes it back.
+    CHECK(!failed(call(reg, d, "undo")));
+    CHECK(sceneHash(d) != before.hash);
+}
+
+TEST(mcp_checkpoint_restore_that_ends_off_the_mark_puts_the_scene_back) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"start"})"))); // before any step: the walk goes to the bottom
+    d.undo.byteBudget = 1;
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "stroke", kStroke))); // the first stroke was dropped: the bottom is not "start"
+    CHECK(d.undo.undoCount() == 1);
+    const Snapshot before = snapshotOf(d);
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        const Json r = call(reg, d, "checkpoint_restore", R"({"name":"start"})");
+        CHECK(failed(r));
+        CHECK(text(r).find("checkpoint no longer in undo history") != std::string::npos);
+        CHECK(snapshotOf(d) == before);
+    }
+    CHECK(!failed(call(reg, d, "undo"))); // and the history still works
+}
+
+TEST(mcp_checkpoint_replaced_by_a_new_edit_leaves_the_scene_alone) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"a"})")));
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"b"})")));
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"a"})")));
+    CHECK(!failed(call(reg, d, "mask_all"))); // "b"'s step is gone for good
+    const Snapshot before = snapshotOf(d);
+    const Json r = call(reg, d, "checkpoint_restore", R"({"name":"b"})");
+    CHECK(failed(r) && text(r).find("checkpoint no longer in undo history") != std::string::npos);
+    CHECK(snapshotOf(d) == before);
+    // A cleared history (a new scene) is the same: the error, and the new scene untouched.
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"c"})")));
+    CHECK(!failed(call(reg, d, "new_sphere", R"({"subdivisions":2})")));
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    const Snapshot fresh = snapshotOf(d);
+    const Json lost = call(reg, d, "checkpoint_restore", R"({"name":"c"})");
+    CHECK(failed(lost) && text(lost).find("cleared") != std::string::npos);
+    CHECK(snapshotOf(d) == fresh);
+    // A valid restore still works afterwards, and keeps batch grouping of earlier steps intact.
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"d"})")));
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"d"})")));
+    CHECK(sceneHash(d) == fresh.hash);
+}
