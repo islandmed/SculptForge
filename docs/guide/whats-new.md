@@ -5,6 +5,43 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.14.0
+
+```features
+date: 2026-11-24
+tagline: Polygon mode: pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span; plus Split view, standalone curves and an orientation widget.
+highlight: Polygon mode: pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span
+highlight: Split view shows a second live view of your scene, each with its own camera
+highlight: Place curves point by point, straight or smooth, and edit their points with the Gizmo
+highlight: An orientation widget in the canvas corner: click a dot to look from that side
+highlight: Remesh one click away: right-click or Space for Quick Remesh, Quad Remesh and Remove Hidden
+title: Polygon mode
+line: Tool > Polygon: select Points, Edges or Faces on the model, move them with the Gizmo, then Extrude, Inset, Bevel, add Edge loops or Span a gap, each one undo step.
+action: guide:polygon-mode.md
+title: Split view
+line: View > Split view (Shift+V): a second live view beside or below the first, each with its own camera; sculpt in one and watch the other follow.
+action: guide:navigation.md
+title: Curves, point by point
+line: Tool > Tube > Draw > Points places a curve point by point; Straight keeps the corners, Smooth curves through them, and the Gizmo moves selected points.
+action: guide:tube.md
+```
+
+- **Polygon mode** (**Tool > Polygon**): select Points, Edges or Faces of a Part on the model, move them with the
+  Gizmo and run **Extrude**, **Inset**, **Bevel**, **Edge loops** and **Span** on them, each one undo step.
+- **Split view** (**View > Split view**, <kbd>Shift</kbd>+<kbd>V</kbd>): a second live view of your scene beside or
+  below the first, each with its own camera.
+- **Curves**: **Tool > Tube > Draw > Points** places a curve point by point; **Line: Straight** keeps the corners and
+  **Smooth** curves through the same points; select points and move them with the Gizmo.
+- **Orientation widget**: the axes in the canvas corner; click a dot to look from that side, drag it to orbit.
+- **Remesh one click away**: right-click the canvas (or press <kbd>Space</kbd>) for Quick Remesh, Quad Remesh and
+  Remove Hidden. Quick Remesh is on in the SculptForge layout; in Classic, tick **Tool > Remesh > Quick Remesh**.
+- **Generate 3D** asks one question under **Result**: **Sculpting base** or **Reference**, and every Part it made
+  carries a provenance tag (provider, model, date, app version, pass).
+- **Text fields**: single-letter shortcuts no longer fire while you type in a field (Ctrl+A in a slider's typed
+  value no longer runs Mask All).
+- **AI agents (MCP)**: restoring a checkpoint that is no longer in the undo history fails cleanly and leaves the
+  scene as it was.
+
 ## Version 0.13.14
 
 ```features
