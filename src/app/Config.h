@@ -100,6 +100,10 @@ struct UiPrefs {
     bool showAxes = true;              // Draw > Camera > Axes: the X / Y / Z gizmo in the canvas corner (#31)
     int axisGizmoSize = 1;             // Draw > Camera > Gizmo size: 0 Small, 1 Medium, 2 Large (axisGizmoScale)
     bool showViewFigure = false;       // Draw > Camera > View Figure: a small shaded head that turns with the view
+    // Draw > Camera > Corner gizmo: what the disc in the corner shows while showAxes is on: -1 by layout (Classic the
+    // X / Y / Z axes, SculptForge the orientation widget), 0 the axes, 1 the orientation widget (OrientationWidget.h).
+    int cornerWidget = -1;
+    int cornerPosition = 0; // Draw > Camera > Corner gizmo > Position: 0 top left (as always), 1 top right (a member's ask)
     bool cursorFollowsSurface = true; // the brush ring lies on the surface under the pointer (#25)
     bool hideRingWhileStroking = false; // Preferences > Cursor (#88): only the centre dot while a stroke runs
     // Preferences > Hints (U11): the notes SculptForge shows over the 3D view. Each has Don't show again, which

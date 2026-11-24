@@ -550,6 +550,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelEdges.cpp
     src/app/PanelPolygon.cpp
     src/app/Gizmo.cpp
+    src/app/CornerGizmo.cpp
     src/app/PanelBake.cpp
     src/app/FocusDetailApp.cpp
     src/app/PanelRetopo.cpp
@@ -1347,6 +1348,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(scatter_2880 scatter --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
+    sculptforge_ui_test(orientation_widget_1440 orientation_widget --size 1440x900) # Draw > Camera > Corner gizmo > Orientation
+    sculptforge_ui_test(orientation_widget_2880 orientation_widget --size 2880x1800)
     sculptforge_ui_test(guide_window_look_1440 guide_window_look --size 1440x900) # the guide's Learn edge, strip and surface
     sculptforge_ui_test(guide_window_look_2880 guide_window_look --size 2880x1800)
     sculptforge_ui_test(guide_window_look_800 guide_window_look --size 800x1280)

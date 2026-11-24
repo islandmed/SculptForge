@@ -9,6 +9,7 @@
 #include "app/Actions.h"
 #include "app/AssetLibrary.h"
 #include "app/AxisGizmo.h"
+#include "app/OrientationWidget.h"
 #include "app/GizmoAll.h"
 #include "app/OrbitSpeed.h"
 #include "app/CommandPalette.h"
@@ -220,7 +221,8 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil, Tube, Reference }; // AirStroke: a stroke begun off the model, waiting to reach it (#62)
+                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil, Tube, Reference,
+                      NavWidget }; // AirStroke: a stroke begun off the model, waiting to reach it (#62); NavWidget: a press on the orientation widget, a click until it moves
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
     void dispatchEvent(const SDL_Event& e);
@@ -2797,6 +2799,43 @@ private:
     glm::vec2 viewFigureCentre() const;                 // Draw > Camera > View Figure: where it sits, how big
     float viewFigureRadius() const;
     void drawViewFigure();
+    // The orientation widget (OrientationWidget.h, CornerGizmo.cpp): Draw > Camera > Corner gizmo. The disc, the axes'
+    // drawAxisGizmo or the widget, the view's name and the orbit-lock badge are one drawing (drawCornerGizmo).
+    bool orientationWidgetOn() const; // the corner shows the widget (not the axes): the preference, else by layout
+    void drawCornerGizmo();
+    void drawNavDisc(ImDrawList* dl, glm::vec2 centre, float radius, bool underPointer, bool light);
+    void drawNavName(ImDrawList* dl, glm::vec2 centre, float radius, const char* text, bool light); // under the disc
+    int navLockAxis() const; // View > Orbit lock's axis (0 X, 1 Y, 2 Z), -1 free
+    void drawNavLockBadge(ImDrawList* dl, glm::vec2 centre, float radius, int lockAxis, bool light);
+    void drawOrientationWidget(ImDrawList* dl, glm::vec2 centre, float discRadius, bool light, const std::array<AxisGizmoEnd, 6>& ends,
+                               int hoverEnd, int lockAxis);
+    int orientationWidgetHover(float x, float y) const; // the dot under (x, y): an end 0-5 (+X +Y +Z -X -Y -Z), -1 none
+    bool cornerGizmoMouseDown(float x, float y);  // the axes' ends and disc, or the widget's press (NavWidget)
+    void navWidgetMove(float x, float y, float dx, float dy, bool fromPen); // past the slop: an orbit
+    void navWidgetRelease();                      // no drag: the click (turn there) or double-click (frame)
+    void navWidgetClick(int end, int clicks);
+    // The eased camera turn (orientation only; target and distance stay): yaw / pitch / roll from where the view is
+    // to the view asked for over kOrientationWidgetMoveSeconds; instant with Reduce motion. Any other change to the
+    // camera meanwhile (an orbit, a numpad step) ends it where it is.
+    void startCameraMove(float yawRadians, float pitchRadians, bool orthoAtEnd); // (radians: the end is set exactly)
+    void animateCameraMove(float dt); // once a frame (animateLayers)
+    void cancelCameraMove() { cameraMove_.active = false; }
+    bool cameraMoving() const { return cameraMove_.active; }
+    struct NavPress { // a press on the orientation widget, until it moves or lets go
+        int end = -1; // the dot pressed (0-5), -1 the disc beside them
+        float x = 0.0f, y = 0.0f;
+        int clicks = 1;
+    } navPress_;
+    struct NavLastClick { // the view before the last single click's turn: a double-click eases back to it and frames
+        bool valid = false, ortho = false, autoOrtho = false;
+        float yaw = 0.0f, pitch = 0.0f;
+    } navLastClick_;
+    struct CameraMove {
+        bool active = false, orthoAtEnd = false;
+        float t = 0.0f;
+        float yaw0 = 0.0f, pitch0 = 0.0f, roll0 = 0.0f, yaw1 = 0.0f, pitch1 = 0.0f; // radians
+        float setYaw = 0.0f, setPitch = 0.0f, setRoll = 0.0f;                     // what the last frame left (a change = someone else moved the view)
+    } cameraMove_;
     // Insert on the model (#34): the primitive chosen in Append > Insert; a drag on the surface places it.
     // "mesh" inserts your own mesh instead: insertMeshKey_ is "part" (a Part's name) or "file" (a path
     // chosen in the file dialog), insertMeshValue_ the name or path (insert_mesh).
