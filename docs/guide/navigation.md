@@ -236,11 +236,12 @@ cap moving itself; if Preferences doesn't show the SpaceMouse moving, quit 3DxWa
 every joystick SculptForge sees on the clipboard, with its USB ids and why it was or wasn't used. Paste it into
 your issue.
 
-If the view drifts after you let go, or stops while you push, switch on **Log device reports** in the same place,
-repeat it for ten seconds and switch it off. SculptForge writes what the device sends (axis values and the raw
-HID reports with their report ids, with times) to `spacemouse-log.txt` in the user data folder, which the section
-shows. Click **Copy log** and paste the lines into your issue (the start and the end of the log, short enough for a
-chat message). The file stays on your computer until you send something; it is off again after a restart (or set
+If the view drifts after you let go, or stops while you push, switch on **Log device reports** in the same place (it
+is off unless you switch it on, and it stays on your computer), repeat it for ten seconds and switch it off.
+SculptForge writes what the device sends to `spacemouse-log.txt` in the user data folder, which the section shows:
+the device name, its USB ids, the axis values and the raw HID reports with their report ids, with times. Nothing
+else: no paths, user names or file names. Copy the lines from the file (the first 50 are enough; **Copy log** copies a
+short excerpt) and paste them into your issue as text. The log is off again after a restart (or set
 `SF_SPACEMOUSE_LOG=1` to log from the start).
 
 SculptForge recognises 3Dconnexion devices by their USB ids: everything under 3Dconnexion's own vendor id

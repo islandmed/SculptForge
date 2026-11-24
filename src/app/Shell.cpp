@@ -539,7 +539,7 @@ void App::registerShellActions() {
          "Dynamic topology: brushes add triangles where they need detail and remove them "
          "where they don't, so you can pull out horns or fingers without stretching. Detail sets how small the "
          "triangles get; zoom in or shrink the brush for finer ones. Needs a mesh without subdivision levels; quads "
-         "under the brush become triangles; UVs and the painted texture are kept.",
+         "under the brush become triangles and UVs are dropped (Undo brings them back).",
          "Draw", "", "dyntopo", [this] { setDynamic(!doc_.sculptor.dyntopo.enabled); },
          [this] { return doc_.sculptor.dyntopo.enabled; }, nullptr});
     add({"draw.dynamic_freeze", "Freeze Levels + Dynamic", nullptr,
