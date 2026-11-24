@@ -331,6 +331,7 @@ constexpr Entry kSpanish[] = {
     {"Pressure > Size", "Presión > Tamaño"},
     {"Pressure > Strength", "Presión > Fuerza"},
     {"Front faces only", "Solo caras frontales"},
+    {"Shift smooths the colour; Sculpt mode smooths the shape", "Shift suaviza el color; el modo Esculpir suaviza la forma"},
     {"Front faces only is ON", "Solo caras frontales está ACTIVADO"},
     {"Turn off", "Desactivar"},
     {"Brushes skip surfaces that face away from you: the hidden inside of a thin or Extract-made Part, and its far side. Smooth cannot reach spikes there. Untick Front faces only below to reach them.",

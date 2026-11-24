@@ -308,6 +308,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Pressure > Size", "笔压 > 大小"},
     {"Pressure > Strength", "笔压 > 强度"},
     {"Front faces only", "仅限正面"},
+    {"Shift smooths the colour; Sculpt mode smooths the shape", "Shift 平滑颜色；雕刻模式平滑形状"},
     {"Front faces only is ON", "仅限正面已开启"},
     {"Turn off", "关闭"},
     {"Brushes skip surfaces that face away from you: the hidden inside of a thin or Extract-made Part, and its far side. Smooth cannot reach spikes there. Untick Front faces only below to reach them.",

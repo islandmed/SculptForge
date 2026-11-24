@@ -569,6 +569,8 @@ constexpr Entry kJapanese[] = {
      "筆圧 > 強さ"},
     {"Front faces only",
      "前面のみ"},
+    {"Shift smooths the colour; Sculpt mode smooths the shape",
+     "Shiftで色を平滑化、形はスカルプトモードで平滑化"},
     {"Front faces only is ON",
      "前面のみがオン"},
     {"Turn off",
