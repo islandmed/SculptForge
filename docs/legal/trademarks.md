@@ -122,14 +122,14 @@ their old ids (`config.store`, `rgb_intensity`, `focal`, `subdiv_lower`...); onl
 | Save UI / Load UI | Export Interface / Import Interface |
 | Draw Size / Z Intensity / RGB Intensity / Focal Shift | Size / Intensity / Colour intensity / Falloff |
 | Popup Info / Quick Info Opacity | Ctrl+hover help / Help box opacity |
-| Lower Res / Higher Res / Del Lower / Del Higher | Lower Level / Higher Level / Delete Lower / Remove Above |
+| Lower Res / Higher Res / Del Lower / Del Higher | Lower Level / Higher Level / Delete Lower / Delete Higher |
 | Project All / PA Blur | Project Detail / Blur |
 | Mask Lasso / Mask Rect | Lasso Mask / Rectangle Mask |
 | Radial Count | Radial Copies |
 | Group Masked | Group from Mask |
 | Thick / E Smt / Double / TCorne / TBorder (Extract) | Thickness / Edge Smooth / Both Sides / Corners / Border (scripts: `triangle_corners`, `triangle_border`; the old names still read) |
 | Modify Topology / Mirror And Weld | Symmetry / Make Symmetric |
-| Reconstruct Subdiv / Delete Lower / Remove Above | Rebuild Lower Levels / Remove Below / Remove Above |
+| Reconstruct Subdiv / Delete Lower / Delete Higher | Rebuild Lower Levels / Remove Below / Remove Above |
 | Divide / Smt / SDiv | Add Level / Smooth / Level |
 | Close Holes / Delete Hidden | Fill Holes / Remove Hidden |
 | Target Polygons / Half / Same / Double / Adaptive Size / Keep Groups / Detect Edges / Curves Strength | Target Quads / 50% / 100% / 200% / Size Variation / Follow Face Groups / Keep Hard Edges / Guide Strength |
