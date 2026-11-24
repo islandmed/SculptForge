@@ -65,3 +65,4 @@ expect_sculpts
 undo_all
 expect_restored
 expect_mesh_valid
+shot way_out_clear
