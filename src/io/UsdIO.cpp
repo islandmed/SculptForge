@@ -258,9 +258,10 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
         };
         w.line("    customData = {");
         w.line("        dictionary sculptforge_ai = {");
-        w.line("            string host = " + str(ai->host));
+        w.line("            string provider = " + str(ai->provider));
         w.line("            string model = " + str(ai->model));
         w.line("            string date = " + str(ai->date));
+        w.line("            string app = " + str(ai->app));
         w.line("            string role = " + str(ai->role));
         w.line("        }");
         w.line("    }");

@@ -2,8 +2,8 @@
 # network, http_requests stays 0). Three candidates side by side (thumbnail over silhouette), pick one -> a Part, the
 # others hidden. The one choice under Result (0.14): Reference keeps the pick exactly as generated; Sculpting base
 # (the default) remeshes it at once, Voxel then Quad Remesh, with a hidden high-detail copy (the Project Detail source),
-# and the button does it again. Every pick carries the AI provenance tag (model, host, date, pass) in the Parts list
-# tooltip. Then: a pick in a scene with work in it is added beside it; a failed candidate says why; paid services start
+# and the button does it again. Every pick carries the AI provenance tag (provider, model, date, app, pass) in the Parts list
+# tooltip (provider and model names only, never a host or file). Then: a pick in a scene with work in it is added beside it; a failed candidate says why; paid services start
 # at one candidate and say what more would bill; AI off hides it all.
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=3
@@ -44,14 +44,14 @@ expect_value visible_parts == 1
 expect_value generated_part == 0
 expect_value subdiv_levels == 0
 expect_value ai_provenance == 3                  # the tag: a reference
-expect_text AI: Hunyuan3D 2.1 (Tencent), tencent-hunyuan3d-2-1.hf.space
+expect_text AI: Hunyuan3D 2.1 (Tencent), Hugging Face
 expect_value http_requests == 0
 shot generate-flow-picked
 
-# The Parts list tooltip names the model, the host, the date and the pass.
+# The Parts list tooltip names the model, the provider, the date, the app version and the pass.
 hover "Parts/Generated"
 wait 0.6
-expect_text AI: Hunyuan3D 2.1 (Tencent), tencent-hunyuan3d-2-1.hf.space
+expect_text AI: Hunyuan3D 2.1 (Tencent), Hugging Face
 expect_text (reference)
 
 # Sculpting base: the button rebuilds the picked model (Resolution down to its minimum, under Advanced, to keep the

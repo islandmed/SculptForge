@@ -16,8 +16,9 @@ std::string AiProvenance::line() const {
         out += (out.empty() ? "" : ", ") + s;
     };
     add(model);
-    add(host);
+    add(provider);
     add(date);
+    if (!app.empty()) add("SculptForge " + app);
     if (!role.empty()) out += " (" + role + ")";
     return out;
 }
@@ -37,9 +38,10 @@ std::string aiProvenanceToday() {
 
 Json aiProvenanceToJson(const AiProvenance& p) {
     Json j = Json::object();
-    j.set("host", p.host);
+    j.set("provider", p.provider);
     j.set("model", p.model);
     j.set("date", p.date);
+    j.set("app", p.app);
     j.set("role", p.role);
     return j;
 }
@@ -47,9 +49,10 @@ Json aiProvenanceToJson(const AiProvenance& p) {
 AiProvenance aiProvenanceFromJson(const Json& j) {
     AiProvenance p;
     if (!j.isObject()) return p;
-    p.host = j["host"].asString();
+    p.provider = j["provider"].asString();
     p.model = j["model"].asString();
     p.date = j["date"].asString();
+    p.app = j["app"].asString();
     p.role = j["role"].asString();
     return p;
 }

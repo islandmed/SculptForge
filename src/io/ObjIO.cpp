@@ -366,8 +366,8 @@ bool saveObj(const std::string& path, const std::vector<MeshObjectRef>& objects,
                     if (c == '\n' || c == '\r') c = ' ';
                 return s;
             };
-            buf += "# sculptforge_ai host=" + oneLine(o.ai.host) + " model=" + oneLine(o.ai.model) + " date=" + oneLine(o.ai.date) +
-                   " role=" + oneLine(o.ai.role) + "\n";
+            buf += "# sculptforge_ai provider=" + oneLine(o.ai.provider) + " model=" + oneLine(o.ai.model) + " date=" +
+                   oneLine(o.ai.date) + " app=" + oneLine(o.ai.app) + " role=" + oneLine(o.ai.role) + "\n";
         }
         const bool colors = mesh.colors.size() == mesh.positions.size() && mesh.hasColors();
         for (size_t i = 0; i < mesh.positions.size(); ++i) {

@@ -13,6 +13,7 @@
 #include "ai/Http.h"
 #include "core/Image.h"
 #include "core/ImageTo3D.h"
+#include "core/Pack.h"
 #include "io/GltfIO.h"
 
 #include <algorithm>
@@ -720,23 +721,31 @@ AiProvenance generateProvenance(const AiSettings& s, bool text) {
     AiProvenance p;
     const std::string& svc = s.generatorService;
     if (svc == "inflate") return p; // offline geometry, not AI
-    const SendTarget target = generateTarget(s, text);
-    p.host = target.local && target.host.empty() ? std::string("this computer") : target.host;
-    if (svc == "command") p.model = "your generator command";
-    else if (svc == "fal") p.model = text ? falTextModel(s.falModel) : s.falModel;
-    else if (svc == "meshy") p.model = "Meshy " + s.meshyModel;
-    else if (svc == "hyper3d") p.model = "Hyper3D Rodin " + s.hyper3dTier;
-    else if (svc == "tripo") p.model = "Tripo " + tripo::resolvedModel(s.tripoModel);
-    else if (svc == "comfyui") {
-        const std::string& wf = text ? s.comfyTextWorkflow : s.comfyImageWorkflow;
-        const auto stem = std::filesystem::path(std::u8string(wf.begin(), wf.end())).stem().u8string();
-        p.model = wf.empty() ? std::string("ComfyUI (bundled workflow)") : "ComfyUI workflow " + std::string(stem.begin(), stem.end());
+    // The tag goes into projects and exports people post and sell (input 11-24): the public provider's name and the model's,
+    // never a host, URL, path, workflow or key name. A ComfyUI run is "ComfyUI" with no model (the workflow is the user's).
+    if (svc == "command") p.provider = "Your generator command";
+    else if (svc == "fal") {
+        p.provider = "fal.ai";
+        p.model = text ? falTextModel(s.falModel) : s.falModel;
+    } else if (svc == "meshy") {
+        p.provider = "Meshy";
+        p.model = "Meshy " + s.meshyModel;
+    } else if (svc == "hyper3d") {
+        p.provider = "Hyper3D";
+        p.model = "Hyper3D Rodin " + s.hyper3dTier;
+    } else if (svc == "tripo") {
+        p.provider = "Tripo";
+        p.model = "Tripo " + tripo::resolvedModel(s.tripoModel);
+    } else if (svc == "comfyui") {
+        p.provider = "ComfyUI";
     } else { // the free Space that runs ("Hunyuan3D 2.1 (Tencent) - free, no token" -> its name)
+        p.provider = "Hugging Face";
         std::string label = resolveHfPreset(s, text).label;
         if (const size_t dash = label.find(" - "); dash != std::string::npos) label.erase(dash);
         p.model = label;
     }
     p.date = aiProvenanceToday();
+    p.app = appVersion();
     p.role = AiProvenance::kGenerated;
     return p;
 }
