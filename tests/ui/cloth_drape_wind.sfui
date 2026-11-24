@@ -1,0 +1,38 @@
+# Drape with wind: the plane over the ball from cloth_drape.sfui, a wind toward the right with gusts. It blows the
+# sheet downwind while it falls; the wind can change while the simulation runs; in gusts the cloth keeps moving
+# until Keep, which keeps the frame as one undo step.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_plane resolution=80
+run transform translate=0,0.62,0
+run part_append type=sphere size=0.5 name=Ball   # 1 m across, appended beside the plane at x = 1.6, y = 0.62
+run transform translate=-1.6,-0.62,0                 # under the plane's middle (12 cm below it)
+run part_select name=Plane
+camera 20 -25
+zoom 1.6
+click "Tool##palette.tool"
+click "Drape##tool.drape"
+expect "##drapewind"
+drag_item "##drapewind" 60 0
+wait_value drape_wind > 0 5
+click "From view##drapewind"
+wait_value drape_heading > 0 5
+drag_item "##drapeheading" -2000 0        # 0: toward -Z (into the screen from the front view)
+wait_value drape_heading == 0 5
+drag_item "##drapeheading" 60 0           # a heading to the right
+wait_value drape_heading > 30 5
+drag_item "##drapegusts" 80 0
+wait_value drape_gusts > 0 5
+click "Simulate##drape"
+wait_value drape_running == 1 10
+wait_value drape_frame > 30 30
+drag_item "##drapewind" 60 0              # harder, while it runs
+wait_value drape_frame > 90 30
+expect "Keep##drape"
+click "Keep##drape"
+wait_value drape_running == 0 10
+expect_value moved > 3000
+expect_value can_undo == 1
+wait_idle 30
+shot cloth_drape_wind
+key ctrl+z
+expect_value moved == 0

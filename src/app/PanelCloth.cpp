@@ -172,6 +172,11 @@ bool App::clothUiValue(const std::string& name, double& out) const {
     if (name == "drape_scale") return out = double(drapeRequest_.scale), true;
     if (name == "drape_running") return out = drape_ ? 1.0 : 0.0, true;
     if (name == "drape_frame") return out = double(drapeFrame()), true;
+    if (name == "drape_wind") return out = double(drapeRequest_.windSpeed), true;
+    if (name == "drape_heading") return out = double(drapeRequest_.windHeading), true;
+    if (name == "drape_lift") return out = double(drapeRequest_.windLift), true;
+    if (name == "drape_gusts") return out = double(drapeRequest_.gusts), true;
+    if (name == "drape_frame") return out = double(drapeFrame()), true;
     if (name == "cloth_colliders") return out = clothColliders_ ? double(clothColliders_->triangles()) : 0.0, true;
     return false;
 }

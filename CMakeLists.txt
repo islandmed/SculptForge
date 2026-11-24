@@ -1599,6 +1599,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Tool > Cloth (tests/ui/cloth_panel.sfui) at 1440 and 2880 px.
     sculptforge_ui_test(cloth_panel_1440 cloth_panel --size 1440x900)
     sculptforge_ui_test(cloth_panel_2880 cloth_panel --size 2880x1800)
+    # Drape with wind (tests/ui/cloth_drape_wind.sfui): blown downwind, changed while it runs, Keep in gusts.
+    sculptforge_ui_test(cloth_drape_wind_1440 cloth_drape_wind --size 1440x900)
     # Edges mode and creases (tests/ui/edge_select.sfui) at 1440 px of UI, 100% and 200% (#108).
     sculptforge_ui_test(edge_select_1440 edge_select --size 1440x900)
     sculptforge_ui_test(edge_select_2880 edge_select --size 2880x1800) # its 200% shots: 1440 px of UI

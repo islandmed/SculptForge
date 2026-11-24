@@ -27,7 +27,14 @@ struct App::DrapeJob {
     int frame = 0, shownFrame = -1;
     bool rested = false;
     float speed = 0.0f;
+    ClothSettings settings; // the wind, changed while it runs (under lock; the worker applies it at its next frame)
+    bool settingsChanged = false;
     std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
+    void setSettings(const ClothSettings& s) {
+        std::lock_guard g(lock);
+        settings = s;
+        settingsChanged = true;
+    }
     ~DrapeJob() {
         stop = true;
         if (worker.joinable()) worker.join();
@@ -46,27 +53,41 @@ void App::startDrape() {
     job->part = doc_.activePartInfo().id;
     job->vertices = doc_.mesh.vertexCount();
     job->start = doc_.mesh.positions;
-    if (!job->sim.init(job->scene.setup, job->scene.fabric)) {
+    if (!job->sim.init(job->scene.setup, job->scene.fabric, drapeSettings(drapeRequest_))) {
         status_ = "Drape: the Part can't be simulated";
         return;
     }
     job->sim.setColliders(&job->scene.colliders);
     DrapeJob* j = job.get();
-    const int maxFrames = drapeRequest_.maxFrames;
-    job->worker = std::thread([j, maxFrames] {
+    // In gusts the cloth never rests: it runs on (a minute) for Keep to take the frame you like.
+    const bool gusty = drapeRequest_.windSpeed > 0.0f && drapeRequest_.gusts > 0.0f;
+    const int maxFrames = gusty ? std::max(drapeRequest_.maxFrames, 3600) : drapeRequest_.maxFrames;
+    job->worker = std::thread([j, maxFrames, gusty] {
+        auto due = std::chrono::steady_clock::now();
         while (!j->stop.load()) {
             if (j->paused.load()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(15));
                 continue;
             }
+            {
+                std::lock_guard g(j->lock);
+                if (j->settingsChanged) j->sim.setSettings(j->settings), j->settingsChanged = false;
+            }
             const bool moving = j->sim.step();
-            std::lock_guard g(j->lock);
-            j->latest = j->sim.positions();
-            ++j->frame;
-            j->speed = j->sim.maxSpeed();
-            if (!moving || j->frame >= maxFrames) {
-                j->rested = !moving;
-                break;
+            {
+                std::lock_guard g(j->lock);
+                j->latest = j->sim.positions();
+                ++j->frame;
+                j->speed = j->sim.maxSpeed();
+                if (!moving || j->frame >= maxFrames) {
+                    j->rested = !moving;
+                    break;
+                }
+            }
+            // Gusts are watched, not waited for: cloth time at most as fast as real time (a flap a second, not five).
+            if (gusty) {
+                due = std::max(due, std::chrono::steady_clock::now()) + std::chrono::microseconds(16667);
+                std::this_thread::sleep_until(due);
             }
         }
         j->done = true;
@@ -172,6 +193,44 @@ void App::drawDrapeSection() {
                  "The cloth falls onto the other visible Parts and rests on them (a shirt on a body).", help);
     ImGui::EndDisabled();
     const float w = ImGui::GetContentRegionAvail().x;
+    // Wind: live, also while the simulation runs (the worker takes the new settings at its next frame).
+    bool windChanged = false;
+    ImGui::SetNextItemWidth(-1);
+    windChanged |= ui::SliderInside("##drapewind", &drapeRequest_.windSpeed, 0.0f, 20.0f, "Wind %.1f m/s");
+    ui::HelpText("Wind", nullptr,
+                 "How hard the air blows on the cloth, in metres per second: 0 none, 3 a breeze, 8 makes flags fly, 15 is hard to "
+                 "walk in. It pushes on the cloth's face and skims along it. Change it while the simulation runs, too.",
+                 help);
+    if (drapeRequest_.windSpeed > 0.0f) {
+        const float button = ImGui::CalcTextSize(tr("From view")).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        ImGui::SetNextItemWidth(w - button - ImGui::GetStyle().ItemSpacing.x);
+        windChanged |= ui::SliderInside("##drapeheading", &drapeRequest_.windHeading, 0.0f, 360.0f, "Toward %.0f deg");
+        ui::HelpText("Toward", nullptr,
+                     "Where the wind blows toward, as a heading: 0 is away from the front view, 90 to the right, 180 toward it.", help);
+        ImGui::SameLine();
+        if (ImGui::Button(tr("From view##drapewind"))) {
+            const glm::vec3 f = camera_.forward();
+            float heading = glm::degrees(std::atan2(f.x, -f.z));
+            if (heading < 0.0f) heading += 360.0f;
+            drapeRequest_.windHeading = heading;
+            windChanged = true;
+        }
+        ui::HelpText("From view", nullptr, "Points the wind away from you: it blows from the camera toward the model.", help);
+        ImGui::SetNextItemWidth(-1);
+        windChanged |= ui::SliderInside("##drapelift", &drapeRequest_.windLift, -60.0f, 60.0f, "Lift %.0f deg");
+        ui::HelpText("Lift", nullptr, "Tilts the wind up from level (a skirt lifts) or down, in degrees.", help);
+        float gusts = drapeRequest_.gusts * 100.0f;
+        ImGui::SetNextItemWidth(-1);
+        if (ui::SliderInside("##drapegusts", &gusts, 0.0f, 100.0f, "Gusts %.0f%%")) {
+            drapeRequest_.gusts = gusts / 100.0f;
+            windChanged = true;
+        }
+        ui::HelpText("Gusts", nullptr,
+                     "How much the wind varies from place to place and moment to moment: the cloth ripples and flaps and never "
+                     "quite settles, so press Keep at the frame you like (it stops by itself after a minute).",
+                     help);
+    }
+    if (windChanged && running) drape_->setSettings(drapeSettings(drapeRequest_));
     if (!running) {
         if (ImGui::Button(tr("Simulate##drape"), ImVec2(w, 0))) startDrape();
         ui::HelpText("Simulate", nullptr,

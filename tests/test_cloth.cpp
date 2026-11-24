@@ -94,6 +94,101 @@ TEST(cloth_hanging_sheet_keeps_its_length) {
     for (int i = 0; i <= res; ++i) CHECK(sim.positions()[i] == s.positions[i]); // held edge never moved
 }
 
+namespace {
+
+// A 1 m sheet held along one edge, hung for 240 frames: it hangs below y = 0 in the XY plane, its face toward +-Z.
+void hangSheet(ClothSim& sim, ClothSetup& s, int res) {
+    s = sheet(res, 1.0f, 0.0f);
+    s.pin.assign(s.positions.size(), 0.0f);
+    for (int i = 0; i <= res; ++i) s.pin[i] = 1.0f; // (row j = 0)
+    CHECK(sim.init(s, fabricPreset(FabricPreset::Cotton)));
+    for (int f = 0; f < 240; ++f) sim.step();
+}
+
+// The mean position of the free (last) row.
+glm::vec3 bottomRowMean(const ClothSim& sim, int res) {
+    glm::vec3 m(0.0f);
+    for (int i = 0; i <= res; ++i) m += sim.positions()[size_t(res) * (res + 1) + i];
+    return m / float(res + 1);
+}
+
+} // namespace
+
+TEST(cloth_wind_blows_the_face_not_the_edge) {
+    // The hung sheet faces +-Z. A 6 m/s wind on its face swings it out and up toward where the wind blows; the same
+    // wind along the held edge (edge-on, +X) moves it far less: wind pushes on the cloth's face, as on a sail, and
+    // only skims along it. Edges keep their length either way and the held edge never moves.
+    const int res = 20;
+    glm::vec3 blown[2];
+    for (int k = 0; k < 2; ++k) {
+        ClothSim sim;
+        ClothSetup s;
+        hangSheet(sim, s, res);
+        const glm::vec3 before = bottomRowMean(sim, res);
+        ClothSettings set;
+        set.wind = k == 0 ? glm::vec3(0.0f, 0.0f, 6.0f) : glm::vec3(6.0f, 0.0f, 0.0f);
+        sim.setSettings(set);
+        float worstStrain = 0.0f;
+        for (int f = 0; f < 300; ++f) {
+            sim.step();
+            worstStrain = std::max(worstStrain, sim.maxStrain());
+        }
+        blown[k] = bottomRowMean(sim, res) - before;
+        std::printf("  wind %s: the free edge moved (%.3f, %.3f, %.3f), worst strain %.4f, max speed %.3f m/s\n",
+                    k == 0 ? "on the face" : "edge-on", blown[k].x, blown[k].y, blown[k].z, worstStrain, sim.maxSpeed());
+        CHECK(worstStrain < 0.06f);
+        for (int i = 0; i <= res; ++i) CHECK(sim.positions()[i] == s.positions[i]);
+    }
+    CHECK(blown[0].z > 0.5f);              // swung out well past 30 degrees
+    CHECK(blown[0].y > 0.2f);              // and so risen
+    CHECK(std::abs(blown[0].x) < 0.05f);   // straight along the wind
+    CHECK(blown[1].x < 0.5f * blown[0].z); // edge-on: much less
+    CHECK(std::abs(blown[1].z) < 0.05f);
+}
+
+TEST(cloth_wind_gusts_keep_moving_and_repeat) {
+    // Gusts: the sheet keeps moving (it never rests, so Drape runs until Keep), with the same positions on every run
+    // and thread count (the gust field is a function of place and time, nothing random). A steady wind settles
+    // into a blown pose and rests.
+    const int res = 16;
+    std::vector<glm::vec3> runs[3];
+    for (int k = 0; k < 3; ++k) {
+        ThreadPool::shared().setSerial(k == 1);
+        ClothSim sim;
+        ClothSetup s;
+        hangSheet(sim, s, res);
+        ClothSettings set;
+        set.wind = glm::vec3(0.0f, 0.0f, 4.0f);
+        set.turbulence = 0.6f;
+        sim.setSettings(set);
+        float slowest = 1e9f;
+        for (int f = 0; f < 300; ++f) {
+            sim.step();
+            if (f >= 240) slowest = std::min(slowest, sim.maxSpeed());
+        }
+        ThreadPool::shared().setSerial(false);
+        std::printf("  gusts run %d: %s, slowest of the last 60 frames %.3f m/s\n", k, sim.atRest() ? "at rest" : "moving", slowest);
+        CHECK(!sim.atRest());
+        CHECK(slowest > 0.02f);
+        runs[k] = sim.positions();
+    }
+    CHECK(runs[0] == runs[1]);
+    CHECK(runs[0] == runs[2]);
+    ClothSim sim;
+    ClothSetup s;
+    hangSheet(sim, s, res);
+    ClothSettings set;
+    set.wind = glm::vec3(0.0f, 0.0f, 4.0f);
+    sim.setSettings(set);
+    int frames = 0;
+    while (frames < 900 && sim.step()) ++frames;
+    const glm::vec3 free = bottomRowMean(sim, res);
+    std::printf("  steady wind: %s after %d frames, free edge at (%.3f, %.3f, %.3f)\n", sim.atRest() ? "at rest" : "moving",
+                frames, free.x, free.y, free.z);
+    CHECK(sim.atRest());
+    CHECK(free.z > 0.3f);
+}
+
 TEST(cloth_drapes_over_a_sphere_and_rests) {
     // A sheet dropped onto a ball rests on it: nothing inside the ball (thickness kept, within a little), the
     // middle on top, the corners hanging down past the ball's equator.
@@ -957,6 +1052,32 @@ TEST(cloth_drape_command_rests_on_the_other_parts) {
     CHECK(d.mesh.positions == before);
 }
 
+TEST(cloth_drape_command_wind_blows_the_sheet_downwind) {
+    // A 3 m/s wind toward +X (heading 90): the sheet ends up downwind of where it fell without one, and never inside
+    // the ball. No wind, heading or gusts given: as before.
+    Document d = drapeDoc();
+    const std::vector<glm::vec3> before = d.mesh.positions;
+    CHECK(runCommand(d, "cloth_drape", {{"fabric", std::string("cotton")}, {"frames", 240.0}}).ok);
+    glm::vec3 still(0.0f);
+    for (const glm::vec3& q : d.mesh.positions) still += q;
+    still /= float(d.mesh.positions.size());
+    d.undo.undo(d.mesh, d.bvh);
+    CHECK(d.mesh.positions == before);
+    const CommandResult r = runCommand(d, "cloth_drape", {{"fabric", std::string("cotton")}, {"frames", 240.0}, {"wind", 3.0},
+                                                          {"heading", 90.0}, {"gusts", 0.3}});
+    std::printf("  %s\n", r.message.c_str());
+    CHECK(r.ok);
+    glm::vec3 windy(0.0f);
+    float closest = 1e9f;
+    for (const glm::vec3& q : d.mesh.positions) windy += q, closest = std::min(closest, glm::length(q));
+    windy /= float(d.mesh.positions.size());
+    std::printf("  mean without wind (%.3f, %.3f, %.3f), with (%.3f, %.3f, %.3f), closest to the ball's centre %.3f\n", still.x,
+                still.y, still.z, windy.x, windy.y, windy.z, closest);
+    CHECK(windy.x > still.x + 0.1f);
+    CHECK(std::abs(windy.z - still.z) < 0.1f);
+    CHECK(closest > 0.297f);
+}
+
 TEST(cloth_drape_scale_is_real_size) {
     // The same scene modelled twice as big drapes the same with scale=2 (units per metre).
     Document a = drapeDoc(1.0f), b = drapeDoc(2.0f);
@@ -1082,6 +1203,19 @@ TEST(cloth_bench_drape_and_brush_on_a_dense_body) {
     const double total = ms(t0, t2) / 1000.0;
     std::printf("  bench drape: colliders %.0f ms, %d frames (rested %d), total %.2f s, frame p50 %.1f ms, slowest %.1f ms\n",
                 ms(t0, t1), r.frames, int(r.rested), total, frames[frames.size() / 2], frames.back());
+    // The same drape in a gusty wind (normals every substep, the wind field every frame): the cost of wind per frame.
+    for (int windy = 0; windy < 2; ++windy) {
+        frames.clear();
+        DrapeOptions o = opt;
+        o.maxFrames = 300;
+        o.settings.wind = glm::vec3(0.0f, 0.0f, 5.0f);
+        o.settings.turbulence = windy ? 0.5f : 0.0f;
+        last = clock::now();
+        const DrapeResult w = drapeToRest(s, colliders, fabricPreset(FabricPreset::Cotton), o);
+        std::sort(frames.begin(), frames.end());
+        std::printf("  bench drape wind 5 m/s%s: %d frames, frame p50 %.1f ms, slowest %.1f ms\n", windy ? " gusts 50%" : "",
+                    w.frames, frames[frames.size() / 2], frames.back());
+    }
     // The Cloth brush on the dense body: a 40-dab drag, 5 cm radius.
     Document d = makeDoc(Mesh(body));
     std::vector<double> dabs;

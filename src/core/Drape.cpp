@@ -10,6 +10,20 @@
 
 namespace sf {
 
+glm::vec3 drapeWind(const DrapeRequest& q) {
+    const float speed = std::clamp(q.windSpeed, 0.0f, 50.0f);
+    if (speed <= 0.0f) return glm::vec3(0.0f);
+    const float h = glm::radians(q.windHeading), l = glm::radians(std::clamp(q.windLift, -89.0f, 89.0f));
+    return glm::vec3(std::sin(h) * std::cos(l), std::sin(l), -std::cos(h) * std::cos(l)) * speed;
+}
+
+ClothSettings drapeSettings(const DrapeRequest& q) {
+    ClothSettings s;
+    s.wind = drapeWind(q);
+    s.turbulence = std::clamp(q.gusts, 0.0f, 1.0f);
+    return s;
+}
+
 bool drapeScene(const Document& doc, const DrapeRequest& request, DrapeScene& out, std::string& error) {
     const Mesh& mesh = doc.mesh;
     if (doc.sculptor.strokeActive()) return error = "Drape: finish the stroke first", false;
@@ -94,7 +108,11 @@ void registerDrapeCommands(CommandRegistry& reg) {
               {"scale", T::Number, "World units per metre of the sculpt (default 1: modelled at real size).", false},
               {"frames", T::Number, "Most simulation frames (1/60 s each; default 600).", false},
               {"masked", T::Bool, "Masked vertices are pins (default true).", false},
-              {"collide", T::Bool, "Collide with the other visible Parts (default true).", false}},
+              {"collide", T::Bool, "Collide with the other visible Parts (default true).", false},
+              {"wind", T::Number, "Wind speed in m/s (default 0: none; 3 a breeze, 8 makes flags fly).", false},
+              {"heading", T::Number, "Where the wind blows toward, degrees: 0 away from the front view, 90 to the right (default 0).", false},
+              {"lift", T::Number, "The wind's lift, degrees up from level (default 0).", false},
+              {"gusts", T::Number, "Gusts 0..1: the wind varies over place and time and the cloth keeps moving until the frame cap (default 0).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  DrapeRequest q;
                  const std::string fabric = argString(a, "fabric", "cotton");
@@ -103,11 +121,16 @@ void registerDrapeCommands(CommandRegistry& reg) {
                  q.maxFrames = std::clamp(int(argNumber(a, "frames", 600.0)), 1, 20000);
                  q.useMask = argBool(a, "masked", true);
                  q.collide = argBool(a, "collide", true);
+                 q.windSpeed = float(argNumber(a, "wind", 0.0));
+                 q.windHeading = float(argNumber(a, "heading", 0.0));
+                 q.windLift = float(argNumber(a, "lift", 0.0));
+                 q.gusts = float(argNumber(a, "gusts", 0.0));
                  DrapeScene scene;
                  std::string err;
                  if (!drapeScene(doc, q, scene, err)) return {false, err};
                  DrapeOptions o;
                  o.maxFrames = q.maxFrames;
+                 o.settings = drapeSettings(q);
                  const DrapeResult r = drapeToRest(scene.setup, scene.colliders, scene.fabric, o);
                  const size_t moved = applyDrape(doc, r.positions, scene.scale, err);
                  if (moved == 0) return {false, err};

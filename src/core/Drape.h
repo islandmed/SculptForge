@@ -24,7 +24,18 @@ struct DrapeRequest {
     int maxFrames = 600;
     bool useMask = true;  // masked vertices are pins (partly masked: soft pins)
     bool collide = true;  // the other visible Parts are colliders
+    // Wind (Tool > Drape > Wind): its speed in m/s (0: none; 3 a breeze, 8 makes flags fly, 15 is hard to walk in),
+    // where it blows toward as a heading (degrees: 0 away from the front view, along -Z; 90 to the right, +X) and a
+    // lift (degrees up from level), and gusts 0..1 (the wind varies over place and time: the cloth keeps moving, so
+    // the panel runs it longer and Keep takes the frame you like).
+    float windSpeed = 0.0f;
+    float windHeading = 0.0f;
+    float windLift = 0.0f;
+    float gusts = 0.0f;
 };
+// The request's wind as a velocity (m/s, the sculpt's axes), and the solver settings for it.
+glm::vec3 drapeWind(const DrapeRequest& request);
+ClothSettings drapeSettings(const DrapeRequest& request);
 
 // The active Part's simulation, ready to step: positions and colliders in metres (divided by `scale`).
 struct DrapeScene {

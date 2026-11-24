@@ -64,8 +64,18 @@ in screenshots: silk flows, denim holds wide folds, leather barely folds.)
 ## 4. Pins, gravity, wind
 
 Pins from the **mask**: masked vertices (mask 1) are fixed, partly masked ones pulled softly. Gravity is world -Y
-(9.81 m/s^2, a slider 0..2x); wind is a velocity with air drag. A SculptForge unit is a metre, so a sculpt modelled at
+(9.81 m/s^2, a slider 0..2x). A SculptForge unit is a metre, so a sculpt modelled at
 a real size drapes right; Drape has a **Scale** field (shows "body height 1.8 m") for sculpts made at another size.
+
+Wind (Tool > Drape > Wind) is an air velocity: speed in m/s, a heading (where it blows toward) and a lift. Each
+particle's normal is gathered once a frame from its triangles; the air moving through the face pushes along the
+normal with half the air's density (1.2 kg/m^3) times the squared normal speed over the fabric's mass per area
+(drag coefficient 1), and the air along the face skims it at 2% of that, so a sail fills and an edge-on sheet barely
+leans. Neither takes a particle past the air's own speed within a substep (the velocity change is capped at the
+relative speed), which keeps a 20 m/s wind stable at h = 1/720 s. Gusts (0..1) make the wind a field over place and
+time: three sine waves (along the wind, across it and up; about half the cloth's size long; 0.7-1.1 Hz) plus a slow
+swell of the steady part, scaled by the gust share of the speed. It is a function, not noise: the same drape on every
+run and thread count. In gusts the cloth never rests, so the panel runs up to a minute and Keep takes a frame.
 
 ## 5. Cloth brush (phase 1)
 

@@ -16,6 +16,16 @@ expect "##clothfabric"
 click "##clothmode"
 click "Grab##clothmode"
 wait_value cloth_mode == 3 5
+# Wind: a speed above 0 shows its heading, From view, lift and gusts.
+expect "##drapewind"
+expect_not "##drapegusts"
+drag_item "##drapewind" 120 0
+wait_value drape_wind > 0 5
+expect "##drapeheading"
+expect "From view##drapewind"
+expect "##drapelift"
+drag_item "##drapegusts" 100 0
+wait_value drape_gusts > 0 5
 shot cloth_panel
 # From Drape: the link opens the same section.
 click "Drape##tool.drape"
