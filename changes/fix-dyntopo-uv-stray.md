@@ -5,4 +5,4 @@ added: **Dynamic on a painted Part keeps the paint inside its charts**: a triang
 testers:
   - Windows or macOS: Auto UV the Human head, paint a few colours, turn Dynamic on and drag big Smooth, Standard and Clay brushes across the eyes and forehead; no white specks or streaks appear on the paint.
 ---
-Follow-up to the 0.13.14 entry "Dynamic topology no longer erases a Part's painted texture". Reviewers: see REPORT.md in the worktree.
+Follow-up to the 0.13.14 entry on Dynamic keeping a painted Part's texture.
