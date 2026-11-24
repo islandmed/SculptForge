@@ -2,14 +2,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Tube.h"
 
+#include "core/BVH.h"
 #include "core/Commands.h"
 #include "core/Parts.h"
 #include "core/PathStroke.h"
+#include "core/SurfaceQuery.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <sstream>
 
 namespace sf {
@@ -548,10 +551,11 @@ std::vector<TubePoint> tubeFromStroke(const std::vector<TubePoint>& samples, flo
     return out;
 }
 
-std::vector<TubePoint> tubeResample(const std::vector<TubePoint>& points, size_t count) {
+std::vector<TubePoint> tubeResample(const std::vector<TubePoint>& points, size_t count, bool straight) {
     count = std::clamp<size_t>(count, 2, kTubeMaxPoints);
     TubeShape shape;
     shape.points = points;
+    shape.straight = straight;
     double length = 0.0;
     for (size_t i = 1; i < points.size(); ++i) length += glm::distance(points[i - 1].position, points[i].position);
     if (points.size() < 2 || !(length > 0.0)) return {};
@@ -642,7 +646,13 @@ std::vector<TubeSample> tubeCenterline(const TubeShape& shape, float edge) {
         const int m = std::clamp(int(std::ceil(chord / (0.25f * edge))), 2, 512);
         const float lo = std::min(b.radius, c.radius), hi = std::max(b.radius, c.radius);
         for (int k = 0; k < m; ++k) {
-            const float t = t1 + (t2 - t1) * float(k) / float(m);
+            const float f = float(k) / float(m);
+            if (shape.straight) { // a polyline: straight from b to c, the radius blended along it
+                dp.push_back(glm::mix(b.position, c.position, f));
+                dr.push_back(glm::mix(b.radius, c.radius, f));
+                continue;
+            }
+            const float t = t1 + (t2 - t1) * f;
             dp.push_back(catmullRom(a.position, b.position, c.position, d.position, t0, t1, t2, t3, t));
             dr.push_back(std::clamp(catmullRom(a.radius, b.radius, c.radius, d.radius, t0, t1, t2, t3, t), lo, hi));
         }
@@ -655,14 +665,25 @@ std::vector<TubeSample> tubeCenterline(const TubeShape& shape, float edge) {
         const vec3 d = dp[std::min(i + 1, dp.size() - 1)] - dp[i > 0 ? i - 1 : 0];
         dt[i] = glm::length(d) > 1e-12f ? glm::normalize(d) : (i > 0 ? dt[i - 1] : vec3(0, 0, 1));
     }
-    // Rings: an edge length apart, closer where the curve turns.
+    // Rings: an edge length apart, closer where the curve turns. A polyline gets a ring on every corner (its tangent
+    // halfway between the two spans: a mitre), whatever the spacing.
+    std::vector<char> corner(dp.size(), 0);
+    if (shape.straight) {
+        size_t at = 0;
+        for (size_t i = 0; i + 1 < n; ++i) {
+            const float chord = glm::distance(p[i].position, p[i + 1].position);
+            const int m = std::clamp(int(std::ceil(chord / (0.25f * edge))), 2, 512);
+            if (i > 0 && at < dp.size()) corner[at] = 1;
+            at += size_t(m);
+        }
+    }
     std::vector<TubeSample> out{{dp[0], dr[0], dt[0]}};
     float acc = 0.0f;
     vec3 last = dt[0];
     const float cosTurn = std::cos(kTurnPerRing);
     for (size_t i = 1; i + 1 < dp.size(); ++i) {
         acc += glm::distance(dp[i - 1], dp[i]);
-        if (acc >= edge || glm::dot(dt[i], last) < cosTurn) {
+        if (acc >= edge || corner[i] || glm::dot(dt[i], last) < cosTurn) {
             out.push_back({dp[i], dr[i], dt[i]});
             acc = 0.0f;
             last = dt[i];
@@ -760,7 +781,7 @@ Mesh tubeMesh(const TubeShape& shape, size_t maxTriangles) {
     return m;
 }
 
-CommandResult tubeAdd(Document& doc, const TubeShape& shape, bool merge, const std::string& name, int* edited) {
+CommandResult tubeAdd(Document& doc, const TubeShape& shape, bool merge, const std::string& name, int* edited, bool select) {
     if (const std::string err = tubeValidate(shape); !err.empty()) return {false, "Tube: " + err};
     if (merge && shape.curve) return {false, "Tube: a curve is only a guide line; make it a tube (tube_from_curve) to merge"};
     if (merge && (doc.mesh.multires || doc.mesh.micro))
@@ -786,12 +807,17 @@ CommandResult tubeAdd(Document& doc, const TubeShape& shape, bool merge, const s
     if (m.triangleCount() == 0) return {false, "Tube: nothing to sweep"};
     const size_t faces = m.triangleCount() - m.quadCount();
     const std::string partName = doc.uniquePartName(name.empty() ? (shape.curve ? "Curve" : "Tube") : name);
+    const uint32_t returnTo = doc.activePartInfo().id;
     const int at = doc.addPart(std::move(m), partName, false, doc.activePart + 1);
     UndoRecord r; // undo takes the new Part out again
     r.label = shape.curve ? "Curve" : "Tube";
     r.part = std::make_shared<PartStep>();
     r.part->id = doc.parts[size_t(at)].id;
     r.part->at = at;
+    if (select) { // in the new Part's own history, as a Boolean's result is: undo removes it and goes back
+        r.part->returnTo = returnTo;
+        doc.selectPart(at);
+    }
     doc.undo.push(std::move(r));
     doc.modified = true;
     if (edited) *edited = at;
@@ -898,6 +924,104 @@ bool tubeMatchesMesh(const Mesh& mesh) {
     return glm::distance(s.positions[n - 1], mesh.positions[n - 1]) <= eps;
 }
 
+bool tubeClosestSurface(Document& doc, const vec3& p, float maxDistance, vec3& out, vec3& normal) {
+    if (!finite(p)) return false;
+    const Part& me = doc.activePartInfo();
+    const vec3 world = me.moved() ? vec3(me.transform * glm::vec4(p, 1.0f)) : p;
+    float best = maxDistance > 0.0f ? maxDistance : std::numeric_limits<float>::infinity();
+    bool found = false;
+    std::vector<uint32_t> tris;
+    for (int i = 0; i < doc.partCount(); ++i) {
+        if (doc.checkedOut(i) || !doc.parts[size_t(i)].visible) continue; // (the curve itself, and Parts linked to it)
+        const Mesh& m = doc.partMesh(i);
+        if (m.triangleCount() == 0 || !m.tube.empty() || !m.forgespheres.empty()) continue; // (other curves are no surface to snap to)
+        const Part& o = doc.parts[size_t(i)];
+        const glm::mat4 inv = o.moved() ? glm::inverse(o.transform) : glm::mat4(1.0f);
+        const vec3 q = o.moved() ? vec3(inv * glm::vec4(world, 1.0f)) : world;
+        const AABB box = m.bounds();
+        if (!box.valid()) continue;
+        // Nearest triangle: the triangles whose boxes touch a sphere round q, the sphere doubled until one is found
+        // (then the closest point within that radius is the closest there is; a bigger sphere adds nothing nearer).
+        const float reach = glm::distance(q, box.center()) + glm::length(box.extent());
+        float r = std::max(1e-4f * glm::length(box.extent()), 1e-9f);
+        if (std::isfinite(best)) { // (not nearer than the best so far: that much is enough)
+            const float scale = o.moved() ? glm::length(vec3(inv[0])) : 1.0f;
+            if (best * scale < r) r = best * scale;
+        }
+        const BVH& bvh = doc.partBvh(i);
+        for (; r <= 2.0f * reach; r *= 2.0f) {
+            bvh.queryTriangles(m, q, r, tris);
+            float local = std::numeric_limits<float>::infinity();
+            vec3 at(0.0f), nrm(0.0f);
+            for (const uint32_t t : tris) {
+                if (!m.hidden.empty() && m.hidden[t]) continue;
+                const glm::uvec3& tri = m.triangles[t];
+                vec3 bary;
+                const vec3 c = closestPointOnTriangle(q, m.positions[tri.x], m.positions[tri.y], m.positions[tri.z], bary);
+                const float d = glm::distance(q, c);
+                if (d < local) {
+                    local = d;
+                    at = c;
+                    const vec3 fn = glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]);
+                    nrm = glm::length(fn) > 1e-20f ? glm::normalize(fn) : vec3(0, 1, 0);
+                }
+            }
+            if (!(local <= r)) continue; // (a box touched the sphere, its triangle did not: look wider)
+            // Back to the active Part's space.
+            vec3 atW = at, nW = nrm;
+            if (o.moved()) {
+                atW = vec3(o.transform * glm::vec4(at, 1.0f));
+                nW = glm::normalize(glm::mat3(glm::transpose(inv)) * nrm);
+            }
+            vec3 atMe = atW, nMe = nW;
+            if (me.moved()) {
+                const glm::mat4 myInv = glm::inverse(me.transform);
+                atMe = vec3(myInv * glm::vec4(atW, 1.0f));
+                nMe = glm::normalize(glm::mat3(glm::transpose(me.transform)) * nW);
+            }
+            const float d = glm::distance(atMe, p);
+            if (d < best) {
+                best = d;
+                out = atMe;
+                normal = nMe;
+                found = true;
+            }
+            break;
+        }
+    }
+    return found;
+}
+
+CommandResult tubeSnapPoints(Document& doc, const std::vector<int>& indices, float sink, int* moved) {
+    TubeShape s = doc.mesh.tube;
+    if (s.empty()) return {false, "The active Part is not a Tube Part (tube_new makes one)"};
+    if (!std::isfinite(sink)) return {false, "Tube: sink must be a number of radii"};
+    std::vector<int> which = indices;
+    if (which.empty())
+        for (size_t i = 0; i < s.points.size(); ++i) which.push_back(int(i));
+    int count = 0, missed = 0;
+    float rmax = 0.0f;
+    for (const TubePoint& p : s.points) rmax = std::max(rmax, p.radius);
+    for (const int i : which) {
+        if (i < 0 || size_t(i) >= s.points.size()) return {false, "Tube: index " + std::to_string(i) + " is not a point"};
+        TubePoint& p = s.points[size_t(i)];
+        vec3 on, nrm;
+        if (!tubeClosestSurface(doc, p.position, 0.0f, on, nrm)) {
+            ++missed;
+            continue;
+        }
+        const vec3 to = on + nrm * (sink * p.radius);
+        if (glm::distance(to, p.position) > 1e-6f * std::max(rmax, 1e-6f)) ++count;
+        p.position = to;
+    }
+    if (moved) *moved = count;
+    if (missed == int(which.size())) return {false, "Snap: no other visible Part to snap to (show or add one)"};
+    if (count == 0) return {true, "Snap: the points already lie on the surface"};
+    CommandResult r = tubeEdit(doc, std::move(s), "Snap curve to surface");
+    if (r.ok) r.message = "Snapped " + std::to_string(count) + (count == 1 ? " point" : " points") + " to the surface";
+    return r;
+}
+
 CommandResult tubeEdit(Document& doc, TubeShape shape, const std::string& label) {
     if (doc.mesh.tube.empty()) return {false, "The active Part is not a Tube Part (tube_new makes one)"};
     if (!tubeMatchesMesh(doc.mesh))
@@ -929,6 +1053,7 @@ Json tubeToJson(const TubeShape& s) {
     if (s.spread != 0.5f) out.set("spread", double(s.spread));
     if (s.strands != 3) out.set("strands", double(s.strands));
     if (s.curve) out.set("curve", true);
+    if (s.straight) out.set("straight", true);
     if (glm::length(s.up) > 0.0f) {
         Json up = Json::array();
         for (int k = 0; k < 3; ++k) up.push(double(s.up[k]));
@@ -957,6 +1082,7 @@ TubeShape tubeFromJson(const Json& json) {
     s.spread = float(json["spread"].asNumber(0.5));
     s.strands = int(json["strands"].asNumber(3.0));
     s.curve = json["curve"].asBool(false);
+    s.straight = json["straight"].asBool(false);
     if (const Json& up = json["up"]; up.isArray() && up.size() == 3)
         s.up = vec3(float(up[0].asNumber(NAN)), float(up[1].asNumber(NAN)), float(up[2].asNumber(NAN)));
     s.taperStart = float(json["taper_start"].asNumber(0.0));
@@ -1022,7 +1148,29 @@ std::string applyOptions(TubeShape& s, const Args& a) {
         s.mirrorX = sym.find('x') != std::string::npos || sym.find('X') != std::string::npos;
     }
     if (a.contains("edge")) s.edge = float(argNumber(a, "edge", 0.0));
+    if (a.contains("straight")) s.straight = argBool(a, "straight", false);
     return {};
+}
+
+// "1 3 5" (spaces, ',' or ';' between them) as point indices of `s`, each once, in order; empty text = none.
+bool parseIndices(const std::string& text, const TubeShape& s, std::vector<int>& out, std::string& error) {
+    out.clear();
+    std::string t = text;
+    for (char& c : t)
+        if (c == ',' || c == ';') c = ' ';
+    std::istringstream in(t);
+    std::string tok;
+    while (in >> tok) {
+        char* stop = nullptr;
+        const long v = std::strtol(tok.c_str(), &stop, 10);
+        if (stop != tok.c_str() + tok.size() || !validPoint(s, int(v))) {
+            error = "indices must be from 0 to " + std::to_string(s.points.size() - 1) + " (\"" + tok + "\")";
+            return false;
+        }
+        if (std::find(out.begin(), out.end(), int(v)) == out.end()) out.push_back(int(v));
+    }
+    std::sort(out.begin(), out.end());
+    return true;
 }
 
 } // namespace
@@ -1069,6 +1217,10 @@ void registerTubeCommands(CommandRegistry& reg) {
                "true: add a Curve Part, only the guide line (a thin wire) to place, edit and tube_resample; tube_from_curve "
                "then makes the tube (default false).",
                false},
+              {"straight", T::Bool,
+               "true: a polyline, straight spans between the points with sharp corners (default false: a smooth curve "
+               "through them). tube_set straight=false makes it smooth later; the points stay.",
+               false},
               {"name", T::String, "Part name (default \"Tube\", or \"Curve\" for a curve).", false}}),
              [](Document& doc, const Args& a) -> CommandResult {
                  const float radius = float(argNumber(a, "radius", 0.05));
@@ -1088,6 +1240,7 @@ void registerTubeCommands(CommandRegistry& reg) {
                  const TubeShape& s = doc.mesh.tube;
                  if (s.empty()) return {false, kNotTube};
                  std::string out = std::to_string(s.points.size()) + " points, " + (s.curve ? "a curve (tube_from_curve makes the tube), " : "") +
+                                   (s.straight ? "straight spans (a polyline), " : "") +
                                    (s.strands != 3 ? std::to_string(s.strands) + " strands, " : std::string()) + (s.twist != 0.0f ? "twist " + num(s.twist) + ", " : "") + (s.spin != 0.0f ? "spin " + num(s.spin) + ", " : "") +
                                    (s.profile == Profile::Round ? std::string()
                                                                 : std::string(tubeProfileName(s.profile)) + " profile" +
@@ -1134,20 +1287,70 @@ void registerTubeCommands(CommandRegistry& reg) {
                  s.points.insert(s.points.begin() + i + 1, TubePoint{0.5f * (p.position + q.position), 0.5f * (p.radius + q.radius)});
                  return tubeEdit(doc, std::move(s), "Tube insert point");
              }});
-    reg.add({"tube_delete_point", "Delete a control point of the active Tube Part (one point always stays).",
-             {{"index", T::Number, "Point index.", true}},
+    reg.add({"tube_add_point",
+             "Add a control point to the active Tube or Curve Part at a position: at the end (default), or after point "
+             "`index` (-1: before the first). Drawing a polyline point by point; a point on another Part's surface with "
+             "snap=true.",
+             {{"position", T::String, "\"x,y,z\".", true},
+              {"radius", T::Number, "Its radius (default: its neighbour's).", false},
+              {"index", T::Number, "The point to add after (default: the last; -1: before the first).", false},
+              {"snap", T::Bool, "Move it onto the nearest other Part's surface first (default false).", false},
+              {"sink", T::Number, "With snap: how far below the surface, in radii (default 0 for a curve, 0.5 for a tube).", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  TubeShape s = doc.mesh.tube;
                  if (s.empty()) return {false, kNotTube};
-                 const int i = int(argNumber(a, "index", -1));
-                 if (!validPoint(s, i)) return {false, "index must be from 0 to " + std::to_string(s.points.size() - 1)};
-                 if (s.points.size() == 1) return {false, "Tube: the last point stays (delete the Part instead)"};
-                 s.points.erase(s.points.begin() + i);
-                 return tubeEdit(doc, std::move(s), "Tube delete point");
+                 if (s.points.size() >= kTubeMaxPoints) return {false, "Tube: at most " + std::to_string(kTubeMaxPoints) + " points"};
+                 const int after = int(argNumber(a, "index", double(s.points.size()) - 1.0));
+                 if (after < -1 || size_t(after + 1) > s.points.size())
+                     return {false, "index must be from -1 to " + std::to_string(s.points.size() - 1)};
+                 const TubePoint& nb = s.points[size_t(std::max(after, 0))]; // (its neighbour)
+                 TubePoint p{nb.position, float(argNumber(a, "radius", double(nb.radius)))};
+                 if (!a.contains("position") || !parseVec3(argString(a, "position"), p.position)) return {false, "position must be \"x,y,z\""};
+                 if (argBool(a, "snap", false)) {
+                     vec3 on, nrm;
+                     if (tubeClosestSurface(doc, p.position, 0.0f, on, nrm))
+                         p.position = on + nrm * (float(argNumber(a, "sink", s.curve ? 0.0 : 0.5)) * p.radius);
+                 }
+                 s.points.insert(s.points.begin() + (after + 1), p);
+                 return tubeEdit(doc, std::move(s), "Tube add point");
              }});
-    reg.add({"tube_set", "Change the active Tube Part's cross-section, taper, ends, mirror copy, density or thickness.",
+    reg.add({"tube_delete_point", "Delete control points of the active Tube Part (one point always stays).",
+             {{"index", T::Number, "Point index.", false},
+              {"indices", T::String, "Several points, \"1 3 5\" (instead of index).", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 TubeShape s = doc.mesh.tube;
+                 if (s.empty()) return {false, kNotTube};
+                 std::vector<int> gone;
+                 std::string err;
+                 if (a.contains("indices")) {
+                     if (!parseIndices(argString(a, "indices"), s, gone, err)) return {false, "Tube: " + err};
+                 } else {
+                     const int i = int(argNumber(a, "index", -1));
+                     if (!validPoint(s, i)) return {false, "index must be from 0 to " + std::to_string(s.points.size() - 1)};
+                     gone.push_back(i);
+                 }
+                 if (gone.empty()) return {false, "Tube: no point to delete"};
+                 if (gone.size() >= s.points.size()) return {false, "Tube: the last point stays (delete the Part instead)"};
+                 for (auto it = gone.rbegin(); it != gone.rend(); ++it) s.points.erase(s.points.begin() + *it);
+                 return tubeEdit(doc, std::move(s), gone.size() > 1 ? "Tube delete points" : "Tube delete point");
+             }});
+    reg.add({"tube_snap_points",
+             "Put control points of the active Tube or Curve Part on the nearest surface of the other visible Parts "
+             "(a curve lies on it, a tube half sunk in). One undo step.",
+             {{"indices", T::String, "Which points, \"1 3 5\" (default: all).", false},
+              {"sink", T::Number, "How far below the surface, in radii (default 0 for a curve, 0.5 for a tube).", false}},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const TubeShape& s = doc.mesh.tube;
+                 if (s.empty()) return {false, kNotTube};
+                 std::vector<int> which;
+                 std::string err;
+                 if (a.contains("indices") && !parseIndices(argString(a, "indices"), s, which, err)) return {false, "Tube: " + err};
+                 return tubeSnapPoints(doc, which, float(argNumber(a, "sink", s.curve ? 0.0 : 0.5)));
+             }});
+    reg.add({"tube_set", "Change the active Tube Part's cross-section, taper, ends, mirror copy, density, thickness or line (smooth / straight).",
              withShape({capsParam, symParam, edgeParam,
-                        {"radius_scale", T::Number, "Multiply every point's radius by this (default 1).", false}}),
+                        {"radius_scale", T::Number, "Multiply every point's radius by this (default 1).", false},
+                        {"straight", T::Bool, "true: straight spans between the points (a polyline); false: a smooth curve through them. The points stay.", false}}),
              [](Document& doc, const Args& a) -> CommandResult {
                  TubeShape s = doc.mesh.tube;
                  if (s.empty()) return {false, kNotTube};
@@ -1183,7 +1386,7 @@ void registerTubeCommands(CommandRegistry& reg) {
                  const double n = argNumber(a, "count", 0);
                  if (!(n >= 2.0 && n <= double(kTubeMaxPoints))) return {false, "count must be from 2 to " + std::to_string(kTubeMaxPoints)};
                  const size_t before = s.points.size();
-                 s.points = tubeResample(s.points, size_t(n));
+                 s.points = tubeResample(s.points, size_t(n), s.straight);
                  if (s.points.empty()) return {false, "Tube: a curve needs two points that differ to resample"};
                  CommandResult r = tubeEdit(doc, std::move(s), "Resample curve");
                  if (r.ok) r.message = "Resampled: " + std::to_string(before) + " -> " + std::to_string(doc.mesh.tube.points.size()) + " points";

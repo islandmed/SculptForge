@@ -1,0 +1,95 @@
+# Standalone curves (Tool > Tube, PanelTube.cpp): a curve placed point by point (Draw > Points), Line: Straight (a
+# polyline) and Smooth converting either way without moving a point, Shift+click selecting points, the Transform
+# gizmo moving and scaling them (one undo step each), Snap to surface, and Tube from curve on a polyline. The shots
+# feed the guide's Tube chapter.
+run ui_look look=classic layout=classic
+wait 0.3
+click "Tube##tool.tube"
+click "Tube/Curve"
+click "Tube/Straight"
+action tube.style_points
+expect_value tube_points_style == 1
+click "Tube/Draw Tube"
+expect_value tube_draw == 1
+view_drag 0.40 0.35 0.40 0.35
+expect_value tube_parts == 1
+expect_value tube_line_open == 1
+expect_value tube_points == 1
+expect_value tube_curve == 1
+view_drag 0.50 0.30 0.50 0.30
+view_drag 0.58 0.42 0.58 0.42
+view_drag 0.50 0.55 0.50 0.55
+view_drag 0.62 0.62 0.62 0.62
+expect_value tube_points == 5
+expect_value tube_straight == 1
+expect_value open_edges == 0
+expect_status "5 points"
+shot polyline
+key enter
+expect_value tube_line_open == 0
+# The next click starts another line; undo takes it away again.
+view_drag 0.30 0.70 0.30 0.70
+expect_value tube_parts == 2
+expect_value tube_points == 1
+key ctrl+z
+expect_value tube_parts == 1
+run part_select index=1
+expect_value tube_points == 5
+# Smooth and back: the same five points.
+action tube.line_smooth
+expect_value tube_straight == 0
+expect_value tube_points == 5
+shot smooth
+action tube.line_straight
+expect_value tube_straight == 1
+# Draw Tube off; Shift+click selects two points, Move moves them (one undo step), the gizmo sits on their centre.
+click "Tube/Draw Tube"
+expect_value tube_draw == 0
+hold shift
+drag_tube_point 1 0 0
+drag_tube_point 2 0 0
+hold none
+expect_value tube_selected_count == 2
+expect_status "2 points selected"
+key w
+expect_value gizmo_mode == 1
+shot selected
+gizmo_drag move_x 60 0
+expect_status "Curve points moved"
+expect_value tube_points == 5
+expect_value tube_curve == 1
+expect_value tube_selected_count == 2
+shot gizmo-moved
+ui_scale 200
+wait 0.3
+shot gizmo-moved-200
+ui_scale 100
+wait 0.3
+key ctrl+z
+# Scale on the last point alone: its radius grows; undo brings it back.
+drag_tube_point 4 0 0
+expect_value tube_selected_count == 1
+remember tube_last_radius_x1000 r0
+key e
+expect_value gizmo_mode == 2
+gizmo_drag scale_uniform 60 0
+expect_status "Curve points scaled"
+expect_value tube_last_radius_x1000 > $r0
+key ctrl+z
+expect_value tube_last_radius_x1000 == $r0
+key q
+# Q (Draw) goes back to the Part sculpted before the curve, as a brush does: pick the curve again.
+run part_select index=1
+expect_value tube_curve == 1
+# Snap points to surface puts the points on the model (or says they are on it already).
+action tube.snap_points
+expect_status "Snap"
+expect_value tube_points == 5
+# Tube from curve keeps the polyline; undo brings the curve back.
+click "Tube/Tube from curve"
+expect_value tube_curve == 0
+expect_value tube_straight == 1
+expect_value open_edges == 0
+shot tube-straight
+key ctrl+z
+expect_value tube_curve == 1

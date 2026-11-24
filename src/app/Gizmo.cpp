@@ -250,7 +250,12 @@ void App::registerGizmoActions() {
 
 void App::setGizmoMode(GizmoMode mode) {
     if (drag_ == Drag::Gizmo) return;
-    const std::string left = leaveDrawModes(); // Draw / Move / Scale / Rotate leave Draw Tube and Append > Insert
+    // Draw / Move / Scale / Rotate leave Draw Tube and Append > Insert. The gizmo edits a Tube Part's points, so it
+    // stays on that Part (a brush still goes back to the Part sculpted before it).
+    const int keepReturn = tubeReturnPart_;
+    if (tubeActive() && mode != GizmoMode::Off) tubeReturnPart_ = -1;
+    const std::string left = leaveDrawModes();
+    if (tubeActive() && mode != GizmoMode::Off) tubeReturnPart_ = keepReturn;
     gizmo_.mode = mode;
     gizmo_.snapNext = false;
     gizmo_.hover = GizmoHandle::None;
@@ -290,7 +295,7 @@ void App::updateGizmoPivot() {
     if (gizmo_.all || gizmo_.folder)
         for (int i = 0; i < doc_.partCount(); ++i)
             key = key * 1099511628211ull ^ doc_.partUndo(i).revision() ^ (doc_.parts[size_t(i)].visible ? 1u : 0u);
-    if (key == gizmo_.centreKey) return;
+    if (key == gizmo_.centreKey && !tubeActive()) return;
     gizmo_.centreKey = key;
     // A new mask (or another Part) means a new part to move: follow its centre again.
     uint64_t maskKey = doc_.activePartInfo().id;
@@ -298,11 +303,17 @@ void App::updateGizmoPivot() {
     double sum = 0.0;
     for (size_t v = 0; v < mask.size(); v += 1 + mask.size() / 65536) sum += double(mask[v]) * double(v % 97 + 1);
     maskKey = maskKey * 1000003u ^ uint64_t(sum * 1024.0) ^ uint64_t(mask.size()) << 40;
+    if (tubeActive()) // a Tube Part: the gizmo moves its selected points, so a new selection is a new thing to move
+        for (const int i : tubeSelectedPoints()) maskKey = (maskKey ^ uint64_t(i + 1)) * 1099511628211ull;
     if (maskKey != gizmo_.maskKey) {
         gizmo_.maskKey = maskKey;
         gizmo_.pivotPlaced = false;
     }
     if (gizmo_.pivotPlaced) return;
+    if (glm::vec3 c; !gizmo_.all && !gizmo_.folder && tubeGizmoPivot(c)) { // the selected points' centre
+        gizmo_.pivot = c;
+        return;
+    }
     AABB box;
     for (int i : gizmoTargets()) {
         const Mesh& m = doc_.partMesh(i);
@@ -609,6 +620,13 @@ bool App::gizmoMouseDown(float x, float y, SDL_Keymod mod) {
     gizmo_.sessions.clear();
     gizmo_.wholeParts.clear();
     gizmo_.wholeStart.clear();
+    if (!gizmo_.pivotOnly && !gizmo_.all && !gizmo_.folder && tubeGizmoBegin()) { // a Tube Part: its points move, not its mesh
+        gizmo_.gpu.clear();
+        gizmo_.gpuModel = glm::mat4(1.0f);
+        gizmo_.pending = false;
+        drag_ = Drag::Gizmo;
+        return true;
+    }
     if (!gizmo_.pivotOnly) {
         std::vector<const PartData*> meshes; // a mesh linked Parts share is edited once
         for (int i : gizmoTargets()) {
@@ -755,6 +773,10 @@ void App::gizmoDragTo(float x, float y) {
     }
     gizmo_.current = t;
     gizmo_.gpuModel = t.matrix();
+    if (tubeGizmo_.on) { // a Tube Part's points (PanelTube.cpp)
+        tubeGizmoApply(t);
+        return;
+    }
     for (size_t i = 0; i < gizmo_.sessions.size(); ++i) {
         if (gizmo_.gpu[i]) continue; // (drawn by gizmoDrawnTransform; the release moves the vertices)
         const Part& s = doc_.parts[size_t(gizmo_.parts[i])];
@@ -793,6 +815,19 @@ void App::gizmoRelease() {
     const std::string readout = std::move(gizmo_.readout);
     gizmo_.handle = H::None;
     gizmo_.readout.clear();
+    if (tubeGizmo_.on) { // a Tube Part's points: one undo step, the gizmo follows them
+        const MeshTransform t = gizmo_.current;
+        const glm::mat3 frameBefore = gizmo_.frame;
+        const bool surfaceBefore = gizmo_.orientSurface;
+        if (!tubeGizmoEnd(isRotate(h) ? "Curve points turned" : isScale(h) ? "Curve points scaled" : "Curve points moved")) return;
+        status_ += " (" + readout + ")";
+        gizmo_.pivot = t.pivot + t.translate;
+        gizmo_.pivotPlaced = true;
+        if (gizmo_.orientSurface && isRotate(h)) gizmo_.frame = glm::mat3_cast(t.rotate) * gizmo_.startFrame;
+        rememberGizmoStep(t.pivot, frameBefore, surfaceBefore);
+        updateTitle();
+        return;
+    }
     if (gizmo_.pivotOnly || (gizmo_.sessions.empty() && gizmo_.wholeParts.empty())) return;
     const char* label = isRotate(h) ? "Gizmo Rotate" : isScale(h) ? "Gizmo Scale" : "Gizmo Move";
     size_t moved = 0;
@@ -895,6 +930,24 @@ void App::applyGizmoNumbers() {
         return;
     }
     const glm::mat3 f = gizmoFrame();
+    if (!gizmo_.all && !gizmo_.folder && tubeGizmoBegin()) { // a Tube Part: its points, as one step
+        MeshTransform t;
+        t.pivot = gizmo_.pivot;
+        t.frame = f;
+        t.translate = move;
+        t.rotate = eulerRotation(rot, f);
+        t.scale = glm::vec3(scale);
+        tubeGizmoApply(t);
+        const glm::vec3 pivot0 = gizmo_.pivot;
+        const glm::mat3 frameBefore = gizmo_.frame;
+        const bool surfaceBefore = gizmo_.orientSurface;
+        if (!tubeGizmoEnd("Curve points transformed")) return;
+        gizmo_.pivot = pivot0 + move;
+        gizmo_.pivotPlaced = true;
+        if (gizmo_.orientSurface) gizmo_.frame = glm::mat3_cast(eulerRotation(rot, f)) * f;
+        rememberGizmoStep(pivot0, frameBefore, surfaceBefore);
+        return;
+    }
     Args args;
     args["translate"] = vecText(move);
     args["rotate"] = vecText(rot);

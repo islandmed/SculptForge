@@ -7,7 +7,9 @@
 // tube never twists. The cross-section is round, square, triangular or a flat ribbon, turned and tapered as asked;
 // the ends are round or flat. Rope and Braid are strands (three by default) round the curve (a rope of one strand is a spring; a braid's round strands twist over and under each other), Sleeve is hollow with open ends; Twist
 // and Spin turn the cross-section along the length. A Curve Part is the same data swept as a thin wire (only the guide
-// line): Resample sets its point count exactly, and Tube from curve makes it a tube. A Tube Part keeps its curve in Mesh::tube and its triangles are
+// line): Resample sets its point count exactly, and Tube from curve makes it a tube. A curve is smooth through its points,
+// or `straight` (a polyline: straight spans, sharp corners); the toggle keeps the points, so a polyline drawn point by
+// point becomes a smooth curve and back. A Tube Part keeps its curve in Mesh::tube and its triangles are
 // made from it, so the points can be moved and resized until Bake makes it a plain, sculptable mesh. Merged into
 // the active Part instead, the tube is swept with even edge lengths (rings with as many sides as their size
 // needs), which suits dynamic topology. Every change is one undo step.
@@ -51,9 +53,9 @@ std::vector<TubePoint> tubeFromStroke(const std::vector<TubePoint>& samples, flo
 // (at least 2), or earlier when the next would change it by more than `tolerance` radii (0 = no limit).
 std::vector<TubePoint> tubeSimplify(const std::vector<TubePoint>& points, float keep, float tolerance = 0.0f);
 
-// Exactly `count` (2..kTubeMaxPoints) points evenly spaced along the smooth curve through `points`, radii blended
-// between them; the first and last stay as they were. Empty for fewer than two distinct points.
-std::vector<TubePoint> tubeResample(const std::vector<TubePoint>& points, size_t count);
+// Exactly `count` (2..kTubeMaxPoints) points evenly spaced along the curve through `points` (smooth, or `straight`
+// spans), radii blended between them; the first and last stay as they were. Empty for fewer than two distinct points.
+std::vector<TubePoint> tubeResample(const std::vector<TubePoint>& points, size_t count, bool straight = false);
 
 // How a braid's round strands lie for a tube of `radius` (its outer reach) with `count` (2..kTubeMaxStrands) strands and Spread
 // `spread` (0..1): each strand has radius `radius`, its centre line winds round the tube's centre line at distance `orbit`,
@@ -74,7 +76,8 @@ struct TubeSample {
     glm::vec3 tangent{0.0f, 0.0f, 1.0f};
 };
 // The centre line rings are placed on: at most `edge` apart along it and closer where it turns (about 10 degrees
-// between rings), from the first point to the last.
+// between rings), from the first point to the last. A `straight` shape's spans are straight lines (a ring sits on
+// each corner).
 std::vector<TubeSample> tubeCenterline(const TubeShape& shape, float edge);
 
 // The ring orientation along `line`: a unit normal per sample, at right angles to its tangent, carried along without
@@ -95,14 +98,22 @@ TubeShape tubeMirrored(const TubeShape& shape);
 
 // Adds a tube to the scene as one undo step: a new Tube Part (not made active; undo removes it), or with `merge`
 // swept with even edges (near the active Part's own edge length) into the active Part. `edited` is the Part that
-// holds it now.
+// holds it now. `select`: the new Part is made active and the step goes in its own history (undo takes it away and
+// goes back to the Part before it), for a curve built point by point.
 CommandResult tubeAdd(Document& doc, const TubeShape& shape, bool merge, const std::string& name = "Tube",
-                      int* edited = nullptr);
+                      int* edited = nullptr, bool select = false);
 // True when `mesh` is still the tube its Mesh::tube sweeps (not moved, sculpted or otherwise changed since): a
 // tube is only re-swept from its points then, so nothing done to it afterwards is lost silently.
 bool tubeMatchesMesh(const Mesh& mesh);
 // Replaces the active Tube Part's curve (one undo step labelled `label`).
 CommandResult tubeEdit(Document& doc, TubeShape shape, const std::string& label);
+
+// The closest point to `p` (in the active Part's space) on the visible surface of the other Parts, with the surface
+// normal there; false when there is none within `maxDistance` (<= 0: any distance).
+bool tubeClosestSurface(Document& doc, const glm::vec3& p, float maxDistance, glm::vec3& out, glm::vec3& normal);
+// Puts the points `indices` (empty: all) of the active Tube or Curve Part on the nearest other surface, `sink` radii
+// below it (0: on it, as a curve lies; 0.5: half sunk, as a drawn tube lies). One undo step. `moved`: how many moved.
+CommandResult tubeSnapPoints(Document& doc, const std::vector<int>& indices, float sink, int* moved = nullptr);
 
 // Repeats the Part `source` along the active Tube or Curve Part's curve as a new Part (one undo step): its longest side
 // lies along the curve, each copy turned `turn` degrees more than the one before about the curve (90: chain links).
@@ -119,8 +130,8 @@ TubeShape tubeFromJson(const Json& json);
 // `radius`.
 bool parseTubePoints(const std::string& text, float radius, std::vector<TubePoint>& out, std::string& error);
 
-// tube_new (curve=true: a Curve Part), tube_list, tube_set_point, tube_insert_point, tube_delete_point, tube_set,
-// tube_simplify, tube_resample, tube_from_curve, tube_bake, tube_repeat.
+// tube_new (curve=true: a Curve Part), tube_list, tube_set_point, tube_insert_point, tube_add_point, tube_delete_point,
+// tube_set (straight=true: a polyline), tube_snap_points, tube_simplify, tube_resample, tube_from_curve, tube_bake, tube_repeat.
 void registerTubeCommands(CommandRegistry& registry);
 
 } // namespace sf
