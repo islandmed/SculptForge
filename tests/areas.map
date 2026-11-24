@@ -72,6 +72,7 @@ ui_forge*                   mesh
 ui_geometry_groups*         mesh
 ui_edge_select*             mesh
 ui_polygon_mode*            mesh
+ui_polygon_extrude*         mesh
 ui_levels_rebuild           mesh
 ui_layers_levels            mesh
 ui_multires                 mesh
@@ -257,7 +258,6 @@ test_render_clusters        render
 test_video_drivers          render
 test_space_camera           render
 test_close_holes            mesh
-test_poly_extrude           mesh
 test_cut                    mesh
 test_decimate_valence       mesh
 test_divide_valence         mesh
@@ -408,7 +408,6 @@ src/core/Arrangement*              mesh
 src/core/MeshBoolean*              mesh
 src/core/PartBoolean*              mesh
 src/core/CloseHoles*               mesh
-src/core/PolyExtrude*              mesh
 src/core/Tube*                     mesh
 src/core/Parts*                    mesh
 src/core/Multires*                 mesh

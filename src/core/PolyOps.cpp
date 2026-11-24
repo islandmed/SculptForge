@@ -7,6 +7,7 @@
 #include "core/Document.h"
 #include "core/FaceGroups.h"
 #include "core/Mesh.h"
+#include "core/PolyExtrude.h"
 
 #include <algorithm>
 #include <cmath>
@@ -202,7 +203,8 @@ void registerBuiltinPolyOps(PolyOpRegistry& reg) {
         reg.add(std::move(op));
     }
     // The modelling ops register here, one line each (core/PolyExtrude.cpp, PolyInset.cpp, PolyBevel.cpp,
-    // PolyEdgeLoop.cpp, PolySpan.cpp): registerPolyExtrudeOp(reg); ...
+    // PolyEdgeLoop.cpp, PolySpan.cpp).
+    registerPolyExtrudeOp(reg);
 }
 
 Args polyOpArgs(const PolyOp& op, const Args& args) {

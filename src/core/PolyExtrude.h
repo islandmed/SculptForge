@@ -108,8 +108,9 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
 ExtrudePlan planEdgeExtrude(const Mesh& mesh, std::span<const glm::uvec2> edges, const EdgeExtrudeOptions& options);
 
 // The mesh for `plan` at `distance` along the offset directions and `inset` into the caps (faces only; edges
-// ignore it). Topology and normals are built; `plan.cap` is the new selection.
-Mesh buildExtrude(const Mesh& mesh, const ExtrudePlan& plan, float distance, float inset = 0.0f);
+// ignore it). Topology and normals are built (`finish`; off for a result the Polygon mode registry finishes
+// itself); `plan.cap` is the new selection.
+Mesh buildExtrude(const Mesh& mesh, const ExtrudePlan& plan, float distance, float inset = 0.0f, bool finish = true);
 // Re-places the moved vertices of `out` (a mesh buildExtrude made from `mesh` and `plan`) for another distance
 // and inset, and recomputes the normals around them. Returns the inset actually applied (scaled back when a cap
 // would fold over).
@@ -120,6 +121,12 @@ bool extrudeFaces(const Mesh& mesh, std::span<const uint8_t> selected, const Ext
                   float inset, Mesh& out, std::vector<uint8_t>& newSelection, std::string& status);
 bool extrudeEdges(const Mesh& mesh, std::span<const glm::uvec2> edges, const EdgeExtrudeOptions& options, float distance,
                   Mesh& out, std::vector<glm::uvec2>& newBorder, std::string& status);
+
+// The Polygon mode op (core/PolyOps.h): "extrude", on Faces (a region or individual faces, inset) or Edges (open
+// borders). distance and inset are fractions of the Part's size (its bounding box's diagonal), so one slider fits
+// every Part.
+class PolyOpRegistry;
+void registerPolyExtrudeOp(PolyOpRegistry& reg);
 
 // Completes `selected` to whole polygons (the partner of a selected quad half) and clears hidden triangles;
 // returns how many polygons that is.

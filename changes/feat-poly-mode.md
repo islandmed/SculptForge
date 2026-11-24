@@ -7,8 +7,13 @@ added: **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. 
   face group; Grow, Shrink, All, None, Invert, Loop, Ring, By Group), see the selection drawn over the model, move it with
   the Transform gizmo (W / E / R) as one undo step, and run operations on it from the panel, each one undo step: Delete
   and Flip ship with the mode, the modelling operations (Extrude, Inset, Bevel, Edge loop, Span) plug into the same
-  registry. Commands: `poly_mode`, `poly_select`, `poly_op`, and `transform selection=true`. Nothing changes for
-  sculpting: the mode is off until you turn it on. Members' top wish (#225 and the ideas threads).
+  registry. **Extrude**: the selected faces move out along their normals (in, with a negative Distance) and get quad
+  side walls in a face group of their own, as one connected region or face by face (Individual) with a groove between
+  neighbours; Even thickness moves every face the full distance where the selection bends, Keep shape moves a region
+  along one direction, Inset narrows the cap first; in Edges, selected open border edges extrude into a strip that
+  extends the surface (or stands on it). The slider shows a live preview. Commands: `poly_mode`, `poly_select`,
+  `poly_op`, and `transform selection=true`. Nothing changes for sculpting: the mode is off until you turn it on.
+  Members' top wish (#225 and the ideas threads).
 member_request: true
 testers:
   - Any OS: Tool > Polygon > Polygon mode on a cube (Tool > Parts > Append > Cube). Click a face, Shift+click another, Ctrl+click
@@ -18,6 +23,9 @@ testers:
     back to how it was.
   - Any OS: a Part with subdivision levels (Tool > Geometry > Add Level), then Polygon mode: the status line says to Delete
     Higher first, nothing else changes.
+  - Any OS: Polygon mode on a cube, double-click a side (its face group), Extrude: the side stands out as a block with quad
+    walls; drag Distance below zero and it sinks in; Individual gives four separate blocks; Ctrl+Z takes each back in one step.
+  - Any OS: Delete a side, switch to Edges, All, Extrude: only the hole's border edges grow a strip; the rest are left alone.
 ---
 Foundation branch: the selection model, overlay, gizmo path and ops registry (src/core/PolyMode.h, src/core/PolyOps.h). The
 op branches (poly-extrude, poly-inset, poly-bevel, poly-edge-loop, poly-bridge) register one op each in

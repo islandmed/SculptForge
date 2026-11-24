@@ -5,7 +5,7 @@
 > **In short:**
 > - **Tool > Polygon > Polygon mode** turns a Part into a cage you edit polygon by polygon.
 > - Pick **Points**, **Edges** or **Faces**, select them on the model, and move them with the Gizmo.
-> - The operations under the selection (Delete, Flip, and the modelling ones as they land) run on what is selected, each as one undo step.
+> - The operations under the selection (Extrude, Delete, Flip, and the other modelling ones as they land) run on what is selected, each as one undo step.
 
 Sculpting shapes a surface; Polygon mode builds one. It is for the low and medium-density meshes hard-surface
 work starts from: a box, a cylinder, a Quad Remesh result, an imported cage. You select the polygons' points,
@@ -69,11 +69,34 @@ box-selects. <kbd>Q</kbd> (Draw) is back to sculpting: it puts the gizmo away an
 
 Every operation runs on the selection and is one undo step. **Delete** removes the selected faces (points and edges
 delete the faces they fully cover). **Flip** turns the selected faces inside out. The modelling operations
-(Extrude, Inset, Bevel, Edge loop, Span) land here as they ship; each has its settings under its button, and a
+(Extrude below; Inset, Bevel, Edge loop, Span) land here as they ship; each has its settings under its button, and a
 slider you drag shows a live preview of the result on the model.
 
 An operation that needs whole faces tells you so when only some of a face's points are selected: switch to Faces, or
 select whole faces.
+
+### Extrude
+
+**Extrude** pushes the selected faces out along their normals and joins them to the surface with new side walls
+(quads, in a face group of their own, so one click selects them afterwards). The cap keeps its face group, UVs and
+paint. With a negative **Distance** the faces sink in instead. Distances are a fraction of the Part's size, so the
+same slider position means the same thing on a 2 cm bolt and a 2 m wall; pull the result further with the gizmo.
+
+| Setting | Does |
+| --- | --- |
+| **Distance** | How far out (negative: in). 0 builds the walls flat, ready for the gizmo. |
+| **Inset** | Narrows the cap first, so the walls slant inward (a boss, a tapered plate). Too deep an inset is scaled back rather than folding the cap. |
+| **Individual** | Each face on its own: every face gets its own walls, with a groove down to the surface between neighbours. Off: the connected selection moves as one region, walls only on its border. |
+| **Even thickness** | Where the selection bends (two sides of a box), every face still moves the full distance along its own normal, so the thickness is even. Off: the shared edge moves along the averaged normal and comes out less. |
+| **Keep shape** | The whole region moves along one direction (its average normal), keeping its shape, instead of inflating along each point's normal. |
+| **Edges along normals** | In **Edges**: the strip stands on the surface instead of extending it. |
+
+In **Edges**, Extrude takes the selected open border edges (a plane's rim, the edge of a hole) and extends the
+surface with a strip of quads; corners go out diagonally so the strip is as wide at a corner as along an edge. Edges
+with a face on both sides are left alone. Selecting a whole closed mesh and extruding it has no border to wall, so
+the surface just moves out: an exact offset.
+
+The slider shows a live outline of the result on the model while you drag.
 
 ## Scripting
 

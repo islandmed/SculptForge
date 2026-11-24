@@ -4,6 +4,8 @@
 
 #include "core/FaceGroups.h"
 #include "core/PaintLayer.h"
+#include "core/PolyMode.h"
+#include "core/PolyOps.h"
 #include "core/Uv.h"
 
 #include <algorithm>
@@ -221,7 +223,7 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
     std::vector<uint8_t> sel(selected.begin(), selected.begin() + std::ptrdiff_t(std::min(selected.size(), nt)));
     plan.polygons = completePolygonSelection(mesh, sel);
     if (plan.polygons == 0) {
-        plan.error = "Extrude: select some polygons first";
+        plan.error = "Extrude: select some faces first";
         return plan;
     }
     const std::vector<uint32_t> twin = cornerTwins(mesh);
@@ -553,7 +555,7 @@ float moveExtrude(const Mesh& mesh, const ExtrudePlan& plan, float distance, flo
     return inset;
 }
 
-Mesh buildExtrude(const Mesh& mesh, const ExtrudePlan& plan, float distance, float inset) {
+Mesh buildExtrude(const Mesh& mesh, const ExtrudePlan& plan, float distance, float inset, bool finish) {
     Mesh out;
     if (!plan.ok()) return out;
     copyVertexAttributes(mesh, plan, out);
@@ -573,8 +575,10 @@ Mesh buildExtrude(const Mesh& mesh, const ExtrudePlan& plan, float distance, flo
         }
     }
     matchWallCreases(plan, out);
-    out.rebuildTopology();
-    out.recomputeAllNormals();
+    if (finish) {
+        out.rebuildTopology();
+        out.recomputeAllNormals();
+    }
     return out;
 }
 
@@ -587,7 +591,7 @@ bool extrudeFaces(const Mesh& mesh, std::span<const uint8_t> selected, const Ext
     }
     out = buildExtrude(mesh, plan, distance, inset);
     newSelection = plan.cap;
-    status = "Extruded " + countText(plan.polygons, "polygon", "polygons");
+    status = "Extruded " + countText(plan.polygons, "face", "faces");
     status += plan.walls ? " (" + countText(plan.walls, "wall", "walls") + ")" : " (no border: the whole surface moved)";
     return true;
 }
@@ -603,6 +607,82 @@ bool extrudeEdges(const Mesh& mesh, std::span<const glm::uvec2> edges, const Edg
     newBorder = plan.newBorder;
     status = "Extruded " + countText(plan.polygons, "edge", "edges");
     return true;
+}
+
+// --- The Polygon mode op ---
+namespace {
+
+float partSize(const Mesh& m) {
+    const AABB box = m.bounds();
+    return box.valid() ? std::max(glm::length(box.extent()), 1e-6f) : 1.0f;
+}
+
+bool polyExtrude(const PolyOpInput& in, PolyOpOutput& out, std::string& error) {
+    const float size = partSize(in.mesh);
+    const float distance = float(argNumber(in.args, "distance", 0.1)) * size;
+    if (in.element == PolyElement::Edges) {
+        if (in.edgePairs.empty()) {
+            error = "Extrude needs edges: select the open border edges to extrude";
+            return false;
+        }
+        EdgeExtrudeOptions o;
+        o.along = argBool(in.args, "normals", false) ? EdgeExtrudeAlong::Normals : EdgeExtrudeAlong::Outward;
+        const ExtrudePlan plan = planEdgeExtrude(in.mesh, in.edgePairs, o);
+        if (!plan.ok()) {
+            error = plan.error;
+            return false;
+        }
+        out.mesh = buildExtrude(in.mesh, plan, distance, 0.0f, false);
+        out.element = PolyElement::Edges;
+        out.edges = plan.newBorder;
+        out.message = "Extruded " + countText(plan.polygons, "edge", "edges");
+        return true;
+    }
+    if (in.element == PolyElement::Points || in.triangles.empty()) {
+        error = "Extrude works on faces or edges: switch to Faces (or Edges for an open border) and select some";
+        return false;
+    }
+    ExtrudeOptions o;
+    o.individual = argBool(in.args, "individual", false);
+    o.along = argBool(in.args, "flat", false) ? ExtrudeAlong::Region : ExtrudeAlong::Normals;
+    o.even = argBool(in.args, "even", true);
+    const ExtrudePlan plan = planExtrude(in.mesh, in.triangleFlags, o);
+    if (!plan.ok()) {
+        error = plan.error;
+        return false;
+    }
+    const float inset = float(argNumber(in.args, "inset", 0.0)) * size;
+    out.mesh = buildExtrude(in.mesh, plan, distance, inset, false);
+    out.element = PolyElement::Faces;
+    for (uint32_t t = 0; t < plan.cap.size(); ++t)
+        if (plan.cap[t]) out.triangles.push_back(t);
+    out.message = "Extruded " + countText(plan.polygons, "face", "faces");
+    if (plan.walls) out.message += " (" + countText(plan.walls, "wall", "walls") + ")";
+    return true;
+}
+
+} // namespace
+
+void registerPolyExtrudeOp(PolyOpRegistry& reg) {
+    PolyOp op;
+    op.id = "extrude";
+    op.label = "Extrude";
+    op.description = "Push the selected faces out along their normals (in, with a negative distance) with new side walls, "
+                     "as one region or face by face; selected open border edges extrude into a strip along the surface.";
+    op.credit = "#225 and the ideas threads";
+    op.needs = PolyElement::Faces;
+    op.anyElement = true;
+    op.preview = true;
+    op.params = {
+        {"distance", "Distance", -0.5, 0.5, 0.1, "How far out, as a fraction of the Part's size (negative: in)."},
+        {"inset", "Inset", 0.0, 0.25, 0.0, "Narrow the cap first by this much (a fraction of the Part's size), so the walls slant in."},
+        {"individual", "Individual", 0.0, 1.0, 0.0, "Each face on its own, with a groove between neighbours, instead of the connected region.", true},
+        {"even", "Even thickness", 0.0, 1.0, 1.0, "Where the selection bends, every face still moves the full distance along its own normal.", true},
+        {"flat", "Keep shape", 0.0, 1.0, 0.0, "Move the whole region along one direction (its average normal) so it keeps its shape.", true},
+        {"normals", "Edges along normals", 0.0, 1.0, 0.0, "Edges: the strip stands on the surface instead of extending it.", true},
+    };
+    op.run = polyExtrude;
+    reg.add(std::move(op));
 }
 
 } // namespace sf

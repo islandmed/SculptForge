@@ -1606,6 +1606,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Polygon mode (tests/ui/polygon_mode.sfui) at 1440 px of UI, 100% and 200%.
     sculptforge_ui_test(polygon_mode_1440 polygon_mode --size 1440x900)
     sculptforge_ui_test(polygon_mode_2880 polygon_mode --size 2880x1800)
+    # Extrude in Polygon mode (tests/ui/polygon_extrude.sfui): faces as a region, individual, undo, then open border edges.
+    sculptforge_ui_test(polygon_extrude_1440 polygon_extrude --size 1440x900)
+    sculptforge_ui_test(polygon_extrude_2880 polygon_extrude --size 2880x1800)
     # The Transform gizmo's look, each mode front and 3/4, 100% and 200% (tests/ui/gizmo/look.sfui).
     sculptforge_ui_test(gizmo_look_1440 gizmo/look --size 1440x900)
     sculptforge_ui_test(gizmo_look_2880 gizmo/look --size 2880x1800)

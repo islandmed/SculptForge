@@ -6,9 +6,12 @@
 #include "TestHarness.h"
 
 #include "core/CloseHoles.h"
+#include "core/Commands.h"
 #include "core/Cut.h"
 #include "core/FaceGroups.h"
 #include "core/PolyExtrude.h"
+#include "core/PolyMode.h"
+#include "core/PolyOps.h"
 #include "core/Primitives.h"
 #include "core/Uv.h"
 
@@ -89,7 +92,7 @@ TEST(poly_extrude_cube_side_region) {
     std::string status;
     CHECK(extrudeFaces(cube, selectGroup(cube, kPlusX), {}, 0.5f, 0.0f, out, sel, status));
     std::printf("  %s\n", status.c_str());
-    CHECK(status == "Extruded 4 polygons (8 walls)");
+    CHECK(status == "Extruded 4 faces (8 walls)");
     // 3 x 3 cap vertices: the 8 on the border split off, the centre one just moves.
     CHECK(out.vertexCount() == cube.vertexCount() + 8);
     CHECK(out.triangleCount() == cube.triangleCount() + 16);
@@ -147,7 +150,7 @@ TEST(poly_extrude_cube_side_individual) {
     std::string status;
     CHECK(extrudeFaces(cube, selectGroup(cube, kPlusX), o, 0.5f, 0.0f, out, sel, status));
     std::printf("  %s\n", status.c_str());
-    CHECK(status == "Extruded 4 polygons (16 walls)");
+    CHECK(status == "Extruded 4 faces (16 walls)");
     // Each of the 4 quads gets its own 4 corners and 4 walls; the old corners stay for the walls' feet.
     CHECK(out.vertexCount() == cube.vertexCount() + 16);
     CHECK(out.triangleCount() == cube.triangleCount() + 32);
@@ -210,7 +213,7 @@ TEST(poly_extrude_two_sides_normals_vs_region) {
     std::string status;
     CHECK(extrudeFaces(cube, sel, o, 0.5f, 0.0f, out, cap, status));
     std::printf("  %s\n", status.c_str());
-    CHECK(status == "Extruded 8 polygons (12 walls)");
+    CHECK(status == "Extruded 8 faces (12 walls)");
     CHECK(closedAndOriented(out));
     for (uint32_t t = 0; t < out.triangleCount(); ++t) {
         if (!cap[t]) continue;
@@ -261,7 +264,7 @@ TEST(poly_extrude_cylinder_cap_fan) {
     std::string status;
     CHECK(extrudeFaces(cyl, sel, {}, 0.3f, 0.0f, out, cap, status));
     std::printf("  %s\n", status.c_str());
-    CHECK(status == "Extruded " + std::to_string(polygons) + " polygons (16 walls)");
+    CHECK(status == "Extruded " + std::to_string(polygons) + " faces (16 walls)");
     CHECK(out.vertexCount() == cyl.vertexCount() + 16);
     CHECK(closedAndOriented(out));
     CHECK(isWatertight(out));
@@ -286,7 +289,7 @@ TEST(poly_extrude_grid_region_and_whole_plane) {
     std::vector<uint8_t> cap;
     std::string status;
     CHECK(extrudeFaces(plane, sel, {}, 0.4f, 0.0f, out, cap, status));
-    CHECK(status == "Extruded 4 polygons (8 walls)");
+    CHECK(status == "Extruded 4 faces (8 walls)");
     CHECK(out.vertexCount() == plane.vertexCount() + 8);
     CHECK(boundaryLoops(out).size() == 1);
     CHECK(openEdges(out) == openEdges(plane));
@@ -294,7 +297,7 @@ TEST(poly_extrude_grid_region_and_whole_plane) {
     const std::vector<uint8_t> all(plane.triangleCount(), 1);
     CHECK(extrudeFaces(plane, all, {}, 0.4f, 0.0f, out, cap, status));
     std::printf("  %s\n", status.c_str());
-    CHECK(status == "Extruded 16 polygons (16 walls)");
+    CHECK(status == "Extruded 16 faces (16 walls)");
     CHECK(out.vertexCount() == plane.vertexCount() + 16);
     CHECK(out.triangleCount() == plane.triangleCount() + 32);
     CHECK(boundaryLoops(out).size() == 1);
@@ -550,7 +553,7 @@ TEST(poly_extrude_selection_completion_and_degenerate_input) {
     std::vector<uint8_t> cap;
     std::string status;
     CHECK(extrudeFaces(cube, one, {}, 0.5f, 0.0f, out, cap, status));
-    CHECK(status == "Extruded 1 polygon (4 walls)");
+    CHECK(status == "Extruded 1 face (4 walls)");
     CHECK(closedAndOriented(out));
     CHECK(cap.size() == out.triangleCount());
     // Nothing selected, a hidden selection and an empty mesh are refused with a reason.
@@ -621,4 +624,120 @@ TEST(poly_extrude_big_selection_is_quick) {
     CHECK(plan_ms < timeLimit(1500.0));
     CHECK(build_ms < timeLimit(3000.0));
     CHECK(move_ms < timeLimit(300.0));
+}
+
+// --- The Polygon mode op (core/PolyOps.h): poly_op op=extrude on faces and on open border edges, undo and preview ---
+namespace {
+const CommandRegistry& commands() {
+    static CommandRegistry r;
+    return r;
+}
+// A face of the +X side of a cube from makeCube: the lower triangle of a quad whose vertices all have x > 0.9.
+uint32_t plusXFace(const Mesh& m) {
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3& tri = m.triangles[t];
+        if (m.facegroupAt(t) == kPlusX && m.quadPartnerAt(t) > t) return t;
+    }
+    return 0;
+}
+} // namespace
+
+TEST(poly_extrude_op_runs_through_the_registry) {
+    CHECK(PolyOpRegistry::instance().find("extrude") != nullptr);
+    Document doc;
+    doc.setMesh(makeCube(2));
+    const Mesh before = doc.mesh;
+    const CommandRegistry& reg = commands();
+    // The whole +X side (its face group) as a region, at the default distance: one whole-mesh undo step, the cap
+    // selected afterwards, the walls in a new group.
+    CommandResult r = reg.execute(doc, "poly_select", {{"op", std::string("group")}, {"group", double(kPlusX)}});
+    CHECK(r.ok);
+    CHECK(doc.polySelection.count() == 4);
+    const size_t steps = doc.undo.undoCount();
+    r = reg.execute(doc, "poly_op", {{"op", std::string("extrude")}});
+    std::printf("  %s\n", r.message.c_str());
+    CHECK(r.ok);
+    CHECK(r.message.find("Extruded 4 faces (8 walls)") != std::string::npos);
+    CHECK(doc.mesh.triangleCount() == before.triangleCount() + 16);
+    CHECK(doc.undo.undoCount() == steps + 1);
+    CHECK(doc.polySelection.element == PolyElement::Faces);
+    CHECK(doc.polySelection.count() == 4);
+    const float size = glm::length(before.bounds().extent());
+    for (uint32_t t = 0; t < doc.mesh.triangleCount(); ++t)
+        if (doc.polySelection.faceSelected(t))
+            for (int k = 0; k < 3; ++k) CHECK(near(doc.mesh.positions[doc.mesh.triangles[t][k]].x, 1.0f + 0.1f * size, 1e-4f));
+    CHECK(nextFaceGroupId(doc.mesh) == nextFaceGroupId(before) + 1);
+    CHECK(closedAndOriented(doc.mesh));
+    // Undo takes it back in one step.
+    r = reg.execute(doc, "undo", {});
+    CHECK(r.ok);
+    CHECK(doc.mesh.triangleCount() == before.triangleCount());
+    CHECK(doc.mesh.positions == before.positions);
+    // Individual, sunk in: four blocks, the volume down.
+    reg.execute(doc, "poly_select", {{"op", std::string("group")}, {"group", double(kPlusX)}});
+    r = reg.execute(doc, "poly_op", {{"op", std::string("extrude")}, {"distance", -0.1}, {"individual", true}});
+    CHECK(r.ok);
+    CHECK(r.message.find("(16 walls)") != std::string::npos);
+    CHECK(volume(doc.mesh) < volume(before));
+    CHECK(closedAndOriented(doc.mesh));
+    reg.execute(doc, "undo", {});
+    // Points can't be extruded: a pointer to Faces / Edges.
+    reg.execute(doc, "poly_select", {{"op", std::string("group")}, {"group", double(kPlusX)}});
+    reg.execute(doc, "poly_mode", {{"element", std::string("points")}});
+    r = reg.execute(doc, "poly_op", {{"op", std::string("extrude")}});
+    CHECK(!r.ok);
+    CHECK(r.message.find("Faces") != std::string::npos);
+    std::printf("  %s\n", r.message.c_str());
+    // The preview never touches the Part and gives the same mesh the op lands.
+    reg.execute(doc, "poly_mode", {{"element", std::string("faces")}});
+    reg.execute(doc, "poly_select", {{"op", std::string("group")}, {"group", double(kPlusX)}});
+    PolyOpOutput out;
+    std::string err;
+    CHECK(previewPolyOp(doc, "extrude", {{"distance", 0.2}}, out, err));
+    CHECK(doc.mesh.triangleCount() == before.triangleCount());
+    CHECK(out.mesh.triangleCount() == before.triangleCount() + 16);
+    CHECK(out.triangles.size() == 8);
+    r = reg.execute(doc, "poly_op", {{"op", std::string("extrude")}, {"distance", 0.2}});
+    CHECK(r.ok);
+    CHECK(doc.mesh.positions == out.mesh.positions);
+    CHECK(doc.mesh.triangles == out.mesh.triangles);
+}
+
+TEST(poly_extrude_op_on_open_border_edges) {
+    Document doc;
+    doc.setMesh(makeCube(2));
+    const CommandRegistry& reg = commands();
+    // Delete the +X side, select every edge: only the hole's 8 border edges extrude, the rest are left alone.
+    reg.execute(doc, "poly_select", {{"op", std::string("group")}, {"group", double(kPlusX)}});
+    CommandResult r = reg.execute(doc, "poly_op", {{"op", std::string("delete")}});
+    CHECK(r.ok);
+    const Mesh open = doc.mesh;
+    CHECK(boundaryLoops(open).size() == 1);
+    reg.execute(doc, "poly_mode", {{"element", std::string("edges")}});
+    reg.execute(doc, "poly_select", {{"op", std::string("all")}});
+    r = reg.execute(doc, "poly_op", {{"op", std::string("extrude")}, {"distance", 0.1}});
+    std::printf("  %s\n", r.message.c_str());
+    CHECK(r.ok);
+    CHECK(r.message.find("Extruded 8 edges") != std::string::npos);
+    CHECK(doc.mesh.triangleCount() == open.triangleCount() + 16);
+    CHECK(doc.mesh.vertexCount() == open.vertexCount() + 8);
+    CHECK(boundaryLoops(doc.mesh).size() == 1);
+    // The new border is selected (8 edges), outward: the strip's points sit beyond x = 1.
+    CHECK(doc.polySelection.element == PolyElement::Edges);
+    CHECK(doc.polySelection.count() == 8);
+    for (uint32_t v = uint32_t(open.vertexCount()); v < doc.mesh.vertexCount(); ++v) CHECK(doc.mesh.positions[v].x > 1.0f + 1e-4f);
+    // Along the normals instead: the strip stands on the sides (x stays 1, the points move out sideways).
+    reg.execute(doc, "undo", {});
+    reg.execute(doc, "poly_select", {{"op", std::string("all")}});
+    r = reg.execute(doc, "poly_op", {{"op", std::string("extrude")}, {"distance", 0.1}, {"normals", true}});
+    CHECK(r.ok);
+    for (uint32_t v = uint32_t(open.vertexCount()); v < doc.mesh.vertexCount(); ++v) CHECK(near(doc.mesh.positions[v].x, 1.0f, 1e-4f));
+    // Only inner edges selected: refused with the reason.
+    reg.execute(doc, "undo", {});
+    doc.setMesh(makeCube(2));
+    reg.execute(doc, "poly_mode", {{"element", std::string("edges")}});
+    reg.execute(doc, "poly_select", {{"op", std::string("all")}});
+    r = reg.execute(doc, "poly_op", {{"op", std::string("extrude")}});
+    CHECK(!r.ok);
+    CHECK(r.message.find("open border") != std::string::npos);
 }
