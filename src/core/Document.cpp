@@ -85,6 +85,7 @@ void Document::selectPart(int i) {
     }
     uvSelection.clear();
     edgeSelection.clear();
+    polySelection.clear();
     // Check the active Part back in, then check `i` out. Swapping keeps each
     // mesh's GPU dirty state, so the renderer doesn't re-upload anything.
     auto swapIn = [this](PartData& s) {
@@ -329,6 +330,7 @@ int Document::linkedDuplicate(int i, const glm::vec3& offset) {
     parts[size_t(at)].visible = parts[size_t(at - 1)].visible;
     parts[size_t(at)].shading = parts[size_t(at - 1)].shading;
     parts[size_t(at)].boolean = parts[size_t(at - 1)].boolean;
+    parts[size_t(at)].ai = parts[size_t(at - 1)].ai;
     selectPart(at);
     // One step in the shared history: undo takes the copy away again (applyPartStep).
     UndoRecord r;

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "app/Theme.h"
+#include "core/AiProvenance.h"
 
 #include <imgui.h>
 
@@ -19,6 +20,10 @@ class App;
 namespace sf::ui {
 
 enum class Look { Label, Icon, IconLabel, Tile };
+
+// A Part's AI provenance tag for the interface: "Hunyuan3D 2.1 (Tencent), tencent-hunyuan3d-2-1.hf.space, 2026-11-23
+// (sculpting base)", the pass translated; "" for a Part no AI made.
+std::string AiProvenanceText(const AiProvenance& ai);
 
 // Runs the action on click; toggles draw with the accent when checked(); shows Ctrl-hover help;
 // is a Ctrl+Alt drag source in customize mode. Ctrl+Alt+click (outside customize mode) assigns
@@ -58,6 +63,10 @@ void HelpAction(App& app, const char* actionId);
 // classic slider with its label drawn inside the frame ("Size 60"), a quiet fill and a thin neutral bar
 // along the bottom (the accent only while dragging).
 bool SliderInside(const char* id, float* v, float lo, float hi, const char* format, ImGuiSliderFlags flags = 0);
+// A slider over a value the command stores (not edited in place): shows `stored`, follows the drag, and returns true on
+// the frame it is let go, with the dragged value in *out. A plain `float v = stored; SliderFloat(&v); if
+// (IsItemDeactivatedAfterEdit()) run(v)` commits the OLD value: the release frame has no drag update and v is the stored copy.
+bool SliderOnRelease(const char* id, float stored, float lo, float hi, const char* format, float* out);
 // Widths a control needs to show its whole label (in the interface language), for rows that put a pair side by side
 // only when both fit: a button, a SliderInside showing `value` with `format` (%d reads as a whole number, as
 // tray::SliderInt shows it), a Checkbox.
@@ -80,6 +89,11 @@ bool HoverAnimating();
 // null. For a press before ImGui's next frame: its hover is a frame behind, and the press of a pointer that jumps
 // there (a pen landing, a tap, a click in the same batch of events as the move) must not reach the canvas (#161).
 const char* FloatingWindowAt(ImVec2 p);
+// A text field has the keyboard (an InputText, a slider's typed number, the command palette's search): no app shortcut
+// may fire, whatever its key (Ctrl+A selects the field's text, B types a B). Live: ImGui's io.WantTextInput only
+// updates at the start of the next frame, and a key that arrives right after the click that opened the field is
+// handled before it (Ctrl+A ran Mask All, 11-23).
+bool TextFieldFocused();
 // For UI tests: the rings and lifted tiles drawn in the last frame.
 int HoverRingsShown();
 int HoverLiftsShown();

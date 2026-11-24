@@ -87,6 +87,7 @@ add_library(sculptforge_core STATIC
   src/core/Commands.cpp
   src/core/CommandParse.cpp
   src/core/FaceGroups.cpp
+  src/core/PolyExtrude.cpp
   src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
   src/core/Parts.cpp
@@ -136,6 +137,9 @@ add_library(sculptforge_core STATIC
   src/core/MeshBoolean.cpp
   src/core/PartBoolean.cpp
   src/core/CloseHoles.cpp
+  src/core/PolySpan.cpp
+  src/core/PolyBevel.cpp
+  src/core/PolyInset.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/CreatureSkin.cpp
@@ -157,6 +161,10 @@ add_library(sculptforge_core STATIC
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
   src/core/EdgeSelect.cpp
+  src/core/PolyMode.cpp
+  src/core/PolyOps.cpp
+  src/core/EdgeLoopInsert.cpp
+  src/core/PolyEdgeLoop.cpp
   src/core/Uv.cpp
   src/core/UvCommands.cpp
   src/core/UvPack.cpp
@@ -187,6 +195,7 @@ add_library(sculptforge_core STATIC
   src/core/SurfaceQuery.cpp
   src/core/QRemesh.cpp
   src/core/GeneratedRemesh.cpp
+  src/core/AiProvenance.cpp
   src/core/MeshPreview.cpp
   src/core/Backdrop.cpp
   src/core/QRemeshGuides.cpp
@@ -197,6 +206,7 @@ add_library(sculptforge_core STATIC
   src/core/QuadQuality.cpp
   src/core/ForgeSpheres.cpp src/core/AgentTools.cpp src/core/DetailPass.cpp
   src/core/Tube.cpp
+  src/core/Scatter.cpp
   src/core/Projection.cpp
   src/core/RetopoCommands.cpp
   third_party/xatlas/xatlas.cpp
@@ -536,6 +546,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelFill.cpp
     src/app/PanelGeometry.cpp
     src/app/PanelEdges.cpp
+    src/app/PanelPolygon.cpp
     src/app/Gizmo.cpp
     src/app/PanelBake.cpp
     src/app/FocusDetailApp.cpp
@@ -543,6 +554,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelGenerate3D.cpp
     src/app/PanelForgeSpheres.cpp
     src/app/PanelTube.cpp
+    src/app/PanelScatter.cpp
     src/app/PanelSplatTrain.cpp
     src/app/PanelRenderBridge.cpp
     src/app/PanelSculptable.cpp
@@ -1104,6 +1116,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The fonts load only the Lucide icons src/ uses (src/app/IconsUsed.h, generated): a new ICON_LC_* needs the script run.
     add_test(NAME icons_used COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/icons_used.py --check)
     add_test(NAME raw_literal_size COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_literals.py)
+    # Every shader the renderer compiles is valid GLSL ES 3.20 too (the Android renderer; desktop Mesa accepts what a phone's driver
+    # rejects), and each program's stages link: glslangValidator on the sources with the ES header GL.cpp puts on them. Skipped
+    # (exit 77) where glslangValidator isn't installed; CI installs glslang-tools.
+    add_test(NAME gles_shaders COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/dev/check_gles_shaders.py)
+    set_tests_properties(gles_shaders PROPERTIES SKIP_RETURN_CODE 77)
     # assets/branding/sculptforge.icns: every slot decodes at its size, 16/32 px as RGB + mask, never PNG (#156).
     add_test(NAME icns COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/brand/icns.py)
     add_test(NAME icns_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/brand/icns.py --self-test)
@@ -1322,6 +1339,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     endforeach()
     sculptforge_ui_test(curve_edit_1440 curve_edit --size 1440x900) # standalone curves: Points, Straight / Smooth, gizmo on points
     sculptforge_ui_test(curve_edit_2880 curve_edit --size 2880x1800)
+    sculptforge_ui_test(color_material_entries_1440 color_material_entries --size 1440x900) # Color > Material rows before any channel is on
+    sculptforge_ui_test(color_material_entries_2880 color_material_entries --size 2880x1800)
+    sculptforge_ui_test(fill_effect_slider_keeps_1440 fill_effect_slider_keeps --size 1440x900)
+    sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
+    sculptforge_ui_test(scatter_1440 scatter --size 1440x900) # Tool > Scatter, its live redo and Separate Parts over 500
+    sculptforge_ui_test(scatter_2880 scatter --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(guide_window_look_1440 guide_window_look --size 1440x900) # the guide's Learn edge, strip and surface
@@ -1335,6 +1358,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(keep_strokes_editable_checkbox_2880 keep_strokes_editable_checkbox --size 2880x1800)
     sculptforge_ui_test(undo_no_replay_lod_1440 undo_no_replay_lod --size 1440x900) # gh#184: the view after undo + a stroke
     sculptforge_ui_test(undo_no_replay_lod_2880 undo_no_replay_lod --size 2880x1800)
+    sculptforge_ui_test(generate_candidates_1440 generate_candidates --size 1440x900) # Generate 3D's Result choice + the AI tag (0.14)
+    sculptforge_ui_test(generate_candidates_2880 generate_candidates --size 2880x1800)
     # (gh#184, the stroke thread: settings read once at startup, so these run cold with their environment set here)
     sculptforge_ui_test(async_stroke_undo_view_1440 async_stroke_undo_view --size 1440x900)
     sculptforge_ui_test(async_stroke_undo_view_2880 async_stroke_undo_view --size 2880x1800)
@@ -1369,12 +1394,6 @@ if(SCULPTFORGE_BUILD_TESTS)
       endif()
       sculptforge_ui_test(e2e_${name} ../e2e/${name})
       set_tests_properties(ui_e2e_${name} PROPERTIES LABELS "ui;e2e")
-    endforeach()
-    # The Dynamic-on-a-painted-Part scenario at the shots bar's sizes too (the stills of the paint surviving the stroke).
-    foreach(size 1440x900 2880x1800)
-      string(REGEX REPLACE "x.*" "" w ${size})
-      sculptforge_ui_test(e2e_dynamic_keeps_texture_${w} ../e2e/dynamic_keeps_texture --size ${size})
-      set_tests_properties(ui_e2e_dynamic_keeps_texture_${w} PROPERTIES LABELS "ui;e2e")
     endforeach()
     if(NOT WIN32 AND Python3_Interpreter_FOUND AND TARGET sf_fake_splat_tools)
       # Quitting the app, every way, with a trainer child running: nothing outside it is signalled (#183).
@@ -1601,6 +1620,18 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Edges mode and creases (tests/ui/edge_select.sfui) at 1440 px of UI, 100% and 200% (#108).
     sculptforge_ui_test(edge_select_1440 edge_select --size 1440x900)
     sculptforge_ui_test(edge_select_2880 edge_select --size 2880x1800) # its 200% shots: 1440 px of UI
+    # Polygon mode (tests/ui/polygon_mode.sfui) at 1440 px of UI, 100% and 200%.
+    sculptforge_ui_test(polygon_mode_1440 polygon_mode --size 1440x900)
+    sculptforge_ui_test(polygon_mode_2880 polygon_mode --size 2880x1800)
+    # Extrude in Polygon mode (tests/ui/polygon_extrude.sfui): faces as a region, individual, undo, then open border edges.
+    sculptforge_ui_test(polygon_extrude_1440 polygon_extrude --size 1440x900)
+    sculptforge_ui_test(polygon_extrude_2880 polygon_extrude --size 2880x1800)
+    # Span (tests/ui/polygon_span.sfui): the same two sizes.
+    sculptforge_ui_test(polygon_span_1440 polygon_span --size 1440x900)
+    sculptforge_ui_test(polygon_span_2880 polygon_span --size 2880x1800)
+    # Bevel (tests/ui/polygon_bevel.sfui): the op's panel entry, preview and result at 100% and 200%.
+    sculptforge_ui_test(polygon_bevel_1440 polygon_bevel --size 1440x900)
+    sculptforge_ui_test(polygon_bevel_2880 polygon_bevel --size 2880x1800)
     # The Transform gizmo's look, each mode front and 3/4, 100% and 200% (tests/ui/gizmo/look.sfui).
     sculptforge_ui_test(gizmo_look_1440 gizmo/look --size 1440x900)
     sculptforge_ui_test(gizmo_look_2880 gizmo/look --size 2880x1800)
@@ -1613,6 +1644,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(timeline_narrow_1024 timeline_narrow --size 1024x768)
     sculptforge_ui_test(extract_labels_1024 extract_labels --size 1024x768)
     sculptforge_ui_test(extract_labels_1440 extract_labels --size 1440x900)
+    # Make Shell on irregular plates of a dense curved surface: the rim is a smooth outline (tests/ui/extract_rim_plates.sfui).
+    sculptforge_ui_test(extract_rim_plates_1440 extract_rim_plates --size 1440x900)
+    sculptforge_ui_test(extract_rim_plates_2880 extract_rim_plates --size 2880x1800)
     # Tool > Reshape: Size, then the Stack, no duplicate sliders (tests/ui/deformation_ops.sfui, foirgairwolf on Discord).
     sculptforge_ui_test(deformation_ops_1024 deformation_ops --size 1024x768)
     sculptforge_ui_test(deformation_ops_1440 deformation_ops --size 1440x900)

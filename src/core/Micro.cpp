@@ -806,16 +806,51 @@ bool microRaycast(const Mesh& m, const BVH& bvh, const glm::vec3& origin, const 
             if (m.triangleHidden(tri)) continue;
             T.set(m, tri, n);
             const int16_t* g = mm.disp.data() + size_t(tri) * S;
-            uint32_t idx = 0;
-            for (uint32_t j = 0; j <= n; ++j)
-                for (uint32_t i = 0; i + j <= n; ++i, ++idx) {
+            // Only the grid window the ray can reach: every surface point is within `grow` (Phong bulge + the
+            // displacement range) of its flat point, so a hit's flat point F is on the base plane within `grow` of
+            // the ray where the ray is within `grow` of the plane. The micro triangles holding such an F, one cell
+            // more, are all that can be hit (the same nearest hit as testing them all).
+            uint32_t i0 = 0, i1 = n, j0 = 0, j1 = n;
+            {
+                const glm::uvec3 tr = m.triangles[tri];
+                const glm::vec3 A = m.positions[tr.x], e1 = m.positions[tr.y] - A, e2 = m.positions[tr.z] - A;
+                const glm::vec3 cr = glm::cross(e1, e2);
+                const float d11 = glm::dot(e1, e1), d12 = glm::dot(e1, e2), d22 = glm::dot(e2, e2), den = d11 * d22 - d12 * d12;
+                const float crLen = glm::length(cr);
+                const float grow = (triangleBulge(T) + float(mm.triRange[tri]) * mm.step) * 1.01f + 1e-6f * std::sqrt(std::max(d11, d22));
+                if (crLen > 0.0f && den > 0.0f) {
+                    const glm::vec3 N = cr / crLen;
+                    const float dn = glm::dot(dir, N), d0 = glm::dot(origin - A, N);
+                    if (std::abs(dn) > 1e-3f) { // (grazing rays: the whole triangle)
+                        float ta = (grow - d0) / dn, tb = (-grow - d0) / dn; // (the plane distance is d0 + t dn)
+                        if (ta > tb) std::swap(ta, tb);
+                        if (tb < 0.0f) continue; // the slab is behind the ray's origin
+                        ta = std::max(ta, 0.0f);
+                        const glm::vec3 gu = (e1 * d22 - e2 * d12) / den, gv = (e2 * d11 - e1 * d12) / den;
+                        const glm::vec3 qa = origin + dir * ta - A, qb = origin + dir * tb - A; // (u, v ignore the normal part)
+                        const float ua = glm::dot(qa, gu), ub = glm::dot(qb, gu), va = glm::dot(qa, gv), vb = glm::dot(qb, gv);
+                        const float du = grow * glm::length(gu), dv = grow * glm::length(gv), fn = float(n);
+                        const float ulo = (std::min(ua, ub) - du) * fn - 1.0f, uhi = (std::max(ua, ub) + du) * fn + 1.0f;
+                        const float vlo = (std::min(va, vb) - dv) * fn - 1.0f, vhi = (std::max(va, vb) + dv) * fn + 1.0f;
+                        if (std::isfinite(ulo) && std::isfinite(uhi) && std::isfinite(vlo) && std::isfinite(vhi)) { // (else all)
+                            if (uhi < 0.0f || vhi < 0.0f || ulo > fn || vlo > fn) continue; // the window is off the triangle
+                            i0 = uint32_t(std::clamp(std::floor(ulo), 0.0f, fn));
+                            i1 = uint32_t(std::clamp(std::ceil(uhi), 0.0f, fn));
+                            j0 = uint32_t(std::clamp(std::floor(vlo), 0.0f, fn));
+                            j1 = uint32_t(std::clamp(std::ceil(vhi), 0.0f, fn));
+                        }
+                    }
+                }
+            }
+            for (uint32_t j = j0; j <= j1; ++j)
+                for (uint32_t i = i0, idx = MicroMesh::index(i0, j, n); i <= i1 && i + j <= n; ++i, ++idx) {
                     glm::vec3 s, nn;
                     T.eval(i, j, s, nn);
                     P[idx] = s + nn * (float(g[idx]) * mm.step);
                 }
-            for (uint32_t j = 0; j < n; ++j) {
+            for (uint32_t j = j0; j < j1; ++j) {
                 const uint32_t row = MicroMesh::index(0, j, n), next = MicroMesh::index(0, j + 1, n);
-                for (uint32_t i = 0; i + j < n; ++i) {
+                for (uint32_t i = i0; i < i1 && i + j < n; ++i) {
                     float t;
                     const glm::vec3 &a = P[row + i], &b = P[row + i + 1], &c = P[next + i];
                     if (rayTriangle(origin, dir, a, b, c, t) && t < bb.t) bb = {t, tri, a, b, c};

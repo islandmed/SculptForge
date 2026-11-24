@@ -6,6 +6,7 @@
 
 #include "core/Commands.h"
 #include "core/Document.h"
+#include "core/EdgeLoopInsert.h"
 #include "core/Mesh.h"
 #include "core/Multires.h"
 #include "core/ThreadPool.h"
@@ -329,13 +330,14 @@ size_t edgeCreasedCount(const Mesh& m, const EdgeTopology& topo) {
 void registerEdgeCommands(CommandRegistry& reg) {
     reg.add({"edge_select",
              "Select edges of the active Part's base level (what edge creases are set on). op: edge (edge `edge`, or the "
-             "edge between vertices `a` and `b`), loop (the edge loop through that edge), angle (edges sharper than "
+             "edge between vertices `a` and `b`), loop (the edge loop through that edge), ring (the ring of edges across the quads "
+             "an edge loop inserted there would cross), angle (edges sharper than "
              "`degrees`, default 30; `within`: only among those selected now), open (the open border edges), grow, "
-             "shrink, all, none, invert, info. edge / loop / open replace the selection unless `add` or `remove`.",
-             {{"op", T::String, "edge, loop, angle, open, grow, shrink, all, none, invert or info", true},
-              {"edge", T::Number, "edge / loop: an edge index (edge_select op=info counts them)", false},
-              {"a", T::Number, "edge / loop: one end vertex", false},
-              {"b", T::Number, "edge / loop: the other end vertex", false},
+             "shrink, all, none, invert, info. edge / loop / ring / open replace the selection unless `add` or `remove`.",
+             {{"op", T::String, "edge, loop, ring, angle, open, grow, shrink, all, none, invert or info", true},
+              {"edge", T::Number, "edge / loop / ring: an edge index (edge_select op=info counts them)", false},
+              {"a", T::Number, "edge / loop / ring: one end vertex", false},
+              {"b", T::Number, "edge / loop / ring: the other end vertex", false},
               {"degrees", T::Number, "angle: the least angle between the faces on either side (default 30)", false},
               {"within", T::Bool, "angle: only among the edges selected now (default false)", false},
               {"add", T::Bool, "edge / loop / open: add to the selection", false},
@@ -365,13 +367,18 @@ void registerEdgeCommands(CommandRegistry& reg) {
                      if (!add && !remove) edgeSelectAll(sel, false);
                      for (uint32_t e : edges) sel.set(e, !remove);
                  };
-                 if (op == "edge" || op == "loop") {
+                 if (op == "edge" || op == "loop" || op == "ring") {
                      const uint32_t e = edgeArg();
                      if (e == kNoEdge) return {false, "No such edge (give edge=N, or a=V b=W for two vertices an edge joins)"};
-                     const std::vector<uint32_t> edges = op == "loop" ? edgeLoop(m, topo, e) : std::vector<uint32_t>{e};
+                     std::vector<uint32_t> edges{e};
+                     if (op == "loop") edges = edgeLoop(m, topo, e);
+                     else if (op == "ring") edges = edgeRing(m, topo, e).edges;
+                     if (edges.empty()) return {false, "No edge ring through this edge (it cannot be split)"};
                      apply(edges);
-                     return {true, (op == "loop" ? "Edge loop of " + count(edges.size(), "edge") + ": " : std::string()) +
-                                       edgeSelectionText(sel)};
+                     const std::string head = op == "loop"   ? "Edge loop of " + count(edges.size(), "edge") + ": "
+                                              : op == "ring" ? "Edge ring of " + count(edges.size(), "edge") + ": "
+                                                             : std::string();
+                     return {true, head + edgeSelectionText(sel)};
                  }
                  if (op == "angle") {
                      const float deg = float(std::clamp(argNumber(a, "degrees", 30.0), 0.0, 180.0));
@@ -390,7 +397,7 @@ void registerEdgeCommands(CommandRegistry& reg) {
                  else if (op == "all") edgeSelectAll(sel, true);
                  else if (op == "none") edgeSelectAll(sel, false);
                  else if (op == "invert") edgeSelectInvert(sel);
-                 else if (op != "info") return {false, "op must be edge, loop, angle, open, grow, shrink, all, none, invert or info"};
+                 else if (op != "info") return {false, "op must be edge, loop, ring, angle, open, grow, shrink, all, none, invert or info"};
                  return {true, edgeSelectionText(sel)};
              }});
     reg.add({"edge_crease",

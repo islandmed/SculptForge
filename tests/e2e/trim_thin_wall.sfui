@@ -1,0 +1,56 @@
+# e2e: Trim on a thin wall (members session 2026-11, "Trim brush tears holes in thin walls"). An Extract shell is a thin
+# sheet; a big Trim brush stroked over it again and again takes the side you see down to its plane and stops short of the
+# wall behind: the sheet only ever loses material (nothing rises: the far wall was dragged out of the sheet and flung off before),
+# keeps a positive volume (the surface did not turn inside out), stays watertight and valid, with Front faces only on and off.
+# It also stays a Trim: the sheet loses some volume. Before/after clip: this script, offscreen, with --record.
+run new_sphere subdivisions=5
+run mask_rect y0=0.3
+expect_value masked > 0
+camera 25 25
+key f
+click "Extract/Make Shell"
+wait_value extract_preview == 1 20
+click "Extract/Accept"
+wait_value extract_preview == 0 20
+expect_value parts == 2
+run mask_clear
+run part_select index=1
+expect_value open_edges == 0
+remember solid_volume sheet
+snapshot
+brush_size 70
+
+click "Trim##brush.trim"
+expect_value checked@draw.front_faces == 0
+stroke 0.4 0.38 0.6 0.38
+stroke 0.4 0.44 0.6 0.44
+stroke 0.4 0.5 0.6 0.5
+stroke 0.4 0.44 0.6 0.44
+stroke 0.4 0.38 0.6 0.5
+expect_value moved > 0
+expect_value solid_volume > 0
+expect_value moved_raised < 0.005
+expect_value solid_volume < $sheet*0.999
+expect_value open_edges == 0
+expect_mesh_valid
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+expect_value moved == 0
+
+action draw.front_faces
+expect_value checked@draw.front_faces == 1
+stroke 0.4 0.38 0.6 0.38
+stroke 0.4 0.44 0.6 0.44
+stroke 0.4 0.5 0.6 0.5
+stroke 0.4 0.44 0.6 0.44
+stroke 0.4 0.38 0.6 0.5
+expect_value moved > 0
+expect_value solid_volume > 0
+expect_value moved_raised < 0.005
+expect_value solid_volume < $sheet*0.999
+expect_value open_edges == 0
+expect_mesh_valid
+wait 1

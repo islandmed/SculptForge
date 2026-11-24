@@ -1,0 +1,119 @@
+# Extrude in Polygon mode (Tool > Polygon): a cube side (its face group) extruded as a region with the default distance
+# (one undo step, the cap stays selected, quad walls in a new face group), the same side sunk in face by face
+# (Individual), the typed Distance, undo back to the cube each time, then the border edges of a deleted side extruded
+# into a strip (only the open edges count). Members' top wish (feature queue row 74, #225).
+run new_sphere subdivisions=1
+run part_append type=cube name=Box
+run part_delete index=0
+# A coarse quad cage (the dense block is sculpting resolution): Quad Remesh keeps the six sides as face groups.
+run qremesh target=600 detect_edges=true keep_groups=true adaptive=0 quality=false
+wait_idle 60
+remember undo_steps base
+remember triangles tris
+orbit 120 -60
+key f
+zoom 0.7
+click "Polygon##tool.polygon"
+expect_value poly_ops >= 3
+click "Polygon/Polygon mode"
+expect_value poly_mode == 1
+expect_value poly_element == 2
+
+# Faces: double-click a face for its whole side, Extrude at the default distance: more triangles, one undo step, the
+# cap (the same faces, moved) stays selected.
+click_part Box 0.5 0.5 2
+expect_value poly_selected > 1
+remember poly_selected side
+click "Polygon/Extrude"
+expect_status "Extruded"
+expect_value triangles > $tris
+expect_value undo_steps == $base+1
+expect_value poly_selected == $side
+expect_value poly_mode == 1
+expect_value open_edges == 0
+shot polygon-extrude
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-extrude-200
+ui_scale 100
+key f
+zoom 0.7
+# Extrude again on the cap: it stacks (a second block on the first), one more step; both undo.
+click "Polygon/Extrude"
+expect_value undo_steps == $base+2
+expect_value poly_selected == $side
+key ctrl+z
+key ctrl+z
+expect_value triangles == $tris
+expect_value undo_steps == $base
+expect_value open_edges == 0
+
+# A Distance below zero sinks the side in (the scripted path, as the console and the AI link run it); Individual gives
+# each face its own walls (more triangles than the region's). Undo takes each back in one step.
+click_part Box 0.5 0.5 2
+expect_value poly_selected == $side
+run poly_op op=extrude distance=-0.1
+expect_status "Extruded"
+expect_value triangles > $tris
+remember triangles region
+expect_value open_edges == 0
+shot polygon-extrude-in
+key ctrl+z
+expect_value triangles == $tris
+click_part Box 0.5 0.5 2
+click "Polygon/Individual"
+click "Polygon/Extrude"
+expect_status "Extruded"
+expect_value triangles > $region
+expect_value open_edges == 0
+shot polygon-extrude-individual
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-extrude-individual-200
+ui_scale 100
+key f
+zoom 0.7
+click "Polygon/Individual"
+key ctrl+z
+expect_value triangles == $tris
+expect_value undo_steps == $base
+
+# Edges: Delete a side, select every edge, Extrude: only the hole's border edges grow a strip (the hole stays one
+# hole, the border is what is selected afterwards), the inner edges are left alone.
+click_part Box 0.5 0.5 2
+click "Polygon/Delete"
+expect_status "Deleted"
+expect_value open_edges > 0
+remember open_edges hole
+remember triangles cut
+click "Polygon/Edges"
+expect_value poly_element == 1
+click "Polygon/All"
+click "Polygon/Extrude"
+expect_status "Extruded"
+expect_value triangles > $cut
+expect_value open_edges == $hole
+expect_value poly_selected == $hole
+shot polygon-extrude-edges
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-extrude-edges-200
+ui_scale 100
+key ctrl+z
+expect_value triangles == $cut
+key ctrl+z
+expect_value triangles == $tris
+expect_value undo_steps == $base
+
+# Points can't be extruded: the status line points to Faces or Edges, nothing changes.
+click "Polygon/Faces"
+click_part Box 0.5 0.5 1
+click "Polygon/Points"
+expect_value poly_element == 0
+click "Polygon/Extrude"
+expect_status "Faces"
+expect_value triangles == $tris
+expect_value undo_steps == $base

@@ -1,0 +1,71 @@
+# While a text field has focus, no app shortcut fires: Ctrl+A selects the field's text (it did not run Mask All, one undo
+# step), Ctrl+C/V/X/Z/Y and plain letters (B switches brush) stay in the field. Enter commits, Esc cancels. The same in the
+# Classic and the Streamlined layout, and in the command palette (F3). One script, both layouts.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+brush_size 60
+wait 0.5
+
+# A slider's typed field: type_here selects with Ctrl+A and types 2.
+double_click "##drawsize"
+expect_value typing == 1
+remember undo_steps typed
+remember brush_type typedbrush
+type_here 2
+expect_value undo_steps == $typed
+expect_value masked == 0
+key ctrl+a
+key ctrl+c
+key ctrl+v
+key ctrl+x
+key ctrl+z
+key ctrl+y
+key b
+key x
+key s
+expect_value undo_steps == $typed
+expect_value brush_type == $typedbrush
+expect_value masked == 0
+expect_value typing == 1
+key enter
+expect_value typing == 0
+expect_value draw_size == 2
+expect_value undo_steps == $typed
+expect_value masked == 0
+
+# The shortcut works again once the field is closed (Ctrl+A masks everything: one undo step).
+key ctrl+a
+expect_value undo_steps == $typed+1
+run undo
+expect_value masked == 0
+
+# The command palette's search box: typing 'b' or Ctrl+A there is the box's.
+remember undo_steps palette
+remember brush_type palettebrush
+key f3
+type "##Command palette" "b"
+key ctrl+a
+key b
+key s
+expect_value undo_steps == $palette
+expect_value brush_type == $palettebrush
+expect_value masked == 0
+key escape
+
+# The Streamlined layout.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=3
+wait 0.5
+double_click "##drawsize"
+expect_value typing == 1
+remember undo_steps typed2
+remember brush_type typedbrush2
+type_here 2
+key ctrl+z
+key b
+expect_value undo_steps == $typed2
+expect_value brush_type == $typedbrush2
+expect_value masked == 0
+key enter
+expect_value draw_size == 2
+expect_value undo_steps == $typed2
