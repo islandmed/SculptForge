@@ -1894,8 +1894,10 @@ private:
         bool keepLength = false;       // Move: Shift held at the last update (its link keeps its length)
     } zsDrag_;
     // Tube (PanelTube.cpp, core/Tube.h): with Draw Tube on, a left-drag anywhere draws a clay tube in the air (on a
-    // plane facing the view, or snapped onto surfaces); a Tube Part's points are dragged to move them (Ctrl: resize,
-    // Alt+click: delete) until Bake. Each stroke or point drag is one undo step.
+    // plane facing the view, or snapped onto surfaces), or in Points style each click adds a point to the curve being
+    // built (a polyline); a Tube Part's points are dragged to move them (Ctrl: resize, Alt+click: delete, Shift+click:
+    // select several) until Bake. The Transform gizmo moves, turns and scales the selected points (or all of them).
+    // Each stroke, click, point drag and gizmo drag is one undo step.
     enum class TubeDepth { Surface, Pivot, Fixed };
     void registerTubeUiActions();
     void drawTubeContents();                                // Tool > Tube
@@ -1913,7 +1915,34 @@ private:
     int tubeSelection() const;                              // tubeSelected_ when it is still a point, else -1
     glm::vec3 tubeViewDir() const;                          // into the screen
     bool tubeGrabsPoints(SDL_Keymod keys) const;            // a press on a dot edits it (Draw Tube on: Shift/Ctrl/Alt)
+    // Where a press at x, y draws (the depth rule and Snap to surfaces), and how thick: as a stroke's first sample.
+    glm::vec3 tubeDrawPoint(float x, float y, float& radius, glm::vec3& planeNormal);
+    bool tubeDragSnap(float x, float y, RayHit& hit);        // another Part's surface under the pointer (Snap to surfaces)
+    bool tubePolyClick(float x, float y);                   // Points style: a click adds a point to the curve being built
+    void tubeFinishLine(const char* why);                    // ... the next click starts a new curve
+    std::vector<int> tubeSelectedPoints() const;            // the selected points of the active Tube Part, sorted (may be empty)
+    void tubeToggleSelect(int point);                       // Shift+click: in or out of the selection
+    void tubeClearSelection();
+    // The Transform gizmo on a Tube or Curve Part edits its points (the selected ones, or all), not the mesh, so the
+    // Part stays editable: begin at the press (false: not a Tube Part, or its mesh no longer fits its points), apply the
+    // drag's transform (positions about the pivot; scale changes the radii too), end as one undo step.
+    bool tubeGizmoBegin();
+    void tubeGizmoApply(const MeshTransform& t);
+    bool tubeGizmoEnd(const char* label); // true when something changed
+    void tubeGizmoCancel();
+    bool tubeGizmoPivot(glm::vec3& out) const; // the selection's centre (all points when none is selected)
     bool tubeDraw_ = false;
+    bool tubePoints_ = false;      // Draw Tube places points: each click adds one to the curve being built
+    uint32_t tubePolyPart_ = 0;    // ... the Part those clicks extend (its id; 0: the next click starts a new one)
+    std::vector<int> tubeMultiSel_; // points selected with Shift+click (with tubeSelected_), of the Part tubeSelPart_
+    uint32_t tubeSelPart_ = 0;
+    struct TubeGizmo {
+        bool on = false;
+        TubeShape start, preview;
+        Mesh before;
+        std::vector<int> points; // the points the drag moves
+        bool changed = false;
+    } tubeGizmo_;
     int tubeReturnPart_ = -1;      // the Part that was active before a press on a tube's point selected its Tube Part
     int forgesphereReturnPart_ = -1; // the Part that was active before New Forge Sphere (a brush or Esc goes back to it)
     // Picking a brush or a tool (Draw / Move / Scale / Rotate), or Esc, leaves Draw Tube and Append > Insert; with a
@@ -1968,6 +1997,8 @@ private:
         std::vector<ImVec4> screen; // x, y, radius in pixels (the trail drawn while the pen moves)
         int point = -1;             // editing: the point dragged
         bool resize = false;
+        bool select = false;        // Shift held: let go without moving toggles the point's selection
+        bool placing = false;       // Points style: a click adds a point where the button is let go
         TubeShape start, preview; // the curve when the drag began, and now
         Mesh before;
         glm::vec3 grab{0.0f};

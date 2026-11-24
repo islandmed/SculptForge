@@ -888,6 +888,10 @@ double Demo::query(const std::string& name, bool& known) const {
         return m.tube.empty() ? -1.0 : 1000.0 * (name[5] == 'f' ? m.tube.points.front() : m.tube.points.back()).radius;
     if (name == "tube_profile") return double(int(m.tube.profile)); // 0 round, 1 square, 2 triangle, 3 ribbon, 4 rope, 5 braid, 6 sleeve
     if (name == "tube_curve") return m.tube.curve ? 1.0 : 0.0; // the active Part is a Curve Part
+    if (name == "tube_straight") return m.tube.straight ? 1.0 : 0.0; // ... a polyline (straight spans)
+    if (name == "tube_selected_count") return double(app_.tubeSelectedPoints().size()); // points selected (Shift+click)
+    if (name == "tube_points_style") return app_.tubePoints_ ? 1.0 : 0.0; // Draw > Points (click to place points)
+    if (name == "tube_line_open") return app_.tubePolyPart_ != 0 ? 1.0 : 0.0; // a polyline being built by clicks
     if (name == "tube_twist") return double(m.tube.twist);
     if (name == "tube_strands") return double(m.tube.strands);
     if (name == "tube_roll") return double(m.tube.roll);
