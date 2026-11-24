@@ -1,7 +1,5 @@
 # Polygon mode: modelling with points, edges and faces
 
-![A cube drawn as a wire cage with a square tunnel through it, the tunnel walls selected in orange](images/polygon-mode.jpg)
-
 > **In short:**
 > - **Tool > Polygon > Polygon mode** turns a Part into a cage you edit polygon by polygon.
 > - Pick **Points**, **Edges** or **Faces**, select them on the model, and move them with the Gizmo.
