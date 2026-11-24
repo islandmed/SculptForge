@@ -1603,9 +1603,8 @@ constexpr Entry kSpanish[] = {
      "Carga un archivo de diseño y atajos que alguien compartió (o que guardaste con Exportar interfaz)."},
     {"Save the layout, shortcuts and interface preferences to a file you can share.",
      "Guarda el diseño, los atajos y las preferencias de la interfaz en un archivo que puedes compartir."},
-    {"Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it.",
-     "Reorganiza los estantes: Ctrl+Alt+arrastra cualquier botón a un estante para añadirlo o moverlo, o fuera de "
-     "los estantes para quitarlo."},
+    {"Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it. (At any time, Customize off too, hold Alt and drag any button, checkbox, slider or choice from a palette onto a shelf.)",
+     "Reorganiza los estantes: Ctrl+Alt+arrastra cualquier botón a un estante para añadirlo o moverlo, o fuera de los estantes para quitarlo. (En cualquier momento, también con Personalizar desactivado, mantén Alt y arrastra cualquier botón, casilla, deslizador u opción de una paleta a un estante.)"}
     {"The short notes SculptForge shows over the 3D view (a mode that is on, the next step of a tool). Off hides them "
      "all; each also has its own Don't show again.",
      "Las notas breves que SculptForge muestra sobre la vista 3D (un modo activado, el siguiente paso de una "
@@ -5800,6 +5799,8 @@ constexpr Entry kSpanish[] = {
     {"Alt+drag to add or move. Right-click an entry to remove it.", "Alt+arrastrar para añadir o mover. Clic derecho en una entrada para quitarla."},
     {"Drop on My Panel to add", "Suelta en Mi panel para añadir"},
     {"Drop on My Panel to move, elsewhere to remove", "Suelta en Mi panel para mover, en otro sitio para quitar"},
+    {"Drop on My Panel or a shelf to add", "Suelta en Mi panel o en un estante para añadir"},
+    {"Drop on My Panel or a shelf to move, elsewhere to remove", "Suelta en Mi panel o en un estante para mover, en otro sitio para quitar"},
     {"Hold Alt and drag a button, or a section's title, from any palette into this panel. Right-click an entry to remove it.", "Mantén Alt y arrastra un botón, o el título de una sección, desde cualquier paleta hasta este panel. Clic derecho en una entrada para quitarla."},
     {"My Panel", "Mi panel"},
     {"Remove from My Panel", "Quitar de Mi panel"},

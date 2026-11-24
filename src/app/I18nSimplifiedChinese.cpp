@@ -1376,8 +1376,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Export Interface...", "导出界面..."},
     {"Save the layout, shortcuts and interface preferences to a file you can share.",
      "将布局、快捷键与界面偏好设置保存为可分享的文件。"},
-    {"Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it.",
-     "重新排列工具栏：按住 Ctrl+Alt 将任何按钮拖到工具栏上即可添加或移动，拖出工具栏即可移除。"},
+    {"Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it. (At any time, Customize off too, hold Alt and drag any button, checkbox, slider or choice from a palette onto a shelf.)",
+     "重新排列工具栏：按住 Ctrl+Alt 将任何按钮拖到工具栏上即可添加或移动，拖出工具栏即可移除。（任何时候，自定义关闭时也一样，按住 Alt 将任意面板中的按钮、复选框、滑块或选项拖到工具栏上。）"}
     {"The short notes SculptForge shows over the 3D view (a mode that is on, the next step of a tool). Off hides them "
      "all; each also has its own Don't show again.",
      "SculptForge 在 3D 视图上显示的简短提示（已打开的模式、工具的下一步）。关闭会全部隐藏；每则提示也各有“不再显示"
@@ -5315,6 +5315,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Alt+drag to add or move. Right-click an entry to remove it.", "按住 Alt 拖动即可添加或移动。右键单击条目可将其移除。"},
     {"Drop on My Panel to add", "拖放到“我的面板”以添加"},
     {"Drop on My Panel to move, elsewhere to remove", "拖放到“我的面板”以移动，拖到其他位置则移除"},
+    {"Drop on My Panel or a shelf to add", "拖放到“我的面板”或工具栏以添加"},
+    {"Drop on My Panel or a shelf to move, elsewhere to remove", "拖放到“我的面板”或工具栏以移动，拖到其他位置则移除"},
     {"Hold Alt and drag a button, or a section's title, from any palette into this panel. Right-click an entry to remove it.", "按住 Alt，将任意面板中的按钮或分区标题拖到此面板。右键单击条目可将其移除。"},
     {"My Panel", "我的面板"},
     {"Remove from My Panel", "从“我的面板”移除"},
