@@ -34,6 +34,7 @@ expect "Scene##mat"
 click "Scene##mat"
 expect_value part_material == -2
 expect_status "material: the scene's"
+wait 0.2                                       # (a frame between the tile's click that closed the picker and the key that reopens it)
 
 # Right-click on Scene mode: Use for this Part only.
 key m

@@ -256,8 +256,8 @@ TEST(project_part_material) {
     // and comes back by its pixels, added for the session when this machine lacks it.
     CustomLitSphere custom;
     custom.name = "Part Gold";
-    custom.size = 4;
-    custom.rgba.assign(4 * 4 * 4, 200);
+    custom.size = 16; // (the smallest a Lit Sphere image may be)
+    custom.rgba.assign(16 * 16 * 4, 200);
     for (size_t i = 0; i < custom.rgba.size(); i += 4) custom.rgba[i] = uint8_t(i), custom.rgba[i + 3] = 255;
     custom.hash = 0x5151u;
     const int gold = addCustomLitSphere(custom);
