@@ -161,6 +161,8 @@ add_library(sculptforge_core STATIC
   src/core/EdgeSelect.cpp
   src/core/PolyMode.cpp
   src/core/PolyOps.cpp
+  src/core/EdgeLoopInsert.cpp
+  src/core/PolyEdgeLoop.cpp
   src/core/Uv.cpp
   src/core/UvCommands.cpp
   src/core/UvPack.cpp

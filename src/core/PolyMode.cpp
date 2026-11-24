@@ -4,6 +4,8 @@
 // Polygon mode's selection; see core/PolyMode.h.
 #include "core/PolyMode.h"
 
+#include "core/EdgeLoopInsert.h"
+
 #include "core/Commands.h"
 #include "core/Document.h"
 #include "core/Mesh.h"
@@ -562,39 +564,11 @@ size_t polySelectEdgeRing(PolySelection& sel, const Mesh& m, uint32_t e, PolySel
 }
 
 std::vector<uint32_t> polyEdgeRing(const Mesh& m, const EdgeTopology& topo, uint32_t e) {
-    std::vector<uint32_t> ring{e};
     if (e >= topo.edgeCount()) return {};
-    // Across the quad on one side of `g` to its opposite edge, or kNoEdge (a triangle, an open edge).
-    auto across = [&](uint32_t g, uint32_t quad) -> uint32_t {
-        if (quad == kNoEdge || m.quadPartnerAt(quad) == Mesh::kNoQuad) return kNoEdge;
-        uint32_t es[4];
-        const int n = polygonEdges(m, topo, quad, es);
-        if (n != 4) return kNoEdge;
-        const glm::uvec2 ge = topo.ends[g];
-        for (int i = 0; i < n; ++i) {
-            const glm::uvec2 h = topo.ends[es[i]];
-            if (es[i] != g && h.x != ge.x && h.x != ge.y && h.y != ge.x && h.y != ge.y) return es[i];
-        }
-        return kNoEdge;
-    };
-    std::unordered_set<uint32_t> crossed, seen{e};
-    for (int dir = 0; dir < 2; ++dir) {
-        uint32_t g = e;
-        uint32_t quad = dir == 0 ? edgeSides(m, topo, e).x : edgeSides(m, topo, e).y;
-        std::vector<uint32_t> side;
-        while (quad != kNoEdge && !crossed.count(quad)) {
-            crossed.insert(quad);
-            const uint32_t next = across(g, quad);
-            if (next == kNoEdge || seen.count(next)) break;
-            seen.insert(next);
-            side.push_back(next);
-            const glm::uvec2 s = edgeSides(m, topo, next);
-            quad = s.x == quad ? s.y : s.x;
-            g = next;
-        }
-        if (dir == 0) ring.insert(ring.end(), side.begin(), side.end());
-        else ring.insert(ring.begin(), side.rbegin(), side.rend());
-    }
+    // The walker Edge loop cuts with (core/EdgeLoopInsert.h), so Ring shows exactly what the op would split; an edge
+    // no ring can be made through (shared by three faces) is just itself.
+    std::vector<uint32_t> ring = edgeRing(m, topo, e).edges;
+    if (ring.empty()) ring.push_back(e);
     return ring;
 }
 
