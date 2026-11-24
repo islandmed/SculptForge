@@ -6,6 +6,57 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Scatter** (Tool > Scatter, the `scatter` command): copies of a built-in shape or another Part over the active Part
+  or only its masked area. Count, random size range, random turn and tilt, follow the surface or stay upright, lie
+  flat, height, seed. **Keep apart** relaxes the copies over the surface until none overlap or touch (Tight fit: their
+  boxes; off: a round space each), with a **Spacing** gap; copies with no room are left out and the status line says
+  how many. One joined Part (a face group per copy) or separate Parts; one undo step; changing a setting redoes the
+  last scatter in place.
+- "Brush cursor: a note appears under the cursor when Shift (or the Smooth brush) would seem to do nothing: \"Smooth
+  face group borders only\" when that Brush option is on for a mesh without face groups, and \"Shift smooths the
+  colour; Sculpt mode smooths the shape\" when Shift is held in Paint mode."
+- "The cursor on a very dense Micro level (the base mesh much coarser than the detail) tests only the part of each
+  triangle's detail grid the ray can reach: about 17% less pick time on the billion-triangle scene (picking was over
+  half of the main thread there); the surface found is the same, point for point."
+
+### Changed
+- **Stencil** (Sculpt > Alpha): a stroke that begins where the image is dark or off the model shows "Stencil on: only
+  its light parts (X removes it)", naming the X that removes it (Alpha > Stencil). Strokes stayed held back with no
+  sign why, which read as sculpting that had stopped.
+- **Paint > Material** (texture painting): the section now appears as soon as paint goes into a texture and lists
+  every material channel, the ones the texture does not have yet in grey. Ticking a greyed channel adds it to the
+  texture (the same undoable step as Material Channels in Tool > Texture Image) and makes the brush paint it; a
+  material swatch adds Roughness and Metallic in one click. Texture Image keeps the same ticks and stays the place to
+  turn a channel off. Requested by a member.
+- UI test harness (tests/ui, the monkey): unlatch closes the Community brushes and AI Brush windows, the monkey's way
+  out closes the floating windows (close_floating), and expect_sculpts reads the window over the stroke where the
+  stroke starts, so a slow runner can't flip the verdict either way (ui_monkey was red on the Actions runner only).
+
+### Fixed
+- **Android: the model vanished after Texture Image > New Texture on some Mali tablets.** The first textured draw is
+  now checked for a GL error: on one, the Part draws without its texture (status bar and Texture Image panel say so)
+  instead of not at all. The UV samplers of the textured shader always have a texture bound, and the log names the
+  call behind each GL error (start-up, mesh upload, texture upload, textured draw) and the driver's own message (debug
+  output, ES builds), so **Help > Copy log to clipboard** shows what failed.
+- "**Fill layer sliders jumping back**: letting go of a Mask effect slider (Noise Size and Contrast, Fill Value,
+  Levels, Blur, the generators) or a Fill layer's Roughness, Metallic or Height slider put the old value back, so the
+  effect never changed. The dragged value now stays, and Undo and Redo move between the old and new values. The same
+  fix covers the Opacity slider in a layer channel's right-click menu."
+- "**Extract > Make Shell**: with Edge Smooth above 0 the outline of a shell made from masked areas follows a smooth
+  line again. Before, the rim came out raised, ridged and jagged (spiky even with Edge Smooth turned up), most of all
+  around thin necks and tips of the mask."
+- "**Trim** on a thin Part (a shell, a wing, a cloth-thin sheet): the wall behind the one you trim stayed in the
+  brush's reach, so the plane ran through the middle of the wall and stroke after stroke sank the near side through
+  the far one, leaving holes. Over a thin sheet, Trim now takes its plane from the side facing you, leaves what faces
+  away (the inner face of a shell, an underside) alone, and stops a fraction of the brush size (2%) short of the wall
+  below, so a thin wall is thinned, never torn (front faces only on or off). On a solid form, a head with its nostrils
+  and lips, Trim is unchanged."
+- "**Trim** on the tapering edge of a thin wing or sheet (the brush bigger than the sheet is thick there): the skin
+  sank through the underside and left a sawtooth of spikes along the rim, with Front faces only on or off. Each point
+  now stops short of the wall straight down its own path, so the sheet is thinned, never torn through. On the wing in
+  the test session the largest point moved differently from before is 0.03 on a 2.8-long wing."
+
 ## [0.13.14] - 2026-11-23
 
 ### Fixed

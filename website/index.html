@@ -19,7 +19,7 @@
   <meta property="og:url" content="https://sculptforge.app/">
   <link rel="canonical" href="https://sculptforge.app/">
   <script type="application/ld+json">
-  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.13.13", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
+  {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "SculptForge", "url": "https://sculptforge.app/", "applicationCategory": "MultimediaApplication", "applicationSubCategory": "3D sculpting", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "0.13.14", "description": "Free, open-source digital sculpting for VFX, animation and game studios.", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "downloadUrl": "https://github.com/islandmed/SculptForge/releases/latest", "image": "https://sculptforge.app/img/social-preview.png?v=5", "sameAs": ["https://github.com/islandmed/SculptForge"]}
   </script>
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sculptforge.app/img/social-preview.png?v=5">
@@ -80,9 +80,9 @@
 
   <main id="top">
     <!-- news-hero:start (build_site.py rewrites this bar and the hero line below from the newest What's New version each release; a hand-edited one for the same version is kept) -->
-    <aside class="news-bar" data-version="0.13.13" aria-label="Latest release">
+    <aside class="news-bar" data-version="0.13.14" aria-label="Latest release">
       <div class="wrap news-bar-inner">
-        <a class="news-bar-link" href="guide/whats-new.html#version-01313"><span class="news-pill">New</span><span class="news-bar-text">New in 0.13.13: Contact facing keeps your brush off the far wall of a slot or the other side of a fold, Engrave walls stay smooth, dense Micro levels shade Undo and Move at once, and Shift smooths every painted channel</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
+        <a class="news-bar-link" href="guide/whats-new.html#version-01314"><span class="news-pill">New</span><span class="news-bar-text">New in 0.13.14: Scatter covers a Part with copies and Keep apart stops them overlapping, Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth</span><span class="news-bar-go" aria-hidden="true">&rarr;</span></a>
         <button class="news-bar-x" type="button" aria-label="Dismiss this announcement">&times;</button>
       </div>
     </aside>
@@ -592,12 +592,12 @@ rez-env sculptforge -- sculptforge troll.usda \
         <!-- whats-new:start (tools/guide/build_site.py writes this from docs/guide/whats-new.md: edit that) -->
         <p class="section-lede"><a href="guide/whats-new.html">Everything that changed</a> &middot; <a href="https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md">changelog</a></p>
         <div class="wn-home">
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-01313"><div class="wn-card-body"><h3>Contact facing, Smooth carved walls, Instant shading on Micro levels <small>new in 0.13.13</small></h3><ul><li>Contact facing</li><li>Smooth carved walls</li><li>Instant shading on Micro levels</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01314"><div class="wn-card-body"><h3>Scatter, Trim on thin Parts <small>new in 0.13.14</small></h3><ul><li>Scatter</li><li>Trim on thin Parts</li></ul></div></a></article>
+          <article class="wn-home-card"><a href="guide/whats-new.html#version-01313"><div class="wn-card-body"><h3>Contact facing, Smooth carved walls, Instant shading on Micro levels <small>new in 0.13.13</small></h3><p>Contact facing keeps your brush off the far wall of a slot, Engrave walls stay smooth, dense Micro levels shade Undo and Move at once, and Shift smooths every painted channel.</p><ul><li>Contact facing</li><li>Smooth carved walls</li><li>Instant shading on Micro levels</li></ul></div></a></article>
           <article class="wn-home-card"><a href="guide/whats-new.html#version-01312"><div class="wn-card-body"><h3>Round Tendril horns, Clean Palette Knife, Smooth Gizmo on heavy Parts <small>new in 0.13.12</small></h3><p>Tendril pulls round horns with Dynamic on, Palette Knife strokes cross without creasing, the Gizmo stays smooth on heavy Parts, and Nudge and Layer stay off the far side.</p><ul><li>Round Tendril horns</li><li>Clean Palette Knife</li><li>Smooth Gizmo on heavy Parts</li></ul></div></a></article>
-          <article class="wn-home-card"><a href="guide/whats-new.html#version-01311"><div class="wn-card-body"><h3>Smooth Forge Sphere chains, Smooth colour on textures, View falloff stays in front <small>new in 0.13.11</small></h3><p>Forge Sphere chains stay smooth while you drag, Shift blends colour on textured Parts, View falloff stays off the far side, and pen orbit is steady again.</p><ul><li>Smooth Forge Sphere chains</li><li>Smooth colour on textures</li><li>View falloff stays in front</li></ul></div></a></article>
         </div>
         <div class="wn-home-groups">
-          <a class="wn-home-group" href="guide/whats-new.html#versions-0130-to-01310"><h3>0.13.0 to 0.13.10</h3><ul><li>Insert works on a mesh with subdivision levels</li><li>Safer plugins</li></ul><span>All changes &rarr;</span></a>
+          <a class="wn-home-group" href="guide/whats-new.html#versions-0130-to-01311"><h3>0.13.0 to 0.13.11</h3><ul><li>Insert works on a mesh with subdivision levels</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-012x"><h3>0.12.x</h3><ul><li>Booleans between Parts</li><li>Pan and zoom keys work again</li><li>Garments and cloth</li></ul><span>All changes &rarr;</span></a>
           <a class="wn-home-group" href="guide/whats-new.html#versions-011-and-earlier"><h3>0.11 and earlier</h3><ul><li>Gizmo All</li><li>Fixed</li><li>Linked duplicates</li><li>Your languages</li><li>Stencil</li><li>Exports keep their real size</li></ul><span>All changes &rarr;</span></a>
         </div>
@@ -623,7 +623,7 @@ rez-env sculptforge -- sculptforge troll.usda \
     <section id="download" class="section alt">
       <div class="wrap">
         <h2>Download</h2>
-        <p class="section-lede">Version 0.13.13. All builds come from the
+        <p class="section-lede">Version 0.13.14. All builds come from the
           <a href="https://github.com/islandmed/SculptForge/releases/latest">latest GitHub release</a>, with
           SHA-256 checksums. Free forever; <a href="support.html">membership</a> adds early builds, like SculptForge for Android today, plus Member Requests, a roadmap vote and credits.</p>
         <div class="downloads">
