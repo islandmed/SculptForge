@@ -13,6 +13,7 @@ tagline: Scatter covers a Part with copies and Keep apart stops them overlapping
 highlight: Scatter covers a Part or its masked area with copies, and Keep apart stops them overlapping
 highlight: Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth
 highlight: Fill layer mask sliders keep the value you drag to
+highlight: Scatter copies over a surface, kept apart
 title: Scatter
 line: Tool > Scatter covers a Part, or its masked area, with copies of a pebble, a cube, a hex or any other Part; Keep apart stops them overlapping.
 action: guide:scatter.md
@@ -29,6 +30,13 @@ action: guide:sculpting.md
 - **Fill layers**: mask effect sliders (Noise, Levels, Blur...) and the material sliders keep the value you drag to.
 - **Android**: if a graphics driver can't draw a texture, the model stays visible without it and the status bar
   says so.
+- **Stencil**: a stroke that starts where the Stencil's image is dark or off the model now says so in the status bar,
+  and how to remove the Stencil.
+- **A model never disappears after New Texture on Android**: if a phone or tablet's graphics driver rejects drawing
+  the texture, the model now stays visible without it and the status bar and the Texture Image panel say so. Painting
+  still goes into the texture.
+- **Paint > Material** lists every material channel as soon as the Part has a texture; tick one there to add it, no
+  trip to **Tool > Texture Image**. *Requested by a member*
 
 ## Version 0.13.13
 

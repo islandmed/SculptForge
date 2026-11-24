@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.13:</strong> Contact facing keeps your brush off the far wall of a slot or the other side of a fold, Engrave walls stay smooth, dense Micro levels shade Undo and Move at once, and Shift smooths every painted channel (<a href="https://sculptforge.app/guide/sculpting.md">how it works</a>)
+  <strong>New in 0.13.14:</strong> Scatter covers a Part with copies and Keep apart stops them overlapping, Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth (<a href="https://sculptforge.app/guide/scatter.md">how it works</a>)
 </p>
 
 <p align="center">
