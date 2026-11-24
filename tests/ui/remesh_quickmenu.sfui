@@ -1,0 +1,55 @@
+# Remesh and Remove Hidden one right click or one key away (0.14.0, a member's request): the Quick Menu's third row
+# (Quick Remesh, Quad Remesh, Remove Hidden) in the SculptForge layout, Ctrl+Shift+H in the SculptForge key style, and
+# the Classic layout and Classic keys as they were.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=4
+key f
+camera 0 0
+expect_value input_style == 1
+expect_shortcut visibility.delete_hidden Ctrl+Shift+H
+expect_value quick_remesh == 1
+remember triangles before
+
+# The right-click Quick Menu has the row; its Quick Remesh button remeshes in the background, one undo step.
+button_drag right 0.3 0.35 0.3 0.35 0.1
+expect_value quickmenu_open == 1
+expect "Quick Remesh##geometry.quick_remesh"
+expect "Quad Remesh##geometry.qremesh"
+expect "Remove Hidden##visibility.delete_hidden"
+shot quickmenu_row
+click "Quick Remesh##geometry.quick_remesh"
+expect_value voxel_remesh_running == 1
+wait_idle 120
+expect_status Quick Remesh: remeshed
+expect_value triangles != $before
+key ctrl+z
+expect_value triangles == $before
+key escape
+expect_value quickmenu_open == 0
+
+# Ctrl+Shift+H removes the hidden half; undo brings it back. With nothing hidden it only says so.
+key ctrl+shift+h
+expect_status Nothing is hidden
+expect_value triangles == $before
+run hide_rect x0=0 y0=-1 x1=1 y1=1
+key ctrl+shift+h
+expect_status Deleted
+expect_value triangles < $before
+key ctrl+z
+expect_value triangles == $before
+
+# Classic keys: no key for Remove Hidden (Ctrl+Shift+H is free there, as before); Shift+R still Quick Remesh.
+input_style classic
+expect_shortcut visibility.delete_hidden
+expect_shortcut geometry.quick_remesh Shift+R
+input_style sculptforge
+expect_shortcut visibility.delete_hidden Ctrl+Shift+H
+
+# The Classic layout's Quick Menu is as it was: no third row.
+run ui_look look=classic layout=classic
+button_drag right 0.3 0.35 0.3 0.35 0.1
+expect_value quickmenu_open == 1
+expect "##qm_drawsize"
+expect_not "Remove Hidden##visibility.delete_hidden"
+expect_not "Quad Remesh##geometry.qremesh"
+key escape

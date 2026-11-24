@@ -1333,6 +1333,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(keep_strokes_editable_checkbox_2880 keep_strokes_editable_checkbox --size 2880x1800)
     sculptforge_ui_test(undo_no_replay_lod_1440 undo_no_replay_lod --size 1440x900) # gh#184: the view after undo + a stroke
     sculptforge_ui_test(undo_no_replay_lod_2880 undo_no_replay_lod --size 2880x1800)
+    sculptforge_ui_test(remesh_quickmenu_1440 remesh_quickmenu --size 1440x900) # the Quick Menu's remesh row (0.14.0)
+    sculptforge_ui_test(remesh_quickmenu_2880 remesh_quickmenu --size 2880x1800)
     # (gh#184, the stroke thread: settings read once at startup, so these run cold with their environment set here)
     sculptforge_ui_test(async_stroke_undo_view_1440 async_stroke_undo_view --size 1440x900)
     sculptforge_ui_test(async_stroke_undo_view_2880 async_stroke_undo_view --size 2880x1800)

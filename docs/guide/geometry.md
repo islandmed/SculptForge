@@ -101,7 +101,8 @@ triangles and needs over 16 GB, so on most computers it says so instead of start
   been back at 512 or less;
 - a remesh that won't fit in the free memory doesn't start: the status line says how much it needs and how much is
   free. Lower the Resolution or close other apps;
-- it runs in the background with a progress bar; **Cancel** stops it within seconds and the Part stays as it was.
+- it runs in the background with a progress bar that moves through every stage; **Cancel** stops it at once (within a
+  blink even on a 5M-triangle sculpt) and the Part stays as it was.
 
 Sculpting tens of millions of triangles needs a fast computer: **Decimate** or a lower Resolution makes the result
 lighter.
@@ -133,7 +134,8 @@ To remesh several Parts into one, first combine them with **Merge visible...** o
 
 ### Quick Remesh
 
-Remesh as you sculpt, without going to the palette (#121). Turn on **Tool > Remesh > Quick Remesh**, then:
+Remesh as you sculpt, without going to the palette (#121). It is on by default (**Tool > Remesh > Quick Remesh** turns
+it off):
 
 - press <kbd>Shift</kbd>+<kbd>R</kbd>, or
 - hold <kbd>N</kbd> and click or drag on the background (anywhere off the model; on the model it stays a brush
@@ -149,7 +151,8 @@ Part again as it is now.
 Both keys change in **Edit > Preferences > Hotkeys** (*Quick Remesh* and *Quick Remesh (hold and drag)*). Neither
 <kbd>Shift</kbd>+<kbd>R</kbd> nor <kbd>N</kbd> is used by any key style, and holding <kbd>N</kbd> changes no other
 drag on the background: without it, a drag there turns, pans or zooms the view, or draws the mask and hide shapes,
-exactly as your key style says. With Quick Remesh off, the keys only tell you where to turn it on.
+exactly as your key style says. With Quick Remesh off, the keys only tell you where to turn it on. The right-click
+[Quick Menu](sculpting.md#the-quick-menu) has a **Quick Remesh** button too, beside **Quad Remesh** and **Remove Hidden**.
 
 **Remesh after each stroke** (off by default) does it for you: when you lift the pen after a stroke that stretched the
 surface (edges pulled to more than 1.6 times their length, as a long Move or Tendril pull does), the active Part is

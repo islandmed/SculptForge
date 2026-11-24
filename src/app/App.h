@@ -1682,8 +1682,10 @@ private:
         int resolution = 200;
         bool keepMasked = false, keepTexture = true;
         bool allowSwap = false; // the person agreed to a remesh past the free memory (MemoryTier::NeedsSwap)
+        int restarts = 0;       // quick ones: how often this job started again because the Part changed meanwhile
     };
     std::unique_ptr<VoxelRemeshJob> voxelRemesh_;
+    int voxelRemeshRestarts_ = 0; // the restart count the next startVoxelRemesh gives its job (pollVoxelRemesh sets it)
     // Resolution above 512: the estimate under the slider, a one-time confirmation with it
     // (again after going back to 512 or less), and a refusal when it won't fit in the free memory (PanelRetopo.cpp).
     // Customize Shelves, Ctrl+Alt: sliders that can be picked up and dropped on a shelf (PanelRetopo.cpp); compact: the shelf's copy,

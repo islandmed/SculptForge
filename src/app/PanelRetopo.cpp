@@ -454,6 +454,7 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     }
     auto job = std::make_unique<VoxelRemeshJob>();
     job->trigger = trigger;
+    job->restarts = std::exchange(voxelRemeshRestarts_, 0);
     job->revision = doc_.undo.revision();
     job->progress = std::make_shared<std::atomic<float>>(0.0f);
     job->cancel = std::make_shared<std::atomic<bool>>(false);
@@ -551,7 +552,14 @@ void App::pollVoxelRemesh() {
     }
     if (job->trigger != RemeshTrigger::Button && doc_.undo.revision() != job->revision) {
         // Sculpted (or undone) while it ran: landing would throw that work away, so it remeshes the Part as it is now.
+        // Twice at most in a row (Quick Remesh is on by default since 0.14.0): a key pressed by mistake mid-stroke must
+        // not keep the computer remeshing for as long as the sculpting goes on.
+        if (job->restarts >= 2) {
+            status_ = std::string(name) + "the Part kept changing while it was remeshed; nothing landed. Remesh again when you pause";
+            return;
+        }
         status_ = std::string(name) + "the Part changed while it was remeshed, remeshing again...";
+        voxelRemeshRestarts_ = job->restarts + 1;
         startVoxelRemesh(job->trigger);
         return;
     }

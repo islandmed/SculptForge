@@ -6,10 +6,12 @@ key f
 camera 0 0
 remember triangles before
 
-# Off by default: Shift+R only says where to turn it on.
+# On by default (0.14.0: remeshing mid-sculpt was too many clicks away); turned off, Shift+R only says where to turn it on.
 click "Remesh##tool.remesh"
-expect_value quick_remesh == 0
+expect_value quick_remesh == 1
 expect_value remesh_after_stroke == 0
+click "Quick Remesh##remesh.quick"
+expect_value quick_remesh == 0
 key shift+r
 expect_status Quick Remesh is off
 expect_value voxel_remesh_running == 0

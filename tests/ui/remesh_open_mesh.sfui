@@ -31,8 +31,8 @@ camera 0 0
 key ctrl+z
 expect_value triangles == $before
 
-# Quick Remesh (Shift+R).
-click "Quick Remesh##remesh.quick"
+# Quick Remesh (Shift+R; on by default since 0.14.0).
+expect_value quick_remesh == 1
 key shift+r
 wait_idle 120
 expect_status Quick Remesh: remeshed
@@ -45,4 +45,3 @@ shot quick_remesh_below
 camera 0 0
 key ctrl+z
 expect_value triangles == $before
-click "Quick Remesh##remesh.quick"
