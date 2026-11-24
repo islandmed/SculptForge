@@ -39,13 +39,14 @@ what was painted in it; **Undo** brings it back.
    texture does not have yet in grey. Tick a channel to add it and paint it (for a typical game asset: Roughness,
    Metallic and Normal; add Height to paint relief, Ambient Occlusion to paint dirt into crevices). A material swatch
    (Gold, Bare metal...) adds Roughness and Metallic in one click.
-3. **Tool > Texture Image > Material Channels** shows the same ticks; it is also where a channel is turned off again
-   (that discards its paint; **Undo** brings it back). **Channel memory** below the ticks shows what the painted
-   tiles use; the same number, for every Part, is in **Edit > Preferences > Performance** under Memory.
+3. **Tool > Texture Image > Material Channels** lists the same channels, ticked when the texture has them; it is where
+   a channel is turned off again (that discards its paint; **Undo** brings it back). **Channel memory** below the
+   ticks shows what the painted tiles use; the same number, for every Part, is in **Edit > Preferences > Performance** under Memory.
 
 ## Paint a material
 
-Open the **Paint** menu. As soon as paint goes into a texture, a **Material** section appears under the swatches:
+Open the **Paint** menu. As soon as the Part paints into a texture (**New Texture**), a **Material** section appears
+under the swatches:
 
 ![Paint > Material: material swatches, and per channel a tick, value swatches and a slider; Material Channels in Tool > Texture Image](images/pbr-brush-material.jpg)
 

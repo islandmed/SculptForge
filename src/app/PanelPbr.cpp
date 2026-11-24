@@ -252,6 +252,8 @@ void App::drawBrushMaterialContents() {
         const Channel c = Channel(ci);
         ImGui::PushID(ci);
         if (!channelEnabled(t, c)) {
+            // (a stale bit, e.g. after undoing the channel's addition, goes: the brush paints what the rows show)
+            if (!(addChannels & channelBit(c))) mat.channels &= ~channelBit(c);
             bool add = false;
             ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
             if (ImGui::Checkbox(channelFormat(c).label, &add)) {
