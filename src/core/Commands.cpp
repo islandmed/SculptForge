@@ -25,6 +25,7 @@
 #include "core/Masking.h"
 #include "core/Backdrop.h"
 #include "core/CloseHoles.h"
+#include "core/EdgeLoopInsert.h"
 #include "core/Cut.h"
 #include "core/Multires.h"
 #include "core/PolyMode.h"
@@ -943,6 +944,7 @@ CommandRegistry::CommandRegistry() {
     registerMaskingCommands(*this);
     registerCutCommands(*this); // cut (core/Cut.h)
     registerCloseHolesCommands(*this); // close_holes (core/CloseHoles.h)
+    registerEdgeLoopCommands(*this);   // edge_loop (core/EdgeLoopInsert.h)
     registerBackdropCommands(*this);   // remove_flat_background (core/Backdrop.h)
     registerFaceGroupCommands(*this);
     registerPolySelectCommands(*this); // poly_mode, poly_select (core/PolyMode.h)
