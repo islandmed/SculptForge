@@ -10,6 +10,7 @@
 #include "core/ThreadPool.h"
 #include "core/TileImage.h"
 
+#include <algorithm>
 #include <deque>
 #include <map>
 #include <memory>
@@ -282,6 +283,16 @@ public:
     UndoRecord* lastRedo() { return redo_.empty() ? nullptr : &redo_.back(); }
     // The undo step BACK places below the top (0 = the next undo), or null.
     const UndoRecord* undoStep(size_t back) const { return back < undo_.size() ? &undo_[undo_.size() - 1 - back] : nullptr; }
+
+    // Every step, undo side then redo side (oldest first within each): a walk that stamps batch ids puts them back with it.
+    template <class F> void forEachStep(F&& f) {
+        for (UndoRecord& r : undo_) f(r);
+        for (UndoRecord& r : redo_) f(r);
+    }
+    bool hasStep(uint64_t seq) const {
+        const auto is = [&](const UndoRecord& r) { return r.seq == seq; };
+        return std::any_of(undo_.begin(), undo_.end(), is) || std::any_of(redo_.begin(), redo_.end(), is);
+    }
 
     // Both rebuild/refit the BVH as needed.
     bool undo(Mesh& mesh, BVH& bvh);
