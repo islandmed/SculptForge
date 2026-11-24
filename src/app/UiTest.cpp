@@ -2607,8 +2607,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         break;
     }
     case StepVerb::AxisClick: {
-        // axis_click +x|-x|+y|-y|+z|-z [double]: click that end of the axis gizmo (Draw > Camera > Axes, #43), or of the
-        // orientation widget; "double": a double-click (the second press as SDL counts it)
+        // axis_click +x|-x|+y|-y|+z|-z [double] [nowait]: click that end of the axis gizmo (Draw > Camera > Axes, #43), or
+        // of the orientation widget; "double": a double-click (the second press as SDL counts it). The widget turns with
+        // a 0.35 s eased move: the step settles until it ends (so the next line sees the view), "nowait" leaves it running.
         if (!need(1)) return false;
         static const char* const names[6] = {"+x", "+y", "+z", "-x", "-y", "-z"};
         const auto found = std::find_if(std::begin(names), std::end(names), [&](const char* n) { return w[1] == n; });
@@ -2623,7 +2624,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             *at = ImVec2(e.at.x, e.at.y);
         });
         stroke([at](float) { return *at; }, 0.2f);
-        if (w.size() > 2 && w[2] == "double")
+        const bool twice = std::find(w.begin() + 2, w.end(), "double") != w.end();
+        const bool nowait = std::find(w.begin() + 2, w.end(), "nowait") != w.end();
+        if (twice)
             steps_.push_back([this](float) {
                 SDL_Event e{};
                 e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
@@ -2640,6 +2643,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
                 return true;
             });
         run([this] { SDL_SetModState(held_); });
+        if (!nowait) steps_.push_back([this](float t) { return !app_.cameraMoving() || t > 2.0f; }); // (the eased turn settles)
         wait(0.1f);
         break;
     }

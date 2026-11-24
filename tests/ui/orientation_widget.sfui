@@ -28,7 +28,8 @@ expect_value nav_hover_end == -1
 shot hover_disc
 
 # A click on the +X dot: the camera eases to the right view (a few frames in, it is on its way), orthographic at the end.
-axis_click +x
+# (nowait: axis_click otherwise settles the move before the next line, as the older scripts expect.)
+axis_click +x nowait
 expect_value camera_moving == 1
 expect_value camera_yaw > 0
 expect_value camera_yaw < 90
