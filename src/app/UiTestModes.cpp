@@ -776,8 +776,11 @@ bool Demo::buildMonkey(int line, uint64_t seed, int count, std::string& error) {
             lines.push_back("key escape");
         }
     }
-    // The way out, then the invariants.
-    for (const char* l : {"release", "hold none", "key escape", "close_floating", "action brush.clay", "action tool.draw", "expect_latched none",
+    // The way out, then the invariants. Frame (by its action: the key differs between layouts) because the sequence may
+    // have left the model off the canvas (a mirror deformation, Rotate drags, numpad views: seed 9 once Solidify's toggle
+    // shifted it), and expect_sculpts' stroke walks the model's screen bounds: the check is about latches, not the camera.
+    for (const char* l : {"release", "hold none", "key escape", "close_floating", "action brush.clay", "action tool.draw", "action view.frame",
+                          "expect_latched none",
                           "expect_mesh_valid", "expect_sculpts", "undo_all", "expect_restored", "expect_mesh_valid"})
         lines.emplace_back(l);
     return addCase(line, "monkey " + std::to_string(seed), nullptr, lines, error);
