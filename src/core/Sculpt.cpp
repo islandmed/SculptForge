@@ -1336,6 +1336,7 @@ static float unpackedShare(const Mesh& mesh, uint32_t v, float typical) {
 // than that is left as it is. Only on a thin Part (partThinness): a solid form, a head with its nostrils and lips, is
 // trimmed flat as ever. The BVH is the one the previous dab refit, so the walls are where they were.
 static constexpr float kTrimKeep = 0.02f; // of the brush radius (Trim's own plane stands this far below the surface at full strength)
+static constexpr float kTrimPathShort = 0.9f; // the wall on the vertex's path counts when it leaves less than this share of the other estimate
 // `normals[i]`: verts[i]'s normal, read before the dab (the adaptive path rewrites the normals as it goes).
 // The wall below a vertex is found along its own normal (a sheet's rim, whose edge runs along the wall, still finds the
 // underside), and the room is the distance to that wall's plane along the cut.
@@ -1368,6 +1369,16 @@ static void keepTrimWalls(const Mesh& mesh, const BVH& bvh, const glm::vec3& are
                 if (across <= 0.3f) continue;
                 const float room = glm::dot(hit.position - mesh.positions[v], hit.normal) / across;
                 allowed = std::min(allowed, std::max(0.0f, room - keep));
+            }
+            // The wall straight down the vertex's own path, where that is well short of what the wall along the normal allowed (where a sheet
+            // tapers to its rim the normal runs on a slant, and the plane of the wall it finds is not the one under the vertex: the skin
+            // sank through the underside there).
+            {
+                const glm::vec3 dir = d[i] / len;
+                if (bvh.raycast(mesh, mesh.positions[v] + dir * eps, dir, hit) && glm::dot(dir, hit.normal) > 0.0f) {
+                    const float onPath = std::max(0.0f, hit.t + eps - keep);
+                    if (onPath < kTrimPathShort * allowed) allowed = onPath;
+                }
             }
             d[i] *= allowed / len;
         }
