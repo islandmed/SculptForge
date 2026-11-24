@@ -360,6 +360,15 @@ bool saveObj(const std::string& path, const std::vector<MeshObjectRef>& objects,
                 if (c == '\n' || c == '\r') c = ' ';
             buf += "o " + name + "\n";
         }
+        if (!o.ai.empty()) { // the AI provenance tag (core/AiProvenance.h): a comment is all OBJ has for it
+            auto oneLine = [](std::string s) {
+                for (char& c : s)
+                    if (c == '\n' || c == '\r') c = ' ';
+                return s;
+            };
+            buf += "# sculptforge_ai host=" + oneLine(o.ai.host) + " model=" + oneLine(o.ai.model) + " date=" + oneLine(o.ai.date) +
+                   " role=" + oneLine(o.ai.role) + "\n";
+        }
         const bool colors = mesh.colors.size() == mesh.positions.size() && mesh.hasColors();
         for (size_t i = 0; i < mesh.positions.size(); ++i) {
             const glm::vec3 v = toFileUnits(mesh.positions[i], scale); // (core/Units.h: 12.7 mm comes back as 12.7)

@@ -17,6 +17,7 @@
 #pragma once
 
 #include "ai/BrushAssistant.h"
+#include "core/AiProvenance.h"
 #include "ai/Generator3D.h"
 #include "core/Json.h"
 
@@ -103,6 +104,11 @@ extern const char* kTrellisNoTokenNote;
 const HfPreset& resolveHfPreset(const AiSettings& settings, bool text, std::string* note = nullptr);
 // Free text-to-3D models ("$PROMPT" in step args is the description).
 const std::vector<HfPreset>& hfTextPresets();
+
+// The provenance tag (core/AiProvenance.h) a model generated with these settings gets: the host the request goes to
+// (generateTarget's), the model that runs (the free preset that would run, the fal.ai / Meshy / Hyper3D / Tripo model,
+// the ComfyUI workflow, "your generator command"), today's date, role kGenerated. Empty for the offline blockout (not AI).
+AiProvenance generateProvenance(const AiSettings& settings, bool text);
 
 // Blocking; run on a worker thread. Writes `<outputStem>.glb` (or .obj) and
 // returns its path in `outputPath`.

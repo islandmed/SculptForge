@@ -7,6 +7,18 @@ telemetry, no account and no servers of its own. When you use an AI feature, Scu
 **Your art is never uploaded or used for training. AI features run only when you use them and can be turned off.** Your sculpts stay on your computer; only what you hand an AI feature (a brush description,
 or the picture or text you give Generate 3D) goes to the service you picked.
 
+## Provenance tag on AI output
+
+A Part that Generate 3D (or `image_to_3d` / `text_to_3d`) made carries a small tag: the **host** the request went to
+(for example `tencent-hunyuan3d-2-1.hf.space` or `queue.fal.run`; `this computer` for your own command), the **model**
+(for example `Hunyuan3D 2.1 (Tencent)` or `fal-ai/trellis-2`), the local **date** and the **pass** (`generated`,
+`sculpting base` or `reference`). It is shown when you hover the Part in the Parts list and by `scene_overview`,
+follows Duplicate, Split and linked copies, is saved in the project (`ai_provenance`, see
+[project files](project-format.md)) and kept on export where the format has a place for it: glTF node
+`extras.sculptforge_ai`, USD prim `customData` (`sculptforge_ai`), an OBJ comment line under the object. FBX, PLY
+and STL have none. The tag is written by SculptForge from your own settings; nothing in it is fetched from or sent to
+anyone, and a Part you sculpted yourself gets no tag. Offline blockouts (Inflate) are not AI and get none either.
+
 ## Turning AI off
 
 **Preferences > AI > Enable AI features** (also asked in the first-run welcome). Off: Brush Lab and

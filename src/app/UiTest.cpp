@@ -126,7 +126,8 @@
 //                            "SculptForge has a new look" card),
 //                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
 //                            index, -1 none), high_detail_part (its hidden copy's index, -1 none, -2 shown),
-//                            subdiv_levels (the active Part's, 0 none),
+//                            subdiv_levels (the active Part's, 0 none), ai_provenance (the active Part's AI tag: 0 none,
+//                            1 generated, 2 sculpting base, 3 reference),
 //                            brush_looks (different alpha + stroke looks the brush thumbnails were asked for, #208),
 //                            thumbnails_regenerated (brush thumbnails remade by right-click > Regenerate thumbnail),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
@@ -1397,6 +1398,10 @@ double Demo::query(const std::string& name, bool& known) const {
         return i < 0 ? -1.0 : app_.doc_.parts[size_t(i)].visible ? -2.0 : double(i);
     }
     if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
+    if (name == "ai_provenance") { // the active Part's AI provenance tag: 0 none, 1 generated, 2 sculpting base, 3 reference
+        const AiProvenance& ai = app_.doc_.activePartInfo().ai;
+        return ai.empty() ? 0.0 : ai.role == AiProvenance::kSculptingBase ? 2.0 : ai.role == AiProvenance::kReference ? 3.0 : 1.0;
+    }
     if (name == "language_bar_open") return app_.languageBar_ ? 1.0 : 0.0; // the first start's "SculptForge is in..." note
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
     if (name == "welcome_close_hidden_px" || name == "welcome_x_hidden_px" || name == "welcome_scroll_px" || name == "welcome_scrolled_px") {

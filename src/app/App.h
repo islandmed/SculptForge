@@ -869,6 +869,7 @@ private:
     // side (a thumbnail and a silhouette each); the one picked becomes a Part; "Use as sculpting base" then remeshes it.
     struct GeneratedCandidate {
         ai::GeneratorResult result;
+        AiProvenance ai;            // host, model, date (core/AiProvenance.h): the Part it becomes carries it
         std::shared_ptr<Mesh> mesh; // as generated, in one piece, its flat background dropped; null: it failed (error)
         BackdropRemoval backdrop;
         std::string error;
@@ -883,6 +884,10 @@ private:
     int candidateCount_ = 3;     // free and local services
     int paidCandidateCount_ = 1; // services billed per generation (fal.ai, Meshy, Hyper3D): one unless asked
     bool keepOtherCandidates_ = false; // the ones not picked stay as hidden Parts
+    // Generate 3D's one choice (areas/ai.md #2): what the pick becomes. Base: remeshed at once (Voxel, then Quad Remesh
+    // unless turned off under Advanced), the model as generated kept hidden as the Reference. Reference: as generated.
+    enum class GeneratedResult { SculptingBase, Reference };
+    int generatedResult_ = int(GeneratedResult::SculptingBase);
     bool keepHighDetail_ = true;       // the sculpting base keeps the generated model as a hidden Part to Project Detail from
     uint32_t generatedPart_ = 0;       // the picked candidate's Part (0: none)
     uint32_t highDetailPart_ = 0;      // its hidden high-detail copy, once the sculpting base is made

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "core/AiProvenance.h"
 #include "core/BVH.h"
 #include "core/BrushAlpha.h"
 #include "core/BrushRecipe.h"
@@ -71,6 +72,7 @@ struct Part {
     // Where the mesh is in the scene: world = transform * mesh position. Identity unless the Part is a linked copy
     // moved on its own (or was one: Make Unique keeps it). A similarity (rotation, translation, uniform scale).
     glm::mat4 transform{1.0f};
+    AiProvenance ai; // set when Generate 3D (or image_to_3d / text_to_3d) made it; empty otherwise (core/AiProvenance.h)
     std::shared_ptr<PartData> data = std::make_shared<PartData>();
     Part() = default;
     Part(Part&&) = default;

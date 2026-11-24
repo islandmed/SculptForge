@@ -20,9 +20,12 @@ Generate for form, remesh for topology: one pass is never asked to deliver both.
 2. The service you picked reconstructs complete meshes, front, back, limbs and all: up to three **candidates** at
    once, shown side by side as a shaded thumbnail over a flat black silhouette.
 3. You pick the strongest form. It becomes a Part, exactly as generated.
-4. **Use as sculpting base** rebuilds it as a clean, even mesh to sculpt on: a Voxel Remesh, then (unless you turn
-   it off) a Quad Remesh into clean quads with one subdivision level that holds the detail. The model as generated
-   can stay as a hidden Part, to Project Detail from later.
+4. **Result** is one choice, made before or after generating. **Sculpting base** (the default) rebuilds the pick at
+   once as a clean, even mesh to sculpt on: a Voxel Remesh, then a Quad Remesh into clean quads of moderate density
+   with one subdivision level that holds the detail; the model as generated stays as a hidden Part, to Project Detail
+   from later. **Reference** keeps the pick exactly as generated, every triangle, at full fidelity.
+5. Every Part an AI made carries a provenance tag (model, host, date, pass): hover it in the Parts list. It is saved in
+   projects and kept in glTF, USD and OBJ exports ([AI services and privacy](../ai-services.md#provenance-tag-on-ai-output)).
 
 Nothing leaves your computer until you choose a hosted service and press **Generate 3D model**. For exactly
 what is sent where, see [AI services and privacy](#privacy-and-model-licences) below.
@@ -73,25 +76,32 @@ The others are discarded, unless **Keep the others as hidden Parts** is on: then
 hidden ("Option A", "Option C"), in the same place as the pick, to compare or use later. **Discard all** drops every candidate. With one candidate there is nothing to
 compare, so it lands at once.
 
-### Use as sculpting base
+### Result: sculpting base or reference
 
-Generated meshes are uneven, often holey and full of overlapping pieces: good form, poor topology. Under
-**Sculpting base**:
+Generated meshes are uneven, often holey and full of overlapping pieces: good form, poor topology. Under **Result**
+you choose, before or after generating, what the candidate you pick becomes:
 
-- **Then Quad Remesh** (on by default): after the Voxel Remesh, clean all-quad topology of about
-  resolution² / 2 quads (32768 at 256), then one subdivision level projected onto the model so the detail
-  survives. Step down to the quad cage with <kbd>Shift</kbd>+<kbd>D</kbd>. Off: the even, watertight triangle
-  surface of the Voxel Remesh alone (about a second).
-- **Resolution** (96 to 400, default 256): higher keeps more detail.
-- **Keep a high-detail copy (hidden)** (on by default, for experts): the model as generated stays as a hidden Part
-  right below the base, named "Reference". Divide the base, then click **Project Detail from the
-  high-detail copy** to bring the fine detail back onto it.
+- **Sculpting base: moderate density, clean quads** (the default). The moment you pick, the model is rebuilt as a
+  Voxel Remesh, then a Quad Remesh into clean all-quad topology of about 32768 quads with one subdivision level
+  projected onto the model so the detail survives: one click from form to topology. Step down to the quad cage with
+  <kbd>Shift</kbd>+<kbd>D</kbd>. The model as generated stays as a hidden Part right below the base, named "Reference":
+  divide the base, then click **Project Detail from the high-detail copy** to bring the fine detail back onto it. Undo
+  goes back to the model as generated.
+- **Reference: high fidelity**. The pick stays exactly as the service made it, every triangle, nothing rebuilt: sculpt
+  on a base of your own and Project Detail from it, or export it as it is.
 
-Click **Use as sculpting base**. The status line reports the result, for example "Sculpting base ready: remeshed to
-32768 quads (2 subdivision levels)".
+**Advanced** (under the Sculpting base choice) holds the remesh knobs: **Then Quad Remesh** (off: the even, watertight
+triangle surface of the Voxel Remesh alone, about a second), **Resolution** (96 to 400, default 256: higher keeps more
+detail; about resolution² / 2 quads) and **Keep a high-detail copy (hidden)**. **Use as sculpting base** does the remesh
+again: after Undo, with another Resolution, or for a model you picked as a reference.
 
+The status line reports the result, for example "Sculpting base ready: remeshed to 32768 quads (2 subdivision levels)".
 Quad Remesh takes about 10 to 25 seconds on a typical model; the progress bar shows it and the window stays usable.
-Undo goes back to the model as generated.
+
+Every Part an AI made carries a **provenance tag**: hover it in the Parts list and the tooltip ends with
+"AI: Hunyuan3D 2.1 (Tencent), tencent-hunyuan3d-2-1.hf.space, 2026-11-23 (sculpting base)". The tag follows Duplicate,
+Split and linked copies, is saved in projects and kept in glTF, USD and OBJ exports; see
+[AI services and privacy](../ai-services.md#provenance-tag-on-ai-output).
 
 ### Pictures that work well
 
@@ -289,7 +299,7 @@ Generated meshes are a starting point. A typical next pass:
 
 1. Check the size of the remeshed result in the bar along the top (the triangle count). If the detail is too soft, divide once more
    (<kbd>Ctrl</kbd>+<kbd>D</kbd>) and **Project Detail from the high-detail copy**, or press **Use as sculpting base**
-   again with a higher **Resolution** after Undo. **Tool > Remesh** has Quad Remesh (first) and Voxel Remesh for
+   again with a higher **Resolution** (under **Advanced**) after Undo. **Tool > Remesh** has Quad Remesh (first) and Voxel Remesh for
    another pass.
 2. Turn on **X** symmetry if the subject is symmetrical, and sculpt the forms with Clay Block, Move and Sharp Crease ([Sculpting and brushes](sculpting.md)).
 3. Save a project (<kbd>Ctrl</kbd>+<kbd>S</kbd>).
