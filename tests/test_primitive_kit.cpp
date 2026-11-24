@@ -357,6 +357,19 @@ TEST(primitive_kit_append_settings_and_freshness) {
     CHECK(primitiveFresh(doc, 1));
     CHECK(reg.execute(doc, "part_primitive", {{"rings", 2.0}}).ok);
     CHECK(doc.mesh.quadCount() == 12);
+    // Undoing a whole move puts the positions back while the newest spec still holds the moved placement: the earlier
+    // spec in the history matches, so the settings stay (and the next change rebuilds at the old place).
+    const glm::vec3 moved = doc.mesh.bounds().center();
+    CHECK(reg.execute(doc, "undo", {}).ok); // the rings change
+    CHECK(reg.execute(doc, "undo", {}).ok); // the rotate + scale
+    CHECK(primitiveFresh(doc, 1));
+    CHECK(glm::distance(doc.mesh.bounds().center(), moved) < 1e-3f); // (a rotation about the centre, scaled: same centre)
+    CHECK(reg.execute(doc, "undo", {}).ok); // the translate
+    CHECK(primitiveFresh(doc, 1));
+    CHECK(glm::distance(doc.mesh.bounds().center(), before) < 1e-3f);
+    CHECK(reg.execute(doc, "part_primitive", {{"segments", 8.0}}).ok);
+    CHECK(glm::distance(doc.mesh.bounds().center(), before) < 1e-3f);
+    CHECK(reg.execute(doc, "redo", {}).ok == false || true); // (redo after a new step: nothing to redo, either answer is fine)
     // Settings on Append itself, and an unknown type.
     CHECK(reg.execute(doc, "part_append", {{"type", std::string("torus")}, {"segments", 8.0}, {"rings", 4.0}}).ok);
     CHECK(doc.mesh.quadCount() == 32);

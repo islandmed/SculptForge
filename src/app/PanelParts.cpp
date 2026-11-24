@@ -649,7 +649,7 @@ void App::drawPartsContents() {
         if (ImGui::MenuItem(tr("Cube"))) append("cube");
         if (ImGui::MenuItem(tr("Plane"))) append("plane");
         for (const char* t : {"cylinder", "cone", "torus", "capsule", "pipe", "icosphere", "quadsphere"}) { // #31
-            if (ImGui::MenuItem(primitiveLabel(t))) append(t);
+            if (ImGui::MenuItem(tr(primitiveLabel(t)))) append(t);
         }
         ImGui::Separator();
         if (ImGui::BeginMenu(tr("Insert on the model"))) { // #34: drag on the surface to place it
