@@ -25,7 +25,7 @@ Generate for form, remesh for topology: one pass is never asked to deliver both.
    with one subdivision level that holds the detail; the model as generated stays as a hidden Part, to Project Detail
    from later. **Reference** keeps the pick exactly as generated, every triangle, at full fidelity.
 5. Every Part an AI made carries a provenance tag (model, host, date, pass): hover it in the Parts list. It is saved in
-   projects and kept in glTF, USD and OBJ exports ([AI services and privacy](../ai-services.md#provenance-tag-on-ai-output)).
+   projects and kept in glTF, USD and OBJ exports ([AI services and privacy](https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md#provenance-tag-on-ai-output)).
 
 Nothing leaves your computer until you choose a hosted service and press **Generate 3D model**. For exactly
 what is sent where, see [AI services and privacy](#privacy-and-model-licences) below.
@@ -101,7 +101,7 @@ Quad Remesh takes about 10 to 25 seconds on a typical model; the progress bar sh
 Every Part an AI made carries a **provenance tag**: hover it in the Parts list and the tooltip ends with
 "AI: Hunyuan3D 2.1 (Tencent), tencent-hunyuan3d-2-1.hf.space, 2026-11-23 (sculpting base)". The tag follows Duplicate,
 Split and linked copies, is saved in projects and kept in glTF, USD and OBJ exports; see
-[AI services and privacy](../ai-services.md#provenance-tag-on-ai-output).
+[AI services and privacy](https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md#provenance-tag-on-ai-output).
 
 ### Pictures that work well
 
