@@ -5193,7 +5193,8 @@ glm::vec2 App::axisGizmoCentre() const {
     // 10 px from the canvas edges.
     const CanvasRect canvas = canvasRect();
     const float r = kAxisGizmoDisc * axisGizmoUnit() + 10.0f * uiScale_;
-    return glm::vec2(canvas.x + r, canvas.y + timelineTopInset_ + r);
+    // Draw > Camera > Corner gizmo > Position: the top left (as always), or the top right.
+    return glm::vec2(orientationWidgetCentreX(uiPrefs_.cornerPosition, canvas.x, canvas.w, r), canvas.y + timelineTopInset_ + r);
 }
 
 std::array<AxisGizmoEnd, 6> App::axisGizmoLayout() const {
@@ -5216,7 +5217,7 @@ glm::vec2 App::viewFigureCentre() const {
     // In the axes' place when they are off, else just below them (and the view's name under them).
     const CanvasRect canvas = canvasRect();
     const float r = viewFigureRadius();
-    const float x = canvas.x + 18.0f * uiScale_ + r;
+    const float x = orientationWidgetCentreX(uiPrefs_.cornerPosition, canvas.x, canvas.w, 18.0f * uiScale_ + r); // (the gizmo's corner)
     if (!uiPrefs_.showAxes) return glm::vec2(x, canvas.y + timelineTopInset_ + 18.0f * uiScale_ + r);
     const glm::vec2 c = axisGizmoCentre();
     return glm::vec2(x, c.y + kAxisGizmoDisc * axisGizmoUnit() + axisGizmoLabelHeight() + r);

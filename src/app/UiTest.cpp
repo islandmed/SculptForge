@@ -604,26 +604,6 @@ template <class T> bool busy(const std::future<T>& f) {
     return f.valid() && f.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
 }
 
-// nav_click's target: a side's name, or signed axes ("+x", "+x-z", "+x+y+z"), to a -1 / 0 / +1 direction.
-bool parseNavTarget(const std::string& s, glm::ivec3& d) {
-    d = glm::ivec3(0);
-    static const std::pair<const char*, glm::ivec3> names[6] = {{"front", {0, 0, 1}}, {"back", {0, 0, -1}}, {"right", {1, 0, 0}},
-                                                                 {"left", {-1, 0, 0}}, {"top", {0, 1, 0}},   {"bottom", {0, -1, 0}}};
-    for (const auto& [name, dir] : names)
-        if (s == name) {
-            d = dir;
-            return true;
-        }
-    if (s.empty() || s.size() % 2) return false;
-    for (size_t i = 0; i + 1 < s.size(); i += 2) {
-        const int sign = s[i] == '+' ? 1 : s[i] == '-' ? -1 : 0;
-        const int axis = s[i + 1] == 'x' ? 0 : s[i + 1] == 'y' ? 1 : s[i + 1] == 'z' ? 2 : -1;
-        if (!sign || axis < 0 || d[axis] != 0) return false;
-        d[axis] = sign;
-    }
-    return true;
-}
-
 bool compare(double a, const std::string& op, double b) {
     if (op == "==") return std::abs(a - b) < 1e-6;
     if (op == "!=") return std::abs(a - b) >= 1e-6;
@@ -1617,11 +1597,13 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "axis_gizmo_length") return double(34.0f * app_.axisGizmoUnit() / std::max(app_.uiScale_, 0.01f));
     if (name == "view_figure") return app_.uiPrefs_.showViewFigure ? 1.0 : 0.0;
     // Draw > Camera > Corner gizmo (CornerGizmo.cpp): the widget shows (the preference, else by layout); what the corner
-    // shows (0 hidden, 1 the axes, 2 the orientation widget); the face (1), edge (2) or corner (3) under the pointer;
-    // an eased camera turn running.
+    // shows (0 hidden, 1 the axes, 2 the orientation widget); which corner and where the disc is; the dot under the
+    // pointer; an eased camera turn running.
     if (name == "orientation_widget") return app_.uiPrefs_.showAxes && app_.orientationWidgetOn() ? 1.0 : 0.0;
     if (name == "corner_gizmo") return !app_.uiPrefs_.showAxes ? 0.0 : app_.orientationWidgetOn() ? 2.0 : 1.0;
-    if (name == "nav_hover") return double(app_.orientationWidgetHover(mouse_.x, mouse_.y).axes);
+    if (name == "corner_position") return double(app_.uiPrefs_.cornerPosition);
+    if (name == "axis_gizmo_x") return double(app_.axisGizmoCentre().x);
+    if (name == "nav_hover_end") return double(app_.orientationWidgetHover(mouse_.x, mouse_.y)); // the dot under the pointer, -1 none
     if (name == "camera_moving") return app_.cameraMoving() ? 1.0 : 0.0;
     // The side view the axis gizmo names under it (0-5: +X +Y +Z -X -Y -Z, as axis_click), -1 between views.
     if (name == "axis_view") return double(axisGizmoAligned(app_.axisGizmoLayout()));
@@ -2129,7 +2111,7 @@ void Demo::testKey(int line, const std::string& combo, int phase) {
 enum class StepVerb { None,
     SafeArea, AndroidBack, TouchDragAt, TouchTap,
     Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
-    AxisDrag, NavClick, NavDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
+    AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
     Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
@@ -2163,8 +2145,6 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"axis_click", StepVerb::AxisClick},
         {"axis_drag", StepVerb::AxisDrag}, {"axis_hover", StepVerb::AxisDrag},
         {"view_figure_click", StepVerb::ViewFigureClick},
-        {"nav_click", StepVerb::NavClick}, {"nav_double_click", StepVerb::NavClick},
-        {"nav_hover", StepVerb::NavDrag}, {"nav_drag", StepVerb::NavDrag},
         {"click_part", StepVerb::ClickPart},
         {"drag", StepVerb::Drag},
         {"button_drag", StepVerb::ButtonDrag},
@@ -2627,7 +2607,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         break;
     }
     case StepVerb::AxisClick: {
-        // axis_click +x|-x|+y|-y|+z|-z: click that end of the axis gizmo (Draw > Camera > Axes, #43)
+        // axis_click +x|-x|+y|-y|+z|-z [double]: click that end of the axis gizmo (Draw > Camera > Axes, #43), or of the
+        // orientation widget; "double": a double-click (the second press as SDL counts it)
         if (!need(1)) return false;
         static const char* const names[6] = {"+x", "+y", "+z", "-x", "-y", "-z"};
         const auto found = std::find_if(std::begin(names), std::end(names), [&](const char* n) { return w[1] == n; });
@@ -2642,6 +2623,22 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             *at = ImVec2(e.at.x, e.at.y);
         });
         stroke([at](float) { return *at; }, 0.2f);
+        if (w.size() > 2 && w[2] == "double")
+            steps_.push_back([this](float) {
+                SDL_Event e{};
+                e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+                e.button.windowID = SDL_GetWindowID(app_.window_);
+                e.button.button = SDL_BUTTON_LEFT;
+                e.button.down = true;
+                e.button.clicks = 2;
+                e.button.x = mouse_.x;
+                e.button.y = mouse_.y;
+                app_.handleEvent(e);
+                e.type = SDL_EVENT_MOUSE_BUTTON_UP;
+                e.button.down = false;
+                app_.handleEvent(e);
+                return true;
+            });
         run([this] { SDL_SetModState(held_); });
         wait(0.1f);
         break;
@@ -2684,81 +2681,6 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             }
         });
         if (verb == "axis_hover") {
-            run([this, from] { mouseMotion(from->x, from->y); });
-            wait(0.15f);
-        } else {
-            stroke([this, from, dx, dy](float u) {
-                const float s = app_.uiScale_;
-                return ImVec2(from->x + dx * s * u, from->y + dy * s * u);
-            }, 0.4f);
-            run([this] { SDL_SetModState(held_); });
-            wait(0.1f);
-        }
-        break;
-    }
-    case StepVerb::NavClick: {
-        // nav_click TARGET / nav_double_click TARGET: click (twice) the orientation widget's face, edge or corner
-        // (Draw > Camera > Corner gizmo > Orientation). TARGET: front, back, left, right, top, bottom, or signed axes
-        // such as +x, +x+z (an edge), +x+y+z (a corner); it has to face the viewer.
-        if (!need(1)) return false;
-        glm::ivec3 d(0);
-        if (!parseNavTarget(w[1], d)) {
-            error = verb + " takes front, back, left, right, top, bottom or signed axes like +x+z";
-            return false;
-        }
-        const bool twice = verb == "nav_double_click";
-        auto at = std::make_shared<ImVec2>();
-        run([this, at, d] {
-            const OrientationWidgetPoint p = orientationWidgetProject(glm::mat3(app_.camera_.view()), app_.axisGizmoCentre(),
-                                                                      kOrientationWidgetHalf * app_.axisGizmoUnit(), glm::vec3(d) * 0.97f); // (a hair inside: never on the silhouette)
-            *at = ImVec2(p.at.x, p.at.y);
-        });
-        stroke([at](float) { return *at; }, 0.2f);
-        if (twice) // the second press, as SDL counts it
-            steps_.push_back([this](float) {
-                SDL_Event e{};
-                e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
-                e.button.windowID = SDL_GetWindowID(app_.window_);
-                e.button.button = SDL_BUTTON_LEFT;
-                e.button.down = true;
-                e.button.clicks = 2;
-                e.button.x = mouse_.x;
-                e.button.y = mouse_.y;
-                app_.handleEvent(e);
-                e.type = SDL_EVENT_MOUSE_BUTTON_UP;
-                e.button.down = false;
-                app_.handleEvent(e);
-                return true;
-            });
-        run([this] { SDL_SetModState(held_); });
-        wait(0.1f);
-        break;
-    }
-    case StepVerb::NavDrag: {
-        // nav_drag DX DY: a left-drag starting on the orientation widget's cube (it orbits, no click);
-        // nav_hover TARGET|disc: the pointer resting on a face, edge, corner or the disc beside the cube (the hover look)
-        if (!need(verb == "nav_drag" ? 2 : 1)) return false;
-        glm::ivec3 d(0);
-        const bool disc = verb == "nav_drag" || w[1] == "disc";
-        if (!disc && !parseNavTarget(w[1], d)) {
-            error = "nav_hover takes front, back, left, right, top, bottom, signed axes like +x+z, or disc";
-            return false;
-        }
-        const float dx = verb == "nav_drag" ? num(1, 0.0f) : 0.0f, dy = verb == "nav_drag" ? num(2, 0.0f) : 0.0f;
-        auto from = std::make_shared<ImVec2>();
-        run([this, from, d, disc, drag = verb == "nav_drag"] {
-            const glm::vec2 c = app_.axisGizmoCentre();
-            if (drag) *from = ImVec2(c.x, c.y); // on the cube's middle: a drag there orbits, a click would turn
-            else if (disc) { // lower left of the disc, outside the cube (its farthest corner reaches 0.73 of the disc)
-                const float r = kAxisGizmoDisc * app_.axisGizmoUnit() * 0.9f;
-                *from = ImVec2(c.x - r * 0.7071f, c.y + r * 0.7071f);
-            } else {
-                const OrientationWidgetPoint p = orientationWidgetProject(glm::mat3(app_.camera_.view()), c,
-                                                                          kOrientationWidgetHalf * app_.axisGizmoUnit(), glm::vec3(d) * 0.97f); // (a hair inside: never on the silhouette)
-                *from = ImVec2(p.at.x, p.at.y);
-            }
-        });
-        if (verb == "nav_hover") {
             run([this, from] { mouseMotion(from->x, from->y); });
             wait(0.15f);
         } else {
@@ -5485,7 +5407,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
             }
             static const std::set<std::string> allowed = {
                 "click", "double_click", "right_click", "hover", "hover_model", "hover_window", "type", "type_here", "key", "key_down",
-                "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click", "nav_click", "nav_double_click", "nav_hover", "nav_drag",
+                "key_up", "hold", "stroke", "view_drag", "drag_frames", "axis_click", "axis_hover", "axis_drag", "view_figure_click",
                 "click_part", "drag", "button_drag", "drag_landmark", "gizmo_hover", "gizmo_drag", "stroke_popup_item",
                 "drag_item", "drag_to", "drag_item_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
                 "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover", "pen_move",

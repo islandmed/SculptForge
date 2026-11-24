@@ -1138,9 +1138,20 @@ constexpr Entry kJapanese[] = {
     {"Corner gizmo: the X / Y / Z axes in the corner of the canvas. Click an end to look from that side, drag the disc "
      "to orbit.",
      "コーナーギズモ: キャンバスの隅の X / Y / Z 軸。端をクリックするとその側から見ます。ディスクをドラッグすると回転します。"},
-    {"Corner gizmo: the orientation widget, a small cube that turns with the view. Click a face, edge or corner to turn "
-     "the camera there with a short move, drag it to orbit, double-click to frame the model.",
-     "コーナーギズモ: 方向ウィジェット。ビューと一緒に回る小さな立方体です。面・辺・角をクリックするとカメラが短い動きでそこへ向きます。ドラッグで回転、ダブルクリックでモデルをフレームに収めます。"},
+    {"Corner gizmo: the orientation widget, the axes through a glass ball with a dot at each end. Click a dot to look from "
+     "that side with a short move (the dot facing you again: the opposite side), drag it to orbit, double-click to frame "
+     "the model.",
+     "コーナーギズモ: 方向ウィジェット。ガラスの球を通る軸で、各端に点があります。点をクリックするとその側から短い動きで見ます（自分を向いている点をもう一度: 反対側）。ドラッグで回転、ダブルクリックでモデルをフレームに収めます。"},
+    {"Position",
+     "位置"},
+    {"Top left",
+     "左上"},
+    {"Top right",
+     "右上"},
+    {"Position: the corner gizmo and the View Figure at the top left of the canvas.",
+     "位置: コーナーギズモとビューフィギュアをキャンバスの左上に。"},
+    {"Position: the corner gizmo and the View Figure at the top right of the canvas.",
+     "位置: コーナーギズモとビューフィギュアをキャンバスの右上に。"},
     {"Corner gizmo: nothing in the corner of the canvas.",
      "コーナーギズモ: キャンバスの隅に何も表示しません。"},
     {"Top view",

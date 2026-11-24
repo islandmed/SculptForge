@@ -2745,12 +2745,13 @@ private:
     void drawNavName(ImDrawList* dl, glm::vec2 centre, float radius, const char* text, bool light); // under the disc
     int navLockAxis() const; // View > Orbit lock's axis (0 X, 1 Y, 2 Z), -1 free
     void drawNavLockBadge(ImDrawList* dl, glm::vec2 centre, float radius, int lockAxis, bool light);
-    void drawOrientationWidget(ImDrawList* dl, glm::vec2 centre, float discRadius, bool light, const OrientationWidgetPick& hover);
-    OrientationWidgetPick orientationWidgetHover(float x, float y) const; // the face / edge / corner under (x, y)
+    void drawOrientationWidget(ImDrawList* dl, glm::vec2 centre, float discRadius, bool light, const std::array<AxisGizmoEnd, 6>& ends,
+                               int hoverEnd, int lockAxis);
+    int orientationWidgetHover(float x, float y) const; // the dot under (x, y): an end 0-5 (+X +Y +Z -X -Y -Z), -1 none
     bool cornerGizmoMouseDown(float x, float y);  // the axes' ends and disc, or the widget's press (NavWidget)
     void navWidgetMove(float x, float y, float dx, float dy, bool fromPen); // past the slop: an orbit
     void navWidgetRelease();                      // no drag: the click (turn there) or double-click (frame)
-    void navWidgetClick(const OrientationWidgetPick& pick, int clicks);
+    void navWidgetClick(int end, int clicks);
     // The eased camera turn (orientation only; target and distance stay): yaw / pitch / roll from where the view is
     // to the view asked for over kOrientationWidgetMoveSeconds; instant with Reduce motion. Any other change to the
     // camera meanwhile (an orbit, a numpad step) ends it where it is.
@@ -2759,7 +2760,7 @@ private:
     void cancelCameraMove() { cameraMove_.active = false; }
     bool cameraMoving() const { return cameraMove_.active; }
     struct NavPress { // a press on the orientation widget, until it moves or lets go
-        OrientationWidgetPick pick;
+        int end = -1; // the dot pressed (0-5), -1 the disc beside them
         float x = 0.0f, y = 0.0f;
         int clicks = 1;
     } navPress_;

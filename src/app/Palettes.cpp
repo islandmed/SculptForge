@@ -521,6 +521,8 @@ void App::drawPalette_Draw() {
         // widget (the SculptForge layout's), or hidden. The View Figure sits under either.
         hint(*this, "Corner gizmo");
         segmented(*this, {"view.corner_axes", "view.corner_widget", "view.corner_off"});
+        hint(*this, "Position");
+        segmented(*this, {"view.corner_top_left", "view.corner_top_right"});
         ui::Checkbox("View Figure##draw.view_figure", &uiPrefs_.showViewFigure);
         ui::HelpText("View Figure", nullptr,
                      "Show a small shaded head in the corner of the canvas that turns with the view. Click it to look "

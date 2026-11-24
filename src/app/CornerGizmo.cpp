@@ -1,12 +1,13 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// The corner gizmo (Draw > Camera > Corner gizmo): the soft disc in the canvas corner with either the X / Y / Z axes
-// (drawAxisGizmo, App.cpp) or the orientation widget, a small cube that turns with the view (OrientationWidget.h).
-// Click one of the cube's faces, edges or corners to turn the camera to that view with a short eased move, drag it
-// to orbit, double-click to frame the model. The Classic layout shows the axes by default, the SculptForge layout
-// the widget; the preference picks either, or hides the corner. Our own look: dark tinted glass shaded by a fixed
-// light, the forge accent under the pointer, the views' names in our words under the disc.
+// The corner gizmo (Draw > Camera > Corner gizmo): the soft disc in a top corner of the canvas with either the X / Y / Z
+// axes (drawAxisGizmo, App.cpp) or the orientation widget: the same axes through a ball of dark glass, a dot at each
+// end and no letters (OrientationWidget.h). Click a dot to turn the camera to look from that side with a short eased
+// move (the dot facing you again: the opposite side), drag the widget to orbit, double-click to frame the model. The
+// Classic layout shows the axes by default, the SculptForge layout the widget; the preference picks either, hides the
+// corner, or moves it to the top right. Our own look: dark glass, the forge accent under the pointer, the sides'
+// names in our words under the disc.
 #include "app/App.h"
 #include "app/I18n.h"
 #include "app/Theme.h"
@@ -27,46 +28,9 @@ ImU32 withAlpha(ImU32 col, float a) {
     return (col & 0x00ffffffu) | (ImU32(std::clamp(a, 0.0f, 1.0f) * 255.0f + 0.5f) << 24);
 }
 
-ImU32 mixColour(ImU32 a, ImU32 b, float t) {
-    t = std::clamp(t, 0.0f, 1.0f);
-    const int r = int(((a >> IM_COL32_R_SHIFT) & 255) * (1.0f - t) + ((b >> IM_COL32_R_SHIFT) & 255) * t + 0.5f);
-    const int g = int(((a >> IM_COL32_G_SHIFT) & 255) * (1.0f - t) + ((b >> IM_COL32_G_SHIFT) & 255) * t + 0.5f);
-    const int bl = int(((a >> IM_COL32_B_SHIFT) & 255) * (1.0f - t) + ((b >> IM_COL32_B_SHIFT) & 255) * t + 0.5f);
-    return IM_COL32(r, g, bl, 255);
-}
-
-ImU32 scaleColour(ImU32 c, float k) {
-    const int r = int(std::clamp(((c >> IM_COL32_R_SHIFT) & 255) * k, 0.0f, 255.0f));
-    const int g = int(std::clamp(((c >> IM_COL32_G_SHIFT) & 255) * k, 0.0f, 255.0f));
-    const int b = int(std::clamp(((c >> IM_COL32_B_SHIFT) & 255) * k, 0.0f, 255.0f));
-    return IM_COL32(r, g, b, 255);
-}
-
 constexpr ImU32 kAxisColours[3] = {IM_COL32(236, 84, 92, 255), IM_COL32(124, 196, 64, 255), IM_COL32(64, 140, 236, 255)};
 constexpr const char* kAxisNames[3] = {"X", "Y", "Z"};
 constexpr ImU32 kAccent = IM_COL32(240, 136, 46, 255); // theme::accent, the forge ember
-
-// The corner index (bit 1 +X, 2 +Y, 4 +Z) of a cube point by its signs.
-int cornerIndex(float x, float y, float z) { return (x > 0.0f ? 1 : 0) | (y > 0.0f ? 2 : 0) | (z > 0.0f ? 4 : 0); }
-
-// How wide (horizontal = true) or tall a convex quad is along the line through `at`: the room a label has there.
-float quadChord(const ImVec2 quad[4], ImVec2 at, bool horizontal) {
-    float lo = 1e9f, hi = -1e9f;
-    for (int k = 0; k < 4; ++k) {
-        const ImVec2& a = quad[k];
-        const ImVec2& b = quad[(k + 1) % 4];
-        const float a1 = horizontal ? a.y : a.x, b1 = horizontal ? b.y : b.x, line = horizontal ? at.y : at.x;
-        if ((a1 <= line) == (b1 <= line)) continue; // the edge does not cross the line
-        const float t = (line - a1) / (b1 - a1);
-        const float x = horizontal ? a.x + (b.x - a.x) * t : a.y + (b.y - a.y) * t;
-        lo = std::min(lo, x);
-        hi = std::max(hi, x);
-    }
-    return hi > lo ? hi - lo : 0.0f;
-}
-
-// A side's name in the interface language.
-std::string sideLabel(int axis, bool negative) { return tr(orientationWidgetSideName(axis, negative)); }
 
 } // namespace
 
@@ -113,9 +77,9 @@ void App::drawNavLockBadge(ImDrawList* dl, glm::vec2 c, float radius, int lockAx
     dl->AddText(font, size, ImVec2(a.x + padX + iconSize.x + gap, a.y + padY), kAxisColours[lockAxis], kAxisNames[lockAxis]);
 }
 
-OrientationWidgetPick App::orientationWidgetHover(float x, float y) const {
-    if (!uiPrefs_.showAxes || !orientationWidgetOn()) return {};
-    return orientationWidgetPick(glm::mat3(camera_.view()), axisGizmoCentre(), kOrientationWidgetHalf * axisGizmoUnit(), x, y);
+int App::orientationWidgetHover(float x, float y) const {
+    if (!uiPrefs_.showAxes || !orientationWidgetOn()) return -1;
+    return axisGizmoHit(axisGizmoLayout(), x, y, kAxisGizmoHitRadius * axisGizmoUnit());
 }
 
 void App::drawCornerGizmo() {
@@ -129,143 +93,88 @@ void App::drawCornerGizmo() {
     const float discR = kAxisGizmoDisc * unit;
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     const bool light = viewBackgroundLight();
-    // The target under the pointer lights up; a pressed one stays lit until the pointer drags it away.
+    // The dot under the pointer lights up; a pressed one stays lit until the pointer drags it away.
     const bool free = !ImGui::GetIO().WantCaptureMouse && drag_ == Drag::None;
-    OrientationWidgetPick hover;
-    if (drag_ == Drag::NavWidget) hover = navPress_.pick;
+    int hover = -1;
+    if (drag_ == Drag::NavWidget) hover = navPress_.end;
     else if (free) hover = orientationWidgetHover(mouse.x, mouse.y);
-    const bool onDisc = drag_ == Drag::NavWidget || (free && (hover.hit() || axisGizmoOnDisc(c, discR, mouse.x, mouse.y)));
+    const bool onDisc = drag_ == Drag::NavWidget || (free && (hover >= 0 || axisGizmoOnDisc(c, discR, mouse.x, mouse.y)));
     drawNavDisc(dl, c, discR, onDisc, light);
-
-    // The locked axis (View > Orbit lock), end to end through the disc under the cube.
+    const auto ends = axisGizmoLayout();
     const int lockAxis = navLockAxis();
-    const glm::mat3 rot(camera_.view());
-    if (lockAxis >= 0) {
-        glm::vec3 axis(0.0f);
-        axis[lockAxis] = 1.0f;
-        const glm::vec3 d = rot * axis;
-        const glm::vec2 s = glm::vec2(d.x, -d.y) * (discR - 3.0f * unit);
-        dl->AddLine(ImVec2(c.x - s.x, c.y - s.y), ImVec2(c.x + s.x, c.y + s.y), withAlpha(kAxisColours[lockAxis], 0.55f), 1.5f * unit);
-    }
+    drawOrientationWidget(dl, c, discR, light, ends, hover, lockAxis);
 
-    drawOrientationWidget(dl, c, discR, light, hover);
-
-    // Under the disc: the side(s) under the pointer ("Right / Top / Front"), else the exact side view's name.
-    std::string name;
-    if (hover.hit()) {
-        for (int a = 0; a < 3; ++a) {
-            if (hover.direction[a] == 0) continue;
-            if (!name.empty()) name += " / ";
-            name += sideLabel(a, hover.direction[a] < 0);
-        }
-    } else if (const int aligned = axisGizmoAligned(axisGizmoLayout()); aligned >= 0) {
-        name = tr(axisGizmoView(aligned % 3, aligned >= 3).label);
-    }
-    if (!name.empty()) drawNavName(dl, c, discR, name.c_str(), light);
+    // Under the disc: the side under the pointer ("Right"), else the exact side view's name ("Right view").
+    const char* name = nullptr;
+    if (hover >= 0) name = tr(orientationWidgetSideName(ends[size_t(hover)].axis, ends[size_t(hover)].negative));
+    else if (const int aligned = axisGizmoAligned(ends); aligned >= 0) name = tr(axisGizmoView(aligned % 3, aligned >= 3).label);
+    if (name) drawNavName(dl, c, discR, name, light);
     if (lockAxis >= 0) drawNavLockBadge(dl, c, discR, lockAxis, light);
 }
 
-void App::drawOrientationWidget(ImDrawList* dl, glm::vec2 c, float /*discRadius*/, bool light, const OrientationWidgetPick& hover) {
-    // A cube of dark tinted glass: each face carries its axis family's colour (X red, Y green, Z blue, as the axes),
-    // shaded by a fixed light from the upper left so it reads as a solid; hairline edges, dots at the corners; the
-    // sides' names on the faces that have room for them. The face, edge or corner under the pointer glows in the
-    // accent. Only what faces the viewer is drawn (a convex solid: no sorting needed).
+void App::drawOrientationWidget(ImDrawList* dl, glm::vec2 c, float discR, bool light, const std::array<AxisGizmoEnd, 6>& layout,
+                                int hover, int lockAxis) {
+    // The three axes through a ball of dark glass: the far halves and their dots first, then the ball (shaded from the
+    // upper left, a soft highlight), then the near halves and dots on top, so the ball hides what runs behind it. A
+    // positive end is a dot in its axis colour, a negative end a smaller, dimmer one; the far ends shrink and fade as
+    // the axes' do. No letters: the side's name shows under the disc as the pointer rests on a dot. The dot under the
+    // pointer glows in the accent with a bright ring.
     const float unit = axisGizmoUnit();
-    const float half = kOrientationWidgetHalf * unit;
-    const glm::mat3 rot(camera_.view());
-    const auto corners = orientationWidgetCorners(rot, c, half);
-    const glm::vec3 lightDir = glm::normalize(glm::vec3(-0.35f, 0.55f, 0.75f));
-    const ImU32 glass = light ? IM_COL32(58, 60, 68, 255) : IM_COL32(50, 53, 60, 255);
-    const ImU32 lineCol = light ? IM_COL32(20, 20, 24, 255) : IM_COL32(255, 255, 255, 255);
-    ImFont* font = fontBold_ ? fontBold_ : ImGui::GetFont();
-    const float fontSize = ImGui::GetFontSize() * 0.78f * std::min(1.0f, unit / std::max(uiScale_, 0.01f));
+    const float ballR = kOrientationWidgetBall * unit;
+    const ImVec2 centre(c.x, c.y);
+    auto ends = layout;
+    std::sort(ends.begin(), ends.end(), [](const AxisGizmoEnd& a, const AxisGizmoEnd& b) { return a.depth < b.depth; });
+    const ImU32 ringCol = light ? IM_COL32(20, 20, 24, 220) : IM_COL32(255, 255, 255, 230);
 
-    bool faceVisible[6]; // index: axis + 3 * negative
-    for (int a = 0; a < 3; ++a)
-        for (int neg = 0; neg < 2; ++neg) faceVisible[a + 3 * neg] = orientationWidgetFaceVisible(rot, a, neg != 0);
-    auto faceIsVisible = [&](int axis, float sign) { return faceVisible[axis + (sign < 0.0f ? 3 : 0)]; };
-
-    // Faces.
-    for (int a = 0; a < 3; ++a)
-        for (int neg = 0; neg < 2; ++neg) {
-            if (!faceVisible[a + 3 * neg]) continue;
-            const float s = neg ? -1.0f : 1.0f;
-            const int b = (a + 1) % 3, d = (a + 2) % 3;
-            glm::vec3 n(0.0f);
-            n[a] = s;
-            ImVec2 quad[4];
-            static constexpr float cyc[4][2] = {{-1.0f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 1.0f}};
-            for (int k = 0; k < 4; ++k) {
-                glm::vec3 p(0.0f);
-                p[a] = s;
-                p[b] = cyc[k][0];
-                p[d] = cyc[k][1];
-                const OrientationWidgetPoint& q = corners[size_t(cornerIndex(p.x, p.y, p.z))];
-                quad[k] = ImVec2(q.at.x, q.at.y);
+    // The locked axis (View > Orbit lock), end to end through the disc, under everything.
+    if (lockAxis >= 0)
+        for (const AxisGizmoEnd& e : layout)
+            if (e.axis == lockAxis && !e.negative) {
+                const glm::vec2 d = (e.at - c) * ((discR - 3.0f * unit) / (kAxisGizmoLength * unit));
+                dl->AddLine(ImVec2(c.x - d.x, c.y - d.y), ImVec2(c.x + d.x, c.y + d.y), withAlpha(kAxisColours[lockAxis], 0.55f), 1.5f * unit);
             }
-            const glm::vec3 nv = rot * n;
-            const float lit = 0.62f + 0.38f * std::max(0.0f, glm::dot(nv, lightDir));
-            const bool isHover = hover.axes == 1 && hover.direction[a] == int(s) && hover.direction[b] == 0 && hover.direction[d] == 0;
-            ImU32 col = scaleColour(mixColour(glass, kAxisColours[a], 0.34f), lit);
-            if (isHover) col = mixColour(col, kAccent, 0.72f);
-            dl->AddConvexPolyFilled(quad, 4, withAlpha(col, 0.94f));
-            // The side's name, when it fits the face where it sits (the face's width and height through its centre on
-            // screen, so a foreshortened face's label never runs into its neighbour's).
-            if (nv.z > 0.45f) {
-                const std::string label = sideLabel(a, neg != 0);
-                const char* text = label.c_str();
-                const ImVec2 ts = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text);
-                const OrientationWidgetPoint centre = orientationWidgetProject(rot, c, half, n);
-                const ImVec2 at(centre.at.x, centre.at.y);
-                if (ts.x <= 0.82f * quadChord(quad, at, true) && ts.y <= 0.9f * quadChord(quad, at, false)) {
-                    const ImU32 textCol = isHover ? IM_COL32(16, 16, 20, 240) : withAlpha(IM_COL32(236, 236, 240, 255), 0.55f + 0.45f * lit);
-                    dl->AddText(font, fontSize, ImVec2(std::round(centre.at.x - ts.x * 0.5f), std::round(centre.at.y - ts.y * 0.5f)), textCol, text);
-                }
-            }
-        }
 
-    // Edges: the 12 pairs of corners one bit apart, where a visible face borders them.
-    for (int i = 0; i < 8; ++i)
-        for (int bit = 0; bit < 3; ++bit) {
-            if (i & (1 << bit)) continue; // (each edge once, from its - end)
-            const int j = i | (1 << bit);
-            const glm::vec3 p = orientationWidgetCorner(i);
-            const int b = (bit + 1) % 3, d = (bit + 2) % 3;
-            if (!faceIsVisible(b, p[b]) && !faceIsVisible(d, p[d])) continue;
-            const ImVec2 p0(corners[size_t(i)].at.x, corners[size_t(i)].at.y), p1(corners[size_t(j)].at.x, corners[size_t(j)].at.y);
-            const bool isHover = hover.axes == 2 && hover.direction[bit] == 0 && hover.direction[b] == int(p[b]) && hover.direction[d] == int(p[d]);
-            if (isHover) {
-                dl->AddLine(p0, p1, kAccent, 3.0f * unit);
-                dl->AddCircleFilled(p0, 1.5f * unit, kAccent, 12);
-                dl->AddCircleFilled(p1, 1.5f * unit, kAccent, 12);
-            } else {
-                dl->AddLine(p0, p1, withAlpha(lineCol, light ? 0.35f : 0.30f), 1.0f * unit);
-            }
+    auto drawEnd = [&](const AxisGizmoEnd& e, bool near) {
+        const ImVec2 tip(e.at.x, e.at.y);
+        const float alpha = axisGizmoEndAlpha(e.depth) * (e.negative ? 0.75f : 1.0f);
+        const float r = orientationWidgetDotRadius(e, unit);
+        const ImU32 col = withAlpha(kAxisColours[e.axis], alpha);
+        const bool isHover = hover >= 0 && layout[size_t(hover)].axis == e.axis && layout[size_t(hover)].negative == e.negative;
+        // The rod from the ball's edge (near ends) or from the centre (far ends: the ball covers the rest) to the dot.
+        const glm::vec2 d = e.at - c;
+        const float len = glm::length(d);
+        if (len > 1.0f) {
+            const glm::vec2 from = near && len > ballR ? c + d * (ballR * 0.92f / len) : c;
+            const glm::vec2 to = c + d * (std::max(len - r, 0.0f) / len);
+            dl->AddLine(ImVec2(from.x, from.y), ImVec2(to.x, to.y), withAlpha(kAxisColours[e.axis], alpha * (near ? 0.9f : 0.6f)),
+                        (e.negative ? 1.4f : 2.0f) * unit);
         }
+        dl->AddCircleFilled(tip, r, isHover ? kAccent : col, 24);
+        if (!e.negative) // a glass highlight on the big dots
+            dl->AddCircleFilled(ImVec2(tip.x - r * 0.3f, tip.y - r * 0.3f), r * 0.32f, IM_COL32(255, 255, 255, int(70 * alpha)), 12);
+        if (isHover) dl->AddCircle(tip, r + 2.0f * unit, ringCol, 24, 1.5f * unit);
+    };
 
-    // Corners: a dot where a visible face has one; the one under the pointer glows.
-    for (int i = 0; i < 8; ++i) {
-        const glm::vec3 p = orientationWidgetCorner(i);
-        if (!faceIsVisible(0, p.x) && !faceIsVisible(1, p.y) && !faceIsVisible(2, p.z)) continue;
-        const ImVec2 at(corners[size_t(i)].at.x, corners[size_t(i)].at.y);
-        const bool isHover = hover.axes == 3 && hover.direction == glm::ivec3(int(p.x), int(p.y), int(p.z));
-        if (isHover) {
-            dl->AddCircleFilled(at, 3.0f * unit, kAccent, 16);
-            dl->AddCircle(at, 4.6f * unit, withAlpha(light ? IM_COL32(20, 20, 24, 255) : IM_COL32(255, 255, 255, 255), 0.85f), 16, 1.2f * unit);
-        } else {
-            dl->AddCircleFilled(at, 1.5f * unit, withAlpha(lineCol, 0.55f), 12);
-        }
-    }
+    for (const AxisGizmoEnd& e : ends)
+        if (e.depth < 0.0f) drawEnd(e, false);
+    // The ball: dark glass with a rim and a highlight towards the light.
+    const ImU32 glass = light ? IM_COL32(62, 64, 72, 235) : IM_COL32(44, 47, 54, 235);
+    dl->AddCircleFilled(centre, ballR, glass, 40);
+    dl->AddCircleFilled(ImVec2(c.x - ballR * 0.3f, c.y - ballR * 0.32f), ballR * 0.42f, IM_COL32(255, 255, 255, 34), 24);
+    dl->AddCircle(centre, ballR, light ? IM_COL32(20, 20, 24, 90) : IM_COL32(255, 255, 255, 60), 40, 1.0f * uiScale_);
+    for (const AxisGizmoEnd& e : ends)
+        if (e.depth >= 0.0f) drawEnd(e, true);
 }
 
 bool App::cornerGizmoMouseDown(float x, float y) {
-    // The orientation widget takes a plain press anywhere on its disc: a click (release without moving) turns to
-    // the face, edge or corner under it, a double-click frames, a drag past the slop orbits (navWidgetMove). Alt /
-    // Ctrl / Shift presses keep their meaning (pan, mask, roll...). Without the widget, the axes (axisGizmoMouseDown).
+    // The orientation widget takes a plain press anywhere on its disc: a click (release without moving) on a dot turns
+    // to that side, a double-click frames, a drag past the slop orbits (navWidgetMove). Alt / Ctrl / Shift presses keep
+    // their meaning (pan, mask, roll...). Without the widget, the axes (axisGizmoMouseDown).
     if (uiPrefs_.showAxes && orientationWidgetOn()) {
         const bool plain = !((SDL_GetModState() | keyMods()) & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
-        if (plain && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * axisGizmoUnit(), x, y)) {
-            navPress_.pick = orientationWidgetHover(x, y);
+        const int end = orientationWidgetHover(x, y);
+        if (plain && (end >= 0 || axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * axisGizmoUnit(), x, y))) {
+            navPress_.end = end;
             navPress_.x = x;
             navPress_.y = y;
             navPress_.clicks = mouseClicks_;
@@ -286,11 +195,9 @@ void App::navWidgetMove(float x, float y, float /*dx*/, float /*dy*/, bool pen) 
     orbitBy(x, y, x - navPress_.x, y - navPress_.y, !pen);
 }
 
-void App::navWidgetRelease() {
-    navWidgetClick(navPress_.pick, navPress_.clicks);
-}
+void App::navWidgetRelease() { navWidgetClick(navPress_.end, navPress_.clicks); }
 
-void App::navWidgetClick(const OrientationWidgetPick& pick, int clicks) {
+void App::navWidgetClick(int end, int clicks) {
     if (clicks >= 2) { // a double-click frames, and only frames: the first click's turn eases back to where the view was
         if (navLastClick_.valid) {
             navLastClick_.valid = false;
@@ -301,16 +208,13 @@ void App::navWidgetClick(const OrientationWidgetPick& pick, int clicks) {
         if (const Action* a = actions_.find("view.frame"); a && a->run) a->run();
         return;
     }
-    if (!pick.hit()) return; // the disc beside the cube: nothing (a drag there orbits)
-    const glm::ivec3 target = orientationWidgetClickTarget(pick.direction, pick.axes, camera_.forward());
-    const OrientationWidgetView v = orientationWidgetView(target);
-    const bool face = pick.axes == 1;
+    if (end < 0) return; // the disc beside the dots: nothing (a drag there orbits)
+    const auto ends = axisGizmoLayout();
+    const int target = axisGizmoSnapEnd(ends, end); // the dot facing you again: the opposite side
+    if (target < 0) return;
+    const AxisGizmoView v = axisGizmoView(ends[size_t(target)].axis, ends[size_t(target)].negative);
     navLastClick_ = {true, camera_.ortho, autoOrtho_, camera_.yaw, camera_.pitch};
-    if (!face && autoOrtho_) { // an edge or corner view is a turned view: back to perspective, as orbiting does
-        camera_.ortho = false;
-        autoOrtho_ = false;
-    }
-    startCameraMove(glm::radians(v.yaw), glm::radians(v.pitch), face);
+    startCameraMove(glm::radians(v.yaw), glm::radians(v.pitch), true);
 }
 
 void App::startCameraMove(float yawRadians, float pitchRadians, bool orthoAtEnd) {
@@ -349,7 +253,7 @@ void App::animateCameraMove(float dt) {
         camera_.pitch = m.pitch1;
         camera_.roll = 0.0f;
         m.active = false;
-        if (m.orthoAtEnd && !camera_.ortho) { // a face: orthographic, as the numpad views (turning the view undoes it)
+        if (m.orthoAtEnd && !camera_.ortho) { // a side view: orthographic, as the numpad views (turning the view undoes it)
             camera_.ortho = true;
             autoOrtho_ = true;
         }
