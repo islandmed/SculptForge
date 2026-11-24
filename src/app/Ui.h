@@ -5,6 +5,7 @@
 #pragma once
 
 #include "app/Theme.h"
+#include "core/AiProvenance.h"
 
 #include <imgui.h>
 
@@ -19,6 +20,10 @@ class App;
 namespace sf::ui {
 
 enum class Look { Label, Icon, IconLabel, Tile };
+
+// A Part's AI provenance tag for the interface: "Hunyuan3D 2.1 (Tencent), tencent-hunyuan3d-2-1.hf.space, 2026-11-23
+// (sculpting base)", the pass translated; "" for a Part no AI made.
+std::string AiProvenanceText(const AiProvenance& ai);
 
 // Runs the action on click; toggles draw with the accent when checked(); shows Ctrl-hover help;
 // is a Ctrl+Alt drag source in customize mode. Ctrl+Alt+click (outside customize mode) assigns

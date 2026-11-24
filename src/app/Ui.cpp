@@ -25,6 +25,16 @@
 
 namespace sf::ui {
 
+std::string AiProvenanceText(const AiProvenance& ai) {
+    if (ai.empty()) return {};
+    AiProvenance shown = ai;
+    shown.role = ai.role == AiProvenance::kGenerated        ? tr("generated")
+                 : ai.role == AiProvenance::kSculptingBase ? tr("sculpting base")
+                 : ai.role == AiProvenance::kReference     ? tr("reference")
+                                                           : ai.role;
+    return shown.line();
+}
+
 namespace {
 
 // The Ctrl-help request for this frame: the last hovered item that asked for help wins.

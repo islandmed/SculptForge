@@ -218,7 +218,7 @@ void writeTransform(Writer& w, const glm::mat4& m, bool always = false) {
 }
 
 void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::string& prim, const std::string& material,
-               const MorphAnimation* animation, const glm::mat4& transform = glm::mat4(1.0f)) {
+               const MorphAnimation* animation, const glm::mat4& transform = glm::mat4(1.0f), const AiProvenance* ai = nullptr) {
     const bool skinned = !mesh.layers.empty();
     const std::string meshPath = skinned ? "/" + root + "/" + prim + "/Mesh" : "/" + root + "/" + prim;
     // Unique, valid prim names for the blend shapes, and the layer names as the shape tokens (a token may hold any text,
@@ -250,6 +250,22 @@ void writeMesh(Writer& w, const Mesh& mesh, const std::string& root, const std::
         writeTransform(w, transform);
     }
     w.line("def Mesh \"" + (skinned ? std::string("Mesh") : prim) + "\" (");
+    if (ai && !ai->empty()) { // the AI provenance tag (core/AiProvenance.h) as prim customData, where USD keeps such notes
+        auto str = [](std::string s) { // (a plain string literal: quotes, backslashes and controls become "_", as tokens do)
+            for (char& c : s)
+                if (c == '"' || c == '\\' || static_cast<unsigned char>(c) < 0x20) c = '_';
+            return "\"" + s + "\""; // (not quoted(): ADL on std::string would pick std::quoted here)
+        };
+        w.line("    customData = {");
+        w.line("        dictionary sculptforge_ai = {");
+        w.line("            string provider = " + str(ai->provider));
+        w.line("            string model = " + str(ai->model));
+        w.line("            string date = " + str(ai->date));
+        w.line("            string app = " + str(ai->app));
+        w.line("            string role = " + str(ai->role));
+        w.line("        }");
+        w.line("    }");
+    }
     w.line(skinned ? "    prepend apiSchemas = [\"SkelBindingAPI\", \"MaterialBindingAPI\"]"
                    : "    prepend apiSchemas = [\"MaterialBindingAPI\"]");
     w.line(")");
@@ -587,7 +603,7 @@ std::string buildUsda(const std::vector<MeshObjectRef>& meshes, const std::vecto
                 texturedMesh.push_back(i);
                 material = "/" + root + "/Materials/" + textured.back().first;
             }
-            writeMesh(w, *m.mesh, root, prim, material, animation, m.transform);
+            writeMesh(w, *m.mesh, root, prim, material, animation, m.transform, m.ai.empty() ? nullptr : &m.ai);
             w.s += '\n';
         }
         w.open("def Scope \"Materials\"");
