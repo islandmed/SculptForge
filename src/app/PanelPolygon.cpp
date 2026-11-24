@@ -413,8 +413,9 @@ void App::drawPolygonContents() {
     ui::ActionButton(*this, "polygon.mode", ImVec2(-1, 0), ui::Look::IconLabel);
     if (!polyMode_) {
         const std::string why = polyModeRefusal(doc_.mesh);
-        if (why.empty()) ImGui::TextDisabled("%s", tr("Polygon mode selects points, edges and faces of the Part to model with"));
-        else ImGui::TextWrapped("%s", why.c_str());
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)); // (wrapped: Classic's tray is narrower)
+        ImGui::TextWrapped("%s", why.empty() ? tr("Polygon mode selects points, edges and faces of the Part to model with") : why.c_str());
+        ImGui::PopStyleColor();
     }
     ImGui::BeginDisabled(!polyMode_);
     ui::Segmented(*this, {"polygon.points", "polygon.edges", "polygon.faces"});
