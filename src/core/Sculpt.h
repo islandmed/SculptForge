@@ -345,6 +345,17 @@ public:
     // No remeshing for the rest of this stroke: strokes that undo and re-stamp while dragging (DragRect,
     // DragDot; restoreStroke) put positions back, not topology. restoreStroke holds it too.
     void holdTopology() { topologyHeld_ = true; }
+    // The topology refresh gesture (Tool > Remesh: the Quick Remesh drag key held while dragging on the model): remeshes
+    // the stretched triangles within `radius` of `center` towards `edgeLength` without moving the surface (dynamic
+    // topology's remesher, refine only: no collapses, see DynamicTopology::refineOnly), whether or not dynamic topology
+    // is on. Inside a stroke (beginStroke ... endStroke, which returns the one undo step); the mask, hidden faces, face
+    // group borders and symmetry are respected as in dynamic topology. Returns false when nothing changed.
+    bool refreshTopologyDab(Mesh& mesh, BVH& bvh, const glm::vec3& center, float radius, float edgeLength, Symmetry sym);
+    // The edge length refreshTopologyDab aims for: dynamic topology's when it is on (as the brush would make), else the
+    // smaller of the typical edge around the brush (within three radii of `center`) and the Part's (core/QuickRemesh.h
+    // typicalEdgeLength): a dense face on a coarse body refreshes to the face's detail, a long tendril (everything near
+    // it stretched) to the Part's.
+    float refreshEdgeLength(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius) const;
 
     // Kelvinlet brushes (core/Kelvinlet.h, defined in Kelvinlet.cpp): one step of KelvinGrab / KelvinSnake
     // (step.delta), KelvinTwist (step.angle) or KelvinScale (step.logScale), mirrored by `sym`. dab() turns a plain

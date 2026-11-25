@@ -13,10 +13,12 @@
 #include <new>
 #include <numeric>
 #include <stdexcept>
+#include <unordered_map>
 
 #include "core/CloseHoles.h"
 #include "core/HardwareProfile.h"
 #include "core/MemoryGuard.h"
+#include "core/SurfaceQuery.h"
 #include "core/ThreadPool.h"
 #include "core/VoxelSparse.h"
 
@@ -1023,7 +1025,7 @@ VoxelRemeshEstimate estimateVoxelRemesh(const Mesh& mesh, int resolution, double
 
 namespace {
 Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, const std::function<bool(float)>& progress,
-                     bool allowSwap) {
+                     bool allowSwap, bool keepGroups) {
     VoxelGrid grid;
     // An open Part (a starter head's neck, an extracted shell): the flood fill would pour in through the opening and
     // leave only a thin, holed shell. Its borders are capped first, on a copy of just the positions and triangles.
@@ -1081,6 +1083,7 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
         if (open) dropSpecks(out, 64);
         if (!step(0.9f)) return {};
         transferVertexAttributes(source, out);
+        if (keepGroups) transferFaceGroups(source, out);
         step(1.0f);
         return out;
     }
@@ -1123,19 +1126,114 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
     if (open) dropSpecks(out, 64); // (a few voxels: never detail at a remesh resolution)
     if (out.triangleCount() == 0 && error) *error = "Remesh produced no surface";
     if (!step(0.9f)) return {};
-    // Mask and vertex paint follow the nearest original vertex; face groups, hidden
-    // flags and UVs don't survive a rebuild (everything becomes visible group 0).
+    // Mask and vertex paint follow the nearest original vertex; hidden flags and UVs don't survive a rebuild (everything
+    // becomes visible group 0), and face groups only with Keep Face Groups (the nearest original triangle's).
     // The original's quads don't either: the new surface is all quads of its own.
     transferVertexAttributes(source, out);
+    if (keepGroups) transferFaceGroups(source, out);
     step(1.0f);
     return out;
 }
 } // namespace
 
+void transferFaceGroups(const Mesh& source, Mesh& dst) {
+    if (!source.hasFaceGroups() || source.facegroups.size() != source.triangleCount() || dst.triangleCount() == 0 ||
+        source.triangleCount() == 0)
+        return;
+    TriangleBVH bvh;
+    bvh.build(source.positions, source.triangles);
+    if (bvh.empty()) return;
+    // Polygons: a quad pair counts once (its first triangle leads; the partner follows it).
+    const size_t nt = dst.triangleCount();
+    std::vector<uint32_t> lead(nt); // per triangle: itself, or the quad partner that leads it
+    std::vector<uint32_t> polys;    // the leading triangles
+    polys.reserve(nt);
+    const size_t nq = std::min(dst.quadPartners.size(), nt);
+    for (uint32_t t = 0; t < nt; ++t) {
+        const uint32_t u = t < nq ? dst.quadPartners[t] : Mesh::kNoQuad;
+        if (u < nq && u < t && dst.quadPartners[u] == t) {
+            lead[t] = u;
+            continue;
+        }
+        lead[t] = t;
+        polys.push_back(t);
+    }
+    auto centre = [&](uint32_t t) {
+        const glm::uvec3 a = dst.triangles[t];
+        glm::vec3 c = dst.positions[a.x] + dst.positions[a.y] + dst.positions[a.z];
+        const uint32_t u = t < nq ? dst.quadPartners[t] : Mesh::kNoQuad;
+        if (u < nt && lead[u] == t) { // the quad's four corners once each
+            const glm::uvec3 b = dst.triangles[u];
+            for (int k = 0; k < 3; ++k)
+                if (b[k] != a.x && b[k] != a.y && b[k] != a.z) return (c + dst.positions[b[k]]) * 0.25f;
+        }
+        return c / 3.0f;
+    };
+    const float reach = glm::length(source.bounds().extent()) + glm::length(dst.bounds().extent());
+    std::vector<uint32_t>& groups = dst.ensureFaceGroups(0u);
+    poolFor(polys.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const uint32_t t = polys[i];
+            SurfaceHit hit;
+            groups[t] = bvh.closestPoint(centre(t), reach, hit) ? source.facegroups[hit.prim] : 0u;
+        }
+    });
+    // Edge neighbours of each polygon (across its outer edges; a quad's diagonal joins its own halves): every edge with
+    // its polygon, sorted, so equal edges sit together (no hash map: a 5M-triangle result would be 15M node allocations).
+    struct EdgeRef {
+        uint64_t key;
+        uint32_t poly;
+    };
+    std::vector<EdgeRef> edges;
+    edges.reserve(nt * 3);
+    for (uint32_t t = 0; t < nt; ++t) {
+        const glm::uvec3 tri = dst.triangles[t];
+        for (int c = 0; c < 3; ++c) {
+            const uint32_t a = std::min(tri[c], tri[(c + 1) % 3]), b = std::max(tri[c], tri[(c + 1) % 3]);
+            edges.push_back({(uint64_t(a) << 32) | b, lead[t]});
+        }
+    }
+    std::sort(edges.begin(), edges.end(), [](const EdgeRef& x, const EdgeRef& y) { return x.key != y.key ? x.key < y.key : x.poly < y.poly; });
+    std::vector<std::array<uint32_t, 4>> nb(nt, {Mesh::kNoQuad, Mesh::kNoQuad, Mesh::kNoQuad, Mesh::kNoQuad});
+    std::vector<uint8_t> nbCount(nt, 0);
+    auto add = [&](uint32_t p, uint32_t q) { // (once per pair: two quads can share two edges around a valence-2 vertex)
+        for (uint8_t k = 0; k < nbCount[p]; ++k)
+            if (nb[p][k] == q) return;
+        if (nbCount[p] < 4) nb[p][nbCount[p]++] = q;
+    };
+    for (size_t i = 0; i < edges.size();) {
+        size_t j = i;
+        while (j < edges.size() && edges[j].key == edges[i].key) ++j;
+        for (size_t x = i; x < j; ++x)
+            for (size_t y = x + 1; y < j; ++y)
+                if (edges[x].poly != edges[y].poly) add(edges[x].poly, edges[y].poly), add(edges[y].poly, edges[x].poly);
+        i = j;
+    }
+    std::vector<EdgeRef>().swap(edges);
+    // Cleanup: a polygon whose group differs from every neighbour's, with the neighbours agreeing, takes theirs. Two
+    // passes catch a 2-polygon speck; a real sliver of a group (a ring one polygon wide) has neighbours of its own group.
+    for (int pass = 0; pass < 2; ++pass) {
+        std::vector<std::pair<uint32_t, uint32_t>> changes;
+        for (uint32_t t : polys) {
+            const uint8_t n = nbCount[t];
+            if (n < 3) continue;
+            const uint32_t g = groups[t];
+            uint32_t other = groups[nb[t][0]];
+            bool allOther = other != g;
+            for (uint8_t k = 1; k < n && allOther; ++k) allOther = groups[nb[t][k]] == other;
+            if (allOther) changes.emplace_back(t, other);
+        }
+        if (changes.empty()) break;
+        for (const auto& [t, g] : changes) groups[t] = g;
+    }
+    for (uint32_t t = 0; t < nt; ++t)
+        if (lead[t] != t) groups[t] = groups[lead[t]];
+}
+
 Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const std::function<bool(float)>& progress,
-                 bool allowSwap) {
+                 bool allowSwap, bool keepGroups) {
     try {
-        return voxelRemeshImpl(source, resolution, error, progress, allowSwap);
+        return voxelRemeshImpl(source, resolution, error, progress, allowSwap, keepGroups);
     } catch (const std::bad_alloc&) { // (the grid, the bricks or the surface didn't fit after all: nothing half made)
     } catch (const std::length_error&) {
     }

@@ -298,7 +298,9 @@ CommandRegistry::CommandRegistry() {
           {"keep_texture", T::Bool, "Keep a painted texture: Auto UV the result and project the texture onto it. "
                                     "Default true.", false},
           {"keep_masked", T::Bool, "Keep masked: masked areas keep their triangles exactly; the rest is remeshed and "
-                                   "joined to them watertight. Default false.", false}},
+                                   "joined to them watertight. Default false.", false},
+          {"keep_groups", T::Bool, "Keep Face Groups: each new polygon takes the face group of the original surface nearest "
+                                   "its centre (hard borders). Default false: one face group.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              std::string err;
              const std::vector<uint8_t> keep = argBool(a, "keep_masked", false) ? keepMaskedTriangles(doc.mesh) : std::vector<uint8_t>();
@@ -309,7 +311,7 @@ CommandRegistry::CommandRegistry() {
                                   [](float f) { // (progress and cancel for an MCP call, core/OpControl.h)
                                       opProgress(0.9f * f, "Remeshing");
                                       return !opCancelled();
-                                  });
+                                  }, false, argBool(a, "keep_groups", false));
              if (m.triangleCount() == 0) return {false, err};
              if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
              std::string keepNote;

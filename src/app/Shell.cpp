@@ -784,14 +784,15 @@ void App::registerShellActions() {
          },
          nullptr, nullptr});
     add({"geometry.quick_remesh_drag", "Quick Remesh (hold and drag)", nullptr,
-         "Hold this key and click or drag on the background (not on the model) to remesh the active Part (on by default in the "
-         "SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
+         "Hold this key and click or drag on the background to remesh the active Part; hold it and drag on the model to refresh "
+         "only the stretched triangles under the brush at the Part's detail (on by default in the SculptForge layout, off in "
+         "Classic; Tool > Remesh > Quick Remesh switches it).",
          "Tool > Remesh", "N", "",
          [this] {
              const std::string key = actions_.shortcutText("geometry.quick_remesh_drag");
              status_ = !quickRemeshOn() ? "Quick Remesh is off: turn it on in Tool > Remesh"
-                       : key.empty()         ? "Quick Remesh: give this a key in Preferences > Hotkeys, then hold it and drag on the background"
-                                             : "Quick Remesh: hold " + key + " and click or drag on the background";
+                       : key.empty()         ? "Quick Remesh: give this a key in Preferences > Hotkeys, then hold it and drag on the background (the model: refresh the topology under the brush)"
+                                             : "Quick Remesh: hold " + key + " and click or drag on the background; on the model it refreshes the stretched topology under the brush";
          },
          nullptr, nullptr});
     add({"geometry.to_splats", "Sculpt to Splats", nullptr, "Turn the sculpt into Gaussian splats.", "Splats", "",

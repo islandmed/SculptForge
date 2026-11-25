@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Sculpt.h"
+#include "core/QuickRemesh.h"
 #include "core/SculptKernel.h"
 
 #include "core/AtomicRef.h"
@@ -761,6 +762,36 @@ void Sculptor::remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym,
     lastMirrors_ = ms;
     followRemesh(mesh);
     timings.remeshMs += lapMs(clock);
+}
+
+bool Sculptor::refreshTopologyDab(Mesh& mesh, BVH& bvh, const glm::vec3& center, float radius, float edgeLength, Symmetry sym) {
+    if (!active_ || !(edgeLength > 0.0f) || !(radius > 0.0f) || !dyntopoBlocker(mesh).empty()) return false;
+    auto clock = std::chrono::steady_clock::now();
+    const std::vector<SymCopy> ms = copies(sym);
+    struct RefineOnly { // (set for this dab only, whatever happens inside)
+        DynamicTopology& d;
+        explicit RefineOnly(DynamicTopology& t) : d(t) { d.refineOnly = true; }
+        ~RefineOnly() { d.refineOnly = false; }
+    } refine(dynTopo_);
+    const bool changed = dynTopo_.remesh(mesh, bvh, center, radius, edgeLength, ms);
+    lastRemesh_ = true;
+    lastCenter_ = center;
+    lastRadius_ = radius;
+    lastEdge_ = edgeLength;
+    lastMirrors_ = ms;
+    followRemesh(mesh);
+    timings.remeshMs += lapMs(clock);
+    return changed;
+}
+
+float Sculptor::refreshEdgeLength(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius) const {
+    if (dyntopo.enabled) return dyntopoEdgeLength(dyntopo, radius, glm::length(mesh.bounds().extent()));
+    // The smaller of the detail around the brush and the Part's: around a long tendril everything near is stretched (the
+    // Part's detail is what it should come back to); a dense face on a coarse body refreshes to the face's.
+    std::vector<uint32_t> around;
+    bvh.queryTriangles(mesh, center, 3.0f * radius, around);
+    const float local = typicalEdgeLength(mesh, around), whole = typicalEdgeLength(mesh);
+    return local > 0.0f && whole > 0.0f ? std::min(local, whole) : std::max(local, whole);
 }
 
 // After the brush: when it squashed a triangle flat (pinching or flattening a fold), the dab is remeshed
