@@ -115,7 +115,8 @@ its own gestures:
   button, as in Hotkeys). While that key is held, a drag anywhere on the canvas, with any mouse button or the pen's tip,
   is that camera move: it never sculpts, and the drag goes on until you let the button go, even if you release the key
   first. While the key is down, a label in the status bar (**HOLD TO ORBIT**, **HOLD TO PAN** or **HOLD TO ZOOM**, beside
-  **CAMERA LOCKED**'s place) names the move, and it goes when you let go. A key typed into a text field is never taken.
+  **CAMERA LOCKED**'s place) names the move, and it goes when you let go. In the SculptForge layout the label keeps its place free while a hold key is
+  bound, so the other items in the bar never shift when you press or release it. A key typed into a text field is never taken.
   Pressed on its own, the key shows what to do in the status bar.
 - **Drag gestures.** Pick a mouse button (**Left**, **Middle** or **Right**) and turn on <kbd>Ctrl</kbd>, <kbd>Shift</kbd>
   or <kbd>Alt</kbd> beside it. That exact combination drags the move, before anything the key style does with the button.
