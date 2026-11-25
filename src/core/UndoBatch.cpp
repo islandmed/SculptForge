@@ -130,12 +130,14 @@ void hashSelectionSetContent(Hasher& h, const SelectionSetList* list) {
 
 void hashSelectionSets(Hasher& out, const SelectionSetList* list) {
     if (!list) return out.word(0x5E7);
-    if (!list->hashCache.value) {
+    uint64_t kept = list->hashCache.value.load(std::memory_order_relaxed);
+    if (!kept) {
         Hasher h;
         hashSelectionSetContent(h, list);
-        list->hashCache.value = h.h | 1; // (never 0)
+        kept = h.h | 1; // (never 0)
+        list->hashCache.value.store(kept, std::memory_order_relaxed);
     }
-    out.word(list->hashCache.value);
+    out.word(kept);
 }
 
 } // namespace

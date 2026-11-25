@@ -10,6 +10,7 @@
 #include "core/Commands.h"
 #include "core/Json.h"
 #include "core/ManagedPolicy.h"
+#include "core/SelectionSets.h"
 #include "core/Timeline.h"
 #include "core/UndoBatch.h"
 
@@ -525,4 +526,55 @@ TEST(mcp_checkpoint_does_not_point_into_a_replaced_history) {
     save(reg, d, "after");
     CHECK(!failed(call(reg, d, "redo")));
     CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"after"})")));
+}
+
+// The hash of a selection set list is kept on the list (SelectionSetList::hashCache). Every way a list changes must show in the
+// hash anyway: a stale one would let a restore pass (it fails open).
+TEST(mcp_selection_set_hash_is_never_stale) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    const auto hash = [&] { return sceneHash(d, HashScope::Everything); };
+    // Each command after a hash that has warmed the cache: the hash moves, and undo / redo bring back exactly the old / new value.
+    const auto edit = [&](const char* tool, const char* args) {
+        const uint64_t before = hash();
+        CHECK(hash() == before); // (cached: stable)
+        CHECK(!failed(call(reg, d, tool, args)));
+        const uint64_t after = hash();
+        CHECK(after != before);
+        CHECK(hash() == after);
+        CHECK(!failed(call(reg, d, "undo")));
+        CHECK(hash() == before);
+        CHECK(!failed(call(reg, d, "redo")));
+        CHECK(hash() == after);
+    };
+    edit("selection_set_store", R"({"name":"a","channels":"mask"})");
+    edit("selection_set_store", R"({"name":"a","channels":"visibility"})"); // same name, other content: replaced
+    edit("selection_set_rename", R"({"name":"a","to":"b"})");
+    edit("selection_set_store", R"({"name":"m","channels":"morph"})");
+    edit("selection_set_morph_target", R"({"name":"m"})");
+    edit("selection_set_morph_target", R"({"name":""})");
+    edit("selection_set_delete", R"({"name":"m"})");
+    edit("selection_set_delete", R"({"name":"b"})"); // the last one: no list at all
+    // A set made from a mask, then the mask changed: the stored mask runs are what the hash sees, whatever the mesh holds now.
+    CHECK(!failed(call(reg, d, "mask_all")));
+    edit("selection_set_store", R"({"name":"c","channels":"mask"})");
+    CHECK(!failed(call(reg, d, "selection_set_store", R"({"name":"c","channels":"mask"})")));
+    const uint64_t withMask = hash();
+    CHECK(!failed(call(reg, d, "mask_clear")));
+    CHECK(!failed(call(reg, d, "selection_set_store", R"({"name":"c","channels":"mask"})")));
+    CHECK(hash() != withMask);
+
+    // Outside the history: a copy of a list that was already hashed, then edited, carries no stale hash (the cache starts empty on a
+    // copy), and a checkpoint made on the old one refuses the new one.
+    CHECK(d.mesh.selectionSets != nullptr);
+    save(reg, d, "cp"); // (hashes the list: the cache is warm)
+    auto copy = std::make_shared<SelectionSetList>(*d.mesh.selectionSets);
+    copy->morphTarget = "elsewhere";
+    d.mesh.selectionSets = copy;
+    expectRefused(reg, d, "cp", kNotExact);
+    auto fewer = std::make_shared<SelectionSetList>(*d.mesh.selectionSets);
+    fewer->sets.clear();
+    fewer->morphTarget.clear();
+    d.mesh.selectionSets = fewer;
+    expectRefused(reg, d, "cp", kNotExact);
 }
