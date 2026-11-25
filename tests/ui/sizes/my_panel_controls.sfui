@@ -42,8 +42,8 @@ hover "Preferences/Orbit around the pointer##input.orbit_at_pointer"
 wait 0.3
 shot classic_alt
 hold none
-# The Streamlined setup (a fresh layout: My Panel starts empty): the floating panel on its key takes two Preferences
-# controls, the choice and the checkbox.
+# The Streamlined setup (a fresh layout: My Panel starts empty): the floating panel on its key, as tall as what it
+# holds, takes two Preferences controls, the choice and the checkbox.
 run ui_look look=forge layout=sculptforge
 run new_sphere subdivisions=3
 hover_window 0.5 0.5
@@ -52,10 +52,10 @@ wait 0.3
 expect_value mypanel_floating == 1
 expect "Preferences/##rotation_input"
 hold alt
-drag_to "Preferences/##rotation_input" "My Panel###mypanel.floating" 0 40
+drag_to "Preferences/##rotation_input" "My Panel###mypanel.floating" 0 10
 hold none
 hold alt
-drag_to "Preferences/Orbit around the pointer##input.orbit_at_pointer" "My Panel###mypanel.floating" 0 40
+drag_to "Preferences/Orbit around the pointer##input.orbit_at_pointer" "My Panel###mypanel.floating" 0 10
 hold none
 expect_value mypanel_entries == 2
 hover "My Panel/##rotation_input"

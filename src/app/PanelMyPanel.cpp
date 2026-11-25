@@ -38,8 +38,6 @@ constexpr float kHeaderH = 22.0f; // a section's header row, unscaled
 
 bool contains(const std::vector<std::string>& v, const std::string& s) { return std::find(v.begin(), v.end(), s) != v.end(); }
 
-bool g_ownWindow = false; // drawPalette_MyPanel runs in the floating panel: a drop anywhere in it lands (not only on its first rows)
-
 // The palette a section id belongs to ("tool.geometry" -> "tool"), or nullptr.
 const PaletteDef* paletteOfSection(const std::string& sectionId) {
     const PaletteDef* def = findPalette(sectionId.substr(0, sectionId.find('.')));
@@ -289,8 +287,8 @@ void App::drawPalette_MyPanel() {
         if (smallFont()) ImGui::PopFont();
     }
     const ImVec2 end = ImGui::GetCursorScreenPos();
-    const float areaBottom = g_ownWindow ? ImGui::GetWindowPos().y + ImGui::GetWindowSize().y : areaMin.y + 96.0f * s;
-    const ImRect area(areaMin, ImVec2(areaMin.x + width, std::max(end.y, areaBottom)));
+    // (The floating panel sizes itself to this content, so the area must not reach for the window's edge: it would never shrink.)
+    const ImRect area(areaMin, ImVec2(areaMin.x + width, std::max(end.y, areaMin.y + 96.0f * s)));
 
     // The drop: an accent line shows where the entry lands.
     const ImGuiPayload* payload = ImGui::GetDragDropPayload();
@@ -376,9 +374,13 @@ void App::drawMyPanelFloating() {
     if (!myPanelFloating_) return;
     const float s = uiScale_;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
+    // As tall as what it holds (a few entries: a few rows, not a tall empty window over the model), up to 70 % of the
+    // view, then it scrolls; the width stays a palette's.
+    const float w = 300.0f * s, hMax = std::min(460.0f * s, vp->Size.y * 0.7f);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0.0f), ImVec2(w, hMax));
     if (myPanelPlace_) { // just opened: the pointer is over its title bar, so the first thing under it is the first entry
-        const float w = 300.0f * s, h = std::min(460.0f * s, vp->Size.y * 0.7f);
-        ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiCond_Always);
+        float h = hMax; // (its height is its content's: the last size it had is the best guess for keeping it in view)
+        if (const ImGuiWindow* last = ImGui::FindWindowByName("###mypanel.floating")) h = std::min(last->Size.y, hMax);
         ImGui::SetNextWindowPos(ImVec2(std::clamp(mouseX_ - w * 0.5f, vp->Pos.x, vp->Pos.x + std::max(0.0f, vp->Size.x - w)),
                                        std::clamp(mouseY_ - 14.0f * s, vp->Pos.y, vp->Pos.y + std::max(0.0f, vp->Size.y - h))),
                                 ImGuiCond_Always);
@@ -386,11 +388,10 @@ void App::drawMyPanelFloating() {
         myPanelPlace_ = false;
     }
     bool open = true;
-    if (ImGui::Begin((std::string(tr("My Panel")) + "###mypanel.floating").c_str(), &open, ImGuiWindowFlags_NoCollapse)) {
+    if (ImGui::Begin((std::string(tr("My Panel")) + "###mypanel.floating").c_str(), &open,
+                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
         Demo::pushScope("My Panel");
-        g_ownWindow = true;
         drawPalette_MyPanel();
-        g_ownWindow = false;
         Demo::popScope();
         if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::IsAnyItemActive() &&
             ImGui::IsKeyPressed(ImGuiKey_Escape, false))

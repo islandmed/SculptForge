@@ -7,6 +7,7 @@ added: **My Panel**: single controls (Edit > My Panel; requested by Hameron and 
   remove, saved with the layout. A control its palette shows only sometimes (the Levels line of a Part without levels)
   shows as its dim name until it is back. While Alt is held a slider is picked up, not changed. The triangle count
   (Tool) and the Levels line (Tool > Geometry) can be pointed at with Ctrl for help, and dragged, like any control.
+  The floating My Panel (its key) is now as tall as what it holds, up to 70 % of the view, instead of a fixed tall window.
 member_request: true
 testers:
   - Any OS, Classic setup: Edit > My Panel..., then hold Alt and drag Tool > Viewport Look > Backface culling into it;
