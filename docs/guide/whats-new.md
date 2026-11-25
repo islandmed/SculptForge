@@ -17,7 +17,7 @@ highlight: Primitive settings for appended Parts, and Solidify gives a flat Part
 highlight: Keep Face Groups through Voxel Remesh, and N-drag refreshes stretched topology under the brush
 highlight: UI scale from 70% to 300%, remembered per monitor
 title: Lights of your own
-line: Material > Light > Lights adds up to four lights on top of the material's own; together they keep one light's exposure, and Shadow strength sets how dark the cast shadows are.
+line: Render > Materials > Light > Lights adds up to four lights on top of the environment; together they keep one light's exposure, and Shadow strength sets how dark the cast shadows are.
 action: guide:pbr-painting.md
 title: Any control on any shelf
 line: Hold Alt and drag a checkbox, slider, choice or readout from a palette onto a shelf or My Panel; it works there just as it does in its palette.
@@ -27,7 +27,7 @@ line: Edit > Preferences > Navigation: hold a key and drag to orbit, pan or zoom
 action: guide:navigation.md
 ```
 
-- **Lights** (**Material > Light > Lights**): up to four directional lights on top of the material's light, balanced so
+- **Lights** (**Render > Materials > Light > Lights**): up to four directional lights on top of the environment, balanced so
   together they add one light's worth of exposure; **Shadow strength** sets how dark cast shadows are.
 - **Shelves and My Panel**: any single control can go on any shelf or on My Panel; a floating My Panel keeps its size.
 - **Navigation bindings** (**Edit > Preferences > Navigation**): hold-to-orbit, pan and zoom keys, drag gestures and the
