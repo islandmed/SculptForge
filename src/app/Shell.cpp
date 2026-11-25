@@ -1775,14 +1775,18 @@ struct StatusModule {
 
 } // namespace
 
-std::string App::navHoldLabel() const {
-    switch (navHoldMove_) {
+namespace {
+std::string navHoldLabelText(int move) {
+    switch (move) {
     case 0: return upper(tr("Hold to orbit"));
     case 1: return upper(tr("Hold to pan"));
     case 2: return upper(tr("Hold to zoom"));
     default: return {};
     }
 }
+} // namespace
+
+std::string App::navHoldLabel() const { return navHoldLabelText(navHoldMove_); }
 
 void App::drawStatusBar(const ShellGeometry& g) {
     const float s = uiScale_;
@@ -2036,7 +2040,11 @@ void App::drawStatusBar(const ShellGeometry& g) {
             mods.push_back({ICON_LC_LOCK, "camera", upper(tr("Camera locked")), true});
         }
         // A Hold to orbit / pan / zoom key is down (Preferences > Navigation): the move it starts, the same label as above.
-        if (!navHoldLabel().empty()) {
+        // With a hold key bound the block keeps its place (the widest label's width, empty while no key is down), so the
+        // chips beside it never shift when a key goes down or up (a tight bar drops other modules first, the same either way).
+        bool holdBound = false;
+        for (const char* id : kNavHoldActions) holdBound = holdBound || !actions_.shortcutText(id).empty();
+        if (holdBound || !navHoldLabel().empty()) {
             holdMod = int(mods.size());
             mods.push_back({ICON_LC_MOVE_3D, "hold", navHoldLabel(), true});
         }
@@ -2056,7 +2064,19 @@ void App::drawStatusBar(const ShellGeometry& g) {
                                                                           : compactBytes(size_t(mem.gpuFreeMB) << 20) + " " + tr("free")});
     }
     ImFont* labelFont = theme::look.id != 0 && fontMonoTiny_ ? fontMonoTiny_ : fontTiny_ ? fontTiny_ : monoSmall;
-    auto moduleW = [&](const StatusModule& m) {
+    auto moduleW = [&](const StatusModule& m) -> float {
+        if (m.label == "hold") { // the reserved slot: as wide as the longest label, whichever is shown
+            float w = 0.0f;
+            for (int i = 0; i < kNavMoves; ++i) {
+                const std::string v = navHoldLabelText(i);
+                switch (style) {
+                case Status::Terminal: w = std::max(w, textW(monoSmall, "[" + v + "]") + 10.0f * s); break;
+                case Status::TitleBlock: w = std::max(w, textW(labelFont, upper(m.label)) + 6.0f * s + textW(monoSmall, v) + 20.0f * s); break;
+                default: w = std::max(w, textW(monoSmall, v) + 20.0f * s); break;
+                }
+            }
+            return w;
+        }
         switch (style) {
         case Status::Terminal:
             return m.mode ? textW(monoSmall, "[" + m.value + "]") + 10.0f * s : textW(monoSmall, m.label + ":" + m.value);
@@ -2087,12 +2107,20 @@ void App::drawStatusBar(const ShellGeometry& g) {
         if (total() > right - menusEnd) shown.erase(std::remove(shown.begin(), shown.end(), drop), shown.end());
     float mx = right - total();
     const float modulesX = mx;
+    // (UI tests: where the chips start, not counting the memory chips, whose text changes width with the readings)
+    statusModulesX_ = modulesX;
+    for (size_t k = 0; k < shown.size(); ++k)
+        if (shown[k] == ramMod || shown[k] == gpuMod) statusModulesX_ += moduleW(mods[size_t(shown[k])]) + sepW;
     std::vector<std::tuple<int, float, float>> memSpans; // (module, x0, x1): the memory modules' tooltip
 
     for (size_t k = 0; k < shown.size(); ++k) {
         const StatusModule& m = mods[size_t(shown[k])];
         const float w = moduleW(m);
-        ImGui::LogText("%s", m.value.c_str()); // (UI tests read the bar)
+        if (!m.value.empty()) ImGui::LogText("%s", m.value.c_str()); // (UI tests read the bar)
+        if (shown[k] == holdMod && m.value.empty()) { // the reserved slot, no key down: nothing drawn, the space kept
+            mx += w + (k ? sepW : 0.0f);
+            continue;
+        }
         if (k) {
             if (style == Status::Terminal) textAt(monoSmall, mx, theme::textDim, " | ");
             mx += sepW;

@@ -1075,6 +1075,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "emulate_3_button") return app_.uiPrefs_.emulate3Button ? 1.0 : 0.0; // Blender style (#77)
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
+    if (name == "status_modules_x") return double(app_.statusModulesX_);
     if (name == "nav_hold") return double(app_.navHoldMove_ + 1);        // a Hold to orbit / pan / zoom key down: 1 / 2 / 3, 0 none
     if (name == "nav_conflicts") return double(app_.navConflictCount()); // Preferences > Navigation's warnings
     for (int i = 0; i < kNavMoves; ++i)                                  // nav_drag_orbit / pan / zoom: the gesture's button (0 none)

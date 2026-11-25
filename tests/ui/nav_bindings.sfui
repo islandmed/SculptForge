@@ -220,10 +220,21 @@ key escape
 
 # The hold key's label shows in this layout's status bar too, in the place Camera locked takes, and goes when it is let go.
 set_shortcut view.hold_zoom K
+set_shortcut view.hold_orbit H
+wait 2
+remember status_modules_x chips0
 key_down k
 wait 2
 expect_text "HOLD TO ZOOM"
+expect_value status_modules_x == $chips0
 shot nav_hold_label
 key_up k
 wait 2
 expect_no_text "HOLD TO ZOOM"
+expect_value status_modules_x == $chips0
+# (a longer label does not move them either: the slot is as wide as the longest)
+key_down h
+wait 2
+expect_text "HOLD TO ORBIT"
+expect_value status_modules_x == $chips0
+key_up h
