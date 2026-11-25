@@ -988,8 +988,9 @@ bool Timeline::load(Document& doc, const std::vector<uint8_t>& in, std::string* 
         if (t->nodes_[k].parent != k - 1) return fail("The history file is damaged");
     UndoStack& s = doc.undo;
     s.listener.reset();
-    s.undo_.clear();
-    s.redo_.clear();
+    s.clear(); // (a new history: checkpoints made on the one it replaces must not point into it)
+    // Fresh step numbers, in path order (the file keeps none): they never repeat, and a step number means one step.
+    for (uint32_t k = 1; k < count; ++k) records[k]->seq = nextUndoSeq();
     t->path_.resize(pathLen);
     for (uint32_t k = 0; k < pathLen; ++k) t->path_[k] = k;
     t->cursor_ = cursor;

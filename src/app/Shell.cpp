@@ -646,9 +646,15 @@ void App::registerShellActions() {
     add({"view.floor_grid", "Floor grid", ICON_LC_GRID_2X2,
          "A faint grid on the floor the model stands on (its lowest point, Y up), fading into the distance: a "
          "reference for perspective and lining up Parts; the red and blue lines are the X and Z axes. It moves when "
-         "a stroke or a move ends. Off by default; saved automatically.",
+         "a stroke or a move ends (Floor grid at Y=0 keeps it still). Off by default; saved automatically.",
          "Render", "", "", [this] { uiPrefs_.floorGrid = renderSettings_.floorGrid = !renderSettings_.floorGrid; },
          [this] { return renderSettings_.floorGrid; }, nullptr});
+    add({"view.floor_grid_fixed", "Floor grid at Y=0", ICON_LC_GRID_2X2,
+         "Keep the floor grid at world height zero (Y=0) instead of under the lowest point of the visible Parts: a "
+         "fixed reference while you move Parts up and down or work on a base. Off by default (the grid follows the "
+         "model); saved automatically.",
+         "Render", "", "", [this] { uiPrefs_.floorGridFixed = !uiPrefs_.floorGridFixed; },
+         [this] { return uiPrefs_.floorGridFixed; }, nullptr});
     // The right shelf's view toggles (foirgairwolf on Discord): each flips a setting that lives elsewhere.
     add({"view.turntable", "Turntable", ICON_LC_ORBIT,
          "Rotation drags turn the view like a turntable, the model upright (on), or freely about the screen's axes "
@@ -778,14 +784,15 @@ void App::registerShellActions() {
          },
          nullptr, nullptr});
     add({"geometry.quick_remesh_drag", "Quick Remesh (hold and drag)", nullptr,
-         "Hold this key and click or drag on the background (not on the model) to remesh the active Part (on by default in the "
-         "SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
+         "Hold this key and click or drag on the background to remesh the active Part; hold it and drag on the model to refresh "
+         "only the stretched triangles under the brush at the Part's detail (on by default in the SculptForge layout, off in "
+         "Classic; Tool > Remesh > Quick Remesh switches it).",
          "Tool > Remesh", "N", "",
          [this] {
              const std::string key = actions_.shortcutText("geometry.quick_remesh_drag");
              status_ = !quickRemeshOn() ? "Quick Remesh is off: turn it on in Tool > Remesh"
-                       : key.empty()         ? "Quick Remesh: give this a key in Preferences > Hotkeys, then hold it and drag on the background"
-                                             : "Quick Remesh: hold " + key + " and click or drag on the background";
+                       : key.empty()         ? "Quick Remesh: give this a key in Preferences > Hotkeys, then hold it and drag on the background (the model: refresh the topology under the brush)"
+                                             : "Quick Remesh: hold " + key + " and click or drag on the background; on the model it refreshes the stretched topology under the brush";
          },
          nullptr, nullptr});
     add({"geometry.to_splats", "Sculpt to Splats", nullptr, "Turn the sculpt into Gaussian splats.", "Splats", "",
@@ -1660,7 +1667,18 @@ void App::applyLook() {
     ImGui::GetStyle() = ImGuiStyle();
     ImGui::GetStyle().HoverDelayNormal = hoverDelay;
     theme::applyLook(uiPrefs_.look, &message);
-    ImGui::GetStyle().ScaleAllSizes(uiScale_);
+    {
+        ImGuiStyle& st = ImGui::GetStyle();
+        const ImGuiStyle unscaled = st;
+        st.ScaleAllSizes(uiScale_);
+        if (uiScale_ < 1.0f) { // below 100 %: the room around the text shrinks less than the text (UiScale.h)
+            const float pad = compactPadScale(uiScale_);
+            st.FramePadding = ImVec2(std::round(unscaled.FramePadding.x * pad), std::round(unscaled.FramePadding.y * pad));
+            st.ScrollbarSize = std::round(unscaled.ScrollbarSize * pad);
+            st.GrabMinSize = std::round(unscaled.GrabMinSize * pad);
+            st.TouchExtraPadding = ImVec2(std::round(unscaled.TouchExtraPadding.x * pad), std::round(unscaled.TouchExtraPadding.y * pad));
+        }
+    }
     const bool mono = theme::look.monoLabels || theme::look.monoAll;
     if (fontInterSmall_) {
         fontSmall_ = mono && fontMonoSmall_ ? fontMonoSmall_ : fontInterSmall_;
@@ -2487,7 +2505,11 @@ void App::drawPaletteBody(const std::string& id) {
     const PaletteDef* def = findPalette(id);
     if (!def) return;
     ImGui::PushID(def->id);
+    ui::PinPalette(def->id); // its controls are My Panel entries (Ui.h)
+    const bool readOnly = ui::BeginPaletteItems();
     (this->*(def->draw))();
+    ui::EndPaletteItems(readOnly);
+    ui::PinPalette("");
     ImGui::PopID();
 }
 
@@ -2794,7 +2816,7 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
             indices.push_back(i);
             continue;
         }
-        if (!shelfItemShown(item)) continue;
+        if (!shelfItemShown(shelf, item)) continue;
         if (!vertical && !lineStart && prevShown >= 0) {
             const std::string& prev = list[size_t(prevShown)];
             ImGui::SameLine(0.0f, prev == "sep" || item == "sep" ? 0.0f : segmentPair(prev, item) ? 1.0f * s : 4.0f * s);
@@ -2810,6 +2832,22 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         indices.push_back(i);
     }
     ImGui::PopStyleVar();
+    // Controls their palette hides now: looked for again twice a second, after the layout, so nothing on the shelf moves for it.
+    for (int i = 0; i < int(list.size()); ++i) {
+        const std::string& item = list[size_t(i)];
+        if (item.rfind("control:", 0) != 0 || shelfItemShown(shelf, item)) continue;
+        const auto it = pinnedControls_.find(pinnedPlaceKey(shelf, item));
+        if (it == pinnedControls_.end() || ImGui::GetTime() - it->second.measured < 0.5) continue;
+        const MyPanelEntry e = myPanelEntry(item);
+        if (!e.valid()) continue;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImRect rc;
+        bool rm = false;
+        ImGui::PushID(i);
+        drawPinnedControl(item, e, shelf, vertical ? ImGui::GetWindowWidth() - 2.0f * pad.x : 180.0f * s, !vertical, 0.0f, rc, rm);
+        ImGui::PopID();
+        ImGui::SetCursorScreenPos(at);
+    }
     if (shelf == kShelfTop && !rects.empty()) {
         // What follows the Intensity slider on its line, and whether the row fits (with the sliders at their least).
         float tail = 0.0f, right = rects[0].Max.x;
@@ -2889,9 +2927,17 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
     if (layout_.customize)
         dashedRect(dl, ImVec2(r.x + 2.0f, r.y + 2.0f), ImVec2(r.x + r.w - 2.0f, r.y + r.h - 2.0f), theme::u32(theme::accent, 0.6f),
                    4.0f * s);
-    // Customize: drop items between the shelf's items (an accent line shows where).
+    // Customize: drop items between the shelf's items (an accent line shows where). And at any time, Alt+drag (the My Panel
+    // payload): a button or a control from any palette, or an entry out of My Panel, lands on the shelf the same way.
     const ImGuiPayload* payload = ImGui::GetDragDropPayload();
-    if (payload && payload->IsDataType(ui::kUiItemPayload) && window->Rect().Contains(ImGui::GetIO().MousePos)) {
+    std::string altItem; // the shelf item an Alt-dragged entry becomes (empty: not one a shelf takes)
+    if (payload && payload->IsDataType(ui::kMyPanelPayload)) {
+        ui::MyPanelPayload entry;
+        std::memcpy(&entry, payload->Data, std::min(size_t(payload->DataSize), sizeof entry));
+        entry.entry[sizeof entry.entry - 1] = 0;
+        altItem = shelfItemForEntry(entry.entry);
+    }
+    if (payload && (payload->IsDataType(ui::kUiItemPayload) || !altItem.empty()) && window->Rect().Contains(ImGui::GetIO().MousePos)) {
         const ImVec2 m = ImGui::GetIO().MousePos;
         int insert = int(list.size());
         ImVec2 a, b;
@@ -2912,7 +2958,13 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
         }
         if (ImGui::BeginDragDropTargetCustom(window->Rect(), ImGui::GetID("##shelfdrop"))) {
             ImGui::GetForegroundDrawList()->AddLine(a, b, theme::u32(theme::accent), 2.0f * s);
-            if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(ui::kUiItemPayload, ImGuiDragDropFlags_AcceptNoDrawDefaultRect)) {
+            if (const ImGuiPayload* p = altItem.empty() ? nullptr : ImGui::AcceptDragDropPayload(ui::kMyPanelPayload, ImGuiDragDropFlags_AcceptNoDrawDefaultRect)) {
+                // (an entry dragged out of My Panel is not accepted there: finishMyPanelDrag removes it from the panel, so this is a move)
+                (void)p;
+                items.insert(items.begin() + std::clamp(insert, 0, int(items.size())), altItem);
+                status_ = "Added to the shelf";
+                noteLayoutChanged();
+            } else if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload(ui::kUiItemPayload, ImGuiDragDropFlags_AcceptNoDrawDefaultRect)) {
                 ui::UiItemPayload item;
                 std::memcpy(&item, p->Data, std::min(size_t(p->DataSize), sizeof item));
                 item.id[sizeof item.id - 1] = 0;
@@ -2940,8 +2992,12 @@ void App::drawShelf(int shelf, const CanvasRect& r) {
 
 // Contextual shelf items (docs/ui-design.md, "Contextual controls"): shown only when they apply, and always in
 // Customize mode so they can still be moved or removed.
-bool App::shelfItemShown(const std::string& item) const {
+bool App::shelfItemShown(int shelf, const std::string& item) const {
     if (layout_.customize) return true;
+    if (item.rfind("control:", 0) == 0) { // a palette's control: not while its palette hides it (measured by drawPinnedControl;
+        const auto it = pinnedControls_.find(pinnedPlaceKey(shelf, item)); // drawShelf looks for it again after its layout)
+        return it == pinnedControls_.end() || !it->second.missing;
+    }
     if (item == "view.splats") return !doc_.splats.empty(); // only when there's a capture
     if (item == "draw.paint_vertex" || item == "draw.paint_texture") return hasTexture(doc_.mesh); // paint target
     if (item == "draw.new_texture") return !hasTexture(doc_.mesh) && (paintMode_ || paintRgb_ || autoUv_); // start one
@@ -2956,7 +3012,8 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
     ImGui::PushID(index);
     // Ctrl+Alt in Customize Shelves grabs a widget (sliders, tiles, the colour picker): it is drawn inert and a button over
     // it takes the press, so the field can't swallow it (Voxel Resolution and the Draw slider wouldn't move).
-    const bool grab = layout_.customize && ui::CtrlHeld() && ui::AltHeld() && item.rfind("widget.", 0) == 0 && !actions_.find(item);
+    const bool grab = layout_.customize && ui::CtrlHeld() && ui::AltHeld() &&
+                      (item.rfind("widget.", 0) == 0 || item.rfind("control:", 0) == 0) && !actions_.find(item);
     if (grab) {
         ImGui::BeginGroup();
         ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
@@ -3210,6 +3267,27 @@ void App::drawShelfItem(int shelf, int index, const std::string& item, bool vert
                      : !doc_.brushes[size_t(found)].description.empty() ? doc_.brushes[size_t(found)].description.c_str()
                                                                        : "One of your custom brushes.",
                      "Bottom shelf");
+    } else if (item.rfind("control:", 0) == 0) { // one control of a palette (Alt-dragged here; PanelMyPanel.cpp drawPinnedControl)
+        const MyPanelEntry e = myPanelEntry(item);
+        ImRect rect;
+        bool remove = false;
+        // A horizontal shelf: laid out at a slider's shelf width, the item only as wide as the control, the row's height at least;
+        // a side shelf: the column's inside width. The palette's frame padding, so the control looks as it does in its palette.
+        const float layoutW = vertical ? winW - 2.0f * padX : 180.0f * s;
+        const float least = shelf == kShelfBottom ? shell::bottomShelfSize(layout_.shelfTiles).tileH * s : shelf == kShelfTop ? rowH : 0.0f;
+        static const char* const kShelfScopes[kShelfCount] = {"Top shelf", "Left shelf", "Right shelf", "Bottom shelf"};
+        Demo::pushScope(kShelfScopes[shelf]); // (UI tests tell the shelf's copy from the palette's: "Top shelf/Backface culling##display")
+        if (!e.valid() || !drawPinnedControl(item, e, shelf, layoutW, !vertical, least, rect, remove))
+            ImGui::Dummy(ImVec2(0, 0)); // a palette this version doesn't have: keep its place in the list
+        Demo::popScope();
+        if (remove) {
+            auto& list = shelf == kShelfTop    ? layout_.topShelf
+                         : shelf == kShelfLeft  ? layout_.leftShelf
+                         : shelf == kShelfRight ? layout_.rightShelf
+                                                : layout_.bottomShelf;
+            if (index < int(list.size()) && list[size_t(index)] == item) list.erase(list.begin() + index);
+            noteLayoutChanged();
+        }
     } else if (const Action* a = actions_.find(item == "brush.paint" ? std::string("draw.paint") : item)) {
         const ui::Look look = shelf != kShelfTop ? ui::Look::Tile
                               : a->icon          ? (topShelfCompact_ ? ui::Look::Icon : ui::Look::IconLabel)
@@ -3524,8 +3602,10 @@ void App::finishShelfDrag() {
                      : shelfDrag_.shelf == kShelfRight ? layout_.rightShelf
                                                        : layout_.bottomShelf;
         if (shelfDrag_.index >= 0 && shelfDrag_.index < int(list.size())) {
-            status_ = "Removed " + list[size_t(shelfDrag_.index)] + " from the shelf" +
-                      (list[size_t(shelfDrag_.index)].rfind("widget.", 0) == 0 ? " - Preferences > Saving & Layouts puts it back" : "");
+            const std::string& gone = list[size_t(shelfDrag_.index)];
+            const MyPanelEntry e = myPanelEntry(gone); // a control: by its name
+            status_ = "Removed " + (e.control ? e.key() : gone) + " from the shelf" +
+                      (gone.rfind("widget.", 0) == 0 ? " - Preferences > Saving & Layouts puts it back" : "");
             list.erase(list.begin() + shelfDrag_.index);
             noteLayoutChanged();
         }

@@ -10,6 +10,7 @@
 #include "core/Json.h"
 #include "core/Mesh.h"
 #include "core/PolyMode.h"
+#include "core/PrimitiveKit.h"
 #include "core/QRemeshGuides.h"
 #include "core/Reference.h"
 #include "core/Sculpt.h"
@@ -52,6 +53,7 @@ struct PartData {
     bool bvhDirty = false;
     uint64_t cleanRevision = 0;
     std::vector<QRemeshGuide> qremeshGuides; // QRemesh Guides (core/QRemeshGuides.h)
+    PrimitiveState primitive; // the settings of a Part from Append, while its mesh is still the generated one (core/PrimitiveKit.h)
     uint32_t key = 0;
 };
 
@@ -275,6 +277,10 @@ struct Document {
 
     // A name not used by any Part yet ("Eye", "Eye 2", ...).
     std::string uniquePartName(const std::string& wanted) const;
+    // The name for a copy of the Part called `source`: numbered, "Head" -> "Head.01", "Head.02", ... (the lowest number
+    // not in use; a source that is itself numbered, "Head.01", counts from its base, so copies of copies never stack;
+    // a wider number, "Cube.001", keeps its width).
+    std::string duplicatePartName(const std::string& source) const;
     // Bounds of every visible Part (in the scene: transforms applied).
     AABB visibleBounds() const;
     // Bounds of Part `i` in the scene (its transform applied).

@@ -98,7 +98,8 @@ one. With it on, <kbd>Ctrl</kbd> still masks and
 
 A [Stencil](sculpting.md#stencil) (**Sculpt > Alpha > Stencil**) paints too: load a photo or a pattern, place it over
 the model, and paint over it with the Paint brush. Where it covers the model the brush lays the image's colours (with
-your Colour intensity, falloff and mask); everywhere else it paints nothing.
+your Colour intensity, falloff and mask); off the image it paints your paint colour as if there were no Stencil (set
+**Outside the image** to **Block** and it paints nothing there).
 
 Turn off **Paint its colours** to paint the paint colour through the image's brightness instead (a grayscale pattern
 as a mask). Turn the model or move the stencil and paint again to cover a whole model.

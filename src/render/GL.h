@@ -185,6 +185,7 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, BlitFramebuffer, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum) \
     X(void, FramebufferTexture2D, GLenum, GLenum, GLenum, GLuint, GLint)                    \
     X(void, TexBuffer, GLenum, GLenum, GLuint)                                               \
+    X(void, GetBufferParameteriv, GLenum, GLenum, GLint*)                                    \
     X(void, VertexAttribIPointer, GLuint, GLint, GLenum, GLsizei, const void*)               \
     X(void, VertexAttribDivisor, GLuint, GLuint)                                             \
     X(void, DrawArraysInstanced, GLenum, GLint, GLsizei, GLsizei)                            \
@@ -251,6 +252,10 @@ const char* load(ProcLoader loader);
 GLint maxTextureBufferTexels();
 uint32_t bufferChunkTexels(uint32_t natural);
 void setTestTexelLimit(uint32_t texels); // 0: the driver's limits
+// Buffer textures made (TexBuffer) past that limit since start: a driver may reject the draw that reads one (Mali-G72: GL error
+// 0x0501, "glTexBuffer ... extends beyond the allocated buffer"). The UI value texbuffer_over_limit; each one is logged once.
+uint32_t texBufferOverLimit();
+bool testTexelLimitSet(); // a UI test lowered the limit (the renderer then also checks its buffer sampler units, Renderer::bind)
 // Tests only (gl_limits reject_textured=1): the first textured draw of a Part counts as one the driver rejected with an error.
 void setTestRejectTextured(bool reject);
 

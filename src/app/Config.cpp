@@ -36,6 +36,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <unordered_map>
 #include <array>
 #include <cctype>
 #include <cfloat>
@@ -108,6 +109,11 @@ Json toJson(const UiPrefs& p) {
     j.set("autoCollapseLeft", p.autoCollapseLeft);
     j.set("autoCollapseRight", p.autoCollapseRight);
     j.set("uiScale", double(p.uiScale));
+    if (!p.uiScaleByDisplay.empty()) { // per monitor (UiScale.h): {"DELL U2720Q 3840x2160": 0.8, ...}
+        Json byDisplay = Json::object();
+        for (const auto& [key, scale] : p.uiScaleByDisplay) byDisplay.set(key, double(scale));
+        j.set("uiScaleByDisplay", byDisplay);
+    }
     j.set("libraryAtStartup", p.libraryAtStartup);
     j.set("startupSplash", p.startupSplash);
     j.set("libraryFolder", p.libraryFolder);
@@ -125,6 +131,7 @@ Json toJson(const UiPrefs& p) {
     j.set("librarySort", p.librarySort);
     if (!p.brushSet.empty()) j.set("brushSet", p.brushSet);
     j.set("spaceCamera", p.spaceCamera);
+    if (p.nav.any()) j.set("navDrag", toJson(p.nav)); // Preferences > Navigation's custom drag gestures (NavBindings.h)
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("wheelZoomToPointer", p.wheelZoomToPointer);
@@ -156,6 +163,7 @@ Json toJson(const UiPrefs& p) {
     if (p.cornerWidget >= 0) j.set("cornerGizmo", std::string(p.cornerWidget == 1 ? "orientation" : "axes"));
     if (p.cornerPosition == 1) j.set("cornerGizmoPosition", std::string("top-right"));
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
+    j.set("appendLowPoly", p.appendLowPoly);
     if (p.newerMenuRows >= 0) j.set("newerMenuRows", p.newerMenuRows != 0); // (unset = by layout)
     lookToJson(p, j);
     j.set("language", p.language);
@@ -175,6 +183,7 @@ Json toJson(const UiPrefs& p) {
     j.set("aoStrength", double(p.aoStrength));
     j.set("aoSoftness", double(p.aoSoftness));
     j.set("shadowSoftness", double(p.shadowSoftness));
+    j.set("shadowStrength", double(p.shadowStrength));
     j.set("viewOcclusionLitSphere", p.viewOcclusionLitSphere);
     j.set("multithreading", p.multithreading);
     j.set("predictiveStrokes", p.predictiveStrokes);
@@ -190,6 +199,7 @@ Json toJson(const UiPrefs& p) {
     j.set("viewportCursor", double(p.viewportCursor));
     j.set("backfaceCulling", p.backfaceCulling);
     j.set("floorGrid", p.floorGrid);
+    j.set("floorGridFixed", p.floorGridFixed);
     j.set("uvPackColumns", double(p.uvPackColumns));
     j.set("uvPackRows", double(p.uvPackRows));
     j.set("maskDarkness", double(p.maskDarkness));
@@ -227,7 +237,16 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.oneSubpalette = j["oneSubpalette"].asBool(p.oneSubpalette);
     p.autoCollapseLeft = j["autoCollapseLeft"].asBool(p.autoCollapseLeft);
     p.autoCollapseRight = j["autoCollapseRight"].asBool(p.autoCollapseRight);
-    p.uiScale = std::clamp(float(j["uiScale"].asNumber(p.uiScale)), 0.0f, 3.0f);
+    p.uiScale = std::clamp(float(j["uiScale"].asNumber(p.uiScale)), 0.0f, kMaxUiScale);
+    if (p.uiScale > 0.0f) p.uiScale = std::max(p.uiScale, kMinUiScale);
+    if (j["uiScaleByDisplay"].isObject()) {
+        p.uiScaleByDisplay.clear();
+        for (const auto& [key, value] : j["uiScaleByDisplay"].members()) {
+            float scale = std::clamp(float(value.asNumber(0.0)), 0.0f, kMaxUiScale);
+            if (scale > 0.0f) scale = std::max(scale, kMinUiScale);
+            setDisplayScale(p.uiScaleByDisplay, key, scale);
+        }
+    }
     p.libraryAtStartup = j["libraryAtStartup"].asBool(p.libraryAtStartup);
     p.startupSplash = j["startupSplash"].asBool(p.startupSplash);
     if (j["libraryFolder"].isString()) p.libraryFolder = j["libraryFolder"].asString();
@@ -248,6 +267,7 @@ void fromJson(const Json& j, UiPrefs& p) {
         if (j[key].isString()) *v = listSortId(listSortFromId(j[key].asString()));
     if (j["brushSet"].isString() && j["brushSet"].asString().size() <= 64) p.brushSet = j["brushSet"].asString();
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
+    fromJson(j["navDrag"], p.nav);
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.wheelZoomToPointer = j["wheelZoomToPointer"].asBool(p.inputStyle == 3); // (inputStyle is read above)
@@ -285,6 +305,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     if (j["cornerGizmo"].isString()) p.cornerWidget = j["cornerGizmo"].asString() == "orientation" ? 1 : 0;
     if (j["cornerGizmoPosition"].isString()) p.cornerPosition = j["cornerGizmoPosition"].asString() == "top-right" ? 1 : 0;
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
+    p.appendLowPoly = j["appendLowPoly"].asBool(p.appendLowPoly);
     if (j["newerMenuRows"].isBool()) p.newerMenuRows = j["newerMenuRows"].asBool() ? 1 : 0;
     // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the Classic layout,
     // and keeps them (the new-look card offers the new default once, PanelSupport.cpp).
@@ -317,6 +338,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.aoStrength = std::clamp(float(j["aoStrength"].asNumber(p.aoStrength)), 0.0f, 1.0f);
     p.aoSoftness = std::clamp(float(j["aoSoftness"].asNumber(p.aoSoftness)), 0.0f, 1.0f);
     p.shadowSoftness = std::clamp(float(j["shadowSoftness"].asNumber(p.shadowSoftness)), 0.0f, 1.0f);
+    p.shadowStrength = std::clamp(float(j["shadowStrength"].asNumber(p.shadowStrength)), 0.0f, 2.0f);
     p.viewOcclusionLitSphere = j["viewOcclusionLitSphere"].asBool(p.viewOcclusionLitSphere);
     p.multithreading = j["multithreading"].asBool(p.multithreading);
     p.predictiveStrokes = j["predictiveStrokes"].asBool(p.predictiveStrokes);
@@ -332,6 +354,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);
     p.backfaceCulling = j["backfaceCulling"].asBool(p.backfaceCulling);
     p.floorGrid = j["floorGrid"].asBool(p.floorGrid);
+    p.floorGridFixed = j["floorGridFixed"].asBool(p.floorGridFixed);
     p.uvPackColumns = std::clamp(int(j["uvPackColumns"].asNumber(p.uvPackColumns)), 1, 10);
     p.uvPackRows = std::clamp(int(j["uvPackRows"].asNumber(p.uvPackRows)), 1, 10);
     p.maskDarkness = std::clamp(float(j["maskDarkness"].asNumber(p.maskDarkness)), 0.0f, 1.0f);
@@ -634,6 +657,15 @@ void App::initActions() {
     add("part.figure_pose_cancel", "Cancel Pose", "Tool > Parts", nullptr, [this] { runCommand("figure_pose_cancel"); },
         nullptr, "figure_pose_cancel", nullptr, [this] { return figurePoseActive(doc_); },
         "Remove the Pose Mesh and show the Parts again; nothing changes.");
+    // Solidify (core/Solidify.h, PanelExtract.cpp): thickness for a flat, single-sided Part, in place.
+    add("part.solidify", "Solidify", "Tool > Parts", nullptr,
+        [this] { runCommand("solidify", {{"thickness", double(solidifyThick_)}, {"both", solidifyBoth_}}); }, nullptr, "solidify",
+        nullptr, [this] { return doc_.mesh.triangleCount() > 0; },
+        "Give a flat, single-sided Part thickness in place: a back pushed along the normals by Thickness, joined by a rim of "
+        "quads along every open edge, one closed mesh. For a Plane, or an Extract made with Thickness 0.");
+    add("part.solidify_both", "Centred", "Tool > Parts", nullptr, [this] { solidifyBoth_ = !solidifyBoth_; }, nullptr, nullptr,
+        [this] { return solidifyBoth_; }, nullptr,
+        "Solidify centres the thickness on the surface, half in front and half behind, instead of all behind it.");
     add("part.extract_double", "Both Sides", "Tool > Parts", nullptr,
         [this] {
             extractDouble_ = !extractDouble_;
@@ -1023,7 +1055,8 @@ void App::initActions() {
             status_ = layout_.customize ? "Customize: Ctrl+Alt+drag to move or remove items" : "Customize off";
         },
         ICON_LC_LAYOUT_TEMPLATE, nullptr, [this] { return layout_.customize; }, nullptr,
-        "Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it.");
+        "Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it. (At any "
+        "time, Customize off too, hold Alt and drag any button, checkbox, slider or choice from a palette onto a shelf.)");
 
     // The shell's actions (Shell.cpp: brushes, shelves, palettes, trays): they replace any of the above with
     // the same id and own P (Paint), the symmetry toggles and Tab.
@@ -2197,28 +2230,66 @@ void drawInterfaceSection(App& app) {
         if (ui::Checkbox("Compact timeline##view.timeline_compact", &compact)) a->run();
         ui::HelpAction(app, "view.timeline_compact");
     }
-    // Finer steps near 100 % (125 % was too big a first step) and up to 300 % for a 5K or 5K2K monitor at its native
-    // resolution, no system scaling (fenix 11-08).
-    static const char* kScales[] = {"Automatic", "100%", "110%", "115%", "125%", "135%", "150%",
-                                    "175%",      "200%", "250%", "300%"};
-    static const float kScaleValues[] = {0.0f, 1.0f, 1.1f, 1.15f, 1.25f, 1.35f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f};
-    constexpr int kScaleCount = int(sizeof kScaleValues / sizeof kScaleValues[0]);
-    int current = 0;
-    for (int i = 0; i < kScaleCount; ++i)
-        if (std::abs(kScaleValues[i] - p.uiScale) < 0.01f) current = i;
-    ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::BeginCombo("##ui_scale", (std::string(tr("UI scale:")) + " " + tr(kScales[current])).c_str())) {
-        for (int i = 0; i < kScaleCount; ++i)
-            if (ImGui::Selectable(tr(kScales[i]), i == current)) {
-                p.uiScale = kScaleValues[i];
-                app.requestUiScale(); // live, from the next frame (#87)
+    // 70 % (a 4K or 5K monitor at its native size, the system scaling the UI too large: Fenix 11-22) to 300 % (a 5K2K
+    // monitor: fenix 11-08), a slider in 5 % steps, applied when it is let go or a typed value is entered: rebuilding the
+    // fonts while it is dragged would move the slider under the pointer (the tray scales with the UI). The sample line
+    // below shows the size while it is dragged. Automatic follows the monitor the window is on; a chosen size is
+    // remembered for that monitor (App::setUiScalePreference, uiScaleByDisplay).
+    {
+        const float pref = app.uiScalePreference();
+        const bool automatic = pref <= 0.0f;
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr("UI scale:"));
+        ImGui::SameLine();
+        bool autoTick = automatic;
+        if (ImGui::Checkbox((std::string(tr("Automatic")) + "##ui_scale_auto").c_str(), &autoTick))
+            app.setUiScalePreference(autoTick ? 0.0f : snapUiScale(app.uiScale()));
+        ui::HelpText("Automatic", nullptr,
+                     "Follow the display the window is on (Windows: Settings > Display > Scale, per monitor; macOS and Wayland: "
+                     "the display's scaling; X11: the desktop's font DPI). Untick, or move the slider, to choose a size.",
+                     "Preferences > Interface");
+        // The value while the slider is held or typed into (pending), and the one let go of, applied a third of a second
+        // later unless a second click follows: the first click of a double-click (which opens the typed field) must not
+        // rebuild the UI under the second. A typed value applies the moment it is entered.
+        static int pending = -1, letGo = -1;
+        static double applyAt = 0.0;
+        static bool wasTyping = false;
+        const int currentPct = int(std::lround((automatic ? app.uiScale() : pref) * 100.0f));
+        int pct = pending >= 0 ? pending : letGo >= 0 ? letGo : currentPct;
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        const bool edited = ImGui::SliderInt("##ui_scale", &pct, int(std::lround(kMinUiScale * 100.0f)),
+                                             int(std::lround(kMaxUiScale * 100.0f)), "%d%%", ImGuiSliderFlags_AlwaysClamp);
+        const bool typing = ImGui::TempInputIsActive(ImGui::GetItemID());
+        if (ImGui::IsItemActive()) {
+            if (edited && !typing) pct = int(std::lround(snapUiScale(float(pct) / 100.0f) * 100.0f)); // dragged or arrow keys: 5 % steps
+            pending = pct;
+            letGo = -1; // (a second click: the first one's value is not applied)
+        } else {
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                letGo = pct;
+                applyAt = wasTyping ? 0.0 : ImGui::GetTime() + 0.35;
+                app.redrawIn(0.35);
             }
-        ImGui::EndCombo();
+            pending = -1;
+            if (letGo >= 0 && ImGui::GetTime() >= applyAt) {
+                app.setUiScalePreference(float(letGo) / 100.0f);
+                letGo = -1;
+            }
+        }
+        wasTyping = typing;
+        ui::HelpText("UI scale", nullptr,
+                     "Size of text and controls, 70% to 300%, applied when you let the slider go (double-click it to type a "
+                     "value). Below 100% the buttons keep a little more room around their text, so they stay easy to hit. "
+                     "The size is remembered for the monitor the window is on, so a laptop screen and a 4K monitor can each "
+                     "have their own.",
+                     "Preferences > Interface");
+        // The sample: the interface font and icons at the slider's size (stretched from the current atlas while it is
+        // dragged; built crisp at that size the moment it is let go).
+        const float sample = std::clamp(float(pct) / 100.0f / std::max(app.uiScale(), 0.01f), 0.2f, 5.0f);
+        ImGui::SetWindowFontScale(sample);
+        ImGui::TextUnformatted((std::string(ICON_LC_SEARCH "  ") + tr("Aa Bb 123") + "  " ICON_LC_BRUSH "  " ICON_LC_BOX).c_str());
+        ImGui::SetWindowFontScale(1.0f);
     }
-    ui::HelpText("UI scale", nullptr,
-                 "Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: "
-                 "Settings > Display > Scale, per monitor).",
-                 "Preferences > Interface");
     static const char* kRotation[] = {"Free", "Turntable", "X axis", "Z axis"}; // UiPrefs::orbitLock
     p.orbitLock = std::clamp(p.orbitLock, 0, 3);
     ImGui::SetNextItemWidth(-FLT_MIN);
@@ -2247,6 +2318,7 @@ void drawInterfaceSection(App& app) {
 }
 
 void drawHotkeysSection(App& app) {
+    const char* hotkeysPath = "Preferences > Hotkeys"; // (the help footer; its steps are translated)
     char (&filter)[64] = g_hotkeysFilter;
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::InputTextWithHint("##hotkeys_filter", tr(ICON_LC_SEARCH "  Filter"), filter, sizeof filter);
@@ -2276,56 +2348,7 @@ void drawHotkeysSection(App& app) {
             ImGui::TextUnformatted(trAction(a->id, a->label));
             ui::HelpAction(app, a->id.c_str());
             ImGui::TableNextColumn();
-            const std::string chord = reg.shortcutText(a->id);
-            const bool capturing = app.capturingShortcut() == a->id;
-            const bool sequencing = capturing && app.capturingSequence();
-            const std::string text = sequencing ? (app.captureFirstKey().empty() ? std::string(tr("press 2 keys..."))
-                                                                                 : app.captureFirstKey() + " " + tr("then..."))
-                                     : capturing ? tr("press a key...") : chord.empty() ? "-" : chord;
-            if (reg.hasOverride(a->id)) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::accent));
-            const bool modified = reg.hasOverride(a->id); // the arrow beside it puts the default back
-            const float tile = ImGui::GetFrameHeight() + 2.0f * s; // each small button beside the key (reset, two keys)
-            if (ImGui::Button((text + "##hk." + a->id).c_str(), ImVec2(-(tile * (modified ? 2.0f : 1.0f)), 0)))
-                app.beginShortcutCapture(a->id);
-            if (reg.hasOverride(a->id)) ImGui::PopStyleColor();
-            ui::HelpText((std::string(tr("Shortcut for")) + " " + trAction(a->id, a->label)).c_str(), chord.c_str(),
-                         chord.find(kThen) != std::string::npos
-                             ? "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
-                               "the arrow beside it puts the default back. A two-key shortcut (C then V) also works with "
-                               "both keys pressed together."
-                             : "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
-                               "the arrow beside it puts the default back.",
-                         "Preferences > Hotkeys");
-            ImGui::SameLine(0.0f, 2.0f * s);
-            const bool sequenceClicked = ImGui::SmallButton(("##hkseq." + a->id).c_str());
-            {   // the chevrons drawn over the button, which keeps a plain id (scripts click it by "##hkseq.<action>")
-                const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
-                const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_CHEVRONS_RIGHT);
-                ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
-                                                    ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_CHEVRONS_RIGHT);
-            }
-            if (sequenceClicked) app.beginShortcutCapture(a->id, true);
-            ui::HelpText("Two keys in a row", nullptr,
-                         "Adds a second shortcut that takes two different keys one after the other, like A then S (within the Two-key "
-                         "window in Preferences > Input), or both pressed together. Each key still works alone if it is "
-                         "bound; it runs when the window is up and the other key did not come.",
-                         "Preferences > Hotkeys");
-            if (reg.hasOverride(a->id)) {
-                ImGui::SameLine(0.0f, 2.0f * s);
-                const bool resetClicked = ImGui::SmallButton(("##hkreset." + a->id).c_str());
-                {   // the arrow drawn over the button, which keeps a plain id (scripts click it by "##hkreset.<action>")
-                    const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
-                    const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_ROTATE_CCW);
-                    ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
-                                                        ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_ROTATE_CCW);
-                }
-                if (resetClicked) {
-                    const std::string lost = reg.resetShortcut(a->id);
-                    app.status_ = std::string(trAction(a->id, a->label)) + ": default " + reg.shortcutText(a->id) +
-                                  (lost.empty() ? "" : " (was " + lost + ")");
-                }
-                ui::HelpText("Reset to default", nullptr, "Puts this action's default shortcut back.", "Preferences > Hotkeys");
-            }
+            drawShortcutCell(app, *a, s, hotkeysPath);
         }
         ImGui::EndTable();
     }
@@ -2334,6 +2357,245 @@ void drawHotkeysSection(App& app) {
         app.status_ = "Default shortcuts restored";
     }
     ui::HelpText("Default shortcuts", nullptr, "Undo every shortcut change.", "Preferences > Hotkeys");
+    app.drawShortcutConflict(); // inside the Preferences popup stack: Esc closes only the box
+}
+
+namespace {
+
+// The labels of the other actions that share one of this action's keys, ", " separated ("" for none). Every action's
+// answer is worked out once per registry revision (the Hotkeys list asks for hundreds of rows a frame: asking the
+// registry per row would be quadratic).
+std::string sharedKeyHolders(const ActionRegistry& reg, const Action& a) {
+    static unsigned revision = ~0u;
+    static Language language = Language::English; // (the names are translated: a language switch rebuilds)
+    static std::unordered_map<std::string, std::string> byId;
+    if (revision != reg.revision() || language != sf::language()) {
+        revision = reg.revision();
+        language = sf::language();
+        byId.clear();
+        std::unordered_map<std::string, std::vector<const Action*>> byKey; // one alternative -> the actions that have it
+        for (const Action& x : reg.all()) {
+            if (!x.run) continue;
+            for (const std::string& alt : shortcutAlternatives(reg.shortcutText(x.id))) byKey[alt].push_back(&x);
+        }
+        // In the registry's order, each action's alternatives in their order: the same text every frame and run.
+        for (const Action& mine : reg.all()) {
+            if (!mine.run) continue;
+            std::string out;
+            std::vector<const Action*> named;
+            for (const std::string& alt : shortcutAlternatives(reg.shortcutText(mine.id)))
+                for (const Action* other : byKey[alt]) {
+                    if (other == &mine || std::find(named.begin(), named.end(), other) != named.end()) continue;
+                    named.push_back(other);
+                    out += (out.empty() ? "" : ", ") + std::string(trAction(other->id, other->label));
+                }
+            if (!out.empty()) byId[mine.id] = std::move(out);
+        }
+    }
+    const auto it = byId.find(a.id);
+    return it == byId.end() ? std::string() : it->second;
+}
+
+} // namespace
+
+// The key button (click, then press the new key), the two-keys button and, once changed, the reset arrow: one action's
+// shortcut as the Hotkeys list shows it, in the table column it is called from. A key another action has as well
+// (an imported keymap, a style's default meeting an override) shows in the warning colour, and the help names it.
+void drawShortcutCell(App& app, const Action& a, float s, const char* path) {
+    ActionRegistry& reg = app.actions();
+    const std::string chord = reg.shortcutText(a.id);
+    const bool capturing = app.capturingShortcut() == a.id;
+    const bool sequencing = capturing && app.capturingSequence();
+    const std::string text = sequencing ? (app.captureFirstKey().empty() ? std::string(tr("press 2 keys..."))
+                                                                         : app.captureFirstKey() + " " + tr("then..."))
+                             : capturing ? tr("press a key...") : chord.empty() ? "-" : chord;
+    const std::string shared = sharedKeyHolders(reg, a); // the other actions that have one of these keys too
+    const bool modified = reg.hasOverride(a.id); // the arrow beside it puts the default back
+    if (!shared.empty()) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::danger));
+    else if (modified) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::accent));
+    const float tile = ImGui::GetFrameHeight() + 2.0f * s; // each small button beside the key (reset, two keys)
+    if (ImGui::Button((text + "##hk." + a.id).c_str(), ImVec2(-(tile * (modified ? 2.0f : 1.0f)), 0)))
+        app.beginShortcutCapture(a.id);
+    if (!shared.empty() || modified) ImGui::PopStyleColor();
+    const std::string title = std::string(tr("Shortcut for")) + " " + trAction(a.id, a.label);
+    std::string help = chord.find(kThen) != std::string::npos
+                           ? "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
+                             "the arrow beside it puts the default back. A two-key shortcut (C then V) also works with "
+                             "both keys pressed together."
+                           : "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
+                             "the arrow beside it puts the default back.";
+    if (!shared.empty()) help = std::string(tr("Also bound to:")) + " " + shared + ". " + help;
+    ui::HelpText(title.c_str(), chord.c_str(), help.c_str(), path);
+    ImGui::SameLine(0.0f, 2.0f * s);
+    const bool sequenceClicked = ImGui::SmallButton(("##hkseq." + a.id).c_str());
+    {   // the chevrons drawn over the button, which keeps a plain id (scripts click it by "##hkseq.<action>")
+        const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+        const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_CHEVRONS_RIGHT);
+        ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
+                                            ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_CHEVRONS_RIGHT);
+    }
+    if (sequenceClicked) app.beginShortcutCapture(a.id, true);
+    ui::HelpText("Two keys in a row", nullptr,
+                 "Adds a second shortcut that takes two different keys one after the other, like A then S (within the Two-key "
+                 "window in Preferences > Input), or both pressed together. Each key still works alone if it is "
+                 "bound; it runs when the window is up and the other key did not come.",
+                 path);
+    if (modified) {
+        ImGui::SameLine(0.0f, 2.0f * s);
+        const bool resetClicked = ImGui::SmallButton(("##hkreset." + a.id).c_str());
+        {   // the arrow drawn over the button, which keeps a plain id (scripts click it by "##hkreset.<action>")
+            const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+            const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_ROTATE_CCW);
+            ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
+                                                ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_ROTATE_CCW);
+        }
+        if (resetClicked) {
+            const std::string lost = reg.resetShortcut(a.id);
+            app.status_ = std::string(trAction(a.id, a.label)) + ": default " + reg.shortcutText(a.id) +
+                          (lost.empty() ? "" : " (was " + lost + ")");
+        }
+        ui::HelpText("Reset to default", nullptr, "Puts this action's default shortcut back.", path);
+    }
+}
+
+namespace {
+
+// The drag gesture of one camera move (Preferences > Navigation): a mouse button, then Ctrl / Shift / Alt toggles. Items
+// keep plain ids (scripts: "##navdrag.pan", "Ctrl##navmod.pan").
+void drawNavDragPicker(App& app, int move, float s, const char* path) {
+    NavDrag& d = app.uiPrefs().nav.drag[move];
+    const std::string id = kNavMoveIds[move];
+    // the combo takes what the three toggles leave (each a frame high plus padding), so the row fits a narrow panel
+    const float toggle = ImGui::CalcTextSize(tr("Shift")).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    ImGui::SetNextItemWidth(std::max(56.0f * s, ImGui::GetContentRegionAvail().x - 3.0f * (toggle + 2.0f * s)));
+    if (ImGui::BeginCombo(("##navdrag." + id).c_str(), d.set() ? tr(navButtonName(d.button)) : tr("None"))) {
+        for (int b = 0; b <= 3; ++b) {
+            const char* name = b ? navButtonName(b) : "None";
+            if (ImGui::Selectable((std::string(tr(name)) + "##navdrag." + id).c_str(), d.button == b)) d.button = b;
+        }
+        ImGui::EndCombo();
+    }
+    ui::HelpText("Drag gesture", nullptr,
+                 "The mouse button that drags this camera move, with the keys beside it held: Left needs Ctrl, Shift or Alt "
+                 "(a plain left drag sculpts). None: the key style's own gestures. A gesture set here comes first, before "
+                 "what the key style does with that button; the warning under the list says what it takes over.",
+                 path);
+    struct Mod { const char* name; bool* on; } mods[] = {{"Ctrl", &d.ctrl}, {"Shift", &d.shift}, {"Alt", &d.alt}};
+    for (const Mod& m : mods) {
+        ImGui::SameLine(0.0f, 2.0f * s);
+        const bool on = *m.on; // (read once: the click below flips it, and the push and pop must pair)
+        if (on) ImGui::PushStyleColor(ImGuiCol_Button, col(ui::color::accent));
+        if (ImGui::Button((std::string(tr(m.name)) + "##navmod." + id).c_str())) *m.on = !on;
+        if (on) ImGui::PopStyleColor();
+        ui::HelpText(m.name, nullptr, "Hold this key with the button for the gesture. Orange: part of the gesture.", path);
+    }
+}
+
+// A row label in a narrow column: whole when it fits, otherwise ellipsized with the full name as a tooltip (the
+// Preferences popup is narrow; "Frame last stroke" was cut at 1440 px, cto 11-24).
+void cellLabel(const char* text) {
+    const float avail = ImGui::GetContentRegionAvail().x;
+    const ImVec2 size = ImGui::CalcTextSize(text);
+    ImGui::AlignTextToFramePadding();
+    if (size.x <= avail) {
+        ImGui::TextUnformatted(text);
+        return;
+    }
+    ImVec2 pos = ImGui::GetCursorScreenPos();
+    pos.y += ImGui::GetStyle().FramePadding.y;
+    ImGui::RenderTextEllipsis(ImGui::GetWindowDrawList(), pos, ImVec2(pos.x + avail, pos.y + size.y), pos.x + avail, pos.x + avail,
+                              text, nullptr, &size);
+    ImGui::Dummy(ImVec2(avail, ImGui::GetFrameHeight()));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", text);
+}
+
+} // namespace
+
+// Preferences > Navigation (members on Discord): the camera's bindings in one place. Per move a hold key (any
+// key; held, every press on the canvas is that drag) and a drag gesture (button + modifiers), the view keys, the pen's
+// side buttons (as Preferences > Tablet), and Navigation defaults. Nothing is set by default: every key style keeps
+// its gestures, so this is a choice, never a change.
+void drawNavigationSection(App& app) {
+    const float s = ImGui::GetFontSize() / 15.0f;
+    const char* path = "Preferences > Navigation";
+    ActionRegistry& reg = app.actions();
+    ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextUnformatted(tr("Hold a key and drag with any button or the pen, or drag with a mouse button and Ctrl, Shift or Alt. "
+                              "Nothing is set until you choose it: the key style's own gestures stay."));
+    ImGui::PopTextWrapPos();
+    ImGui::PopStyleColor();
+    // Two short tables, one under the other (the Preferences popup is narrow): the hold keys as Hotkeys shows a key,
+    // then the drag gestures.
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", tr("Hold key"));
+    if (ImGui::BeginTable("##nav_moves", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX)) {
+        ImGui::TableSetupColumn("move", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("key", ImGuiTableColumnFlags_WidthFixed, 165.0f * s);
+        for (int i = 0; i < kNavMoves; ++i) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            cellLabel(tr(kNavMoveLabels[i]));
+            ui::HelpAction(app, kNavHoldActions[i]);
+            ImGui::TableNextColumn();
+            if (const Action* a = reg.find(kNavHoldActions[i])) drawShortcutCell(app, *a, s, path);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", tr("Drag gesture"));
+    if (ImGui::BeginTable("##nav_drags", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX)) {
+        ImGui::TableSetupColumn("move", ImGuiTableColumnFlags_WidthFixed, 52.0f * s);
+        ImGui::TableSetupColumn("drag", ImGuiTableColumnFlags_WidthStretch);
+        for (int i = 0; i < kNavMoves; ++i) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(tr(kNavMoveLabels[i]));
+            ui::HelpAction(app, kNavHoldActions[i]);
+            ImGui::TableNextColumn();
+            drawNavDragPicker(app, i, s, path);
+        }
+        ImGui::EndTable();
+    }
+    for (const std::string& w : app.navWarningLines()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::danger));
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted((std::string(ICON_LC_TRIANGLE_ALERT) + "  " + w).c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::PopStyleColor();
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", tr("View keys"));
+    static const char* const kViewKeys[] = {"view.frame", "view.frame_selected", "view.frame_last_stroke", "view.reset",
+                                            "view.orbit_left", "view.orbit_right", "view.orbit_up", "view.orbit_down",
+                                            "view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down",
+                                            "view.zoom_in", "view.zoom_out"};
+    if (ImGui::BeginTable("##nav_keys", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX)) {
+        ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("key", ImGuiTableColumnFlags_WidthFixed, 165.0f * s);
+        for (const char* id : kViewKeys) {
+            const Action* a = reg.find(id);
+            if (!a) continue;
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            cellLabel(trAction(a->id, a->label));
+            ui::HelpAction(app, a->id.c_str());
+            ImGui::TableNextColumn();
+            drawShortcutCell(app, *a, s, path);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", tr("Pen buttons"));
+    const float width = ImGui::GetContentRegionAvail().x;
+    for (int b = 0; b < kPenButtons; ++b) app.drawPenButtonRow(b, path, width);
+    ImGui::Spacing();
+    if (ImGui::Button(tr("Navigation defaults##nav.defaults"), ImVec2(-FLT_MIN, 0))) app.resetNavigationBindings();
+    ui::HelpText("Navigation defaults", nullptr,
+                 "The hold keys unbound, no drag gestures, the view keys above back to the key style's defaults, and the "
+                 "pen's side buttons as the Tablet defaults. Other shortcuts stay as they are.",
+                 path);
     app.drawShortcutConflict(); // inside the Preferences popup stack: Esc closes only the box
 }
 

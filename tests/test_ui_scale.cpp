@@ -9,6 +9,7 @@
 #include "app/UiScale.h"
 
 #include <cmath>
+#include <string>
 
 using namespace sf;
 
@@ -35,9 +36,54 @@ TEST(ui_scale_choice_wins_and_is_clamped) {
         CHECK(near(resolveUiScale(s, 2.0f), s)); // a chosen scale ignores the display (#87: Automatic overrode it)
     }
     CHECK(near(resolveUiScale(9.0f, 1.0f), 3.0f));
-    CHECK(near(resolveUiScale(0.0f, 0.1f), 0.5f));
+    CHECK(near(resolveUiScale(0.0f, 0.1f), 0.7f)); // never below 70 % (the captions stop reading)
+    for (float s : {0.7f, 0.75f, 0.85f, 0.9f}) CHECK(near(resolveUiScale(s, 2.0f), s)); // below 100 % (Fenix 11-22)
+    CHECK(near(resolveUiScale(0.6f, 1.0f), 0.7f));
     CHECK(uiScaleChanged(1.0f, 1.25f));
     CHECK(!uiScaleChanged(1.25f, 1.2499f)); // jitter from the system rebuilds nothing
+}
+
+TEST(ui_scale_slider_steps_and_compact_padding) {
+    // The slider lands on whole 5 % steps inside 70-300 %.
+    CHECK(near(snapUiScale(0.73f), 0.75f));
+    CHECK(near(snapUiScale(0.72f), 0.7f));
+    CHECK(near(snapUiScale(1.0f), 1.0f));
+    CHECK(near(snapUiScale(1.126f), 1.15f));
+    CHECK(near(snapUiScale(0.5f), 0.7f));
+    CHECK(near(snapUiScale(4.0f), 3.0f));
+    // Below 100 % the padding shrinks by the square root of the scale (70 % text keeps 84 % padding), never more than
+    // the text; at and above 100 % everything scales alike.
+    CHECK(near(compactPadScale(0.7f), std::sqrt(0.7f)));
+    CHECK(compactPadScale(0.7f) > 0.7f && compactPadScale(0.7f) < 1.0f);
+    CHECK(compactPadScale(0.85f) > 0.85f && compactPadScale(0.85f) < 1.0f);
+    CHECK(near(compactPadScale(1.0f), 1.0f));
+    CHECK(near(compactPadScale(1.5f), 1.5f));
+    CHECK(near(compactPadScale(3.0f), 3.0f));
+}
+
+TEST(ui_scale_remembered_per_display) {
+    DisplayScales scales;
+    const std::string laptop = displayScaleKey("Built-in Retina Display", 3024, 1964);
+    const std::string monitor = displayScaleKey("DELL U2720Q", 3840, 2160);
+    CHECK(laptop != monitor);
+    CHECK(displayScaleKey("DELL U2720Q", 3840, 2160) == monitor); // the same monitor again: the same key
+    CHECK(displayScaleKey("DELL U2720Q", 1920, 1080) != monitor); // its 1080p sibling is another one
+    CHECK(displayScaleKey(nullptr, 1920, 1080) == displayScaleKey("", 1920, 1080)); // SDL without a name
+    CHECK(!hasDisplayScale(scales, laptop));
+    CHECK(near(displayScaleFor(scales, laptop, 1.25f), 1.25f)); // no entry: the general choice
+    setDisplayScale(scales, monitor, 0.8f);
+    CHECK(near(displayScaleFor(scales, monitor, 1.25f), 0.8f));
+    CHECK(near(displayScaleFor(scales, laptop, 1.25f), 1.25f)); // the laptop keeps the general choice
+    setDisplayScale(scales, laptop, 0.0f); // Automatic on the laptop
+    CHECK(hasDisplayScale(scales, laptop));
+    CHECK(near(displayScaleFor(scales, laptop, 1.25f), 0.0f));
+    CHECK(near(resolveUiScale(displayScaleFor(scales, laptop, 1.25f), 2.0f), 2.0f)); // ...so the display decides there
+    setDisplayScale(scales, monitor, 0.7f); // changed: one entry, the new value
+    CHECK(scales.size() == 2);
+    CHECK(near(displayScaleFor(scales, monitor, 1.25f), 0.7f));
+    for (int i = 0; i < 40; ++i) setDisplayScale(scales, displayScaleKey("Projector", 1280 + i, 720), 1.0f);
+    CHECK(scales.size() == 16); // the oldest forgotten
+    CHECK(!hasDisplayScale(scales, laptop));
 }
 
 TEST(ui_scale_fonts_at_the_pixel_density) {
@@ -61,14 +107,16 @@ TEST(ui_scale_fonts_at_the_pixel_density) {
 TEST(ui_scale_matrix_shell_sizes) {
     // A 2400x1350 window (wide enough that no scale makes it narrow): every shell size grows with the scale.
     const ShellGeometry base = computeShell(standardLayout(), 2400, 1350, 1.0f);
-    for (float s : {1.0f, 1.25f, 1.5f, 1.75f}) {
+    for (float s : {0.7f, 0.85f, 1.0f, 1.25f, 1.5f, 1.75f}) { // (70 and 85 %: the shelves shrink with the text)
         const ShellGeometry g = computeShell(standardLayout(), 2400, 1350, s);
         CHECK(!g.narrow);
         CHECK(near(g.rightShelf.w, base.rightShelf.w * s, 1.0f));
         CHECK(near(g.leftShelf.w, base.leftShelf.w * s, 1.0f));
         CHECK(near(g.title.h, base.title.h * s, 1.0f));
         CHECK(near(g.topShelf.h, base.topShelf.h * s, 1.0f));
-        CHECK(g.canvas.w < base.canvas.w + 0.5f && g.canvas.w > 0.0f);
+        CHECK(g.canvas.w > 0.0f);
+        if (s >= 1.0f) CHECK(g.canvas.w < base.canvas.w + 0.5f); // larger shelves: less canvas
+        else CHECK(g.canvas.w > base.canvas.w - 0.5f);            // smaller shelves: more canvas (the point of 70 %)
     }
     // 200 % on the same window: 1200 logical px is a narrow window, the shelves still scale.
     const ShellGeometry g = computeShell(standardLayout(), 2400, 1350, 2.0f);

@@ -9,6 +9,7 @@
 #include "app/OptimisticBench.h"
 #include "app/StartupSplashWindow.h"
 #include "app/UserData.h"
+#include "core/UiTestSeed.h"
 #include "app/UiServe.h"
 #include "ai/AiPolicy.h"
 #include "core/BenchPack.h"
@@ -38,6 +39,10 @@
 #include <vector>
 #ifndef _WIN32
 #include <unistd.h> // execv (--cli)
+
+#ifndef SCULPTFORGE_VERSION
+#define SCULPTFORGE_VERSION "unknown" // (the build sets it: CMakeLists.txt)
+#endif
 #endif
 
 #if defined(_WIN32)
@@ -379,6 +384,12 @@ static int runMain(int argc, char** argv) {
             options.uiRecordClip = true;
         }
         isolateSettings();
+        // "# prefs: {...}" in the script: the settings the test starts from, written only into the isolated profile
+        // (core/UiTestSeed.h refuses anything else, so a script can never touch a real user's settings).
+        if (const std::string why = sf::uitest::seedPrefs(options.uiTest, g_isolatedDir.string(), sf::userDataDir(), std::getenv("SF_ISOLATE"),
+                                                           SCULPTFORGE_VERSION);
+            !why.empty() && why != "none")
+            std::fprintf(stderr, "ui-test: '# prefs:' %s\n", why.c_str());
     }
     if (options.benchmarkScene == "standard-1b") { // the asset first (written once, a few seconds), before any window
 #if defined(_WIN32)

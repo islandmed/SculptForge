@@ -53,13 +53,56 @@ Fail at any step: the temporary file is deleted, nothing in place changes, nothi
 - Key loss or leak: ship a release with a new key (old apps then fall back to the Download button for releases
   signed with a key they don't know).
 
-## macOS (plan only)
+## macOS
 
-The app is ad-hoc signed, so Gatekeeper treats each new bundle as new: replacing `/Applications/SculptForge.app`
-in place would trip quarantine/translocation and could leave a bundle that won't open. Safe path, once there is a
-Developer ID and notarization: download the `.dmg` (same chain), `hdiutil attach -nobrowse`, `ditto` the bundle to
-`SculptForge.app.new` beside the old one, verify `codesign --verify --deep --strict` and the Team ID, swap with
-`rename`, relaunch with `open -n`. Until then: Download (and `brew upgrade --cask sculptforge` for Homebrew).
+The same chain (feed, fixed GitHub URLs, signed `SHA256SUMS.txt`, versioned name `SculptForge-<v>-darwin-universal.dmg`,
+hash), then a fourth check before the swap. What it proves, in one line (the UI, the guide and the changes note say no
+more): it protects against a broken or altered download; not against someone who controls the project's GitHub
+releases (the checksum-list key is an Actions secret there); a developer-signed Mac build adds that later.
+
+- **Where**: the bundle the running executable is in (`<...>/SculptForge.app/Contents/MacOS/sculptforge`), wherever the
+  user keeps it. Not self-updated: a Homebrew cask (`brew upgrade --cask sculptforge`), a bundle Gatekeeper runs from a
+  read-only translocation copy (`/AppTranslocation/`), a build folder. The `.dmg` is downloaded to
+  `~/Library/Caches/SculptForge/updates/`, never into `/Applications`.
+- **Open, copy** (`installMacApp`): the staged image's hash is checked again, then `/usr/bin/hdiutil attach -nobrowse
+  -readonly -noautoopen -mountpoint <our folder>` (read-only, nothing opened or run from it; our images have no licence
+  prompt and the child's stdin is /dev/null), the image must hold exactly one `.app`, named `SculptForge.app`;
+  `/usr/bin/ditto` copies it to `SculptForge.app.new` beside the old bundle (same volume: the swap is a rename); detach.
+- **Code signature**: `/usr/bin/codesign --verify --deep --strict SculptForge.app.new` must exit 0, and the Security
+  framework (`SecStaticCodeCheckValidity` strict + nested code + all architectures) must agree; its team identifier must
+  equal the running app's own (`SecCodeCopySelf`, read at run time). Neither identifier is stored, hard-coded or shown.
+  Today's builds are ad-hoc signed (`cmake/MacSign.cmake`, no `SCULPTFORGE_CODESIGN_IDENTITY` in CI): both sides have no
+  team identifier, so this step proves the bundle's integrity (every file matches its signature) but not who made it;
+  the checksum list adds only that the files are the ones the release build published (see above: not proof against
+  someone who controls the project's GitHub releases). A future Developer ID build makes the team check bite: an app
+  with a team identifier refuses a download with another one or none.
+- **Swap**: `update_pending.json`, then `renamex_np(new, target, RENAME_SWAP)` (APFS: one atomic step; the target path
+  is always a whole bundle), the old bundle becomes `SculptForge.app.old`. Elsewhere two renames, the second undone on
+  failure. No privileges are asked for: a folder this user can't write to is an error and nothing changes.
+- **Relaunch, rollback**: as Linux. Restart now starts `Contents/MacOS/sculptforge` of the new bundle and watches it;
+  the new version confirms after 5 s (the `.old` bundle goes), else the old one is put back and the `.failed` bundle is
+  removed so Finder never shows it. Later installs at quit.
+- **Dry run**: `SF_UPDATE_DRY_RUN=1` does everything up to and including the signature checks, then removes the copy
+  and the download; the status line says what would have happened. Linux/Windows: the same variable skips the install
+  and removes the download.
+- **Feed hold**: the Update button replaces a Mac bundle only when `latest.json` carries a top-level
+  `"self_update": {"macos": true}` (`UpdateInfo::macSelfUpdate`; missing, unreadable, any other value, or the key inside
+  a channel = no offer, the banner's Download link). Checked where the button is drawn and again where the download
+  starts, and read through a strict parse (a duplicate key anywhere in the feed keeps the hold). It only ever removes
+  behaviour. Turning it on is a release decision, not a routine site push: the real-Mac tester's run of the swap against
+  a public release (through a local feed copy with the flag, `SF_UPDATE_FEED=<file>`) plus OKs from input and cto, logged
+  in reviews.tsv, then sitepush. The same key set back to false is the kill switch if a swap ever goes wrong in the
+  field: it stops new swaps within a day (the feed is read once a day, or on Help > Check for updates) but cannot undo
+  one that already happened (that Mac keeps the `.old` bundle only until the new version has run 5 s).
+- **Build switch**: CMake `SCULPTFORGE_MAC_SELF_UPDATE` (default ON; `SF_MAC_SELF_UPDATE` in core/SelfUpdate.h). OFF
+  builds the leg out: a Mac gets the banner's Download link as before and `downloadUpdate` refuses a bundle install; the
+  release manager ships OFF when no real-Mac tester has run the checklist by the cut. Nothing else changes.
+- **Quarantine**: the app's own HTTP client sets no `com.apple.quarantine` attribute (as `curl -O` doesn't), so the
+  copied bundle opens without Gatekeeper's first-launch prompt; what it opens is exactly the bytes the signed list names.
+
+Tests: `tests/test_self_update.cpp` (`self_update_mac_*`): the tools stood in for on every platform (order of the calls,
+every refusal leaves Applications as it was, the download gone, the image detached), and on a macOS runner a real
+ad-hoc signed probe bundle through `macBundleSignature` (passes; fails once a file is changed).
 
 ## Member builds (src/core/MemberBuilds.*, src/core/Keychain.*)
 

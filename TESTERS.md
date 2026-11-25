@@ -1,3 +1,9 @@
+# Testers: Android Mali, the sphere vanishing (0.13.14 follow-up)
+For the member who reported it (Mali-G72, buffer-texture limit 65536) and any Mali phone or tablet; a Xiaomi that painted fine is not the case to repeat.
+- **Sphere**, 6 subdivisions (about 70k triangles, past 65k); the sphere is visible at once. **Texture Image > Auto UV > New Texture** (2K); **Paint into: Texture**; paint a stroke. Good: the sphere stays visible and the stroke shows.
+- Switch **Wire** and the PBR view on and off, add a Paint layer: the model never disappears.
+- Then **Help > Copy log to clipboard** and paste it to us; "GL error" or "GL driver message" lines mean it still fails (tell us the device and Android version).
+
 # Testers: Android, New Texture on a Mali tablet or phone
 The model vanished (or showed only its wireframe) after Texture Image > New Texture on a Mali-G72 tablet. Any Android device helps; Mali first.
 - **Sphere**, 5-6 subdivisions (60k+ triangles); **Texture Image > Auto UV**; **New Texture** (2K); paint one stroke. Good: the sphere stays visible and the stroke shows.

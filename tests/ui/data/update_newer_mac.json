@@ -1,0 +1,12 @@
+{
+  "version": "99.0.0",
+  "download": "https://islandmed.github.io/SculptForge/#download",
+  "notes": "https://islandmed.github.io/SculptForge/guide/whats-new.html",
+  "highlights": [
+    "Twice as fast",
+    "Half the memory"
+  ],
+  "self_update": {
+    "macos": true
+  }
+}

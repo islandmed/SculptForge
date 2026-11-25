@@ -8,7 +8,9 @@
 #pragma once
 
 #include "app/LookSchemes.h"
+#include "app/NavBindings.h"
 #include "app/Theme.h"
+#include "app/UiScale.h"
 #include "core/Json.h"
 #include "core/ModifierBrush.h"
 #include "core/SpaceMouse.h"
@@ -30,11 +32,13 @@ struct UiPrefs {
     bool reduceMotion = false;  // hover highlights change colour only: no easing, no lifting tiles (Ui.h)
     bool oneSubpalette = true;  // opening a sub-palette closes the others (Shift+click opens more)
     bool autoCollapseLeft = true, autoCollapseRight = false; // trays collapse palettes that would overflow
-    float uiScale = 0.0f;       // 0 = follow the display; otherwise applied at the next start
+    float uiScale = 0.0f;       // 0 = follow the display (Automatic); 0.7-3.0 otherwise, applied live (UiScale.h)
+    DisplayScales uiScaleByDisplay; // the choice per monitor the window has been on (displayScaleKey): wins over uiScale there
     bool libraryAtStartup = true;
     bool startupSplash = true;  // the logo while a slow start-up runs (read early from ui.json: StartupSplash.h)
     std::string libraryFolder;  // "" = Documents/SculptForge
     bool alphabeticalPalettes = false; // strict A-Z palette bar (default: File, Edit first)
+    bool appendLowPoly = false; // Parts > Append makes low-poly cages for Polygon mode (off: the dense sculpting meshes, as always)
     int newerMenuRows = -1;     // the menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts, > Render bridge): -1 = by layout (Classic off, SculptForge on), 0 off, 1 on
     // Preferences > Interface > Units (#148; core/Units.h ids): the unit sizes show in (brush ring, Part size, export
     // sizes, Measure), and the unit the numbers in OBJ and PLY files are read in (STL is millimetres by convention).
@@ -59,6 +63,7 @@ struct UiPrefs {
     bool rightClickQuickMenu = true; // a right click on the canvas (no drag) opens the QuickMenu (#22)
     ModifierBrushes modifierBrushes; // the Shift and Ctrl brushes (Shift+click / Ctrl+click a shelf brush)
     bool spaceCamera = false; // hold Space and drag to move the camera (#43; off: Space opens the QuickMenu)
+    NavBindings nav;          // custom drag gestures per camera move (Preferences > Navigation; none by default)
     // Blender style (#77): off, as Blender 5.1+'s default keymap, Alt+left-drag on the model masks (Ctrl+Alt unmasks)
     // and turns the view only beside the model; on (Blender's Emulate 3 Button Mouse) it always turns the view.
     bool emulate3Button = false;
@@ -132,6 +137,9 @@ struct UiPrefs {
     bool backfaceCulling = false;
     // View > Display > Floor grid (#115): the grid on the ground plane (RenderSettings::floorGrid). Off by default.
     bool floorGrid = false;
+    // View > Display > Floor grid at Y=0 (Discord ask): the grid stays at world height zero instead of following the
+    // lowest point of the visible Parts. Off by default (the grid follows the model, as before).
+    bool floorGridFixed = false;
     // UV Editor > Pack > Columns x Rows (#135): the UDIM grid the last pack filled, the default for new projects.
     int uvPackColumns = 1, uvPackRows = 1;
     // Preferences > Interface > Mask darkness (and Tool > Masking): how strongly masked areas show, 0-1
@@ -162,6 +170,7 @@ struct UiPrefs {
     // the PBR view; viewOcclusionLitSphere adds them to the Lit Sphere and studio shading.
     int viewAo = -1, viewShadows = -1;
     float aoStrength = 0.8f, aoSoftness = 0.4f, shadowSoftness = 0.35f;
+    float shadowStrength = 1.0f; // times the light's own share: 1 = the shipped darkness, 2 = black (RenderSettings::shadowStrength)
     bool viewOcclusionLitSphere = false;
     bool multithreading = true; // brushes, normals and BVH updates on every core (off: one thread)
     // Sculpt strokes solved on their own thread with a GPU preview of the dabs still to come, the cursor and the
@@ -215,11 +224,17 @@ void fromJson(const Json& j, UiPrefs& prefs);
 const char* orbitLockName(int lock);
 int parseOrbitLock(std::string_view name);
 
+struct Action;
+
 namespace config {
 // Preferences palette sub-palettes (the shell's Preferences palette calls these).
 void drawConfigSection(App& app);    // Customize Shelves, Store / Restore / Save / Import Interface
 void drawInterfaceSection(App& app); // UI scale, Ctrl+hover help, tooltips, sub-palettes, left-handed layout
 void drawHotkeysSection(App& app);   // every action's shortcut, click to reassign
+void drawNavigationSection(App& app); // orbit / pan / zoom: hold keys, drag gestures, pen buttons, the view keys
+// One action's shortcut cell as Hotkeys draws it (the key button, the two-keys button, the reset arrow when changed),
+// in the table column it is called from. `path`: the help footer's menu path.
+void drawShortcutCell(App& app, const Action& a, float s, const char* path);
 void drawLibraryBrowserSection(App& app);  // show at startup, rows, placement, library folder
 // The Classic look's colours as a Palette (for its card; the look itself uses Theme.h's tokens).
 looks::Palette classicPalette();

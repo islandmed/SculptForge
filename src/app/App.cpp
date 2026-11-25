@@ -1717,7 +1717,39 @@ float App::targetUiScale() const {
     if (displayScaleOverride_ > 0.0f) automatic = displayScaleOverride_; // UI tests: display_scale
     else if (!options_.recordPath.empty() || !options_.uiTest.empty()) automatic = float(options_.height) / 900.0f;
     else if (window_) automatic = automaticUiScale(SDL_GetWindowDisplayScale(window_), SDL_GetWindowPixelDensity(window_));
-    return resolveUiScale(uiPrefs_.uiScale, automatic);
+    return resolveUiScale(uiScalePreference(), automatic);
+}
+
+// The display's name and its size in physical pixels (its mode's size times its pixel density: 3840x2160 for a 4K
+// monitor whether Windows runs it at 150 % or macOS at 2x), so the key is the monitor's, not the window's.
+std::string App::displayScaleKey() const {
+    if (!window_) return "";
+    const SDL_DisplayID display = SDL_GetDisplayForWindow(window_);
+    if (!display) return "";
+    int w = 0, h = 0;
+    if (const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(display); mode && mode->w > 0 && mode->h > 0) {
+        const float d = mode->pixel_density > 0.0f && std::isfinite(mode->pixel_density) ? mode->pixel_density : 1.0f;
+        w = int(std::lround(mode->w * d));
+        h = int(std::lround(mode->h * d));
+    } else {
+        SDL_Rect bounds{};
+        if (!SDL_GetDisplayBounds(display, &bounds)) return "";
+        w = bounds.w;
+        h = bounds.h;
+    }
+    return sf::displayScaleKey(SDL_GetDisplayName(display), w, h);
+}
+
+float App::uiScalePreference() const {
+    const std::string key = displayScaleKey();
+    return key.empty() ? uiPrefs_.uiScale : displayScaleFor(uiPrefs_.uiScaleByDisplay, key, uiPrefs_.uiScale);
+}
+
+void App::setUiScalePreference(float scale) {
+    scale = scale > 0.0f ? std::clamp(scale, kMinUiScale, kMaxUiScale) : 0.0f;
+    uiPrefs_.uiScale = scale;
+    if (const std::string key = displayScaleKey(); !key.empty()) setDisplayScale(uiPrefs_.uiScaleByDisplay, key, scale);
+    requestUiScale();
 }
 
 // Live, between frames (the atlas can't change inside one): the fonts rasterised again at the new size, the style
@@ -1917,6 +1949,16 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) androidBack();
         return;
     }
+    // An Alt+middle click (centreViewOnPointer) is over once anything moves the pointer past the slop: here, before a
+    // pen in range makes the mouse's moves strays (strayMouseMotion) or a pointer drag drops the pen's samples
+    // (onMouseMove), so whichever device carries the drag, a drag never ends in a centring (artist-qa 11-24).
+    if (centreClick_.pending) {
+        float px = 0.0f, py = 0.0f;
+        bool moved = false;
+        if (event.type == SDL_EVENT_MOUSE_MOTION) { px = event.motion.x; py = event.motion.y; moved = true; }
+        else if (event.type == SDL_EVENT_PEN_MOTION) { px = event.pmotion.x; py = event.pmotion.y; moved = true; }
+        if (moved && std::hypot(px - centreClick_.x, py - centreClick_.y) > kRightClickSlop) centreClick_.pending = false;
+    }
     if (strayMouseMotion(event)) { // neither the canvas nor the UI follows a driver's stray mouse events
         ++penDiag_.strayMouse;
         return;
@@ -1984,6 +2026,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = selectSpace_ = false; // Space let go in another window never reaches us
         quickRemeshDragKey_ = SDLK_UNKNOWN; // (the same for the Quick Remesh drag key)
+        navHoldKey_ = SDLK_UNKNOWN, navHoldMove_ = -1; // (and a Hold to orbit / pan / zoom key)
         break;
 #ifdef __ANDROID__
     case SDL_EVENT_WINDOW_RESIZED: // rotation, split screen, a free-form window: the geometry the touches map onto changed
@@ -2049,7 +2092,11 @@ void App::dispatchEvent(const SDL_Event& event) {
         // A right click that didn't drag: the QuickMenu (#22). (SDL's click for a pen button doesn't count: a pen
         // button opens it only when set to Right click, in penButton.)
         if (e.button.button == SDL_BUTTON_RIGHT && e.button.which != SDL_PEN_MOUSEID) rightClickRelease();
+        centreClick_.release = e.button.button == SDL_BUTTON_MIDDLE; // (only its own release centres the view)
+        centreClick_.upX = e.button.x; // (the event's own place: mouseX_ may be stale when a pen in range made the mouse's moves strays)
+        centreClick_.upY = e.button.y;
         onMouseUp();
+        centreClick_.release = false;
         break;
     case SDL_EVENT_MOUSE_MOTION:
         pointerEventNs_ = e.motion.timestamp; // (the pen predictor's sample time: a batch is handled all at once)
@@ -2082,6 +2129,9 @@ void App::dispatchEvent(const SDL_Event& event) {
             selectSpace_ = true; // (before the camera and the QuickMenu: Space mid-drag is only for this)
             break;
         }
+        // A key bound to Hold to orbit / pan / zoom (Preferences > Navigation): held, the next press on the canvas moves the
+        // camera. Before the Space branch below, so Space bound to one of them works with Hold Space on as well.
+        if (!io.WantCaptureKeyboard && !e.key.repeat) navHoldKey(e.key.key, e.key.mod, true);
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
             spaceCameraKeyDown(uiPrefs_.spaceCamera, io.WantTextInput || io.WantCaptureKeyboard)) {
             spaceHeld_ = true;
@@ -2098,6 +2148,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
         if (e.key.key == SDLK_SPACE) spaceHeld_ = selectSpace_ = false;
         quickRemeshKey(e.key.key, e.key.mod, false);
+        navHoldKey(e.key.key, e.key.mod, false);
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
         radialKeyUp(e.key.key);                        // a radial menu's held key: run the slot pointed at
         strokePopupKeyUp(e.key.key);                   // the stroke popup's held key: pick the item pointed at
@@ -2257,11 +2308,25 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     rightClick_.x = x;
     rightClick_.y = y;
     rightClick_.dx = rightClick_.dy = 0.0f;
+    // Alt+middle click (no drag) centres the view on the pointer (centreViewOnPointer, every key style: an Alt+middle
+    // drag still pans, or orbits with Blender keys, from the press on).
+    centreClick_.pending = button == SDL_BUTTON_MIDDLE && (SDL_GetModState() & SDL_KMOD_ALT) &&
+                           !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_GUI)) && previewLod_ < 0;
+    centreClick_.x = x;
+    centreClick_.y = y;
+    centreClick_.dx = centreClick_.dy = 0.0f;
     zsMenu_.armed = false;
     // A right click on a Forge Sphere opens its menu (#8): Delete, Insert Between, Set as Root.
     if (button == SDL_BUTTON_RIGHT && forgesphereActive() && !doc_.mesh.forgespherePreview &&
         !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)))
         forgesphereRightDown(x, y);
+    // Preferences > Navigation: a Hold to orbit / pan / zoom key held, or a custom drag gesture (button + modifiers), in
+    // every key style and with any button or the pen's tip (NavBindings.h). The drag goes on to the release, as Space's.
+    if (const int move = navMoveForPress(button); move >= 0) {
+        drag_ = move == 0 ? Drag::Orbit : move == 1 ? Drag::Pan : Drag::Zoom;
+        rightClick_.pending = false;
+        return;
+    }
     if (spaceHeld_) { // Preferences > Input > Hold Space and drag to move the camera (#43)
         switch (spaceCameraMove(button, ctrlDown(SDL_GetModState()))) {
         case SpaceCameraMove::Orbit: drag_ = Drag::Orbit; break;
@@ -2477,6 +2542,13 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     mouseX_ = x;
     mouseY_ = y;
     lastInputPen_ = fromPen;
+    if (centreClick_.pending) { // an Alt+middle click so far (as the right click's slop below; the drag never waits)
+        centreClick_.dx += dx;
+        centreClick_.dy += dy;
+        const float steps = std::hypot(centreClick_.dx, centreClick_.dy);
+        const float away = std::hypot(x - centreClick_.x, y - centreClick_.y);
+        if (std::max(steps, away) > kRightClickSlop) centreClick_.pending = false;
+    }
     if (rightClick_.pending) { // a right click so far: the view waits until it is a drag
         // (By the motion's own steps, not the position: some input moves only relatively.) Past the slop, the
         // drag goes on by everything since the press, so it loses nothing.
@@ -2545,6 +2617,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Tube: tubeDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::QuickRemesh: break; // (remeshes when let go)
+    case Drag::RefreshTopology: refreshTopologyTo(x, y); break; // (the drag key held, on the model: PanelRetopo.cpp)
     case Drag::SizeScrub:
         sizeScrubDx_ += dx;
         radiusPx_ = drawSizeScrub(sizeScrubStart_, sizeScrubDx_);
@@ -2734,6 +2807,11 @@ void App::onMouseUp() {
     rollPending_ = false;
     rollSideways_ = false;
     rightClick_.pending = rightClick_.down = false;
+    if (centreClick_.pending) { // Alt+middle click: pressed and let go without moving
+        const bool fire = centreClick_.release; // another button's, a pen's or a touch's release only drops it
+        centreClick_.pending = false;
+        if (fire) centreViewOnPointer(centreClick_.upX, centreClick_.upY);
+    }
     zsMenu_.armed = false;
     orbitStarted_ = false;
     orbitPivotPicked_ = false;
@@ -2742,6 +2820,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::NavWidget) navWidgetRelease(); // the orientation widget: a click (turn there) or a double-click (frame)
     if (drag_ == Drag::Select) selectionMouseUp();
     if (drag_ == Drag::QuickRemesh) quickRemesh(RemeshTrigger::Quick);
+    if (drag_ == Drag::RefreshTopology) refreshTopologyRelease();
     if (drag_ == Drag::Insert) {
         // The drag's length on screen, as a size at the surface point's depth (at least a small default).
         const float px = std::max(insertPx_, 12.0f * uiScale_);
@@ -2922,6 +3001,9 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_;
     strokePaint_ = strokeColourSmooth_ || (strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_));
     strokeSculpt_ = !(strokePaint_ && paintMode_);
+    // Show SculptForge on Discord: a stroke counts as activity (Idle five minutes after the last input or stroke).
+    // When it started, never where, what or on which file (PanelIntegrations.cpp).
+    discordStrokeAt_ = double(SDL_GetTicksNS()) * 1e-9;
     const BrushRecipe* recipe = strokeRecipe();
     { // the brush's own pressure curve (Precision.cpp)
         const auto it = brushCurves_.find(pressureCurveKey(strokeBrush_, recipe));
@@ -3378,8 +3460,12 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
         p.stencil.stencil = &st.stencil;
         p.stencil.viewProj = cam.projection() * cam.view();
         p.stencil.canvasAspect = cr.h > 0.0f ? cr.w / cr.h : 1.0f;
-        if (!haveLastDab_ && p.stencil.weight(p.center) < 0.05f) // (a stroke that starts where the image is dark or off it)
-            status_ = "Stencil on: only its light parts (X removes it)";
+        if (!haveLastDab_ && p.stencil.weight(p.center) < 0.05f) { // (a stroke that starts where the image is dark or off it)
+            glm::vec2 at, uv;
+            const bool off = !p.stencil.canvasAt(p.center, at) || !st.stencil.imageCoord(at, p.stencil.canvasAspect, uv);
+            status_ = off ? "Stencil blocks outside: set to Sculpt"
+                          : "Stencil on: only its light parts (X removes it)";
+        }
     }
     p.strokeDelta = haveLastDab_ ? hit.position - lastDabHit_ : glm::vec3(0.0f);
     lastDabHit_ = hit.position;
@@ -3683,8 +3769,9 @@ AABB App::sceneBounds() const {
 }
 
 void App::updateFloorHeight() {
-    if (!renderSettings_.floorGrid) {
-        floorKey_ = 0; // (measured again when it is turned on)
+    if (!renderSettings_.floorGrid || uiPrefs_.floorGridFixed) {
+        floorKey_ = 0; // (measured again when it is turned on, or set to follow the model again)
+        if (uiPrefs_.floorGridFixed) renderSettings_.floorHeight = 0.0f; // View > Display > Floor grid at Y=0
         return;
     }
     if (renderSettings_.stroking || drag_ != Drag::None) return; // after the stroke or the drag, not during it
@@ -3907,7 +3994,7 @@ void App::updateTitle() {
     std::string name = doc_.path.empty()
                            ? std::string("Untitled")
                            : fileNameUtf8(doc_.path);
-    updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
+    updateDiscordPresence(); // every frame: the switch and Sculpting / Painting / Idle (sends only on a change)
     // "Head.sfproj* — SculptForge 0.11.13": the document first (taskbars and Alt-Tab cut the end off), the version
     // last, so support screenshots show it.
     std::string title = name + (doc_.dirty() ? "*" : "") + " — SculptForge " + appShownVersion().text();

@@ -34,9 +34,12 @@ struct UiLayout {
     float leftShelfWidth = 0;
     std::vector<std::string> leftTray, rightTray;     // palette ids, top to bottom
     std::vector<std::string> openSubpalettes;         // "tool.part", ...
-    // My Panel (Palettes.cpp): what the member dragged in, top to bottom: "action:<action id>" or "section:<section id>".
+    // My Panel (PanelMyPanel.cpp): what the member dragged in, top to bottom: "action:<action id>", "section:<section id>"
+    // or one control, "control:<scope>/<key>" (scope: the section id or, outside any section, the palette id; key: the
+    // control's help title, or its action id; "#2" behind a repeated one).
     std::vector<std::string> myPanel;
-    // Item ids: action ids, "widget.*", "sep", "row" (top shelf line break).
+    // Item ids: action ids, "widget.*", "sep", "row" (top shelf line break), and (0.14) any one control of a palette,
+    // "control:<scope>/<key>" as My Panel stores it (myPanelEntry): hold Alt and drag it from its palette onto a shelf.
     std::vector<std::string> topShelf, leftShelf, rightShelf, bottomShelf;
     bool consoleOpen = false;
     float consoleHeight = 160;
@@ -54,13 +57,18 @@ struct UiLayout {
     bool customize = false; // runtime only, never stored
 };
 
-// One My Panel entry: a button (an action) or a whole section of a palette. Empty id = not an entry.
+// One My Panel entry: a button (an action), a whole section of a palette or one control of one. Empty id = not an entry.
 constexpr size_t kMyPanelMax = 64;
 struct MyPanelEntry {
     bool section = false;
+    bool control = false; // id is "<scope>/<key>" (scope(), key())
     std::string id;
     bool valid() const { return !id.empty(); }
+    std::string scope() const { return control ? id.substr(0, id.find('/')) : id; }
+    std::string key() const { return control ? id.substr(id.find('/') + 1) : std::string(); }
 };
+// "control:<scope>/<key>" as My Panel stores it (empty when the two don't make an entry).
+std::string myPanelControlEntry(const std::string& scope, const std::string& key);
 MyPanelEntry myPanelEntry(const std::string& entry);
 
 // A shelf with nothing on it but separators and line breaks: hidden outside Customize Shelves, so the canvas takes

@@ -124,6 +124,12 @@ public:
     // everywhere (a collapse needs a free end or a feature edge), and a pass that only stopped at its operations
     // scanned every edge of the brush's disc, seconds a dab on a dense Part.
     static constexpr size_t kTriesPerOp = 4;
+    // Refine only (the topology refresh gesture, Sculptor::refreshTopologyDab): edges longer than 1.5 times the target
+    // (4/3 for a brush) are split, valences evened and the changed vertices relaxed as always, but no edge is collapsed for being short (a
+    // squashed sliver is still repaired), and only the vertices the stroke added are relaxed (the ones that were there
+    // stay bit for bit), so detail finer than the target is never coarsened and nothing is moved: only the stretched part of
+    // the surface under the brush changes.
+    bool refineOnly = false;
     // Remeshes within `radius` of `center` and of its symmetric copies (`mirrors` as Sculptor::copies makes them:
     // mirror images and radial turns, the identity first) towards edges of `edgeLength`. Returns false when
     // nothing changed.

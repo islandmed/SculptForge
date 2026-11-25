@@ -16,6 +16,8 @@
 #include "core/Mesh.h"
 
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace sf {
 
@@ -34,6 +36,10 @@ struct ExtractOptions {
 // (face group 2) and the rim joining them (face group 3, quads), with the vertex paint of the source. A single
 // surface (face group 1) when the thickness is 0. Empty (with `error`) when nothing is masked.
 Mesh extractShell(const Mesh& mesh, const ExtractOptions& options, std::string& error);
+
+// The directed edges (a, b) of `tris` that no other triangle shares: the open boundary, wound as in the triangles
+// (empty for a closed mesh). Solidify (core/Solidify.h) and Extract build their rims along it.
+std::vector<std::pair<uint32_t, uint32_t>> boundaryEdges(const std::vector<glm::uvec3>& tris);
 
 // Make Symmetric across the plane `axis` = 0 (X), 1 (Y) or 2 (Z) through the origin, keeping the + side (or
 // the - side when !keepPositive). Empty (with `error`) when nothing is on the kept side.

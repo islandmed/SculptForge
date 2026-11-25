@@ -1,11 +1,11 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Show SculptForge on Discord (core/DiscordPresence.h): what is sent (the name only, the optional challenge and
-// file name, never a path), sanitising, the frame reader's bounds (malformed frames, oversized lengths, fuzz),
-// the socket ownership check (wrong owner, symlink), off = zero connections, and a whole session against a fake
-// Discord on a Unix socket (handshake, activity, clear; a malformed reply closes the connection; Discord restarting;
-// bursts; a killed process), and agent runs never showing.
+// Show SculptForge on Discord (core/DiscordPresence.h): what is sent (the name, one of three fixed words, the start
+// time; nothing else), the retry floor (30 s), the frame reader's bounds (malformed frames, oversized lengths,
+// fuzz), the socket ownership check (wrong owner, symlink), off = zero connections and no thread left behind, and a
+// whole session against a fake Discord on a Unix socket (handshake, activity, clear; a malformed reply closes the
+// connection; Discord restarting; bursts; a killed process), and agent runs never showing.
 #include "TestHarness.h"
 
 #include "core/DiscordPresence.h"
@@ -56,29 +56,39 @@ TEST(discord_app_id_placeholder_hides_it) {
     CHECK(appIdConfigured(kDiscordAppId)); // SculptForge's application
 }
 
-TEST(discord_sanitize_strings) {
-    CHECK(sanitize("Dragons", 64) == "Dragons");
-    CHECK(sanitize("  Sea \t\n monsters  ", 64) == "Sea monsters");
-    CHECK(sanitize("a\x01" "b\x1b[31mc\x7f", 64) == "ab[31mc");      // control characters
-    CHECK(sanitize("x\xC2\x85y", 64) == "xy");                       // C1 control (NEL)
-    CHECK(sanitize("abc\xE2\x80\xAE" "gpj.exe", 64) == "abcgpj.exe"); // right-to-left override
-    CHECK(sanitize("a\xE2\x81\xA6" "b", 64) == "ab");                // isolate
-    CHECK(sanitize("\xEF\xBB\xBF" "bom", 64) == "bom");
-    CHECK(sanitize("bad\xFF\xFE" "utf8", 64) == "badutf8");
-    CHECK(sanitize("over\xC0\xAFlong", 64) == "overlong");           // overlong '/'
-    CHECK(sanitize("sur\xED\xA0\x80rogate", 64) == "surrogate");
-    CHECK(sanitize("cut\xE2\x82", 64) == "cut");                     // truncated sequence
-    CHECK(sanitize("caf\xC3\xA9 \xF0\x9F\x90\x89", 64) == "caf\xC3\xA9 \xF0\x9F\x90\x89"); // UTF-8 kept
-    CHECK(sanitize(std::string(500, 'x'), 64) == std::string(64, 'x'));
-    CHECK(sanitize("\xC3\xA9\xC3\xA9\xC3\xA9", 2) == "\xC3\xA9\xC3\xA9"); // code points, not bytes
-    CHECK(sanitize("ab   ", 3) == "ab");
+TEST(discord_state_is_one_of_three_words) {
+    CHECK(std::string(modeName(Mode::Idle)) == "Idle");
+    CHECK(std::string(modeName(Mode::Sculpting)) == "Sculpting");
+    CHECK(std::string(modeName(Mode::Painting)) == "Painting");
+    Activity a;
+    CHECK(activityState(a).empty()); // not shown
+    a.show = true;
+    CHECK(activityState(a) == "Idle");
+    a.mode = Mode::Sculpting;
+    CHECK(activityState(a) == "Sculpting");
+    a.mode = Mode::Painting;
+    CHECK(activityState(a) == "Painting");
+    a.mode = Mode(42); // never happens; still one of the words
+    CHECK(activityState(a) == "Idle");
+}
+
+// The owner's condition: no retry sooner than 30 s after a failed or lost connection (tests cap it shorter).
+TEST(discord_retries_no_sooner_than_30_s) {
+    CHECK(kRetryMinMs >= 30000);
+    for (int f = 0; f < 10; ++f) CHECK(retryDelayMs(f, kDefaultBackoffMs) >= kRetryMinMs);
+    CHECK(retryDelayMs(0, kDefaultBackoffMs) == 30000);
+    CHECK(retryDelayMs(1, kDefaultBackoffMs) == 60000);
+    CHECK(retryDelayMs(7, kDefaultBackoffMs) == 60000);
+    CHECK(retryDelayMs(-1, kDefaultBackoffMs) == 30000);
+    CHECK(retryDelayMs(0, 1000) == 1000); // a test's cap
+    CHECK(retryDelayMs(3, 0) == 1);
 }
 
 TEST(discord_activity_sends_the_name_only) {
     Activity a;
     a.show = true;
     a.start = 1793750400;
-    CHECK(activityState(a).empty());
+    CHECK(activityState(a) == "Idle");
     const Json j = parsed(setActivityJson(4242, &a, 7));
     CHECK(j["cmd"].asString() == "SET_ACTIVITY");
     CHECK(j["nonce"].asString() == "7");
@@ -86,40 +96,40 @@ TEST(discord_activity_sends_the_name_only) {
     const Json& act = j["args"]["activity"];
     CHECK(act.isObject());
     CHECK(!act.has("details")); // Discord shows the application's name: SculptForge
-    CHECK(!act.has("state"));
+    CHECK(act["state"].asString() == "Idle");
     // The app icon by URL (Discord's RPC docs: an external https image in large_image, through its media proxy).
     CHECK(act["assets"]["large_image"].asString() == "https://sculptforge.app/press/sculptforge-app-icon-cube-outline-1024.png");
     CHECK(act["assets"]["large_text"].asString() == "SculptForge");
     CHECK(act["timestamps"]["start"].asNumber() == 1793750400.0); // seconds, as in the docs' SET_ACTIVITY example
     CHECK(act["type"].asNumber() == 0.0); // Playing (SET_ACTIVITY takes 0, 2, 3 or 5)
     // Nothing else: no buttons, party, secrets (join / spectate) or small image.
-    for (const auto& m : act.members()) CHECK(m.first == "assets" || m.first == "timestamps" || m.first == "type");
+    for (const auto& m : act.members()) CHECK(m.first == "assets" || m.first == "timestamps" || m.first == "type" || m.first == "state");
     for (const auto& m : act["assets"].members()) CHECK(m.first == "large_image" || m.first == "large_text");
 }
 
-TEST(discord_activity_challenge_and_file_name) {
-    Activity a;
-    a.show = true;
-    a.challenge = "  Sea\x07 monsters ";
-    CHECK(activityState(a) == "Monthly challenge: Sea monsters");
-    a.challenge = std::string(200, 'z');
-    CHECK(activityState(a) == "Monthly challenge: " + std::string(kChallengeMax, 'z'));
-    a.challenge.clear();
-    a.fileName = "/home/someone/secret project/kraken.sfproj";
-    CHECK(activityState(a) == "kraken.sfproj"); // the name, never the path
-    a.fileName = "C:\\Users\\someone\\Desktop\\kraken.sfproj";
-    CHECK(activityState(a) == "kraken.sfproj");
-    a.challenge = "Dragons";
-    CHECK(activityState(a) == "Monthly challenge: Dragons \xC2\xB7 kraken.sfproj");
-    const Json j = parsed(setActivityJson(1, &a, 1));
-    CHECK(j["args"]["activity"]["state"].asString() == activityState(a));
-    CHECK(j.dump().find("someone") == std::string::npos);
-    a.fileName = "x"; // shorter than Discord's 2-character minimum on its own
-    a.challenge.clear();
-    CHECK(activityState(a).empty());
-    a.show = false;
-    a.challenge = "Dragons";
-    CHECK(activityState(a).empty());
+// Whatever the mode, the payload is the same fixed set of keys and words: nothing from the scene can get in.
+TEST(discord_activity_payload_holds_fixed_strings_only) {
+    for (Mode m : {Mode::Idle, Mode::Sculpting, Mode::Painting}) {
+        Activity a;
+        a.show = true;
+        a.mode = m;
+        a.start = 1793750400;
+        const std::string text = setActivityJson(31337, &a, 5);
+        const Json j = parsed(text);
+        const Json& act = j["args"]["activity"];
+        CHECK(act["state"].asString() == std::string(modeName(m)));
+        // Every string in the frame is one of ours: strip them and only JSON punctuation and numbers remain.
+        std::string stripped = text;
+        for (const char* ours : {"\"cmd\"", "\"args\"", "\"nonce\"", "\"pid\"", "\"activity\"", "\"type\"", "\"state\"",
+                                 "\"timestamps\"", "\"start\"", "\"assets\"", "\"large_image\"", "\"large_text\"", "\"SET_ACTIVITY\"",
+                                 "\"SculptForge\"", "\"5\"", modeName(m)}) {
+            for (size_t at; (at = stripped.find(ours)) != std::string::npos;) stripped.erase(at, std::strlen(ours));
+        }
+        const std::string url = std::string("\"") + kLargeImageUrl + "\"";
+        for (size_t at; (at = stripped.find(url)) != std::string::npos;) stripped.erase(at, url.size());
+        // Only JSON punctuation and numbers remain: no other text left the app.
+        for (char c : stripped) CHECK(std::strchr("{}[]:,.0123456789 \"", c) != nullptr);
+    }
 }
 
 TEST(discord_clear_has_no_activity) {
@@ -248,12 +258,13 @@ TEST(discord_off_never_connects) {
     {
         Client c("1234567890"); // a real-looking ID, but switched off
         Activity a;
-        a.challenge = "Dragons";
+        a.mode = Mode::Sculpting;
         for (int i = 0; i < 5; ++i) {
             a.start = i;
             c.set(a);
         }
         CHECK(!c.connected());
+        CHECK(!c.threadRunning()); // off: no thread either
     }
     {
         Client placeholder("0"); // no application: never connects
@@ -426,14 +437,18 @@ TEST(discord_session_with_a_fake_discord) {
         Activity a;
         a.show = true;
         a.start = 1793750400;
-        a.fileName = "/somewhere/private/kraken.sfproj";
+        a.mode = Mode::Sculpting;
         client.set(a);
         for (int i = 0; i < 400 && client.activitiesSent() < 1; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(10));
         CHECK(client.connected());
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        a.show = false; // switched off: cleared
+        CHECK(client.threadRunning());
+        a.show = false; // switched off: cleared, and the thread ends
         client.set(a);
         for (int i = 0; i < 400 && client.activitiesSent() < 2; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        for (int i = 0; i < 400 && client.threadRunning(); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        CHECK(!client.threadRunning()); // nothing left behind
+        CHECK(!client.connected());
     }
     discord.join();
     close(listener);
@@ -441,8 +456,7 @@ TEST(discord_session_with_a_fake_discord) {
     CHECK(parsed(handshake)["client_id"].asString() == "1234567890");
     const Json act = parsed(activity);
     CHECK(act["cmd"].asString() == "SET_ACTIVITY");
-    CHECK(act["args"]["activity"]["state"].asString() == "kraken.sfproj");
-    CHECK(activity.find("somewhere") == std::string::npos);
+    CHECK(act["args"]["activity"]["state"].asString() == "Sculpting");
     const Json cl = parsed(clear);
     CHECK(cl["cmd"].asString() == "SET_ACTIVITY" && !cl["args"].has("activity"));
 }
@@ -498,14 +512,14 @@ TEST(discord_reconnects_after_discord_restarts) {
     EnvVar xdg("XDG_RUNTIME_DIR", t.dir);
 
     Client client("1234567890");
-    client.setTimingForTests(60000, 1000, 0);
+    client.setTimingForTests(1000, 1000, 0); // (the real floor is 30 s: discord_retries_no_sooner_than_30_s)
     Activity a;
     a.show = true;
-    a.fileName = "kraken.sfproj";
+    a.mode = Mode::Sculpting;
     client.set(a);
     std::string first;
     int c = acceptSession(listener, first);
-    CHECK(c >= 0 && stateOf(first) == "kraken.sfproj");
+    CHECK(c >= 0 && stateOf(first) == "Sculpting");
     // Discord quits: its socket goes away.
     if (c >= 0) close(c);
     close(listener);
@@ -519,14 +533,14 @@ TEST(discord_reconnects_after_discord_restarts) {
     std::string again;
     c = acceptSession(listener, again);
     const double waited = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    CHECK(c >= 0 && stateOf(again) == "kraken.sfproj"); // shown again without any change
+    CHECK(c >= 0 && stateOf(again) == "Sculpting"); // shown again without any change
     CHECK(waited < 4.5);
     // A change after the reconnect goes out.
-    a.fileName = "dragon.sfproj";
+    a.mode = Mode::Painting;
     client.set(a);
     uint32_t op = 0;
     std::string changed;
-    CHECK(c >= 0 && readFrame(c, op, changed) && stateOf(changed) == "dragon.sfproj");
+    CHECK(c >= 0 && readFrame(c, op, changed) && stateOf(changed) == "Painting");
     if (c >= 0) close(c);
     close(listener);
 }
@@ -543,24 +557,31 @@ TEST(discord_bursts_send_the_latest) {
     client.setTimingForTests(60000, 1000, 400);
     Activity a;
     a.show = true;
-    a.fileName = "a0.sfproj";
+    a.start = 1000;
+    a.mode = Mode::Idle;
     client.set(a);
     std::string frame;
     const int c = acceptSession(listener, frame);
-    CHECK(c >= 0 && stateOf(frame) == "a0.sfproj");
+    CHECK(c >= 0 && stateOf(frame) == "Idle");
     if (c < 0) return;
+    const Mode words[] = {Mode::Sculpting, Mode::Painting, Mode::Idle};
     for (int i = 1; i <= 8; ++i) {
-        a.fileName = "a" + std::to_string(i) + ".sfproj";
+        a.start = 1000 + i;
+        a.mode = words[i % 3];
         client.set(a);
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
     std::vector<std::string> got;
     uint32_t op = 0;
-    while (got.empty() || got.back() != "a8.sfproj") {
+    double lastStart = 0; // the start time tells the sets apart (1001..1008)
+    while (lastStart != 1008.0) {
         if (!readFrame(c, op, frame)) break;
         got.push_back(stateOf(frame));
+        Json j;
+        std::string err;
+        if (Json::parseStrict(frame, j, err)) lastStart = j["args"]["activity"]["timestamps"]["start"].asNumber();
     }
-    CHECK(!got.empty() && got.back() == "a8.sfproj");
+    CHECK(lastStart == 1008.0 && !got.empty() && got.back() == std::string(modeName(words[8 % 3])));
     CHECK(got.size() <= 4); // not 8 (2 here; a slow macOS runner stretched the 20 ms sleeps past the 400 ms window once)
     close(c);
     close(listener);

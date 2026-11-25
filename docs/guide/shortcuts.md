@@ -101,7 +101,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
-| My Panel | <kbd>F4</kbd> | Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own. |
+| My Panel | <kbd>F4</kbd> | Your own panel, floating at the cursor: the buttons, controls and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own. |
 | Redo | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> or <kbd>Ctrl</kbd>+<kbd>Y</kbd> | Redo the last undone action. |
 | Undo | <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Undo the last action. |
 
@@ -191,7 +191,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Mask All | <kbd>Ctrl</kbd>+<kbd>A</kbd> | Mask the whole visible Part. |
 | Preview | <kbd>A</kbd> | Show the skin Make Mesh would build instead of the spheres. Turn it off to edit the spheres again. |
 | Quick Remesh | <kbd>Shift</kbd>+<kbd>R</kbd> | Remesh the active Part at the Voxel Remesh resolution, in the background (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it). |
-| Quick Remesh (hold and drag) | <kbd>N</kbd> | Hold this key and click or drag on the background (not on the model) to remesh the active Part (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it). |
+| Quick Remesh (hold and drag) | <kbd>N</kbd> | Hold this key and click or drag on the background to remesh the active Part; hold it and drag on the model to refresh only the stretched triangles under the brush at the Part's detail (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it). |
 | Remove Hidden | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> | Permanently delete the hidden part of the mesh (one undo step). What stays keeps its mask, paint, face groups, UVs and sculpt layers. |
 | Sculpt the Part under the cursor | <kbd>Alt</kbd>+<kbd>Q</kbd> | Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). The same key as Blender's; Preferences > Hotkeys changes it. |
 
@@ -249,6 +249,9 @@ generated from SculptForge's action registry, the same source as the Controls wi
 <!-- END GENERATED: shortcuts -->
 
 ## Mouse and pen gestures
+
+Hold keys and drag gestures of your own for orbit, pan and zoom are set in **Edit > Preferences > Navigation**
+(see [Navigation bindings](navigation.md#navigation-bindings)); the table below shows the defaults.
 
 | Action | Gesture |
 |---|---|
