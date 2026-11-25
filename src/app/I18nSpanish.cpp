@@ -4005,12 +4005,12 @@ constexpr Entry kSpanish[] = {
      "Los pinceles restan a la superficie. Mantén Alt para sumar durante un trazo."},
     {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
      "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
-     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
-     "are dropped (Undo brings them back).",
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles; UVs and the "
+     "painted texture are kept.",
      "Topología dinámica: los pinceles añaden triángulos donde necesitan detalle y los quitan donde no, para sacar "
      "cuernos o dedos sin estirar. Detalle fija lo pequeños que son los triángulos; acerca la vista o reduce el "
      "pincel para hacerlos más finos. Necesita una malla sin niveles de subdivisión; los quads bajo el pincel pasan "
-     "a triángulos y las UV se descartan (Deshacer las recupera)."},
+     "a triángulos; las UV y la textura pintada se conservan."},
     {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
      "sculpting.",
      "Sombreado Lit Sphere (por defecto): la esfera de material elegida o las luces de estudio, pensado para leer "
