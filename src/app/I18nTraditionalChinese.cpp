@@ -734,7 +734,6 @@ constexpr Entry kTraditionalChinese[] = {
     {"Orbit", "環繞"},
     {"Pan", "平移"},
     {"Middle", "中鍵"},
-    {"Right", "右鍵"},
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
     {"Show at startup", "啟動時顯示"},
     {"Show startup splash", "顯示啟動畫面"},

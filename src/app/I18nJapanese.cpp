@@ -6864,7 +6864,6 @@ constexpr Entry kJapanese[] = {
     {"Orbit", "回転"},
     {"Pan", "パン"},
     {"Middle", "中"},
-    {"Right", "右"},
 };
 
 } // namespace

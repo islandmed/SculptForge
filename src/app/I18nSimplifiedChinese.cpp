@@ -734,7 +734,6 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Orbit", "环绕"},
     {"Pan", "平移"},
     {"Middle", "中键"},
-    {"Right", "右键"},
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
     {"Show at startup", "启动时显示"},
     {"Show startup splash", "显示启动画面"},

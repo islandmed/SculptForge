@@ -893,7 +893,6 @@ constexpr Entry kSpanish[] = {
     {"Orbit", "Orbitar"},
     {"Pan", "Desplazar"},
     {"Middle", "Central"},
-    {"Right", "Derecho"},
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
     {"Show at startup", "Mostrar al iniciar"},
     {"Show startup splash", "Mostrar pantalla de inicio"},
