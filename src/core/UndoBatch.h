@@ -22,11 +22,17 @@ bool redoOnce(Document& doc);
 bool undoStepOrBatch(Document& doc);
 bool redoStepOrBatch(Document& doc);
 
-// A hash of everything a rollback must bring back: each Part's name, visibility, placement and its mesh (positions,
-// triangles, mask, paint, face groups, hidden, UVs, creases, sculpt layers), and the splat count. Same scene, same hash.
-uint64_t sceneHash(const Document& doc);
+// How much of the scene a hash covers. Mesh: each Part's name, visibility, placement and its mesh (positions, triangles,
+// mask, paint, face groups, hidden, UVs, creases, sculpt layers) and the splat count: what a batch's rollback checks, at
+// the cost it always had. Everything adds paint layers, UV flags, quad pairs, selection sets (hashed once per list), the
+// Part folders, the reference images and the splats' content and version: what a checkpoint checks (a whole-scene scan, ~10
+// GB/s: about 100 ms for a 28M-triangle scene with its layers and sets).
+enum class HashScope { Mesh, Everything };
+// Same scene, same hash.
+uint64_t sceneHash(const Document& doc, HashScope scope = HashScope::Mesh);
 
-HistoryMark markHistory(const Document& doc); // the place the history is at now (includes sceneHash)
+// The place the history is at now (includes sceneHash of `scope`; a restore compares with the same scope).
+HistoryMark markHistory(const Document& doc, HashScope scope = HashScope::Mesh);
 
 struct HistoryWalk {
     int undone = 0, redone = 0; // steps taken
@@ -47,6 +53,7 @@ std::string markUnreachable(const Document& doc, const HistoryMark& mark);
 // step counts are 0. `exact` = at the mark, hash and all.
 struct HistoryRestore : HistoryWalk {
     bool untouched = false;
+    bool offHistory = false; // the steps are all there, but the scene differs from the checkpoint's (changed outside the history)
 };
 HistoryRestore restoreToMark(Document& doc, const HistoryMark& mark, uint64_t groupId);
 
