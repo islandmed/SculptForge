@@ -2882,6 +2882,16 @@ constexpr Entry kSimplifiedChinese[] = {
      "此笔触的显示强度：1 = 雕刻时的样子，0 = 消失，2 = 两倍强。之后的笔触不会重做：与此笔触重叠之处会保留它们自己的"
      "位移在上方。"},
     // --- PanelUpdate.cpp (tools/i18n/coverage.py) ---
+    {"SculptForge %s (%.0f MB) is downloaded from github.com/islandmed/SculptForge releases and checked.",
+     "SculptForge %s (%.0f MB) 已从 github.com/islandmed/SculptForge releases 下载并完成检查。"},
+    {"Restart now replaces %s after its code signature is checked too.",
+     "立即重启将在其代码签名也完成检查后替换 %s。"},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge checks the download arrived intact (its checksum must match the release's checksum list) and that the app inside passes macOS's code signature check and comes from the same developer as this one. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "通过受检连接从 SculptForge 的 GitHub releases 下载新版本。SculptForge 会检查下载是否完好无损（其校验和必须与发布的校验和列表一致），并确保其中的应用程序通过 macOS 的代码签名检查且来自与此版本相同的开发者。在替换任何内容之前由您确认；当前版本将被保留，直到新版本启动。"},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge checks the download arrived intact (its checksum must match the release's checksum list) and that the app inside passes macOS's code signature check. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "通过受检连接从 SculptForge 的 GitHub releases 下载新版本。SculptForge 会检查下载是否完好无损（其校验和必须与发布的校验和列表一致），并确保其中的应用程序通过 macOS 的代码签名检查。在替换任何内容之前由您确认；当前版本将被保留，直到新版本启动。"},
+    {"Download the new version from SculptForge's GitHub releases, check the download arrived intact, and install it. The current version is kept until the new one has started.",
+     "从 SculptForge 的 GitHub releases 下载新版本，检查下载是否完好无损，然后进行安装。当前版本将被保留，直到新版本启动。"},
     {"Downloading the update...", "正在下载更新..."},
     {"It installs when you quit.", "退出程序时安装。"},
     {"Restart now", "立即重新启动"},
@@ -2898,9 +2908,6 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Try again", "再试一次"},
     {"Switched off by the Space's owner, use Image to 3D", "该 Space 的所有者已将其关闭，请使用图像转 3D"},
     {"Update", "更新"},
-    {"Download the new version from SculptForge's GitHub releases, check its signature and checksum, and install it. "
-     "The current version is kept until the new one has started.",
-     "从 SculptForge 的 GitHub 发布版本下载新版本，检查签章与总和检查码后安装。当前版本会保留到新版本成功启动为止。"},
     {"Asking GitHub...", "正在询问 GitHub..."},
     {"On GitHub, enter this code:", "请在 GitHub 输入此代码："},
     {"Open github.com/login/device", "打开 github.com/login/device"},

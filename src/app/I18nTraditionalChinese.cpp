@@ -2882,6 +2882,16 @@ constexpr Entry kTraditionalChinese[] = {
      "此筆畫的顯示強度：1 = 雕刻時的樣子，0 = 消失，2 = 兩倍強。之後的筆畫不會重做：與此筆畫重疊之處會保留它們自己的"
      "位移在上方。"},
     // --- PanelUpdate.cpp (tools/i18n/coverage.py) ---
+    {"SculptForge %s (%.0f MB) is downloaded from github.com/islandmed/SculptForge releases and checked.",
+     "SculptForge %s (%.0f MB) 已從 github.com/islandmed/SculptForge releases 下載並完成檢查。"},
+    {"Restart now replaces %s after its code signature is checked too.",
+     "立即重新啟動將在其程式碼簽章也完成檢查後取代 %s。"},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge checks the download arrived intact (its checksum must match the release's checksum list) and that the app inside passes macOS's code signature check and comes from the same developer as this one. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "透過受檢查的連線從 SculptForge 的 GitHub releases 下載新版本。SculptForge 會檢查下載是否完整無損（其總和檢查碼必須與發行版本的總和檢查碼清單相符），並確認內部的應用程式通過 macOS 的程式碼簽章檢查且來自與此版本相同的開發者。在替換任何內容之前由您確認；目前的版本將保留至新版本啟動。"},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge checks the download arrived intact (its checksum must match the release's checksum list) and that the app inside passes macOS's code signature check. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "透過受檢查的連線從 SculptForge 的 GitHub releases 下載新版本。SculptForge 會檢查下載是否完整無損（其總和檢查碼必須與發行版本的總和檢查碼清單相符），並確認內部的應用程式通過 macOS 的程式碼簽章檢查。在替換任何內容之前由您確認；目前的版本將保留至新版本啟動。"},
+    {"Download the new version from SculptForge's GitHub releases, check the download arrived intact, and install it. The current version is kept until the new one has started.",
+     "從 SculptForge 的 GitHub releases 下載新版本，檢查下載是否完整無損，然後進行安裝。目前的版本將保留至新版本啟動。"},
     {"Downloading the update...", "正在下載更新..."},
     {"It installs when you quit.", "結束程式時安裝。"},
     {"Restart now", "立即重新啟動"},
@@ -2898,9 +2908,6 @@ constexpr Entry kTraditionalChinese[] = {
     {"Try again", "再試一次"},
     {"Switched off by the Space's owner, use Image to 3D", "該 Space 的擁有者已將其關閉，請使用圖像轉 3D"},
     {"Update", "更新"},
-    {"Download the new version from SculptForge's GitHub releases, check its signature and checksum, and install it. "
-     "The current version is kept until the new one has started.",
-     "從 SculptForge 的 GitHub 發行版本下載新版本，檢查簽章與總和檢查碼後安裝。目前版本會保留到新版本成功啟動為止。"},
     {"Asking GitHub...", "正在詢問 GitHub..."},
     {"On GitHub, enter this code:", "請在 GitHub 輸入此代碼："},
     {"Open github.com/login/device", "開啟 github.com/login/device"},

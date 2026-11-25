@@ -1,0 +1,28 @@
+# One-click update on a macOS app bundle (PanelUpdate.cpp, core/SelfUpdate.h installMacApp): the banner has Update, the
+# download's progress and Cancel, and the help says what the checks prove and no more. Its own script: a build with
+# SCULPTFORGE_MAC_SELF_UPDATE=OFF shows Download on a Mac instead and CMake leaves this script out. UI tests never
+# download (SF_UPDATE_TEST_INSTALL only works in them), and nothing is sent: no request at all.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+env SF_UPDATE_FEED $SCRIPT_DIR/data/update_newer.json
+env SF_UPDATE_TEST_INSTALL macapp
+click "Help##palette.help"
+click "Check for updates##help.check_updates"
+wait_idle 20
+expect_text "SculptForge 99.0.0 is available"
+expect "Update##update.update"
+expect "Download"
+shot update-mac
+# The help says what the checks prove and no more: an ad-hoc signed build (every build in a UI test) never claims
+# "the same developer"; that sentence ends at the code signature check.
+hold ctrl
+hover "Update##update.update"
+expect_help arrived intact
+expect_help code signature check. You confirm
+hold none
+click "Update##update.update"
+expect_text "Downloading the update..."
+click "Cancel##update.cancel"
+expect "Update##update.update"
+
+expect_value http_requests == 0

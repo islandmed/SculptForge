@@ -3235,6 +3235,16 @@ constexpr Entry kSpanish[] = {
      "Cuánto se ve este trazo: 1 = tal como se esculpió, 0 = nada, 2 = el doble de fuerte. Los trazos posteriores no "
      "se rehacen: donde se solapan con este conservan su propio desplazamiento encima."},
     // --- PanelUpdate.cpp (tools/i18n/coverage.py) ---
+    {"SculptForge %s (%.0f MB) is downloaded from github.com/islandmed/SculptForge releases and checked.",
+     "SculptForge %s (%.0f MB) se descarga desde los lanzamientos de github.com/islandmed/SculptForge y se comprueba."},
+    {"Restart now replaces %s after its code signature is checked too.",
+     "Reiniciar ahora reemplaza %s después de que su firma de código también sea comprobada."},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge checks the download arrived intact (its checksum must match the release's checksum list) and that the app inside passes macOS's code signature check and comes from the same developer as this one. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "Descargue la nueva versión desde las versiones de GitHub de SculptForge a través de una conexión verificada. SculptForge comprueba que la descarga haya llegado intacta (su suma de comprobación debe coincidir con la lista de sumas de comprobación del lanzamiento) y que la aplicación que contiene pase la comprobación de firma de código de macOS y provenga del mismo desarrollador que esta. Usted confirma antes de que se reemplace nada; la versión actual se conserva hasta que la nueva se haya iniciado."},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge checks the download arrived intact (its checksum must match the release's checksum list) and that the app inside passes macOS's code signature check. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "Descargue la nueva versión desde las versiones de GitHub de SculptForge a través de una conexión verificada. SculptForge comprueba que la descarga haya llegado intacta (su suma de comprobación debe coincidir con la lista de sumas de comprobación del lanzamiento) y que la aplicación que contiene pase la comprobación de firma de código de macOS. Usted confirma antes de que se reemplace nada; la versión actual se conserva hasta que la nueva se haya iniciado."},
+    {"Download the new version from SculptForge's GitHub releases, check the download arrived intact, and install it. The current version is kept until the new one has started.",
+     "Descargue la nueva versión desde las versiones de GitHub de SculptForge, compruebe que la descarga haya llegado intacta e instálela. La versión actual se conserva hasta que la nueva se haya iniciado."},
     {"Downloading the update...", "Descargando la actualización..."},
     {"It installs when you quit.", "Se instala al salir."},
     {"Restart now", "Reiniciar ahora"},
@@ -3252,10 +3262,6 @@ constexpr Entry kSpanish[] = {
     {"Try again", "Reintentar"},
     {"Switched off by the Space's owner, use Image to 3D", "El propietario del Space lo desactivó; usa Imagen a 3D"},
     {"Update", "Actualizar"},
-    {"Download the new version from SculptForge's GitHub releases, check its signature and checksum, and install it. "
-     "The current version is kept until the new one has started.",
-     "Descarga la versión nueva de las versiones de SculptForge en GitHub, comprueba su firma y su suma de "
-     "verificación, y la instala. La versión actual se conserva hasta que arranca la nueva."},
     {"Asking GitHub...", "Preguntando a GitHub..."},
     {"On GitHub, enter this code:", "En GitHub, escribe este código:"},
     {"Open github.com/login/device", "Abrir github.com/login/device"},
