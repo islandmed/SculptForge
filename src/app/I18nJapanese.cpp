@@ -3135,16 +3135,19 @@ constexpr Entry kJapanese[] = {
      "最高細分化レベルを超えるMicroレベルです。各レベルで三角形数が4倍になり、頂点あたり1つの16bitディスプレイスメントとして保存されます(メッシュなし)。これにより3億ポリゴンでも約0.4GBに収まり、リアルタイムでスカルプトできます。Moveブラシで下のレベルを変形するとディテールも追従します。"},
     {"Show SculptForge on Discord",
      "DiscordにSculptForgeを表示"},
-    {"Your Discord profile shows SculptForge, its icon and how long you've been sculpting. Sent only to the Discord app on this computer, which shows it to your friends. Off by default.",
-     "DiscordのプロフィールにSculptForge、そのアイコン、およびスカルプトしている時間を表示します。このコンピューター上のDiscordアプリにのみ送信され、フレンドに表示されます。デフォルトはオフです。"},
-    {"Show the monthly challenge",
-     "マンスリーチャレンジを表示"},
-    {"Adds \"Monthly challenge: <theme>\", with the theme you type below.",
-     "下に入力したテーマで「Monthly challenge: <theme>」を追加します。"},
-    {"Show the file name",
-     "ファイル名を表示"},
-    {"Adds the name of the file you're working on (never its folder). Off by default.",
-     "作業中のファイル名を追加します(フォルダー名は含まれません)。デフォルトはオフです。"},
+    {"Your Discord profile shows SculptForge, its icon, the time since you started it and one word for what you're "
+     "doing: Sculpting, Painting or Idle. Sent only to the Discord app on this computer, which shows it to your "
+     "friends. Needs the Discord app running. Off by default.",
+     "Discordのプロフィールに表示される内容: SculptForge、アイコン、起動からの経過時間、現在の作業を表す1単語(Sculpting、Painting または "
+     "Idle)。このコンピューター上のDiscordアプリにのみ送信され、フレンドに表示されます。Discordアプリの起動が必要です。デフォルトではオフです。"},
+    {"Shown on your Discord profile: SculptForge, its icon, the time since you started it, and Sculpting, Painting "
+     "or Idle (nothing done for five minutes). Sent only to the Discord app on this computer. Nothing else: no "
+     "file names, folders, Part names, user name or model details.",
+     "Discordのプロフィールに表示: SculptForge、アイコン、起動からの経過時間、Sculpting、Painting または "
+     "Idle(5分間操作なし)。このコンピューター上のDiscordアプリにのみ送信されます。それ以外は何も送信されません: ファイル名、フォルダ、パーツ名、ユーザー名、モデルの詳細は含まれません。"},
+    {"Discord now shows only SculptForge and what you're doing, never the file name or a challenge theme. Those "
+     "two options are gone.",
+     "DiscordにはSculptForgeと現在の作業内容のみが表示されるようになり、ファイル名やチャレンジのテーマは表示されなくなりました。これら2つのオプションは削除されました。"},
     {"How the Kelvinlet brushes' material keeps its volume (Poisson's ratio): 0 is rubbery (it stretches without bulging), 100 is incompressible clay (pressing in bulges the surface up around the thumb, pulling out draws the sides in).",
      "Kelvinletブラシのマテリアルが体積を維持する方法(ポアソン比): 0はゴム状(膨らまずに伸びる)、100は非圧縮性の粘土(押し込むと親指の周りの表面が膨らみ、引き出すと側面が引き込まれる)です。"},
     {"A tighter, more pointed peak at the brush centre with the same soft reach (a smaller inner scale of the multi-scale Kelvinlet): for pulling points and tips.",
@@ -5434,8 +5437,6 @@ constexpr Entry kJapanese[] = {
      "利用規約と返金"},
     {"Nothing about memberships for a week.",
      "メンバーシップの通知を1週間停止します。"},
-    {"Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running.",
-     "それ以外は何も送信されません: フォルダ、ユーザー名、モデルの詳細は含まれません。Discordアプリが実行されている必要があります。"},
     {"Off (raw mesh)",
      "オフ（生メッシュ）"},
     {"Off in this run: tests, renders and recordings use fixed settings.",
@@ -5688,8 +5689,6 @@ constexpr Entry kJapanese[] = {
      "スマートフォンでページが開けませんか？"},
     {"The phone link couldn't start.",
      "スマートフォンとの連携を開始できませんでした。"},
-    {"Theme (64 characters at most)",
-     "テーマ（最大64文字）"},
     {"There is no ready-made %s for this computer. %s",
      "このコンピュータ用の既製の%sはありません。%s"},
     {"Thickness",

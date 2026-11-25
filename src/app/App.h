@@ -718,17 +718,20 @@ private:
     std::string challengeTitle_;                // the monthly challenge whose results came (latest.json)
     // Show SculptForge on Discord (PanelIntegrations.cpp, core/DiscordPresence.h): off by default, project.json.
     struct DiscordPresencePrefs {
-        bool enabled = false, showChallenge = false, showFileName = false;
-        std::string challenge; // the theme the user typed (sanitised when sent)
+        bool enabled = false;
+        // Up to 0.14.0 the status could carry the file name or a typed challenge theme; both options are gone (only the
+        // app, Sculpting / Painting / Idle and the time leave the app). Someone who had one on sees a note once.
+        bool optionsNote = false;
     };
     struct DiscordClientDelete { void operator()(discord::Client* c) const; };
     DiscordPresencePrefs discordPrefs_;
     std::unique_ptr<discord::Client, DiscordClientDelete> discordClient_; // made on the first switch-on
     bool discordClosed_ = false;                 // quitting: cleared and closed, never made again (shutdown)
     int64_t discordStart_ = 0;                   // seconds since 1970 when this session started (the elapsed time)
-    char discordChallengeBuf_[64 * 4 + 1] = {};  // the theme field (64 code points of UTF-8)
+    double discordStrokeAt_ = -1e9;              // SDL seconds of the last stroke's start (with lastInputAt_: Idle 5 min after)
     bool discordPresenceAvailable() const;       // an application ID is compiled in
-    void updateDiscordPresence();                // every frame: sends only when what's shown changes
+    discord::Mode discordMode() const;           // Sculpting, Painting or Idle: the one word about the work that is sent
+    void updateDiscordPresence();                // every frame (tickProject): sends only when what's shown changes
     bool discordAgentRun() const;                // agent or offscreen run: never (discord::agentRun)
     void drawIntegrationsPrefs();                // Preferences > Integrations
     bool supportCardQueued_ = false;            // the first start's full card waits for the welcome and the tier card

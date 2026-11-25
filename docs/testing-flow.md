@@ -262,6 +262,8 @@ script's first 40 lines: it logs `XFAIL` and passes while the bug stands, and lo
 line then). A script that names a hook its fix adds (it doesn't parse yet) is XFAIL too. `# xfail` never blocks a batch,
 and it hides any failure in that script, so keep such a script to the one bug.
 
+A script that must start from saved settings puts `# prefs: {"key": value, ...}` (JSON, one line) in its first lines: it
+becomes the isolated profile's project.json before the app reads it (tests/ui/discord_options_note.sfui).
 Run one: `build/sculptforge --ui-test tests/e2e/NAME.sfui --ui-out DIR` (a failure prints `FAIL file:line: why` and
 saves `FAIL-line-N.png` in DIR: read the shot first), or `ctest -R ui_e2e_NAME` / `ctest -L e2e` in a build.
 
