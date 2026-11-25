@@ -147,7 +147,7 @@ bool lineRayClosest(const glm::vec3& point, const glm::vec3& dir, const glm::vec
 }
 
 void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& sc,
-                   std::vector<float>* surface) {
+                   std::vector<float>* surface, const glm::vec3* facingHint) {
     if (surface) surface->clear();
     if (verts.empty()) return;
     const size_t n = mesh.vertexCount();
@@ -158,14 +158,17 @@ void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t
         sc.epoch = 0;
     }
     const uint32_t inside = ++sc.epoch, reached = ++sc.epoch;
-    uint32_t start = verts[0];
-    float best = std::numeric_limits<float>::max();
+    uint32_t start = verts[0], startFacing = verts[0];
+    float best = std::numeric_limits<float>::max(), bestFacing = best;
+    const bool hinted = facingHint && mesh.normals.size() == n;
     for (uint32_t v : verts) {
         sc.stamp[v] = inside;
         const glm::vec3 d = mesh.positions[v] - seed;
         const float d2 = glm::dot(d, d);
         if (d2 < best) best = d2, start = v;
+        if (hinted && d2 < bestFacing && glm::dot(mesh.normals[v], *facingHint) > 0.5f) bestFacing = d2, startFacing = v;
     }
+    if (hinted && bestFacing < std::numeric_limits<float>::max()) start = startFacing, best = bestFacing;
     // Breadth first through the edges between vertices in the region.
     std::vector<uint32_t>& q = sc.queue;
     q.clear();
@@ -599,12 +602,12 @@ void Sculptor::microBaseKernel(Mesh& mesh, BVH& bvh, BrushType type, const DabPa
             const DabParams mp = m.identity() ? p : transformed(p, m);
             const glm::vec3 contact = contactNormal(mesh, baseVerts_, c, r, contactHint(mp));
             facingVerts_ = baseVerts_;
-            keepConnected(mesh, c, facingVerts_, connected_, &surface_);
+            keepConnected(mesh, c, facingVerts_, connected_, &surface_, &contact);
             PieceStamps st{connected_.epoch, 0};
             if (facingVerts_.size() != baseVerts_.size()) { // (a fold within the brush: how far round, keepFacing's)
                 bvh.queryVertices(mesh, c, r * kDetourFlood + float(mm.rangeMax) * mm.step, wideVerts_);
                 facingVerts_ = wideVerts_;
-                keepConnected(mesh, c, facingVerts_, connected_, &surface_);
+                keepConnected(mesh, c, facingVerts_, connected_, &surface_, &contact);
                 st = markClosedPieces(mesh, wideVerts_, connected_);
             }
             poolFor(nv, [&](size_t b, size_t e) {
@@ -1471,13 +1474,13 @@ bool Sculptor::keepFacing(const Mesh& mesh, const BVH& bvh, const DabParams& p, 
     surface_.clear();
     if (surface) {
         facingVerts_ = verts_;
-        keepConnected(mesh, p.center, facingVerts_, connected_, &surface_); // (fills connected_.dist)
+        keepConnected(mesh, p.center, facingVerts_, connected_, &surface_, &contact); // (fills connected_.dist)
         PieceStamps st{connected_.epoch, 0};
         if (facingVerts_.size() != verts_.size()) {
             brushVertices(mesh, bvh, p.center, R * kDetourFlood, wideVerts_);
             if (mesh.hasHidden()) std::erase_if(wideVerts_, [&](uint32_t v) { return mesh.vertexHidden(v); });
             facingVerts_ = wideVerts_;
-            keepConnected(mesh, p.center, facingVerts_, connected_, &surface_);
+            keepConnected(mesh, p.center, facingVerts_, connected_, &surface_, &contact);
             st = markClosedPieces(mesh, wideVerts_, connected_);
         }
         surface_.resize(verts_.size());
