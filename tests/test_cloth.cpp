@@ -1096,6 +1096,46 @@ TEST(cloth_drape_command_wind_blows_the_sheet_downwind) {
     CHECK(closest > 0.297f);
 }
 
+TEST(cloth_drape_wind_invariants) {
+    // What wind promises on a dense curved scene (the sheet over the ball, a masked strip along one edge as pins, the
+    // wind blowing the sheet over the ball): pinned vertices never move, bit for bit; no vertex ends inside the ball;
+    // every position stays finite; and at a wind that makes flags fly (8 m/s, steady) no edge stretches beyond a few
+    // percent once it has settled. The first three also at the panel's hardest wind, 20 m/s with full gusts.
+    for (const float wind : {8.0f, 20.0f}) {
+        Document d = drapeDoc();
+        d.mesh.ensureMask();
+        std::vector<uint32_t> pinned;
+        for (uint32_t v = 0; v < d.mesh.vertexCount(); ++v) {
+            const bool pin = d.mesh.positions[v].z < -0.4f; // (a strip along the -Z edge, off the ball)
+            d.mesh.mask[v] = pin ? 1.0f : 0.0f;
+            if (pin) pinned.push_back(v);
+        }
+        const std::vector<glm::vec3> before = d.mesh.positions;
+        std::vector<std::pair<uint32_t, uint32_t>> edges;
+        std::vector<float> rest;
+        for (const glm::uvec3& t : d.mesh.triangles)
+            for (int k = 0; k < 3; ++k) {
+                const uint32_t a = t[k], b = t[(k + 1) % 3];
+                if (a < b) edges.push_back({a, b}), rest.push_back(glm::length(before[a] - before[b]));
+            }
+        const CommandResult r = runCommand(d, "cloth_drape", {{"fabric", std::string("cotton")}, {"frames", 300.0}, {"wind", double(wind)},
+                                                              {"heading", 180.0}, {"gusts", wind > 8.0f ? 1.0 : 0.0}});
+        CHECK(r.ok);
+        CHECK(allFinite(d.mesh));
+        size_t movedPins = 0;
+        for (const uint32_t v : pinned) movedPins += d.mesh.positions[v] != before[v] ? 1 : 0;
+        float closest = 1e9f, stretch = 0.0f;
+        for (const glm::vec3& q : d.mesh.positions) closest = std::min(closest, glm::length(q));
+        for (size_t e = 0; e < edges.size(); ++e)
+            stretch = std::max(stretch, (glm::length(d.mesh.positions[edges[e].first] - d.mesh.positions[edges[e].second]) - rest[e]) / rest[e]);
+        std::printf("  wind %.0f m/s: %s; pinned vertices moved %zu of %zu, closest to the ball's centre %.3f, worst edge stretch %.3f\n",
+                    wind, r.message.c_str(), movedPins, pinned.size(), closest, stretch);
+        CHECK(movedPins == 0);
+        CHECK(closest > 0.297f);
+        if (wind <= 8.0f) CHECK(stretch < 0.08f);
+    }
+}
+
 TEST(cloth_drape_scale_is_real_size) {
     // The same scene modelled twice as big drapes the same with scale=2 (units per metre).
     Document a = drapeDoc(1.0f), b = drapeDoc(2.0f);
