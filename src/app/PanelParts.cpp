@@ -422,10 +422,16 @@ void App::drawPartsContents() {
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
                     char linked[96] = "";
                     if (links > 1) std::snprintf(linked, sizeof linked, tr("\nLinked: %d Parts share this mesh"), links);
+                    std::string more = linked;
+                    if (!s.ai.empty()) { // the AI provenance tag (core/AiProvenance.h): model, host, date, pass
+                        char ai[256];
+                        std::snprintf(ai, sizeof ai, tr("AI: %s"), ui::AiProvenanceText(s.ai).c_str());
+                        more += std::string("\n") + ai;
+                    }
                     ImGui::SetTooltip(tr("%s\n%zu vertices, %zu triangles%s%s%s\nClick to select, double-click to rename"),
                                       s.name.c_str(), doc_.partMesh(i).vertexCount(), doc_.partMesh(i).triangleCount(),
                                       subdivLevelCount(doc_.partMesh(i)) ? ", " : "",
-                                      subdivLevelText(doc_.partMesh(i)).c_str(), linked);
+                                      subdivLevelText(doc_.partMesh(i)).c_str(), more.c_str());
                 }
                 if (links > 1) { // a link and the count at the name's end (#94): these Parts share one mesh
                     const std::string badge = std::string(ICON_LC_LINK) + " " + std::to_string(links);
@@ -1119,7 +1125,7 @@ void App::selectInsertSetItem(int index) {
 void App::drawInsertSetPicker() {
     if (!insertSetActive()) return;
     const float s = uiScale_, tile = 72.0f * s;
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     // Bottom left of the canvas: clear of the timeline strip and the view figure at the top.
     ImGui::SetNextWindowPos(ImVec2(c.x + 12.0f * s, c.y + c.h - 12.0f * s), ImGuiCond_Appearing, ImVec2(0.0f, 1.0f));
     ImGui::SetNextWindowSizeConstraints(ImVec2(tile * 2.5f, 0), ImVec2(tile * 5.6f, c.h * 0.7f));

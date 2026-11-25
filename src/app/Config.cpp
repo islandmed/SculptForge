@@ -87,6 +87,17 @@ bool lookFromJson(const Json& j, UiPrefs& p) {
     return j["look"].isObject() || j["layout"].isString();
 }
 
+// Split view lenses in ui.json (UiPrefs::splitLens): words, so a hand edit reads.
+const char* splitLensName(int lens) {
+    static const char* const names[4] = {"free", "front", "right", "top"};
+    return names[std::clamp(lens, 0, 3)];
+}
+int splitLensFromName(const std::string& name, int fallback) {
+    for (int i = 0; i < 4; ++i)
+        if (name == splitLensName(i)) return i;
+    return fallback;
+}
+
 Json toJson(const UiPrefs& p) {
     Json j = Json::object();
     j.set("popupInfo", p.popupInfo);
@@ -123,7 +134,10 @@ Json toJson(const UiPrefs& p) {
     j.set("invertTwist", p.invertTwist);
     j.set("keyNavSpeed", p.keyNavSpeed);
     j.set("twoKeyWindow", p.twoKeyWindow);
-    j.set("quickRemesh", p.quickRemesh);
+    // The effective value as before (the Classic golden file keeps its quickRemesh=false); an explicit off is its own key,
+    // since quickRemesh=false is also what every pre-0.14 file says (read as: by layout).
+    j.set("quickRemesh", p.quickRemesh < 0 ? p.shellLayout != 0 : p.quickRemesh != 0);
+    if (p.quickRemesh == 0) j.set("quickRemeshOff", true);
     j.set("remeshAfterStroke", p.remeshAfterStroke);
     j.set("alongNormal", std::string(p.alongNormal == 1 ? "always" : p.alongNormal == 2 ? "never" : "invert_key"));
     j.set("connectedOnly", p.connectedOnly);
@@ -139,6 +153,8 @@ Json toJson(const UiPrefs& p) {
     j.set("showAxes", p.showAxes);
     j.set("axisGizmoSize", std::string(p.axisGizmoSize == 0 ? "small" : p.axisGizmoSize == 2 ? "large" : "medium"));
     j.set("showViewFigure", p.showViewFigure);
+    if (p.cornerWidget >= 0) j.set("cornerGizmo", std::string(p.cornerWidget == 1 ? "orientation" : "axes"));
+    if (p.cornerPosition == 1) j.set("cornerGizmoPosition", std::string("top-right"));
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     if (p.newerMenuRows >= 0) j.set("newerMenuRows", p.newerMenuRows != 0); // (unset = by layout)
     lookToJson(p, j);
@@ -150,6 +166,10 @@ Json toJson(const UiPrefs& p) {
     j.set("antialiasing", double(p.antialiasing));
     j.set("fastNavigation", p.fastNavigation);
     j.set("viewResolution", double(p.viewResolution));
+    j.set("splitView", std::string(p.splitView == 1 ? "beside" : p.splitView == 2 ? "below" : "off"));
+    j.set("splitLensFirst", std::string(splitLensName(p.splitLens[0])));
+    j.set("splitLensSecond", std::string(splitLensName(p.splitLens[1])));
+    j.set("splitRatio", double(p.splitRatio));
     j.set("viewAo", double(p.viewAo));
     j.set("viewShadows", double(p.viewShadows));
     j.set("aoStrength", double(p.aoStrength));
@@ -237,7 +257,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.invertTwist = j["invertTwist"].asBool(p.invertTwist);
     p.twoKeyWindow = std::clamp(float(j["twoKeyWindow"].asNumber(p.twoKeyWindow)), kKeySequenceMin, kKeySequenceMax);
     p.keyNavSpeed = std::clamp(float(j["keyNavSpeed"].asNumber(p.keyNavSpeed)), 0.1f, 5.0f);
-    p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
+    p.quickRemesh = j["quickRemeshOff"].asBool(false) ? 0 : j["quickRemesh"].asBool(false) ? 1 : -1;
     p.remeshAfterStroke = j["remeshAfterStroke"].asBool(p.remeshAfterStroke);
     if (j["alongNormal"].isString()) {
         const std::string a = j["alongNormal"].asString();
@@ -262,6 +282,8 @@ void fromJson(const Json& j, UiPrefs& p) {
         p.axisGizmoSize = size == "small" ? 0 : size == "large" ? 2 : 1;
     }
     p.showViewFigure = j["showViewFigure"].asBool(p.showViewFigure);
+    if (j["cornerGizmo"].isString()) p.cornerWidget = j["cornerGizmo"].asString() == "orientation" ? 1 : 0;
+    if (j["cornerGizmoPosition"].isString()) p.cornerPosition = j["cornerGizmoPosition"].asString() == "top-right" ? 1 : 0;
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     if (j["newerMenuRows"].isBool()) p.newerMenuRows = j["newerMenuRows"].asBool() ? 1 : 0;
     // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the Classic layout,
@@ -283,6 +305,13 @@ void fromJson(const Json& j, UiPrefs& p) {
         const int r = int(j["viewResolution"].asNumber(p.viewResolution));
         p.viewResolution = r <= 50 ? 50 : r <= 75 ? 75 : 100;
     }
+    if (j["splitView"].isString()) {
+        const std::string s = j["splitView"].asString();
+        p.splitView = s == "beside" ? 1 : s == "below" ? 2 : 0;
+    }
+    if (j["splitLensFirst"].isString()) p.splitLens[0] = splitLensFromName(j["splitLensFirst"].asString(), p.splitLens[0]);
+    if (j["splitLensSecond"].isString()) p.splitLens[1] = splitLensFromName(j["splitLensSecond"].asString(), p.splitLens[1]);
+    p.splitRatio = std::clamp(float(j["splitRatio"].asNumber(p.splitRatio)), 0.2f, 0.8f);
     p.viewAo = std::clamp(int(j["viewAo"].asNumber(p.viewAo)), -1, 1);
     p.viewShadows = std::clamp(int(j["viewShadows"].asNumber(p.viewShadows)), -1, 1);
     p.aoStrength = std::clamp(float(j["aoStrength"].asNumber(p.aoStrength)), 0.0f, 1.0f);
@@ -849,6 +878,7 @@ void App::initActions() {
                 paintMode_ = false;
                 guidesMode_ = false; // leaves the QRemesh Guides brush
                 edgesMode_ = false;  // and Edges mode
+                if (polyMode_) setPolyMode(false); // and Polygon mode (PanelPolygon.cpp)
                 maskBrush_.on = false;
                 leaveDrawModesStatus(); // and Draw Tube / Append > Insert
             },
@@ -1009,6 +1039,7 @@ void App::initActions() {
     registerGarmentActions();   // Tool > Garments, the Pattern window (PanelGarments.cpp)
     registerRetopoUiActions(); // Geometry > QRemesh, Part > ProjectAll (PanelRetopo.cpp)
     registerEdgeUiActions();   // Geometry > Edges (PanelEdges.cpp)
+    registerPolygonUiActions(); // Tool > Polygon (PanelPolygon.cpp)
     registerForgeSphereUiActions(); // Tool > Forge Spheres (PanelForge Spheres.cpp)
     registerTubeUiActions();        // Tool > Tube (PanelTube.cpp)
     registerSplatTrainUi();    // Splats > Train from capture (PanelSplatTrain.cpp)
@@ -1505,7 +1536,7 @@ bool App::hintShown(const char* id) const {
 
 void App::drawViewportHint(const char* id, const char* text, ImU32 colour, float top) {
     if (!hintShown(id)) return;
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     const float s = uiScale_;
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, top), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
     ImGui::SetNextWindowBgAlpha(0.72f);
@@ -1544,7 +1575,7 @@ void App::drawViewportToast() {
         viewportToast_.clear();
         return;
     }
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     const float s = uiScale_;
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + timelineTopInset_ + 8.0f * s), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
     ImGui::SetNextWindowBgAlpha(0.85f);
@@ -1613,7 +1644,7 @@ void App::consoleEcho(const std::string& name, const Args& args, const CommandRe
     console_.seenStatus(status_);
 }
 
-CanvasRect App::paletteArea() const { return canvasRect(); } // top centre of the canvas
+CanvasRect App::paletteArea() const { return wholeCanvasRect(); } // top centre of the canvas
 
 CanvasRect App::consoleRect() const {
     // The shell reserves this strip between the canvas and the bottom shelf (ShellGeometry::console);

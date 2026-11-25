@@ -517,9 +517,12 @@ void App::drawPalette_Draw() {
             std::snprintf(label, sizeof label, "%.0f##focal%d", presets[i], i);
             if (ImGui::Button(label, ImVec2(w, 0))) camera_.fovY = toFov(presets[i]);
         }
-        ui::Checkbox("Axes##draw.axes", &uiPrefs_.showAxes);
-        ui::HelpText("Axes", nullptr, "Show the X / Y / Z directions in the corner of the canvas.", "Draw > Camera");
-        ImGui::SameLine();
+        // The corner gizmo (CornerGizmo.cpp): the X / Y / Z axes (the Classic layout's default), the orientation
+        // widget (the SculptForge layout's), or hidden. The View Figure sits under either.
+        hint(*this, "Corner gizmo");
+        segmented(*this, {"view.corner_axes", "view.corner_widget", "view.corner_off"});
+        hint(*this, "Position");
+        segmented(*this, {"view.corner_top_left", "view.corner_top_right"});
         ui::Checkbox("View Figure##draw.view_figure", &uiPrefs_.showViewFigure);
         ui::HelpText("View Figure", nullptr,
                      "Show a small shaded head in the corner of the canvas that turns with the view. Click it to look "
@@ -837,6 +840,7 @@ void App::drawPalette_Render() {
     ImGui::TextDisabled("%s", tr("View resolution"));
     ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});
     drawViewsSection();
+    drawSplitViewSection(); // View > Split view (SplitView.cpp)
     drawReferencesSection(); // View > Reference images (ReferenceImages.cpp)
     actionRow(*this, {"view.frame", "view.fullscreen"});
     actionRow(*this, {"ui.library", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
@@ -951,6 +955,12 @@ void App::drawPalette_Tool() {
         tray::Section section;
         Demo::pushScope("Geometry");
         drawGeometrySection(); // PanelGeometry.cpp
+        Demo::popScope();
+    }
+    if (subpalette("tool.polygon", "Polygon")) {
+        tray::Section section;
+        Demo::pushScope("Polygon");
+        drawPolygonContents(); // Polygon mode: Points / Edges / Faces and the operations (PanelPolygon.cpp)
         Demo::popScope();
     }
     if (subpalette("tool.remesh", "Remesh")) {

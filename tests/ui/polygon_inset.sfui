@@ -1,0 +1,124 @@
+# Tool > Polygon > Inset (the first modelling op of Polygon mode): a cube side as one shape with a depth (a sunken
+# panel with a quad rim, one undo step, the inner faces stay selected), every face by itself with a thickness the
+# faces can't take (held, nothing turns inside out), and the status line when nothing is selected.
+run new_sphere subdivisions=1
+run part_append type=cube name=Box
+run part_delete index=0
+run qremesh target=600 detect_edges=true keep_groups=true adaptive=0 quality=false
+wait_idle 60
+remember undo_steps base
+orbit 120 -60
+key f
+zoom 0.7
+click "Polygon##tool.polygon"
+click "Polygon/Polygon mode"
+expect_value poly_mode == 1
+expect_value poly_element == 2
+remember triangles tris
+remember poly_total total
+
+# Nothing selected: the button is disabled, the command says what to select.
+run_fails poly_op op=inset
+expect_status "Inset needs"
+expect_value triangles == $tris
+
+# A whole side (double-click = its face group), then Inset with a depth: a sunken panel, one undo step, the inner faces still
+# selected (a few beside the corners may have merged into them: the cage's cells differ a little per platform).
+click_part Box 0.5 0.5 2
+expect_value poly_selected > 1
+remember poly_selected side
+run poly_op op=inset thickness=0.3 depth=-0.03
+expect_status "Inset 1 face"
+expect_value undo_steps == $base+1
+expect_value triangles > $tris
+expect_value poly_selected <= $side
+expect_value poly_selected > 50
+expect_value open_edges == 0
+shot polygon-inset-side
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-inset-side-200
+ui_scale 100
+key f
+zoom 0.7
+# A second Inset continues from the inner faces (the panel's own button, the defaults).
+click "Polygon/Inset"
+expect_status "Inset 1 face"
+expect_value undo_steps == $base+2
+expect_value poly_selected > 50
+shot polygon-inset-twice
+key ctrl+z
+key ctrl+z
+expect_value triangles == $tris
+expect_value undo_steps == $base
+expect_value open_edges == 0
+
+# Every face by itself at the end of the slider (as deep as it goes): nothing inside out, every face still selected.
+click "Polygon/All"
+expect_value poly_selected == $total
+run_fails poly_op op=inset thickness=0.5
+expect_status "no border"
+expect_value triangles == $tris
+run poly_op op=inset thickness=1 individual=true
+expect_status "Inset"
+expect_value triangles > $tris
+expect_value poly_selected == $total
+expect_value undo_steps == $base+1
+expect_value open_edges == 0
+shot polygon-inset-each
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-inset-each-200
+ui_scale 100
+key f
+zoom 0.7
+key ctrl+z
+expect_value triangles == $tris
+expect_value undo_steps == $base
+
+# The slider's typed field sets the thickness; the button then uses it.
+click "Polygon/None"
+click_part Box 0.5 0.5 1
+expect_value poly_selected == 1
+double_click "##thickness"
+expect_value typing == 1
+type_here 0.1
+key enter
+expect_value typing == 0
+remember undo_steps typed
+click "Polygon/Inset"
+expect_status "Inset 1 face"
+expect_value undo_steps == $typed+1
+expect_value poly_selected == 1
+expect_value triangles > $tris
+key ctrl+z
+expect_value triangles == $tris
+
+# A short slider drag (the Thickness is a share of what the face can take, not of the Part): the inner face is still a
+# real face, its shortest edge a good part of the original's, never a fan of slivers.
+click "Polygon/None"
+click_part Box 0.5 0.5 1
+expect_value poly_selected == 1
+remember poly_selected_min_edge edge
+remember undo_steps dragged
+drag_item "##thickness" 12 0
+click "Polygon/Inset"
+expect_status "Inset 1 face"
+expect_value undo_steps == $dragged+1
+expect_value poly_selected == 1
+expect_value open_edges == 0
+expect_value poly_selected_min_edge > $edge*0.25
+shot polygon-inset-short-drag
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-inset-short-drag-200
+ui_scale 100
+key f
+zoom 0.7
+key ctrl+z
+expect_value triangles == $tris
+key escape
+expect_value poly_mode == 0

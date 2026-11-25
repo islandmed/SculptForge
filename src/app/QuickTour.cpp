@@ -136,7 +136,7 @@ void App::quickTourShowMe(int slide) {
 
 void App::drawQuickTour() {
     const float s = uiScale_;
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     if (quickTourOffer_ && !quickTourOpen_ && !showWelcome_) {
         // Once, when the Classic sculpting keys are picked: a quiet note along the bottom, no focus taken.
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + c.h - 12.0f * s), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
