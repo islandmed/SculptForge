@@ -195,13 +195,15 @@ void StencilView::setSpacing(const glm::vec3& center, const glm::vec3& viewDir, 
 
 float StencilView::weight(const glm::vec3& world) const {
     glm::vec2 c, uv;
-    if (!canvasAt(world, c) || !stencil->imageCoord(c, canvasAspect, uv)) return 0.0f;
+    if (!canvasAt(world, c)) return 0.0f; // behind the camera
+    if (!stencil->imageCoord(c, canvasAspect, uv)) return stencil->outsideSculpts ? 1.0f : 0.0f;
     return stencil->value(uv, spacing);
 }
 
 glm::vec4 StencilView::paint(const glm::vec3& world, const glm::vec3& paintColor) const {
     glm::vec2 c, uv;
-    if (!canvasAt(world, c) || !stencil->imageCoord(c, canvasAspect, uv)) return glm::vec4(paintColor, 0.0f);
+    if (!canvasAt(world, c)) return glm::vec4(paintColor, 0.0f);
+    if (!stencil->imageCoord(c, canvasAspect, uv)) return glm::vec4(paintColor, stencil->outsideSculpts ? 1.0f : 0.0f);
     if (!stencil->colors) return glm::vec4(paintColor, stencil->value(uv, spacing));
     const glm::vec4 col = stencil->color(uv, spacing);
     return col.w > 1e-6f ? glm::vec4(glm::vec3(col) / col.w, col.w) : glm::vec4(paintColor, 0.0f); // (un-premultiplied)
@@ -261,6 +263,7 @@ void registerStencilCommands(CommandRegistry& registry) {
                    {"opacity", T::Number, "How strongly the overlay shows, 0-1 (the brushes take it whole).", false},
                    {"invert", T::Bool, "Use the image's negative.", false},
                    {"tile", T::Bool, "Repeat the image across the whole view.", false},
+                   {"outside", T::String, "Outside the image: 'sculpt' (strokes work as if there were no Stencil) or 'block' (they do nothing).", false},
                    {"visible", T::Bool, "Show it (hidden: the brushes ignore it).", false},
                    {"colors", T::Bool, "Vertex Paint lays the image's colours (off: its brightness masks the paint colour).", false},
                    {"reset", T::Bool, "Centre it, upright, 80% of the view's height (before the values above).", false}},
@@ -283,6 +286,11 @@ void registerStencilCommands(CommandRegistry& registry) {
                       st.angle = glm::radians(angleDeg);
                       if (a.contains("invert")) st.invert = argBool(a, "invert", st.invert);
                       if (a.contains("tile")) st.tile = argBool(a, "tile", st.tile);
+                      if (a.contains("outside")) {
+                          const std::string o = argString(a, "outside", "");
+                          if (o != "sculpt" && o != "block") return {false, "stencil_set: outside is 'sculpt' or 'block'"};
+                          st.outsideSculpts = o == "sculpt";
+                      }
                       if (a.contains("visible")) st.visible = argBool(a, "visible", st.visible);
                       if (a.contains("colors")) st.colors = argBool(a, "colors", st.colors);
                       return {true, st.image ? "Stencil '" + st.name + "'" : std::string("Stencil set (no image loaded)")};

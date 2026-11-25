@@ -17,6 +17,7 @@ wait 0.3
 expect "Adjust##stencil.adjust"
 expect "Tile##stencil.tile"
 expect "Invert##stencil.invert"
+expect "##stencil.outside"
 expect_value past_right:Alpha == 0
 remember_items classic Alpha
 shot classic
@@ -30,6 +31,7 @@ wait 0.3
 expect "Adjust##stencil.adjust"
 expect "Tile##stencil.tile"
 expect "Invert##stencil.invert"
+expect "##stencil.outside"
 expect_value past_right:Alpha == 0
 expect_value offscreen_items == 0
 expect_same_items classic Alpha

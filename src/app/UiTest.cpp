@@ -176,7 +176,7 @@
 //                            smooth_group_borders (Brush > Smooth face group borders only, #81),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            moved_off_stencil (moved vertices that showed off the Stencil's image), stencil_active,
-//                            stencil_adjust, stencil_tile, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
+//                            stencil_adjust, stencil_tile, stencil_outside_sculpts, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
 //                            reference_count, reference_selected, reference_adjust, reference_gpu_kb, reference_x /
 //                            reference_y / reference_height / reference_stretch / reference_origin_x..z (x1000, the
 //                            selected one), reference_scene, reference_has_image, reference_facing (x1000),

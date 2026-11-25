@@ -631,7 +631,7 @@ scans of your own planks (scan or photograph boards you own, or use images you h
 
 A **Stencil** is an image laid over the view that you sculpt and paint *through*: wherever it covers the model, a
 stroke takes its detail (the sculpt brushes its brightness, white = full effect, as an alpha; Vertex Paint its
-colours). Off the image nothing happens. It stays put on the screen while the model turns under it, so you place it,
+colours). Off the image a stroke works as if there were no Stencil (**Outside the image**, below). It stays put on the screen while the model turns under it, so you place it,
 stroke over it, turn the model or move the stencil, and stroke again.
 
 ![A Cobblestone stencil over a sphere, turned and placed with Adjust](images/wn-stencil-overlay.jpg)
@@ -652,6 +652,7 @@ stroke over it, turn the model or move the stencil, and stroke again.
 | **Show** | Hidden, the stencil is off and brushes work as if it weren't there. |
 | **Invert** | Uses the image's negative: black works, white leaves the surface alone. |
 | **Tile** | Repeats the image across the whole view, for skin, fabric and other patterns. |
+| **Outside the image** | **Sculpt** (the default): a stroke past the image's edge works as if there were no Stencil. **Block**: it does nothing there, so the image's edge is a wall. A tiled image covers the whole view. |
 | **Paint its colours** | Vertex Paint lays the image's own colours; off, its brightness masks the paint colour. |
 | **Hide while navigating** | Fades the stencil while the view turns, moves or zooms, so you see the model under it. |
 | **Opacity** | How strongly the overlay shows. The brushes always take the whole image (use Intensity to go lighter). |
@@ -661,7 +662,7 @@ With symmetry on, the mirrored side gets the stencil mirrored, as the stroke is.
 levels](micro-levels.md) too. Move, the Kelvinlet brushes, vector displacement stamps and the mask brush don't use it.
 
 Texture painting doesn't take it yet (Vertex Paint does). The stencil isn't saved with the project. From a script:
-`stencil_load path=skin.png`, `stencil_set x=0.5 y=0.5 size=0.8 angle=30 tile=true`, `stencil_clear`.
+`stencil_load path=skin.png`, `stencil_set x=0.5 y=0.5 size=0.8 angle=30 tile=true outside=block`, `stencil_clear`.
 
 ## Vector displacement brushes
 

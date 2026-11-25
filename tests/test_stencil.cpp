@@ -100,10 +100,21 @@ TEST(stencil_outside_is_no_effect_unless_tiled) {
     StencilView view{&st, topView(), 1.0f};
     CHECK(view.weight(glm::vec3(0.0f, 0.0f, -0.05f)) > 0.99f); // on the image's top half
     CHECK(view.weight(glm::vec3(0.0f, 0.0f, 0.05f)) < 0.01f);  // its bottom half
-    CHECK(view.weight(glm::vec3(0.8f, 0.0f, 0.8f)) == 0.0f);   // off the image
+    CHECK(view.weight(glm::vec3(0.8f, 0.0f, 0.8f)) == 1.0f);   // off the image: as if there were no Stencil
+    CHECK(view.weight(glm::vec3(0.0f, 0.0f, 0.05f)) < 0.01f);   // (inside it the image still weighs)
+    st.outsideSculpts = false; // Block: the old behaviour, off the image nothing
+    CHECK(view.weight(glm::vec3(0.8f, 0.0f, 0.8f)) == 0.0f);
+    CHECK(view.paint(glm::vec3(0.8f, 0.0f, 0.8f), glm::vec3(1, 0, 0)).w == 0.0f);
+    st.outsideSculpts = true;
+    CHECK(view.paint(glm::vec3(0.8f, 0.0f, 0.8f), glm::vec3(1, 0, 0)).w == 1.0f); // paints as if there were no Stencil
     st.tile = true; // repeats: one image height (0.2 of the canvas = 0.4 world) further down is the top half again
     CHECK(st.imageCoord({0.9f, 0.9f}, 1.0f, uv));
     CHECK(view.weight(glm::vec3(0.0f, 0.0f, -0.05f + 0.4f)) > 0.99f);
+    CHECK(view.weight(glm::vec3(0.8f, 0.0f, 0.05f + 0.4f)) < 0.01f); // tiled: the image covers the view, Block or not
+    st.outsideSculpts = false;
+    CHECK(view.weight(glm::vec3(0.0f, 0.0f, 0.05f)) < 0.01f);
+    CHECK(view.weight(glm::vec3(0.0f, 0.0f, -0.05f + 0.4f)) > 0.99f);
+    st.outsideSculpts = true;
     st.visible = false;
     CHECK(!view.active());
     // Behind a perspective camera: nothing (in front, the same line of sight takes it).
@@ -118,11 +129,13 @@ TEST(stencil_outside_is_no_effect_unless_tiled) {
 TEST(stencil_sculpts_only_under_the_image) {
     Document doc = makeDoc(makePlane(80));
     Mesh& m = doc.mesh;
-    // A white image whose right edge sits on the canvas centre: the brush's left half is under it.
+    // A white image whose right edge sits on the canvas centre: the brush's left half is under it. Block: the right
+    // half, off the image, stays.
     Stencil st;
     st.set(blackImage(1, 1, {{0, 0}}), "white", "");
     st.size = 0.6f;
     st.center = {0.5f - 0.3f, 0.5f};
+    st.outsideSculpts = false;
     DabParams p = topDab(glm::vec3(0.0f), 0.4f);
     p.stencil = {&st, topView(), 1.0f};
     CHECK(doc.sculptor.beginStroke(m, "Standard"));
@@ -130,6 +143,15 @@ TEST(stencil_sculpts_only_under_the_image) {
     doc.sculptor.endStroke();
     CHECK(maxRise(m, true) > 0.01f);
     CHECK(maxRise(m, false) == 0.0f);
+    // Sculpt (the default): the half off the image rises as it would with no Stencil.
+    Document open = makeDoc(makePlane(80));
+    st.outsideSculpts = true;
+    DabParams o = topDab(glm::vec3(0.0f), 0.4f);
+    o.stencil = {&st, topView(), 1.0f};
+    CHECK(open.sculptor.beginStroke(open.mesh, "Standard"));
+    for (int i = 0; i < 4; ++i) open.sculptor.dab(open.mesh, open.bvh, BrushType::Standard, o, Symmetry{false, false, false});
+    open.sculptor.endStroke();
+    CHECK(maxRise(open.mesh, true) > 0.01f && maxRise(open.mesh, false) > 0.01f);
     // Without the stencil the same dab raises both sides.
     Document plain = makeDoc(makePlane(80));
     DabParams q = topDab(glm::vec3(0.0f), 0.4f);
