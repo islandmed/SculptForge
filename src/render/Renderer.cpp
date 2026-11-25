@@ -179,8 +179,9 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
         } else if (kind == 9) { // Trim: what sticks out above a plane cut off
             float h = dot(x - (ac - an * (sgn * r * 0.02 * s)), an);
             if (sgn * h > 0.0) {
-                float q = sqrt(max(f, 0.0)) * (0.5 + s);
-                float m = min(1.0, q), dm = q < 1.0 && f > 1e-6 ? (0.5 + s) * F.y / (2.0 * sqrt(f)) : 0.0;
+                float gain = s < 0.5 ? 2.0 * s : 0.5 + s; // (trimGain, core/SculptKernel.h)
+                float q = sqrt(max(f, 0.0)) * gain;
+                float m = min(1.0, q), dm = q < 1.0 && f > 1e-6 ? gain * F.y / (2.0 * sqrt(f)) : 0.0;
                 x -= an * (h * m);
                 lap -= cn * (2.0 * dm * dot(radial, dh) + m * cn * lap + h * dm * inv);
                 g -= cn * (m * dh + h * dm * radial);

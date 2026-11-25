@@ -65,7 +65,7 @@ Notes on particular brushes:
   instead of placing dabs, so stroke types (Dots, Spray and so on) don't apply to them.
 - **Layer** sets its height from the brush size and **Intensity**. Pen pressure lowers the height when
   **Pressure > Strength** is on, so you can feather the edge of a layer.
-- **Trim** gives crisp planes on cylinders and edges. Use it with **Front** on when you work on thin shapes.
+- **Trim** gives crisp planes on cylinders and edges. Use it with **Front** on when you work on thin shapes. **Intensity** sets how much of what sticks out above the plane each dab takes: all of it at the brush's middle from 50 up, proportionally less below 50, so Intensity 1 is a light touch.
 
 ## Custom brushes that ship with SculptForge
 

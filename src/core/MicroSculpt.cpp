@@ -823,7 +823,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         if (!reachesPlane) break;
                         const glm::vec3 pp = areaCenter - areaNormal * (sign * r * 0.02f * s);
                         const float h = glm::dot(p - pp, areaNormal);
-                        if (sign * h > 0.0f) delta = std::clamp(-h * std::min(1.0f, std::sqrt(f) * (0.5f + s)) / facing, -planeCap, planeCap);
+                        if (sign * h > 0.0f) delta = std::clamp(-h * std::min(1.0f, std::sqrt(f) * trimGain(s)) / facing, -planeCap, planeCap);
                         break;
                     }
                     case BrushType::Layer: {
@@ -1055,7 +1055,7 @@ bool MicroStroke::dabTiles(Mesh& m, BrushType type, const glm::vec3& center, flo
                         if (!reachesPlane) break;
                         const glm::vec3 pp = areaCenter - areaNormal * (sign * r * 0.02f * s);
                         const float h = glm::dot(pt - pp, areaNormal);
-                        if (sign * h > 0.0f) delta = std::clamp(-h * std::min(1.0f, std::sqrt(f) * (0.5f + s)) / facing, -planeCap, planeCap);
+                        if (sign * h > 0.0f) delta = std::clamp(-h * std::min(1.0f, std::sqrt(f) * trimGain(s)) / facing, -planeCap, planeCap);
                         break;
                     }
                     default: break;
