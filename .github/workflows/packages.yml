@@ -126,7 +126,7 @@ jobs:
           - { arch: x86_64, os: "${{ vars.SF_RUNNER_LINUX_OLD || 'ubuntu-22.04' }}", ld: x86_64 }
           - { arch: arm64, os: "${{ vars.SF_RUNNER_LINUX_OLD_ARM || 'ubuntu-22.04-arm' }}", ld: aarch64 }
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.REF }}' }
       - name: Tag (the release's, or v<project version>)
         # (a beta's tag names its packages without the prerelease: v0.11.0-beta.1 makes SculptForge-0.11.0-*)
@@ -137,12 +137,12 @@ jobs:
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
       - name: Downloads (cmake/Fetch.cmake's archives and pinned tools, kept by hash by tools/ci/fetch.sh)
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .deps
           key: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', 'packaging/linux/build-appimage.sh', '.github/workflows/packages.yml') }}
           restore-keys: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
-      - uses: actions/cache/restore@v5
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
           key: ccache-pkg-linux-${{ matrix.arch }}.${{ github.sha }}
@@ -158,7 +158,7 @@ jobs:
           cmake --build build --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
           key: ccache-pkg-linux-${{ matrix.arch }}.${{ github.sha }}
@@ -183,7 +183,7 @@ jobs:
         run: tools/ci/python-selftest.sh AppDir/usr/bin/sculptforge AppDir "$RUNNER_TEMP/pyrt/python"
       - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
         run: python3 tools/release/build_mcpb.py --cli build/sculptforge-cli --version auto --platform linux --out "build/SculptForge-{version}-linux-${{ matrix.arch }}.mcpb"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-${{ matrix.arch }}
           path: |
@@ -219,17 +219,17 @@ jobs:
           - { arch: x86_64, os: "${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}" }
           - { arch: aarch64, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.REF }}' }
       - name: flatpak and flatpak-builder
         run: sudo ./packaging/linux/apt-retry.sh update && sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends flatpak flatpak-builder elfutils xvfb
       - name: The manifest's sources (flatpak-builder's downloads, checked by their sha256 in the manifest)
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: build-flatpak/state/downloads
           key: flatpak-src-${{ matrix.arch }}-${{ hashFiles('packaging/flatpak/*.yml') }}
           restore-keys: flatpak-src-${{ matrix.arch }}-
-      - uses: actions/cache/restore@v5
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: build-flatpak/state/ccache
           key: ccache-pkg-flatpak-${{ matrix.arch }}.${{ github.sha }}
@@ -237,7 +237,7 @@ jobs:
       - name: Build the bundle (packaging/flatpak/org.sculptforge.SculptForge.yml; the SDK's ccache)
         run: SF_FLATPAK_CCACHE=1 packaging/flatpak/build.sh dist
       - if: env.SAVE_CACHE == 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: build-flatpak/state/ccache
           key: ccache-pkg-flatpak-${{ matrix.arch }}.${{ github.sha }}
@@ -250,7 +250,7 @@ jobs:
               flatpak run --env=LIBGL_ALWAYS_SOFTWARE=1 org.sculptforge.SculptForge \
                 --ui-test "$PWD/tests/ui/$t.sfui" --ui-out "$PWD/flatpak-ui/$t"
           done
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: flatpak-${{ matrix.arch }}
           path: dist/*.flatpak
@@ -283,14 +283,14 @@ jobs:
           - { label: 'VFX CY2027', suffix: vfx2027, cy: CY2027, generators: 'TGZ', image: 'rockylinux:9', arch: arm64, ccarch: aarch64, os: "${{ vars.SF_RUNNER_LINUX_ARM || 'ubuntu-24.04-arm' }}" }
     steps:
       - run: dnf -y install git tar gzip zstd
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.REF }}' }
       - name: Tag (the release's, or v<project version>)
         # (a beta's tag names its packages without the prerelease: v0.11.0-beta.1 makes SculptForge-0.11.0-*)
         run: echo "TAG=${{ inputs.tag }}" | sed "s/^TAG=$/TAG=v$(sed -n 's/^project(SculptForge VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)/; s/^\(TAG=v[0-9.]*\)-.*/\1/" >> "$GITHUB_ENV"
       - run: ./packaging/linux/install-build-deps.sh
       - name: Downloads (cmake/Fetch.cmake's archives and pinned tools, kept by hash by tools/ci/fetch.sh)
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .deps
           key: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', '.github/workflows/packages.yml') }}
@@ -306,7 +306,7 @@ jobs:
           echo "/opt/${f%.tar.gz}" >> "$GITHUB_PATH"
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
-      - uses: actions/cache/restore@v5
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
           key: ccache-pkg-${{ matrix.suffix }}-${{ matrix.arch }}.${{ github.sha }}
@@ -336,7 +336,7 @@ jobs:
           cmake --build build --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
           key: ccache-pkg-${{ matrix.suffix }}-${{ matrix.arch }}.${{ github.sha }}
@@ -349,7 +349,7 @@ jobs:
           cd build
           cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=SculptForge-${TAG#v}-linux-${{ matrix.arch }}-${{ matrix.suffix }}
           if [ "${{ matrix.generators }}" = "RPM;TGZ" ]; then cpack -G RPM; fi
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: vfx-${{ matrix.suffix }}-${{ matrix.arch }}
           path: |
@@ -372,10 +372,10 @@ jobs:
       attestations: write
     runs-on: ${{ vars.SF_RUNNER_MAC || 'macos-15' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.REF }}' }
       - name: Downloads (cmake/Fetch.cmake's archives and pinned tools, kept by hash by tools/ci/fetch.sh)
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .deps
           key: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', '.github/workflows/packages.yml') }}
@@ -387,7 +387,7 @@ jobs:
           echo "$RUNNER_TEMP/ccache-4.14.2-darwin" >> "$GITHUB_PATH"
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
-      - uses: actions/cache/restore@v5
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
           key: ccache-pkg-macos.${{ github.sha }}
@@ -404,7 +404,7 @@ jobs:
           cmake --build build --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
           key: ccache-pkg-macos.${{ github.sha }}
@@ -426,7 +426,7 @@ jobs:
           exit 1
       - name: Claude Desktop bundle (.mcpb; build_mcpb.py also runs its server)
         run: python3 tools/release/build_mcpb.py --cli build/sculptforge-cli --version auto --platform darwin --out "build/SculptForge-{version}-darwin-universal.mcpb"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos
           path: |
@@ -463,10 +463,10 @@ jobs:
       SIGN: ${{ (vars.SIGNING == 'signpath' && (github.ref == 'refs/heads/staging' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) }}
       SIGN_POLICY: ${{ (github.event_name == 'workflow_dispatch' && inputs.sign_test == true) && (vars.SIGNPATH_TEST_POLICY_SLUG || 'test-signing') || vars.SIGNPATH_SIGNING_POLICY_SLUG }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.REF }}' }
       - name: Downloads (cmake/Fetch.cmake's archives and pinned tools, kept by hash by tools/ci/fetch.sh)
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .deps
           key: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', '.github/workflows/packages.yml') }}
@@ -487,7 +487,7 @@ jobs:
           "SF_CCACHE_CL=$($cl -replace '\\', '/')" >> $env:GITHUB_ENV
           "CCACHE_DIR=$env:GITHUB_WORKSPACE\.ccache" >> $env:GITHUB_ENV
           "CCACHE_BASEDIR=$env:GITHUB_WORKSPACE" >> $env:GITHUB_ENV
-      - uses: actions/cache/restore@v5
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
           key: ccache-pkg-windows.${{ github.sha }}
@@ -507,7 +507,7 @@ jobs:
           cmake --build build --config Release --parallel 4
           ccache -s
       - if: env.SAVE_CACHE == 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
           key: ccache-pkg-windows.${{ github.sha }}
@@ -695,7 +695,7 @@ jobs:
           }
           $line >> $env:GITHUB_STEP_SUMMARY
           Write-Host "::notice title=Windows signing::$line"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows
           path: |
@@ -738,9 +738,9 @@ jobs:
           - { name: macOS universal2, id: macos, os: macos-15, minutes: 45 }
           - { name: Windows x64, id: windows, os: windows-2022, minutes: 90 }
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.REF }}', persist-credentials: false }
-      - uses: actions/cache@v5
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .deps
           key: deps-${{ github.job }}-${{ matrix.id }}-${{ hashFiles('cmake/Fetch.cmake') }}
@@ -758,7 +758,7 @@ jobs:
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: wheelhouse/*.whl
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pywheels-${{ matrix.id }}
           path: wheelhouse/*.whl
@@ -771,7 +771,7 @@ jobs:
     continue-on-error: true # (as job wheels: an incomplete set records nothing, and job pypi publishes nothing)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
@@ -780,7 +780,7 @@ jobs:
           n=$(ls dist/*.whl | wc -l | tr -d " ")
           [ "$n" = 12 ] || { echo "::error::expected 12 wheels (4 platforms x 3 Pythons), found $n"; exit 1; }
           cd dist && sha256sum * > ../SHA256SUMS.wheels.txt && cat ../SHA256SUMS.wheels.txt
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: staged-sums-wheels
           path: SHA256SUMS.wheels.txt
@@ -793,13 +793,13 @@ jobs:
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.flatpak.result == 'success' && needs.vfx.result == 'success' && needs.macos.result == 'success' && needs.windows.result == 'success' }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
           pattern: '{linux,flatpak,vfx,macos,windows}*'
       - run: cd dist && sha256sum * > ../SHA256SUMS.staged.txt && cat ../SHA256SUMS.staged.txt
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: staged-sums
           path: SHA256SUMS.staged.txt

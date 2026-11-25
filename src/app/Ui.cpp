@@ -8,6 +8,7 @@
 #include "app/I18n.h"
 #include "app/Shell.h"
 #include "app/Theme.h"
+#include "app/UiLayout.h"
 #include "core/ManagedPolicy.h"
 
 #include <IconsLucide.h>
@@ -21,9 +22,20 @@
 #include <cstring>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace sf::ui {
+
+std::string AiProvenanceText(const AiProvenance& ai) {
+    if (ai.empty()) return {};
+    AiProvenance shown = ai;
+    shown.role = ai.role == AiProvenance::kGenerated        ? tr("generated")
+                 : ai.role == AiProvenance::kSculptingBase ? tr("sculpting base")
+                 : ai.role == AiProvenance::kReference     ? tr("reference")
+                                                           : ai.role;
+    return shown.line();
+}
 
 namespace {
 
@@ -127,10 +139,32 @@ bool CtrlHeld() {
 bool AltHeld() { return ImGui::GetIO().KeyAlt || (SDL_GetModState() & SDL_KMOD_ALT) != 0; }
 
 bool MyPanelDragSource(const char* id, bool section, const char* label, bool fromPanel) {
+    return MyPanelDragEntry(std::string(section ? "section:" : "action:") + id, label, fromPanel);
+}
+
+namespace {
+// The item MyPanelDragEntry was last called for: a button or a section header is an entry of its own, not a control too
+// (pinLastItem leaves it alone when its HelpText / HelpAction follows).
+struct {
+    ImGuiWindow* window = nullptr;
+    ImVec2 min, max;
+    int frame = -1;
+} g_dragItem;
+bool isDragItem() {
+    const ImGuiContext* g = ImGui::GetCurrentContext();
+    return g_dragItem.frame == g->FrameCount && g_dragItem.window == g->CurrentWindow && g_dragItem.min.x == ImGui::GetItemRectMin().x &&
+           g_dragItem.min.y == ImGui::GetItemRectMin().y && g_dragItem.max.x == ImGui::GetItemRectMax().x && g_dragItem.max.y == ImGui::GetItemRectMax().y;
+}
+} // namespace
+
+bool MyPanelDragEntry(const std::string& entry, const char* label, bool fromPanel) {
+    g_dragItem = {ImGui::GetCurrentWindow(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetFrameCount()};
     if (!AltHeld() || CtrlHeld()) return false;
+    if (entry.size() >= sizeof(MyPanelPayload::entry)) return false;
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand); // it can be picked up
     if (!ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) return false;
     MyPanelPayload p;
-    std::snprintf(p.entry, sizeof p.entry, "%s%s", section ? "section:" : "action:", id);
+    std::snprintf(p.entry, sizeof p.entry, "%s", entry.c_str());
     p.fromPanel = fromPanel;
     ImGui::SetDragDropPayload(kMyPanelPayload, &p, sizeof p);
     ImGui::TextUnformatted(label);
@@ -143,6 +177,15 @@ bool MyPanelDragged() {
     if (!AltHeld() || CtrlHeld()) return false;
     const ImGuiIO& io = ImGui::GetIO();
     return std::abs(io.MousePos.x - io.MouseClickedPos[0].x) + std::abs(io.MousePos.y - io.MouseClickedPos[0].y) >= 4.0f;
+}
+
+bool TextFieldFocused() {
+    const ImGuiContext& g = *GImGui;
+    if (g.IO.WantTextInput) return true;
+    // A field that took the keyboard in the frame just drawn: its flag comes with the next frame's start. (Only a field
+    // that is new: one that went away with its window, the console closing, keeps ActiveId until that frame clears it.)
+    return g.ActiveId != 0 && g.ActiveId != g.ActiveIdPreviousFrame && g.ActiveIdIsAlive == g.ActiveId &&
+           (g.ActiveId == g.TempInputId || g.ActiveId == g.InputTextState.ID);
 }
 
 const char* FloatingWindowAt(ImVec2 p) {
@@ -173,7 +216,94 @@ void SameLineAt(float cursorPosX) {
     ImGui::SetCursorPosX(cursorPosX);
 }
 
+namespace {
+// Controls as My Panel entries (PinPalette / PinSection / BeginPinnedControl, Ui.h).
+std::string g_pinPalette, g_pinSection;
+std::unordered_map<std::string, int> g_pinCountPalette, g_pinCountSection; // key -> times seen in the scope this pass
+PinnedControl g_pin;
+bool g_pinActive = false;
+bool g_inActionButton = false; // ActionButton's own HelpAction: the button is an "action:" entry already
+
+// The control drawn just before: a My Panel drag source while Alt is held; measured and movable while My Panel draws it.
+void pinLastItem(const std::string& key, const char* label) {
+    const std::string& scope = !g_pinSection.empty() ? g_pinSection : g_pinPalette;
+    if (scope.empty() || key.empty() || g_inActionButton) return;
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    if (window->SkipItems) return; // the control was not drawn (a section My Panel is not drawing): no item to mark
+    if (!g_pinActive && !(AltHeld() && !CtrlHeld())) return; // nothing to do this frame: no counting either (every pass counts alike)
+    if (isDragItem()) return;      // a section header or a button: an entry of its own already
+    auto& counts = !g_pinSection.empty() ? g_pinCountSection : g_pinCountPalette;
+    const int n = ++counts[key];
+    const std::string fullKey = n > 1 ? key + "#" + std::to_string(n) : key;
+    if (g_pinActive) {
+        if (g_pin.scope != scope || g_pin.key != fullKey) return;
+        g_pin.found = true;
+        g_pin.min = ImGui::GetItemRectMin();
+        g_pin.max = ImGui::GetItemRectMax();
+        // A control that starts mid-line and runs to the right edge ("Rotation [Free]", a label then a stretched combo or
+        // slider) keeps what is left of it on the line: its words. Narrow ones (a checkbox in a row) stay on their own.
+        const float lineStart = window->DC.CursorPos.x; // (ItemSize moved the cursor to the line's start)
+        if (g_pin.min.x > lineStart + 2.0f && g_pin.max.x >= window->WorkRect.Max.x - 2.0f) g_pin.min.x = lineStart;
+        g_pin.lineX = std::min(lineStart, g_pin.min.x);
+        if (g_pin.measuring) return;
+        MyPanelDragEntry(myPanelControlEntry(scope, fullKey), label, true);
+        if (ImGui::BeginPopupContextItem("##mypanel.control.ctx")) {
+            if (ImGui::MenuItem(tr("Remove from My Panel"))) g_pin.remove = true;
+            ImGui::EndPopup();
+        }
+        return;
+    }
+    if (AltHeld() && !CtrlHeld()) MyPanelDragEntry(myPanelControlEntry(scope, fullKey), label, false);
+}
+} // namespace
+
+void PinPalette(const char* paletteId) {
+    g_pinPalette = paletteId ? paletteId : "";
+    g_pinSection.clear();
+    g_pinCountPalette.clear();
+    g_pinCountSection.clear();
+}
+
+void PinSection(const char* sectionId) {
+    g_pinSection = sectionId ? sectionId : "";
+    g_pinCountSection.clear();
+}
+
+void BeginPinnedControl(const std::string& scope, const std::string& key, bool measuring) {
+    g_pin = PinnedControl{};
+    g_pin.scope = scope;
+    g_pin.key = key;
+    g_pin.measuring = measuring;
+    g_pinActive = true;
+}
+
+PinnedControl EndPinnedControl() {
+    g_pinActive = false;
+    return std::exchange(g_pin, PinnedControl{});
+}
+
+bool BeginPaletteItems() {
+    const bool readOnly = AltHeld() && !CtrlHeld();
+    if (readOnly) ImGui::PushItemFlag(ImGuiItemFlags_ReadOnly, true);
+    return readOnly;
+}
+
+void EndPaletteItems(bool readOnly) {
+    if (readOnly) ImGui::PopItemFlag();
+}
+
+void Readout(const char* id, const char* text) {
+    const ImVec2 size = ImGui::CalcTextSize(text);
+    const ImVec2 p = ImGui::GetCursorScreenPos();
+    ImGui::PushItemFlag(ImGuiItemFlags_NoNav | ImGuiItemFlags_NoTabStop, true); // words, not a button: no keyboard focus
+    ImGui::InvisibleButton(id, ImVec2(std::max(size.x, 1.0f), std::max(size.y, 1.0f)));
+    ImGui::PopItemFlag();
+    ImGui::GetWindowDrawList()->AddText(p, ImGui::GetColorU32(ImGuiCol_TextDisabled), text);
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogRenderedText(&p, text); // (as ImGui::Text does: UI tests read the log as the screen's text)
+}
+
 void HelpText(const char* title, const char* shortcut, const char* description, const char* path) {
+    if (title) pinLastItem(title, tr(title));
     if (!wantHelp() || !itemHoveredForHelp()) return;
     g_help = HelpRequest{};
     g_help.active = true;
@@ -308,9 +438,10 @@ void Segmented(App& app, std::initializer_list<const char*> actionIds, float wid
 }
 
 void HelpAction(App& app, const char* actionId) {
-    if (!wantHelp() || !itemHoveredForHelp()) return;
     const Action* a = app.actions().find(actionId);
     if (!a) return;
+    if (!g_inActionButton) pinLastItem(a->id, trAction(a->id, a->label));
+    if (!wantHelp() || !itemHoveredForHelp()) return;
     g_help = HelpRequest{};
     g_help.active = true;
     g_help.title = trAction(a->id, a->label);
@@ -723,7 +854,9 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     const bool customize = app.layout().customize;
     dragSource(app, id.c_str(), label.c_str(), shelf, index);
     MyPanelDragSource(id.c_str(), false, label.c_str());
+    g_inActionButton = true; // (the button is an "action:" entry: not a control too)
     HelpAction(app, id.c_str());
+    g_inActionButton = false;
     if (clipped) {
         const std::string chord = app.actions().shortcutText(id);
         DelayedTooltip((chord.empty() ? label : label + "   " + chord).c_str());
@@ -870,6 +1003,12 @@ float g_dragScrollY = 0.0f;
 
 void resetUiGlobals() {
     g_help = {};
+    g_pinPalette.clear();
+    g_pinSection.clear();
+    g_pinCountPalette.clear();
+    g_pinCountSection.clear();
+    g_pin = {};
+    g_pinActive = g_inActionButton = false;
     g_shown.clear();
     g_popupInfo = true;
     g_nextShelf = ShelfNone, g_nextIndex = -1;

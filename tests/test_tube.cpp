@@ -10,7 +10,10 @@
 #include "core/MeshTransform.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
+#include "core/SurfaceQuery.h"
 #include "core/Tube.h"
+
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <chrono>
 #include <cmath>
@@ -1088,4 +1091,330 @@ TEST(tube_invariant_drag_preview_with_the_full_density_tree_is_safe_to_pick) {
         if (hit.t > 0.0f) CHECK(hit.triangle < preview.triangleCount());
     }
     CHECK(hits < 1000); // (any answer will do, as long as the rays came back)
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Standalone curves (0.14): a polyline (straight spans) and the smooth curve share their points, so a curve converts
+// either way and back without moving a point; Resample follows the line it has; points snap to other Parts' surfaces;
+// a polyline is drawn point by point (tube_add_point) and several points go at once.
+// ---------------------------------------------------------------------------------------------------------------
+
+namespace {
+// Distance from `p` to the polyline through `pts`.
+float distanceToPolyline(const vec3& p, const std::vector<TubePoint>& pts) {
+    float best = 1e30f;
+    for (size_t i = 0; i + 1 < pts.size(); ++i) {
+        const vec3 a = pts[i].position, b = pts[i + 1].position, ab = b - a;
+        const float len2 = glm::dot(ab, ab);
+        const float t = len2 > 0.0f ? std::clamp(glm::dot(p - a, ab) / len2, 0.0f, 1.0f) : 0.0f;
+        best = std::min(best, glm::distance(p, a + t * ab));
+    }
+    return best;
+}
+double lengthOf(const std::vector<TubeSample>& line) {
+    double l = 0.0;
+    for (size_t i = 1; i < line.size(); ++i) l += glm::distance(line[i - 1].position, line[i].position);
+    return l;
+}
+} // namespace
+
+TEST(tube_straight_polyline_spans_and_corners) {
+    TubeShape s;
+    s.points = {{vec3(0, 0, 0), 0.05f}, {vec3(1, 0, 0), 0.05f}, {vec3(1, 1, 0), 0.08f}, {vec3(2, 1, 0.5f), 0.05f}};
+    s.straight = true;
+    const float edge = 0.02f;
+    const std::vector<TubeSample> line = tubeCenterline(s, edge);
+    CHECK(line.size() > 20);
+    // Every ring lies on the polyline, and a ring sits on each corner exactly.
+    float worst = 0.0f;
+    for (const TubeSample& r : line) worst = std::max(worst, distanceToPolyline(r.position, s.points));
+    CHECK(worst < 1e-5f);
+    for (size_t k = 1; k + 1 < s.points.size(); ++k) {
+        float d = 1e30f;
+        for (const TubeSample& r : line) d = std::min(d, glm::distance(r.position, s.points[k].position));
+        CHECK(d < 1e-5f);
+    }
+    // Its length is the polyline's; the radius blends along the span.
+    double want = 0.0;
+    for (size_t i = 1; i < s.points.size(); ++i) want += glm::distance(s.points[i - 1].position, s.points[i].position);
+    CHECK(std::abs(lengthOf(line) / want - 1.0) < 1e-4);
+    // The same points as a smooth curve bulge away from the chords (it is a different line) but pass through the points.
+    TubeShape smooth = s;
+    smooth.straight = false;
+    const std::vector<TubeSample> curve = tubeCenterline(smooth, edge);
+    float bulge = 0.0f;
+    for (const TubeSample& r : curve) bulge = std::max(bulge, distanceToPolyline(r.position, s.points));
+    CHECK(bulge > 0.05f);
+    for (const TubePoint& p : s.points) { // (rings are an edge apart on a smooth curve: one lies within that of each point)
+        float d = 1e30f;
+        for (const TubeSample& r : curve) d = std::min(d, glm::distance(r.position, p.position));
+        CHECK(d < edge);
+    }
+    // Swept: closed, outward, as a tube and as a curve's wire; the mirror copy too.
+    const Mesh m = tubeSweep(s);
+    CHECK(watertight(m) && oriented(m) && signedVolume(m) > 0.0);
+    TubeShape wire = s;
+    wire.curve = true;
+    const Mesh w = tubeSweep(wire);
+    CHECK(watertight(w) && oriented(w) && w.triangleCount() > 0);
+    TubeShape mirrored = s;
+    mirrored.mirrorX = true;
+    CHECK(watertight(tubeSweep(mirrored)));
+    // Two points: one straight span, a sharp one-corner polyline with a very tight angle still sweeps.
+    TubeShape two;
+    two.points = {{vec3(0, 0, 0), 0.1f}, {vec3(1, 0, 0), 0.1f}};
+    two.straight = true;
+    CHECK(watertight(tubeSweep(two)) && std::abs(lengthOf(tubeCenterline(two, 0.05f)) - 1.0) < 1e-4);
+    TubeShape sharp;
+    sharp.points = {{vec3(0, 0, 0), 0.1f}, {vec3(1, 0, 0), 0.1f}, {vec3(0.05f, 0.1f, 0), 0.1f}};
+    sharp.straight = true;
+    CHECK(tubeSweep(sharp).triangleCount() > 0);
+}
+
+TEST(tube_straight_resample_stays_on_the_polyline) {
+    std::vector<TubePoint> pts = {{vec3(0, 0, 0), 0.05f}, {vec3(1, 0, 0), 0.05f}, {vec3(1, 1, 0), 0.05f}, {vec3(2, 1, 0), 0.05f}};
+    const std::vector<TubePoint> straight = tubeResample(pts, 13, true);
+    CHECK(straight.size() == 13);
+    for (const TubePoint& p : straight) CHECK(distanceToPolyline(p.position, pts) < 1e-4f);
+    CHECK(straight.front().position == pts.front().position && straight.back().position == pts.back().position);
+    // Evenly spaced along it: 3 units over 12 gaps.
+    for (size_t i = 1; i < straight.size(); ++i)
+        CHECK(std::abs(glm::distance(straight[i - 1].position, straight[i].position) - 0.25f) < 2e-3f);
+    // Resampled as a smooth curve, the points leave the chords (they lie on the curve).
+    const std::vector<TubePoint> smooth = tubeResample(pts, 13, false);
+    float off = 0.0f;
+    for (const TubePoint& p : smooth) off = std::max(off, distanceToPolyline(p.position, pts));
+    CHECK(off > 0.02f);
+}
+
+TEST(tube_straight_toggle_keeps_points_and_round_trips) {
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 1,0,0 1,1,0 2,1,0")}, {"radius", 0.05}, {"curve", true}, {"straight", true}}).ok);
+    doc.selectPart(1);
+    CHECK(doc.mesh.tube.straight && doc.mesh.tube.curve && tubeMatchesMesh(doc.mesh));
+    CHECK(reg.execute(doc, "tube_list").message.find("straight spans") != std::string::npos);
+    const std::vector<TubePoint> before = doc.mesh.tube.points;
+    const size_t straightTris = doc.mesh.triangleCount();
+    // Smooth, and back: the points never move; each toggle is one undo step.
+    CHECK(reg.execute(doc, "tube_set", {{"straight", false}}).ok && !doc.mesh.tube.straight);
+    CHECK(doc.mesh.tube.points.size() == before.size());
+    for (size_t i = 0; i < before.size(); ++i) CHECK(doc.mesh.tube.points[i].position == before[i].position && doc.mesh.tube.points[i].radius == before[i].radius);
+    CHECK(doc.mesh.triangleCount() != straightTris); // (a different line)
+    CHECK(reg.execute(doc, "tube_set", {{"straight", true}}).ok && doc.mesh.tube.straight && doc.mesh.triangleCount() == straightTris);
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh) && !doc.mesh.tube.straight);
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh) && doc.mesh.tube.straight);
+    // Resample follows the line it has, and Tube from curve keeps the polyline.
+    CHECK(reg.execute(doc, "tube_resample", {{"count", 7.0}}).ok && doc.mesh.tube.points.size() == 7);
+    for (const TubePoint& p : doc.mesh.tube.points) CHECK(distanceToPolyline(p.position, before) < 1e-4f);
+    CHECK(reg.execute(doc, "tube_from_curve", {{"radius", 0.1}}).ok && !doc.mesh.tube.curve && doc.mesh.tube.straight);
+    CHECK(watertight(doc.mesh));
+    // Projects keep it.
+    const std::string path = tempPath("sf_tube_straight.sfproj");
+    std::string err;
+    CHECK(saveProject(path, doc, err));
+    Document back;
+    CHECK(loadProject(path, back, err));
+    CHECK(back.partMesh(1).tube.straight && back.partMesh(1).tube.points.size() == 7);
+    CHECK(tubeFromJson(tubeToJson(doc.mesh.tube)).straight);
+    std::filesystem::remove(path);
+}
+
+TEST(tube_add_point_and_delete_many) {
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0")}, {"radius", 0.1}, {"curve", true}}).ok); // one click: a dot
+    doc.selectPart(1);
+    CHECK(doc.mesh.tube.points.size() == 1);
+    // Point by point: at the end, the radius carried along unless given.
+    CHECK(reg.execute(doc, "tube_add_point", {{"position", std::string("1,0,0")}}).ok);
+    CHECK(reg.execute(doc, "tube_add_point", {{"position", std::string("1,1,0")}, {"radius", 0.2}}).ok);
+    CHECK(doc.mesh.tube.points.size() == 3 && doc.mesh.tube.points[1].radius == 0.1f && doc.mesh.tube.points[2].radius == 0.2f);
+    CHECK(doc.mesh.tube.points[2].position == vec3(1, 1, 0));
+    // After a given point, and before the first.
+    CHECK(reg.execute(doc, "tube_add_point", {{"position", std::string("0.5,0.5,0")}, {"index", 0.0}}).ok);
+    CHECK(doc.mesh.tube.points.size() == 4 && doc.mesh.tube.points[1].position == vec3(0.5f, 0.5f, 0));
+    CHECK(reg.execute(doc, "tube_add_point", {{"position", std::string("-1,0,0")}, {"index", -1.0}}).ok);
+    CHECK(doc.mesh.tube.points.size() == 5 && doc.mesh.tube.points[0].position == vec3(-1, 0, 0));
+    CHECK(!reg.execute(doc, "tube_add_point", {{"position", std::string("0,0,0")}, {"index", 9.0}}).ok);
+    CHECK(!reg.execute(doc, "tube_add_point", {{"position", std::string("nope")}}).ok);
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh) && doc.mesh.tube.points.size() == 4); // one step each
+    CHECK(doc.undo.redo(doc.mesh, doc.bvh) && doc.mesh.tube.points.size() == 5);
+    // Several at once (any order, repeats), one undo step; the last point always stays.
+    CHECK(reg.execute(doc, "tube_delete_point", {{"indices", std::string("3 1 3")}}).ok && doc.mesh.tube.points.size() == 3);
+    CHECK(doc.mesh.tube.points[0].position == vec3(-1, 0, 0) && doc.mesh.tube.points[1].position == vec3(0.5f, 0.5f, 0) && doc.mesh.tube.points[2].position == vec3(1, 1, 0));
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh) && doc.mesh.tube.points.size() == 5);
+    CHECK(!reg.execute(doc, "tube_delete_point", {{"indices", std::string("0 1 2 3 4")}}).ok);
+    CHECK(!reg.execute(doc, "tube_delete_point", {{"indices", std::string("0 7")}}).ok);
+    CHECK(!reg.execute(doc, "tube_delete_point", {{"indices", std::string("")}}).ok);
+    CHECK(doc.mesh.tube.points.size() == 5 && tubeMatchesMesh(doc.mesh));
+}
+
+TEST(tube_snap_points_to_other_surfaces) {
+    Document doc;
+    CommandRegistry reg;
+    doc.replaceActiveMesh(makeQuadSphere(24, 2.0f)); // radius 1 at the origin
+    // A curve floating 1.5 from the centre: snapped, every point lies on the sphere (within its facets).
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("1.5,0,0 0,1.5,0 0,0,1.5 -1.5,0.2,0.1")}, {"radius", 0.05}, {"curve", true}}).ok);
+    doc.selectPart(1);
+    vec3 on, nrm;
+    CHECK(tubeClosestSurface(doc, vec3(1.5f, 0, 0), 0.0f, on, nrm));
+    CHECK(std::abs(glm::length(on) - 1.0f) < 0.01f && glm::dot(nrm, vec3(1, 0, 0)) > 0.95f);
+    CHECK(!tubeClosestSurface(doc, vec3(1.5f, 0, 0), 0.1f, on, nrm)); // (not within 0.1)
+    CommandResult r = reg.execute(doc, "tube_snap_points");
+    CHECK(r.ok && r.message.find("Snapped 4 points") == 0);
+    for (const TubePoint& p : doc.mesh.tube.points) CHECK(std::abs(glm::length(p.position) - 1.0f) < 0.01f);
+    CHECK(tubeMatchesMesh(doc.mesh));
+    CHECK(reg.execute(doc, "tube_snap_points").ok && reg.execute(doc, "tube_snap_points").message.find("already") != std::string::npos);
+    CHECK(doc.undo.undo(doc.mesh, doc.bvh) && std::abs(glm::length(doc.mesh.tube.points[0].position) - 1.5f) < 1e-5f); // one step
+    // Only some points, and a tube sinks half its radius in.
+    CHECK(reg.execute(doc, "tube_snap_points", {{"indices", std::string("0 2")}, {"sink", 0.5}}).ok);
+    CHECK(std::abs(glm::length(doc.mesh.tube.points[0].position) - 1.025f) < 0.01f);
+    CHECK(std::abs(glm::length(doc.mesh.tube.points[1].position) - 1.5f) < 1e-5f);
+    // A point added with snap lands on the surface; a hidden Part is no surface; no other Part: refused.
+    CHECK(reg.execute(doc, "tube_add_point", {{"position", std::string("0,-2,0")}, {"snap", true}}).ok);
+    CHECK(std::abs(glm::length(doc.mesh.tube.points.back().position) - 1.0f) < 0.01f);
+    doc.parts[0].visible = false;
+    CHECK(!reg.execute(doc, "tube_snap_points").ok);
+    doc.parts[0].visible = true;
+    // Through a moved Part: the sphere shifted by 10 in x, the snap follows it.
+    doc.parts[0].transform = glm::translate(glm::mat4(1.0f), vec3(10, 0, 0));
+    CHECK(tubeClosestSurface(doc, vec3(10.0f, 0, 1.5f), 0.0f, on, nrm) && std::abs(glm::length(on - vec3(10, 0, 0)) - 1.0f) < 0.01f);
+}
+
+// Reviewer 11-24: a point lying exactly on the first other Part (distance 0) shrank the search sphere for the next
+// Part to 0, and the doubling loop never grew it: the app froze. Two other Parts, the point on a flat face of the
+// first, snapped twice.
+TEST(tube_snap_points_on_a_face_already_with_two_other_parts) {
+    Document doc;
+    CommandRegistry reg;
+    doc.replaceActiveMesh(makeCube(2, 2.0f)); // a box from -1 to 1: flat faces at x = 1, vertices at the corners
+    doc.addPart(makeQuadSphere(8, 1.0f), "Ball", false); // another visible Part, centred at the origin
+    for (vec3& p : doc.partMesh(1).positions) p += vec3(6.0f, 0.0f, 0.0f);
+    doc.partMesh(1).topologyDirty = true;
+    doc.partBvh(1).build(doc.partMesh(1));
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("1,0.2,0.1 1,-0.3,0.2 1,1,1 3,0,0")}, {"radius", 0.05}, {"curve", true}}).ok);
+    const int curve = doc.findPart("Curve"); // (added right after the active box: the ball moved to index 2)
+    CHECK(curve > 0 && doc.partCount() == 3);
+    doc.selectPart(curve);
+    CHECK(doc.mesh.tube.curve && doc.mesh.tube.points.size() == 4);
+    if (doc.mesh.tube.points.size() != 4) return;
+    // Points 0 and 1 lie on the face x = 1, point 2 on the corner (1, 1, 1): distance 0 to the box, the ball 5 away.
+    for (int k = 0; k < 2; ++k) { // (the second pass starts from points that are exactly on the surface)
+        const auto t0 = std::chrono::steady_clock::now();
+        const CommandResult r = reg.execute(doc, "tube_snap_points");
+        CHECK(r.ok);
+        CHECK(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < 5.0);
+        CHECK(std::abs(doc.mesh.tube.points[0].position.x - 1.0f) < 1e-5f && std::abs(doc.mesh.tube.points[1].position.x - 1.0f) < 1e-5f);
+        CHECK(glm::distance(doc.mesh.tube.points[2].position, vec3(1, 1, 1)) < 1e-5f);
+        CHECK(std::abs(doc.mesh.tube.points[3].position.x - 1.0f) < 1e-5f); // (3, 0, 0): the box face is 2 away, the ball 2 as well: either, not stuck
+    }
+    // The same with the ball first in the Part list (the zero-distance Part comes second): still not stuck.
+    vec3 on, nrm;
+    CHECK(tubeClosestSurface(doc, vec3(6.0f, 0.0f, 1.0f), 0.0f, on, nrm) && std::abs(glm::length(on - vec3(6, 0, 0)) - 0.5f) < 0.02f); // (the ball has radius 0.5)
+    CHECK(tubeClosestSurface(doc, vec3(1.0f, 0.0f, 0.0f), 0.0f, on, nrm) && glm::distance(on, vec3(1, 0, 0)) < 1e-5f);
+}
+
+TEST(tube_repeat_along_a_straight_polyline) {
+    Document doc;
+    CommandRegistry reg;
+    Mesh bar = makeCube(2, 1.0f);
+    for (vec3& p : bar.positions) p *= vec3(0.6f, 0.2f, 0.2f);
+    bar.recomputeAllNormals();
+    doc.replaceActiveMesh(bar);
+    const size_t barTriangles = doc.mesh.triangleCount();
+    CHECK(reg.execute(doc, "tube_new", {{"points", std::string("0,0,0 3,0,0 3,3,0")}, {"radius", 0.05}, {"curve", true}, {"straight", true}}).ok);
+    doc.selectPart(1);
+    CHECK(reg.execute(doc, "tube_repeat", {{"part", 0.0}}).ok);
+    const Mesh& made = doc.partMesh(doc.findPart(doc.parts[0].name + " Repeat"));
+    CHECK(made.triangleCount() == 10 * barTriangles); // 6 / 0.6 copies along the two legs
+    vec3 lo(1e9f), hi(-1e9f);
+    for (const vec3& p : made.positions) lo = glm::min(lo, p), hi = glm::max(hi, p);
+    CHECK(std::abs(lo.x) < 0.11f && hi.x < 3.11f && hi.y < 3.11f && lo.y > -0.11f); // (the corner copy turns the corner)
+}
+
+// The promises of a polyline tube and of the gizmo's point edits, on many random curves: every vertex of a straight
+// sweep lies within its radius of the polyline (no spikes past the surface, no ring reaching across a corner), the
+// sweep stays closed and outward however sharp the corners, the mirror copy is the exact mirror, and a selection of
+// points moved, turned and scaled as the gizmo does still fits its mesh (tubeMatchesMesh), so the points stay editable.
+TEST(tube_invariant_straight_sweep_hugs_the_polyline_and_point_edits_keep_the_curve) {
+    std::mt19937 rng(20261124);
+    std::uniform_real_distribution<float> u(-1.0f, 1.0f), rad(0.02f, 0.12f);
+    for (int round = 0; round < 24; ++round) {
+        TubeShape s;
+        s.straight = true;
+        const int n = 2 + int(rng() % 7);
+        vec3 p(0.0f);
+        for (int i = 0; i < n; ++i) {
+            s.points.push_back({p, rad(rng)});
+            p += vec3(u(rng), u(rng), u(rng)) * (0.3f + 0.7f * std::abs(u(rng))); // (any angle, sharp ones included)
+        }
+        s.points = tubeResample(s.points, size_t(s.points.size()), true).empty() ? s.points : s.points; // (as drawn)
+        const Mesh m = tubeSweep(s);
+        if (m.triangleCount() == 0) continue; // (a degenerate random walk)
+        CHECK(watertight(m) && oriented(m) && signedVolume(m) > 0.0);
+        float rmax = 0.0f;
+        for (const TubePoint& q : s.points) rmax = std::max(rmax, q.radius);
+        float worst = 0.0f;
+        for (const vec3& v : m.positions) worst = std::max(worst, distanceToPolyline(v, s.points));
+        CHECK(worst <= 1.02f * rmax); // every vertex within the largest radius of the line: no spike, no stray ring
+        // The mirror copy: the same surface as the plain sweep mirrored (its rings may start from another "up", so
+        // the vertices differ; every mirrored vertex of the original lies on the copy's surface, and the volumes match).
+        TubeShape mir = s;
+        mir.mirrorX = true;
+        const Mesh mm = tubeSweep(mir);
+        CHECK(mm.vertexCount() == 2 * m.vertexCount() && mm.triangleCount() == 2 * m.triangleCount());
+        if (mm.triangleCount() == 2 * m.triangleCount()) {
+            Mesh copy;
+            copy.positions.assign(mm.positions.begin() + long(m.vertexCount()), mm.positions.end());
+            for (size_t t = m.triangleCount(); t < mm.triangleCount(); ++t)
+                copy.triangles.push_back(mm.triangles[t] - glm::uvec3(uint32_t(m.vertexCount())));
+            TriangleBVH surface;
+            surface.build(copy);
+            float mirrorErr = 0.0f;
+            for (size_t v = 0; v < m.vertexCount(); v += 1 + m.vertexCount() / 1500) {
+                SurfaceHit hit;
+                const vec3 want(-m.positions[v].x, m.positions[v].y, m.positions[v].z);
+                mirrorErr = std::max(mirrorErr, surface.closestPoint(want, 10.0f * rmax, hit) ? hit.distance : 10.0f * rmax);
+            }
+            CHECK(mirrorErr < 2e-3f * rmax);
+            CHECK(std::abs(signedVolume(copy) / signedVolume(m) - 1.0) < 1e-3);
+        }
+        // Point edits as the gizmo makes them: a selection moved, turned about its centre and scaled (radii with it).
+        Mesh tube = tubeMesh(s);
+        CHECK(tubeMatchesMesh(tube));
+        TubeShape e = s;
+        vec3 c(0.0f);
+        const int sel0 = int(rng() % size_t(n)), sel1 = std::min(sel0 + 1 + int(rng() % 2), n - 1);
+        for (int i = sel0; i <= sel1; ++i) c += e.points[size_t(i)].position;
+        c /= float(sel1 - sel0 + 1);
+        const glm::quat turn = glm::angleAxis(0.6f, glm::normalize(vec3(0.3f, 1.0f, 0.2f)));
+        const float k = 1.4f;
+        for (int i = sel0; i <= sel1; ++i) {
+            TubePoint& q = e.points[size_t(i)];
+            q.position = c + turn * ((q.position - c) * k) + vec3(0.1f, -0.05f, 0.02f);
+            q.radius *= k;
+        }
+        const Mesh edited = tubeMesh(e);
+        CHECK(edited.triangleCount() > 0 && tubeMatchesMesh(edited) && watertight(edited));
+        for (int i = 0; i < n; ++i) // the other points did not move
+            if (i < sel0 || i > sel1) CHECK(e.points[size_t(i)].position == s.points[size_t(i)].position);
+        // Smooth and back: the same points, and the smooth sweep also hugs its own line within the radius.
+        TubeShape sm = e;
+        sm.straight = false;
+        const Mesh smooth = tubeSweep(sm);
+        if (smooth.triangleCount() > 0) {
+            CHECK(watertight(smooth) && oriented(smooth));
+            const std::vector<TubeSample> line = tubeCenterline(sm, 0.005f);
+            float off = 0.0f;
+            for (size_t v = 0; v < smooth.vertexCount(); v += 1 + smooth.vertexCount() / 2000) {
+                float d = 1e30f;
+                for (const TubeSample& r : line) d = std::min(d, glm::distance(r.position, smooth.positions[v]));
+                off = std::max(off, d);
+            }
+            float rmaxE = 0.0f;
+            for (const TubePoint& q : e.points) rmaxE = std::max(rmaxE, q.radius);
+            CHECK(off <= 1.05f * rmaxE);
+        }
+    }
 }

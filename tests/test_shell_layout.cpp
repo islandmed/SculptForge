@@ -389,6 +389,20 @@ TEST(my_panel_layout_json) {
     CHECK(back.myPanel.size() == kMyPanelMax);
     CHECK(myPanelEntry("section:tool.geometry").section && myPanelEntry("section:tool.geometry").id == "tool.geometry");
     CHECK(!myPanelEntry("tool.geometry").valid());
+    // One control (0.14): "control:<scope>/<key>", the scope a section or a palette, the key its help title or action id.
+    const MyPanelEntry c = myPanelEntry("control:tool.display/Backface culling");
+    CHECK(c.valid() && c.control && !c.section && c.scope() == "tool.display" && c.key() == "Backface culling");
+    const MyPanelEntry d = myPanelEntry("control:draw/Size#2");
+    CHECK(d.valid() && d.control && d.scope() == "draw" && d.key() == "Size#2");
+    CHECK(!myPanelEntry("control:tool.display/").valid());
+    CHECK(!myPanelEntry("control:/Backface culling").valid());
+    CHECK(!myPanelEntry("control:nothing").valid());
+    CHECK(myPanelControlEntry("tool.display", "Backface culling") == "control:tool.display/Backface culling");
+    CHECK(myPanelControlEntry("", "x").empty() && myPanelControlEntry("a", "").empty() && myPanelControlEntry("a/b", "x").empty());
+    UiLayout withControl = standardLayout();
+    withControl.myPanel = {"control:tool.display/Backface culling", "action:view.wire"};
+    CHECK(fromJson(toJson(withControl), back, err));
+    CHECK(back.myPanel == withControl.myPanel);
 }
 
 // ui.json keeps the layout in use ("layout", autosaved) and the one Save Layout kept ("layoutSaved", what Revert returns to).

@@ -159,6 +159,7 @@ inline const char* navStyleGesture(int style, const NavDrag& d) {
         return "";
     }
     if (c) return "Zoom (Ctrl+middle-drag)";
+    if (a) return "Centre the view on the pointer (Alt+middle click); a drag pans";
     return "Pan (middle-drag)";
 }
 

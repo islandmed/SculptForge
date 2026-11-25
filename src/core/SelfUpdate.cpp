@@ -19,7 +19,10 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #elif defined(__APPLE__)
+#include <CoreFoundation/CoreFoundation.h>
+#include <Security/Security.h>
 #include <mach-o/dyld.h>
+#include <cstdio> // renamex_np, RENAME_SWAP
 #endif
 #if defined(__linux__)
 #include <sys/stat.h>
@@ -111,6 +114,7 @@ std::string versionedAsset(const std::string& asset, const std::string& version)
     if (asset == "SculptForge-linux-arm64.AppImage") return "SculptForge-" + v + "-aarch64.AppImage";
     if (asset == "SculptForge-windows-x86_64-setup.exe") return "SculptForge-" + v + "-windows-x86_64.exe";
     if (asset == "SculptForge-windows-x86_64-portable.zip") return "SculptForge-" + v + "-windows-x86_64.zip";
+    if (asset == "SculptForge-macos.dmg") return "SculptForge-" + v + "-darwin-universal.dmg";
     return {};
 }
 
@@ -175,6 +179,7 @@ InstallProbe currentInstallProbe() {
         const fs::path c = fs::weakly_canonical(buf, ec);
         p.exePath = ec ? std::string(buf) : pathString(c);
     }
+    if (const char* h = std::getenv("HOME")) p.home = h;
 #else
     p.os = "linux";
     std::error_code ec;
@@ -240,11 +245,14 @@ Install detectInstall(const InstallProbe& probe) {
             return in;
         }
         const size_t app = probe.exePath.find(".app/Contents/MacOS/");
-        if (app != std::string::npos) {
-            in.kind = InstallKind::MacApp;
-            in.target = probe.exePath.substr(0, app + 4);
-            in.asset = "SculptForge-macos.dmg";
-        }
+        // A bundle Gatekeeper runs from a read-only translocation copy (opened from the download folder, never moved):
+        // replacing the copy would change nothing; the Download link instead.
+        if (app == std::string::npos || probe.exePath.find("/AppTranslocation/") != std::string::npos || probe.home.empty())
+            return in;
+        in.kind = InstallKind::MacApp;
+        in.target = probe.exePath.substr(0, app + 4);
+        in.asset = "SculptForge-macos.dmg";
+        in.stagingDir = pathString(fsPath(probe.home) / "Library" / "Caches" / "SculptForge" / "updates");
         return in;
     }
     if (probe.os == "windows") {
@@ -273,6 +281,11 @@ Install detectInstall(const InstallProbe& probe) {
 }
 
 // --- The download ---
+
+std::string appExecutable(const std::string& target) {
+    const fs::path t = fsPath(target);
+    return t.extension() == ".app" ? pathString(t / "Contents" / "MacOS" / "sculptforge") : target;
+}
 
 std::string stagingPath(const Install& install, const std::string& version) {
     // The asset's own extension stays last: Windows opens the installer by it (Start-Process), and Windows
@@ -474,7 +487,7 @@ bool rollback(const Pending& p, const std::string& notePath, std::string& error)
         fs::remove(fsPath(notePath), ec);
         return false;
     }
-    if (fs::is_directory(backup, ec)) { // a Windows portable folder: the failed one is set aside first
+    if (fs::is_directory(backup, ec) && fs::exists(target, ec)) { // a folder (Windows portable, a .app): the failed one is set aside first
         const fs::path failed = fsPath(p.target + ".failed");
         fs::remove_all(failed, ec);
         fs::rename(target, failed, ec);
@@ -488,6 +501,7 @@ bool rollback(const Pending& p, const std::string& notePath, std::string& error)
         error = "can't put the previous version back: " + ec.message();
         return false;
     }
+    if (target.extension() == ".app") fs::remove_all(fsPath(p.target + ".failed"), ec); // (Finder would show it as a folder)
     fs::remove(fsPath(notePath), ec);
     return true;
 }
@@ -545,6 +559,239 @@ void confirmStarted(const std::string& notePath) {
     if (readPending(notePath, p)) fs::remove_all(fsPath(p.backup), ec);
     fs::remove(fsPath(notePath), ec);
 }
+
+// --- macOS ---
+
+bool teamIdsAcceptable(const std::string& running, const std::string& downloaded, std::string& why) {
+    why.clear();
+    if (running.empty()) return true; // ad-hoc signed: nothing to compare (the signed checksum list and the signature's validity hold)
+    if (running == downloaded) return true;
+    why = downloaded.empty() ? "the new app isn't signed by the same developer as this one (it carries no team identifier)"
+                             : "the new app isn't signed by the same developer as this one";
+    return false;
+}
+
+bool signerAcceptable(const MacTools& tools, const std::string& identifier, const std::string& teamId, std::string& why) {
+    if (!tools.runningIdentifier.empty() && identifier != tools.runningIdentifier) {
+        why = "the new app isn't signed as SculptForge";
+        return false;
+    }
+    return teamIdsAcceptable(tools.runningTeamId, teamId, why);
+}
+
+std::string bundleInMount(const std::string& mountDir, const std::string& name) {
+    std::error_code ec;
+    std::string found;
+    int apps = 0;
+    for (const auto& e : fs::directory_iterator(fsPath(mountDir), ec)) {
+        if (!e.is_directory(ec) || e.path().extension() != ".app") continue;
+        ++apps;
+        if (e.path().filename() == fsPath(name)) found = pathString(e.path());
+    }
+    return apps == 1 ? found : std::string();
+}
+
+std::string mountPath(const Install& install, const std::string& version) {
+    return pathString(fsPath(stagingPath(install, version)).parent_path() / ("mount-" + version));
+}
+
+bool swapDirectories(const std::string& fresh, const std::string& target, const std::string& backup, std::string& error,
+                     bool* targetIsNew) {
+    std::error_code ec;
+    const fs::path f = fsPath(fresh), t = fsPath(target), b = fsPath(backup);
+    if (targetIsNew) *targetIsNew = false;
+    fs::remove_all(b, ec);
+    if (!fs::is_directory(f, ec) || !fs::is_directory(t, ec)) {
+        error = "nothing to swap";
+        return false;
+    }
+#if defined(__APPLE__)
+    // One step: the target path is the old bundle or the new one, never missing or half of either. (A file system
+    // without RENAME_SWAP for folders answers an error and the two renames below do it.)
+    if (::renamex_np(fresh.c_str(), target.c_str(), RENAME_SWAP) == 0) {
+        fs::rename(f, b, ec); // (the old bundle, now under the .new name)
+        if (!ec) return true;
+        error = "the old version couldn't be kept as a backup: " + ec.message();
+        if (::renamex_np(fresh.c_str(), target.c_str(), RENAME_SWAP) == 0) return false; // swapped back: as before
+        if (targetIsNew) *targetIsNew = true; // the new one is in place, the old one under .new: both are kept
+        return false;
+    }
+#endif
+    fs::rename(t, b, ec);
+    if (ec) {
+        error = "can't move the current version aside: " + ec.message();
+        return false;
+    }
+    fs::rename(f, t, ec);
+    if (ec) {
+        error = "can't put the new version in place: " + ec.message();
+        std::error_code ec2;
+        fs::rename(b, t, ec2); // the old one back where it was
+        return false;
+    }
+    return true;
+}
+
+bool installMacApp(const Install& install, const Download& d, const std::string& version, const std::string& fromVersion,
+                   const std::string& notePath, const MacTools& tools, bool dryRun, std::string& error) {
+    const fs::path staged = fsPath(d.staged), target = fsPath(install.target);
+    const std::string fresh = install.target + ".new", backup = install.target + ".old";
+    std::error_code ec;
+    if (install.kind != InstallKind::MacApp || d.staged.empty() || target.extension() != ".app" || !tools.run ||
+        !tools.signature) {
+        error = "nothing to install";
+        return false;
+    }
+    if (hashFile(staged) != d.sha256 || d.sha256.empty()) { // (it sat on disk since the download)
+        fs::remove(staged, ec);
+        error = "the download changed since it was checked: nothing was installed";
+        return false;
+    }
+    // Everything downloaded goes when any step fails (and after a dry run); the mounted image is always detached.
+    const std::string mnt = mountPath(install, version);
+    bool mounted = false;
+    const auto detach = [&] {
+        if (!mounted) return true;
+        if (tools.run({"/usr/bin/hdiutil", "detach", mnt, "-quiet"}) != 0 &&
+            tools.run({"/usr/bin/hdiutil", "detach", mnt, "-force", "-quiet"}) != 0)
+            return false; // still mounted: its folder is left alone (never removed through a mount)
+        mounted = false;
+        return true;
+    };
+    const auto fail = [&](const std::string& why) {
+        std::error_code e;
+        fs::remove_all(fsPath(fresh), e);
+        fs::remove(staged, e);
+        if (detach()) fs::remove_all(fsPath(mnt), e);
+        error = why;
+        return false;
+    };
+    // The copy goes beside the target (the same volume: the swap is a rename); ditto makes the bundle's root itself.
+    // A folder this user can't write to (an administrator's /Applications) is the end of it: no privileges are asked for.
+    fs::remove_all(fsPath(fresh), ec);
+    fs::create_directories(fsPath(fresh), ec);
+    if (ec) return fail("can't write to " + pathString(target.parent_path()) + ": " + ec.message());
+    fs::remove_all(fsPath(fresh), ec);
+    fs::remove_all(fsPath(mnt), ec);
+    fs::create_directories(fsPath(mnt), ec);
+    if (ec) return fail("can't create " + mnt + ": " + ec.message());
+    // Read-only, not shown in Finder, nothing in it opened: the image is only read.
+    if (tools.run({"/usr/bin/hdiutil", "attach", "-nobrowse", "-readonly", "-noautoopen", "-noverify", "-quiet", "-mountpoint", mnt,
+                   d.staged}) != 0)
+        return fail("couldn't open the downloaded disk image");
+    mounted = true;
+    const std::string bundle = bundleInMount(mnt, pathString(target.filename()));
+    if (bundle.empty()) return fail("the disk image doesn't hold " + pathString(target.filename()));
+    if (tools.run({"/usr/bin/ditto", bundle, fresh}) != 0) return fail("couldn't copy the new version out of the disk image");
+    if (detach()) fs::remove_all(fsPath(mnt), ec);
+    // The copy must carry a valid signature over all of its code, from the same developer as the running app.
+    if (tools.run({"/usr/bin/codesign", "--verify", "--deep", "--strict", fresh}) != 0)
+        return fail("the new app's code signature doesn't check out: nothing was installed");
+    std::string identifier, teamId, why;
+    if (!tools.signature(fresh, identifier, teamId, why)) return fail(why.empty() ? "the new app's code signature doesn't check out" : why);
+    if (!signerAcceptable(tools, identifier, teamId, why)) return fail(why + ": nothing was installed");
+    if (dryRun) {
+        fail("");
+        return true;
+    }
+    Pending p{version, fromVersion, install.target, backup, 0};
+    if (!writePending(notePath, p)) return fail("can't write the update note");
+    bool targetIsNew = false;
+    if (!swapDirectories(fresh, install.target, backup, why, &targetIsNew)) {
+        fs::remove(fsPath(notePath), ec);
+        if (targetIsNew) { // the new version is in place and the old one is under .new: nothing is deleted
+            fs::remove(staged, ec);
+            error = why + "; the previous version is kept as " + fresh;
+            return false;
+        }
+        return fail(why);
+    }
+    fs::remove(staged, ec);
+    return true;
+}
+
+#if defined(__APPLE__)
+
+namespace {
+
+struct CfRef {
+    CFTypeRef ref = nullptr;
+    explicit CfRef(CFTypeRef r) : ref(r) {}
+    ~CfRef() {
+        if (ref) CFRelease(ref);
+    }
+    CfRef(const CfRef&) = delete;
+    CfRef& operator=(const CfRef&) = delete;
+};
+
+std::string cfString(CFStringRef s) {
+    if (!s) return {};
+    if (const char* direct = CFStringGetCStringPtr(s, kCFStringEncodingUTF8)) return direct;
+    char buf[512];
+    return CFStringGetCString(s, buf, sizeof buf, kCFStringEncodingUTF8) ? std::string(buf) : std::string();
+}
+
+// The signing and team identifiers in a code object's signing information ("" when missing). They are compared,
+// never logged or stored.
+bool identityOf(SecStaticCodeRef code, std::string& identifier, std::string& teamId, std::string& error) {
+    CFDictionaryRef info = nullptr;
+    if (SecCodeCopySigningInformation(code, kSecCSSigningInformation, &info) != errSecSuccess || !info) {
+        error = "can't read the app's code signature";
+        return false;
+    }
+    CfRef holder(info);
+    const auto text = [&](CFStringRef key) {
+        const CFTypeRef v = CFDictionaryGetValue(info, key);
+        return v && CFGetTypeID(v) == CFStringGetTypeID() ? cfString(static_cast<CFStringRef>(v)) : std::string();
+    };
+    identifier = text(kSecCodeInfoIdentifier);
+    teamId = text(kSecCodeInfoTeamIdentifier);
+    return true;
+}
+
+} // namespace
+
+bool macBundleSignature(const std::string& bundle, std::string& identifier, std::string& teamId, std::string& error) {
+    identifier.clear();
+    teamId.clear();
+    CFURLRef url = CFURLCreateFromFileSystemRepresentation(nullptr, reinterpret_cast<const UInt8*>(bundle.c_str()),
+                                                           CFIndex(bundle.size()), true);
+    if (!url) {
+        error = "can't read the new app";
+        return false;
+    }
+    CfRef urlHolder(url);
+    SecStaticCodeRef code = nullptr;
+    if (SecStaticCodeCreateWithPath(url, kSecCSDefaultFlags, &code) != errSecSuccess || !code) {
+        error = "the new app has no code signature";
+        return false;
+    }
+    CfRef codeHolder(code);
+    CFErrorRef why = nullptr;
+    const OSStatus st = SecStaticCodeCheckValidityWithErrors(
+        code, kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode, nullptr, &why);
+    if (why) CFRelease(why);
+    if (st != errSecSuccess) {
+        error = "the new app's code signature doesn't check out (" + std::to_string(int(st)) + ")";
+        return false;
+    }
+    return identityOf(code, identifier, teamId, error);
+}
+
+bool runningCodeIdentity(std::string& identifier, std::string& teamId) {
+    identifier.clear();
+    teamId.clear();
+    SecCodeRef self = nullptr;
+    if (SecCodeCopySelf(kSecCSDefaultFlags, &self) != errSecSuccess || !self) return false;
+    CfRef selfHolder(self);
+    SecStaticCodeRef code = nullptr; // the on-disk code behind this process, as SecStaticCode* calls want it
+    if (SecCodeCopyStaticCode(self, kSecCSDefaultFlags, &code) != errSecSuccess || !code) return false;
+    CfRef codeHolder(code);
+    std::string error;
+    return identityOf(code, identifier, teamId, error);
+}
+
+#endif
 
 // --- Windows ---
 

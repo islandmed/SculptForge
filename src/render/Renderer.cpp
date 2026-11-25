@@ -1208,6 +1208,15 @@ bool Renderer::init(std::string& error) {
         gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, dummyUvBufferData_);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
         gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+        const uint32_t zeroUint = 0;
+        gl::GenBuffers(1, &dummyUintBufferData_);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, dummyUintBufferData_);
+        gl::BufferData(GL_TEXTURE_BUFFER, sizeof zeroUint, &zeroUint, GL_STATIC_DRAW);
+        gl::GenTextures(1, &dummyUintBufferTexture_);
+        gl::BindTexture(GL_TEXTURE_BUFFER, dummyUintBufferTexture_);
+        gl::TexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, dummyUintBufferData_);
+        gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
         gl::GenTextures(1, &dummyUv2D_);
         gl::BindTexture(GL_TEXTURE_2D, dummyUv2D_);
         gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -1608,6 +1617,8 @@ void Renderer::shutdown() {
     gl::DeleteVertexArrays(1, &emptyVao_);
     gl::DeleteBuffers(1, &dummyUvBufferData_);
     gl::DeleteTextures(1, &dummyUvBufferTexture_);
+    gl::DeleteBuffers(1, &dummyUintBufferData_);
+    gl::DeleteTextures(1, &dummyUintBufferTexture_);
     gl::DeleteTextures(1, &dummyUv2D_);
     for (MeshProgram& p : programs_) {
         deleteProgram(p.id);
@@ -3456,7 +3467,42 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     if (directView_) samples = 1;
     // Resolution scale (#80): the view drawn into a smaller target and scaled up into the window.
     const float scale = std::clamp(settings.resolutionScale, 0.25f, 1.0f);
-    if (scale < 0.999f && !directView_ && !scaleFailed_) {
+    const bool pane = viewport.multi && viewport.w > 0 && viewport.h > 0; // one pane of a split view (RenderViewport)
+    if (scale < 0.999f && !directView_ && !scaleFailed_ && pane) {
+        // Split view: the pane drawn smaller in its own corner of the frame-size target (the same target every pane
+        // uses: a target per size would be remade twice a frame), then stretched into its place in the window.
+        Viewport small = viewport;
+        small.w = std::max(1, int(std::lround(viewport.w * scale)));
+        small.h = std::max(1, int(std::lround(viewport.h * scale)));
+        int s = samples;
+        while (s > 1 && !viewTarget(width, height, s)) s /= 2;
+        if (s > 1 || viewTarget(width, height, 1)) {
+            gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
+            draw(camera, width, height, settings, small);
+            logViewFrame("scaled pane", small.w, small.h, s, scale, lastDrawn_, true);
+            gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_);
+            gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
+            gl::BlitFramebuffer(small.x, small.y, small.x + small.w, small.y + small.h, small.x, small.y, small.x + small.w,
+                                small.y + small.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            applyOcclusion(viewFbo_, viewResolveFbo_, width, height);
+            gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+            gl::Disable(GL_SCISSOR_TEST);
+            gl::Viewport(0, 0, width, height);
+            if (!viewport.keep) { // the window around the panes, once a frame (as draw() leaves it)
+                gl::ClearColor(viewport.surround.x, viewport.surround.y, viewport.surround.z, 1.0f);
+                gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            }
+            gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_);
+            gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            gl::BlitFramebuffer(small.x, small.y, small.x + small.w, small.y + small.h, viewport.x, viewport.y,
+                                viewport.x + viewport.w, viewport.y + viewport.h, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+            const GLenum blitError = gl::GetError();
+            gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+            if (blitError == GL_NO_ERROR) return s;
+            scaleFailed_ = true;
+            SDL_Log("Scaled pane copy to the window failed (GL error 0x%04x); drawing at full resolution", unsigned(blitError));
+        }
+    } else if (scale < 0.999f && !directView_ && !scaleFailed_) {
         const int sw = std::max(1, int(std::lround(width * scale))), sh = std::max(1, int(std::lround(height * scale)));
         const bool inset = viewport.w > 0 && viewport.h > 0;
         Viewport small = viewport;
@@ -3499,7 +3545,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     while (samples > 1 && !viewTarget(width, height, samples)) samples /= 2;
     screenStrokeDrawn_ = false;
     // A screen stroke needs the view in a target it can read back: through the single-sample one when no AA.
-    const bool screen = !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr() && !settings.unlit;
+    const bool screen = !viewport.secondary && !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr() && !settings.unlit;
     // ... and so do the view's shadows and AO (they read its depth).
     const bool occlusion = occlusionWanted(settings);
     if (samples <= 1 && !((screen || occlusion) && viewTarget(width, height, 1))) {
@@ -3513,7 +3559,12 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     logViewFrame("view target", width, height, samples, 1.0f, lastDrawn_, true);
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_); // resolve: same format and size on both sides
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
-    gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    // A later pane of a split view copies only its own rect: the rest of the target is the panes before it (or stale).
+    const bool keepPane = pane && viewport.keep;
+    if (keepPane)
+        gl::BlitFramebuffer(viewport.x, viewport.y, viewport.x + viewport.w, viewport.y + viewport.h, viewport.x, viewport.y,
+                            viewport.x + viewport.w, viewport.y + viewport.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    else gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     if (occlusion) applyOcclusion(viewFbo_, viewResolveFbo_, width, height);
     if (screen)
         screenStrokeDrawn_ = screenPass_.apply(screenStroke_, viewFbo_, viewResolveFbo_, width, height, frameView_, frameProj_,
@@ -3521,7 +3572,10 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
                                                lightRotation(settings.lightYaw, settings.lightPitch));
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_); // single-sample blit: may convert to the window's format
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    if (keepPane)
+        gl::BlitFramebuffer(viewport.x, viewport.y, viewport.x + viewport.w, viewport.y + viewport.h, viewport.x, viewport.y,
+                            viewport.x + viewport.w, viewport.y + viewport.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    else gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     const GLenum blitError = gl::GetError();
     gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
     if (blitError != GL_NO_ERROR) { // the view never reached the window: draw this frame and later ones directly
@@ -3707,8 +3761,10 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     gl::Viewport(0, 0, targetWidth, targetHeight);
     const bool inset = viewport.w > 0 && viewport.h > 0;
     if (inset) {
-        gl::ClearColor(viewport.surround.x, viewport.surround.y, viewport.surround.z, 1.0f);
-        gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        if (!viewport.keep) { // (a second pane of a split view keeps what the first drew around it)
+            gl::ClearColor(viewport.surround.x, viewport.surround.y, viewport.surround.z, 1.0f);
+            gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
         gl::Viewport(viewport.x, viewport.y, viewport.w, viewport.h);
         gl::Scissor(viewport.x, viewport.y, viewport.w, viewport.h);
         gl::Enable(GL_SCISSOR_TEST);
@@ -4399,7 +4455,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::ActiveTexture(kTexture7);
     gl::BindTexture(GL_TEXTURE_BUFFER, s.primTexture);
     gl::ActiveTexture(GL_TEXTURE1);
-    gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.groupTexture : 0);
+    gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.groupTexture : dummyUintBufferTexture_);
     gl::ActiveTexture(GL_TEXTURE0);
     gl::Uniform1i(p->paint, settings.showVertexPaint && s.hasColors ? 1 : 0);
     gl::Uniform1i(p->showMask, active && settings.showMask && s.hasMask ? 1 : 0);
@@ -4411,6 +4467,15 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform1i(p->twoSided, 1);
     gl::Uniform1i(p->checker, checker ? 1 : 0);
     gl::Uniform1f(p->checkerScale, checker ? s.overlay->checkerScale : 8.0f);
+    if (gl::testTexelLimitSet()) { // (a UI test: a driver that checks every sampler, Mali, rejects the draw when one buffer unit is empty)
+        for (const GLenum unit : {kTexture7, GL_TEXTURE1, textured || normalMapped ? GL_TEXTURE3 : kTexture7, normalMapped ? kTexture6 : kTexture7}) {
+            GLint bound = 0;
+            gl::ActiveTexture(unit);
+            gl::GetIntegerv(0x8C2C /* GL_TEXTURE_BINDING_BUFFER */, &bound);
+            if (!bound) ++emptyBufferSamplers_;
+        }
+        gl::ActiveTexture(GL_TEXTURE0);
+    }
     };
     bind(p);
     gl::BindVertexArray(s.vao);
@@ -4551,7 +4616,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         if (!s.patchMaskOn) gl::VertexAttrib1f(3, 0.0f);
         if (perTriangle) {
             gl::ActiveTexture(GL_TEXTURE1);
-            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : 0);
+            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : dummyUintBufferTexture_);
             gl::ActiveTexture(GL_TEXTURE0);
         }
         drawPatches(s, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);

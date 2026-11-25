@@ -6,6 +6,111 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-24
+
+### Added
+- **Guide: Polygon mode**: a chapter for Tool > Polygon (selecting points, edges and faces, moving the selection,
+  Extrude, Inset, Bevel, Edge loops, Span, block out then sculpt).
+- **Generate 3D > Result**: one clear choice for what the picked candidate becomes. **Sculpting base: moderate
+  density, clean quads** (the default) remeshes the pick at once (Voxel Remesh, then Quad Remesh, about 32768 quads
+  with one subdivision level) and keeps the model as generated hidden as the Reference for Project Detail;
+  **Reference: high fidelity** keeps the pick exactly as generated. The remesh knobs (Then Quad Remesh, Resolution,
+  Keep a high-detail copy) moved under **Advanced**; **Use as sculpting base** remains to do it again after Undo or
+  for a pick made as a reference. Existing services only; nothing new is sent anywhere.
+- **AI provenance tag**: a Part made by Generate 3D (or `image_to_3d` / `text_to_3d`) records the public provider
+  (Hugging Face, fal.ai, Meshy, Hyper3D, Tripo, ComfyUI, your generator command), the model when it is a built-in
+  choice, the local date, the SculptForge version and the pass (generated, sculpting base, reference); never a host,
+  URL, path, workflow or key name. It shows in the Parts list tooltip and `scene_overview`, follows Duplicate, Split
+  and linked copies, is saved in projects (`ai_provenance`, an optional per-Part key older versions ignore) and kept
+  on export where the format has a place for it: glTF node `extras.sculptforge_ai`, USD prim `customData`
+  (`sculptforge_ai`), an OBJ comment under the object line. FBX, PLY and STL have no place for it. Nothing in the tag
+  leaves your computer on its own.
+- **Standalone curves, part 2** (Tool > Tube): **Draw > Points** adds a point per click to the curve or tube being
+  built (Enter, Next line or Draw Tube off ends the line; `tube_add_point`). **Line: Smooth / Straight** switches a
+  curve or tube between a smooth curve through its points and a polyline with sharp corners, keeping the points
+  (`tube_set straight=true`; Resample, Tube from curve and Repeat along curve follow it). **Shift+click** selects
+  several points (Delete Point removes them all; `tube_delete_point indices=`). The **Transform gizmo** (W / E / R)
+  moves, turns and scales the selected points, or the whole curve, re-sweeping the tube live, one undo step per drag
+  (before, it moved the mesh and the points could no longer be edited). **Snap points to surface** puts the selected
+  points on the nearest other Part (`tube_snap_points`), and with Snap to surfaces on a curve's dragged point lands on
+  the model under it. Requested by Hameron and GABO.
+- **Orientation widget** (Draw > Camera > Corner gizmo > Orientation): the world axes through a ball of dark glass in
+  the corner of the canvas, a dot at each of the six ends (X red, Y green, Z blue; no letters), the dot under the
+  pointer lit in the accent and its side named under the disc. Click a dot to look from that side (orthographic, as
+  the numpad views; the dot facing you again shows the opposite side) with a short eased move (none with Preferences >
+  Interface > Reduce motion); drag it to orbit; double-click to frame the model. The SculptForge layout shows it by
+  default, the Classic layout keeps the X / Y / Z axes; **Corner gizmo** picks either or hides the corner, and
+  **Position** puts it at the top left (as before) or the top right. Saved in the preferences. Requested by members.
+- **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. Turn a Part into a cage (plain meshes up to
+  2 million triangles; Parts with subdivision or Micro levels are told what to do first), pick Points, Edges or Faces
+  and select them on the model (click, Shift adds, Ctrl removes, drag a box; double-click an edge for its loop, a face
+  for its face group; Grow, Shrink, All, None, Invert, Loop, Ring, By Group), see the selection drawn over the model
+  (the Part shows its wireframe and flat faces while the mode is on, its own shading comes back after), move it with
+  the Transform gizmo (W / E / R) as one undo step, and run operations on it from the panel, each one undo step:
+  Delete and Flip ship with the mode, the modelling operations (Extrude, Inset, Bevel, Edge loop, Span) plug into the
+  same registry. **Extrude**: the selected faces move out along their normals (in, with a negative Distance) and get
+  quad side walls in a face group of their own, as one connected region or face by face (Individual) with a groove
+  between neighbours; Even thickness moves every face the full distance where the selection bends, Keep shape moves a
+  region along one direction, Inset narrows the cap first; in Edges, selected open border edges extrude into a strip
+  that extends the surface (or stands on it). The slider shows a live preview. **Span** joins two edge loops or two
+  face selections with new faces: two open borders get a band of quads (Segments adds rings across, Twist turns the
+  pairing, Reverse for a piece wound inside out), faces on two sides are removed and their openings joined (a tunnel
+  through a block, a handle between two shells), and one whole border loop is closed across its width. Borders of
+  different lengths pair by distance along each, with the odd triangles spread evenly; the band is a face group of its
+  own and stays selected afterwards. **Edge loop**: new loops of edges across the ring of quads through the selected
+  edge (or every ring the selected edges are on), Loops per ring evenly spaced, Position across the quads with a live
+  preview; the loop runs round the model or stops at a border, a triangle (split in two) or a quad it already crossed,
+  keeps face groups, UVs, seams, creases, paint and mask, and the new loops stay selected. **Bevel**: selected edges
+  (or the edges of selected faces) become a strip of 1 to 12 faces across, shaped by a profile (flat chamfer, round,
+  square-ish or concave); edges meeting at a vertex join in a mitre or a rounded corner (a box corner becomes a sphere
+  piece), a bevel ending at a face cuts that face's corner round, and two bevels running through a vertex join into
+  one strip. Selected points are cut off instead, flat or as a rounded cap. The width is a share of the Part's size
+  and is held back so no two cuts meet (Limit width). Faces keep their groups, UVs, mask and paint; the bevel faces
+  get a face group of their own. Open and non-manifold edges are left alone and counted. **Inset**: shrinks the
+  selected faces inward by a Thickness and moves them in or out by a Depth (the Thickness as a share of the most the
+  selected faces can take, so a short drag is a clear inset on a Part of any density and the end of the slider is as
+  deep as it goes; the Depth as a fraction of the Part's size; a slider drag previews the result), the selection as
+  one shape or Each face by itself. The rim of quads between the old border and the new one keeps the faces' groups
+  (or joins one new Rim group), UVs stay continuous, creases and UV seams stay on the old edge, and the thickness is
+  held a fifth short of the point where the inner faces would meet, so an inset is never a fan of slivers. Commands:
+  `poly_mode`, `poly_select`, `poly_op`, and `transform selection=true` (`edge_loop` and `edge_select op=ring` do the
+  same from Edges mode for scripts). Nothing changes for sculpting: the mode is off until you turn it on. Members' top
+  wish (#225 and the ideas threads).
+- **Split view** (View > Split view, Shift+V; #171, requested by members): a second live view of the same scene beside
+  or below the first. Each view has its own camera: Free turns like any view, Front / Right / Top hold that side
+  (orthographic; pan and zoom still work). The view under the pointer is the one you sculpt, orbit and frame in; the
+  other updates with every stroke. Drag the divider to share the canvas; the chip at a view's top right switches its
+  direction, swaps the views or goes back to one view. While a stroke runs or the view moves, the other view draws at
+  a lower resolution (half on the Essential tier) and comes back sharp when you stop. Off by default; saved with the
+  preferences.
+- **Remove Hidden** is an action: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> in the SculptForge key style
+  (Preferences > Hotkeys changes it; the Classic, Maya and Blender styles keep their keys as they were), in the
+  command palette, and as a Quick Menu button.
+- **Quick Menu** (right click on the canvas, or <kbd>Space</kbd>): a third row with Quick Remesh, Quad Remesh and
+  Remove Hidden, in the SculptForge layout (the Classic layout's menu is as it was).
+
+### Changed
+- UI test harness (tests/ui, the monkey): the monkey's way out frames the model (the Frame action) before the sculpt
+  check, so a sequence that mirrors, rotates or views the model off the canvas fails only for a latch, never for the
+  camera (ui_monkey seed 9 went red on every branch that added a checked toggle).
+- **Quick Remesh is on by default in the SculptForge layout**: <kbd>Shift</kbd>+<kbd>R</kbd>, and <kbd>N</kbd> held
+  while clicking or dragging on the background, remesh the active Part at the Voxel Remesh resolution in the
+  background without first ticking Tool > Remesh > Quick Remesh (the checkbox switches it). The Classic layout keeps
+  it off until you tick that box. Reported by a Founding Member: remeshing mid-sculpt took too many clicks, and a slow
+  remesh was cancelled instead.
+
+### Fixed
+- **MCP `checkpoint_restore`**: restoring a checkpoint whose steps were no longer in the undo history (dropped by the
+  undo memory budget, or replaced by a newer edit) returned an error but had already undone your current changes on
+  the way. The restore is now checked before any step is taken, and a restore that still ends off the checkpoint puts
+  the scene, the undo and redo steps and the active Part back as they were. The error reads "checkpoint no longer in
+  undo history" and says the scene was not changed. Reported by a member.
+- **Typing in a field**: while a text field has the keyboard (a slider's typed number, the command palette's search,
+  any text box), no shortcut runs. Ctrl+A selects the field's text instead of Mask All (one undo step), Ctrl+Z, Ctrl+Y
+  and plain letters stay in the field. It could happen when the key came right after the click that opened the field.
+
+## [0.13.14] - 2026-11-24
+
 ### Added
 - **Scatter** (Tool > Scatter, the `scatter` command): copies of a built-in shape or another Part over the active Part
   or only its masked area. Count, random size range, random turn and tilt, follow the surface or stay upright, lie
@@ -57,12 +162,9 @@ All notable changes to SculptForge are listed here. The format follows
   now stops short of the wall straight down its own path, so the sheet is thinned, never torn through. On the wing in
   the test session the largest point moved differently from before is 0.03 on a 2.8-long wing."
 
-## [0.13.14] - 2026-11-23
-
-### Fixed
-- Dynamic topology no longer erases a Part's painted texture: the UVs are kept through the stroke (new triangles get
-  UVs from the ones they split; at a UV seam the remesh merges and relaxes only along the seam), so the paint stays in
-  place and Undo restores the UVs exactly.
+### Known issues
+- Sculpting with Dynamic on a painted Part can still erase its texture; workaround: turn Dynamic off
+  on painted Parts or save first. The fix ships in the next release (0.14.1).
 
 ## [0.13.13] - 2026-11-23
 

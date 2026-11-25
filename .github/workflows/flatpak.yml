@@ -44,7 +44,7 @@ jobs:
     name: Flatpak x86_64
     runs-on: ${{ vars.SF_RUNNER_LINUX || 'ubuntu-24.04' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: sudo ./packaging/linux/apt-retry.sh update && sudo ./packaging/linux/apt-retry.sh install -y --no-install-recommends flatpak flatpak-builder elfutils xvfb
       - name: Build the bundle
         run: packaging/flatpak/build.sh dist

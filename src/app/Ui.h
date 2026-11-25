@@ -5,6 +5,7 @@
 #pragma once
 
 #include "app/Theme.h"
+#include "core/AiProvenance.h"
 
 #include <imgui.h>
 
@@ -19,6 +20,10 @@ class App;
 namespace sf::ui {
 
 enum class Look { Label, Icon, IconLabel, Tile };
+
+// A Part's AI provenance tag for the interface: "Hunyuan3D 2.1 (Tencent), tencent-hunyuan3d-2-1.hf.space, 2026-11-23
+// (sculpting base)", the pass translated; "" for a Part no AI made.
+std::string AiProvenanceText(const AiProvenance& ai);
 
 // Runs the action on click; toggles draw with the accent when checked(); shows Ctrl-hover help;
 // is a Ctrl+Alt drag source in customize mode. Ctrl+Alt+click (outside customize mode) assigns
@@ -84,6 +89,11 @@ bool HoverAnimating();
 // null. For a press before ImGui's next frame: its hover is a frame behind, and the press of a pointer that jumps
 // there (a pen landing, a tap, a click in the same batch of events as the move) must not reach the canvas (#161).
 const char* FloatingWindowAt(ImVec2 p);
+// A text field has the keyboard (an InputText, a slider's typed number, the command palette's search): no app shortcut
+// may fire, whatever its key (Ctrl+A selects the field's text, B types a B). Live: ImGui's io.WantTextInput only
+// updates at the start of the next frame, and a key that arrives right after the click that opened the field is
+// handled before it (Ctrl+A ran Mask All, 11-23).
+bool TextFieldFocused();
 // For UI tests: the rings and lifted tiles drawn in the last frame.
 int HoverRingsShown();
 int HoverLiftsShown();
@@ -133,8 +143,34 @@ struct MyPanelPayload {
 inline constexpr const char* kMyPanelPayload = "SF_MYPANEL";
 // Makes the last item a drag source for My Panel while Alt (without Ctrl) is held. `section`: a header, else an action.
 bool MyPanelDragSource(const char* id, bool section, const char* label, bool fromPanel = false);
+// The same for any entry as My Panel stores it ("control:tool.display/Backface culling").
+bool MyPanelDragEntry(const std::string& entry, const char* label, bool fromPanel);
 // Alt-dragged a button or header more than a click's travel: its release was the end of a drag, not a click.
 bool MyPanelDragged();
+
+// One control as a My Panel entry ("control:<scope>/<key>", UiLayout.h; PanelMyPanel.cpp draws it). HelpText and
+// HelpAction mark the control drawn just before them: while Alt (without Ctrl) is held it is a drag source for My Panel,
+// keyed by the help title (or the action id) inside the scope being drawn; while My Panel draws one control
+// (BeginPinnedControl) the one whose key matches is measured and made movable. A key repeated in a scope gets "#2", "#3".
+void PinPalette(const char* paletteId); // the palette whose body is being drawn ("" when done); resets the key counts
+void PinSection(const char* sectionId); // the open section being drawn ("" at its end)
+struct PinnedControl {
+    std::string scope, key; // what My Panel wants
+    bool measuring = false;  // the first pass only measures: no drag source, no menu
+    bool found = false;
+    ImVec2 min, max;         // the control's rect this frame
+    float lineX = 0.0f;      // where its line starts (a control mid-row is drawn from there in My Panel)
+    bool remove = false;     // its right-click menu asked for removal
+};
+void BeginPinnedControl(const std::string& scope, const std::string& key, bool measuring);
+PinnedControl EndPinnedControl();
+// Palette bodies while Alt (without Ctrl) is held: sliders and fields are read-only, so an Alt-drag that starts on one
+// picks it up for My Panel without changing it. Returns what EndPaletteItems needs.
+bool BeginPaletteItems();
+void EndPaletteItems(bool readOnly);
+// A readout ("12,480 tris", "Level 2 of 4"): dim text that is an item with an id, so it can be hovered for help, found
+// by UI tests and dragged into My Panel like a control (ImGui::Text has no id).
+void Readout(const char* id, const char* text);
 
 // Keyboard keycaps for a chord ("Ctrl+Shift+I", "F3 / Ctrl+Shift+P"), drawn inline as an item.
 void Keycaps(const std::string& chord);

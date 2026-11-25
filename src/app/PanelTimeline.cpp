@@ -435,7 +435,7 @@ void App::drawTimelineUi() {
     // The strip: along the bottom of the canvas, or its top (Preferences > Interface > Timeline position, #63:
     // away from the brush shelf). At the top it sits below the top shelf (the canvas starts there) and what else
     // the canvas shows at its top (the axis gizmo, the update banner) moves down below it (timelineTopInset_).
-    CanvasRect c = canvasRect();
+    CanvasRect c = wholeCanvasRect();
     const float sc = uiScale_;
     const bool top = uiPrefs_.timelineTop;
     // The open Library takes the canvas's top (or bottom) edge: the strip moves off it, so it never covers the
@@ -463,7 +463,7 @@ void App::drawTimelineUi() {
             ui::HelpText("Sculpt Timeline", nullptr, "Open the history strip.", "Edit");
             timelineStripY_ = ImGui::GetWindowPos().y;
             timelineStripH_ = ImGui::GetWindowSize().y;
-            if (top) timelineTopInset_ = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - canvasRect().y;
+            if (top) timelineTopInset_ = ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - wholeCanvasRect().y;
         }
         ImGui::End();
         return;
@@ -482,7 +482,7 @@ void App::drawTimelineUi() {
     ImGui::SetNextWindowPos(ImVec2(c.x + margin, stripY), ImGuiCond_Always);
     timelineStripY_ = stripY;
     timelineStripH_ = height;
-    if (top) timelineTopInset_ = stripY + height - canvasRect().y;
+    if (top) timelineTopInset_ = stripY + height - wholeCanvasRect().y;
     ImGui::SetNextWindowSize(ImVec2(c.w - 2 * margin, height), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.88f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2((compact ? 6 : 8) * sc, padY));

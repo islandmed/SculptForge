@@ -19,14 +19,19 @@
 #include "core/Dyntopo.h"
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
+#include "core/PrimitiveKit.h"
+#include "core/Solidify.h"
 #include "core/Face.h"
 #include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
 #include "core/Backdrop.h"
 #include "core/CloseHoles.h"
+#include "core/EdgeLoopInsert.h"
 #include "core/Cut.h"
 #include "core/Multires.h"
+#include "core/PolyMode.h"
+#include "core/PolyOps.h"
 #include "core/Micro.h"
 #include "core/FigurePose.h"
 #include "core/UndoBatch.h"
@@ -943,8 +948,11 @@ CommandRegistry::CommandRegistry() {
     registerMaskingCommands(*this);
     registerCutCommands(*this); // cut (core/Cut.h)
     registerCloseHolesCommands(*this); // close_holes (core/CloseHoles.h)
+    registerEdgeLoopCommands(*this);   // edge_loop (core/EdgeLoopInsert.h)
     registerBackdropCommands(*this);   // remove_flat_background (core/Backdrop.h)
     registerFaceGroupCommands(*this);
+    registerPolySelectCommands(*this); // poly_mode, poly_select (core/PolyMode.h)
+    registerPolyOpCommands(*this);     // poly_op (core/PolyOps.h)
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerPartCommands(*this);
     registerBooleanCommands(*this); // part_boolean, boolean_parts, make_boolean_mesh (core/PartBoolean.h)
@@ -955,6 +963,8 @@ CommandRegistry::CommandRegistry() {
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
     registerFigurePoseCommands(*this); // figure_pose_* (core/FigurePose.h)
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
+    registerSolidifyCommands(*this); // solidify (core/Solidify.h)
+    registerPrimitiveCommands(*this); // part_primitive (core/PrimitiveKit.h)
     registerMeshCheckCommands(*this);     // weld_points, mesh_check, mesh_fix (core/MeshCheck.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
     registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)

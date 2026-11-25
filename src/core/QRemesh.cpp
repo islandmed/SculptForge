@@ -1539,7 +1539,7 @@ bool remeshPiece(WorkMesh work, int axis, double wantQuads, const QRemeshOptions
     // Surface the quads snap to (before any subdivision for density: same surface).
     mark("prepare");
     TriangleBVH surface;
-    surface.build(work.P, work.T);
+    if (!surface.build(work.P, work.T, [&] { return report(0.03f); })) return false;
     mark("surface bvh");
     if (!report(0.05f)) return false;
 
@@ -1827,7 +1827,7 @@ bool qremesh(const Mesh& source, const QRemeshOptions& opt, Mesh& out, std::stri
     // The whole sculpt as a query surface: the symmetry test, attributes, and the snap of mirrored vertices.
     TriangleBVH full;
     auto buildFull = [&] {
-        if (full.empty()) full.build(source.positions, source.triangles);
+        if (full.empty() && !full.build(source.positions, source.triangles, [&] { return asked(); })) return false;
         return asked();
     };
 

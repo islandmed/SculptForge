@@ -18,8 +18,10 @@
 #include "core/Parallel.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <atomic>
+#include <mutex>
 #include <numeric>
 #include <thread>
 #include <unordered_map>
@@ -89,6 +91,8 @@ struct ProxyBuilder::Impl {
     std::vector<float> Lt; // per vertex target length (remesh)
     std::vector<uint8_t> locked; // pre-decimation blocks: vertices shared with other blocks never go
     float reach = 1.0f;
+    double tEdges = 0.0, tCollapse = 0.0, tProject = 0.0; // decimate's seconds per step (SF_QREMESH_TIMING)
+    size_t nCollapsed = 0, nTried = 0, nPasses = 0;
 
     explicit Impl(const ProxySource& s)
         : src(*s.mesh), surface(s.surface), features(s.features), sharp(s.sharp), groups(s.keepGroups),
@@ -330,22 +334,29 @@ struct ProxyBuilder::Impl {
     }
 
     void decimate(float edge) {
+        using Clock = std::chrono::steady_clock;
+        auto secs = [](Clock::time_point a, Clock::time_point b) { return std::chrono::duration<double>(b - a).count(); };
         reach = 3.0f * edge;
         std::vector<uint32_t> ra, rb, scratch, moved;
         std::vector<uint8_t> touched(P.size(), 0);
         for (int pass = 0; pass < 60; ++pass) {
             if (cancelled && cancelled()) return;
+            ++nPasses;
+            const auto t0 = Clock::now();
             std::vector<Cand> c = edges(0.0f, 0.8f * edge, false);
             if (c.empty()) break;
             std::sort(c.begin(), c.end(), [](const Cand& x, const Cand& y) {
                 return x.len2 < y.len2 || (x.len2 == y.len2 && (x.a < y.a || (x.a == y.a && x.b < y.b)));
             });
+            const auto t1 = Clock::now();
+            tEdges += secs(t0, t1);
             std::fill(touched.begin(), touched.end(), 0);
             size_t done = 0;
             size_t seen = 0;
             for (const Cand& e : c) {
                 if ((++seen & 8191) == 0 && cancelled && cancelled()) return;
                 if (deadV[e.a] || deadV[e.b] || touched[e.a] || touched[e.b]) continue;
+                ++nTried;
                 const uint32_t s = collapseEdge(e.a, e.b, 1.25f * edge, ra, rb, scratch);
                 if (s == kNone) continue;
                 ++done;
@@ -354,7 +365,11 @@ struct ProxyBuilder::Impl {
                 ring(s, ra);
                 for (uint32_t u : ra) touched[u] = 1;
             }
+            nCollapsed += done;
+            const auto t2 = Clock::now();
+            tCollapse += secs(t1, t2);
             projectMoved(moved);
+            tProject += secs(t2, Clock::now());
             if (done == 0 || done < c.size() / 400) break;
         }
     }
@@ -634,14 +649,21 @@ qr::WorkMesh preDecimate(const ProxySource& source, float edge, std::unordered_s
     };
     std::vector<Part> parts(ranges.size());
     std::vector<vec3> P = m.P;
-    // The blocks go in rounds of one per thread, Cancel asked between rounds (on this thread: the callback isn't
-    // called from the workers).
-    const size_t round = std::max<size_t>(1, size_t(std::max(1u, std::thread::hardware_concurrency())));
-    for (size_t first = 0; first < ranges.size(); first += round) {
-        if (source.cancelled && source.cancelled()) return {};
-        parallelJobs(std::min(round, ranges.size() - first), [&, first](size_t j) {
-            const size_t k = first + j;
-            {
+    std::mutex statsMutex; // the blocks' decimate step times, summed (thread seconds; SF_QREMESH_TIMING)
+    double tEdges = 0.0, tCollapse = 0.0, tProject = 0.0;
+    size_t nCollapsed = 0, nTried = 0, nPasses = 0;
+    // All the blocks in one go, the workers taking the next free one (no rounds: a round's barrier left the pool a
+    // third idle at 2M triangles). Cancel is asked on this thread, which only polls while the workers run (the
+    // callback is never called from a worker); a stop lands within one decimation pass of a block (tens of ms).
+    std::atomic<bool> stopNow{false};
+    std::atomic<bool> stopped{false};
+    {
+        std::atomic<size_t> next{0}, done{0};
+        const size_t workers = std::max<size_t>(1, size_t(parallelThreads()) - (source.cancelled ? 1 : 0));
+        auto work = [&] {
+            tInJob = true; // (the blocks' own parallel loops run inline, as they did in parallelJobs' workers)
+            for (size_t k = next++; k < ranges.size(); k = next++) {
+                if (stopNow.load(std::memory_order_relaxed)) return;
                 qr::WorkMesh local;
                 std::unordered_map<uint32_t, uint32_t> l;
                 std::vector<uint32_t> g;
@@ -657,7 +679,7 @@ qr::WorkMesh preDecimate(const ProxySource& source, float edge, std::unordered_s
                 }
                 ProxySource ls = source;
                 ls.mesh = &local;
-                ls.cancelled = {};
+                ls.cancelled = [&] { return stopNow.load(std::memory_order_relaxed); }; // (a flag read, never the caller's callback)
                 ls.sharp.clear();
                 for (uint64_t key : source.sharp) {
                     const auto a = l.find(uint32_t(key >> 32)), b = l.find(uint32_t(key & 0xffffffffu));
@@ -668,6 +690,15 @@ qr::WorkMesh preDecimate(const ProxySource& source, float edge, std::unordered_s
                 for (size_t v = 0; v < g.size(); ++v)
                     impl.locked[v] = shared[g[v]];
                 impl.decimate(edge);
+                if (stopNow.load(std::memory_order_relaxed)) {
+                    stopped = true;
+                    return;
+                }
+                {
+                    std::lock_guard<std::mutex> lock(statsMutex);
+                    tEdges += impl.tEdges, tCollapse += impl.tCollapse, tProject += impl.tProject;
+                    nCollapsed += impl.nCollapsed, nTried += impl.nTried, nPasses += impl.nPasses;
+                }
                 Part& out = parts[k];
                 out.g = g;
                 out.P = impl.P;
@@ -676,9 +707,27 @@ qr::WorkMesh preDecimate(const ProxySource& source, float edge, std::unordered_s
                         out.T.push_back({g[impl.T[t].x], g[impl.T[t].y], g[impl.T[t].z]}), out.G.push_back(impl.G[t]);
                 for (uint64_t key : impl.sharp)
                     out.sharp.push_back(edgeKey(g[uint32_t(key >> 32)], g[uint32_t(key & 0xffffffffu)]));
+                ++done; // (this block)
             }
-        });
+            tInJob = false;
+        };
+        std::vector<std::thread> pool;
+        for (size_t t = 0; t < workers; ++t) pool.emplace_back(work);
+        if (source.cancelled) {
+            // This thread only asks the caller, every 20 ms, until every block is done (or one was stopped).
+            while (done.load() < ranges.size() && !stopNow.load()) {
+                if (source.cancelled()) stopNow = true;
+                else std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+        } else {
+            work();
+        }
+        for (auto& th : pool) th.join();
+        if (stopNow.load() || stopped.load()) return {};
     }
+    if (std::getenv("SF_QREMESH_TIMING"))
+        std::fprintf(stderr, "    pre-decimate blocks: %zu passes, %zu tried, %zu collapsed; thread-seconds edges %.2f collapse %.2f project %.2f\n",
+                     nPasses, nTried, nCollapsed, tEdges, tCollapse, tProject);
     // Merge (surviving vertices keep their global ids, moved by midpoint collapses), then compact.
     qr::WorkMesh merged;
     std::vector<uint32_t> remap(nv, kNone);

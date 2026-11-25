@@ -15,7 +15,11 @@ read by `loadProject` (src/core/Project.cpp). Commands: `save_project path=...`,
   strokes go into, -1 = base) and, for a mesh that came , `bridge_name` (the Bridge object name
   that `bridge_send` / `bridge_receive` match on). Optional `shading` (`"smooth"` or `"flat"`; missing or unknown =
   follow the scene) is the Part's own viewport shading, and the app's `render.flat_shading` (bool) the scene's;
-  both were added after 0.9.4 without a version bump (older readers ignore them).
+  both were added after 0.9.4 without a version bump (older readers ignore them). Optional `ai_provenance` (added in
+  0.14.0 without a version bump; src/core/AiProvenance.h) marks a Part an AI made: `{"provider", "model", "date", "app", "role"}`,
+  the public provider's name, the model (may be empty), the local date (YYYY-MM-DD), the SculptForge version and the pass
+  (`generated`, `sculpting base` or `reference`); never a host, URL, path, workflow or key name. Missing keys read as
+  empty, a Part without the key has no tag. Linked copies carry their own copy.
 - Optional top-level `attachments` (added in 0.9.5 without a version bump; older readers ignore it): files the app
   keeps in the project, each `{"name", "data"}` with `data` a `u8` blob under `attachments/<name>`. Names use
   letters, digits, space, `. _ -` and `/` (no `..`); a missing or unreadable attachment is left out on loading. The

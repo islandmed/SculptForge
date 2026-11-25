@@ -375,7 +375,7 @@ void App::drawPhoneWindow() {
     ImGui::SetNextWindowSize(ImVec2(780 * scale, 0), ImGuiCond_Always);
     {
         // At the top of the canvas, leaving most of the model in view.
-        const CanvasRect c = canvasRect();
+        const CanvasRect c = wholeCanvasRect();
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + 12 * scale), ImGuiCond_Appearing, ImVec2(0.5f, 0.0f));
     }
     ImGui::SetNextWindowBgAlpha(1.0f);

@@ -79,7 +79,10 @@ bool contextHealthy() {
     return complete && gl::GetError() == GL_NO_ERROR;
 }
 
-uint32_t bufferChunkTexels(uint32_t natural) { return g_testTexelLimit ? std::min(natural, g_testTexelLimit) : natural; }
+uint32_t bufferChunkTexels(uint32_t natural) { // (the driver's limit always: a Mali's 65536 texels, not only a test's)
+    const GLint driver = maxTextureBufferTexels();
+    return driver > 0 ? std::min(natural, uint32_t(driver)) : natural;
+}
 
 #define SF_GL_DEFINE(ret, name, ...) PFN_##name name = nullptr;
 SF_GL_FUNCTIONS(SF_GL_DEFINE)
@@ -193,6 +196,39 @@ GenericProc loadES(const char* name) {
 } // namespace
 #endif
 
+namespace {
+PFN_TexBuffer g_realTexBuffer = nullptr;
+uint32_t g_texBufferOver = 0;
+// Bytes of one texel in a buffer texture's format (0: not one this renderer uses).
+size_t texelBytes(GLenum format) {
+    switch (format) {
+    case GL_R16UI: case 0x8233 /* R16I */: return 2;
+    case GL_R32UI: case GL_RG16F: case GL_RGBA8: return 4;
+    case GL_RG32F: case 0x881A /* RGBA16F */: return 8;
+    case GL_RGBA32F: case GL_RGBA32UI: return 16;
+    default: return 0;
+    }
+}
+// TexBuffer, then a look at the buffer's size: a buffer texture holds at most GL_MAX_TEXTURE_BUFFER_SIZE texels (a Mali's 65536).
+void SF_GLAPI checkedTexBuffer(GLenum target, GLenum format, GLuint buffer) {
+    g_realTexBuffer(target, format, buffer);
+    const size_t bytes = texelBytes(format);
+    if (!bytes || !buffer) return;
+    GLint previous = 0, size = 0;
+    GetIntegerv(GL_COPY_READ_BUFFER, &previous); // (GL_COPY_READ_BUFFER_BINDING has the same value)
+    BindBuffer(GL_COPY_READ_BUFFER, buffer);
+    GetBufferParameteriv(GL_COPY_READ_BUFFER, 0x8764 /* GL_BUFFER_SIZE */, &size);
+    BindBuffer(GL_COPY_READ_BUFFER, GLuint(previous));
+    const size_t texels = size_t(size) / bytes;
+    if (texels <= size_t(std::max(maxTextureBufferTexels(), 0))) return;
+    ++g_texBufferOver;
+    static int said = 0;
+    if (said++ < 8) SDL_Log("Buffer texture past the GPU's limit: %zu texels (format 0x%04x), limit %d", texels, unsigned(format), maxTextureBufferTexels());
+}
+} // namespace
+uint32_t texBufferOverLimit() { return g_texBufferOver; }
+bool testTexelLimitSet() { return g_testTexelLimit != 0; }
+
 const char* load(ProcLoader loader) {
 #ifdef SF_GLES
     esLoader = loader;
@@ -206,6 +242,8 @@ const char* load(ProcLoader loader) {
 #define SF_GL_LOAD_OPTIONAL(ret, name, ...) name = reinterpret_cast<PFN_##name>(loader("gl" #name));
     SF_GL_OPTIONAL(SF_GL_LOAD_OPTIONAL)
 #undef SF_GL_LOAD_OPTIONAL
+    g_realTexBuffer = TexBuffer;
+    TexBuffer = &checkedTexBuffer;
     return nullptr;
 }
 

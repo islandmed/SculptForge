@@ -30,6 +30,8 @@ wait 0.3
 wait_idle 30
 print view_vs_mark
 remember view_vs_mark with_s
+# (S's view, for view_nearer_mark at the end.)
+mark_view other
 expect_value view_vs_mark > 0.02
 key ctrl+z
 wait_idle 30
@@ -38,8 +40,10 @@ wait_idle 30
 expect_value view_vs_mark < 0.01
 
 # S again, released and still draining: Undo and a far-away press wait behind it. Once the undo has run (the redo step exists), the
-# far stroke is on the stroke thread: the view meanwhile is the mark's, not S's. The far stroke's own batches reach the GPU as they
-# land (more of them under a loaded machine: 0.039 seen), so the bound is half of S's difference, not a third: S still shown is all of it.
+# far stroke is on the stroke thread: the view meanwhile is the mark's, not S's. A stroke running shades the whole model a little
+# differently (0.0595 of S's 0.1145 on GitHub's llvmpipe runners, wherever the far stroke lands), so the distance to the mark alone
+# can't be bounded below half of S's difference: the view must be nearer the mark than S's view (S still shown is the other way
+# round by all of S's difference).
 stroke 0.45 0.35 0.70 0.65 0.5 hold
 wait 0.2
 release
@@ -49,5 +53,6 @@ stroke 0.10 0.12 0.12 0.14 0.5
 wait_value can_redo == 1 30
 expect_value stroke_draining == 1
 print view_vs_mark
-expect_value view_vs_mark < $with_s*0.5
+print view_nearer_mark
+expect_value view_nearer_mark > 0.0
 shot undo-then-stroke-busy

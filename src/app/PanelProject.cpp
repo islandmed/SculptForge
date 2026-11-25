@@ -181,11 +181,10 @@ void App::initProject() {
             }
         }
         discordPrefs_.enabled = prefs["discord_presence"].asBool(false); // Preferences > Integrations (PanelIntegrations.cpp)
-        discordPrefs_.showChallenge = prefs["discord_challenge_shown"].asBool(false);
-        discordPrefs_.showFileName = prefs["discord_file_name_shown"].asBool(false);
-        if (prefs["discord_challenge"].isString())
-            discordPrefs_.challenge = discord::sanitize(prefs["discord_challenge"].asString(), discord::kChallengeMax);
-        std::snprintf(discordChallengeBuf_, sizeof discordChallengeBuf_, "%s", discordPrefs_.challenge.c_str());
+        // The file-name and challenge options of 0.11 to 0.14.0 are gone: whoever had one on gets a note until dismissed
+        // (their keys are never written again; the note's own key keeps it across sessions until then).
+        discordPrefs_.optionsNote = prefs["discord_options_note"].asBool(false) || prefs["discord_challenge_shown"].asBool(false) ||
+                                    prefs["discord_file_name_shown"].asBool(false);
         // The look (0.10.7): what the last session used, unless ui.json names one. An install from before 0.10.7
         // remembers neither and keeps the Classic look with the Classic layout; the new-look card offers the
         // new default once (PanelSupport.cpp).
@@ -316,9 +315,7 @@ void App::saveProjectPrefs() {
         }
     }
     prefs.set("discord_presence", discordPrefs_.enabled); // Preferences > Integrations (PanelIntegrations.cpp)
-    prefs.set("discord_challenge_shown", discordPrefs_.showChallenge);
-    prefs.set("discord_file_name_shown", discordPrefs_.showFileName);
-    if (!discordPrefs_.challenge.empty()) prefs.set("discord_challenge", discordPrefs_.challenge);
+    if (discordPrefs_.optionsNote) prefs.set("discord_options_note", true);
     if (!uiConfigDeterministic_) {
         Json look = Json::object();
         lookToJson(uiPrefs_, look);
@@ -1046,7 +1043,7 @@ void App::drawUpdateBanner() {
     tickSelfUpdate();  // (and in run() on the passes that draw nothing: asleep, hidden for a restart)
     if (!updateAvailable_) return;
     const UpdateInfo& u = *updateAvailable_;
-    const CanvasRect c = canvasRect(); // top centre of the 3D view, clear of the shelves
+    const CanvasRect c = wholeCanvasRect(); // top centre of the 3D view, clear of the shelves
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + timelineTopInset_ + 12.0f * uiScale_), ImGuiCond_Always,
                             ImVec2(0.5f, 0.0f)); // (below the timeline strip when it is at the top)
     ImGui::SetNextWindowBgAlpha(0.96f);

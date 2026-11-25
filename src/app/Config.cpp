@@ -88,6 +88,17 @@ bool lookFromJson(const Json& j, UiPrefs& p) {
     return j["look"].isObject() || j["layout"].isString();
 }
 
+// Split view lenses in ui.json (UiPrefs::splitLens): words, so a hand edit reads.
+const char* splitLensName(int lens) {
+    static const char* const names[4] = {"free", "front", "right", "top"};
+    return names[std::clamp(lens, 0, 3)];
+}
+int splitLensFromName(const std::string& name, int fallback) {
+    for (int i = 0; i < 4; ++i)
+        if (name == splitLensName(i)) return i;
+    return fallback;
+}
+
 Json toJson(const UiPrefs& p) {
     Json j = Json::object();
     j.set("popupInfo", p.popupInfo);
@@ -98,6 +109,11 @@ Json toJson(const UiPrefs& p) {
     j.set("autoCollapseLeft", p.autoCollapseLeft);
     j.set("autoCollapseRight", p.autoCollapseRight);
     j.set("uiScale", double(p.uiScale));
+    if (!p.uiScaleByDisplay.empty()) { // per monitor (UiScale.h): {"DELL U2720Q 3840x2160": 0.8, ...}
+        Json byDisplay = Json::object();
+        for (const auto& [key, scale] : p.uiScaleByDisplay) byDisplay.set(key, double(scale));
+        j.set("uiScaleByDisplay", byDisplay);
+    }
     j.set("libraryAtStartup", p.libraryAtStartup);
     j.set("startupSplash", p.startupSplash);
     j.set("libraryFolder", p.libraryFolder);
@@ -125,7 +141,10 @@ Json toJson(const UiPrefs& p) {
     j.set("invertTwist", p.invertTwist);
     j.set("keyNavSpeed", p.keyNavSpeed);
     j.set("twoKeyWindow", p.twoKeyWindow);
-    j.set("quickRemesh", p.quickRemesh);
+    // The effective value as before (the Classic golden file keeps its quickRemesh=false); an explicit off is its own key,
+    // since quickRemesh=false is also what every pre-0.14 file says (read as: by layout).
+    j.set("quickRemesh", p.quickRemesh < 0 ? p.shellLayout != 0 : p.quickRemesh != 0);
+    if (p.quickRemesh == 0) j.set("quickRemeshOff", true);
     j.set("remeshAfterStroke", p.remeshAfterStroke);
     j.set("alongNormal", std::string(p.alongNormal == 1 ? "always" : p.alongNormal == 2 ? "never" : "invert_key"));
     j.set("connectedOnly", p.connectedOnly);
@@ -141,7 +160,10 @@ Json toJson(const UiPrefs& p) {
     j.set("showAxes", p.showAxes);
     j.set("axisGizmoSize", std::string(p.axisGizmoSize == 0 ? "small" : p.axisGizmoSize == 2 ? "large" : "medium"));
     j.set("showViewFigure", p.showViewFigure);
+    if (p.cornerWidget >= 0) j.set("cornerGizmo", std::string(p.cornerWidget == 1 ? "orientation" : "axes"));
+    if (p.cornerPosition == 1) j.set("cornerGizmoPosition", std::string("top-right"));
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
+    j.set("appendLowPoly", p.appendLowPoly);
     if (p.newerMenuRows >= 0) j.set("newerMenuRows", p.newerMenuRows != 0); // (unset = by layout)
     lookToJson(p, j);
     j.set("language", p.language);
@@ -152,6 +174,10 @@ Json toJson(const UiPrefs& p) {
     j.set("antialiasing", double(p.antialiasing));
     j.set("fastNavigation", p.fastNavigation);
     j.set("viewResolution", double(p.viewResolution));
+    j.set("splitView", std::string(p.splitView == 1 ? "beside" : p.splitView == 2 ? "below" : "off"));
+    j.set("splitLensFirst", std::string(splitLensName(p.splitLens[0])));
+    j.set("splitLensSecond", std::string(splitLensName(p.splitLens[1])));
+    j.set("splitRatio", double(p.splitRatio));
     j.set("viewAo", double(p.viewAo));
     j.set("viewShadows", double(p.viewShadows));
     j.set("aoStrength", double(p.aoStrength));
@@ -172,6 +198,7 @@ Json toJson(const UiPrefs& p) {
     j.set("viewportCursor", double(p.viewportCursor));
     j.set("backfaceCulling", p.backfaceCulling);
     j.set("floorGrid", p.floorGrid);
+    j.set("floorGridFixed", p.floorGridFixed);
     j.set("uvPackColumns", double(p.uvPackColumns));
     j.set("uvPackRows", double(p.uvPackRows));
     j.set("maskDarkness", double(p.maskDarkness));
@@ -209,7 +236,16 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.oneSubpalette = j["oneSubpalette"].asBool(p.oneSubpalette);
     p.autoCollapseLeft = j["autoCollapseLeft"].asBool(p.autoCollapseLeft);
     p.autoCollapseRight = j["autoCollapseRight"].asBool(p.autoCollapseRight);
-    p.uiScale = std::clamp(float(j["uiScale"].asNumber(p.uiScale)), 0.0f, 3.0f);
+    p.uiScale = std::clamp(float(j["uiScale"].asNumber(p.uiScale)), 0.0f, kMaxUiScale);
+    if (p.uiScale > 0.0f) p.uiScale = std::max(p.uiScale, kMinUiScale);
+    if (j["uiScaleByDisplay"].isObject()) {
+        p.uiScaleByDisplay.clear();
+        for (const auto& [key, value] : j["uiScaleByDisplay"].members()) {
+            float scale = std::clamp(float(value.asNumber(0.0)), 0.0f, kMaxUiScale);
+            if (scale > 0.0f) scale = std::max(scale, kMinUiScale);
+            setDisplayScale(p.uiScaleByDisplay, key, scale);
+        }
+    }
     p.libraryAtStartup = j["libraryAtStartup"].asBool(p.libraryAtStartup);
     p.startupSplash = j["startupSplash"].asBool(p.startupSplash);
     if (j["libraryFolder"].isString()) p.libraryFolder = j["libraryFolder"].asString();
@@ -240,7 +276,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.invertTwist = j["invertTwist"].asBool(p.invertTwist);
     p.twoKeyWindow = std::clamp(float(j["twoKeyWindow"].asNumber(p.twoKeyWindow)), kKeySequenceMin, kKeySequenceMax);
     p.keyNavSpeed = std::clamp(float(j["keyNavSpeed"].asNumber(p.keyNavSpeed)), 0.1f, 5.0f);
-    p.quickRemesh = j["quickRemesh"].asBool(p.quickRemesh);
+    p.quickRemesh = j["quickRemeshOff"].asBool(false) ? 0 : j["quickRemesh"].asBool(false) ? 1 : -1;
     p.remeshAfterStroke = j["remeshAfterStroke"].asBool(p.remeshAfterStroke);
     if (j["alongNormal"].isString()) {
         const std::string a = j["alongNormal"].asString();
@@ -265,7 +301,10 @@ void fromJson(const Json& j, UiPrefs& p) {
         p.axisGizmoSize = size == "small" ? 0 : size == "large" ? 2 : 1;
     }
     p.showViewFigure = j["showViewFigure"].asBool(p.showViewFigure);
+    if (j["cornerGizmo"].isString()) p.cornerWidget = j["cornerGizmo"].asString() == "orientation" ? 1 : 0;
+    if (j["cornerGizmoPosition"].isString()) p.cornerPosition = j["cornerGizmoPosition"].asString() == "top-right" ? 1 : 0;
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
+    p.appendLowPoly = j["appendLowPoly"].asBool(p.appendLowPoly);
     if (j["newerMenuRows"].isBool()) p.newerMenuRows = j["newerMenuRows"].asBool() ? 1 : 0;
     // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the Classic layout,
     // and keeps them (the new-look card offers the new default once, PanelSupport.cpp).
@@ -286,6 +325,13 @@ void fromJson(const Json& j, UiPrefs& p) {
         const int r = int(j["viewResolution"].asNumber(p.viewResolution));
         p.viewResolution = r <= 50 ? 50 : r <= 75 ? 75 : 100;
     }
+    if (j["splitView"].isString()) {
+        const std::string s = j["splitView"].asString();
+        p.splitView = s == "beside" ? 1 : s == "below" ? 2 : 0;
+    }
+    if (j["splitLensFirst"].isString()) p.splitLens[0] = splitLensFromName(j["splitLensFirst"].asString(), p.splitLens[0]);
+    if (j["splitLensSecond"].isString()) p.splitLens[1] = splitLensFromName(j["splitLensSecond"].asString(), p.splitLens[1]);
+    p.splitRatio = std::clamp(float(j["splitRatio"].asNumber(p.splitRatio)), 0.2f, 0.8f);
     p.viewAo = std::clamp(int(j["viewAo"].asNumber(p.viewAo)), -1, 1);
     p.viewShadows = std::clamp(int(j["viewShadows"].asNumber(p.viewShadows)), -1, 1);
     p.aoStrength = std::clamp(float(j["aoStrength"].asNumber(p.aoStrength)), 0.0f, 1.0f);
@@ -306,6 +352,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.viewportCursor = std::clamp(int(j["viewportCursor"].asNumber(p.viewportCursor)), 0, 1);
     p.backfaceCulling = j["backfaceCulling"].asBool(p.backfaceCulling);
     p.floorGrid = j["floorGrid"].asBool(p.floorGrid);
+    p.floorGridFixed = j["floorGridFixed"].asBool(p.floorGridFixed);
     p.uvPackColumns = std::clamp(int(j["uvPackColumns"].asNumber(p.uvPackColumns)), 1, 10);
     p.uvPackRows = std::clamp(int(j["uvPackRows"].asNumber(p.uvPackRows)), 1, 10);
     p.maskDarkness = std::clamp(float(j["maskDarkness"].asNumber(p.maskDarkness)), 0.0f, 1.0f);
@@ -608,6 +655,15 @@ void App::initActions() {
     add("part.figure_pose_cancel", "Cancel Pose", "Tool > Parts", nullptr, [this] { runCommand("figure_pose_cancel"); },
         nullptr, "figure_pose_cancel", nullptr, [this] { return figurePoseActive(doc_); },
         "Remove the Pose Mesh and show the Parts again; nothing changes.");
+    // Solidify (core/Solidify.h, PanelExtract.cpp): thickness for a flat, single-sided Part, in place.
+    add("part.solidify", "Solidify", "Tool > Parts", nullptr,
+        [this] { runCommand("solidify", {{"thickness", double(solidifyThick_)}, {"both", solidifyBoth_}}); }, nullptr, "solidify",
+        nullptr, [this] { return doc_.mesh.triangleCount() > 0; },
+        "Give a flat, single-sided Part thickness in place: a back pushed along the normals by Thickness, joined by a rim of "
+        "quads along every open edge, one closed mesh. For a Plane, or an Extract made with Thickness 0.");
+    add("part.solidify_both", "Centred", "Tool > Parts", nullptr, [this] { solidifyBoth_ = !solidifyBoth_; }, nullptr, nullptr,
+        [this] { return solidifyBoth_; }, nullptr,
+        "Solidify centres the thickness on the surface, half in front and half behind, instead of all behind it.");
     add("part.extract_double", "Both Sides", "Tool > Parts", nullptr,
         [this] {
             extractDouble_ = !extractDouble_;
@@ -852,6 +908,7 @@ void App::initActions() {
                 paintMode_ = false;
                 guidesMode_ = false; // leaves the QRemesh Guides brush
                 edgesMode_ = false;  // and Edges mode
+                if (polyMode_) setPolyMode(false); // and Polygon mode (PanelPolygon.cpp)
                 maskBrush_.on = false;
                 leaveDrawModesStatus(); // and Draw Tube / Append > Insert
             },
@@ -1012,6 +1069,7 @@ void App::initActions() {
     registerGarmentActions();   // Tool > Garments, the Pattern window (PanelGarments.cpp)
     registerRetopoUiActions(); // Geometry > QRemesh, Part > ProjectAll (PanelRetopo.cpp)
     registerEdgeUiActions();   // Geometry > Edges (PanelEdges.cpp)
+    registerPolygonUiActions(); // Tool > Polygon (PanelPolygon.cpp)
     registerForgeSphereUiActions(); // Tool > Forge Spheres (PanelForge Spheres.cpp)
     registerTubeUiActions();        // Tool > Tube (PanelTube.cpp)
     registerSplatTrainUi();    // Splats > Train from capture (PanelSplatTrain.cpp)
@@ -1508,7 +1566,7 @@ bool App::hintShown(const char* id) const {
 
 void App::drawViewportHint(const char* id, const char* text, ImU32 colour, float top) {
     if (!hintShown(id)) return;
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     const float s = uiScale_;
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, top), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
     ImGui::SetNextWindowBgAlpha(0.72f);
@@ -1547,7 +1605,7 @@ void App::drawViewportToast() {
         viewportToast_.clear();
         return;
     }
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     const float s = uiScale_;
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + timelineTopInset_ + 8.0f * s), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
     ImGui::SetNextWindowBgAlpha(0.85f);
@@ -1616,7 +1674,7 @@ void App::consoleEcho(const std::string& name, const Args& args, const CommandRe
     console_.seenStatus(status_);
 }
 
-CanvasRect App::paletteArea() const { return canvasRect(); } // top centre of the canvas
+CanvasRect App::paletteArea() const { return wholeCanvasRect(); } // top centre of the canvas
 
 CanvasRect App::consoleRect() const {
     // The shell reserves this strip between the canvas and the bottom shelf (ShellGeometry::console);
@@ -2169,28 +2227,66 @@ void drawInterfaceSection(App& app) {
         if (ui::Checkbox("Compact timeline##view.timeline_compact", &compact)) a->run();
         ui::HelpAction(app, "view.timeline_compact");
     }
-    // Finer steps near 100 % (125 % was too big a first step) and up to 300 % for a 5K or 5K2K monitor at its native
-    // resolution, no system scaling (fenix 11-08).
-    static const char* kScales[] = {"Automatic", "100%", "110%", "115%", "125%", "135%", "150%",
-                                    "175%",      "200%", "250%", "300%"};
-    static const float kScaleValues[] = {0.0f, 1.0f, 1.1f, 1.15f, 1.25f, 1.35f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f};
-    constexpr int kScaleCount = int(sizeof kScaleValues / sizeof kScaleValues[0]);
-    int current = 0;
-    for (int i = 0; i < kScaleCount; ++i)
-        if (std::abs(kScaleValues[i] - p.uiScale) < 0.01f) current = i;
-    ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::BeginCombo("##ui_scale", (std::string(tr("UI scale:")) + " " + tr(kScales[current])).c_str())) {
-        for (int i = 0; i < kScaleCount; ++i)
-            if (ImGui::Selectable(tr(kScales[i]), i == current)) {
-                p.uiScale = kScaleValues[i];
-                app.requestUiScale(); // live, from the next frame (#87)
+    // 70 % (a 4K or 5K monitor at its native size, the system scaling the UI too large: Fenix 11-22) to 300 % (a 5K2K
+    // monitor: fenix 11-08), a slider in 5 % steps, applied when it is let go or a typed value is entered: rebuilding the
+    // fonts while it is dragged would move the slider under the pointer (the tray scales with the UI). The sample line
+    // below shows the size while it is dragged. Automatic follows the monitor the window is on; a chosen size is
+    // remembered for that monitor (App::setUiScalePreference, uiScaleByDisplay).
+    {
+        const float pref = app.uiScalePreference();
+        const bool automatic = pref <= 0.0f;
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr("UI scale:"));
+        ImGui::SameLine();
+        bool autoTick = automatic;
+        if (ImGui::Checkbox((std::string(tr("Automatic")) + "##ui_scale_auto").c_str(), &autoTick))
+            app.setUiScalePreference(autoTick ? 0.0f : snapUiScale(app.uiScale()));
+        ui::HelpText("Automatic", nullptr,
+                     "Follow the display the window is on (Windows: Settings > Display > Scale, per monitor; macOS and Wayland: "
+                     "the display's scaling; X11: the desktop's font DPI). Untick, or move the slider, to choose a size.",
+                     "Preferences > Interface");
+        // The value while the slider is held or typed into (pending), and the one let go of, applied a third of a second
+        // later unless a second click follows: the first click of a double-click (which opens the typed field) must not
+        // rebuild the UI under the second. A typed value applies the moment it is entered.
+        static int pending = -1, letGo = -1;
+        static double applyAt = 0.0;
+        static bool wasTyping = false;
+        const int currentPct = int(std::lround((automatic ? app.uiScale() : pref) * 100.0f));
+        int pct = pending >= 0 ? pending : letGo >= 0 ? letGo : currentPct;
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        const bool edited = ImGui::SliderInt("##ui_scale", &pct, int(std::lround(kMinUiScale * 100.0f)),
+                                             int(std::lround(kMaxUiScale * 100.0f)), "%d%%", ImGuiSliderFlags_AlwaysClamp);
+        const bool typing = ImGui::TempInputIsActive(ImGui::GetItemID());
+        if (ImGui::IsItemActive()) {
+            if (edited && !typing) pct = int(std::lround(snapUiScale(float(pct) / 100.0f) * 100.0f)); // dragged or arrow keys: 5 % steps
+            pending = pct;
+            letGo = -1; // (a second click: the first one's value is not applied)
+        } else {
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                letGo = pct;
+                applyAt = wasTyping ? 0.0 : ImGui::GetTime() + 0.35;
+                app.redrawIn(0.35);
             }
-        ImGui::EndCombo();
+            pending = -1;
+            if (letGo >= 0 && ImGui::GetTime() >= applyAt) {
+                app.setUiScalePreference(float(letGo) / 100.0f);
+                letGo = -1;
+            }
+        }
+        wasTyping = typing;
+        ui::HelpText("UI scale", nullptr,
+                     "Size of text and controls, 70% to 300%, applied when you let the slider go (double-click it to type a "
+                     "value). Below 100% the buttons keep a little more room around their text, so they stay easy to hit. "
+                     "The size is remembered for the monitor the window is on, so a laptop screen and a 4K monitor can each "
+                     "have their own.",
+                     "Preferences > Interface");
+        // The sample: the interface font and icons at the slider's size (stretched from the current atlas while it is
+        // dragged; built crisp at that size the moment it is let go).
+        const float sample = std::clamp(float(pct) / 100.0f / std::max(app.uiScale(), 0.01f), 0.2f, 5.0f);
+        ImGui::SetWindowFontScale(sample);
+        ImGui::TextUnformatted((std::string(ICON_LC_SEARCH "  ") + tr("Aa Bb 123") + "  " ICON_LC_BRUSH "  " ICON_LC_BOX).c_str());
+        ImGui::SetWindowFontScale(1.0f);
     }
-    ui::HelpText("UI scale", nullptr,
-                 "Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: "
-                 "Settings > Display > Scale, per monitor).",
-                 "Preferences > Interface");
     static const char* kRotation[] = {"Free", "Turntable", "X axis", "Z axis"}; // UiPrefs::orbitLock
     p.orbitLock = std::clamp(p.orbitLock, 0, 3);
     ImGui::SetNextItemWidth(-FLT_MIN);

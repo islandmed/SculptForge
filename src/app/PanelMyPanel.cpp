@@ -1,11 +1,17 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// My Panel (Member Request, November 2026): a panel of your own. Hold Alt and drag a button or a section header from
-// any palette into it; it holds that button, or that whole section (its controls, live). Open it in a tray or a
-// drop-down like any palette (and in a window of its own, docs/design/detach-panels.md), or float it at the cursor
-// with a key (ui.my_panel). Alt-drag inside it to reorder; drag an entry out, or right-click it, to remove it.
-// What it holds is saved with the layout (UiLayout::myPanel). docs/design/my-panel.md.
+// My Panel (Member Request, November 2026): a panel of your own. Hold Alt and drag a button, a section header or (0.14)
+// any one control, a checkbox, slider, choice or readout, from any palette into it; it holds that button, that whole
+// section (its controls, live) or that one control. Open it in a tray or a drop-down like any palette (and in a window
+// of its own, docs/design/detach-panels.md), or float it at the cursor with a key (ui.my_panel). Alt-drag inside it to
+// reorder; drag an entry out, or right-click it, to remove it. What it holds is saved with the layout (UiLayout::myPanel).
+//
+// A control entry ("control:<scope>/<key>") is drawn by drawing its scope's body, the section (or the palette's own
+// controls) the same way a section entry is, in a child window cropped to that one control: the body starts above the
+// child by the control's measured offset and a clip rect hides its neighbours. The control is the palette's own widget,
+// so it cannot differ from it. ui::HelpText / HelpAction, which follow nearly every control, are the marker that names
+// it (the English help title, or the action id) and measures it (Ui.cpp pinLastItem).
 #include "app/App.h"
 
 #include "app/Demo.h"
@@ -43,7 +49,7 @@ const PaletteDef* paletteOfSection(const std::string& sectionId) {
 bool App::myPanelAdd(const std::string& entry, int at) {
     const MyPanelEntry e = myPanelEntry(entry);
     if (!e.valid() || entry.size() >= sizeof(ui::MyPanelPayload::entry)) return false;
-    if (e.section ? !paletteOfSection(e.id) : !actions_.find(e.id)) return false;
+    if (e.control ? !paletteOfSection(e.scope()) : e.section ? !paletteOfSection(e.id) : !actions_.find(e.id)) return false;
     auto& list = layout_.myPanel;
     if (const auto it = std::find(list.begin(), list.end(), entry); it != list.end()) { // already there: a move
         const int from = int(it - list.begin());
@@ -61,18 +67,125 @@ bool App::myPanelAdd(const std::string& entry, int at) {
 // One section's controls without its header: the palette body runs with every item skipped (SkipItems) and only the
 // section's own body let through (App::subpalette and tray::Section, Palettes.cpp). Every section of a palette is
 // drawn by the same code, here and in the palette, so a control cannot differ between the two.
-void App::drawMyPanelSection(const std::string& sectionId) {
-    const PaletteDef* def = paletteOfSection(sectionId);
+void App::drawMyPanelSection(const std::string& sectionId) { drawMyPanelScope(sectionId); }
+
+// A scope is a section id ("tool.display") or a palette id ("draw"): the palette's own controls outside every section
+// (subpalette() then keeps every section shut).
+void App::drawMyPanelScope(const std::string& scope) {
+    const PaletteDef* def = paletteOfSection(scope);
     if (!def) return;
     ImGuiWindow* window = ImGui::GetCurrentWindow();
     const bool wasSkipping = window->SkipItems;
-    myPanelSection_ = sectionId;
-    window->SkipItems = true;
-    ImGui::PushID(sectionId.c_str());
+    const bool paletteLevel = scope.find('.') == std::string::npos;
+    myPanelSection_ = scope;
+    myPanelPaletteLevel_ = paletteLevel;
+    window->SkipItems = !paletteLevel;
+    ImGui::PushID(scope.c_str());
+    ui::PinPalette(def->id); // its controls are My Panel entries (Ui.h), here as in the palette
+    const bool readOnly = ui::BeginPaletteItems();
     (this->*(def->draw))();
+    ui::EndPaletteItems(readOnly);
+    ui::PinPalette("");
     ImGui::PopID();
     window->SkipItems = wasSkipping;
     myPanelSection_.clear();
+    myPanelPaletteLevel_ = false;
+}
+
+// The words of a control entry when the control itself cannot be shown: its help title (English, translated here), or
+// the action's label; a repeat's "#2" dropped.
+static std::string controlWords(App& app, const MyPanelEntry& e) {
+    std::string key = e.key();
+    if (const size_t hash = key.rfind('#'); hash != std::string::npos && hash > 0 && key.find_first_not_of("0123456789", hash + 1) == std::string::npos)
+        key.resize(hash);
+    if (const Action* a = app.actions().find(key)) return trAction(a->id, a->label);
+    return tr(key.c_str());
+}
+
+bool App::drawMyPanelControl(const std::string& entry, const MyPanelEntry& e, ImRect& rect, bool& remove) {
+    const std::string scope = e.scope(), key = e.key();
+    if (!paletteOfSection(scope)) return false;
+    const float s = uiScale_;
+    const float width = ImGui::GetContentRegionAvail().x;
+    MyPanelControlPlace& place = myPanelControls_[entry];
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground |
+                                   ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav; // (nav would scroll it to a hidden neighbour)
+    ImGui::PushID(entry.c_str());
+    if (!place.known) { // the first time (and after it went missing): lay the body out unseen and find the control
+        const ImVec2 start = ImGui::GetCursorScreenPos();
+        if (ImGui::BeginChild(("##mypanel.measure." + entry).c_str(), ImVec2(width, 1.0f), ImGuiChildFlags_None,
+                              flags | ImGuiWindowFlags_NoInputs)) {
+            const ImVec2 origin = ImGui::GetCursorScreenPos();
+            ui::BeginPinnedControl(scope, key, true);
+            drawMyPanelScope(scope);
+            const ui::PinnedControl r = ui::EndPinnedControl();
+            if (r.found) {
+                place.known = true;
+                place.x = r.min.x - origin.x;
+                place.y = r.min.y - origin.y;
+                place.w = r.max.x - r.min.x;
+                place.h = r.max.y - r.min.y;
+                place.lineX = r.lineX - origin.x;
+            }
+        }
+        ImGui::EndChild();
+        ImGui::SetCursorScreenPos(start); // (the 1 px child took no room)
+    }
+    if (!place.known || place.h < 1.0f || place.w < 1.0f) { // hidden in this state (a readout of levels the Part has none of)
+        const std::string words = controlWords(*this, e);
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        const float h = ImGui::GetFrameHeight();
+        ImGui::InvisibleButton("##mypanel.control.missing", ImVec2(width, h));
+        rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        ui::MyPanelDragEntry(entry, words.c_str(), true);
+        if (ImGui::BeginPopupContextItem("##mypanel.ctx")) {
+            if (ImGui::MenuItem(tr("Remove from My Panel"))) remove = true;
+            ImGui::EndPopup();
+        }
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const float ty = std::floor(p.y + (h - ImGui::GetFontSize()) * 0.5f);
+        dl->AddText(ImVec2(p.x + 8.0f * s, ty), theme::u32(theme::textDim, 0.7f), words.c_str());
+        const std::string note = tr("(not shown now)");
+        const float nw = ImGui::CalcTextSize(note.c_str()).x;
+        dl->AddText(ImVec2(std::max(p.x + 8.0f * s + ImGui::CalcTextSize(words.c_str()).x + 8.0f * s, p.x + width - nw), ty),
+                    theme::u32(theme::textDim, 0.5f), note.c_str());
+        ui::DelayedTooltip(tr("Its palette does not show this control right now (it depends on the Part or the mode). It comes back when it does."));
+        ImGui::PopID();
+        return true;
+    }
+    // The control, live: the body drawn so the control lands at the top of a child as tall as it, cropped to its width.
+    // One from the middle of a row ("Mask" between Wireframe and Groups) is moved left to where its row starts.
+    // (Every line of the body starts at the child's left edge, so the move left is the child's scroll: its content is told
+    // to be that much wider and it is scrolled by as much, every frame; no scrollbar, no wheel.)
+    const ImVec2 childMin = ImGui::GetCursorScreenPos();
+    const float shift = std::max(0.0f, place.x - place.lineX);
+    if (shift > 0.0f) ImGui::SetNextWindowContentSize(ImVec2(width + shift, 0.0f));
+    ImGui::SetNextWindowScroll(ImVec2(shift, 0.0f)); // (every frame: a row that stops being one keeps no stale scroll)
+    ui::PinnedControl r;
+    const bool drawn = ImGui::BeginChild(("##mypanel.control." + entry).c_str(), ImVec2(width, place.h), ImGuiChildFlags_None, flags);
+    if (drawn) {
+        const ImVec2 origin(childMin.x - shift, childMin.y - place.y);
+        const float left = childMin.x + place.lineX;
+        ImGui::PushClipRect(ImVec2(left - 1.0f, childMin.y), ImVec2(left + place.w + 1.0f, childMin.y + place.h), true);
+        ImGui::SetCursorScreenPos(origin);
+        ui::BeginPinnedControl(scope, key, false);
+        drawMyPanelScope(scope);
+        r = ui::EndPinnedControl();
+        ImGui::PopClipRect();
+        if (r.found) { // where it is now, for the next frame (a readout grows, a row above it appears)
+            place.x = r.min.x - origin.x;
+            place.y = r.min.y - origin.y;
+            place.w = r.max.x - r.min.x;
+            place.h = r.max.y - r.min.y;
+            place.lineX = r.lineX - origin.x;
+        }
+    }
+    ImGui::EndChild();
+    rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    if (drawn && !r.found) place.known = false; // gone this frame: measured again next frame, the placeholder meanwhile
+    if (r.remove) remove = true;
+    ImGui::PopID();
+    return true;
 }
 
 void App::drawPalette_MyPanel() {
@@ -82,12 +195,20 @@ void App::drawPalette_MyPanel() {
     const ImVec2 areaMin = ImGui::GetCursorScreenPos();
     const float width = ImGui::GetContentRegionAvail().x;
     std::vector<ImRect> rects(entries.size()); // each entry's first item (a section: its header), for where a drop lands
-    std::vector<bool> isSection(entries.size(), false);
+    std::vector<bool> isSection(entries.size(), false); // ... a row of its own (a section's header, a control)
     std::string remove;                         // an entry the member removed this frame
     bool prevButton = false;                    // the last entry was a button: the next one may share its line
     float lineRight = 0.0f;                     // where that line ends (screen x)
     for (size_t i = 0; i < entries.size(); ++i) {
         const MyPanelEntry e = myPanelEntry(entries[i]);
+        if (e.control) {
+            bool removeThis = false;
+            if (!drawMyPanelControl(entries[i], e, rects[i], removeThis)) continue; // a palette this version no longer has
+            prevButton = false;
+            isSection[i] = true;
+            if (removeThis) remove = entries[i];
+            continue;
+        }
         if (e.section) {
             const PaletteDef* def = paletteOfSection(e.id);
             if (!def) continue; // a section this version no longer has: skipped, kept (the file may be from a newer one)
@@ -159,13 +280,14 @@ void App::drawPalette_MyPanel() {
         ImGui::Dummy(ImVec2(0, 4.0f * s));
         if (smallFont()) ImGui::PushFont(smallFont());
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped("%s", tr(entries.empty() ? "Hold Alt and drag a button, or a section's title, from any palette into this panel. "
-                                                       "Right-click an entry to remove it."
+        ImGui::TextWrapped("%s", tr(entries.empty() ? "Hold Alt and drag a button, a slider, a checkbox or a section's title from any palette "
+                                                       "into this panel. Right-click an entry to remove it."
                                                      : "Alt+drag to add or move. Right-click an entry to remove it."));
         ImGui::PopStyleColor();
         if (smallFont()) ImGui::PopFont();
     }
     const ImVec2 end = ImGui::GetCursorScreenPos();
+    // (The floating panel sizes itself to this content, so the area must not reach for the window's edge: it would never shrink.)
     const ImRect area(areaMin, ImVec2(areaMin.x + width, std::max(end.y, areaMin.y + 96.0f * s)));
 
     // The drop: an accent line shows where the entry lands.
@@ -252,9 +374,13 @@ void App::drawMyPanelFloating() {
     if (!myPanelFloating_) return;
     const float s = uiScale_;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
+    // As tall as what it holds (a few entries: a few rows, not a tall empty window over the model), up to 70 % of the
+    // view, then it scrolls; the width stays a palette's.
+    const float w = 300.0f * s, hMax = std::min(460.0f * s, vp->Size.y * 0.7f);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(w, 0.0f), ImVec2(w, hMax));
     if (myPanelPlace_) { // just opened: the pointer is over its title bar, so the first thing under it is the first entry
-        const float w = 300.0f * s, h = std::min(460.0f * s, vp->Size.y * 0.7f);
-        ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiCond_Always);
+        float h = hMax; // (its height is its content's: the last size it had is the best guess for keeping it in view)
+        if (const ImGuiWindow* last = ImGui::FindWindowByName("###mypanel.floating")) h = std::min(last->Size.y, hMax);
         ImGui::SetNextWindowPos(ImVec2(std::clamp(mouseX_ - w * 0.5f, vp->Pos.x, vp->Pos.x + std::max(0.0f, vp->Size.x - w)),
                                        std::clamp(mouseY_ - 14.0f * s, vp->Pos.y, vp->Pos.y + std::max(0.0f, vp->Size.y - h))),
                                 ImGuiCond_Always);
@@ -262,7 +388,8 @@ void App::drawMyPanelFloating() {
         myPanelPlace_ = false;
     }
     bool open = true;
-    if (ImGui::Begin((std::string(tr("My Panel")) + "###mypanel.floating").c_str(), &open, ImGuiWindowFlags_NoCollapse)) {
+    if (ImGui::Begin((std::string(tr("My Panel")) + "###mypanel.floating").c_str(), &open,
+                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
         Demo::pushScope("My Panel");
         drawPalette_MyPanel();
         Demo::popScope();
@@ -281,8 +408,8 @@ void App::registerMyPanelActions() {
     a.icon = ICON_LC_STAR;
     a.palette = "Edit > My Panel";
     a.shortcut = "F4";
-    a.description = "Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag "
-                    "from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for "
+    a.description = "Your own panel, floating at the cursor: the buttons, controls and sections you dragged into it (hold Alt and "
+                    "drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for "
                     "a tray, and can be moved to a window of its own.";
     a.run = [this] {
         myPanelFloating_ = !myPanelFloating_;

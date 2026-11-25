@@ -124,7 +124,15 @@ CommandResult runTransform(Document& doc, const Args& a) {
         else if (c != ',' && c != ' ') return {false, "Bad symmetry (expected axes such as x or xz)"};
     }
 
-    const std::vector<int> targets = transformTargets(doc, all, folder, useMask);
+    // selection: Polygon mode's selected points / edges / faces of the active Part (core/PolyMode.h) move, nothing else.
+    std::vector<float> selected;
+    const bool selection = argBool(a, "selection", false);
+    if (selection) {
+        doc.polySelection.sync(doc.mesh, doc.edgeSelection.topo);
+        selected = doc.polySelection.weights(doc.mesh);
+        if (selected.empty()) return {false, "Nothing selected: pick points, edges or faces in Polygon mode first (Tool > Polygon)"};
+    }
+    const std::vector<int> targets = selection ? std::vector<int>{doc.activePart} : transformTargets(doc, all, folder, useMask);
 
     MeshTransform t;
     t.translate = translate;
@@ -137,7 +145,7 @@ CommandResult runTransform(Document& doc, const Args& a) {
         for (int i : targets) {
             const Mesh& m = doc.partMesh(i);
             if (m.vertexCount() == 0) continue;
-            const AABB b = transformBounds(m, transformWeights(m, useMask, falloff));
+            const AABB b = transformBounds(m, selection ? selected : transformWeights(m, useMask, falloff));
             const glm::mat4& place = doc.parts[size_t(i)].transform; // (where a linked copy is)
             for (int c = 0; c < 8 && b.valid(); ++c)
                 box.expand(glm::vec3(place * glm::vec4(c & 1 ? b.max.x : b.min.x, c & 2 ? b.max.y : b.min.y,
@@ -154,9 +162,10 @@ CommandResult runTransform(Document& doc, const Args& a) {
         return {false, "Active layer weight is 0 - raise it to transform into the layer"};
 
     size_t moved = 0;
-    for (int i : targets) moved += transformPart(doc, i, t, useMask, falloff, sym, "Transform");
+    for (int i : targets) moved += transformPart(doc, i, t, useMask, falloff, sym, "Transform", selection ? &selected : nullptr);
     if (moved == 0)
-        return {false, useMask && doc.mesh.hasMask() ? "Nothing moved: everything is masked (masked=0 ignores the mask)"
+        return {false, selection ? "Nothing moved: the selected points are hidden"
+                     : useMask && doc.mesh.hasMask() ? "Nothing moved: everything is masked (masked=0 ignores the mask)"
                                                     : "Nothing moved: the Part is empty or hidden"};
     // "Moved 2,562 vertices": the verb says what changed (the pivot is in the command's own arguments).
     const bool moves = t.translate != glm::vec3(0.0f), turns = t.rotate != glm::quat(1, 0, 0, 0),
@@ -194,6 +203,7 @@ void registerTransformCommands(CommandRegistry& reg) {
               {"pivot", T::String,
                "Where to rotate and scale about: center (default: centre of what moves), origin, or x,y,z.", false},
               {"orient", T::String, "Axes for rotate and scale: world (default), or x,y,z Euler degrees.", false},
+              {"selection", T::Bool, "Move only Polygon mode's selected points / edges / faces of the active Part (poly_select).", false},
               {"masked", T::Bool, "Leave masked vertices where they are (default true; false moves everything).",
                false},
               {"falloff", T::Number,

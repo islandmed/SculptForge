@@ -64,6 +64,44 @@ void App::prepareClothColliders() {
     doc_.sculptor.clothColliders = clothColliders_.get();
 }
 
+// Tool > Cloth: the Cloth brush settings and Drape (running a simulation) together. No state of its own: the
+// controls are the ones in Brush > Cloth and Tool > Drape, shown once more (own ids), so the three always agree.
+void App::drawClothPanel() {
+    ImGui::PushID("clothpanel");
+    inClothPanel_ = true;
+    hint(tr("Cloth in one place: how the Cloth brush behaves while you sculpt, and dropping a whole Part as fabric."));
+    ImGui::Spacing();
+    ImGui::TextUnformatted(tr("Cloth brush"));
+    hint(tr("Fabric, gravity and folds for the brush on the shelf: drag, push or settle cloth by hand."));
+    drawClothSection();
+    ImGui::Spacing();
+    ImGui::TextUnformatted(tr("Drape a Part"));
+    hint(tr("Lets the active Part fall as cloth until it rests on the other Parts (a shirt on a body)."));
+    drawDrapeSection();
+    inClothPanel_ = false;
+    ImGui::PopID();
+}
+
+// Opens Tool > Cloth as a click on its header would (the other Tool sections close), scrolled to and flashed.
+void App::showClothPanel() {
+    auto& open = layout_.openSubpalettes;
+    if (uiPrefs_.oneSubpalette)
+        open.erase(std::remove_if(open.begin(), open.end(), [](const std::string& o) { return o.rfind("tool.", 0) == 0; }),
+                   open.end());
+    if (std::find(open.begin(), open.end(), "tool.cloth") == open.end()) open.push_back("tool.cloth");
+    flashSubpalette_ = "tool.cloth";
+    flashSubpaletteStart_ = ImGui::GetTime();
+    if (const Action* a = actions_.find("ui.palette.tool"); a && a->run) a->run();
+}
+
+void App::drawClothSettingsLink(const char* id) {
+    if (inClothPanel_) return;   // (already there)
+    if (!newerMenuRows()) return; // (Classic without Show newer menu rows has no Tool > Cloth row to open)
+    if (ImGui::SmallButton((std::string(tr("Cloth settings...")) + "##" + id).c_str())) showClothPanel();
+    ui::HelpText("Cloth settings...", nullptr,
+                 "Opens Tool > Cloth: the Cloth brush settings and Drape together in one place.", "Tool > Cloth");
+}
+
 void App::drawClothSection() {
     ClothBrushSettings& c = doc_.sculptor.cloth;
     const char* help = "Brush > Cloth";
@@ -122,7 +160,9 @@ void App::drawClothSection() {
     ui::HelpText("Collide with other Parts", nullptr,
                  "The cloth rests on the other visible Parts instead of passing through them (a shirt on a body).", help);
     hint(tr("Cloth brush: pick it from the brush shelf. Masked areas hold still, like pins."));
+    drawClothSettingsLink("brush");
 }
+
 
 bool App::clothUiValue(const std::string& name, double& out) const {
     if (name == "cloth_mode") return out = double(int(doc_.sculptor.cloth.mode)), true;
@@ -132,6 +172,10 @@ bool App::clothUiValue(const std::string& name, double& out) const {
     if (name == "cloth_region") return out = double(doc_.sculptor.clothRegion()), true;
     if (name == "drape_scale") return out = double(drapeRequest_.scale), true;
     if (name == "drape_running") return out = drape_ ? 1.0 : 0.0, true;
+    if (name == "drape_wind") return out = double(drapeRequest_.windSpeed), true;
+    if (name == "drape_heading") return out = double(drapeRequest_.windHeading), true;
+    if (name == "drape_lift") return out = double(drapeRequest_.windLift), true;
+    if (name == "drape_gusts") return out = double(drapeRequest_.gusts), true;
     if (name == "drape_frame") return out = double(drapeFrame()), true;
     if (name == "cloth_colliders") return out = clothColliders_ ? double(clothColliders_->triangles()) : 0.0, true;
     return false;

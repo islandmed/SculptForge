@@ -270,6 +270,8 @@ constexpr Entry kSpanish[] = {
     {"Back to the palette bar", "Volver a la barra de paletas"},
     {"Move to the tray", "Mover a la bandeja"},
     {"Take this palette out of the tray.", "Saca esta paleta de la bandeja."},
+    {"Bevel",
+     "Bisel"},
     {"Keep this palette in the right tray (Shift+click: left tray), or drag the icon onto a tray.",
      "Deja esta paleta en la bandeja derecha (Mayús+clic: la izquierda), o arrastra el icono a una bandeja."},
     {"Click to open or close. Opening one closes the others (Shift+click keeps them open; Preferences > Interface).",
@@ -286,6 +288,12 @@ constexpr Entry kSpanish[] = {
 
     // --- Shelves ---
     {"Add a brush", "Añadir pincel"},
+    {"Limit width",
+     "Limitar anchura"},
+    {"New face group",
+     "Nuevo grupo de caras"},
+    {"Profile",
+     "Perfil"},
     {"Put another brush (built-in or one of yours) on this shelf.",
      "Pon otro pincel (de serie o uno tuyo) en este estante."},
     {"One of your custom brushes.", "Uno de tus pinceles personalizados."},
@@ -294,6 +302,8 @@ constexpr Entry kSpanish[] = {
     {"Small", "Pequeño"},
     {"Medium", "Mediano"},
     {"Large", "Grande"},
+    {"Segments",
+     "Segmentos"},
     {"The active brush. Click for the brush picker; the bottom shelf holds favourites.",
      "El pincel activo. Clic para elegir pincel; el estante inferior guarda los favoritos."},
     {"How dabs follow the cursor: Dots, Drag Stamp, Slide Stamp, Spray or Lazy Stroke. Click to choose.",
@@ -556,6 +566,32 @@ constexpr Entry kSpanish[] = {
     {"Double", "Doble"},
     {"Thickness %.3f", "Grosor %.3f"},
     {"Both Sides", "Ambos lados"},
+    {"Axis", "Eje"},
+    {"The shape's axis: up (Y), or along X or Z", "El eje de la forma: hacia arriba (Y), o a lo largo de X o Z"},
+    {"Low-poly (Polygon mode)", "Low-poly (modo Polígonos)"},
+    {"New primitives come as a low-poly cage (12 segments, 1 ring, a 1-cell cube) for Polygon mode; off: the dense sculpting mesh. The settings stay editable below the list until you sculpt.", "Los nuevos primitivos vienen como una jaula low-poly (12 segmentos, 1 anillo, un cubo de 1 celda) para el modo Polígonos; desactivado: la malla densa para esculpir. Los ajustes siguen editables bajo la lista hasta que esculpes."},
+    {"Primitive", "Primitivo"},
+    {"This Part is still the primitive Append made: change its segments, rings, caps, radius or height here and it is built again (one undo step each). Sculpting, remeshing or editing its faces turns it into an ordinary mesh and the settings go; undo brings them back. Moving it whole with the Gizmo keeps them.", "Esta pieza sigue siendo el primitivo que creó Añadir: cambia aquí sus segmentos, anillos, tapas, radio o altura y se construye de nuevo (un paso de deshacer cada vez). Esculpir, remallar o editar sus caras la convierte en una malla normal y los ajustes desaparecen; deshacer los devuelve. Moverla entera con el Gizmo los conserva."},
+    {"Dense", "Densa"},
+    {"The low-poly cage for Polygon mode", "La jaula low-poly para el modo Polígonos"},
+    {"The dense mesh for sculpting", "La malla densa para esculpir"},
+    {"Segments %d", "Segmentos %d"},
+    {"Cells %d", "Celdas %d"},
+    {"Subdivisions %d", "Subdivisiones %d"},
+    {"Rings %d", "Anillos %d"},
+    {"Cap rings %d", "Anillos de tapa %d"},
+    {"0: open ends; 1: a fan; more: rings of quads, then a fan", "0: extremos abiertos; 1: un abanico; más: anillos de quads y luego un abanico"},
+    {"Quad caps", "Tapas de quads"},
+    {"Caps as an all-quad grid with no pole (segments become a multiple of 4)", "Tapas como una rejilla solo de quads sin polo (los segmentos pasan a ser múltiplo de 4)"},
+    {"Radius %.2f", "Radio %.2f"},
+    {"Top radius %.2f", "Radio superior %.2f"},
+    {"Tube radius %.2f", "Radio del tubo %.2f"},
+    {"Inner radius %.2f", "Radio interior %.2f"},
+    {"Solidify", "Solidificar"},
+    {"Centred", "Centrado"},
+    {"Give a flat, single-sided Part thickness in place: a back pushed along the normals by Thickness, joined by a rim of quads along every open edge, one closed mesh. For a Plane, or an Extract made with Thickness 0.", "Da grosor en el sitio a una pieza plana de una sola cara: un reverso desplazado a lo largo de las normales según el Grosor, unido por un borde de quads en cada arista abierta, una sola malla cerrada. Para un Plano, o una extracción hecha con Grosor 0."},
+    {"Solidify centres the thickness on the surface, half in front and half behind, instead of all behind it.", "Solidificar centra el grosor en la superficie, mitad delante y mitad detrás, en vez de todo detrás."},
+    {"Thickness Solidify adds, as a fraction of the Part's size (0.03 is 3%). Positive grows behind the surface, negative in front of it.", "Grosor que añade Solidificar, como fracción del tamaño de la pieza (0.03 es el 3%). Positivo crece detrás de la superficie, negativo delante."},
     {"Project Detail", "Project Detail"},
     {"Dist", "Dist"},
 
@@ -719,6 +755,29 @@ constexpr Entry kSpanish[] = {
     {"Back view", "Vista trasera"},
     {"Left view", "Vista izquierda"},
     {"Right view", "Vista derecha"},
+    // The orientation widget's sides (Draw > Camera > Corner gizmo; Top, Bottom, Front and Rear have entries elsewhere)
+    {"Right", "Derecha"},
+    {"Left", "Izquierda"},
+    {"Corner gizmo", "Gizmo de la esquina"},
+    {"Orientation", "Orientación"},
+    {"Corner gizmo: the X / Y / Z axes in the corner of the canvas. Click an end to look from that side, drag the disc "
+     "to orbit.",
+     "Gizmo de la esquina: los ejes X / Y / Z en la esquina del lienzo. Haz clic en un extremo para mirar desde ese "
+     "lado, arrastra el disco para orbitar."},
+    {"Corner gizmo: the orientation widget, the axes through a glass ball with a dot at each end. Click a dot to look from "
+     "that side with a short move (the dot facing you again: the opposite side), drag it to orbit, double-click to frame "
+     "the model.",
+     "Gizmo de la esquina: el widget de orientación, los ejes a través de una bola de cristal con un punto en cada "
+     "extremo. Haz clic en un punto para mirar desde ese lado con un movimiento corto (el punto que te mira, otra vez: el "
+     "lado opuesto), arrástralo para orbitar, doble clic para encuadrar el modelo."},
+    {"Position", "Posición"},
+    {"Top left", "Arriba a la izquierda"},
+    {"Top right", "Arriba a la derecha"},
+    {"Position: the corner gizmo and the View Figure at the top left of the canvas.",
+     "Posición: el gizmo de la esquina y la Figura de vista arriba a la izquierda del lienzo."},
+    {"Position: the corner gizmo and the View Figure at the top right of the canvas.",
+     "Posición: el gizmo de la esquina y la Figura de vista arriba a la derecha del lienzo."},
+    {"Corner gizmo: nothing in the corner of the canvas.", "Gizmo de la esquina: nada en la esquina del lienzo."},
     {"Top view", "Vista superior"},
     {"Bottom view", "Vista inferior"},
     {"Opposite side", "Lado opuesto"},
@@ -1341,10 +1400,31 @@ constexpr Entry kSpanish[] = {
     {"Clone Spacing", "Espaciado del clon"},
     {"Clone follows stroke", "El clon sigue el trazo"},
     {"Drape", "Drapeado"},
+    {"Cloth in one place: how the Cloth brush behaves while you sculpt, and dropping a whole Part as fabric.", "Tela en un solo lugar: cómo se comporta el pincel Cloth al esculpir, y cómo dejar caer una Part entera como tela."},
+    {"Cloth brush", "Pincel Cloth"},
+    {"Fabric, gravity and folds for the brush on the shelf: drag, push or settle cloth by hand.", "Tejido, gravedad y pliegues del pincel de la barra: arrastra, empuja o asienta la tela a mano."},
+    {"Drape a Part", "Drapear una Part"},
+    {"Lets the active Part fall as cloth until it rests on the other Parts (a shirt on a body).", "Deja caer la Part activa como tela hasta que descanse sobre las otras Parts (una camisa sobre un cuerpo)."},
+    {"Cloth settings...", "Ajustes de tela..."},
+    {"Opens Tool > Cloth: the Cloth brush settings and Drape together in one place.", "Abre Herramienta > Tela: los ajustes del pincel Cloth y el drapeado juntos."},
     {"Drops the active Part as cloth under gravity until it rests on the other Parts. It shows live; at rest the result is kept as one undo step.", "Deja caer la Part activa como una tela por gravedad hasta que reposa sobre las otras Parts. Se ve en directo; al reposar, el resultado se guarda como un solo paso de deshacer."},
     {"How big the sculpt is in real life: 1 when it is modelled at real size (a SculptForge unit is a metre). A body 2 units tall that should be a 1.8 m person: 1.11. Cloth drapes by real size. The value was guessed from the size of the scene (centimetres above 20 units, millimetres above 600); move it to set it yourself.", "Qué tamaño tiene la escultura en la vida real: 1 si está modelada a tamaño real (una unidad de SculptForge es un metro). Un cuerpo de 2 unidades que debe ser una persona de 1,8 m: 1,11. La tela cae según el tamaño real. El valor se estimó por el tamaño de la escena (centímetros por encima de 20 unidades, milímetros por encima de 600); muévelo para fijarlo tú."},
     {"How the cloth hangs: Silk flows into many fine folds, Cotton medium ones, Denim holds broad folds, Leather barely folds.", "Cómo cae la tela: la seda fluye en muchos pliegues finos, el algodón en medianos, la mezclilla mantiene pliegues anchos y el cuero apenas se pliega."},
     {"Masked areas hold still, like pins (a waistband, a collar).", "Las zonas enmascaradas se quedan quietas, como alfileres (una cintura, un cuello)."},
+    {"From view", "Desde la vista"},
+    {"Gusts", "Ráfagas"},
+    {"Gusts %.0f%%", "Ráfagas %.0f%%"},
+    {"How hard the air blows on the cloth, in metres per second: 0 none, 3 a breeze, 8 makes flags fly, 15 is hard to walk in. It pushes on the cloth's face and skims along it. Change it while the simulation runs, too.", "Con qué fuerza sopla el aire sobre la tela, en metros por segundo: 0 nada, 3 una brisa, 8 hace ondear banderas, 15 cuesta caminar. Empuja la cara de la tela y se desliza a lo largo de ella. Cámbialo también mientras se ejecuta la simulación."},
+    {"How much the wind varies from place to place and moment to moment: the cloth ripples and flaps and never quite settles, so press Keep at the frame you like (it stops by itself after a minute).", "Cuánto varía el viento de un lugar a otro y de un momento a otro: la tela ondula y aletea y nunca se asienta del todo, así que pulsa Conservar en el fotograma que te guste (se detiene solo después de un minuto)."},
+    {"Lift", "Elevación"},
+    {"Lift %.0f deg", "Elevación %.0f deg"},
+    {"Points the wind away from you: it blows from the camera toward the model (heading and lift).", "Apunta el viento lejos de ti: sopla desde la cámara hacia el modelo (rumbo y elevación)."},
+    {"Tilts the wind up from level (a skirt lifts) or down, in degrees.", "Inclina el viento hacia arriba desde el nivel horizontal (una falda se levanta) o hacia abajo, en grados."},
+    {"Toward", "Hacia"},
+    {"Toward %.0f deg", "Hacia %.0f deg"},
+    {"Where the wind blows toward, as a heading: 0 is away from the front view, 90 to the right, 180 toward it.", "Hacia dónde sopla el viento, como rumbo: 0 se aleja de la vista frontal, 90 a la derecha, 180 hacia ella."},
+    {"Wind", "Viento"},
+    {"Wind %.1f m/s", "Viento %.1f m/s"},
     {"Pins from mask", "Alfileres desde la máscara"},
     {"Resume", "Reanudar"},
     {"Simulate", "Simular"},
@@ -1645,10 +1725,19 @@ constexpr Entry kSpanish[] = {
     {"Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
      "Desactivado: Archivo y Editar van primero en la barra de paletas y Ayuda al final, el resto de la A a la Z. "
      "Activado: todas las paletas de la A a la Z."},
-    {"Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: Settings > "
-     "Display > Scale, per monitor).",
-     "Tamaño del texto y los controles, aplicado al instante. Automático sigue a la pantalla en la que está la "
-     "ventana (Windows: Configuración > Pantalla > Escala, por monitor)."},
+    {"Follow the display the window is on (Windows: Settings > Display > Scale, per monitor; macOS and Wayland: the "
+     "display's scaling; X11: the desktop's font DPI). Untick, or move the slider, to choose a size.",
+     "Seguir la pantalla en la que está la ventana (Windows: Configuración > Pantalla > Escala, por monitor; macOS y "
+     "Wayland: el escalado de la pantalla; X11: el DPI de fuente del escritorio). Desmarque, o mueva el control "
+     "deslizante, para elegir un tamaño."},
+    {"Size of text and controls, 70% to 300%, applied when you let the slider go (double-click it to type a value). "
+     "Below 100% the buttons keep a little more room around their text, so they stay easy to hit. The size is "
+     "remembered for the monitor the window is on, so a laptop screen and a 4K monitor can each have their own.",
+     "Tamaño del texto y los controles, del 70% al 300%, aplicado al soltar el control deslizante (haga doble clic "
+     "para escribir un valor). Por debajo del 100%, los botones conservan un poco más de espacio alrededor de su "
+     "texto, para que sigan siendo fáciles de pulsar. El tamaño se recuerda para el monitor en el que está la "
+     "ventana, así que la pantalla de un portátil y un monitor 4K pueden tener cada uno el suyo."},
+    {"Aa Bb 123", "Aa Bb 123"},
     {"Free: dragging turns the model about the screen's axes and can roll it over the top; press Shift while rotating "
      "to snap to the nearest front, side, top or bottom view. Turntable: the model stays upright and turns about its "
      "vertical axis, as in Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",
@@ -1934,6 +2023,8 @@ constexpr Entry kSpanish[] = {
      "visibility).",
      "Muestra solo el grupo de caras bajo el cursor; otra vez, con él aislado, lo muestra todo (Blender: alternar "
      "visibilidad)."},
+    {"Permanently delete the hidden part of the mesh (one undo step). What stays keeps its mask, paint, face groups, UVs and sculpt layers.",
+     "Elimina permanentemente la parte oculta de la malla (un paso de deshacer). Lo que queda conserva su máscara, pintura, grupos de caras, UVs y capas de esculpido."},
     {"Show every hidden part of the mesh.", "Muestra todas las partes ocultas de la malla."},
     {"Look at the model from the front (orthographic).", "Mira el modelo desde el frente (ortográfica)."},
     {"Look at the model from behind (orthographic).", "Mira el modelo desde atrás (ortográfica)."},
@@ -2116,6 +2207,20 @@ constexpr Entry kSpanish[] = {
      "nearest side (front, back, left, right, top or bottom).",
      "Muestra una pequeña cabeza sombreada en la esquina del lienzo que gira con la vista. Haz clic en ella para "
      "mirar desde el lado más cercano (frente, atrás, izquierda, derecha, arriba o abajo)."},
+    // Split view (SplitView.cpp)
+    {"Split view", "Vista dividida"},
+    {"Beside", "Al lado"},
+    {"Below", "Debajo"},
+    {"Swap views", "Intercambiar vistas"},
+    {"Single view", "Una vista"},
+    {"Upper view", "Vista superior"},
+    {"Lower view", "Vista inferior"},
+    {"One view, the whole canvas.", "Una sola vista, todo el lienzo."},
+    {"Two views side by side: left and right.", "Dos vistas una junto a otra: izquierda y derecha."},
+    {"Two views one above the other.", "Dos vistas una encima de otra."},
+    {"The two views trade places.", "Las dos vistas intercambian su lugar."},
+    {"This view's direction: Free turns like any view; Front, Right and Top hold that side (orthographic), pan and zoom still work. The view under the pointer is the one you sculpt and turn in.", "La dirección de esta vista: Libre gira como cualquier vista; Frente, Derecha y Arriba mantienen ese lado (ortográfica), desplazar y acercar siguen funcionando. La vista bajo el puntero es en la que esculpes y giras."},
+    {"A second live view of the scene beside this one (View > Split view: beside or below, and each view's direction). The view under the pointer is the one you sculpt and turn in; the other follows every stroke. Again: one view.", "Una segunda vista en vivo de la escena junto a esta (Vista > Vista dividida: al lado o debajo, y la dirección de cada vista). La vista bajo el puntero es en la que esculpes y giras; la otra sigue cada trazo. Otra vez: una sola vista."},
     {"Gizmo size", "Tamaño del gizmo"},
     {"AI features are off (Preferences > AI): Relief, Inflate and Stamp work offline.",
      "Las funciones de IA están desactivadas (Preferencias > IA): Relieve, Inflar y Estampar funcionan sin conexión."},
@@ -2144,11 +2249,21 @@ constexpr Entry kSpanish[] = {
     {"Floor grid", "Cuadrícula del suelo"},
     {"A faint grid on the floor the model stands on (its lowest point, Y up), fading into the distance: a "
      "reference for perspective and lining up Parts; the red and blue lines are the X and Z axes. It moves when "
-     "a stroke or a move ends. Off by default; saved automatically.",
+     "a stroke or a move ends (Floor grid at Y=0 keeps it still). Off by default; saved automatically.",
      "Una cuadrícula tenue en el suelo sobre el que se apoya el modelo (su punto más bajo, Y hacia arriba), que "
      "se desvanece a lo lejos: una referencia para la perspectiva y para alinear Piezas; las líneas roja y azul "
-     "son los ejes X y Z. Se mueve al terminar un trazo o un movimiento. Desactivada por defecto; se guarda "
+     "son los ejes X y Z. Se mueve al terminar un trazo o un movimiento (Cuadrícula del suelo en Y=0 la deja fija). Desactivada por defecto; se guarda "
      "automáticamente."},
+    {"Floor grid at Y=0", "Cuadrícula del suelo en Y=0"},
+    {"Keep the floor grid at world height zero (Y=0) instead of under the lowest point of the visible Parts: a "
+     "fixed reference while you move Parts up and down or work on a base. Off by default (the grid follows the "
+     "model); saved automatically.",
+     "Mantén la cuadrícula del suelo a la altura cero del mundo (Y=0) en lugar de bajo el punto más bajo de las Piezas visibles: una referencia fija mientras subes y bajas Piezas o trabajas en una base. Desactivada por defecto (la cuadrícula sigue al modelo); se guarda automáticamente."},
+    {"Centre view on the pointer", "Centrar la vista en el puntero"},
+    {"Slide the view so the point under the pointer is in the middle, keeping the zoom and the angle; the view then "
+     "turns about that point. Alt+middle click on the canvas does it in every key style (a drag still pans); this "
+     "action does the same at the pointer when you press its key (no key by default: bind one in Preferences > Hotkeys).",
+     "Desplaza la vista para que el punto bajo el puntero quede en el centro, manteniendo el zoom y el ángulo; después la vista gira alrededor de ese punto. Alt+clic central en el lienzo lo hace en todos los estilos de teclas (arrastrar sigue desplazando); esta acción hace lo mismo en el puntero al pulsar su tecla (sin tecla por defecto: asigna una en Preferencias > Atajos)."},
     {"Backface culling", "Ocultar caras traseras"},
     {"Don't draw the back faces of the model: faster on dense meshes, and you see through the openings of open meshes "
      "(a scan, a garment) instead of their inside. Brushes then work only on faces you can see. Off by default; "
@@ -2472,16 +2587,23 @@ constexpr Entry kSpanish[] = {
      "esculpen en tiempo real. Move cambia la forma del nivel inferior y el detalle va con él."},
     // --- PanelIntegrations.cpp (tools/i18n/coverage.py) ---
     {"Show SculptForge on Discord", "Mostrar SculptForge en Discord"},
-    {"Your Discord profile shows SculptForge, its icon and how long you've been sculpting. Sent only to the Discord "
-     "app on this computer, which shows it to your friends. Off by default.",
-     "Tu perfil de Discord muestra SculptForge, su icono y cuánto llevas esculpiendo. Se envía solo a la app de "
-     "Discord de este equipo, que lo muestra a tus amigos. Desactivado por defecto."},
-    {"Show the monthly challenge", "Mostrar el reto mensual"},
-    {"Adds \"Monthly challenge: <theme>\", with the theme you type below.",
-     "Añade \"Monthly challenge: <theme>\", con el tema que escribas abajo."},
-    {"Show the file name", "Mostrar el nombre del archivo"},
-    {"Adds the name of the file you're working on (never its folder). Off by default.",
-     "Añade el nombre del archivo en el que trabajas (nunca su carpeta). Desactivado por defecto."},
+    {"Your Discord profile shows SculptForge, its icon, the time since you started it and one word for what you're "
+     "doing: Sculpting, Painting or Idle. Sent only to the Discord app on this computer, which shows it to your "
+     "friends. Needs the Discord app running. Off by default.",
+     "Tu perfil de Discord muestra SculptForge, su icono, el tiempo desde que lo iniciaste y una palabra para lo "
+     "que estás haciendo: Sculpting, Painting o Idle. Se envía solo a la aplicación de Discord de este equipo, que "
+     "lo muestra a tus amigos. Necesita la aplicación de Discord abierta. Desactivado por defecto."},
+    {"Shown on your Discord profile: SculptForge, its icon, the time since you started it, and Sculpting, Painting "
+     "or Idle (nothing done for five minutes). Sent only to the Discord app on this computer. Nothing else: no "
+     "file names, folders, Part names, user name or model details.",
+     "Se muestra en tu perfil de Discord: SculptForge, su icono, el tiempo desde que lo iniciaste y Sculpting, "
+     "Painting o Idle (sin actividad durante cinco minutos). Se envía solo a la aplicación de Discord de este "
+     "equipo. Nada más: ni nombres de archivo, ni carpetas, ni nombres de piezas, ni nombre de usuario, ni "
+     "detalles del modelo."},
+    {"Discord now shows only SculptForge and what you're doing, never the file name or a challenge theme. Those "
+     "two options are gone.",
+     "Discord ahora solo muestra SculptForge y lo que estás haciendo, nunca el nombre del archivo ni el tema de un "
+     "reto. Esas dos opciones han desaparecido."},
     // --- PanelKelvinlet.cpp (tools/i18n/coverage.py) ---
     {"How the Kelvinlet brushes' material keeps its volume (Poisson's ratio): 0 is rubbery (it stretches without "
      "bulging), 100 is incompressible clay (pressing in bulges the surface up around the thumb, pulling out draws "
@@ -3211,6 +3333,16 @@ constexpr Entry kSpanish[] = {
      "Cuánto se ve este trazo: 1 = tal como se esculpió, 0 = nada, 2 = el doble de fuerte. Los trazos posteriores no "
      "se rehacen: donde se solapan con este conservan su propio desplazamiento encima."},
     // --- PanelUpdate.cpp (tools/i18n/coverage.py) ---
+    {"SculptForge %s (%.0f MB) is downloaded from github.com/islandmed/SculptForge releases and checked.",
+     "SculptForge %s (%.0f MB) se descarga desde los lanzamientos de github.com/islandmed/SculptForge y se comprueba."},
+    {"Restart now replaces %s after its code signature is checked too.",
+     "Reiniciar ahora reemplaza %s después de que su firma de código también sea comprobada."},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge checks the download arrived intact (its checksum must match the release's checksum list) and that the app inside passes macOS's code signature check and comes from the same developer as this one. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "Descargue la nueva versión desde las versiones de GitHub de SculptForge a través de una conexión verificada. SculptForge comprueba que la descarga haya llegado intacta (su suma de comprobación debe coincidir con la lista de sumas de comprobación del lanzamiento) y que la aplicación que contiene pase la comprobación de firma de código de macOS y provenga del mismo desarrollador que esta. Usted confirma antes de que se reemplace nada; la versión actual se conserva hasta que la nueva se haya iniciado."},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge checks the download arrived intact (its checksum must match the release's checksum list) and that the app inside passes macOS's code signature check. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "Descargue la nueva versión desde las versiones de GitHub de SculptForge a través de una conexión verificada. SculptForge comprueba que la descarga haya llegado intacta (su suma de comprobación debe coincidir con la lista de sumas de comprobación del lanzamiento) y que la aplicación que contiene pase la comprobación de firma de código de macOS. Usted confirma antes de que se reemplace nada; la versión actual se conserva hasta que la nueva se haya iniciado."},
+    {"Download the new version from SculptForge's GitHub releases, check the download arrived intact, and install it. The current version is kept until the new one has started.",
+     "Descargue la nueva versión desde las versiones de GitHub de SculptForge, compruebe que la descarga haya llegado intacta e instálela. La versión actual se conserva hasta que la nueva se haya iniciado."},
     {"Downloading the update...", "Descargando la actualización..."},
     {"It installs when you quit.", "Se instala al salir."},
     {"Restart now", "Reiniciar ahora"},
@@ -3228,10 +3360,6 @@ constexpr Entry kSpanish[] = {
     {"Try again", "Reintentar"},
     {"Switched off by the Space's owner, use Image to 3D", "El propietario del Space lo desactivó; usa Imagen a 3D"},
     {"Update", "Actualizar"},
-    {"Download the new version from SculptForge's GitHub releases, check its signature and checksum, and install it. "
-     "The current version is kept until the new one has started.",
-     "Descarga la versión nueva de las versiones de SculptForge en GitHub, comprueba su firma y su suma de "
-     "verificación, y la instala. La versión actual se conserva hasta que arranca la nueva."},
     {"Asking GitHub...", "Preguntando a GitHub..."},
     {"On GitHub, enter this code:", "En GitHub, escribe este código:"},
     {"Open github.com/login/device", "Abrir github.com/login/device"},
@@ -3926,14 +4054,11 @@ constexpr Entry kSpanish[] = {
     {"Rebuild as an even, watertight surface (like Voxel Remesh): merges parts, fixes scans and generated models.",
      "Reconstruye como superficie uniforme y estanca (como Remallado vóxel): une partes, arregla escaneos y "
      "modelos generados."},
-    {"With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background.",
-     "Con Herramienta > Remallado > Remallado rápido activado: remalla la Pieza activa a la resolución de Remallado "
-     "por vóxeles, en segundo plano."},
+    {"Remesh the active Part at the Voxel Remesh resolution, in the background (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
+     "Remalla la Pieza activa a la resolución de Remallado por vóxeles, en segundo plano (activado por defecto en la disposición SculptForge, desactivado en Classic; Herramienta > Remallado > Remallado rápido lo cambia)."},
     {"Quick Remesh (hold and drag)", "Remallado rápido (mantén y arrastra)"},
-    {"With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to "
-     "remesh the active Part.",
-     "Con Herramienta > Remallado > Remallado rápido activado: mantén esta tecla y haz clic o arrastra sobre el "
-     "fondo (no sobre el modelo) para remallar la Pieza activa."},
+    {"Hold this key and click or drag on the background (not on the model) to remesh the active Part (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
+     "Mantén esta tecla y haz clic o arrastra sobre el fondo (no sobre el modelo) para remallar la Pieza activa (activado por defecto en la disposición SculptForge, desactivado en Classic; Herramienta > Remallado > Remallado rápido lo cambia)."},
     {"Turn the sculpt into Gaussian splats.", "Convierte la escultura en splats gaussianos."},
     {"Fill the unmasked area with the colour.", "Rellena la zona sin máscara con el color."},
     {"Hide or show the shelves and trays around the canvas.",
@@ -4798,8 +4923,6 @@ constexpr Entry kSpanish[] = {
     {"Terms & refunds", "Términos y reembolsos"},
     {"Nothing about memberships for a week.",
      "Nada sobre membresías durante una semana."},
-    {"Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running.",
-     "No se envía nada más: ni carpetas, ni nombre de usuario, ni detalles del modelo. Necesita la aplicación de Discord abierta."},
     {"Off (raw mesh)",
      "Desactivado (malla original)"},
     {"Off in this run: tests, renders and recordings use fixed settings.",
@@ -5052,8 +5175,6 @@ constexpr Entry kSpanish[] = {
      "¿El teléfono no puede abrir la página?"},
     {"The phone link couldn't start.",
      "No se pudo iniciar el enlace con el teléfono."},
-    {"Theme (64 characters at most)",
-     "Tema (64 caracteres como máximo)"},
     {"There is no ready-made %s for this computer. %s",
      "No hay un %s listo para este ordenador. %s"},
     {"Thickness",
@@ -5226,6 +5347,12 @@ constexpr Entry kSpanish[] = {
      "Pintar sus colores"},
     {"Hide while navigating",
      "Ocultar al navegar"},
+    {"Outside the image",
+     "Fuera de la imagen"},
+    {"Block",
+     "Bloquear"},
+    {"What a stroke does where the Stencil's image isn't. Sculpt: it works as if there were no Stencil. Block: it does nothing (the image's edge is a wall). A tiled image covers the whole view.",
+     "Qué hace un trazo donde no está la imagen de la plantilla. Esculpir: funciona como si no hubiera plantilla. Bloquear: no hace nada (el borde de la imagen es un muro). Una imagen en mosaico cubre toda la vista."},
     {"Reset placement",
      "Restablecer posición"},
     {"Lay an image over the view and sculpt or paint through it: the sculpt brushes take its brightness (white = full effect), Vertex Paint its colours, only where it covers the model.",
@@ -5710,6 +5837,35 @@ constexpr Entry kSpanish[] = {
      "Después Quad Remesh"},
     {"Use as sculpting base",
      "Usar como base de esculpido"},
+    // Generate 3D: the Result choice and the AI provenance tag (PanelGenerate3D.cpp, PanelParts.cpp, Ui.cpp)
+    {"AI: %s",
+     "IA: %s"},
+    {"Advanced",
+     "Avanzado"},
+    {"Generate a model and pick one: it stays exactly as generated.",
+     "Genera un modelo y elige uno: se queda exactamente como se generó."},
+    {"Rebuilds the picked model as a sculpting base. A pick does this on its own; the button does it again, after Undo or for a model picked as a reference.",
+     "Reconstruye el modelo elegido como base de esculpido. Al elegir ya se hace solo; el botón lo repite, tras Deshacer o para un modelo elegido como referencia."},
+    {"Reference",
+     "Referencia"},
+    {"High fidelity, exactly as generated",
+     "Alta fidelidad, exactamente como se generó"},
+    {"Moderate density, clean quads",
+     "Densidad moderada, cuadriláteros limpios"},
+    {"The AI gives the form; SculptForge gives the topology. Choose what the model you pick becomes:",
+     "La IA da la forma; SculptForge da la topología. Elige en qué se convierte el modelo que elijas:"},
+    {"The model exactly as the service made it, every triangle. Sculpt on a base of your own and Project Detail from it, or export it as it is.",
+     "El modelo exactamente como lo hizo el servicio, con todos sus triángulos. Esculpe sobre una base propia y usa Project Detail desde él, o expórtalo tal cual."},
+    {"Voxel Remesh, then Quad Remesh: about %d quads with one subdivision level, ready to divide and sculpt. The model as generated stays hidden as a Reference for Project Detail.",
+     "Remallado vóxel y después Quad Remesh: unos %d cuadriláteros con un nivel de subdivisión, listos para dividir y esculpir. El modelo tal como se generó queda oculto como Referencia para Project Detail."},
+    {"Voxel Remesh: one even, watertight surface of about %d triangles. The model as generated stays hidden as a Reference for Project Detail.",
+     "Remallado vóxel: una superficie uniforme y cerrada de unos %d triángulos. El modelo tal como se generó queda oculto como Referencia para Project Detail."},
+    {"generated",
+     "generado"},
+    {"reference",
+     "referencia"},
+    {"sculpting base",
+     "base de esculpido"},
     {"Voxel Remesh first makes one even, watertight surface. Quad Remesh then turns it into clean quads with one subdivision level holding the detail, ready to divide and sculpt. Off: the even triangle surface.",
      "Remallado vóxel crea primero una superficie uniforme y cerrada. Luego Quad Remesh la convierte en cuadriláteros limpios con un nivel de subdivisión que guarda el detalle, lista para dividir y esculpir. Desactivado: la superficie uniforme de triángulos."},
     {"Ready",
@@ -5738,6 +5894,31 @@ constexpr Entry kSpanish[] = {
     {"Edges", "Aristas"},
     {"Edges mode", "Modo aristas"},
     {"Edges mode selects edges of the base level", "El modo aristas selecciona aristas del nivel base"},
+    // --- Tool > Polygon > Extrude (core/PolyExtrude.cpp op labels and help, shown by PanelPolygon.cpp) ---
+    {"Extrude", "Extruir"},
+    {"Inset", "Insertar"},
+    {"Individual", "Individual"},
+    {"Even thickness", "Grosor uniforme"},
+    {"Keep shape", "Mantener forma"},
+    {"Edges along normals", "Aristas a lo largo de las normales"},
+    {"Push the selected faces out along their normals (in, with a negative distance) with new side walls, as one region or face by face; selected open border edges extrude into a strip along the surface.", "Empuja las caras seleccionadas hacia fuera a lo largo de sus normales (hacia dentro, con una distancia negativa) con nuevas paredes laterales, como una sola región o cara por cara; las aristas de borde abierto seleccionadas se extruyen formando una franja a lo largo de la superficie."},
+    {"How far out, as a fraction of the Part's size (negative: in).", "Cuánto hacia fuera, como una fracción del tamaño de la Pieza (negativo: hacia dentro)."},
+    {"Narrow the cap first by this much (a fraction of the Part's size), so the walls slant in.", "Estrecha primero la tapa en esta cantidad (una fracción del tamaño de la Pieza), para que las paredes se inclinen hacia dentro."},
+    {"Each face on its own, with a groove between neighbours, instead of the connected region.", "Cada cara por separado, con una ranura entre vecinas, en lugar de la región conectada."},
+    {"Where the selection bends, every face still moves the full distance along its own normal.", "Donde la selección se dobla, cada cara se sigue moviendo la distancia completa a lo largo de su propia normal."},
+    {"Move the whole region along one direction (its average normal) so it keeps its shape.", "Mueve toda la región a lo largo de una dirección (su normal promedio) para que conserve su forma."},
+    {"Edges: the strip stands on the surface instead of extending it.", "Aristas: la franja se levanta sobre la superficie en lugar de extenderla."},
+    // --- Tool > Polygon (Polygon mode, PanelPolygon.cpp) ---
+    {"By Group", "Por grupo"},
+    {"Extend each selected edge to its edge loop: across the quads, on through every vertex with four edges, until it comes back round or meets a pole or a border (a double-click on an edge does the same).", "Extiende cada arista seleccionada a su bucle de aristas: a través de los quads, pasando por cada vértice con cuatro aristas, hasta que vuelve al inicio o encuentra un polo o un borde (un doble clic en una arista hace lo mismo)."},
+    {"Extend each selected edge to its edge ring: the edges across the quads beside it, on until the ring comes back round or meets a triangle or a border (what an added edge loop would cut through).", "Extiende cada arista seleccionada a su anillo de aristas: las aristas al otro lado de los quads contiguos, hasta que el anillo vuelve al inicio o encuentra un triángulo o un borde (lo que cortaría un bucle de aristas añadido)."},
+    {"Extend the selection to the whole face groups the selected faces are in (a double-click on a face does the same).", "Extiende la selección a los grupos de caras completos en los que están las caras seleccionadas (un doble clic en una cara hace lo mismo)."},
+    {"Model with polygons: select Points, Edges or Faces of the Part on the model (click, Shift adds, Ctrl removes, drag a box; double-click an edge for its loop, a face for its face group), move them with the Transform gizmo and run the operations below on them. For low and medium-density meshes without subdivision or Micro levels. Esc, the button or any brush goes back to sculpting.", "Modela con polígonos: selecciona Puntos, Aristas o Caras de la Pieza sobre el modelo (clic, Shift añade, Ctrl quita, arrastra un recuadro; doble clic en una arista para su bucle, en una cara para su grupo de caras), muévelos con el gizmo de Transformar y ejecuta sobre ellos las operaciones de abajo. Para mallas de densidad baja y media sin niveles de subdivisión ni Micro. Esc, el botón o cualquier pincel vuelve a esculpir."},
+    {"Operations", "Operaciones"},
+    {"Polygon", "Polígono"},
+    {"Polygon mode", "Modo polígono"},
+    {"Polygon mode selects points, edges and faces of the Part to model with", "El modo polígono selecciona puntos, aristas y caras de la Pieza para modelar"},
+    {"Ring", "Anillo"},
     {"Only within selection", "Solo dentro de la selección"},
     {"Open Edges", "Aristas abiertas"},
     {"Select by Angle", "Seleccionar por ángulo"},
@@ -5834,7 +6015,7 @@ constexpr Entry kSpanish[] = {
     {"Hold Alt and drag a button, or a section's title, from any palette into this panel. Right-click an entry to remove it.", "Mantén Alt y arrastra un botón, o el título de una sección, desde cualquier paleta hasta este panel. Clic derecho en una entrada para quitarla."},
     {"My Panel", "Mi panel"},
     {"Remove from My Panel", "Quitar de Mi panel"},
-    {"Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "Tu propio panel, flotando junto al cursor: los botones y secciones que arrastraste a él (mantén Alt y arrastra desde cualquier paleta). Pulsa la tecla otra vez, o Esc, para cerrarlo. También es una paleta (Editar > Mi panel) para una bandeja, y puede pasar a una ventana propia."},
+    {"Your own panel, floating at the cursor: the buttons, controls and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "Tu propio panel, flotando junto al cursor: los botones, controles y secciones que arrastraste a él (mantén Alt y arrastra desde cualquier paleta). Pulsa la tecla otra vez, o Esc, para cerrarlo. También es una paleta (Editar > Mi panel) para una bandeja, y puede pasar a una ventana propia."},
     {"Add images...",
      "Añadir imágenes..."},
     {"Adjust Reference",
@@ -6115,6 +6296,43 @@ constexpr Entry kSpanish[] = {
      "no configurado"},
     {"system default",
      "predeterminado del sistema"},
+    {"Freehand",
+     "A mano alzada"},
+    {"Points",
+     "Puntos"},
+    {"Straight",
+     "Recta"},
+    {"Line",
+     "Línea"},
+    {"Next line",
+     "Siguiente línea"},
+    {"Snap points to surface",
+     "Ajustar puntos a la superficie"},
+    {"(%d selected)",
+     "(%d seleccionados)"},
+    {"Drag to draw: the stroke becomes the tube or curve, smoothed and simplified into points.",
+     "Arrastra para dibujar: el trazo se convierte en el tubo o la curva, suavizado y simplificado en puntos."},
+    {"Click to place points one by one: each click adds a point to the curve being built, on the model where Snap to surfaces finds it. Enter, Next line, Esc or Draw Tube off ends the line; the next click starts a new one.",
+     "Haz clic para colocar los puntos uno a uno: cada clic añade un punto a la curva en construcción, sobre el modelo donde Ajustar a superficies lo encuentre. Enter, Siguiente línea, Esc o desactivar Dibujar Tube termina la línea; el siguiente clic empieza otra."},
+    {"End the curve being built: the next click starts a new one (Enter does the same).",
+     "Termina la curva en construcción: el siguiente clic empieza otra (Enter hace lo mismo)."},
+    {"A smooth curve through the points (for new tubes and curves, and the active one). Switching keeps the points.",
+     "Una curva suave que pasa por los puntos (para tubos y curvas nuevos, y la activa). Al cambiar, los puntos se conservan."},
+    {"Straight spans between the points with sharp corners, a polyline (for new tubes and curves, and the active one). Switching keeps the points.",
+     "Tramos rectos entre los puntos con esquinas marcadas, una polilínea (para tubos y curvas nuevos, y la activa). Al cambiar, los puntos se conservan."},
+    {"Put the selected points (or all of them) on the nearest surface of the other visible Parts: a curve lies on it, a tube half sunk in. One undo step. With Snap to surfaces on, a curve's dot dragged over a Part lands on it too.",
+     "Coloca los puntos seleccionados (o todos) sobre la superficie más cercana de las otras Piezas visibles: una curva queda sobre ella, un tubo medio hundido. Un paso de deshacer. Con Ajustar a superficies activo, un punto de curva arrastrado sobre una Pieza también cae en ella."},
+    {"Delete the selected points (orange; Shift+click selects several). Alt+click a point does the same.",
+     "Borra los puntos seleccionados (naranja; Shift+clic selecciona varios). Alt+clic en un punto hace lo mismo."},
+    {"Shift+click dots to select several; Move, Scale and Rotate (W, E, R) work on them.",
+     "Shift+clic en los puntos para seleccionar varios; Mover, Escalar y Rotar (W, E, R) actúan sobre ellos."},
+    {"Hold Alt and drag a button, a slider, a checkbox or a section's title from any palette into this panel. Right-click an entry to remove it.", "Mantén Alt y arrastra un botón, un deslizador, una casilla o el título de una sección desde cualquier paleta hasta este panel. Clic derecho en una entrada para quitarla."},
+    {"(not shown now)", "(no se muestra ahora)"},
+    {"Its palette does not show this control right now (it depends on the Part or the mode). It comes back when it does.", "Su paleta no muestra este control ahora mismo (depende de la parte o del modo). Vuelve cuando lo haga."},
+    {"Triangle count", "Recuento de triángulos"},
+    {"How many triangles the active Part has at its current level. Hold Alt and drag it into My Panel to keep it in view.", "Cuántos triángulos tiene la parte activa en su nivel actual. Mantén Alt y arrástralo a Mi panel para tenerlo a la vista."},
+    {"Subdivision levels", "Niveles de subdivisión"},
+    {"The level you are on, how many the Part has, and the triangles of the lowest and highest. Hold Alt and drag it into My Panel to keep it in view.", "El nivel en el que estás, cuántos tiene la parte y los triángulos del más bajo y del más alto. Mantén Alt y arrástralo a Mi panel para tenerlo a la vista."},
     // Tool > Scatter (PanelScatter.cpp)
     {"Another seed gives another random scatter with the same settings.",
      "Otra semilla genera otra dispersión aleatoria con los mismos ajustes."},

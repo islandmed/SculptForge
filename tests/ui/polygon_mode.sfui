@@ -1,0 +1,196 @@
+# Tool > Polygon (Polygon mode, the foundation every polygon-modelling op plugs into): the mode toggle on the active
+# Part, Points / Edges / Faces selection on the model (click, Shift adds, Ctrl removes, a box drag, double-click an edge
+# for its loop and a face for its group), Grow / Shrink / All / None / Invert / Loop / Ring / By Group, the overlay, the
+# gizmo moving the selection as one undo step, the ops panel (Delete, Flip) with one undo step each, the refusals (a Part
+# with subdivision levels), and leaving the mode (Esc, a brush). Members' top wish (feature queue row 74).
+run new_sphere subdivisions=1
+run part_append type=cube name=Box
+run part_delete index=0
+# A coarse quad cage (the dense block is sculpting resolution): Quad Remesh keeps the six sides as face groups.
+run qremesh target=600 detect_edges=true keep_groups=true adaptive=0 quality=false
+wait_idle 60
+remember undo_steps base
+orbit 120 -60
+key f
+zoom 0.7
+expect_value wireframe == 0
+click "Polygon##tool.polygon"
+expect_value poly_mode == 0
+expect_value poly_ops >= 2
+click "Polygon/Polygon mode"
+expect_value poly_mode == 1
+expect_value wireframe == 1
+expect_status "Polygon mode (Faces)"
+expect_value poly_element == 2
+expect_value poly_selected == 0
+remember poly_total faces
+remember triangles tris
+
+# Faces: a click selects one face (a quad is one face), Shift adds, Ctrl removes; the clicks never sculpt.
+click_part Box 0.5 0.5 1
+expect_value poly_selected == 1
+expect_value poly_shown == 1
+hold shift
+click_part Box 0.3 0.62 1
+hold none
+expect_value poly_selected == 2
+hold ctrl
+click_part Box 0.3 0.62 1
+hold none
+expect_value poly_selected == 1
+expect_value undo_steps == $base
+expect_value triangles == $tris
+
+# Grow / Shrink around the face, then the whole face group (a cube side) by double-click.
+click "Polygon/Grow"
+expect_value poly_selected > 1
+remember poly_selected grown
+click "Polygon/Shrink"
+expect_value poly_selected == 1
+click_part Box 0.5 0.5 2
+expect_value poly_selected > 1
+remember poly_selected side
+shot polygon-faces-group
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-faces-group-200
+ui_scale 100
+key f
+zoom 0.7
+click "Polygon/Invert"
+expect_value poly_selected > $side
+expect_value poly_selected < $faces
+click "Polygon/Invert"
+expect_value poly_selected == $side
+click "Polygon/None"
+expect_value poly_selected == 0
+click "Polygon/All"
+expect_value poly_selected == $faces
+click "Polygon/None"
+
+# A box drag selects the faces inside it that face the camera; the background click deselects.
+hold none
+drag_path -0.1 -0.1 0.55 0.55
+expect_value poly_selected > 0
+expect_value poly_selected < $faces
+remember poly_selected boxed
+shot polygon-box
+click_part Box 0.5 0.5 1
+expect_value poly_selected == 1
+drag_path -0.4 0.5 -0.4 0.5
+expect_value poly_selected == 0
+
+# Edges: the selection converts when switching; a double-click takes the edge loop; Ring crosses the quads.
+click_part Box 0.5 0.5 1
+click "Polygon/Edges"
+expect_value poly_element == 1
+expect_value poly_selected == 4
+expect_status "4 edges selected"
+click "Polygon/None"
+click_part Box 0.5 0.5 2
+expect_value poly_selected > 1
+remember poly_selected loop
+click "Polygon/Ring"
+expect_value poly_selected > $loop
+shot polygon-edges-loop
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-edges-loop-200
+ui_scale 100
+key f
+zoom 0.7
+
+# One edge's ring (the quads across it), then Points: the ring's points; Grow adds their neighbours; the gizmo moves
+# the selection as one undo step and the selection survives the move.
+click "Polygon/None"
+click_part Box 0.5 0.5 1
+expect_value poly_selected == 1
+click "Polygon/Ring"
+expect_value poly_selected > 1
+remember poly_selected ring
+click "Polygon/Points"
+expect_value poly_element == 0
+expect_value poly_selected > 1
+remember poly_selected pts
+click "Polygon/Grow"
+expect_value poly_selected > $pts
+remember poly_selected pgrown
+click "Polygon/Shrink"
+expect_value poly_selected < $pgrown
+expect_value poly_selected >= $pts
+click "Polygon/None"
+click_part Box 0.5 0.5 1
+expect_value poly_selected == 1
+shot polygon-points
+snapshot
+key w
+expect_value undo_steps == $base
+gizmo_drag move_x 60 0
+expect_value undo_steps == $base+1
+expect_value moved == 1
+expect_value poly_selected == 1
+expect_value poly_mode == 1
+key ctrl+z
+expect_value moved == 0
+expect_value poly_selected == 1
+key e
+expect_value poly_mode == 1
+key q
+expect_value poly_mode == 0
+expect_status "Left Polygon mode"
+click "Polygon/Polygon mode"
+expect_value poly_mode == 1
+
+# Ops: Flip turns a face (one undo step, stays selected); Delete removes faces (one undo step); undo restores both.
+click "Polygon/Faces"
+click "Polygon/None"
+click_part Box 0.5 0.5 1
+expect_value poly_selected == 1
+click "Polygon/Flip##polygon.op.flip"
+expect_status "Flipped 1 face"
+expect_value undo_steps == $base+1
+expect_value poly_selected == 1
+key ctrl+z
+expect_value undo_steps == $base
+click_part Box 0.5 0.5 2
+remember poly_selected del
+click "Polygon/Delete"
+expect_status "Deleted"
+expect_value triangles < $tris
+expect_value undo_steps == $base+1
+expect_value poly_selected == 0
+expect_value open_edges > 0
+shot polygon-delete
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-delete-200
+ui_scale 100
+key f
+zoom 0.7
+key ctrl+z
+expect_value triangles == $tris
+expect_value open_edges == 0
+expect_value undo_steps == $base
+
+# Esc leaves the mode and puts the wireframe back; a brush leaves it too.
+key escape
+expect_value poly_mode == 0
+expect_value wireframe == 0
+expect_status "Polygon mode off"
+click "Polygon/Polygon mode"
+expect_value poly_mode == 1
+action brush.clay
+expect_value poly_mode == 0
+expect_value brush_type != 0
+
+# A Part with subdivision levels is refused with a clear status line.
+run subdiv_divide
+expect_value subdiv_level == 2
+click "Polygon/Polygon mode"
+expect_value poly_mode == 0
+expect_status "without subdivision levels"
+expect_text "Remove Above first"
+shot polygon-refused

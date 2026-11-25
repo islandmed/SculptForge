@@ -659,7 +659,7 @@ void App::drawGarments() {
             runCommand("garment_export", a);
         }
     }
-    const CanvasRect cr = canvasRect();
+    const CanvasRect cr = wholeCanvasRect();
     ImGui::SetNextWindowPos(ImVec2(cr.x + cr.w * 0.34f, cr.y + 6 * scale), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(cr.w * 0.66f - 6 * scale, cr.h - 12 * scale), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSizeConstraints(ImVec2(std::min(520 * scale, cr.w), std::min(360 * scale, cr.h)), ImVec2(FLT_MAX, FLT_MAX));

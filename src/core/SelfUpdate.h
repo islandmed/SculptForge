@@ -11,8 +11,10 @@
 // file next to what it replaces (same folder, so the final rename is one atomic step); the old version is kept as
 // "<name>.old" until the new one has started once, and put back when it doesn't start.
 // Package-managed installs (Flatpak, pacman/AUR, .deb/.rpm, Homebrew) are never replaced: the banner names the
-// command instead. Linux AppImage and Windows (installer and portable zip) update themselves; macOS opens the
-// download page (see docs/design/one-click-update.md).
+// command instead. Linux AppImage, Windows (installer and portable zip) and the macOS app bundle update themselves
+// (see docs/design/one-click-update.md). macOS adds a fourth step before the swap: the bundle copied out of the
+// verified disk image must pass codesign --verify --deep --strict, and its team identifier must be the running app's
+// own (read at run time, never stored).
 #pragma once
 
 #include <atomic>
@@ -20,6 +22,7 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace sf::update {
 
@@ -50,7 +53,7 @@ std::string releaseFileUrl(const std::string& version, const std::string& file);
 // --- What a release must prove ---
 
 // The release file that is downloaded for `asset` (a version-less name such as SculptForge-linux-x86_64.AppImage):
-// its versioned twin, SculptForge-0.12.0-x86_64.AppImage. Its line in the signed SHA256SUMS.txt ties the package to
+// its versioned twin, SculptForge-0.12.0-x86_64.AppImage (macOS: SculptForge-0.12.0-darwin-universal.dmg). Its line in the signed SHA256SUMS.txt ties the package to
 // that version, so an older release's signed files can't be passed off as a newer one's. "" for unknown assets.
 std::string versionedAsset(const std::string& asset, const std::string& version);
 
@@ -67,7 +70,7 @@ enum class InstallKind {
     AppImage,         // target: the .AppImage file
     WindowsInstaller, // target: the install folder (bin\sculptforge.exe, Uninstall.exe)
     WindowsPortable,  // target: the unzipped folder (bin\sculptforge.exe, no uninstaller)
-    MacApp,           // target: the .app bundle (not self-updated yet)
+    MacApp,           // target: the .app bundle (the versioned universal .dmg; staged in ~/Library/Caches/SculptForge/updates)
     PackageManager,   // Flatpak, pacman/AUR, .deb/.rpm, Homebrew: `command` says what to run
 };
 
@@ -88,13 +91,23 @@ struct InstallProbe {
     std::string appImage;  // $APPIMAGE (set by the AppImage runtime)
     std::string flatpakId; // $FLATPAK_ID
     std::string localAppData; // %LOCALAPPDATA% (Windows)
+    std::string home;         // $HOME (macOS: the download's cache folder)
     std::function<bool(const std::string&)> exists;
 };
 InstallProbe currentInstallProbe(); // this process
 Install detectInstall(const InstallProbe& probe);
-inline bool selfUpdates(InstallKind k) {
-    return k == InstallKind::AppImage || k == InstallKind::WindowsInstaller || k == InstallKind::WindowsPortable;
+// The macOS leg can be built out (CMake SCULPTFORGE_MAC_SELF_UPDATE=OFF, SF_MAC_SELF_UPDATE=0): a Mac then gets the
+// banner's Download link as before, and downloadUpdate refuses a MacApp install. Everything else is unchanged.
+#if !defined(SF_MAC_SELF_UPDATE)
+#define SF_MAC_SELF_UPDATE 1
+#endif
+inline constexpr bool kMacSelfUpdate = SF_MAC_SELF_UPDATE != 0;
+inline bool selfUpdates(InstallKind k, bool macSelfUpdate = kMacSelfUpdate) {
+    return k == InstallKind::AppImage || k == InstallKind::WindowsInstaller || k == InstallKind::WindowsPortable ||
+           (k == InstallKind::MacApp && macSelfUpdate);
 }
+// What to start for an install's target: the AppImage file itself, a bundle's Contents/MacOS/sculptforge.
+std::string appExecutable(const std::string& target);
 
 // --- The download (a worker thread) ---
 
@@ -158,6 +171,55 @@ StartCheck checkPendingAtStart(const std::string& notePath, const std::string& r
                                std::string& error);
 // The new version is up: the backup and the note go.
 void confirmStarted(const std::string& notePath);
+
+// --- macOS ---
+//
+// The bundle out of the verified .dmg replaces the running one (installMacApp). The system tools run by absolute path
+// (/usr/bin/hdiutil, ditto, codesign) through `run`, so tests can stand in for them; the signature check and the
+// team identifiers come from the Security framework (macBundleSignature, runningTeamIdentifier).
+struct MacTools {
+    // Runs a tool (argv[0] its absolute path); its exit code, -1 when it couldn't start.
+    std::function<int(const std::vector<std::string>& argv)> run;
+    // The bundle's code signature is valid (as codesign --verify --deep --strict: strict, nested code, every
+    // architecture); `identifier` is its signing identifier (the bundle identifier) and `teamId` its team identifier
+    // ("" when it has none: ad-hoc signed). False with `error` otherwise.
+    std::function<bool(const std::string& bundle, std::string& identifier, std::string& teamId, std::string& error)> signature;
+    std::string runningIdentifier; // this app's signing identifier, read at run time
+    std::string runningTeamId;     // this app's team identifier, read at run time ("" when ad-hoc signed)
+};
+// The policy: a running app with a team identifier accepts only a download with the very same one; an ad-hoc signed
+// app (no team identifier) has nothing to compare and relies on the signed checksum list and the signature's
+// validity. Neither identifier is ever written anywhere (`why` names no identifier).
+bool teamIdsAcceptable(const std::string& running, const std::string& downloaded, std::string& why);
+// Both: the signing identifier must be the running app's own (when it has one), then teamIdsAcceptable.
+bool signerAcceptable(const MacTools& tools, const std::string& identifier, const std::string& teamId, std::string& why);
+// The one <name> bundle at the root of a mounted image: "<mountDir>/<name>" when it is the only .app there, else "".
+std::string bundleInMount(const std::string& mountDir, const std::string& name);
+// Puts `fresh` in the target's place and the target at `backup`, in one atomic swap where the file system can
+// (macOS renamex_np RENAME_SWAP), else two renames (the second undone when it fails). `backup` is removed first.
+// False: nothing changed and `fresh` is still the new bundle, except when `targetIsNew` is set true: the swap held
+// but could not be undone after the backup step failed, so the target IS the new bundle and `fresh` holds the old
+// one (the caller must keep both).
+bool swapDirectories(const std::string& fresh, const std::string& target, const std::string& backup, std::string& error,
+                     bool* targetIsNew = nullptr);
+// The folder the image is mounted at, beside the download: "<staging folder>/mount-<version>".
+std::string mountPath(const Install& install, const std::string& version);
+// Checks the staged .dmg's hash again, mounts it read-only (hdiutil attach -nobrowse -readonly -noautoopen -noverify: the
+// hash is the check), copies its one SculptForge.app to "<target>.new" (ditto), detaches, runs codesign --verify --deep
+// --strict on the copy, reads its identifiers and compares them with the running app's (signerAcceptable), writes the note and swaps the bundles
+// (swapDirectories; the old one becomes "<target>.old"). On any doubt the copy and the download are deleted and nothing
+// in place changes. `dryRun`: everything up to and including the checks, then the copy and the download are removed
+// and nothing is swapped (true, `error` empty). No elevated privileges: a folder this user can't write to is an error.
+bool installMacApp(const Install& install, const Download& d, const std::string& version, const std::string& fromVersion,
+                   const std::string& notePath, const MacTools& tools, bool dryRun, std::string& error);
+#if defined(__APPLE__)
+// The Security framework's view of a bundle: SecStaticCodeCheckValidity with kSecCSStrictValidate | kSecCSCheckNestedCode |
+// kSecCSCheckAllArchitectures, then the identifiers out of its signing information. (MacTools::signature.)
+bool macBundleSignature(const std::string& bundle, std::string& identifier, std::string& teamId, std::string& error);
+// This process's own identifiers (SecCodeCopySelf + SecCodeCopyStaticCode); the team "" when ad-hoc signed. False
+// when they can't be read at all: the caller then refuses to update (nothing to compare against is not "anything goes").
+bool runningCodeIdentity(std::string& identifier, std::string& teamId);
+#endif
 
 // Linux AppImage: the process at procDir (/proc/<pid>) is an earlier SculptForge run from the same AppImage file:
 // ours (same user), its program is named sculptforge, and its APPIMAGE is appImage. Anything else (the file manager,
