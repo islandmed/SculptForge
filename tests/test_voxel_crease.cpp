@@ -79,9 +79,9 @@ const crease::Fixture& fixture() {
 TEST(voxel_crease_invariant_fine_creases_stay_clean) {
     const Run off = remesh(fixture(), 200, false), on = remesh(fixture(), 200, true);
     CHECK(on.mesh.triangleCount() == off.mesh.triangleCount()); // (the same voxel topology)
-    CHECK(on.m.depthCv <= 0.65 * off.m.depthCv); // (0.6 before the sealed-crease sign fix, gh#240: it changed both runs a little)
+    CHECK(on.m.depthCv <= 0.62 * off.m.depthCv); // (0.6 at 0.597; the sealed-crease sign fix, gh#240, lowers the unsnapped depth cv 0.442 -> 0.439, the snapped 0.264 stays: ratio 0.601)
     CHECK(on.m.normalErrDeg <= 0.6 * off.m.normalErrDeg);
-    CHECK(on.m.profileErr <= 0.65 * off.m.profileErr);
+    CHECK(on.m.profileErr <= 0.6 * off.m.profileErr);
     CHECK(on.m.wiggleVox < off.m.wiggleVox);
     CHECK(on.m.mean < off.m.mean);
     CHECK(on.m.hausdorff <= off.m.hausdorff);

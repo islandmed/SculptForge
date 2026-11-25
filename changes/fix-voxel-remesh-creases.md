@@ -6,9 +6,9 @@ fixed: **Voxel Remesh filled narrow creases and left speckled bits along them** 
   one-voxel bits along it, at any Resolution. The remesh now follows the crease on down to where it is under a voxel wide.
   On a test slab with V-shaped creases 24 voxels deep it now reaches the tip at Resolution 200 (it stopped 4 to 24 voxels
   short before) and makes one clean surface (it left up to 85 loose pieces), and a smooth or bumpy surface comes out
-  as before. Together with the crease cleaning in the same release, the test sphere with creases 1.6 voxels wide at the
-  default Resolution (200) now measures: depth variation along the crease 40% lower than without the cleaning, its sides tilted
-  44 to 24 degrees off, its cross-section 41% closer to the original (the cleaning alone gave 43%). Reported by @nino3thd.
+  as before. With the crease cleaning of the same release, the test sphere with creases 1.6 voxels wide at the default
+  Resolution (200) measures: depth variation along the crease 40% lower than without the cleaning, its sides tilted 44 to
+  24 degrees off, its cross-section 41% closer to the original. Reported by @nino3thd.
 testers:
   - Any OS: take a dense head with deep wrinkles (carve lines with Detail Crease, or import one), Decimate it, then Tool >
     Remesh > Voxel Remesh at the default Resolution and at a higher one. Close up on the eye bags and the folds beside the nose:
