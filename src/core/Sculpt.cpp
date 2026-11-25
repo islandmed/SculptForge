@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Sculpt.h"
+#include "core/QuickRemesh.h"
 #include "core/SculptKernel.h"
 
 #include "core/AtomicRef.h"
@@ -14,6 +15,7 @@
 #include <cstdlib>
 #include <iterator>
 #include <limits>
+#include <mutex>
 #include <queue>
 #include <unordered_map>
 
@@ -145,7 +147,7 @@ bool lineRayClosest(const glm::vec3& point, const glm::vec3& dir, const glm::vec
 }
 
 void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& sc,
-                   std::vector<float>* surface) {
+                   std::vector<float>* surface, const glm::vec3* facingHint) {
     if (surface) surface->clear();
     if (verts.empty()) return;
     const size_t n = mesh.vertexCount();
@@ -156,14 +158,17 @@ void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t
         sc.epoch = 0;
     }
     const uint32_t inside = ++sc.epoch, reached = ++sc.epoch;
-    uint32_t start = verts[0];
-    float best = std::numeric_limits<float>::max();
+    uint32_t start = verts[0], startFacing = verts[0];
+    float best = std::numeric_limits<float>::max(), bestFacing = best;
+    const bool hinted = facingHint && mesh.normals.size() == n;
     for (uint32_t v : verts) {
         sc.stamp[v] = inside;
         const glm::vec3 d = mesh.positions[v] - seed;
         const float d2 = glm::dot(d, d);
         if (d2 < best) best = d2, start = v;
+        if (hinted && d2 < bestFacing && glm::dot(mesh.normals[v], *facingHint) > 0.5f) bestFacing = d2, startFacing = v;
     }
+    if (hinted && bestFacing < std::numeric_limits<float>::max()) start = startFacing, best = bestFacing;
     // Breadth first through the edges between vertices in the region.
     std::vector<uint32_t>& q = sc.queue;
     q.clear();
@@ -597,12 +602,12 @@ void Sculptor::microBaseKernel(Mesh& mesh, BVH& bvh, BrushType type, const DabPa
             const DabParams mp = m.identity() ? p : transformed(p, m);
             const glm::vec3 contact = contactNormal(mesh, baseVerts_, c, r, contactHint(mp));
             facingVerts_ = baseVerts_;
-            keepConnected(mesh, c, facingVerts_, connected_, &surface_);
+            keepConnected(mesh, c, facingVerts_, connected_, &surface_, &contact);
             PieceStamps st{connected_.epoch, 0};
             if (facingVerts_.size() != baseVerts_.size()) { // (a fold within the brush: how far round, keepFacing's)
                 bvh.queryVertices(mesh, c, r * kDetourFlood + float(mm.rangeMax) * mm.step, wideVerts_);
                 facingVerts_ = wideVerts_;
-                keepConnected(mesh, c, facingVerts_, connected_, &surface_);
+                keepConnected(mesh, c, facingVerts_, connected_, &surface_, &contact);
                 st = markClosedPieces(mesh, wideVerts_, connected_);
             }
             poolFor(nv, [&](size_t b, size_t e) {
@@ -760,6 +765,36 @@ void Sculptor::remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym,
     lastMirrors_ = ms;
     followRemesh(mesh);
     timings.remeshMs += lapMs(clock);
+}
+
+bool Sculptor::refreshTopologyDab(Mesh& mesh, BVH& bvh, const glm::vec3& center, float radius, float edgeLength, Symmetry sym) {
+    if (!active_ || !(edgeLength > 0.0f) || !(radius > 0.0f) || !dyntopoBlocker(mesh).empty()) return false;
+    auto clock = std::chrono::steady_clock::now();
+    const std::vector<SymCopy> ms = copies(sym);
+    struct RefineOnly { // (set for this dab only, whatever happens inside)
+        DynamicTopology& d;
+        explicit RefineOnly(DynamicTopology& t) : d(t) { d.refineOnly = true; }
+        ~RefineOnly() { d.refineOnly = false; }
+    } refine(dynTopo_);
+    const bool changed = dynTopo_.remesh(mesh, bvh, center, radius, edgeLength, ms);
+    lastRemesh_ = true;
+    lastCenter_ = center;
+    lastRadius_ = radius;
+    lastEdge_ = edgeLength;
+    lastMirrors_ = ms;
+    followRemesh(mesh);
+    timings.remeshMs += lapMs(clock);
+    return changed;
+}
+
+float Sculptor::refreshEdgeLength(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius) const {
+    if (dyntopo.enabled) return dyntopoEdgeLength(dyntopo, radius, glm::length(mesh.bounds().extent()));
+    // The smaller of the detail around the brush and the Part's: around a long tendril everything near is stretched (the
+    // Part's detail is what it should come back to); a dense face on a coarse body refreshes to the face's.
+    std::vector<uint32_t> around;
+    bvh.queryTriangles(mesh, center, 3.0f * radius, around);
+    const float local = typicalEdgeLength(mesh, around), whole = typicalEdgeLength(mesh);
+    return local > 0.0f && whole > 0.0f ? std::min(local, whole) : std::max(local, whole);
 }
 
 // After the brush: when it squashed a triangle flat (pinching or flattening a fold), the dab is remeshed
@@ -1172,6 +1207,7 @@ UndoRecord Sculptor::endStroke() {
     // A pinching recipe's per-stroke state (24 bytes a vertex: 120 MB on a 5M mesh) goes with the stroke, not with the mesh.
     std::vector<uint32_t>().swap(pinchStamp_), std::vector<glm::vec3>().swap(pinchStart_);
     std::vector<uint32_t>().swap(pinchDabStamp_), std::vector<float>().swap(pinchTaper_);
+    clayStart_ = StartStore();
     clearRecorded();
     active_ = false;
     grabVerts_.clear();
@@ -1268,6 +1304,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         const bool useAlpha = p.alpha && !p.alpha->empty(); // (the reach dabSingle gives the brush)
         const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock ? 1.3f : 1.0f;
         const float scale = type == BrushType::Smooth ? dyntopoSmoothScale(dyntopo) : 1.0f;
+        dynTopo_.dissolveNeedles = type == BrushType::Smooth;
         if (scale > 0.0f) remeshDab(mesh, bvh, p, sym, scale, reach);
         else lastRemesh_ = false; // (Smooth only: no repair pass either)
     }
@@ -1326,6 +1363,95 @@ static float unpackedShare(const Mesh& mesh, uint32_t v, float typical) {
     return std::clamp((shortest / typical - 0.65f) / 0.25f, 0.0f, 1.0f);
 }
 
+// Trim on a thin wall (members session 2026-11, phoenix: "Trim tears holes in thin walls"). A Trim dab cuts the skin the
+// viewer sees down to its plane; it never reaches the wall behind it. Two things went wrong on a shell or a thin wing:
+// the far wall, inside the brush's ball, fed the plane (the area normal and centre averaged both walls, so the plane
+// ran through the middle of the wall or faced backwards) and took the cut itself, and dab after dab the skin sank past
+// the far wall (no hole is left to see until it has crossed). Now only what faces the cut (the skin; the far wall and
+// an underside face away and keep still, over a short ramp so no edge forms where the facing turns) is trimmed, and
+// each vertex stops `kTrimKeep` of the brush radius short of the first surface below it along the cut: a wall thinner
+// than that is left as it is. Only on a thin Part (partThinness): a solid form, a head with its nostrils and lips, is
+// trimmed flat as ever. The BVH is the one the previous dab refit, so the walls are where they were.
+static constexpr float kTrimKeep = 0.02f; // of the brush radius (Trim's own plane stands this far below the surface at full strength)
+static constexpr float kTrimPathShort = 0.9f; // the wall on the vertex's path counts when it leaves less than this share of the other estimate
+// `normals[i]`: verts[i]'s normal, read before the dab (the adaptive path rewrites the normals as it goes).
+// The wall below a vertex is found along its own normal (a sheet's rim, whose edge runs along the wall, still finds the
+// underside), and the room is the distance to that wall's plane along the cut.
+static void keepTrimWalls(const Mesh& mesh, const BVH& bvh, const glm::vec3& areaNormal, float r, std::span<const uint32_t> verts,
+                          std::span<const glm::vec3> normals, std::vector<glm::vec3>& d) {
+    const float keep = kTrimKeep * r, eps = 1e-3f * r, shift = 2e-3f * r;
+    poolFor(verts.size(), [&](size_t b, size_t e) {
+        RayHit hit;
+        for (size_t i = b; i < e; ++i) {
+            const float len = glm::length(d[i]);
+            if (len <= 0.0f) continue;
+            const uint32_t v = verts[i];
+            const glm::vec3 n = normals[i];
+            const float w = std::clamp((glm::dot(n, areaNormal) + 0.1f) / 0.15f, 0.0f, 1.0f);
+            if (w <= 0.0f) {
+                d[i] = glm::vec3(0.0f);
+                continue;
+            }
+            float allowed = len * w;
+            // (a shell made by offsetting a surface has its vertices straight below its skin's: the ray starts a hair to either side,
+            // so it lands inside a triangle, not on the shared vertex where a miss is possible; a sheet's rim, which a ray
+            // to one side misses, is found from the other)
+            glm::vec3 side = glm::cross(n, glm::vec3(0.267f, 0.534f, 0.802f));
+            const float sideLen = glm::length(side);
+            side = sideLen > 1e-6f ? side * (shift / sideLen) : glm::vec3(0.0f);
+            for (const float sgn : {1.0f, -1.0f}) {
+                if (!bvh.raycast(mesh, mesh.positions[v] - n * eps + side * sgn, -n, hit)) continue;
+                // (only a wall the cut runs into, facing away down the cut: not a ridge's side, nor another surface's top)
+                const float across = glm::dot(-areaNormal, hit.normal);
+                if (across <= 0.3f) continue;
+                const float room = glm::dot(hit.position - mesh.positions[v], hit.normal) / across;
+                allowed = std::min(allowed, std::max(0.0f, room - keep));
+            }
+            // The wall straight down the vertex's own path, where that is well short of what the wall along the normal allowed (where a sheet
+            // tapers to its rim the normal runs on a slant, and the plane of the wall it finds is not the one under the vertex: the skin
+            // sank through the underside there).
+            {
+                const glm::vec3 dir = d[i] / len;
+                if (bvh.raycast(mesh, mesh.positions[v] + dir * eps, dir, hit) && glm::dot(dir, hit.normal) > 0.0f) {
+                    const float onPath = std::max(0.0f, hit.t + eps - keep);
+                    if (onPath < kTrimPathShort * allowed) allowed = onPath;
+                }
+            }
+            d[i] *= allowed / len;
+        }
+    }, 256);
+}
+
+// Is this Part a thin sheet (a shell, a wing, an Extract, a cloth-thin Part)? Its mean wall thickness, 2 x volume / area, is a
+// few percent of its size or less; a head's is a third of it. A Part-wide fact, decided once per Part (its mesh and triangle count), so neither the dabs of a
+// stroke nor rough strokes that fold a solid form change the answer: what a local test (a wall behind the skin, air behind the wall) could not give, as the lids
+// and lips of a head are thin walls too, and a closed shell has surface behind its far wall.
+float partThinness(const Mesh& mesh) {
+    const size_t tris = mesh.triangles.size();
+    const float none = std::numeric_limits<float>::infinity();
+    if (tris < 8 || mesh.positions.empty()) return none;
+    const AABB box = mesh.bounds();
+    const glm::vec3 o = 0.5f * (box.min + box.max), ext = box.max - box.min;
+    const double diag = double(glm::length(ext));
+    if (diag <= 0.0) return none;
+    constexpr size_t kBlock = 8192;
+    std::vector<std::pair<double, double>> parts((tris + kBlock - 1) / kBlock, {0.0, 0.0}); // (6 x volume, 2 x area)
+    poolFor(tris, [&](size_t b, size_t e) {
+        auto& acc = parts[b / kBlock];
+        for (size_t t = b; t < e; ++t) {
+            const glm::uvec3 f = mesh.triangles[t];
+            const glm::dvec3 a = glm::dvec3(mesh.positions[f.x] - o), c = glm::dvec3(mesh.positions[f.y] - o),
+                             d = glm::dvec3(mesh.positions[f.z] - o);
+            acc.first += glm::dot(a, glm::cross(c, d));
+            acc.second += glm::length(glm::cross(c - a, d - a));
+        }
+    }, kBlock);
+    double v6 = 0.0, a2 = 0.0;
+    for (const auto& p : parts) v6 += p.first, a2 += p.second;
+    if (a2 <= 0.0) return none;
+    return float(std::abs(v6 / 6.0) * 4.0 / a2 / diag); // 2 V / A, A = a2 / 2
+}
+
 void Sculptor::microFacing(const DabParams& p, const SymCopy& m, MicroDab& d) {
     d.facingNormal = glm::vec3(0.0f);
     if (p.contactFacing) { // (the grid finds the contact normal on its own surface from this hint, MicroStroke::facingNormal)
@@ -1349,13 +1475,13 @@ bool Sculptor::keepFacing(const Mesh& mesh, const BVH& bvh, const DabParams& p, 
     surface_.clear();
     if (surface) {
         facingVerts_ = verts_;
-        keepConnected(mesh, p.center, facingVerts_, connected_, &surface_); // (fills connected_.dist)
+        keepConnected(mesh, p.center, facingVerts_, connected_, &surface_, &contact); // (fills connected_.dist)
         PieceStamps st{connected_.epoch, 0};
         if (facingVerts_.size() != verts_.size()) {
             brushVertices(mesh, bvh, p.center, R * kDetourFlood, wideVerts_);
             if (mesh.hasHidden()) std::erase_if(wideVerts_, [&](uint32_t v) { return mesh.vertexHidden(v); });
             facingVerts_ = wideVerts_;
-            keepConnected(mesh, p.center, facingVerts_, connected_, &surface_);
+            keepConnected(mesh, p.center, facingVerts_, connected_, &surface_, &contact);
             st = markClosedPieces(mesh, wideVerts_, connected_);
         }
         surface_.resize(verts_.size());
@@ -1411,12 +1537,22 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const bool facing = p.contactFacing && keepFacing(mesh, bvh, p, reach);
     if (p.contactFacing && verts_.empty()) return;
 
+    // Trim on a thin Part: the wall behind the skin is protected (keepTrimWalls); on anything else it is the plane it always was.
+    bool trimSheet = false;
+    if (type == BrushType::Trim && !p.invert) {
+        if (thinMesh_ != &mesh || thinTris_ != mesh.triangles.size()) {
+            thinPart_ = partThinness(mesh) < kTrimThinPart;
+            thinMesh_ = &mesh, thinTris_ = mesh.triangles.size();
+        }
+        trimSheet = thinPart_;
+    }
     // Scale-adaptive dabs (Sculpt.h, adaptiveDabs): a big region's plane from an even sample of its vertices.
     adaptiveDab_ = (adaptiveDabs || analyticNormals) && !dynTopo_.active() && !draft_ && verts_.size() >= kAdaptiveMinVertices &&
                    type != BrushType::Smooth && type != BrushType::SmoothPeaks && type != BrushType::Layer && type != BrushType::Morph &&
                    // (an alpha's fine pattern or Clay Block's square tip, which turn with the area normal, and the brushes that move along each vertex's own normal amplify a
                    // hair's difference in the normals the next dabs read)
                    type != BrushType::Nudge && type != BrushType::Inflate && type != BrushType::ClayBlock && !useAlpha &&
+                   !trimSheet && // (its wall clamp, keepTrimWalls, is a ray per vertex: the carried normals can't follow it)
                    !p.stencil.active() && // (the stencil's detail, as an alpha's)
                    !facing && // (its fade is a step the adaptive normals don't see, as a mask's)
                    mesh.normals.size() == mesh.vertexCount();
@@ -1432,19 +1568,29 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     }
     // The normals a later mirror copy of this dab reads, carried now (earlyNormals_); not where the exact path's rings
     // matter (masks, an alpha, dynamic topology, the draft) or the brush isn't a plane brush.
-    const bool analyticEarly = earlyNormals_ && !adaptiveDab_ && isPlaneKernelBrush(type) && !p.viewFalloff && !useAlpha && !useStencil && !facing &&
+    const bool analyticEarly = earlyNormals_ && !adaptiveDab_ && isPlaneKernelBrush(type) && !trimSheet && !p.viewFalloff && !useAlpha && !useStencil && !facing &&
                                !dynTopo_.active() && !draft_ && mesh.normals.size() == mesh.vertexCount() &&
                                mesh.mask.size() != mesh.vertexCount() && !mesh.hasHidden();
+    // Clay weighs a vertex that lies far below its plane (more than 0.6 of the radius: the foot of a wall, at the edge of the reach) by
+    // where it stood when the stroke first reached it (pinchStart_): each dab pulls a vertex along the area normal to the plane, and
+    // where a wall leans away from that normal (the lip of a squeezed band) the pull moved it toward the dab, its falloff rose, and
+    // the next dab pulled it further, a runaway x1.5 a dab at the edge of the reach that left ribs along it. On a surface that bends
+    // away gently (a head under a big brush: up to half the radius at the edge) the weights are what they were. (The exact path
+    // only: the adaptive and the early-normals paths weigh by where a vertex is.)
+    const bool startWanted = !analyticEarly && clayStartWeights && type == BrushType::Clay && !adaptiveDab_ &&
+                             !useAlpha && !useStencil && !p.viewFalloff && !dynTopo_.active() && !draft_;
     earlyNormals_ = false;
     const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
 
     // Weighted area normal and centre of the brush region. View falloff reaches through the model as a cylinder, but the
     // plane is the surface's under the cursor (the ball around it): across the cylinder it was the mean of the front
     // and the back, inside the model, and Clay / Clay Block pulled the far side through to it in shards (gh#229).
+    bool skinOnly = trimSheet; // (Trim on a thin sheet: the plane is the skin's, not the mean of its two walls)
     const auto sumsWithin = [&](bool ball) {
         return areaSums((verts_.size() + stride - 1) / stride, [&](size_t i, AreaSums& acc) {
             const uint32_t v = verts_[i * stride];
             float w = brushFalloff(ball ? glm::distance(pos[v], p.center) : brushDistance(p, pos[v]), p.radius, p.focal);
+            if (skinOnly && glm::dot(nrm[v], p.viewDir) > 0.0f) w = 0.0f; // (the far wall of a thin Part, inside the ball)
             if (facing) w *= facing_[i * stride]; // (the plane is the contact side's: the far wall doesn't tilt it)
             acc.normal += glm::dvec3(nrm[v]) * double(w);
             acc.center += glm::dvec3(pos[v]) * double(w);
@@ -1453,6 +1599,11 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     };
     AreaSums sums = sumsWithin(p.viewFalloff);
     if (p.viewFalloff && sums.weight <= 0.0) sums = sumsWithin(false); // (no vertex near the cursor: big faces)
+    if (skinOnly && sums.weight <= 0.0) { // (nothing faces the viewer here: the whole region, as before)
+        skinOnly = false;
+        sums = sumsWithin(p.viewFalloff);
+        if (p.viewFalloff && sums.weight <= 0.0) sums = sumsWithin(false);
+    }
     glm::vec3 areaNormal = glm::vec3(sums.normal), areaCenter = glm::vec3(sums.center);
     const float wsum = float(sums.weight);
     if (wsum <= 0.0f) return;
@@ -1502,6 +1653,44 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     plane.invert = p.invert;
     plane.viewFalloff = p.viewFalloff;
 
+    // The stroke's start positions (16 bytes a vertex) are kept from the first dab that reaches a vertex far below its plane: an
+    // ordinary stroke never allocates them.
+    bool startWeights = startWanted;
+    if (startWeights) {
+        float kk;
+        const glm::vec3 planeAt = plane.clayPlane(kk);
+        const float deepAt = kStartDeep * p.radius;
+        // The deep vertices of the dab (those the stroke has kept not counted when `all` is off), gathered in parallel.
+        const auto gather = [&](bool all) {
+            std::vector<uint32_t> found;
+            std::mutex foundLock;
+            poolFor(verts_.size(), [&](size_t b, size_t e) {
+                std::vector<uint32_t> mine;
+                for (size_t i = b; i < e; ++i) {
+                    const uint32_t v = verts_[i];
+                    if (std::abs(glm::dot(pos[v] - planeAt, areaNormal)) > deepAt && (all || !(clayStart_.bits[v >> 6] >> (v & 63) & 1u))) mine.push_back(v);
+                }
+                if (!mine.empty()) {
+                    std::lock_guard<std::mutex> lk(foundLock);
+                    found.insert(found.end(), mine.begin(), mine.end());
+                }
+            }, 65536);
+            return found;
+        };
+        const size_t kBudget = clayStartBudget;
+        std::vector<uint32_t> found = gather(clayStart_.bits.empty());
+        if (clayStart_.count + found.size() > kBudget) { // (the budget is spent: start afresh with this dab's own, or none if they alone are over it, so
+            clayStart_ = StartStore();                   // that every deep vertex of a dab is weighed alike, never a mix of kept and not)
+            found = gather(true);
+            if (found.size() > kBudget) found.clear();
+        }
+        if (!found.empty()) {
+            if (clayStart_.bits.empty()) clayStart_.bits.assign((mesh.vertexCount() + 63) / 64, 0);
+            for (const uint32_t v : found) clayStart_.insert(v, pos[v]);
+        }
+        startWeights = clayStart_.count > 0;
+    }
+
     // Inflate swells along each vertex's own normal, unless the dab reaches a groove or a packed grid (see inflateAlongNormals).
     bool inflateAlongNormals = true;
     if (type == BrushType::Inflate) {
@@ -1516,6 +1705,11 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
             bad.fetch_add(n, std::memory_order_relaxed);
         }, 512);
         inflateAlongNormals = bad.load() * stride < std::max<size_t>(32, verts_.size() / 500);
+    }
+    std::vector<glm::vec3> trimNormals;
+    if (trimSheet) {
+        trimNormals.resize(verts_.size());
+        for (size_t i = 0; i < verts_.size(); ++i) trimNormals[i] = nrm[verts_[i]];
     }
     scratch_.resize(verts_.size());
     // Each vertex's offset depends only on the positions before the dab (and, for Layer, on its own state). The
@@ -1548,9 +1742,17 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                         viewDepthFade(x, p.center, p.viewDir, r);
             if (reachFade <= 0.0f) return glm::vec3(0.0f);
         }
-        const glm::vec3 o = x - p.center;
+        glm::vec3 xw = x; // (where the falloff weighs it)
+        glm::vec3 st;
+        if (startWeights && clayStart_.find(v, st)) {
+            float kk;
+            const float deep = std::abs(glm::dot(st - plane.clayPlane(kk), areaNormal)) / r;
+            const float t = std::clamp((deep - kStartDeep) * 4.0f, 0.0f, 1.0f);
+            if (t > 0.0f) xw = x + (st - x) * (t * t * (3.0f - 2.0f * t));
+        }
+        const glm::vec3 o = xw - p.center;
         float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
-                           : brushFalloff(brushDistance(p, x), r, p.focal);
+                           : brushFalloff(brushDistance(p, xw), r, p.focal);
         if (useStencil && f > 0.0f) f *= stencil.weight(x);
         glm::vec3 d(0.0f);
 
@@ -1709,6 +1911,7 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
         });
     }
 
+    if (trimSheet) keepTrimWalls(mesh, bvh, areaNormal, r, verts_, trimNormals, scratch_);
     // (Tendril is left as it was: the app pulls its tip under the cursor in many tiny steps, and a pulled horn folds into its own
     // pinch, smooth to the eye; relaxing it there made a crossing fold where it did not.)
     if (type == BrushType::Nudge && verts_.size() <= kLimitVerts) limitFolds(mesh, scratch_);

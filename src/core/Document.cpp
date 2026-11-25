@@ -85,6 +85,7 @@ void Document::selectPart(int i) {
     }
     uvSelection.clear();
     edgeSelection.clear();
+    polySelection.clear();
     // Check the active Part back in, then check `i` out. Swapping keeps each
     // mesh's GPU dirty state, so the renderer doesn't re-upload anything.
     auto swapIn = [this](PartData& s) {
@@ -225,6 +226,25 @@ std::string Document::uniquePartName(const std::string& wanted) const {
     }
 }
 
+std::string Document::duplicatePartName(const std::string& source) const {
+    // The base: the source without a ".NN" number of its own (two or more digits after a dot, as the copies get).
+    std::string base = source;
+    size_t digits = 2; // the copies' width: two, or the source's own when it has more ("Cube.001" -> "Cube.002")
+    const size_t dot = base.rfind('.');
+    if (dot != std::string::npos && dot + 3 <= base.size() &&
+        std::all_of(base.begin() + long(dot) + 1, base.end(), [](unsigned char ch) { return std::isdigit(ch) != 0; })) {
+        digits = std::max(digits, base.size() - dot - 1);
+        base.erase(dot);
+    }
+    if (base.empty()) base = "Part";
+    for (int n = 1;; ++n) {
+        std::string number = std::to_string(n);
+        if (number.size() < digits) number.insert(0, digits - number.size(), '0');
+        const std::string candidate = base + "." + number;
+        if (findPart(candidate) < 0) return candidate;
+    }
+}
+
 uint32_t Document::addPartFolder(const std::string& name) {
     PartFolder f;
     f.id = nextFolderId_++;
@@ -329,6 +349,7 @@ int Document::linkedDuplicate(int i, const glm::vec3& offset) {
     parts[size_t(at)].visible = parts[size_t(at - 1)].visible;
     parts[size_t(at)].shading = parts[size_t(at - 1)].shading;
     parts[size_t(at)].boolean = parts[size_t(at - 1)].boolean;
+    parts[size_t(at)].ai = parts[size_t(at - 1)].ai;
     selectPart(at);
     // One step in the shared history: undo takes the copy away again (applyPartStep).
     UndoRecord r;

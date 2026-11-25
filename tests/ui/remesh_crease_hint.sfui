@@ -1,0 +1,33 @@
+# gh#240: Voxel Remesh's fine-crease hint. A starter head at the default Resolution has eyelid and lip creases finer than
+# two voxels: the first remesh's status line starts with the Resolution that keeps them. It says so once per Part and
+# Resolution a session (a repeat of the same remesh doesn't nag), and never once the Resolution is above the default.
+run new_starter_mesh name=human-head levels=3
+click "Remesh##tool.remesh"
+click "Voxel Remesh##geometry.remesh"
+click "Freeze Levels and Proceed"   # (the starter head has levels; Undo brings them back)
+wait_idle 240
+expect_status keeps fine creases
+expect_status Remeshed
+expect_mesh_valid
+
+# The same Part at the same Resolution again: no hint.
+key ctrl+z
+click "Voxel Remesh##geometry.remesh"
+click "Freeze Levels and Proceed"   # (the starter head has levels; Undo brings them back)
+wait_idle 240
+expect_status Remeshed
+expect_status_not keeps fine creases
+
+# Raised past the default: no hint either.
+key ctrl+z
+hold ctrl
+click "##voxres"
+hold none
+type "Resolution##voxrestype" 256
+key enter
+expect_value voxel_resolution == 256
+click "Voxel Remesh##geometry.remesh"
+click "Freeze Levels and Proceed"   # (the starter head has levels; Undo brings them back)
+wait_idle 240
+expect_status Remeshed
+expect_status_not keeps fine creases

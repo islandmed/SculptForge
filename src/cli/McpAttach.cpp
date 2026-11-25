@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "cli/McpAttach.h"
 
+#include "cli/McpBatch.h"
 #include "cli/McpServer.h"
 #include "cli/McpTools.h"
 #include "core/Commands.h"
@@ -51,9 +52,12 @@ Json tool(const std::string& name, const std::string& description, Json properti
 Json mcpAppToolList(const CommandRegistry& registry) {
     Json tools = Json::array();
     const Json commands = mcpToolList(registry), live = mcpLiveTools(); // (named: items() must not outlive its Json)
-    for (const Json& t : commands.items()) // (leaves out what a studio's policy doesn't allow; the window tools below
-                                           // replace its viewport_image and view_closeup)
-        if (!link::AiLinkPolicy::hidden(t["name"].asString()) && !mcpIsLiveTool(t["name"].asString())) tools.push(t);
+    for (const Json& t : commands.items()) { // (leaves out what a studio's policy doesn't allow; the window tools below
+                                             // replace its viewport_image and view_closeup; batch and checkpoint_* are
+                                             // headless-only: the window's dispatcher answers "Unknown tool" to them)
+        const std::string name = t["name"].asString();
+        if (!link::AiLinkPolicy::hidden(name) && !mcpIsLiveTool(name) && !isHistoryTool(name)) tools.push(t);
+    }
     for (const Json& t : live.items())
         if (policy::mcpToolAllowed(t["name"].asString(), {})) tools.push(t);
     return tools;

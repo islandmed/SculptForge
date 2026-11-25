@@ -111,6 +111,7 @@ struct TubeShape {
     int strands = 3;     // Rope/Braid: how many strands (1..8; a rope of one strand is a spring)
     float spread = 0.5f; // Rope/Braid: strand spacing (0.5: touching); Sleeve: wall thickness (half of it, as a fraction of the radius)
     bool curve = false;  // a Curve Part: only the guide line (a thin wire) is swept until Tube from curve clears this
+    bool straight = false; // a polyline: straight spans between the points, sharp corners (else a smooth curve through them)
     bool empty() const { return points.empty(); }
 };
 

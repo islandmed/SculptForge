@@ -10,6 +10,7 @@
 #include "core/ThreadPool.h"
 #include "core/TileImage.h"
 
+#include <algorithm>
 #include <deque>
 #include <map>
 #include <memory>
@@ -255,7 +256,8 @@ uint64_t undoClearEpoch();
 // applied step (0 = none), plus what the scene looked like then. No copies of the scene: going back is undo.
 struct HistoryMark {
     uint64_t epoch = 0; // undoClearEpoch() when made
-    uint64_t hash = 0;  // sceneHash() when made
+    uint64_t hash = 0;  // sceneHash() when made, of the scope below
+    bool everything = false; // HashScope::Everything (a checkpoint) rather than Mesh (a batch)
     std::map<uint32_t, uint64_t> tops;
 };
 
@@ -282,6 +284,24 @@ public:
     UndoRecord* lastRedo() { return redo_.empty() ? nullptr : &redo_.back(); }
     // The undo step BACK places below the top (0 = the next undo), or null.
     const UndoRecord* undoStep(size_t back) const { return back < undo_.size() ? &undo_[undo_.size() - 1 - back] : nullptr; }
+
+    // Every step, undo side then redo side (oldest first within each): a walk that stamps batch ids puts them back with it.
+    template <class F> void forEachStep(F&& f) {
+        for (UndoRecord& r : undo_) f(r);
+        for (UndoRecord& r : redo_) f(r);
+    }
+    bool hasStep(uint64_t seq) const {
+        const auto is = [&](const UndoRecord& r) { return r.seq == seq; };
+        return std::any_of(undo_.begin(), undo_.end(), is) || std::any_of(redo_.begin(), redo_.end(), is);
+    }
+    // The `seq` of the last step the byte budget dropped from the bottom (0 = none has been): with every undo step
+    // undone, the Part is exactly as that step left it. A history position is "after step N" (0 = the very start).
+    uint64_t retainedBase() const { return retainedBase_; }
+    // The position this history is at now: the top applied step, or the retained base when none is left.
+    uint64_t topSeq() const { return undo_.empty() ? retainedBase_ : undo_.back().seq; }
+    // Whether undoing / redoing can bring this history to "after step `seq`": it holds that step, or the steps below
+    // it were dropped (it IS the base). Position 0 is reachable only while nothing has been dropped.
+    bool reaches(uint64_t seq) const { return seq == retainedBase_ || hasStep(seq); }
 
     // Both rebuild/refit the BVH as needed.
     bool undo(Mesh& mesh, BVH& bvh);
@@ -316,7 +336,7 @@ private:
     void enforceBudget();
 
     std::deque<UndoRecord> undo_, redo_;
-    uint64_t revision_ = 0, microRevisions_ = 0;
+    uint64_t revision_ = 0, microRevisions_ = 0, retainedBase_ = 0;
     size_t droppedPending_ = 0, droppedTotal_ = 0;
     bool lastStepOver_ = false, overPending_ = false;
 };

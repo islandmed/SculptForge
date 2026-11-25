@@ -1,8 +1,8 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Dyntopo.h"
+#include "core/SurfaceQuery.h"
 
-#include "core/Texture.h"
 #include "core/ThreadPool.h"
 
 #include <algorithm>
@@ -82,23 +82,6 @@ void swapSlots(std::vector<T>& a, const std::vector<uint32_t>& slots, std::vecto
     stored.swap(current);
 }
 
-// The same for per-corner values (3 per slot).
-void swapSlots3(std::vector<glm::vec2>& a, const std::vector<uint32_t>& slots, std::vector<glm::vec2>& stored, size_t count) {
-    if (a.empty()) return;
-    std::vector<glm::vec2> current;
-    current.reserve(slots.size() * 3);
-    for (uint32_t s : slots)
-        if (size_t(s) * 3 + 2 < a.size()) current.insert(current.end(), a.begin() + std::ptrdiff_t(s) * 3, a.begin() + std::ptrdiff_t(s) * 3 + 3);
-    a.resize(count * 3);
-    size_t k = 0;
-    for (uint32_t s : slots)
-        if (s < count && k + 3 <= stored.size()) {
-            std::copy_n(stored.begin() + std::ptrdiff_t(k), 3, a.begin() + std::ptrdiff_t(s) * 3);
-            k += 3;
-        }
-    stored.swap(current);
-}
-
 template <class T>
 size_t bytesOf(const std::vector<T>& v) {
     return v.size() * sizeof(T);
@@ -144,11 +127,11 @@ size_t TopologyVertexValues::bytes() const {
 }
 
 size_t TopologyTriangleValues::bytes() const {
-    return bytesOf(triangles) + bytesOf(facegroups) + bytesOf(quadPartners) + bytesOf(hidden) + bytesOf(uvs);
+    return bytesOf(triangles) + bytesOf(facegroups) + bytesOf(quadPartners) + bytesOf(hidden);
 }
 
 size_t TopologyUndo::bytes() const {
-    return vertices.bytes() + triangles.bytes() + bytesOf(vertexSlots) + bytesOf(triangleSlots);
+    return vertices.bytes() + triangles.bytes() + bytesOf(vertexSlots) + bytesOf(triangleSlots) + bytesOf(uvs);
 }
 
 void TopologyUndo::swapWith(Mesh& mesh) {
@@ -156,7 +139,7 @@ void TopologyUndo::swapWith(Mesh& mesh) {
     zipVertexArrays(mesh, vertices, [&](auto& a, auto& stored) { swapSlots(a, vertexSlots, stored, vertexCount); });
     zipTriangleArrays(mesh, triangles, [&](auto& a, auto& stored) { swapSlots(a, triangleSlots, stored, triangleCount); });
     mesh.normals.resize(vertexCount, glm::vec3(0.0f, 1.0f, 0.0f));
-    swapSlots3(mesh.uvs, triangleSlots, triangles.uvs, triangleCount);
+    std::swap(uvs, mesh.uvs);
     vertexCount = nv;
     triangleCount = nt;
 }
@@ -182,8 +165,6 @@ void DynamicTopology::recordTriangle(uint32_t t) {
         zipTriangleArrays(*mesh_, undo_->triangles, [&](auto& a, auto& stored) {
             if (!a.empty()) stored.push_back(a[t]);
         });
-    if (t < startTriangles_ && !mesh_->uvs.empty())
-        undo_->triangles.uvs.insert(undo_->triangles.uvs.end(), mesh_->uvs.begin() + std::ptrdiff_t(t) * 3, mesh_->uvs.begin() + std::ptrdiff_t(t) * 3 + 3);
 }
 
 void DynamicTopology::markVertex(uint32_t v) {
@@ -294,7 +275,6 @@ uint32_t DynamicTopology::newTriangle(const glm::uvec3& tri, uint32_t like) {
         forTriangleArrays(m, [&](auto& a) {
             if (!a.empty()) a.emplace_back();
         });
-        if (!m.uvs.empty()) m.uvs.resize(m.uvs.size() + 3, glm::vec2(0.0f));
         deadT_.push_back(0);
     }
     recordTriangle(t);
@@ -345,146 +325,6 @@ void DynamicTopology::killTriangle(uint32_t t) {
     markTriangle(t);
 }
 
-glm::vec2 DynamicTopology::cornerUv(uint32_t t, uint32_t v) const {
-    const glm::uvec3& tri = mesh_->triangles[t];
-    const uint32_t c = tri.x == v ? 0u : tri.y == v ? 1u : 2u;
-    return mesh_->uvs[size_t(t) * 3 + c];
-}
-
-void DynamicTopology::setCornerUv(uint32_t t, uint32_t v, const glm::vec2& uv) {
-    const glm::uvec3& tri = mesh_->triangles[t];
-    const uint32_t c = tri.x == v ? 0u : tri.y == v ? 1u : 2u;
-    mesh_->uvs[size_t(t) * 3 + c] = uv;
-    markTriangle(t);
-}
-
-bool DynamicTopology::seamVertex(uint32_t v) const {
-    if (mesh_->uvs.empty()) return false;
-    bool first = true;
-    glm::vec2 uv(0.0f);
-    for (uint32_t t : mesh_->vertexTriangles(v)) {
-        const glm::vec2 u = cornerUv(t, v);
-        if (first) uv = u, first = false;
-        else if (std::abs(u.x - uv.x) > 1e-6f || std::abs(u.y - uv.y) > 1e-6f) return true;
-    }
-    return false;
-}
-
-bool DynamicTopology::collapseUvPlan(uint32_t keep, uint32_t drop, const uint32_t* edgeTris, int n,
-                                     std::vector<std::pair<uint32_t, glm::vec2>>& out) const {
-    out.clear();
-    const Mesh& m = *mesh_;
-    if (m.uvs.empty() || n < 1) return true;
-    auto same = [](const glm::vec2& a, const glm::vec2& b) { return std::abs(a.x - b.x) <= 1e-6f && std::abs(a.y - b.y) <= 1e-6f; };
-    glm::vec2 atDrop[2], atKeep[2];
-    for (int i = 0; i < n && i < 2; ++i) {
-        atDrop[i] = cornerUv(edgeTris[i], drop);
-        atKeep[i] = cornerUv(edgeTris[i], keep);
-    }
-    for (uint32_t t : m.vertexTriangles(drop)) {
-        if (t == edgeTris[0] || (n == 2 && t == edgeTris[1])) continue;
-        const glm::vec2 du = cornerUv(t, drop);
-        bool found = false;
-        glm::vec2 uv(0.0f);
-        for (int i = 0; i < n && i < 2; ++i) {
-            if (!same(du, atDrop[i])) continue;
-            if (!found) uv = atKeep[i], found = true;
-            else if (!same(uv, atKeep[i])) return false; // (the two sides disagree)
-        }
-        if (!found) return false; // (a chart keep has no corner in: moving drop's corner there would leave the paint)
-        out.emplace_back(t, uv);
-    }
-    return true;
-}
-
-bool DynamicTopology::openVertex(uint32_t v) const {
-    const Mesh& m = *mesh_;
-    std::vector<uint32_t>& around = openScratch_;
-    around.clear();
-    size_t tris = 0;
-    for (uint32_t t : m.vertexTriangles(v)) {
-        const glm::uvec3& tri = m.triangles[t];
-        for (int c = 0; c < 3; ++c)
-            if (tri[c] != v) around.push_back(tri[c]);
-        ++tris;
-    }
-    std::sort(around.begin(), around.end());
-    const size_t distinct = size_t(std::unique(around.begin(), around.end()) - around.begin());
-    return distinct != tris; // (a closed fan has as many neighbours as triangles; an open one, one more)
-}
-
-bool DynamicTopology::outlineStaysInChart(uint32_t keep, uint32_t drop) const {
-    const Mesh& m = *mesh_;
-    if (m.uvs.empty()) return true;
-    // The neighbours of drop along the outline of its charts: over a seam, or over an edge of one triangle only.
-    uint32_t along[3];
-    int found = 0;
-    uint32_t tris[4];
-    std::vector<uint32_t> around;
-    ring(drop, around);
-    for (uint32_t u : around)
-        if (seamEdge(drop, u) || edgeTriangles(drop, u, tris) == 1) {
-            if (found == 3) return false;
-            along[found++] = u;
-        }
-    if (found == 0) return true; // (inside a chart: its outline is not touched)
-    if (found != 2) return false; // (a junction or a tip: no chord to judge)
-    if (along[0] != keep && along[1] != keep) return true; // (merging across, not along: collapseUvPlan's reach decides)
-    const uint32_t other = along[0] == keep ? along[1] : along[0];
-    const float texel = 1.0f / float(std::max(m.texture ? m.texture->width : 1024, 256));
-    auto same = [](const glm::vec2& a, const glm::vec2& b) { return std::abs(a.x - b.x) <= 1e-6f && std::abs(a.y - b.y) <= 1e-6f; };
-    glm::vec2 seen[4];
-    int charts = 0;
-    for (uint32_t t : m.vertexTriangles(drop)) {
-        const glm::vec2 at = cornerUv(t, drop);
-        bool known = false;
-        for (int i = 0; i < charts; ++i) known = known || same(seen[i], at);
-        if (known) continue;
-        if (charts == 4) return false;
-        seen[charts++] = at;
-        glm::vec2 uv[2];
-        int got = 0;
-        glm::vec2 inward(0.0f);
-        const uint32_t ends[2] = {keep, other};
-        for (uint32_t t2 : m.vertexTriangles(drop)) {
-            if (!same(cornerUv(t2, drop), at)) continue;
-            const glm::uvec3& tri = m.triangles[t2];
-            for (int c = 0; c < 3; ++c)
-                if (tri[c] != drop) inward += m.uvs[size_t(t2) * 3 + size_t(c)] - at;
-        }
-        for (int e = 0; e < 2; ++e)
-            for (uint32_t t2 : m.vertexTriangles(drop)) {
-                const glm::uvec3& tri = m.triangles[t2];
-                if ((tri.x != ends[e] && tri.y != ends[e] && tri.z != ends[e]) || !same(cornerUv(t2, drop), at)) continue;
-                uv[e] = cornerUv(t2, ends[e]);
-                ++got;
-                break;
-            }
-        if (got != 2) return false; // (a chart that doesn't have both ends: judged by collapseUvPlan)
-        const glm::vec2 chord = uv[1] - uv[0];
-        const float len = glm::length(chord);
-        if (!(len > 1e-12f)) continue;
-        const glm::vec2 dir = chord / len;
-        const glm::vec2 nearest = uv[0] + dir * glm::dot(at - uv[0], dir);
-        const float inLen = glm::length(inward);
-        const glm::vec2 move = nearest - at; // the outline's move: out of the chart if it goes against `inward`
-        if (inLen > 1e-12f && glm::dot(move, -inward / inLen) > 0.25f * texel) return false;
-    }
-    return true;
-}
-
-bool DynamicTopology::seamEdge(uint32_t a, uint32_t b) const {
-    if (mesh_->uvs.empty()) return false;
-    uint32_t tris[4];
-    const int n = std::min(2, edgeTriangles(a, b, tris));
-    if (n < 2) return false;
-    for (uint32_t v : {a, b}) {
-        const glm::vec2 d = cornerUv(tris[0], v) - cornerUv(tris[1], v);
-        if (std::abs(d.x) > 1e-6f || std::abs(d.y) > 1e-6f) return true;
-    }
-    return false;
-}
-
 void DynamicTopology::moveTriangle(uint32_t from, uint32_t to) {
     Mesh& m = *mesh_;
     recordTriangle(to);
@@ -492,7 +332,6 @@ void DynamicTopology::moveTriangle(uint32_t from, uint32_t to) {
     forTriangleArrays(m, [&](auto& a) {
         if (!a.empty()) a[to] = a[from];
     });
-    if (!m.uvs.empty()) std::copy_n(m.uvs.begin() + std::ptrdiff_t(from) * 3, 3, m.uvs.begin() + std::ptrdiff_t(to) * 3);
     if (!m.quadPartners.empty()) {
         const uint32_t p = m.quadPartners[to];
         if (p != Mesh::kNoQuad && p < m.quadPartners.size() && m.quadPartners[p] == from) {
@@ -547,7 +386,6 @@ void DynamicTopology::compact() {
     forTriangleArrays(m, [&](auto& a) {
         if (!a.empty()) a.resize(nt);
     });
-    if (!m.uvs.empty()) m.uvs.resize(nt * 3);
     bvh_->resizeTriangles(nt);
     deadT_.resize(nt); // (every slot below nt is live again)
     freeT_.clear();
@@ -931,18 +769,8 @@ uint32_t DynamicTopology::split(uint32_t a, uint32_t b) {
         const uint32_t x = tri[k], y = tri[(k + 1) % 3], c = tri[(k + 2) % 3];
         glm::uvec3 first = tri;
         first[(k + 1) % 3] = v; // (x, v, c) in t's own rotation
-        glm::vec2 uv[3];
-        if (!m.uvs.empty())
-            for (int j = 0; j < 3; ++j) uv[j] = m.uvs[size_t(t) * 3 + size_t(j)];
         setTriangle(t, first);
-        const uint32_t second = newTriangle(glm::uvec3(v, y, c), t);
-        if (!m.uvs.empty()) { // (the new corner takes the midpoint of this triangle's own UVs: a seam stays a seam)
-            const glm::vec2 mid = (uv[k] + uv[(k + 1) % 3]) * 0.5f;
-            m.uvs[size_t(t) * 3 + size_t((k + 1) % 3)] = mid;
-            m.uvs[size_t(second) * 3 + 0] = mid;
-            m.uvs[size_t(second) * 3 + 1] = uv[(k + 1) % 3];
-            m.uvs[size_t(second) * 3 + 2] = uv[(k + 2) % 3];
-        }
+        newTriangle(glm::uvec3(v, y, c), t);
         (void)x;
     }
     ++stats.splits;
@@ -1072,12 +900,6 @@ bool DynamicTopology::collapseTarget(uint32_t a, uint32_t b, uint32_t& keep, uin
         keep = std::min(a, b);
         drop = std::max(a, b);
         p = (pos[a] + pos[b]) * 0.5f;
-        if (!mesh_->uvs.empty()) { // (with UVs one end stays where it is and the other merges into it: a seam vertex stays)
-            const bool seamKeep = seamVertex(keep), seamDrop = seamVertex(drop);
-            keep = seamKeep || !seamDrop ? keep : drop;
-            drop = keep == a ? b : a;
-            p = pos[keep];
-        }
         return true;
     }
     if (fa == 0) {
@@ -1100,17 +922,13 @@ bool DynamicTopology::collapseTarget(uint32_t a, uint32_t b, uint32_t& keep, uin
     return false;
 }
 
-bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3& p) const {
+// The topology half of canCollapse: the edge is a manifold one, and merging its ends neither pinches the surface nor
+// leaves a vertex with fewer than three neighbours. (Leaves the ends' rings in ringA_ and ringB_.)
+bool DynamicTopology::collapseKeepsTopology(uint32_t keep, uint32_t drop) const {
     const Mesh& m = *mesh_;
     uint32_t tris[4];
     const int n = edgeTriangles(keep, drop, tris);
     if (n < 1 || n > 2) return false;
-    // (A seam vertex stays where it is, the other merges into it: only vertices with one UV each meet at the midpoint.)
-    if (!m.uvs.empty() && p != m.positions[keep] && (seamVertex(keep) || seamVertex(drop))) return false;
-    // (Two vertices with one UV each, drop inside the mesh: nothing to judge. Most candidates are like that.)
-    if (!m.uvs.empty() && p == m.positions[keep] && (seamVertex(drop) || seamVertex(keep) || openVertex(drop)) &&
-        (!outlineStaysInChart(keep, drop) || !collapseUvPlan(keep, drop, tris, n, uvPlan_)))
-        return false;
     uint32_t opposite[2] = {kNone, kNone};
     for (int i = 0; i < n; ++i) {
         const glm::uvec3& tri = m.triangles[tris[i]];
@@ -1140,6 +958,16 @@ bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3&
         if (ro.size() <= 3) return false;
     }
     if (n == 1 && (rk.size() < 3 || rd.size() < 3)) return false;
+    return true;
+}
+
+bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3& p) const {
+    if (!collapseKeepsTopology(keep, drop)) return false;
+    const Mesh& m = *mesh_;
+    uint32_t tris[4];
+    const int n = edgeTriangles(keep, drop, tris);
+    const std::vector<uint32_t>& rk = ringA_; // (the rings collapseKeepsTopology just listed)
+    const std::vector<uint32_t>& rd = ringB_;
     // No long edge, no triangle turned over or made degenerate or much worse.
     const auto& pos = m.positions;
     // (Only what the collapse makes worse counts: merging two vertices at one point moves nothing.)
@@ -1176,16 +1004,6 @@ void DynamicTopology::collapse(uint32_t keep, uint32_t drop, const glm::vec3& p)
     Mesh& m = *mesh_;
     uint32_t tris[4];
     const int n = edgeTriangles(keep, drop, tris);
-    const bool midpoint = p != m.positions[keep];
-    glm::vec2 mergedUv(0.0f); // (midpoint: neither end is on a seam, so each has one UV, both on the edge's triangles)
-    bool plan = false;
-    if (!m.uvs.empty() && n >= 1) {
-        if (midpoint) {
-            mergedUv = (cornerUv(tris[0], keep) + cornerUv(tris[0], drop)) * 0.5f;
-        } else {
-            plan = collapseUvPlan(keep, drop, tris, n, uvPlan_);
-        }
-    }
     for (int i = 0; i < n && i < 2; ++i) killTriangle(tris[i]);
     const IndexRing around = m.vertexTriangles(drop);
     std::vector<uint32_t>& list = ringA_;
@@ -1196,15 +1014,7 @@ void DynamicTopology::collapse(uint32_t keep, uint32_t drop, const glm::vec3& p)
             if (tri[c] == drop) tri[c] = keep;
         setTriangle(t, tri);
     }
-    if (!m.uvs.empty()) {
-        if (midpoint)
-            for (uint32_t t : m.vertexTriangles(keep)) {
-                recordTriangle(t);
-                setCornerUv(t, keep, mergedUv);
-            }
-        else if (plan)
-            for (const auto& [t, uv] : uvPlan_) setCornerUv(t, keep, uv);
-    }
+    const bool midpoint = p != m.positions[keep];
     if (midpoint) interpolateVertex(keep, keep, drop, 0.5f, p);
     markVertex(keep);
     killVertex(drop);
@@ -1216,6 +1026,7 @@ void DynamicTopology::collapsePass() {
     heap_.clear();
     uint32_t tris[4];
     for (uint32_t t : regionTris_) {
+        if (refineOnly) break; // (refine only: slivers alone, below)
         if (t >= mesh_->triangleCount() || deadT_[t]) continue;
         const glm::uvec3 tri = mesh_->triangles[t];
         for (int c = 0; c < 3; ++c) {
@@ -1226,6 +1037,7 @@ void DynamicTopology::collapsePass() {
         }
     }
     for (uint32_t t : mirrorTris_) { // (as in splitPass)
+        if (refineOnly) break;
         if (t >= mesh_->triangleCount() || deadT_[t]) continue;
         const glm::uvec3 tri = mesh_->triangles[t];
         for (int c = 0; c < 3; ++c) {
@@ -1288,13 +1100,86 @@ void DynamicTopology::collapsePass() {
     }
 }
 
+// A needle: a triangle whose height over its longest edge is under kNeedleWidth of the target edge length (a hair-thin
+// strip: its two long edges run side by side). Even triangles are around 0.8 of the target, a sliver a repair pass
+// still has to look at is above this.
+bool DynamicTopology::needleTriangle(uint32_t t) const {
+    const auto& p = mesh_->positions;
+    const glm::uvec3& tri = mesh_->triangles[t];
+    const glm::vec3 e0 = p[tri.y] - p[tri.x], e1 = p[tri.z] - p[tri.y], e2 = p[tri.x] - p[tri.z];
+    const float longest2 = std::max({glm::dot(e0, e0), glm::dot(e1, e1), glm::dot(e2, e2)});
+    const float area2 = glm::length(glm::cross(e0, -e2));
+    // (height = area2 / longest edge)
+    const float w = kNeedleWidth * target_;
+    return area2 * area2 < w * w * longest2;
+}
+
+// Smooth with Dynamic on: a hair-thin strand (a Tendril pulled long and thin, then smoothed) has edges far longer than the
+// collapse length, so the collapse pass never takes them, and smoothing a straight line of vertices moves nothing. A vertex
+// whose every triangle is a needle is merged onto a neighbour (the one with the most ordinary triangles: the strand's base,
+// which does not move), from the strand's end inwards, until it is gone. Anything with a solid triangle around it is left.
+void DynamicTopology::dissolvePass() {
+    std::vector<uint32_t> work;
+    for (uint32_t t : regionTris_) {
+        if (t >= mesh_->triangleCount() || deadT_[t] || !needleTriangle(t)) continue;
+        const glm::uvec3 tri = mesh_->triangles[t];
+        for (int c = 0; c < 3; ++c)
+            if (inside(tri[c], tri[c])) work.push_back(tri[c]);
+    }
+    if (work.empty()) return;
+    std::sort(work.begin(), work.end());
+    work.erase(std::unique(work.begin(), work.end()), work.end());
+    auto allNeedles = [&](uint32_t v) {
+        for (uint32_t t : mesh_->vertexTriangles(v))
+            if (!needleTriangle(t)) return false;
+        return true;
+    };
+    std::vector<uint32_t> neighbours;
+    std::vector<std::pair<uint32_t, uint32_t>> edges;
+    size_t tries = 0;
+    for (size_t i = 0; i < work.size() && ops_ < maxOps_ && tries < maxOps_ * kTriesPerOp; ++i) {
+        const uint32_t v = work[i];
+        if (deadV_[v] || locked(v) || !allNeedles(v)) continue;
+        uint32_t other[2];
+        if (featureEdges(v, other) != 0) continue;
+        ++tries;
+        ring(v, neighbours);
+        // The neighbour with the most ordinary triangles first (ties: the lowest index, so the result is the same on any thread count).
+        std::vector<std::pair<int, uint32_t>> order;
+        for (uint32_t u : neighbours) {
+            int solid = 0;
+            for (uint32_t t : mesh_->vertexTriangles(u)) solid += needleTriangle(t) ? 0 : 1;
+            order.emplace_back(-solid, u);
+        }
+        std::sort(order.begin(), order.end());
+        for (const auto& [solid, u] : order) {
+            if (locked(u) || !collapseKeepsTopology(u, v)) continue;
+            orbit(v, u, edges);
+            if (edges.size() > 1 && orbitSharesTriangle(edges)) break; // at the symmetry plane: leave it
+            bool ok = true;
+            for (const auto& [x, y] : edges)
+                ok = ok && !deadV_[x] && !deadV_[y] && !locked(x) && !locked(y) && allNeedles(x) && collapseKeepsTopology(y, x);
+            if (!ok) continue;
+            if (orbitIncomplete_ && !mirrorMaps_.empty()) ++stats.unpaired;
+            for (size_t k = 0; k < edges.size(); ++k) {
+                const auto [x, y] = edges[k];
+                if (deadV_[x] || deadV_[y] || (k > 0 && !collapseKeepsTopology(y, x))) continue; // (the first changed its surroundings)
+                collapse(y, x, mesh_->positions[y]);
+                ++stats.dissolved;
+                ring(y, neighbours); // (what the strand's next vertex sees now)
+                work.insert(work.end(), neighbours.begin(), neighbours.end());
+            }
+            break;
+        }
+    }
+}
+
 // Flipping a-b (between triangles a,b,c and b,a,d) to c-d: worth it when it brings the four valences closer
 // to 6 (4 on a boundary) without folding or flattening the surface.
 bool DynamicTopology::flipGain(uint32_t a, uint32_t b, uint32_t& c, uint32_t& d) const {
     const Mesh& m = *mesh_;
     uint32_t tris[4];
     if (edgeTriangles(a, b, tris) != 2 || featureEdge(a, b)) return false;
-    if (seamEdge(a, b)) return false; // (the two triangles' UVs don't share a chart there)
     c = d = kNone;
     for (int i = 0; i < 2; ++i) {
         const glm::uvec3& tri = m.triangles[tris[i]];
@@ -1358,17 +1243,8 @@ void DynamicTopology::flip(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
         while (k < 3 && tri[k] != a) ++k;
         if (tri[(k + 1) % 3] != b) std::swap(t1, t2);
     }
-    // (Not a seam edge: both triangles' UVs are in one chart, so each corner keeps the UV it has.)
-    glm::vec2 ua(0.0f), ub(0.0f), uc(0.0f), ud(0.0f);
-    if (!m.uvs.empty()) {
-        ua = cornerUv(t1, a), ub = cornerUv(t1, b), uc = cornerUv(t1, c), ud = cornerUv(t2, d);
-    }
     setTriangle(t1, glm::uvec3(c, a, d));
     setTriangle(t2, glm::uvec3(d, b, c));
-    if (!m.uvs.empty()) {
-        mesh_->uvs[size_t(t1) * 3 + 0] = uc, mesh_->uvs[size_t(t1) * 3 + 1] = ua, mesh_->uvs[size_t(t1) * 3 + 2] = ud;
-        mesh_->uvs[size_t(t2) * 3 + 0] = ud, mesh_->uvs[size_t(t2) * 3 + 1] = ub, mesh_->uvs[size_t(t2) * 3 + 2] = uc;
-    }
     ++stats.flips;
     ++ops_;
 }
@@ -1440,6 +1316,7 @@ void DynamicTopology::relaxPass() {
     const float r2 = radius_ * radius_;
     for (uint32_t v : changedV_) {
         if (deadV_[v] || locked(v)) continue;
+        if (refineOnly && v < startVertices_) continue; // (refine only: the vertices that were there stay put; the new ones settle)
         bool in = glm::dot(m.positions[v] - center_, m.positions[v] - center_) <= r2;
         for (const SymCopy& s : mirrorSigns_) {
             const glm::vec3 d0 = m.positions[v] - s.point(center_);
@@ -1449,7 +1326,6 @@ void DynamicTopology::relaxPass() {
         if (featureEdges(v, other) != 0) continue;
         ring(v, r);
         if (r.size() < 3) continue;
-        if (seamVertex(v)) continue; // (a seam vertex stays: sliding it would take its corners out of their charts)
         glm::vec3 avg(0.0f);
         for (uint32_t u : r) avg += m.positions[u];
         avg /= float(r.size());
@@ -1461,7 +1337,21 @@ void DynamicTopology::relaxPass() {
     // Applied one by one, each only if no triangle around it turns over or goes flat.
     const float minArea = 1e-4f * target_ * target_;
     for (const auto& [v, d] : moves) {
-        const glm::vec3 to = m.positions[v] + d;
+        glm::vec3 to = m.positions[v] + d;
+        if (refineOnly) {
+            // Refine only: the vertex slides on the surface itself, not in its tangent plane: the target's closest point on
+            // the fan around v (the fan is the surface there), so a refresh never lifts the new vertices off the sculpt.
+            float best = std::numeric_limits<float>::max();
+            glm::vec3 on = to;
+            for (uint32_t t : m.vertexTriangles(v)) {
+                const glm::uvec3& tri = m.triangles[t];
+                glm::vec3 bary;
+                const glm::vec3 p = closestPointOnTriangle(to, m.positions[tri.x], m.positions[tri.y], m.positions[tri.z], bary);
+                const float d2 = glm::dot(p - to, p - to);
+                if (d2 < best) best = d2, on = p;
+            }
+            to = on;
+        }
         bool ok = true;
         for (uint32_t t : m.vertexTriangles(v)) {
             const glm::uvec3& tri = m.triangles[t];
@@ -1479,50 +1369,8 @@ void DynamicTopology::relaxPass() {
         }
         if (!ok) continue;
         recordVertex(v);
-        slideUvs(v, to);
         m.positions[v] = to;
         if (!m.base.empty()) m.base[v] += d;
-    }
-}
-
-// The vertex is about to slide along the surface to `to`, which relaxing makes a fraction of the way to the middle of its
-// ring: its UV goes the same fraction of the way to the middle of the ring's UVs (in its chart: a seam vertex isn't relaxed).
-// A convex combination of the corners around it stays inside its chart, however many times it is relaxed; the affine
-// extension of each triangle's own map did not (its errors added up, a few texels out, where the paint ends).
-void DynamicTopology::slideUvs(uint32_t v, const glm::vec3& to) {
-    Mesh& m = *mesh_;
-    if (m.uvs.empty()) return;
-    const IndexRing fan = m.vertexTriangles(v);
-    if (fan.begin() == fan.end()) return;
-    const glm::vec2 at = cornerUv(*fan.begin(), v);
-    glm::vec3 mean3(0.0f);
-    glm::vec2 mean2(0.0f);
-    int n = 0;
-    ring(v, scratch2_);
-    for (uint32_t u : scratch2_) {
-        bool found = false;
-        for (uint32_t t : fan) {
-            const glm::uvec3& tri = m.triangles[t];
-            if (tri.x != u && tri.y != u && tri.z != u) continue;
-            mean2 += cornerUv(t, u);
-            found = true;
-            break;
-        }
-        if (!found) return;
-        mean3 += m.positions[u];
-        ++n;
-    }
-    if (n == 0) return;
-    mean3 /= float(n);
-    mean2 /= float(n);
-    const float full = glm::length(mean3 - m.positions[v]);
-    if (!(full > 1e-12f)) return;
-    const float f = std::min(1.0f, glm::length(to - m.positions[v]) / full);
-    const glm::vec2 target = at + (mean2 - at) * f;
-    for (uint32_t t : fan) {
-        recordTriangle(t);
-        m.uvs[size_t(t) * 3 + (m.triangles[t].x == v ? 0u : m.triangles[t].y == v ? 1u : 2u)] = target;
-        markTriangle(t);
     }
 }
 
@@ -1612,7 +1460,6 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
     recordedNow_.clear();
     if (!dyntopoBlocker(mesh).empty() || !(edgeLength > 0.0f) || !(radius > 0.0f)) return false;
     if (mesh_ && mesh_ != &mesh) return false; // (another mesh mid-stroke)
-    if (!mesh.uvs.empty() && mesh.uvs.size() != mesh.triangleCount() * 3) return false; // (UVs that don't fit: leave it alone)
     if (!mesh_) {
         // A former subdivision level (its levels deleted) may still derive its adjacency from them: store it.
         if (mesh.implicitAdjacency()) mesh.rebuildTopology();
@@ -1627,11 +1474,19 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
         deadV_.assign(mesh.vertexCount(), 0);
         deadT_.assign(mesh.triangleCount(), 0);
         changedVFlag_.assign(mesh.vertexCount(), 0);
+        if (!mesh.uvs.empty()) { // a remeshed surface has no UVs: they come back with undo
+            undo_->uvs = std::move(mesh.uvs);
+            mesh.uvs.clear();
+            mesh.topologyDirty = true;
+        }
     }
     center_ = center;
     radius_ = radius;
     target_ = edgeLength;
-    splitLen2_ = (edgeLength * 4.0f / 3.0f) * (edgeLength * 4.0f / 3.0f);
+    // Refine only: an edge counts as stretched at 1.5 times the target (a surface dynamic topology made has edges up to
+    // 4/3 of its target, and an even sphere's vary by a quarter: neither is "stretched"), else 4/3 as always.
+    const float splitAt = refineOnly ? 1.5f : 4.0f / 3.0f;
+    splitLen2_ = (edgeLength * splitAt) * (edgeLength * splitAt);
     collapseLen2_ = (edgeLength * 0.6f) * (edgeLength * 0.6f);
     mirrorSigns_.assign(mirrors.size() > 1 ? mirrors.begin() + 1 : mirrors.end(), mirrors.end());
     // Each copy's inverse (a mirror is its own; a radial turn's is the opposite turn), without the identity.
@@ -1665,6 +1520,7 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
     queryRegion();
     phase(stats.gatherMs);
     collapsePass();
+    if (dissolveNeedles) dissolvePass();
     phase(stats.collapseMs);
     flipPass();
     phase(stats.flipMs);
@@ -1730,7 +1586,7 @@ std::unique_ptr<TopologyUndo> DynamicTopology::finish(Mesh& mesh, BVH& bvh) {
     std::vector<uint32_t>().swap(gridHead_);
     std::vector<uint32_t>().swap(gridNext_);
     std::vector<uint32_t>().swap(regionVerts_);
-    if (undo->vertexSlots.empty() && undo->triangleSlots.empty()) return nullptr;
+    if (undo->vertexSlots.empty() && undo->triangleSlots.empty() && undo->uvs.empty()) return nullptr;
     return undo;
 }
 

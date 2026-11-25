@@ -40,6 +40,19 @@ branch.
 2. Keep changes focused; one feature or fix per pull request.
 3. Each source file starts with the SPDX license header.
 4. CI must pass on Linux, macOS and Windows.
+5. If users will notice the change, add a short note as `changes/<your-branch>.md` (see changes/README.md); the
+   CHANGELOG is written from these at release time, so don't edit CHANGELOG.md or version numbers.
+
+## How pull requests are reviewed
+
+- A maintainer approves the CI run for each push from a contributor outside the team (forks run with a read-only
+  token and no secrets), reads the whole diff, and merges with credit to you in the release notes.
+- Changes to the areas below also get a security review from a code owner (`.github/CODEOWNERS`): CI and release
+  scripts, the build and its dependencies (`CMakeLists.txt`, `cmake/`, `third_party/`, `packaging/`), readers of
+  files people open or download (`src/io/`, projects, packs, images), and anything that talks to the network or
+  other programs (AI and MCP, app links, plugins, scripting, self-update). Expect more questions there, and keep
+  those changes small; a new dependency needs a good reason, a pinned version and its license notice.
+- Every commit needs its sign-off (the DCO check above runs on each pull request).
 
 ## Code style
 

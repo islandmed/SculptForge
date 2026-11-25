@@ -7,9 +7,13 @@
 //     through the pivot, or at a fixed distance from the camera. Snap to surfaces (on by default) puts points over a
 //     surface onto it, and the plane follows the last of them. Pen pressure thins the tube; the stroke is smoothed and simplified into the curve's control points.
 //     The result is a new Tube Part (undo takes it away again) or, with Merge, part of the active Part.
+//   Points style: each click adds a point to the curve being built (a polyline; Line: Straight keeps its corners, Smooth
+//     curves through them); Enter, Next line or Draw Tube off ends it.
 //   A Tube Part's points show as dots: drag one to move it (in the view plane), Ctrl+drag to make the tube thicker
-//     or thinner there, Alt+click to delete it. With Draw Tube on, a plain press always draws; the dots of every
-//     visible Tube Part show, and Shift+drag (or Ctrl, Alt) on one selects that Part and edits it. Bake makes the Part a plain mesh to sculpt.
+//     or thinner there, Alt+click to delete it, Shift+click to select several (orange). With Draw Tube on, a plain press always draws; the dots of every
+//     visible Tube Part show, and Shift+drag (or Ctrl, Alt) on one selects that Part and edits it. The Transform gizmo
+//     (W / E / R) moves, turns and scales the selected points (all of them when none is selected) and re-sweeps the
+//     tube; Snap to surface puts them on the other Parts. Bake makes the Part a plain mesh to sculpt.
 // Alt+drag still navigates; every stroke and point drag is one undo step. Symmetry X draws the mirror copy too.
 #include "app/App.h"
 #include "app/Demo.h"
@@ -21,6 +25,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <limits>
 
 namespace sf {
 
@@ -34,6 +40,18 @@ glm::vec3 planeHit(const glm::vec3& o, const glm::vec3& d, const glm::vec3& p, c
     const float dn = glm::dot(d, n);
     const float t = std::abs(dn) > 1e-12f ? glm::dot(p - o, n) / dn : 0.0f;
     return o + d * std::max(t, 0.0f);
+}
+
+std::string indicesText(const std::vector<int>& v) {
+    std::string out;
+    for (int i : v) out += (out.empty() ? "" : " ") + std::to_string(i);
+    return out;
+}
+
+std::string pointText(const glm::vec3& v) {
+    char buf[96];
+    std::snprintf(buf, sizeof buf, "%.7g,%.7g,%.7g", double(v.x), double(v.y), double(v.z));
+    return buf;
 }
 
 } // namespace
@@ -55,12 +73,47 @@ void App::registerTubeUiActions() {
     add("tube.draw", "Draw Tube",
         [this] {
             tubeDraw_ = !tubeDraw_;
-            status_ = tubeDraw_ ? "Tube: drag anywhere to draw. Esc or a brush leaves it" // (short: the top bar)
+            if (!tubeDraw_) tubeFinishLine(nullptr);
+            status_ = tubeDraw_ ? (tubePoints_ ? "Tube: click to place points, Enter ends the line. Esc or a brush leaves it"
+                                               : "Tube: drag anywhere to draw. Esc or a brush leaves it") // (short: the top bar)
                                 : "Tube: Draw Tube off";
         },
         nullptr, [this] { return tubeDraw_; },
         "Drag anywhere in the view to draw a clay tube in the air, like a 3D pen: on the model or off it. Pen "
         "pressure makes it thinner, Symmetry X draws the mirror copy. Alt+drag still moves the view.");
+    add("tube.style_freehand", "Freehand", [this] { tubePoints_ = false; tubeFinishLine(nullptr); }, nullptr,
+        [this] { return !tubePoints_; },
+        "Drag to draw: the stroke becomes the tube or curve, smoothed and simplified into points.");
+    add("tube.style_points", "Points", [this] { tubePoints_ = true; }, nullptr, [this] { return tubePoints_; },
+        "Click to place points one by one: each click adds a point to the curve being built, on the model where Snap "
+        "to surfaces finds it. Enter, Next line, Esc or Draw Tube off ends the line; the next click starts a new one.");
+    add("tube.next_line", "Next line", [this] { tubeFinishLine("Next line"); }, [this] { return tubePolyPart_ != 0; }, nullptr,
+        "End the curve being built: the next click starts a new one (Enter does the same).");
+    const auto line = [this](bool straight) {
+        return [this, straight] {
+            tubeLook_.straight = straight;
+            if (tubeActive() && doc_.mesh.tube.straight != straight) runCommand("tube_set", {{"straight", straight}});
+        };
+    };
+    add("tube.line_smooth", "Smooth", line(false), nullptr,
+        [this] { return !(tubeActive() ? doc_.mesh.tube.straight : tubeLook_.straight); },
+        "A smooth curve through the points (for new tubes and curves, and the active one). Switching keeps the points.",
+        "tube_set");
+    add("tube.line_straight", "Straight", line(true), nullptr,
+        [this] { return tubeActive() ? doc_.mesh.tube.straight : tubeLook_.straight; },
+        "Straight spans between the points with sharp corners, a polyline (for new tubes and curves, and the active "
+        "one). Switching keeps the points.",
+        "tube_set");
+    add("tube.snap_points", "Snap points to surface",
+        [this] {
+            Args a;
+            if (const std::vector<int> sel = tubeSelectedPoints(); !sel.empty()) a["indices"] = indicesText(sel);
+            runCommand("tube_snap_points", a);
+        },
+        [this] { return tubeActive(); }, nullptr,
+        "Put the selected points (or all of them) on the nearest surface of the other visible Parts: a curve lies on "
+        "it, a tube half sunk in. One undo step. With Snap to surfaces on, a curve's dot dragged over a Part lands on it too.",
+        "tube_snap_points");
     const auto depth = [this](TubeDepth d) {
         return [this, d] {
             tubeDepth_ = d;
@@ -132,14 +185,19 @@ void App::registerTubeUiActions() {
         "then turn into a tube with Tube from curve.",
         "tube_new");
     add("tube.from_curve", "Tube from curve",
-        [this] { runCommand("tube_from_curve"); tubeSelected_ = -1; },
+        [this] { runCommand("tube_from_curve"); tubeClearSelection(); },
         [this] { return tubeActive() && doc_.mesh.tube.curve; }, nullptr,
         "Make the active Curve Part a tube, with the Shape, Ends and modifiers set here. Undo brings the curve back.",
         "tube_from_curve");
     const auto selected = [this] { return tubeSelection() >= 0; };
     add("tube.delete_point", "Delete Point",
-        [this] { if (const int i = tubeSelection(); i >= 0) runCommand("tube_delete_point", {{"index", double(i)}}); tubeSelected_ = -1; },
-        selected, nullptr, "Delete the selected point (the one last dragged, in orange). Alt+click a point does the same.",
+        [this] {
+            const std::vector<int> sel = tubeSelectedPoints();
+            if (sel.size() > 1) runCommand("tube_delete_point", {{"indices", indicesText(sel)}});
+            else if (const int i = tubeSelection(); i >= 0) runCommand("tube_delete_point", {{"index", double(i)}});
+            tubeClearSelection();
+        },
+        selected, nullptr, "Delete the selected points (orange; Shift+click selects several). Alt+click a point does the same.",
         "tube_delete_point");
     add("tube.insert_point", "Insert Point",
         [this] {
@@ -147,13 +205,14 @@ void App::registerTubeUiActions() {
             if (i < 0) return;
             const int at = size_t(i) + 1 < doc_.mesh.tube.points.size() ? i : i - 1;
             if (at >= 0) runCommand("tube_insert_point", {{"index", double(at)}});
+            tubeClearSelection();
             tubeSelected_ = at + 1;
         },
         selected, nullptr, "Add a point halfway between the selected point and the next one.", "tube_insert_point");
     add("tube.simplify", "Simplify",
         [this] {
             runCommand("tube_simplify");
-            tubeSelected_ = -1;
+            tubeClearSelection();
         },
         [this] { return tubeActive() && doc_.mesh.tube.points.size() > 2; }, nullptr,
         "Fewer points: takes out about a third of them, the ones the curve needs least (the ends stay). Press again "
@@ -162,7 +221,7 @@ void App::registerTubeUiActions() {
     add("tube.bake", "Bake",
         [this] {
             runCommand("tube_bake", {{"uniform", tubeBakeUniform_}});
-            tubeSelected_ = -1;
+            tubeClearSelection();
         },
         [this] { return tubeActive() && !doc_.mesh.tube.curve; }, nullptr,
         "Make the active Tube Part a plain mesh to sculpt. Its points can't be edited after this (undo brings them "
@@ -177,6 +236,7 @@ std::string App::leaveDrawModes() {
     std::string left;
     if (tubeDraw_) {
         tubeDraw_ = false;
+        tubeFinishLine(nullptr);
         left = "Draw Tube";
     }
     if (!insertType_.empty()) {
@@ -230,6 +290,11 @@ void App::drawTubeContents() {
     const ImGuiStyle& style = ImGui::GetStyle();
     const float full = ImGui::GetContentRegionAvail().x;
     ui::ActionButton(*this, "tube.draw", ImVec2(full, 0));
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%s", tr("Draw"));
+    ImGui::SameLine();
+    ui::Segmented(*this, {"tube.style_freehand", "tube.style_points"});
+    if (tubeDraw_ && tubePoints_ && tubePolyPart_ != 0) ui::ActionButton(*this, "tube.next_line", ImVec2(full, 0));
     tray::GroupLabel(*this, "Stroke");
     ImGui::SetNextItemWidth(full);
     ui::SliderInside("##tubesize", &tubeSizePx_, 2.0f, 120.0f, tr("Size %.0f"));
@@ -267,6 +332,10 @@ void App::drawTubeContents() {
     ImGui::TextDisabled("%s", tr("Result"));
     ImGui::SameLine();
     ui::Segmented(*this, {"tube.new_part", "tube.merge", "tube.curve"});
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%s", tr("Line"));
+    ImGui::SameLine();
+    ui::Segmented(*this, {"tube.line_smooth", "tube.line_straight"});
     if (!tubeActive()) {
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextDisabled("%s", tr("Select a Tube Part to edit its points."));
@@ -276,7 +345,11 @@ void App::drawTubeContents() {
     tray::GroupLabel(*this, "Edit");
     const TubeShape& t = doc_.mesh.tube;
     ImGui::TextDisabled(tr("%d points"), int(t.points.size()));
-    if (const int sel = tubeSelection(); sel >= 0) {
+    const std::vector<int> selectedPoints = tubeSelectedPoints();
+    if (selectedPoints.size() > 1) {
+        ImGui::SameLine();
+        ImGui::TextDisabled(tr("(%d selected)"), int(selectedPoints.size()));
+    } else if (const int sel = tubeSelection(); sel >= 0) {
         ImGui::SameLine();
         ImGui::TextDisabled(tr("(point %d selected)"), sel);
         // (applied as one undo step when the slider is let go)
@@ -315,6 +388,10 @@ void App::drawTubeContents() {
     ImGui::SameLine();
     ui::ActionButton(*this, "tube.insert_point", ImVec2(-1, 0));
     ui::ActionButton(*this, "tube.simplify", ImVec2(full, 0));
+    ui::ActionButton(*this, "tube.snap_points", ImVec2(full, 0));
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("%s", tr("Shift+click dots to select several; Move, Scale and Rotate (W, E, R) work on them."));
+    ImGui::PopTextWrapPos();
     {   // Repeat along curve: copies of another Part, end to end along this curve, as a new Part
         tray::GroupLabel(*this, "Repeat a Part along the curve");
         if (tubeRepeatPart_ != 0 && doc_.partIndex(tubeRepeatPart_) < 0) tubeRepeatPart_ = 0;
@@ -474,6 +551,7 @@ int App::tubePointAt(float x, float y, int* part) const {
 
 bool App::tubeMouseDown(float x, float y, SDL_Keymod mod) {
     const SDL_Keymod keys = SDL_GetModState(); // the keyboard itself
+    if (tubeActive() && gizmoActive() && gizmoHandleAt(x, y) != GizmoHandle::None) return false; // the gizmo's handle comes first
     int part = -1;
     const int point = tubeGrabsPoints(keys) ? tubePointAt(x, y, &part) : -1;
     TubeDrag& d = tubeDrag_;
@@ -496,6 +574,8 @@ bool App::tubeMouseDown(float x, float y, SDL_Keymod mod) {
         d = {};
         d.point = point;
         d.resize = ctrlDown(mod) || ctrlDown(keys);
+        d.select = !d.resize && ((mod | keys) & SDL_KMOD_SHIFT) != 0; // let go without moving: in or out of the selection
+        if (!d.select) tubeMultiSel_.clear();                 // a plain drag edits this one point
         d.start = doc_.mesh.tube;
         d.before = doc_.mesh;
         d.x = x;
@@ -504,7 +584,16 @@ bool App::tubeMouseDown(float x, float y, SDL_Keymod mod) {
         canvasRay(x, y, o, dir);
         const glm::vec3 c = d.start.points[size_t(point)].position;
         d.grab = c - planeHit(o, dir, c, tubeViewDir());
-        tubeSelected_ = point;
+        if (!d.select) tubeSelected_ = point; // (a Shift+click toggles it when let go; a Shift+drag selects it as it moves)
+        drag_ = Drag::Tube;
+        return true;
+    }
+    if (tubeDraw_ && tubePoints_) { // Points style: the point goes where the button is let go
+        if (keys & SDL_KMOD_ALT) return false; // navigates
+        d = {};
+        d.placing = true;
+        d.x = x;
+        d.y = y;
         drag_ = Drag::Tube;
         return true;
     }
@@ -545,6 +634,7 @@ bool App::tubeMouseDown(float x, float y, SDL_Keymod mod) {
 
 void App::tubeDragTo(float x, float y) {
     TubeDrag& d = tubeDrag_;
+    if (d.placing) return;
     glm::vec3 o, dir;
     canvasRay(x, y, o, dir);
     if (d.drawing) {
@@ -566,6 +656,11 @@ void App::tubeDragTo(float x, float y) {
         return;
     }
     if (d.point < 0) return;
+    if (d.select && !d.changed && std::abs(x - d.x) + std::abs(y - d.y) < 4.0f * uiScale_) return; // a Shift+click, not a nudge
+    if (d.select && !d.changed) { // a Shift+drag after all: this one point moves, and is the selection
+        tubeMultiSel_.clear();
+        tubeSelected_ = d.point;
+    }
     TubeShape s = d.start;
     TubePoint& p = s.points[size_t(d.point)];
     if (d.resize) {
@@ -574,6 +669,8 @@ void App::tubeDragTo(float x, float y) {
         status_ = "Tube: point " + std::to_string(d.point) + " radius " + std::to_string(p.radius).substr(0, 6);
     } else {
         p.position = planeHit(o, dir, p.position, tubeViewDir()) + d.grab;
+        RayHit hit; // Snap to surfaces: a curve's point dragged over another Part lands on it (a tube's moves freely, as before)
+        if (tubeSnap_ && s.curve && tubeDragSnap(x, y, hit)) p.position = hit.position;
     }
     Mesh m = tubeMesh(s, kTubePreviewTriangles); // (coarser while dragging a long or thin tube)
     if (m.triangleCount() == 0) return; // (too long or fine to sweep: the last good shape stays)
@@ -586,6 +683,11 @@ void App::tubeDragTo(float x, float y) {
 
 void App::tubeRelease() {
     TubeDrag& d = tubeDrag_;
+    if (d.placing) {
+        d = {};
+        tubePolyClick(mouseX_, mouseY_);
+        return;
+    }
     if (d.drawing) {
         TubeShape s;
         s = tubeLook_;
@@ -594,6 +696,7 @@ void App::tubeRelease() {
         s.flatCaps = tubeFlatCaps_;
         s.mirrorX = symmetry_.x;
         s.curve = tubeCurve_;
+        s.straight = tubeLook_.straight;
         if (!s.points.empty()) {
             int edited = -1;
             const CommandResult r = tubeAdd(doc_, s, tubeMerge_ && !tubeCurve_, tubeCurve_ ? "Curve" : "Tube", &edited);
@@ -616,16 +719,245 @@ void App::tubeRelease() {
         doc_.replaceMeshUndoable(std::move(full), d.resize ? "Tube point size" : "Tube point");
         status_ = std::string("Tube: ") + (d.resize ? "point size" : "point moved") + "; " +
                   std::to_string(doc_.mesh.tube.points.size()) + " points";
+    } else if (d.select && d.point >= 0) {
+        tubeToggleSelect(d.point);
     }
     d = {};
+}
+
+// The surface under the pointer that a dragged point snaps to: another Part's (the tube's own mesh moves with the
+// point, so it is skipped, and so are other Tube and Curve Parts' wires).
+bool App::tubeDragSnap(float x, float y, RayHit& hit) {
+    glm::vec3 o, dir;
+    canvasRay(x, y, o, dir);
+    float best = std::numeric_limits<float>::infinity();
+    bool found = false;
+    for (int i = 0; i < doc_.partCount(); ++i) {
+        if (doc_.checkedOut(i) || !doc_.parts[size_t(i)].visible) continue;
+        const Mesh& m = doc_.partMesh(i);
+        if (m.triangleCount() == 0 || !m.tube.empty() || !m.forgespheres.empty()) continue;
+        const Part& s = doc_.parts[size_t(i)];
+        glm::vec3 lo = o, ld = dir;
+        if (s.moved()) {
+            const glm::mat4 inv = glm::inverse(s.transform);
+            lo = glm::vec3(inv * glm::vec4(o, 1.0f));
+            ld = glm::vec3(inv * glm::vec4(dir, 0.0f));
+        }
+        RayHit h;
+        if (!doc_.partBvh(i).raycast(m, lo, ld, h)) continue;
+        glm::vec3 pos = h.position, nrm = h.normal;
+        if (s.moved()) {
+            pos = glm::vec3(s.transform * glm::vec4(pos, 1.0f));
+            nrm = glm::normalize(glm::mat3(glm::transpose(glm::inverse(s.transform))) * nrm);
+        }
+        const float t = glm::dot(pos - o, dir);
+        if (t < best) {
+            best = t;
+            hit = h;
+            hit.position = pos;
+            hit.normal = nrm;
+            found = true;
+        }
+    }
+    return found;
+}
+
+glm::vec3 App::tubeDrawPoint(float x, float y, float& radius, glm::vec3& planeNormal) {
+    planeNormal = tubeViewDir();
+    RayHit hit;
+    const glm::vec3 eye = camera_.position();
+    glm::vec3 planePoint;
+    bool over = false;
+    if (tubeDepth_ == TubeDepth::Fixed) {
+        if (tubeFixedDepth_ <= 0.0f) tubeFixedDepth_ = glm::distance(eye, camera_.target);
+        planePoint = eye + planeNormal * tubeFixedDepth_;
+    } else if (tubeDepth_ == TubeDepth::Surface && (over = pickPart(x, y, &hit) >= 0)) {
+        planePoint = hit.position;
+    } else if (tubeDepth_ == TubeDepth::Surface && tubeHaveAnchor_ && glm::dot(tubeAnchor_ - eye, planeNormal) > 0.0f) {
+        planePoint = tubeAnchor_;
+    } else {
+        planePoint = camera_.target;
+    }
+    const float wpp = worldPerPixel(planePoint);
+    radius = std::max(tubeSizePx_ * (wpp > 0.0f ? wpp : 0.01f), 1e-5f);
+    glm::vec3 o, dir;
+    canvasRay(x, y, o, dir);
+    glm::vec3 p = planeHit(o, dir, planePoint, planeNormal);
+    if (tubeSnap_ && (over || pickPart(x, y, &hit) >= 0)) p = hit.position + glm::normalize(hit.normal) * (0.5f * radius);
+    return p;
+}
+
+bool App::tubePolyClick(float x, float y) {
+    float r = 0.0f;
+    glm::vec3 n;
+    const glm::vec3 p = tubeDrawPoint(x, y, r, n);
+    const char* kind = tubeCurve_ ? "Curve" : "Tube";
+    const int at = tubePolyPart_ ? doc_.partIndex(tubePolyPart_) : -1;
+    if (at >= 0 && at == doc_.activePart && tubeActive() && tubeMatchesMesh(doc_.mesh)) {
+        runCommand("tube_add_point", {{"position", pointText(p)}, {"radius", double(r)}});
+        if (!lastCommandOk_) return false;
+        tubeAnchor_ = p;
+        tubeHaveAnchor_ = true;
+        status_ = std::string(doc_.mesh.tube.curve ? "Curve" : "Tube") + ": " + std::to_string(doc_.mesh.tube.points.size()) +
+                  " points; click to add more, Enter ends the line";
+        return true;
+    }
+    TubeShape s = tubeLook_;
+    s.points = {{p, r}};
+    s.up = n;
+    s.flatCaps = tubeFlatCaps_;
+    s.mirrorX = symmetry_.x;
+    s.curve = tubeCurve_;
+    const int before = doc_.activePart;
+    int edited = -1;
+    const CommandResult res = tubeAdd(doc_, s, false, kind, &edited, true); // (made active: the next clicks extend it)
+    status_ = res.message;
+    if (!res.ok || edited < 0) return false;
+    if (doc_.partMesh(before).tube.empty()) tubeReturnPart_ = before; // (sculpted before: a brush or Esc goes back to it)
+    partSelected("tube point");
+    tubePolyPart_ = doc_.parts[size_t(edited)].id;
+    tubeAnchor_ = p;
+    tubeHaveAnchor_ = true;
+    status_ = std::string(kind) + ": 1 point; click to add more, Enter ends the line";
+    return true;
+}
+
+void App::tubeFinishLine(const char* why) {
+    if (!tubePolyPart_) return;
+    tubePolyPart_ = 0;
+    if (why) status_ = std::string("Tube: line ended (") + why + "); the next click starts a new one";
+}
+
+std::vector<int> App::tubeSelectedPoints() const {
+    std::vector<int> out;
+    if (!tubeActive()) return out;
+    const size_t n = doc_.mesh.tube.points.size();
+    if (tubeSelPart_ == doc_.activePartInfo().id)
+        for (const int i : tubeMultiSel_)
+            if (i >= 0 && size_t(i) < n) out.push_back(i);
+    if (const int s = tubeSelection(); s >= 0 && std::find(out.begin(), out.end(), s) == out.end()) out.push_back(s);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+void App::tubeToggleSelect(int point) {
+    const uint32_t id = doc_.activePartInfo().id;
+    if (tubeSelPart_ != id) {
+        tubeMultiSel_.clear();
+        tubeSelPart_ = id;
+    }
+    std::vector<int> sel = tubeSelectedPoints();
+    const auto it = std::find(sel.begin(), sel.end(), point);
+    const bool removed = it != sel.end();
+    if (removed) sel.erase(it);
+    else sel.push_back(point);
+    tubeMultiSel_ = sel;
+    tubeSelected_ = removed ? (sel.empty() ? -1 : sel.back()) : point;
+    status_ = sel.empty() ? "Tube: no point selected; the gizmo moves the whole curve"
+                          : "Tube: " + std::to_string(sel.size()) + (sel.size() == 1 ? " point" : " points") +
+                                " selected; Move, Scale and Rotate (W, E, R) work on them";
+}
+
+void App::tubeClearSelection() {
+    tubeMultiSel_.clear();
+    tubeSelected_ = -1;
+}
+
+bool App::tubeGizmoBegin() {
+    tubeGizmo_ = {};
+    if (!tubeActive()) return false;
+    if (!tubeMatchesMesh(doc_.mesh)) {
+        status_ = "Tube: this Part was moved or changed since it was drawn, so the gizmo moves its mesh (Bake keeps it as it is)";
+        return false;
+    }
+    tubeGizmo_.on = true;
+    tubeGizmo_.start = tubeGizmo_.preview = doc_.mesh.tube;
+    tubeGizmo_.before = doc_.mesh;
+    tubeGizmo_.points = tubeSelectedPoints();
+    if (tubeGizmo_.points.empty())
+        for (size_t i = 0; i < doc_.mesh.tube.points.size(); ++i) tubeGizmo_.points.push_back(int(i));
+    return true;
+}
+
+void App::tubeGizmoApply(const MeshTransform& t) {
+    if (!tubeGizmo_.on) return;
+    const Part& me = doc_.activePartInfo();
+    const glm::mat4 m = (me.moved() ? t.inSpaceOf(me.transform) : t).matrix();
+    const float k = std::cbrt(std::max(t.scale.x * t.scale.y * t.scale.z, 1e-12f)); // the radii follow an even scale
+    TubeShape s = tubeGizmo_.start;
+    for (const int i : tubeGizmo_.points) {
+        TubePoint& p = s.points[size_t(i)];
+        p.position = glm::vec3(m * glm::vec4(p.position, 1.0f));
+        p.radius = std::max(p.radius * k, 1e-5f);
+    }
+    Mesh mesh = tubeMesh(s, kTubePreviewTriangles); // (coarser while dragging a long or thin tube)
+    if (mesh.triangleCount() == 0) return;          // (too long or fine to sweep: the last good shape stays)
+    doc_.mesh = std::move(mesh);
+    doc_.mesh.topologyDirty = true;
+    doc_.bvhDirty = true; // (built once when let go)
+    tubeGizmo_.preview = s;
+    tubeGizmo_.changed = true;
+}
+
+bool App::tubeGizmoEnd(const char* label) {
+    TubeGizmo g = std::move(tubeGizmo_);
+    tubeGizmo_ = {};
+    if (!g.on || !g.changed) return false;
+    doc_.mesh = std::move(g.before);
+    Mesh full = tubeMesh(g.preview); // (full density)
+    doc_.mesh.topologyDirty = true;
+    doc_.bvhDirty = true;
+    if (full.triangleCount() == 0) {
+        status_ = "Tube: that is too long or fine to sweep; the points stay where they were";
+        return false;
+    }
+    doc_.replaceMeshUndoable(std::move(full), label);
+    status_ = std::string(label) + ": " + std::to_string(g.points.size()) + (g.points.size() == 1 ? " point" : " points");
+    return true;
+}
+
+void App::tubeGizmoCancel() {
+    if (tubeGizmo_.on && tubeGizmo_.changed) {
+        doc_.mesh = std::move(tubeGizmo_.before);
+        doc_.mesh.topologyDirty = true;
+        doc_.bvhDirty = true;
+        status_ = "Tube: points put back";
+    }
+    tubeGizmo_ = {};
+}
+
+bool App::tubeGizmoPivot(glm::vec3& out) const {
+    if (!tubeActive()) return false;
+    const std::vector<int> sel = tubeSelectedPoints();
+    const std::vector<TubePoint>& pts = doc_.mesh.tube.points;
+    glm::vec3 lo(1e30f), hi(-1e30f);
+    if (sel.empty())
+        for (const TubePoint& p : pts) lo = glm::min(lo, p.position), hi = glm::max(hi, p.position);
+    else
+        for (const int i : sel) lo = glm::min(lo, pts[size_t(i)].position), hi = glm::max(hi, pts[size_t(i)].position);
+    const glm::vec3 c = 0.5f * (lo + hi);
+    const Part& me = doc_.activePartInfo();
+    out = me.moved() ? glm::vec3(me.transform * glm::vec4(c, 1.0f)) : c;
+    return true;
 }
 
 // Undo in the middle of a stroke or a point drag would change the scene under it (the drag puts its own copy back
 // when let go: the mesh and its points no longer agree), so Esc, Undo and Redo drop the drag instead.
 bool App::tubeKey(SDL_Keycode key, SDL_Keymod mod) {
-    if (drag_ != Drag::Tube) return false;
+    if ((key == SDLK_RETURN || key == SDLK_KP_ENTER) && drag_ == Drag::None && tubeDraw_ && tubePoints_ && tubePolyPart_ != 0) {
+        tubeFinishLine("Enter");
+        return true;
+    }
+    if (drag_ != Drag::Tube && !(drag_ == Drag::Gizmo && tubeGizmo_.on)) return false;
     const Action* a = actions_.actionForKey(key, mod);
     if (key != SDLK_ESCAPE && !(a && (a->id == "edit.undo" || a->id == "edit.redo"))) return false;
+    if (drag_ == Drag::Gizmo) { // the gizmo's drag on the curve's points: put them back
+        tubeGizmoCancel();
+        gizmo_.handle = GizmoHandle::None;
+        gizmo_.readout.clear();
+        drag_ = Drag::None;
+        return true;
+    }
     tubeCancel();
     return true;
 }
@@ -660,6 +992,13 @@ void App::drawTubeOverlay() {
     const bool hoverOk = !ImGui::GetIO().WantCaptureMouse && cr.contains(mouseX_, mouseY_) && drag_ == Drag::None;
     int hoverPart = -1;
     const int hover = hoverOk && tubeGrabsPoints(inputMods()) ? tubePointAt(mouseX_, mouseY_, &hoverPart) : -1;
+    const std::vector<int> selected = tubeSelectedPoints();
+    // Points style: the span the next click would add, from the line's last point to the pointer.
+    if (tubeDraw_ && tubePoints_ && hoverOk && tubePolyPart_ && tubeActive() && doc_.partIndex(tubePolyPart_) == doc_.activePart) {
+        ImVec2 last;
+        if (gizmoProject(doc_.mesh.tube.points.back().position, last))
+            dl->AddLine(last, ImVec2(mouseX_, mouseY_), theme::u32(theme::accent), 1.5f * s);
+    }
     for (int i = 0; i < doc_.partCount(); ++i) {
         if ((i != doc_.activePart && !tubeDraw_) || !doc_.parts[size_t(i)].visible) continue;
         const TubeShape& t = doc_.partMesh(i).tube;
@@ -679,7 +1018,7 @@ void App::drawTubeOverlay() {
         for (size_t k = 0; k < t.points.size(); ++k) {
             ImVec2 p;
             if (!gizmoProject(t.points[k].position, p)) continue;
-            const bool sel = active && int(k) == tubeSelection();
+            const bool sel = active && std::binary_search(selected.begin(), selected.end(), int(k));
             const bool hot = int(k) == hover && i == hoverPart;
             const ImU32 col = hot ? ((inputMods() & SDL_KMOD_ALT) ? IM_COL32(255, 90, 80, 240) : IM_COL32(120, 200, 255, 240))
                               : sel ? IM_COL32(255, 170, 60, 240)

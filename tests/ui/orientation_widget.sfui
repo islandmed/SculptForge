@@ -1,0 +1,139 @@
+# The orientation widget (Draw > Camera > Corner gizmo > Orientation; a member's request): the axes through a ball of
+# dark glass, a dot at each end, no letters. A click on a dot turns the camera to that side with a short eased move
+# (orthographic at the end, as the numpad views), the dot facing you again turns to the opposite side, a drag
+# orbits, a double-click frames the model. The SculptForge layout shows it by default, the Classic layout keeps the
+# axes; the preference picks either, hides the corner, or moves it to the top right. Shots: hover looks, views,
+# light background, UI scale 200, the top right corner.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+key f
+expect_value orientation_widget == 0        # Classic: the axes, as before
+expect_value corner_gizmo == 1
+expect_value axis_gizmo_length == 34
+run ui_look look=forge layout=sculptforge
+expect_value orientation_widget == 1        # SculptForge: the widget
+expect_value corner_gizmo == 2
+expect_value axis_view == 2
+shot front_dark_100
+
+# Hover: a dot lights up and its side is named; the disc beside the dots is just the disc.
+axis_hover +x
+expect_value nav_hover_end == 0
+shot hover_right
+axis_hover -x
+expect_value nav_hover_end == 3
+shot hover_left
+axis_hover disc
+expect_value nav_hover_end == -1
+shot hover_disc
+
+# A click on the +X dot: the camera eases to the right view (a few frames in, it is on its way), orthographic at the end.
+# (nowait: axis_click otherwise settles the move before the next line, as the older scripts expect.)
+axis_click +x nowait
+expect_value camera_moving == 1
+expect_value camera_yaw > 0
+expect_value camera_yaw < 90
+wait 0.5
+expect_value camera_moving == 0
+expect_value camera_yaw == 90
+expect_value camera_pitch == 0
+expect_value camera_ortho == 1
+expect_value axis_view == 0
+shot right_view
+
+# The +X dot again while it faces you: the left view (the opposite side).
+axis_click +x
+wait 0.5
+expect_value axis_view == 3
+expect_value camera_yaw == -90
+expect_value camera_ortho == 1
+
+# The top from a three-quarter view (the `camera` verb sets the angles directly, so the auto-ortho stays until a turn).
+camera 35 -25
+axis_hover +y
+shot three_quarter_hover_top
+axis_click +y
+wait 0.5
+expect_value camera_pitch == -90
+expect_value camera_yaw == 0
+expect_value axis_view == 1
+shot top_view
+
+# A drag on the disc orbits instead of clicking: the view leaves the side view, no eased move runs.
+axis_drag 40 0
+expect_value camera_moving == 0
+expect_value camera_aligned == 0
+expect_value axis_view == -1
+shot after_drag
+
+# A double-click frames, and only frames: zoom far out first, then the model fills the view again and the view is
+# back where it was (the first click's turn is undone).
+camera 35 -25
+camera_distance 40
+axis_click +z double
+wait 0.6
+expect_value camera_distance < 10
+expect_value camera_moving == 0
+expect_value camera_yaw == 35
+expect_value camera_pitch == -25
+
+# Orbit lock: the locked axis runs through the disc and its badge sits at the lower right, with the widget too.
+action view.orbit_lock_x
+camera 35 -25
+shot orbit_lock_x
+action view.orbit_lock_free
+
+# Reduce motion: a click lands at once.
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Interface##preferences.interface"
+click "Reduce motion"
+expect_value reduce_motion == 1
+key escape
+camera 35 -25
+axis_click +z
+expect_value camera_moving == 0
+expect_value camera_yaw == 0
+expect_value camera_pitch == 0
+expect_value camera_ortho == 1
+
+# The preference: the axes instead, hidden, and the widget again (Draw > Camera > Corner gizmo).
+camera 35 -25
+action view.corner_axes
+expect_value corner_gizmo == 1
+expect_value orientation_widget == 0
+shot axes_instead
+action view.corner_off
+expect_value corner_gizmo == 0
+axis_click +z
+expect_value camera_moving == 0             # nothing there to click: a plain click on the background
+expect_value camera_yaw > 34.9
+expect_value camera_yaw < 35.1
+action view.corner_widget
+expect_value corner_gizmo == 2
+
+# The top right corner (the member asked for it there): the disc moves across, clicks still land, and back.
+remember axis_gizmo_x gx_left
+action view.corner_top_right
+expect_value corner_position == 1
+expect_value axis_gizmo_x > 600
+shot top_right_corner
+axis_click +x
+wait 0.5
+expect_value axis_view == 0
+action view.corner_top_left
+expect_value corner_position == 0
+expect_value axis_gizmo_x == $gx_left
+
+# A light background: the glass darkens, the names stay readable; and UI scale 200.
+run set_background color=215,215,218
+camera 35 -25
+shot three_quarter_light_100
+axis_hover -z
+shot three_quarter_light_hover_rear
+ui_scale 200
+expect_value ui_scale == 200
+camera 35 -25
+shot three_quarter_light_200
+axis_hover +z
+shot three_quarter_light_200_hover_front

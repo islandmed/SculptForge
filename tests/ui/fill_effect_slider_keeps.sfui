@@ -1,0 +1,135 @@
+# Letting go of a Mask effect slider (Paint Layers > Fill layer > Mask) keeps the dragged value: the panel used to commit
+# the slider's per-frame copy of the stored value on release (the old one), so Size and Contrast jumped back (a user's clip).
+# The same for the material sliders and the Fill effect's Value. Undo returns the old value, redo the new one.
+run new_sphere subdivisions=3
+run uv_auto resolution=1024
+wait_value auto_uv_running == 0 120
+run texture_create size=1024
+click "Paint Layers##tool.paint_layers"
+run fill_layer name=Slider color=c08040
+run fill_layer action=effect kind=noise
+wait_value mesh_maps_busy == 0 300
+expect_value fill_noise_scale == 0.05
+expect_value fill_noise_contrast == 1.0
+
+# The panel is taller than the window: scroll down to the mask effects.
+wheel_item "Fill layer" 0 -20
+wait 0.2
+
+# Size: drag the slider, let go; the stored value is the dragged one, not the old.
+drag_item "Paint Layers/##scale" 60 0
+wait 0.3
+shot size-released
+expect_value fill_noise_scale != 0.05
+remember fill_noise_scale size_new
+wait 0.3
+expect_value fill_noise_scale == $size_new
+# Contrast
+drag_item "Paint Layers/##contrast" -60 0
+wait 0.3
+expect_value fill_noise_contrast != 1.0
+remember fill_noise_contrast contrast_new
+wait 0.3
+expect_value fill_noise_contrast == $contrast_new
+# Value on the Fill effect (the first effect).
+drag_item "Paint Layers/##value" -60 0
+wait 0.3
+expect_value fill_fill_value != 1.0
+remember fill_fill_value value_new
+wait 0.3
+expect_value fill_fill_value == $value_new
+
+# Undo returns the old values, redo the new ones.
+key ctrl+z
+expect_value fill_fill_value == 1.0
+key ctrl+z
+expect_value fill_noise_contrast == 1.0
+key ctrl+z
+expect_value fill_noise_scale == 0.05
+key ctrl+shift+z
+expect_value fill_noise_scale == $size_new
+key ctrl+shift+z
+expect_value fill_noise_contrast == $contrast_new
+key ctrl+shift+z
+expect_value fill_fill_value == $value_new
+
+# A typed value (double-click) is the one stored, not the old copy or the click's middle value.
+double_click "Paint Layers/##contrast"
+expect_value typing == 1
+type_here 2.5
+key enter
+expect_value typing == 0
+wait 0.3
+expect_value fill_noise_contrast == 2.5
+key ctrl+z
+expect_value fill_noise_contrast != 2.5
+
+# The material slider (Roughness, once its channel is on) keeps its value on release the same way.
+click "R##fillch"
+remember fill_roughness rough_old
+drag_item "Paint Layers/##fillrough" 50 0
+wait 0.3
+expect_value fill_roughness != $rough_old
+remember fill_roughness rough_new
+wait 0.3
+expect_value fill_roughness == $rough_new
+key ctrl+z
+expect_value fill_roughness == $rough_old
+key ctrl+shift+z
+expect_value fill_roughness == $rough_new
+
+# The layer channel chip's Opacity slider (right-click the chip) too.
+right_click "R##chip"
+remember layer_roughness_opacity op_old
+drag_item "##chipopacity" -40 0
+wait 0.3
+expect_value layer_roughness_opacity != $op_old
+remember layer_roughness_opacity op_new
+wait 0.3
+expect_value layer_roughness_opacity == $op_new
+key escape
+key ctrl+z
+expect_value layer_roughness_opacity == $op_old
+key ctrl+shift+z
+expect_value layer_roughness_opacity == $op_new
+
+# One slider from each other effect type: Levels (Gamma), Blur (Radius), a Generator (Level).
+run fill_layer action=effect kind=levels
+run fill_layer action=effect kind=blur
+run fill_layer action=effect generator=edge_wear
+wait_value mesh_maps_busy == 0 300
+wheel_item "Fill layer" 0 -30
+wait 0.2
+remember fill_levels_gamma gamma_old
+drag_item "Paint Layers/##gamma" 60 0
+wait 0.3
+expect_value fill_levels_gamma != $gamma_old
+remember fill_levels_gamma gamma_new
+wait 0.3
+expect_value fill_levels_gamma == $gamma_new
+key ctrl+z
+expect_value fill_levels_gamma == $gamma_old
+key ctrl+shift+z
+expect_value fill_levels_gamma == $gamma_new
+remember fill_blur_radius radius_old
+drag_item "Paint Layers/##radius" 60 0
+wait 0.3
+expect_value fill_blur_radius != $radius_old
+remember fill_blur_radius radius_new
+wait 0.3
+expect_value fill_blur_radius == $radius_new
+key ctrl+z
+expect_value fill_blur_radius == $radius_old
+key ctrl+shift+z
+expect_value fill_blur_radius == $radius_new
+remember fill_generator_level level_old
+drag_item "Paint Layers/##level" -60 0
+wait 0.3
+expect_value fill_generator_level != $level_old
+remember fill_generator_level level_new
+wait 0.3
+expect_value fill_generator_level == $level_new
+key ctrl+z
+expect_value fill_generator_level == $level_old
+key ctrl+shift+z
+expect_value fill_generator_level == $level_new

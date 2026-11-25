@@ -328,7 +328,13 @@ void App::drawTextureMapContents() {
     ImGui::SameLine();
     ui::ActionButton(*this, "texture.new", ImVec2(-1, 0));
 
-    if (hasTexture(m) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart))) {
+    if (hasTexture(m) && renderer_.textureRejected(doc_.meshKey(doc_.activePart))) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f), "%s",
+                           tr("This graphics chip rejected drawing the texture on the model. Painting still goes into the texture "
+                              "(see it in the UV view or export it). Help > Copy log to clipboard shows what failed."));
+        ImGui::PopTextWrapPos();
+    } else if (hasTexture(m) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart))) {
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f), "%s",
                            tr("This graphics chip cannot show the texture on a model this dense. Painting still goes into the texture "

@@ -4,12 +4,15 @@
 // sf_remesh_bench: times every remesh path at the UI defaults on spheres of a given size (tests/perf,
 // docs/testing-flow.md).
 //   sf_remesh_bench [--runs N] [--tris 1000,10000,...] [--paths qr2,legacy,voxel] [--bumpy] [--shape
-//   sphere|cube|torus|horn|starter:<id>]
+//   sphere|cube|torus|horn|creased|starter:<id>]
 //                   [--target Q] [--voxel-res R] [--cancel-after MS] [--noise A] [--holes N] [--detail KIND]
 //                   [--symmetry x|y|z]
 // --noise A: every vertex moved along its normal by up to A x the bounding-box diagonal (scan or pore-like grain);
 // --holes N: N round holes punched through the surface (open boundaries, as a sculpt with deleted faces).
 // --detail KIND: a whole-surface detail_pass (pores, skin, wrinkles, scales, scars), as a finished sculpt has.
+// --no-crease-snap: Voxel Remesh without its crease pass (A/B). --keep-groups: with Keep Face Groups.
+// --shape creased: a sphere with V-creases under two voxels wide at Resolution 200 (tests/CreaseProbe.h, gh#240; --tris
+// is ignored); each voxel row is followed by a CREASE line: serration and distances along the creases.
 // --cancel-after MS: Cancel each run MS ms after it starts (from another thread, as the app's button does) and print
 // the Cancel latency (gh#226: how long the remesh takes to notice and return). One CSV row per run on stdout: path,
 // input triangles, run, total ms, the time between progress marks (stages), the output size and the Hausdorff / mean
@@ -22,6 +25,8 @@
 #include "core/StarterMeshes.h"
 #include "core/Voxel.h"
 
+#include "../CreaseProbe.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -31,7 +36,12 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/resource.h>
+#endif
 
 using namespace sf;
 
@@ -140,6 +150,66 @@ uint64_t meshHash(const Mesh& m) {
     return h;
 }
 
+// Peak resident memory of this process so far, in MB (the high-water mark: run one size per process for a
+// per-size number). 0 where the platform has no getrusage.
+double peakRssMb() {
+#if defined(__unix__) || defined(__APPLE__)
+    rusage ru{};
+    if (getrusage(RUSAGE_SELF, &ru) == 0) {
+#if defined(__APPLE__)
+        return double(ru.ru_maxrss) / (1024.0 * 1024.0);
+#else
+        return double(ru.ru_maxrss) / 1024.0;
+#endif
+    }
+#endif
+    return 0.0;
+}
+
+// Poles (interior vertices of valence != 4) on the symmetry plane and within 3 mean edge lengths of it: with Symmetry
+// the half is remeshed with the cut as a feature line and mirrored, and a weak seam shows up as poles along it.
+size_t seamPoles(const Mesh& mesh, int axis, size_t* near) {
+    if (near) *near = 0;
+    if (axis < 0) return 0;
+    std::vector<int> valence(mesh.vertexCount(), 0);
+    std::vector<uint8_t> open(mesh.vertexCount(), 0);
+    std::unordered_map<uint64_t, int> edges;
+    double lsum = 0.0;
+    for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
+        glm::uvec4 f;
+        const int n = mesh.exportFace(t, f);
+        if (n < 3) continue;
+        for (int k = 0; k < n; ++k) {
+            const uint32_t a = f[k], b = f[(k + 1) % n];
+            ++edges[a < b ? (uint64_t(a) << 32) | b : (uint64_t(b) << 32) | a];
+        }
+    }
+    for (auto [key, uses] : edges) {
+        const uint32_t a = uint32_t(key >> 32), b = uint32_t(key & 0xffffffffu);
+        ++valence[a], ++valence[b];
+        if (uses == 1) open[a] = open[b] = 1;
+        lsum += double(glm::length(mesh.positions[a] - mesh.positions[b]));
+    }
+    const float meanEdge = edges.empty() ? 0.0f : float(lsum / double(edges.size()));
+    if (std::getenv("SF_QREMESH_TIMING")) { // the valences on the plane (a seam vertex has 2 quads a side when all is well: 4)
+        std::vector<size_t> hist(10, 0);
+        for (uint32_t v = 0; v < mesh.vertexCount(); ++v)
+            if (valence[v] > 0 && !open[v] && std::abs(mesh.positions[v][axis]) < 1e-3f * meanEdge) ++hist[size_t(std::min(valence[v], 9))];
+        std::fprintf(stderr, "  seam valences:");
+        for (size_t k = 2; k < hist.size(); ++k)
+            if (hist[k]) std::fprintf(stderr, " %zu x%zu", k, hist[k]);
+        std::fprintf(stderr, "\n");
+    }
+    size_t on = 0;
+    for (uint32_t v = 0; v < mesh.vertexCount(); ++v) {
+        if (valence[v] == 0 || open[v] || valence[v] == 4) continue;
+        const float d = std::abs(mesh.positions[v][axis]);
+        if (d < 1e-3f * meanEdge) ++on;
+        else if (near && d < 3.0f * meanEdge) ++*near;
+    }
+    return on;
+}
+
 std::vector<long> parseList(const char* s) {
     std::vector<long> v;
     std::stringstream ss(s);
@@ -152,10 +222,10 @@ std::vector<long> parseList(const char* s) {
 
 int main(int argc, char** argv) {
     int runs = 5, target = 5000, voxelRes = 200, cancelAfter = -1, holes = 0;
-    float noise = 0.0f;
+    float noise = 0.0f, adaptive = -1.0f; // (adaptive < 0: the option's default)
     std::string detail;
     int symmetry = -1;
-    bool bumpy = false;
+    bool bumpy = false, keepGroups = false;
     std::vector<long> sizes = {1000, 10000, 100000, 1000000};
     std::string paths = "qr2,legacy,voxel", shape = "sphere";
     for (int i = 1; i < argc; ++i) {
@@ -167,9 +237,12 @@ int main(int argc, char** argv) {
         else if (a == "--target" && more) target = std::atoi(argv[++i]);
         else if (a == "--voxel-res" && more) voxelRes = std::atoi(argv[++i]);
         else if (a == "--bumpy") bumpy = true;
+        else if (a == "--no-crease-snap") setVoxelCreaseSnap(false);
+        else if (a == "--keep-groups") keepGroups = true;
         else if (a == "--shape" && more) shape = argv[++i];
         else if (a == "--cancel-after" && more) cancelAfter = std::atoi(argv[++i]);
         else if (a == "--noise" && more) noise = float(std::atof(argv[++i]));
+        else if (a == "--adaptive" && more) adaptive = float(std::atof(argv[++i]));
         else if (a == "--holes" && more) holes = std::atoi(argv[++i]);
         else if (a == "--detail" && more)
             detail = argv[++i];
@@ -178,18 +251,21 @@ int main(int argc, char** argv) {
         else {
             std::fprintf(stderr,
                          "usage: sf_remesh_bench [--runs N] [--tris a,b,c] [--paths qr2,legacy,voxel] [--bumpy] "
-                         "[--shape sphere|cube|torus|horn|starter:<id>] [--target Q] [--voxel-res R] [--cancel-after "
+                         "[--shape sphere|cube|torus|horn|creased|starter:<id>] [--target Q] [--voxel-res R] [--cancel-after "
                          "MS] [--noise A] [--holes N] [--detail KIND] [--symmetry x|y|z]\n");
             return 2;
         }
     }
     // A compact summary at the end (median, min, max per path and size), for logs that keep only the tail.
     std::vector<std::string> summary;
-    std::printf("path,tris,run,total_ms,stages,out_tris,hausdorff_pct,mean_pct,poles,angle_dev,angle_p99,edge_cv,hash\n");
+    std::printf("path,tris,run,total_ms,stages,out_tris,hausdorff_pct,mean_pct,poles,angle_dev,angle_p99,edge_cv,hash,max_gap_ms,seam_poles,near_seam_poles\n");
+    const bool creased = shape == "creased";
+    const crease::Fixture creases = creased ? crease::makeCreasedSphere() : crease::Fixture{};
+    if (creased) sizes = {long(creases.mesh.triangleCount())};
     for (long n : sizes) {
-        Mesh src = noise > 0.0f || holes > 0 ? roughen(sphere(size_t(n), bumpy, shape), noise, holes)
+        Mesh src = creased ? creases.mesh : noise > 0.0f || holes > 0 ? roughen(sphere(size_t(n), bumpy, shape), noise, holes)
                                              : sphere(size_t(n), bumpy, shape);
-        if (!detail.empty()) src = withDetail(src, detail);
+        if (!creased && !detail.empty()) src = withDetail(src, detail);
         if (const char* path =
                 std::getenv("SF_BENCH_SOURCE")) { // SF_BENCH_SOURCE=<file>: the input as OBJ (to open it in the app)
             if (std::FILE* fo = std::fopen(path, "w")) {
@@ -220,10 +296,17 @@ int main(int argc, char** argv) {
                         cancelAt = Clock::now();
                         cancel = true;
                     });
+                // The longest silence between two progress calls is the Cancel latency bound (the job notices a Cancel at
+                // its next call). Marks at every 0.05 of progress keep the stage columns short now that a stage reports
+                // its way through.
+                auto lastCall = t0;
+                double maxGap = 0.0;
                 auto mark = [&](float f) {
                     if (cancel) return false;
                     const auto now = Clock::now();
-                    if (f != lastF) {
+                    maxGap = std::max(maxGap, ms(lastCall, now));
+                    lastCall = now;
+                    if (f != lastF && (std::floor(f * 20.0f + 1e-4f) != std::floor(lastF * 20.0f + 1e-4f) || f >= 1.0f)) {
                         char b[48];
                         std::snprintf(b, sizeof b, "%s%.2f:%.1f", stages.empty() ? "" : " ", f, ms(last, now));
                         stages += b;
@@ -236,12 +319,13 @@ int main(int argc, char** argv) {
                 QuadQuality q;
                 bool ok;
                 if (std::string(path) == "voxel") {
-                    out = voxelRemesh(src, voxelRes, &error, mark);
+                    out = voxelRemesh(src, voxelRes, &error, mark, false, keepGroups);
                     ok = out.triangleCount() > 0;
                 } else {
                     QRemeshOptions o; // the UI defaults (App::startQRemesh with retopo_ untouched)
                     o.method = std::string(path) == "legacy" ? QRemeshMethod::Legacy : QRemeshMethod::V2;
                     o.targetQuads = target;
+                    if (adaptive >= 0.0f) o.adaptive = adaptive;
                     o.symmetryAxis = symmetry >= 0 && symmetry <= 2 ? symmetry : -1;
                     QRemeshStats st;
                     ok = qremesh(src, o, out, error, mark, &st);
@@ -257,8 +341,9 @@ int main(int argc, char** argv) {
                 const double total = ms(t0, Clock::now());
                 if (canceller.joinable()) {
                     canceller.join();
-                    std::printf("CANCEL %s %zu: asked at %.0f ms, returned %.0f ms later (%s)\n", path, src.triangleCount(),
-                                ms(t0, cancelAt), total - ms(t0, cancelAt), ok ? "finished anyway" : error.c_str());
+                    std::printf("CANCEL %s %zu: asked at %.0f ms, returned %.0f ms later (%s); longest silence %.0f ms\n", path,
+                                src.triangleCount(), ms(t0, cancelAt), total - ms(t0, cancelAt), ok ? "finished anyway" : error.c_str(),
+                                maxGap);
                     std::fflush(stdout);
                     continue;
                 }
@@ -267,19 +352,40 @@ int main(int argc, char** argv) {
                     continue;
                 }
                 if (!q.measured) q = quadQuality(out, &src); // (voxel: measured here, outside its time)
-                std::printf("%s,%zu,%d,%.1f,%s,%zu,%.4f,%.4f,%zu,%.2f,%.2f,%.3f,%016llx\n", path, src.triangleCount(), run, total,
+                size_t nearSeam = 0;
+                const size_t onSeam = std::string(path) == "voxel" ? 0 : seamPoles(out, symmetry, &nearSeam);
+                std::printf("%s,%zu,%d,%.1f,%s,%zu,%.4f,%.4f,%zu,%.2f,%.2f,%.3f,%016llx,%.1f,%zu,%zu\n", path, src.triangleCount(), run, total,
                             stages.c_str(), out.triangleCount(), q.hausdorff, q.meanDistance, q.poles, q.angleDeviation,
-                            q.angleDeviationMax, q.edgeLengthCv, (unsigned long long)meshHash(out));
+                            q.angleDeviationMax, q.edgeLengthCv, (unsigned long long)meshHash(out), maxGap, onSeam, nearSeam);
+                if (std::getenv("SF_BENCH_SELFX")) // SF_BENCH_SELFX=1: the result's self-intersections (tests/CreaseProbe.h)
+                    std::printf("SELFX %s %zu: %zu self-intersections\n", path, src.triangleCount(), crease::selfIntersections(out));
+                if (creased && std::string(path) == "voxel") {
+                    const glm::vec3 ext = src.bounds().extent();
+                    const crease::Measure cm = crease::measure(creases, out, std::max({ext.x, ext.y, ext.z}) / float(voxelRes));
+                    std::printf("CREASE res %d: serration %.3f deg, normal error %.3f deg, Hausdorff %.3f, mean %.4f, bottom gap "
+                                "%.3f voxels (%zu samples), wiggle %.3f voxels, depth cv %.3f, profile error %.3f voxels, %zu self-intersections\n",
+                                voxelRes, cm.serrationDeg, cm.normalErrDeg, cm.hausdorff, cm.mean, cm.bottomGap, cm.samples,
+                                cm.wiggleVox, cm.depthCv, cm.profileErr,
+                                crease::selfIntersections(out));
+                    if (const char* img = std::getenv("SF_CREASE_IMAGE")) { // SF_CREASE_IMAGE=<prefix>: close-ups, source and result
+                        for (size_t g : {size_t(1), size_t(4)}) {
+                            const std::string pre = std::string(img) + "-g" + std::to_string(g);
+                            crease::renderPatch(creases, src, g, 0.6f, 0.25f, (pre + "-source.ppm").c_str());
+                            crease::renderPatch(creases, out, g, 0.6f, 0.25f, (pre + "-result.ppm").c_str());
+                        }
+                    }
+                }
                 std::fflush(stdout);
                 totals.push_back(total);
                 lastQuality = q;
+                std::fprintf(stderr, "PEAK_RSS %s %zu %d %.0f MB\n", path, src.triangleCount(), run, peakRssMb());
             }
             if (totals.empty()) continue;
             std::sort(totals.begin(), totals.end());
             char b[160];
-            std::snprintf(b, sizeof b, "SUMMARY %s %zu: median %.0f ms (%.0f..%.0f), Hausdorff %.4f%%, poles %zu", path,
-                          src.triangleCount(), totals[totals.size() / 2], totals.front(), totals.back(),
-                          lastQuality.hausdorff, lastQuality.poles);
+            std::snprintf(b, sizeof b, "SUMMARY %s %zu: median %.0f ms (%.0f..%.0f), Hausdorff %.4f%%, poles %zu, peak RSS %.0f MB",
+                          path, src.triangleCount(), totals[totals.size() / 2], totals.front(), totals.back(),
+                          lastQuality.hausdorff, lastQuality.poles, peakRssMb());
             summary.push_back(b);
         }
     }

@@ -1,0 +1,39 @@
+# Drape with wind: a flag, a plane stood up and held along its top edge by a mask (Pins from mask), a wind toward the
+# right with gusts: it streams along the wind and flaps; the wind can change while the simulation runs; in gusts the
+# cloth keeps moving until Keep, which keeps the frame as one undo step.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_plane resolution=80
+run transform rotate=90,0,0                    # stood up: it faces the front view
+run transform translate=-0.6,0,0               # room to stream to the right
+run mask_rect y0=0.85                          # its top strip, seen from the front: the pins
+run part_select name=Plane
+camera 25 -12
+zoom 1.25
+click "Tool##palette.tool"
+click "Drape##tool.drape"
+expect "##drapewind"
+drag_item "##drapewind" -75 0             # a breeze (the slider's middle is 10 m/s)
+wait_value drape_wind > 0 5
+click "From view##drapewind"
+wait_value drape_heading > 0 5
+drag_item "##drapeheading" -2000 0        # 0: toward -Z (into the screen from the front view)
+wait_value drape_heading == 0 5
+drag_item "##drapeheading" 62 0           # a heading away to the left of the view: it streams across the view
+wait_value drape_heading > 30 5
+drag_item "##drapegusts" 25 0
+wait_value drape_gusts > 0 5
+snapshot
+click "Simulate##drape"
+wait_value drape_running == 1 10
+wait_value drape_frame > 30 30
+drag_item "##drapewind" -60 0             # a little harder, while it runs (each drag starts at the slider's middle)
+wait_value drape_frame > 90 30
+expect "Keep##drape"
+click "Keep##drape"
+wait_value drape_running == 0 10
+expect_value moved > 3000
+expect_value can_undo == 1
+wait_idle 30
+shot cloth_drape_wind
+key ctrl+z
+expect_value moved == 0

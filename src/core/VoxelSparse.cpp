@@ -131,7 +131,7 @@ void morph(const Bricks& g, std::vector<uint8_t>& flags, Src src, Uniform unifor
 } // namespace
 
 Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float band, bool checkClosed, std::string* error,
-                        const std::function<bool(float)>& step, bool allowSwap) {
+                        const std::function<bool(float)>& step, bool allowSwap, CreaseReport* creases) {
     auto fits = [&](size_t need) { // (free memory, or past it with the person's go-ahead and room on swap)
         const MemoryTier tier = classifyMemory(need);
         return tier == MemoryTier::Fits || (allowSwap && tier == MemoryTier::NeedsSwap);
@@ -205,8 +205,9 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
     std::vector<uint8_t>().swap(mark);
     const size_t stored = g.at.size() * kB3;
     {
-        // Flags, morph scratch, distance and nearest triangle per stored sample, the surface it makes.
-        const size_t need = stored * 11 + size_t(double(stored) * 0.6);
+        // Flags, morph scratch, distance and nearest triangle per stored sample (kept for the crease pass: the surface
+        // nets' cell numbers get their own), the surface it makes.
+        const size_t need = stored * (voxelCreaseSnap() ? 15 : 11) + size_t(double(stored) * 0.6);
         if (const MemoryCheck c = checkMemory(need); !fits(need))
             return fail("Voxel Remesh at " + std::to_string(resolution) + " needs ~" + formatGigabytes(c.needBytes + memoryMargin(c.needBytes)) +
                         " free, " + formatGigabytes(c.availableBytes) + " available. Lower the Resolution or close other apps");
@@ -507,7 +508,10 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
     for (size_t r = 0; r + 1 < rowStart.size(); ++r) rowStart[r + 1] += rowStart[r];
     // (g.at is in brick order: z, y, x, so a row's bricks are consecutive and its slots run from rowStart[row].)
     auto row = [&](int y, int z) { return size_t(z >> 3) * size_t(g.bd.y) + size_t(y >> 3); };
-    std::vector<int32_t>& cellVertex = nearest;
+    const bool snap = voxelCreaseSnap();
+    std::vector<int32_t> ownCells;
+    if (snap) ownCells.assign(stored, -1);
+    std::vector<int32_t>& cellVertex = snap ? ownCells : nearest;
     std::fill(cellVertex.begin(), cellVertex.end(), -1);
     const glm::ivec3 cells = g.dims - 1;
     if (glm::any(glm::lessThan(cells, glm::ivec3(1)))) return {};
@@ -622,8 +626,8 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
         }
     }, 1);
     std::vector<float>().swap(dist2);
-    std::vector<int32_t>().swap(nearest);
-    std::vector<int32_t>().swap(g.slot);
+    std::vector<int32_t>().swap(ownCells);
+    if (!snap) std::vector<int32_t>().swap(nearest), std::vector<int32_t>().swap(g.slot);
     size_t triangleTotal = 0;
     for (const auto& t : sliceTriangles) triangleTotal += t.size();
     m.triangles.reserve(triangleTotal);
@@ -635,6 +639,14 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
     m.rebuildTopology();
     taubinSmooth(m, 2);
     m.recomputeAllNormals();
+    if (snap) {
+        const bool rebuilt = snapVoxelCreases(m, mesh, origin, cell, g.dims, [&](const glm::ivec3& s) {
+            const int64_t i = g.find(s.x, s.y, s.z);
+            return i < 0 ? int32_t(-1) : nearest[size_t(i)];
+        }, creases);
+        if (rebuilt) m.rebuildTopology();
+        m.recomputeAllNormals();
+    }
     return m;
 }
 

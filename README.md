@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.14:</strong> sculpting with Dynamic on no longer erases the texture of a painted Part (<a href="https://sculptforge.app/guide/texture-painting.md">how it works</a>)
+  <strong>New in 0.14.1:</strong> up to four lights of your own with a shadow strength, any control on any shelf, and one place for the camera&#x27;s navigation bindings (<a href="https://sculptforge.app/guide/pbr-painting.md">how it works</a>)
 </p>
 
 <p align="center">

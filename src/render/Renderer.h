@@ -27,6 +27,32 @@ namespace sf {
 
 class MicroRenderer;
 
+// An added view light (RenderSettings::lights).
+struct ViewLight {
+    enum class Role : uint8_t { Key = 0, Fill = 1, Rim = 2 };
+    Role role = Role::Key;
+    float yaw = 0.0f, pitch = 0.0f; // degrees, as RenderSettings::lightYaw / lightPitch (view space)
+    glm::vec3 color{1.0f};         // linear RGB
+    float intensity = 1.0f;        // 0..3
+    bool shadows = false;          // the view's cast shadows come from this light (one light at most; a Key starts so)
+};
+constexpr int kMaxViewLights = 4;
+// What a light of that role starts as: the key from the upper left front, a cool fill from the right, a rim from
+// behind and above. The names are what the interface shows.
+ViewLight viewLightPreset(ViewLight::Role role);
+const char* viewLightRoleName(ViewLight::Role role);    // "Key", "Fill", "Rim"
+bool parseViewLightRole(const std::string& text, ViewLight::Role& out); // either name, any case
+// The direction towards the light in view space (yaw / pitch as lightRotation turns it from straight ahead).
+glm::vec3 viewLightDirection(float yawDegrees, float pitchDegrees);
+// Balance of the added lights: the factor every light's colour is scaled by so that together they add one light's worth
+// of exposure (their luminance-weighted intensities sum to at most the strongest light's own intensity, or 1 if that is
+// less). 1 with no light or one light: a single light is exactly what its slider says; four at their presets share it
+// instead of washing the model out.
+float viewLightsBalance(const std::vector<ViewLight>& lights);
+// The share of the light a cast shadow takes away: the light's own share `base` times RenderSettings::shadowStrength,
+// at most 1 (black).
+float shadowDarknessFor(float base, float strength);
+
 struct RenderSettings {
     bool wireframe = false;
     glm::vec3 baseColor{0.62f, 0.58f, 0.53f}; // Studio's colour: a warm clay grey, like the default Soft Clay
@@ -100,7 +126,16 @@ struct RenderSettings {
     float aoSoftness = 0.4f;  // 0..1: the blur's width
     bool shadows = false;     // the key light's cast shadows (PBR: the environment's brightest direction)
     float shadowSoftness = 0.35f;
+    // Shadow strength (a member's request): a multiplier on how dark the cast shadows get. 1 = the darkness Shadows & AO
+    // shipped with (the light's own share, Occlusion.h shadowDarkness), 2 = black shadows, 0 = none (shadowDarknessFor).
+    float shadowStrength = 1.0f;
     bool occlusionInLitSphere = false;
+    // Added lights (Material > Light > Lights): up to kMaxViewLights directional lights on top of the material's
+    // own light (Lit Sphere / studio) or the environment (PBR), each a role it started as (Key, Fill, Rim), a
+    // direction in view space (yaw / pitch as the light above: they turn with the camera), a linear colour and an
+    // intensity. None by default: the view draws exactly as it did. The one with `shadows` on (a Key starts with
+    // it) is the light the cast shadows come from (Shadows & AO). Saved in the project.
+    std::vector<ViewLight> lights;
     // Lit Sphere and studio lighting (#80): the light turned from where the material has it, in degrees about the
     // view's up axis (yaw, + to the right) and its side axis (pitch, + up), its intensity (a multiplier) and an
     // ambient term that lifts the shadows (a share of the colour). The defaults leave the material as it is.
@@ -160,6 +195,11 @@ struct SceneMesh {
 struct RenderViewport {
     int x = 0, y = 0, w = 0, h = 0;
     glm::vec3 surround{0.118f, 0.118f, 0.125f};
+    // Several views in one frame (App's Split view): multi = a scaled draw goes into the frame-size target and only this
+    // rect is copied to the window, so the panes share one target (no reallocation between them); keep = the target
+    // outside this rect is left as it is (the pane before drew there; the first pane clears it); secondary = no
+    // screen-stroke pass (the pending dabs' preview belongs to the view the stroke is in).
+    bool multi = false, keep = false, secondary = false;
 };
 
 // Display colour of a face group id (linear RGB): a stable hash spread over
@@ -185,7 +225,7 @@ public:
     // `features` unchanged when nothing more can go (then the mesh isn't drawn, and the log says why).
     static int simplerMeshFeatures(int features) {
         for (int bit : {kGhost, kPbr, kNormalMap, kTextured, kPrim, kFlat})
-            if (features & bit) return features & ~bit;
+            if ((features & bit) && !(bit == kGhost && (features & kMicro))) return features & ~bit; // (a micro level's kWide stays)
         return features;
     }
     // Makes `scene` what draw() shows, in order: uploads whatever each visible
@@ -234,6 +274,10 @@ public:
     // Part `id` has a painted texture (or UV checker) this GPU cannot show on the model (too many triangles for its
     // limits): painting still goes into the texture, the model draws without it. The panel says so.
     bool textureNotShown(uint32_t id) const;
+    // The GPU rejected drawing the texture (a GL error at its first textured draw, logged): the Part draws plain, with a status.
+    bool textureRejected(uint32_t id) const;
+    bool microWide(uint32_t id) const; // (tests: Part `id` is a micro level whose per-slot tables are 2D textures)
+    uint32_t emptyBufferSamplers() const { return emptyBufferSamplers_; } // (tests: gl_limits)
     // How Part `id`'s UVs reach the shader, for tests: 0 a texture buffer, N rows of N texels in a 2D texture.
     int textureUvWidth(uint32_t id) const;
 
@@ -435,6 +479,14 @@ private:
     bool persistentUpload() const;  // the preference, SF_PERSISTENT_UPLOAD=0 / 1 overrides; needs GL_ARB_buffer_storage
     int captureW_ = 0, captureH_ = 0;
     GLuint emptyVao_ = 0;
+    // The textured program's two UV samplers (a buffer and a 2D texture) always have a complete texture of their own type
+    // bound, the unused one a single texel: a driver that checks every sampler (Mali) never meets an empty unit in the geometry shader.
+    GLuint dummyUvBufferData_ = 0, dummyUvBufferTexture_ = 0, dummyUv2D_ = 0;
+    // The same for the face group sampler (an unsigned one: the mesh program declares it in every variant): a Part without
+    // per-triangle ids (a mesh past a small GPU's buffer limit, or none set) binds this, never an empty unit (Mali-G72, 0.13.14:
+    // a 69632-triangle sphere drew with GL error 0x0501 "glTexBuffer ... beyond the allocated buffer" against a 65536-texel limit).
+    GLuint dummyUintBufferData_ = 0, dummyUintBufferTexture_ = 0;
+    uint32_t emptyBufferSamplers_ = 0; // tests only (gl_limits): draws that met a buffer sampler unit with no texture on it
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)
     std::vector<ReferenceImage> references_; // setReferences
     struct ReferenceTexture {
@@ -465,6 +517,8 @@ private:
         GLuint uvTexture2D = 0;
         int uvWidth = 0;
         bool uvsWanted = false, uvsLost = false;
+        // The first textured draw checks for a GL error (drawSlot): the driver rejected it, and the Part draws without the texture.
+        mutable bool texturedChecked = false, texturedFailed = false;
         GLuint paintTexture = 0;          // the painted texture (sRGB, mipmapped)
         uint64_t textureSerial = 0, textureRevision = 0;
         int textureW = 0, textureH = 0;
@@ -535,7 +589,6 @@ private:
             std::vector<uint32_t> verts;     // the mesh vertex of each local index
             std::vector<uint16_t> local;     // triangles (local indices), while stale
             std::vector<uint32_t> groups;    // their face groups, while stale
-            std::vector<glm::vec2> uvs;      // their corners' UVs (3 each), while stale
             ClusterBounds bounds;
             bool stale = true;    // triangles changed: rebuild and upload everything
             bool uploaded = false;
@@ -545,10 +598,8 @@ private:
         std::vector<uint32_t> chunkCluster;           // per layout chunk of triangles: its cluster
         uint32_t layoutTriangles = 0;
         GLuint patchVao = 0, patchLineVao = 0, patchVertices = 0, patchIndices = 0, patchLines = 0, patchColors = 0,
-               patchMask = 0, patchGroupData = 0, patchGroupTexture = 0, patchUvData = 0, patchUvTexture = 0;
+               patchMask = 0, patchGroupData = 0, patchGroupTexture = 0;
         size_t patchParts = 0; // parts the patch buffers have room for
-        std::vector<glm::vec2> patchUvShadow; // the patches' UVs as the GPU holds them (3 per triangle, per part): sent in runs
-        std::vector<uint32_t> patchUvParts;   // parts whose UVs changed in this sync
         bool patchColorsOn = false, patchMaskOn = false, patchLinesOn = false;
         PositionGrid patchGrid; // the grid the patches' vertices were packed with
         size_t patchBytes = 0;
@@ -681,7 +732,8 @@ private:
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, maskDarkness = -1, maskColor = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
               hasPaint = -1, unlit = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
-              lightLevels = -1, alpha = -1, microWire = -1, occAlpha = -1, occLight = -1;
+              lightLevels = -1, alpha = -1, microWire = -1, occAlpha = -1, occLight = -1, lightCount = -1, lightDirs = -1,
+              lightCols = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;
         // The units the environment and BRDF table are bound to (meshProgram: a micro level's own buffers hold 8-15).
@@ -691,6 +743,7 @@ private:
     static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64,
                          kPbr = 128;
     static constexpr int kFocus = kPaint; // with kMicro: a streamed level (render/MicroFocus.h; micro programs never paint)
+    static constexpr int kWide = kGhost;  // with kMicro: the per-slot tables are 2D textures (past the GPU's buffer-texture limit: TexelStore.h)
     static constexpr int kTiles = kPrim;  // with kMicro: Adaptive Detail tile pages (render/MicroTilePages.h; only while a Part has some)
     MeshProgram programs_[256];
     void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);

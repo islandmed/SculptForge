@@ -1,0 +1,54 @@
+# A Micro level on a GPU whose buffer textures hold 65536 texels (a Mali-G72's). The per-triangle record and the base vertices (two
+# texels each), the cluster levels and the Focus and tile page tables are buffer textures; past the limit (a base mesh of 33k triangles
+# or more) they are 2D textures of 4096-texel rows (render/TexelStore.h, the programs' WIDE variant) and the level draws, takes
+# strokes and paint like any other. micro_wide is 1 then (0 below the limit); every cell fails when the model is not drawn.
+# cold: a warm server keeps no gl_limits or env between scripts.
+run ui_look look=classic layout=classic
+gl_limits texels=65536
+run new_sphere subdivisions=6
+run micro_divide level=2
+wait_idle 120
+expect_value micro_wide == 1
+expect_value texbuffer_over_limit == 0
+expect_value empty_buffer_samplers == 0
+render_cell "Lit Sphere x Micro past the buffer limit" mode=lit
+render_cell "PBR x Micro past the buffer limit" mode=pbr
+stroke 0.3 0.4 0.7 0.45
+stroke 0.35 0.55 0.65 0.6
+wait_idle 60
+render_cell "Lit Sphere x Micro past the buffer limit, after strokes" mode=lit
+action draw.paint
+run set_color color=00ff00
+stroke 0.2 0.5 0.8 0.5
+wait_idle 60
+expect_value texbuffer_over_limit == 0
+render_cell "Lit Sphere x Micro past the buffer limit, painted" mode=lit
+shot micro_small_gpu
+# Focus Detail (a record per slot, the page table past the limit too)
+env SF_FOCUS_DETAIL 1
+run new_sphere subdivisions=6
+run micro_divide level=3
+env SF_FOCUS_DETAIL 0
+wait_idle 120
+expect_value micro_wide == 1
+stroke 0.3 0.4 0.7 0.45
+wait_idle 60
+render_cell "Lit Sphere x Focus Detail past the buffer limit" mode=lit
+# Adaptive Detail tiles (the tile page table past the limit)
+env SF_MICRO_TILES 1
+run new_sphere subdivisions=6
+run micro_divide level=3
+wait_idle 120
+camera_distance 0.4
+brush_size 30
+stroke 0.490 0.497 0.510 0.497
+wait_idle 60
+render_cell "Lit Sphere x tile pages past the buffer limit" mode=lit
+env SF_MICRO_TILES 0
+# the driver's limit again: buffer textures
+gl_limits texels=0
+run new_sphere subdivisions=6
+run micro_divide level=2
+wait_idle 120
+expect_value micro_wide == 0
+render_cell "Lit Sphere x Micro, buffer textures" mode=lit

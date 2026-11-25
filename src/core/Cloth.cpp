@@ -40,7 +40,10 @@ constexpr uint32_t kKindShift = 30;
 enum Kind : uint32_t { kStretch = 0, kBend = 1, kSeam = 2 };
 constexpr int kSeamRampFrames = 30;
 constexpr float kOmega = 1.0f; // (Gauss-Seidel over colours: no over-relaxation needed)
-constexpr float kDrag = 0.3f;  // air drag, 1/s (wind)
+// Wind: air (1.2 kg/m^3) moving through the cloth's face pushes it with half that density times the squared speed
+// (drag coefficient 1) over the fabric's mass per area; along the face it only skims, a small share of that.
+constexpr float kAirDensity = 1.2f, kSkim = 0.02f;
+constexpr float kTau = 6.2831853f;
 // A slow particle's contact (under this many times restSpeed: cloth settling) keeps last frame's triangle unless
 // another is nearer by this share of the contact thickness. (Moving cloth needs no keep; keeping slowed its settling.)
 constexpr float kContactKeepSpeed = 3.0f, kContactKeep = 0.5f;
@@ -262,6 +265,9 @@ bool ClothSim::init(const ClothSetup& setup, const Fabric& fabric, const ClothSe
     double edges = 0.0;
     for (const Edge& e : stretch_) edges += e.rest;
     if (!stretch_.empty()) meanEdge_ = std::max(float(edges / double(stretch_.size())), 1e-4f);
+    glm::vec3 lo(std::numeric_limits<float>::max()), hi(-std::numeric_limits<float>::max());
+    for (const glm::vec3& p : rest) lo = glm::min(lo, p), hi = glm::max(hi, p);
+    size_ = std::max(glm::length(hi - lo), 4.0f * meanEdge_);
     return true;
 }
 
@@ -374,13 +380,26 @@ void ClothSim::project(uint32_t id, float h2inv) {
 void ClothSim::substep(float h) {
     const size_t n = x_.size();
     const glm::vec3 gravity = settings_.gravity, wind = settings_.wind;
-    const float windDrag = glm::dot(wind, wind) > 0.0f ? kDrag : 0.0f;
+    const bool windy = glm::dot(wind, wind) > 0.0f;
+    if (windy) updateNormals();
+    // Wind: the air moving through the face pushes along the normal (the normal's sign is of no account: it is used
+    // twice), the air along the face skims. Each is a relaxation toward the air's speed (a fraction a / (1 + a) of
+    // the difference, a = h x the drag rate), never past it, so a 20 m/s wind on silk stays smooth at any step.
+    const float push = h * 0.5f * kAirDensity / std::max(fabric_.density, 1e-4f);
     // Predict.
     poolFor(n, [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
             prev_[i] = x_[i];
             if (w_[i] <= 0.0f) continue;
-            v_[i] += h * (gravity + windDrag * (wind - v_[i]));
+            v_[i] += h * gravity;
+            if (windy) {
+                const glm::vec3 u = (windAt_.empty() ? wind : windAt_[i]) - v_[i];
+                const glm::vec3& nrm = normal_[i];
+                const float un = glm::dot(u, nrm);
+                const glm::vec3 ut = u - nrm * un;
+                const float an = push * std::abs(un), at = push * kSkim * glm::length(ut);
+                v_[i] += nrm * (un * (an / (1.0f + an))) + ut * (at / (1.0f + at));
+            }
             x_[i] += h * v_[i];
             // Soft pins pull toward their target before the constraints, so the fabric has the last word (a
             // driven region drags the cloth along instead of tearing it).
@@ -389,7 +408,8 @@ void ClothSim::substep(float h) {
     }, 8192);
     // Constraints, one colour at a time.
     const float h2inv = 1.0f / (h * h);
-    for (int it = 0; it < std::max(1, settings_.iterations); ++it) {
+    // (wind drives the cloth harder than gravity, a 6 m/s wind on cotton at 144 m/s^2: one pass left edges 8-28% long)
+    for (int it = 0; it < std::max(settings_.iterations, windy ? 2 : 1); ++it) {
         for (size_t c = 0; c + 1 < colourOffset_.size(); ++c) {
             const uint32_t b0 = colourOffset_[c], e0 = colourOffset_[c + 1];
             poolFor(e0 - b0, [&](size_t b, size_t e) {
@@ -429,6 +449,61 @@ void ClothSim::substep(float h) {
         }
     }, 8192);
     if (!seam_.empty() && colliders_) holdSeamsOnContact(h);
+}
+
+// Each substep in wind: every particle's normal, its triangles' area-weighted sum (the cloth turns tens of degrees
+// within a frame in a hard wind; a frame-old normal flutters).
+void ClothSim::updateNormals() {
+    const size_t n = x_.size();
+    normal_.assign(n, glm::vec3(0.0f));
+    for (const glm::uvec3& t : tris_) { // (one thread, in triangle order: the same sums on any machine)
+        const glm::vec3 nrm = glm::cross(x_[t.y] - x_[t.x], x_[t.z] - x_[t.x]);
+        normal_[t.x] += nrm, normal_[t.y] += nrm, normal_[t.z] += nrm;
+    }
+    poolFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const float l = glm::length(normal_[i]);
+            normal_[i] = l > 1e-20f ? normal_[i] / l : glm::vec3(0.0f);
+        }
+    }, 8192);
+}
+
+// Once a frame, in gusts: the wind at each particle. Gusts are three waves over place and time (along the wind,
+// across it and up; about half the cloth's size long, 0.7-1.1 Hz) and a slow swell of the steady wind: a function of
+// place and time, nothing random, so a drape repeats on any machine and thread count.
+void ClothSim::updateWind(float frame) {
+    const glm::vec3 wind = settings_.wind;
+    const float speed = glm::length(wind);
+    const size_t n = x_.size();
+    if (speed <= 0.0f) {
+        normal_.clear(), windAt_.clear();
+        return;
+    }
+    const float gust = std::clamp(settings_.turbulence, 0.0f, 1.0f);
+    if (gust <= 0.0f) {
+        windAt_.clear();
+        return;
+    }
+    const float t = float(frame_) * frame;
+    const glm::vec3 along = wind / speed;
+    glm::vec3 across = glm::cross(along, glm::vec3(0.0f, 1.0f, 0.0f));
+    if (glm::dot(across, across) < 1e-6f) across = glm::cross(along, glm::vec3(1.0f, 0.0f, 0.0f));
+    across = glm::normalize(across);
+    const glm::vec3 up = glm::cross(across, along);
+    const float k = kTau / (0.5f * size_);
+    const glm::vec3 steady = wind * (1.0f + 0.4f * gust * std::sin(kTau * 0.35f * t));
+    const float amp = gust * speed;
+    windAt_.resize(n);
+    poolFor(n, [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const glm::vec3& p = x_[i];
+            const float pa = glm::dot(p, along), pc = glm::dot(p, across), pu = glm::dot(p, up);
+            const glm::vec3 g = along * (0.6f * std::sin(k * pc + 0.7f * k * pu + kTau * 0.7f * t)) +
+                                across * (0.5f * std::sin(1.3f * k * pa + kTau * 1.1f * t + 1.7f)) +
+                                up * (0.5f * std::sin(0.8f * k * pa + 0.5f * k * pc + kTau * 0.9f * t + 3.1f));
+            windAt_[i] = steady + amp * g;
+        }
+    }, 8192);
 }
 
 // The contact push moves one end of a seam out and leaves the other behind. Closes the seams again, then pushes
@@ -843,13 +918,14 @@ bool ClothSim::step() {
     if (frame_ == 0 && !outward_.empty()) leaveColliders();
     findContacts(frame);
     findSelfPairs(frame);
+    updateWind(frame);
     // Thin pairs are looked for out to an edge length: a cloth moving farther than that in a frame looks again
     // within it, every `every` substeps.
     const bool thin = settings_.thinFeatures && colliders_ && !colliders_->empty();
     int every = substeps;
     start_ = x_;
     if (thin) {
-        const float travel = (maxSpeed_ + glm::length(settings_.gravity) * frame) * frame * 1.5f;
+        const float travel = (maxSpeed_ + glm::length(settings_.gravity) * frame + glm::length(settings_.wind) * (1.0f + settings_.turbulence)) * frame * 1.5f;
         const int looks = std::clamp(int(std::ceil(travel / meanEdge_)), 1, substeps);
         every = (substeps + looks - 1) / looks;
         findThinPairs(h * float(every));

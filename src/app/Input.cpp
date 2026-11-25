@@ -267,6 +267,15 @@ void App::registerInputActions() {
         [this] { hideGroupUnderCursor(true); });
     add("visibility.show_all", "Show all", ICON_LC_EYE, "Tool > Visibility", "", "Show every hidden part of the mesh.",
         [this] { runCommand("show_all"); });
+    // Remove Hidden (the Face Groups panel's button) as an action: a key in the SculptForge style (applyInputStyle) and a
+    // Quick Menu button, so deleting the hidden part never needs the palette (a member, 0.14.0). Classic keeps no key.
+    add("visibility.delete_hidden", "Remove Hidden", ICON_LC_EYE_OFF, "Tool > Face Groups", "",
+        "Permanently delete the hidden part of the mesh (one undo step). What stays keeps its mask, paint, face groups, "
+        "UVs and sculpt layers.",
+        [this] {
+            runCommand("delete_hidden");
+            if (lastCommandOk_) status_ += " (" + actions_.shortcutText("edit.undo") + " undoes it)";
+        });
 
     commands_.add({"blender_keymap_import",
                    "Use the keys of a keymap exported from Blender (Preferences > Keymap > Export, a .py file): "
@@ -278,6 +287,7 @@ void App::registerInputActions() {
                        return {ok, status_};
                    }});
     registerViewActions();
+    registerSplitViewActions();   // SplitView.cpp
     registerStrokePopupActions(); // StrokePopup.cpp
     applyInputStyle();
 }
@@ -317,6 +327,33 @@ void App::registerViewActions() {
             "the UI scale.",
             [this, i] { uiPrefs_.axisGizmoSize = i; },
             [this, i] { return uiPrefs_.axisGizmoSize == i; });
+    // Draw > Camera > Corner gizmo: the X / Y / Z axes, the orientation widget (the axes through a glass ball, a dot at
+    // each end: click one to turn there, drag to orbit, double-click to frame; OrientationWidget.h) or nothing, and the
+    // corner it sits in. The default follows the layout: the Classic layout keeps the axes, the SculptForge layout shows
+    // the widget; both at the top left unless Position says the top right.
+    add("view.corner_axes", "Axes", "",
+        "Corner gizmo: the X / Y / Z axes in the corner of the canvas. Click an end to look from that side, drag the "
+        "disc to orbit.",
+        [this] {
+            uiPrefs_.showAxes = true;
+            uiPrefs_.cornerWidget = 0;
+        },
+        [this] { return uiPrefs_.showAxes && !orientationWidgetOn(); });
+    add("view.corner_widget", "Orientation", "",
+        "Corner gizmo: the orientation widget, the axes through a glass ball with a dot at each end. Click a dot to look "
+        "from that side with a short move (the dot facing you again: the opposite side), drag it to orbit, double-click "
+        "to frame the model.",
+        [this] {
+            uiPrefs_.showAxes = true;
+            uiPrefs_.cornerWidget = 1;
+        },
+        [this] { return uiPrefs_.showAxes && orientationWidgetOn(); });
+    add("view.corner_off", "Hidden", "", "Corner gizmo: nothing in the corner of the canvas.",
+        [this] { uiPrefs_.showAxes = false; }, [this] { return !uiPrefs_.showAxes; });
+    add("view.corner_top_left", "Top left", "", "Position: the corner gizmo and the View Figure at the top left of the canvas.",
+        [this] { uiPrefs_.cornerPosition = 0; }, [this] { return uiPrefs_.cornerPosition != 1; });
+    add("view.corner_top_right", "Top right", "", "Position: the corner gizmo and the View Figure at the top right of the canvas.",
+        [this] { uiPrefs_.cornerPosition = 1; }, [this] { return uiPrefs_.cornerPosition == 1; });
     add("view.ortho", "Orthographic", "Numpad 5",
         "Switch between a perspective and an orthographic view (no foreshortening: sizes don't shrink with depth).",
         [this] {
@@ -357,6 +394,39 @@ void App::registerViewActions() {
         "Maya keys: Alt+F).", [this] { frameActivePart(); });
     add("view.frame_last_stroke", "Frame last stroke", "", "Move in on where you last sculpted (no key by default: bind one "
         "in Preferences > Hotkeys). The view keeps its angle; Frame fits the whole model.", [this] { frameLastStroke(); });
+    // Hold to orbit / pan / zoom (Preferences > Navigation; members on Discord): no key by default. Bound to one,
+    // the key held turns any press on the canvas (any button, the pen's tip) into that camera drag, in every key style:
+    // left-handed and tablet users navigate from the hand on the keyboard. navHoldKey tracks the key, navMoveForPress
+    // starts the drag (App.cpp onMouseDown), which goes on to the button's release as Hold Space does.
+    // (the status line is translated here, with the key spelled in: tr(status_) would not find a composed text)
+    auto holdHint = [this](const char* id, const char* label, const char* noKey, const char* withKey) {
+        const std::string key = actions_.shortcutText(id);
+        char line[256];
+        if (key.empty()) std::snprintf(line, sizeof line, noKey, label);
+        else std::snprintf(line, sizeof line, withKey, key.c_str());
+        status_ = line;
+    };
+    add("view.hold_orbit", "Hold to orbit", "",
+        "No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, "
+        "to turn the view: it never sculpts while the key is down. Preferences > Navigation sets it beside the other camera keys.",
+        [holdHint] { holdHint("view.hold_orbit", tr("Hold to orbit"), tr("%s: give it a key in Preferences > Navigation, then hold it and drag"),
+                          tr("Hold %s and drag anywhere to turn the view")); });
+    add("view.hold_pan", "Hold to pan", "",
+        "No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, "
+        "to pan the view: it never sculpts while the key is down. Preferences > Navigation sets it beside the other camera keys.",
+        [holdHint] { holdHint("view.hold_pan", tr("Hold to pan"), tr("%s: give it a key in Preferences > Navigation, then hold it and drag"),
+                          tr("Hold %s and drag anywhere to pan the view")); });
+    add("view.hold_zoom", "Hold to zoom", "",
+        "No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, "
+        "to zoom: drag up to come closer, down to back away (the Classic sculpting keys the other way round). Preferences > "
+        "Navigation sets it beside the other camera keys.",
+        [holdHint] { holdHint("view.hold_zoom", tr("Hold to zoom"), tr("%s: give it a key in Preferences > Navigation, then hold it and drag"),
+                          tr("Hold %s and drag anywhere to zoom")); });
+    add("view.centre_pointer", "Centre view on the pointer", "",
+        "Slide the view so the point under the pointer is in the middle, keeping the zoom and the angle; the view then "
+        "turns about that point. Alt+middle click on the canvas does it in every key style (a drag still pans); this "
+        "action does the same at the pointer when you press its key (no key by default: bind one in Preferences > Hotkeys).",
+        [this] { centreViewOnPointer(mouseX_, mouseY_); });
     add("view.reset", "Reset view", "", "Back to the view a new model opens with: from the front, in perspective, "
         "the whole model in view (Maya keys: Alt+H).", [this] { resetView(); });
     // Saved views (from a review: "custom cam views, like Blender"): named cameras, kept with the project.
@@ -435,6 +505,7 @@ void App::applyInputStyle() {
         {"visibility.hide_group", {"", "", "H"}},
         {"visibility.isolate_group", {"", "", "Shift+H"}},
         {"visibility.show_all", {"", "", "Alt+H"}},
+        {"visibility.delete_hidden", {"", "Ctrl+Shift+H", ""}}, // (Ctrl+H is View Mask; the Classic and Blender keys stay as they were)
     };
     for (const Keys& k : kKeys) actions_.setDefaultShortcut(k.id, k.keys[style]);
     // Maya's own view keys on top of the Classic sculpting keys (#134): Alt+F frames the Part, Alt+H resets the view.
@@ -460,6 +531,7 @@ void App::applyInputStyle() {
 // ---------------------------------------------------------------------------
 
 void App::viewAxis(float yawDegrees, float pitchDegrees) {
+    cancelCameraMove(); // (the orientation widget's eased turn, if one runs: this view wins)
     camera_.yaw = glm::radians(yawDegrees);
     camera_.pitch = glm::radians(pitchDegrees);
     camera_.roll = 0.0f;
@@ -484,7 +556,7 @@ void App::tickKeySequence(float dt) {
 // speed over kKeyNavEaseSeconds and back down after its release, moving the view by speed * time: smooth, the same
 // distance at any frame rate, and nothing to do with the OS's key repeat.
 void App::updateKeyNav(float dt) {
-    const bool blocked = ImGui::GetIO().WantCaptureKeyboard || !capturingShortcut_.empty() || shortcutConflictOpen();
+    const bool blocked = ImGui::GetIO().WantCaptureKeyboard || ui::TextFieldFocused() || !capturingShortcut_.empty() || shortcutConflictOpen();
     // (a hitch of a frame is not a jump of the view; and the frame a press wakes the idle loop with has waited since the
     // last one: it counts as one 60 Hz frame)
     dt = std::min(dt, keyNavMoving_ ? 0.1f : 1.0f / 60.0f);
@@ -627,6 +699,36 @@ void App::notePressOnAnotherPart(float x, float y) {
     status_ = doc_.parts[size_t(other)].name + " is in front: Alt+Q selects it";
 }
 
+void App::centreViewOnPointer(float x, float y) {
+    // Run from a menu or the command palette, or with the pointer over a panel that floats on the canvas: not on the view.
+    if (ImGui::GetIO().WantCaptureMouse || !canvasRect().contains(x, y)) { // (as the canvas presses in App.cpp)
+        status_ = "Centre view on the pointer: Alt+middle click the canvas, or press its key with the pointer over the view";
+        return;
+    }
+    doc_.syncBvh();
+    RayHit hit;
+    glm::vec3 point;
+    if (pickPart(x, y, &hit) >= 0) point = hit.position; // any visible Part, where the pointer is
+    else { // the background: the point on the view plane through the orbit target (a pan to it, nothing else)
+        glm::vec3 origin, dir;
+        canvasRay(x, y, origin, dir);
+        const glm::vec3 f = camera_.forward();
+        const float along = glm::dot(dir, f);
+        if (!(std::abs(along) > 1e-6f)) return;
+        const float t = glm::dot(camera_.target - origin, f) / along;
+        if (!std::isfinite(t)) return;
+        point = origin + dir * t;
+    }
+    // Across the view only: the eye keeps its depth (the model stays the same size on screen), the point lands where
+    // the target does (the view's middle, or its free area's with a lens shift); then the orbit target takes its depth.
+    const glm::vec3 f = camera_.forward(), rel = point - camera_.position();
+    const glm::vec3 across = rel - f * glm::dot(rel, f);
+    if (!std::isfinite(across.x) || !std::isfinite(across.y) || !std::isfinite(across.z)) return;
+    camera_.target += across;
+    camera_.targetDepthOf(point);
+    status_ = "Centred the view on the pointer";
+}
+
 // Close in on the last stroke's place (the view's angle stays): a box round it a tenth the size of its Part.
 void App::frameLastStroke() {
     const auto p = lastStrokePoint();
@@ -731,6 +833,88 @@ bool App::importBlenderKeymap(const std::string& path) {
               " Blender keys have no SculptForge equivalent). Saved automatically.";
     lastCommandOk_ = true;
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// Preferences > Navigation: hold keys and drag gestures (NavBindings.h)
+// ---------------------------------------------------------------------------
+
+// A key down that is bound to Hold to orbit / pan / zoom is remembered until it goes up (one at a time: the last pressed
+// wins). Not while a shortcut is being captured (the press is the new key) and never from a text field (the caller gates
+// on WantCaptureKeyboard, as quickRemeshKey's does).
+void App::navHoldKey(SDL_Keycode key, SDL_Keymod mods, bool down) {
+    if (!down) {
+        if (key == navHoldKey_) navHoldKey_ = SDLK_UNKNOWN, navHoldMove_ = -1;
+        return;
+    }
+    if (!capturingShortcut_.empty() || shortcutConflictOpen() || isModifierKey(key)) return;
+    const Action* a = actions_.actionForChord(chordFromEvent(key, mods));
+    if (!a) return;
+    for (int i = 0; i < kNavMoves; ++i)
+        if (a->id == kNavHoldActions[i]) {
+            navHoldKey_ = key;
+            navHoldMove_ = i;
+            return;
+        }
+}
+
+// The camera move a press on the canvas starts under Preferences > Navigation, or -1 for the key style's own gestures:
+// a held hold key first, then a custom drag gesture matching the button and the keyboard's Ctrl / Shift / Alt exactly
+// (the keyboard's, not the style's remapping or a pen button's Alt: the panel shows keyboard names).
+int App::navMoveForPress(Uint8 button) const {
+    if (navHoldMove_ >= 0) return navHoldMove_;
+    if (!uiPrefs_.nav.any()) return -1;
+    const SDL_Keymod keys = SDL_GetModState();
+    return navDragMatch(uiPrefs_.nav, int(button), ctrlDown(keys), (keys & SDL_KMOD_SHIFT) != 0, (keys & SDL_KMOD_ALT) != 0);
+}
+
+// The panel's warnings, one line per problem, each saying who wins and what to change: a hold key another action has
+// too; a left-button gesture with no modifier (never active); one gesture on two moves (the first in the list wins);
+// a gesture the key style already uses for something else (the custom one wins; a gesture that already does this very
+// move, like Shift+Middle for Pan, is no clash and gets no line).
+std::vector<std::string> App::navWarningLines() const {
+    std::vector<std::string> out;
+    char line[512];
+    for (int i = 0; i < kNavMoves; ++i)
+        for (const std::string& alt : shortcutAlternatives(actions_.shortcutText(kNavHoldActions[i])))
+            for (const Action* h : actions_.holdersOfShortcut(alt, kNavHoldActions[i]))
+                out.push_back(std::string(tr(kNavMoveLabels[i])) + ": " + alt + " " + tr("is also") + " " + trAction(h->id, h->label));
+    for (int i = 0; i < kNavMoves; ++i)
+        if (const NavDrag& d = uiPrefs_.nav.drag[i]; d.set() && !d.usable())
+            out.push_back(std::string(tr(kNavMoveLabels[i])) + ": " + tr("a plain left drag sculpts: add Ctrl, Shift or Alt"));
+    for (int i = 0; i < kNavMoves; ++i) {
+        const NavDrag& d = uiPrefs_.nav.drag[i];
+        if (!d.usable()) continue;
+        bool first = true; // the first move with this gesture: it wins, and its line speaks for the clash
+        for (int j = 0; j < i; ++j)
+            if (uiPrefs_.nav.drag[j] == d) first = false;
+        if (!first) continue;
+        for (int j = i + 1; j < kNavMoves; ++j)
+            if (uiPrefs_.nav.drag[j] == d) {
+                std::snprintf(line, sizeof line, tr("%s and %s both use %s: %s wins. Change one of them."), tr(kNavMoveLabels[i]),
+                              tr(kNavMoveLabels[j]), navDragText(d).c_str(), tr(kNavMoveLabels[i]));
+                out.emplace_back(line);
+            }
+        const char* was = navStyleGesture(uiPrefs_.inputStyle, d);
+        if (was[0] && navStyleGestureMove(was) != i)
+            out.push_back(std::string(tr(kNavMoveLabels[i])) + ": " + navDragText(d) + " " + tr("takes over") + " " + tr(was));
+    }
+    return out;
+}
+
+// Navigation defaults: the hold keys unbound, no custom gestures, the view keys the panel lists back to the key style's
+// defaults, and the pen's side buttons as Preferences > Tablet's defaults.
+void App::resetNavigationBindings() {
+    for (const char* id : kNavHoldActions) actions_.resetShortcut(id);
+    for (const char* id : {"view.frame", "view.frame_selected", "view.reset", "view.frame_last_stroke", "view.orbit_left", "view.orbit_right",
+                           "view.orbit_up", "view.orbit_down", "view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down",
+                           "view.zoom_in", "view.zoom_out"})
+        if (actions_.find(id)) actions_.resetShortcut(id);
+    uiPrefs_.nav = NavBindings();
+    uiPrefs_.tablet.buttons = TabletSettings().buttons;
+    navHoldKey_ = SDLK_UNKNOWN;
+    navHoldMove_ = -1;
+    status_ = tr("Navigation bindings back to their defaults");
 }
 
 void App::drawInputStyleRow(float width) {
@@ -1075,6 +1259,16 @@ void App::drawQuickMenu() {
         ui::ActionButton(*this, "draw.rgb");
         ImGui::SameLine();
         ui::ActionButton(*this, "transform.symmetry_x");
+        if (uiPrefs_.shellLayout != 0) {
+            // Remesh and Remove Hidden one right click away (a member, 0.14.0): Quick Remesh (the Voxel Remesh at Tool >
+            // Remesh's Resolution, in the background), Quad Remesh and Remove Hidden. The Classic layout's menu is as it was.
+            const float third = (width - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f; // (the rows above)
+            ui::ActionButton(*this, "geometry.quick_remesh", ImVec2(third, 0));
+            ImGui::SameLine();
+            ui::ActionButton(*this, "geometry.qremesh", ImVec2(third, 0));
+            ImGui::SameLine();
+            ui::ActionButton(*this, "visibility.delete_hidden", ImVec2(third, 0));
+        }
         const bool clicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
         const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
         if (clicked && !hovered && ImGui::GetFrameCount() > quickMenu_.openedFrame + 1) close = true;
@@ -1137,7 +1331,7 @@ void App::drawAirStrokeIndicator() {
     if (!uiPrefs_.airStrokes) return;
     // (below a top timeline; Don't show again and Preferences > Hints hide it, U11)
     drawViewportHint("air_strokes", tr("Strokes start off the model"), theme::u32(theme::accent),
-                     canvasRect().y + timelineTopInset_ + 8.0f * uiScale_);
+                     wholeCanvasRect().y + timelineTopInset_ + 8.0f * uiScale_);
 }
 
 } // namespace sf

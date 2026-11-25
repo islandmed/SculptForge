@@ -65,7 +65,7 @@ Notes on particular brushes:
   instead of placing dabs, so stroke types (Dots, Spray and so on) don't apply to them.
 - **Layer** sets its height from the brush size and **Intensity**. Pen pressure lowers the height when
   **Pressure > Strength** is on, so you can feather the edge of a layer.
-- **Trim** gives crisp planes on cylinders and edges. Use it with **Front** on when you work on thin shapes.
+- **Trim** gives crisp planes on cylinders and edges. Use it with **Front** on when you work on thin shapes. **Intensity** sets how much of what sticks out above the plane each dab takes: all of it at the brush's middle from 50 up, proportionally less below 50, so Intensity 1 is a light touch. With a pen, a light press is lighter too (Intensity and pressure scale all the way down); to get a heavier cut from a light press, pick the **Soft** preset on Trim's pressure curve in **Brush Lab** or **Edit > Preferences > Tablet**.
 
 ## Custom brushes that ship with SculptForge
 
@@ -282,7 +282,9 @@ make it **Always** (no key needed, handy with a pen) or **Never**.
 ## The Quick Menu
 
 Press <kbd>Space</kbd> for the Quick Menu under the cursor: the Brush, Stroke, Alpha and Material tiles,
-Size, Falloff, Intensity and Colour intensity, Add / Sub, Sculpt / Paint, Rgb and X symmetry. Hold
+Size, Falloff, Intensity and Colour intensity, Add / Sub, Sculpt / Paint, Rgb and X symmetry, and (in the
+SculptForge layout) **Quick Remesh**, **Quad Remesh** and **Remove Hidden**, so a remesh mid-sculpt is one right click
+away (see [Quick Remesh](geometry.md#quick-remesh)). Hold
 <kbd>Space</kbd> and let go to close it again (it stays while the pointer is on it), or tap <kbd>Space</kbd> to
 keep it open until you click elsewhere or press <kbd>Esc</kbd>. Clicking a tile opens its picker.
 
@@ -631,7 +633,7 @@ scans of your own planks (scan or photograph boards you own, or use images you h
 
 A **Stencil** is an image laid over the view that you sculpt and paint *through*: wherever it covers the model, a
 stroke takes its detail (the sculpt brushes its brightness, white = full effect, as an alpha; Vertex Paint its
-colours). Off the image nothing happens. It stays put on the screen while the model turns under it, so you place it,
+colours). Off the image a stroke works as if there were no Stencil (**Outside the image**, below). It stays put on the screen while the model turns under it, so you place it,
 stroke over it, turn the model or move the stencil, and stroke again.
 
 ![A Cobblestone stencil over a sphere, turned and placed with Adjust](images/wn-stencil-overlay.jpg)
@@ -652,6 +654,7 @@ stroke over it, turn the model or move the stencil, and stroke again.
 | **Show** | Hidden, the stencil is off and brushes work as if it weren't there. |
 | **Invert** | Uses the image's negative: black works, white leaves the surface alone. |
 | **Tile** | Repeats the image across the whole view, for skin, fabric and other patterns. |
+| **Outside the image** | **Sculpt** (the default): a stroke past the image's edge works as if there were no Stencil (fading in over a short distance, so the edge leaves no wall). **Block**: it does nothing there, so the image's edge is a wall. A tiled image covers the whole view. |
 | **Paint its colours** | Vertex Paint lays the image's own colours; off, its brightness masks the paint colour. |
 | **Hide while navigating** | Fades the stencil while the view turns, moves or zooms, so you see the model under it. |
 | **Opacity** | How strongly the overlay shows. The brushes always take the whole image (use Intensity to go lighter). |
@@ -661,7 +664,7 @@ With symmetry on, the mirrored side gets the stencil mirrored, as the stroke is.
 levels](micro-levels.md) too. Move, the Kelvinlet brushes, vector displacement stamps and the mask brush don't use it.
 
 Texture painting doesn't take it yet (Vertex Paint does). The stencil isn't saved with the project. From a script:
-`stencil_load path=skin.png`, `stencil_set x=0.5 y=0.5 size=0.8 angle=30 tile=true`, `stencil_clear`.
+`stencil_load path=skin.png`, `stencil_set x=0.5 y=0.5 size=0.8 angle=30 tile=true outside=block`, `stencil_clear`.
 
 ## Vector displacement brushes
 
@@ -804,7 +807,8 @@ cloth follows the brush, bunching into folds on the side you push toward; the fo
 instead of stretching it like rubber. Only the surface within a few brush radii of the stroke moves, and masked
 areas hold still like pins, so mask a seam or a cuff to keep it in place.
 
-Set it up in **Sculpt > Brush > Cloth**:
+Set it up in **Sculpt > Brush > Cloth**, or in **Tool > Cloth**, which shows these settings together with
+[Drape](#drape) in one place (**Cloth settings...** under the Cloth brush's settings and under Drape opens it):
 
 - **Mode**: **Drag** (the cloth follows the stroke), **Push** (presses it in along the surface; <kbd>Alt</kbd>
   pulls it out, and the cloth around follows), **Settle** (only gravity: the cloth under the brush sags and drapes
@@ -830,10 +834,18 @@ levels.
 
 **Drape** drops a whole Part as cloth: it falls under gravity onto the other visible Parts and settles there, the
 way a sheet settles over a chair or a shirt over a body. Make the cloth Part (a plane, an extracted shell, a
-garment you sculpted roughly), place it above the body, and with it active open **Tool > Drape**:
+garment you sculpted roughly), place it above the body, and with it active open **Tool > Drape** (or **Tool > Cloth**,
+which also holds the Cloth brush's settings):
 
 - **Fabric**: **Silk** flows into many fine folds, **Cotton** medium ones, **Denim** holds broad folds,
   **Leather** barely folds.
+- **Wind**: how hard the air blows, in metres per second (3 is a breeze, 8 makes flags fly, 15 is hard to walk
+  in). Above 0 you also get where it blows **Toward** (a heading in degrees; **From view** points it from the camera
+  into the scene), its **Lift** up or down from level, and **Gusts**: how much it varies from place to place and
+  moment to moment. Wind pushes on the cloth's face and skims along its edge, so a sheet side-on to it barely moves.
+  You can change all of it while the simulation runs. In gusts the cloth ripples and never quite settles: press
+  **Keep** at the frame you like (it stops by itself after a minute). A steady wind holds a pose, though its folds
+  may keep fluttering, as a flag's do; the simulation then stops at its frame cap and keeps the pose.
 - **Units per metre**: how big the sculpt is in real life. Cloth falls by real size, so a sculpt modelled at real
   size (a SculptForge unit is a metre) uses 1; a body 2 units tall that should be a 1.8 m person uses 1.11.
 - **Pins from mask**: masked areas hold still, like pins: mask a waistband or a collar to hang the cloth from it.
@@ -844,7 +856,17 @@ garment you sculpted roughly), place it above the body, and with it active open 
 **Resume** stop and continue, **Keep** stops and keeps where it got to, **Reset** puts the Part back. Sculpting or
 running a command while it moves keeps where it got to first.
 
-The result is a normal Part: sculpt it, or give it thickness with Extract. From a script: `cloth_drape fabric=denim`.
+The result is a normal Part: sculpt it, or give it thickness with Extract. From a script: `cloth_drape fabric=denim`,
+with wind `cloth_drape fabric=silk wind=6 heading=90 lift=10 gusts=0.5 frames=600`.
+
+## Tool > Cloth
+
+Everything cloth in one place: **Tool > Cloth** shows the [Cloth brush](#cloth-brush)'s settings (mode, fabric,
+gravity, reach, steps, soft body, collisions) and [Drape](#drape) (fabric, wind, units per metre, pins, Simulate)
+one under the other, with a line on what each part does. They are the same controls as in **Sculpt > Brush > Cloth**
+and **Tool > Drape**, not copies: a fabric picked here is the fabric there. **Cloth settings...** under the Cloth
+brush's settings and under Drape opens it. In the Classic layout it is a row added after 0.13.0: turn on
+**Edit > Preferences > Interface > Show newer menu rows** to see it (the SculptForge layout shows it always).
 
 ## Capture an alpha or a VDM from the model
 

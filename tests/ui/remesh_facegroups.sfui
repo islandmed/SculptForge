@@ -1,0 +1,64 @@
+# Tool > Remesh > Keep Face Groups: Voxel Remesh carries the face groups onto the new surface (each new polygon takes the
+# group of the original surface nearest its centre, hard borders); off (the default) the result is one group as before.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=4
+key f
+camera 0 0
+run mask_rect x0=-1 y0=0 x1=1 y1=1
+run facegroup_from_mask
+run mask_clear
+expect_value groups == 2
+remember triangles before
+click "Remesh##tool.remesh"
+expect_value voxel_keep_groups == 0
+
+# Off: one group after the remesh, as before.
+click "Voxel Remesh##geometry.remesh"
+wait_idle 120
+expect_status Remeshed
+expect_value groups == 1
+expect_value triangles != $before
+key ctrl+z
+expect_value groups == 2
+expect_value triangles == $before
+
+# On: both groups come through, one undo step.
+click "Keep Face Groups##remesh"
+expect_value voxel_keep_groups == 1
+hold ctrl
+hover "Keep Face Groups##remesh"
+expect_help "nearest its centre"
+hold none
+click "Voxel Remesh##geometry.remesh"
+wait_idle 120
+expect_status Remeshed
+expect_value groups == 2
+expect_value triangles != $before
+expect_value open_edges == 0
+expect_mesh_valid
+action view.facegroups
+expect_value show_facegroups == 1
+shot keep_face_groups
+action view.facegroups
+key ctrl+z
+expect_value groups == 2
+expect_value triangles == $before
+expect_value can_undo == 1
+
+# Quick Remesh follows the checkbox.
+click "Quick Remesh##remesh.quick"
+expect_value quick_remesh == 1
+key shift+r
+wait_idle 120
+expect_status Quick Remesh: remeshed
+expect_value groups == 2
+key ctrl+z
+expect_value triangles == $before
+click "Keep Face Groups##remesh"
+expect_value voxel_keep_groups == 0
+key shift+r
+wait_idle 120
+expect_status Quick Remesh: remeshed
+expect_value groups == 1
+key ctrl+z
+click "Quick Remesh##remesh.quick"

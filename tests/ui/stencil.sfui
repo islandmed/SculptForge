@@ -36,7 +36,8 @@ key enter
 expect_value stencil_adjust == 0
 shot overlay
 
-# One stroke across its edge, symmetry off: only vertices under the stencil move.
+# One stroke across its edge, symmetry off: with Outside the image on Block, only vertices under the stencil move.
+run stencil_set outside=block
 click "X##transform.symmetry_x"
 expect_value symmetry_x == 0
 snapshot

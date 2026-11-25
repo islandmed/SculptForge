@@ -105,10 +105,16 @@ private:
 
 struct ClothSettings {
     glm::vec3 gravity{0.0f, -9.81f, 0.0f}; // m/s^2
-    glm::vec3 wind{0.0f};                  // m/s, air velocity (drag pulls the cloth toward it)
+    // Wind: the air's velocity, m/s. It pushes on the cloth's face (as on a sail) and skims along it; it never takes
+    // the cloth past its own speed. Zero: still air (no drag at all, as before).
+    glm::vec3 wind{0.0f};
+    // Gusts, 0..1: the wind differs from place to place and moment to moment by this share of its speed (waves about
+    // half the cloth's size across, around a second long; a function of place and time, nothing random, so a drape
+    // repeats on any machine and thread count). The cloth never rests in gusts.
+    float turbulence = 0.0f;
     float frameSeconds = 1.0f / 60.0f;
     int substeps = 12;
-    int iterations = 1; // constraint passes per substep (the brush uses more: its soft pins pull every substep)
+    int iterations = 1; // constraint passes per substep (the brush uses more: its soft pins pull every substep; wind at least 2)
     // At rest: every particle's mean position over `restFrames` frames moved from the last such window's mean less than
     // half as far as this speed (m/s) would take it, and none went faster than ten times it over any two frames.
     float restSpeed = 0.01f;
@@ -174,6 +180,8 @@ private:
     void sweepParticles();
     void leaveColliders(); // (the first frame: particles that start inside go out along outward_)
     void substep(float h);
+    void updateNormals();         // each substep in wind: the particle normals
+    void updateWind(float frame); // once a frame in gusts: the wind at each particle
     void holdSeamsOnContact(float h);
     // How far off a collider the cloth is held: the fabric's, and at least an eighth of the particle spacing (a
     // triangle between particles sags into a curved body: 1.9 mm at 15 mm spacing; a third (and a fifth to a seventh, unevenly) made a 20 mm bag over a ball
@@ -226,6 +234,9 @@ private:
     std::vector<glm::vec3> thinDx_;
     std::vector<float> thinCount_;
     float meanEdge_ = 0.01f;       // rest edge length, mean
+    float size_ = 1.0f;            // the rest shape's extent (its bounding box's diagonal): the gusts' scale
+    std::vector<glm::vec3> normal_; // per particle, this substep (only in wind; else empty)
+    std::vector<glm::vec3> windAt_; // per particle, this frame's wind (only in gusts; else empty: settings_.wind)
     float seamCompliance_ = 0.0f, seamAlpha_ = 0.0f;
     int frame_ = 0;
     float maxSpeed_ = 0.0f;

@@ -1,0 +1,88 @@
+# Span (Tool > Polygon): join two edge loops or face selections with new faces. A cube block: double-click a face selects
+# its whole side, orbit round, Shift+double-click the opposite side, Span (Segments 2) removes both sides and joins the
+# two openings with a band of quads: a tunnel through the block, closed again, one undo step, the band selected. The
+# Segments slider previews live; one side alone is refused with a reason; undo brings the block back. Members' top wish.
+run new_sphere subdivisions=1
+run part_append type=cube name=Box
+run part_delete index=0
+run qremesh target=600 detect_edges=true keep_groups=true adaptive=0 quality=false
+wait_idle 60
+remember undo_steps base
+remember triangles tris
+camera 35 -25
+key f
+zoom 0.7
+click "Polygon##tool.polygon"
+click "Polygon/Polygon mode"
+expect_value poly_mode == 1
+expect_value poly_element == 2
+expect_value open_edges == 0
+
+# The +Z side by double-click (its face group), then the -Z side from behind with Shift.
+click_part Box 0.5 0.5 2
+expect_value poly_selected > 1
+remember poly_selected side
+camera 215 -25
+key f
+zoom 0.7
+wait 0.3
+hold shift
+click_part Box 0.5 0.5 2
+hold none
+expect_value poly_selected > $side
+camera 35 -25
+key f
+zoom 0.7
+wait 0.3
+shot polygon-span-before
+
+# One side alone is refused with the reason (nothing changes).
+click "Polygon/None"
+click_part Box 0.5 0.5 2
+click "Polygon/Span"
+expect_status "two sides"
+expect_value triangles == $tris
+expect_value undo_steps == $base
+
+# Both sides again, Segments 2 typed into its slider, Span: a tunnel through the block.
+camera 215 -25
+key f
+zoom 0.7
+wait 0.3
+hold shift
+click_part Box 0.5 0.5 2
+hold none
+expect_value poly_selected > $side
+camera 35 -25
+key f
+zoom 0.7
+wait 0.3
+double_click "##segments"
+type_here 2
+key enter
+# (the undo count from here: typing into a field may leave a step of its own, Span must add exactly one)
+remember undo_steps typed
+click "Polygon/Span"
+expect_status "Spanned"
+expect_status "between the two openings"
+expect_value open_edges == 0
+expect_value undo_steps == $typed+1
+expect_value poly_selected > 0
+expect_value poly_element == 2
+expect_mesh_valid
+shot polygon-span
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-span-200
+ui_scale 100
+key f
+zoom 0.7
+
+# Undo: the block is whole again.
+key ctrl+z
+expect_value undo_steps == $typed
+expect_value triangles == $tris
+expect_value open_edges == 0
+key q
+expect_value poly_mode == 0

@@ -185,6 +185,7 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, BlitFramebuffer, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum) \
     X(void, FramebufferTexture2D, GLenum, GLenum, GLenum, GLuint, GLint)                    \
     X(void, TexBuffer, GLenum, GLenum, GLuint)                                               \
+    X(void, GetBufferParameteriv, GLenum, GLenum, GLint*)                                    \
     X(void, VertexAttribIPointer, GLuint, GLint, GLenum, GLsizei, const void*)               \
     X(void, VertexAttribDivisor, GLuint, GLuint)                                             \
     X(void, DrawArraysInstanced, GLenum, GLint, GLsizei, GLsizei)                            \
@@ -210,8 +211,16 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
     X(void, DeleteSync, GLsync)                                                              \
     X(void, MultiDrawElementsBaseVertex, GLenum, const GLsizei*, GLenum, const void* const*, GLsizei, const GLint*)
 
-// Optional (GL 4.4 / GL_ARB_buffer_storage; macOS stops at 4.1): null when missing.
-#define SF_GL_OPTIONAL(X) X(void, BufferStorage, GLenum, GLsizeiptr, const void*, GLbitfield)
+using GLDEBUGPROC = void(SF_GLAPI*)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message,
+                                    const void* userParam);
+
+// Optional (GL 4.4 / GL_ARB_buffer_storage; macOS stops at 4.1; GL 4.3 / ES 3.2 debug output): null when missing.
+#define SF_GL_OPTIONAL(X)                                          \
+    X(void, BufferStorage, GLenum, GLsizeiptr, const void*, GLbitfield) \
+    X(void, DebugMessageCallback, GLDEBUGPROC, const void*)
+constexpr GLenum GL_DEBUG_OUTPUT = 0x92E0;
+constexpr GLenum GL_DEBUG_TYPE_ERROR = 0x824C;
+constexpr GLenum GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR = 0x824E;
 
 constexpr GLenum GL_COPY_READ_BUFFER = 0x8F36;
 constexpr GLenum GL_COPY_WRITE_BUFFER = 0x8F37;
@@ -243,6 +252,18 @@ const char* load(ProcLoader loader);
 GLint maxTextureBufferTexels();
 uint32_t bufferChunkTexels(uint32_t natural);
 void setTestTexelLimit(uint32_t texels); // 0: the driver's limits
+// Buffer textures made (TexBuffer) past that limit since start: a driver may reject the draw that reads one (Mali-G72: GL error
+// 0x0501, "glTexBuffer ... extends beyond the allocated buffer"). The UI value texbuffer_over_limit; each one is logged once.
+uint32_t texBufferOverLimit();
+bool testTexelLimitSet(); // a UI test lowered the limit (the renderer then also checks its buffer sampler units, Renderer::bind)
+// Tests only (gl_limits reject_textured=1): the first textured draw of a Part counts as one the driver rejected with an error.
+void setTestRejectTextured(bool reject);
+
+// The driver's own words for what it rejects (KHR_debug, core in ES 3.2 and GL 4.3): errors and undefined behaviour go to the
+// log, the first 40 different ones, each with the call it came from. On in the ES build (Mali-G72, 11-22: "GL error 0x0501" and
+// no word of which call); elsewhere with SF_GL_DEBUG=1. Needs a current context.
+void enableDebugLog();
+bool testRejectTextured();
 bool testTinyGpu(); // a test lowered the limit to 256 texels or less: no 2D-texture fallback either (a texture then cannot be shown)
 // Partial buffer updates as GPU copies (render/BufferUpload.h): on Mesa's OpenGL over D3D12, whose glBufferSubData into
 // busy texture buffers removes the device; elsewhere BufferSubData (copies cost large micro strokes a third of their frame

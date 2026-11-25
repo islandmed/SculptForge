@@ -189,7 +189,7 @@ HistoryToolReply saveCheckpoint(Document& doc, const Json& arguments) {
         dropped = list.front().first;
         list.erase(list.begin());
     }
-    list.emplace_back(name, markHistory(doc));
+    list.emplace_back(name, markHistory(doc, HashScope::Everything)); // (a checkpoint: the whole scene)
     HistoryToolReply r;
     r.text = "Checkpoint '" + name + "' saved (" + plural(list.size(), "checkpoint", "checkpoints") + ")";
     if (!dropped.empty()) r.text += "; the oldest, '" + dropped + "', was dropped (at most " + std::to_string(kMaxCheckpoints) + ")";
@@ -206,8 +206,8 @@ HistoryToolReply restoreCheckpoint(Document& doc, const Json& arguments) {
     if (it == doc.checkpoints.end()) return fail("No checkpoint named '" + name + "' (checkpoint_list shows them)");
     const HistoryMark mark = it->second; // (a copy: a restore never changes the list)
     const uint64_t group = nextUndoSeq();
-    const HistoryWalk w = walkToMark(doc, mark, group);
-    const bool same = w.exact && sceneHash(doc) == mark.hash;
+    const HistoryRestore w = restoreToMark(doc, mark, group); // (checks first; a failure puts everything back)
+    const bool same = w.exact;
     HistoryToolReply r;
     r.ok = same;
     r.structured = Json::object();
@@ -220,12 +220,12 @@ HistoryToolReply restoreCheckpoint(Document& doc, const Json& arguments) {
                                           : "Restored checkpoint '" + name + "': " + plural(size_t(w.undone), "step", "steps") +
                                                 " undone, " + std::to_string(w.redone) + " redone. undo takes it back";
     } else {
-        const std::string problem = !w.problem.empty() ? w.problem
-                                                       : "the scene differs from the checkpoint (something in it was changed "
-                                                         "outside the undo history)";
-        r.text = "Could not restore checkpoint '" + name + "' exactly: " + problem + " (" + std::to_string(w.undone) +
-                 " undone, " + std::to_string(w.redone) + " redone)";
-        r.structured.set("problem", problem);
+        r.text = std::string("Could not restore checkpoint '") + name + "': " +
+                 (w.offHistory ? "the scene could not be restored exactly" : "checkpoint no longer in undo history") + " (" +
+                 w.problem + "). " +
+                 (w.untouched ? "The scene was not changed." : "THE SCENE MAY HAVE CHANGED: check with mesh_info / viewport_image.");
+        r.structured.set("problem", w.problem);
+        r.structured.set("scene_unchanged", w.untouched);
     }
     return r;
 }
