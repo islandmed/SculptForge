@@ -9,14 +9,14 @@ All notable changes to SculptForge are listed here. The format follows
 ## [0.14.1] - 2026-11-25
 
 ### Added
-- "**Tool > Cloth**: the Cloth brush's settings (mode, fabric, gravity, reach, steps, soft body, collisions) and Drape
+- **Tool > Cloth**: the Cloth brush's settings (mode, fabric, gravity, reach, steps, soft body, collisions) and Drape
   (fabric, units per metre, pins, Simulate) in one section with a line on what each part does. Brush > Cloth and Tool
   > Drape get a **Cloth settings...** link to it; the controls are the same ones, so all three agree. In the Classic
   layout it is a newer row: on with **Show newer menu rows**. Requested by Hameron. **Wind for Drape** (Tool > Drape
   and Tool > Cloth): a wind speed in m/s, where it blows toward (a heading, or **From view**), its lift and **Gusts**;
   the wind pushes on the cloth's face and skims along its edge, and all of it can change while the simulation runs. In
   gusts the cloth ripples on until Keep. The cloth_drape command takes wind, heading, lift and gusts. Requested by
-  members."
+  members.
 - **One-click update on macOS** (update banner > **Update**): the Mac app downloads the release's disk image from
   SculptForge's GitHub releases to `~/Library/Caches/SculptForge/updates`, checks the download arrived intact (its
   checksum must match the release's checksum list), copies the app out of it beside the current one, runs macOS's code
@@ -161,9 +161,9 @@ All notable changes to SculptForge are listed here. The format follows
   "could not be restored exactly" and changes nothing. Opening a saved history now gives its steps new numbers and
   counts as a new history, so checkpoints made before it are refused instead of pointing into it. Reported and
   reproduced by SurrealByDesign.
-- "**AI tools (live mode)**: the tool list a paired AI tool gets no longer offers `batch` and the `checkpoint_*`
-  tools, which only work in the headless server and answered \"Unknown tool\" when called; the list now matches what a
-  live session can call. Reported by SurrealByDesign."
+- **AI tools (live mode)**: the tool list a paired AI tool gets no longer offers `batch` and the `checkpoint_*`
+  tools, which only work in the headless server and answered "Unknown tool" when called; the list now matches what a
+  live session can call. Reported by SurrealByDesign.
 - **Android**: on graphics chips with a small buffer limit (some Mali phones and tablets), a Micro level on a mesh of
   more than about 33,000 triangles now draws and takes strokes.
 - **Stencil** (Sculpt > Alpha): strokes outside the Stencil's image did nothing, which read as a broken brush. Now
