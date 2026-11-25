@@ -72,6 +72,9 @@ It is a preference (saved automatically) and is saved with the project; from a s
 - **Quads** under the brush become triangles. The rest of the mesh keeps its quads.
 - **UVs are dropped** the first time a stroke remeshes a Part (the status bar says so), since the new
   triangles have none. Undo brings them back. Unwrap again with **Auto UV** when you are done.
+- **A painted texture is not shown** on a remeshed Part, because it lives on the UVs. The first Dynamic stroke on a Part
+  with a painted texture asks first: **Continue** goes on (then stroke again), **Cancel** makes no dab. Undo brings the
+  texture back exactly. **Don't show again** hides the question; **Edit > Preferences > Hints** shows it again.
 
 ## Subdivision levels
 

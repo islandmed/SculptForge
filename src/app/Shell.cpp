@@ -3418,6 +3418,13 @@ void App::setDynamic(bool on) {
     status_ = dyntopoSummary(doc_.sculptor.dyntopo);
 }
 
+// A Dynamic stroke is about to remesh a Part that has a painted texture (a stroke that holds the topology doesn't).
+bool App::dynamicPaintNoticeDue() const {
+    return doc_.sculptor.dyntopo.enabled && !dynamicPaintAcked_ && hintShown("dynamic_paint") &&
+           strokeType_ != StrokeType::DragRect && strokeType_ != StrokeType::DragDot && hasTexture(doc_.mesh) &&
+           dyntopoBlocker(doc_.mesh).empty();
+}
+
 void App::freezeLevelsAndDynamic() {
     if (!doc_.mesh.multires) {
         setDynamic(true);
@@ -3567,6 +3574,39 @@ void App::drawDynamicOffer() {
                 levelsProceed_ = nullptr;
                 ImGui::CloseCurrentPopup();
             }
+        }
+        Demo::popScope();
+        ImGui::EndPopup();
+    }
+
+    // The first Dynamic stroke on a Part with a painted texture: say what it does before it does it. Undo brings the
+    // texture back exactly (test_dyntopo), so Continue is the default; Cancel makes no dab and asks again next time.
+    static constexpr const char* kPaintNotice = "##dynamic_paint_notice";
+    if (openDynamicPaintNotice_) {
+        openDynamicPaintNotice_ = false;
+        ImGui::OpenPopup(kPaintNotice);
+    }
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal(kPaintNotice, nullptr,
+                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar)) {
+        Demo::pushScope("Dynamic Paint");
+        ImGui::TextUnformatted(tr("Dynamic rebuilds triangles and drops this Part's painted texture. Undo brings it back."));
+        ImGui::TextDisabled("%s", tr("Press Continue, then stroke again."));
+        bool hide = uiPrefs_.hiddenHints.count("dynamic_paint") > 0;
+        if (ImGui::Checkbox(tr("Don't show again##dynamic_paint"), &hide)) {
+            if (hide) uiPrefs_.hiddenHints.insert("dynamic_paint");
+            else uiPrefs_.hiddenHints.erase("dynamic_paint");
+        }
+        ImGui::Spacing();
+        if (ImGui::Button(tr("Continue##dynamic_paint")) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            dynamicPaintAcked_ = true;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SetItemDefaultFocus();
+        ImGui::SameLine();
+        if (ImGui::Button(tr("Cancel##dynamic_paint")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            uiPrefs_.hiddenHints.erase("dynamic_paint"); // (Cancel doesn't stop the asking)
+            ImGui::CloseCurrentPopup();
         }
         Demo::popScope();
         ImGui::EndPopup();

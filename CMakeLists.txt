@@ -1365,6 +1365,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(color_material_entries_2880 color_material_entries --size 2880x1800)
     sculptforge_ui_test(fill_effect_slider_keeps_1440 fill_effect_slider_keeps --size 1440x900)
     sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
+    sculptforge_ui_test(dyntopo_paint_notice_1440 dyntopo_paint_notice --size 1440x900) # the first Dynamic stroke on a painted Part asks first
+    sculptforge_ui_test(dyntopo_paint_notice_2880 dyntopo_paint_notice --size 2880x1800)
     sculptforge_ui_test(scatter_1440 scatter --size 1440x900) # Tool > Scatter, its live redo and Separate Parts over 500
     sculptforge_ui_test(scatter_2880 scatter --size 2880x1800)
     sculptforge_ui_test(floor_grid_fixed_1440 floor_grid_fixed --size 1440x900) # View > Display > Floor grid at Y=0
