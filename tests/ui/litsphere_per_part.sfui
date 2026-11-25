@@ -24,6 +24,7 @@ click "This Part##material.target_part"
 expect "Scene##mat"
 # (the Part the material goes to is named under the toggle)
 expect_text "Sphere 2"
+wait_idle 20
 shot picker-this-part
 click "Red Wax##mat"
 expect_value part_material != -2
