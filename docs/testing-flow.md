@@ -61,7 +61,8 @@ stay in `~/Work/.sf/t0-ci/<worktree>/`.
 - `spawn.sh` starts agents on Sonnet (`--opus` for hard design or perf work); the model is a column of `agents.tsv`.
 - `tidy.sh --apply` closes the herdr pane of an idle agent whose branch is merged and whose REPORT.md says done.
 
-- The run (`tools/ci/t0.sh`): `check_marks`, a Ninja build, impacted.py against the merge base with `origin/main`,
+- The run (`tools/ci/t0.sh`): `check_marks`, the gallery gate (a diff touching `tools/brush-gallery/repo/` must already match the
+  public gallery repo: `tools/ci/gallery_gate.sh`), a Ninja build, impacted.py against the merge base with `origin/main`,
   the picked tests through `run.py` on the CPU (Mesa llvmpipe, `SDL_VIDEO_DRIVER=offscreen`, `SF_TEST_BUDGET=150`;
   `GITHUB_ACTIONS` gives the in-test time limits their CI slack).
 - **A full run fits**: all ~390 tests finish in about 10 minutes on a runner, as long as the warm UI servers
