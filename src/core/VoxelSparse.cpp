@@ -433,7 +433,7 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
         return i < 0 ? !g.out[g.brickOf(p.x, p.y, p.z)] : (flags[size_t(i)] & kSolid) != 0;
     };
     // (a crease sealed by the wall closing: see the sign pass in Voxel.cpp)
-    constexpr float kSealed = 2.5f, kHug = 2.0f;
+    constexpr float kSealed = 2.5f, kHug = 2.0f, kBack = -0.3f, kProbe = 2.5f, kGap = 1.25f; // (as in Voxel.cpp)
     std::atomic<size_t> opened{0};
     poolFor(stored, [&](size_t b, size_t e) {
         size_t openedHere = 0;
@@ -450,13 +450,21 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
                 const glm::vec3 p = origin + glm::vec3(s) * cell;
                 const glm::vec3 onSurface = closestOnTriangle(p, P[tri.x], P[tri.y], P[tri.z]);
                 const float len = glm::length(nrm);
-                const glm::ivec3 probe(glm::round((onSurface + nrm * (2.5f * cell / std::max(len, 1e-20f)) - origin) / cell));
+                const glm::vec3 probeAt = onSurface + nrm * (kProbe * cell / std::max(len, 1e-20f));
+                const glm::ivec3 probe(glm::round((probeAt - origin) / cell));
                 bool buried = len > 0.0f && g.inGrid(probe) && solidAt(probe);
                 if (buried) { // (a gap's far wall is within kHug of the probe and has the sample on its outer side too)
                     const int64_t k = g.find(probe.x, probe.y, probe.z);
-                    if (k >= 0 && nearest[size_t(k)] >= 0 && dist2[size_t(k)] < kHug * kHug &&
-                        sideOfTriangle(mesh, uint32_t(nearest[size_t(k)]), p) > 0.0f)
-                        buried = false;
+                    if (k >= 0 && nearest[size_t(k)] >= 0 && dist2[size_t(k)] < kHug * kHug) {
+                        const glm::uvec3 t = mesh.triangles[size_t(nearest[size_t(k)])];
+                        const glm::vec3 m = glm::cross(P[t.y] - P[t.x], P[t.z] - P[t.x]);
+                        const float l = glm::length(m);
+                        if (l > 0.0f && glm::dot(m / l, nrm / len) < kBack && sideOfTriangle(mesh, uint32_t(nearest[size_t(k)]), p) > 0.0f) {
+                            const glm::vec3 d = probeAt - closestOnTriangle(probeAt, P[t.x], P[t.y], P[t.z]);
+                            const float e = glm::length(d) / cell;
+                            if ((glm::dot(d, m) > 0.0f ? kProbe + e : kProbe - e) >= kGap) buried = false;
+                        }
+                    }
                 }
                 inside = buried || glm::dot(p - onSurface, nrm) < 0.0f;
                 openedHere += sealed && !inside;

@@ -1364,9 +1364,22 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
     // nearest triangle decides for every solid sample within kSealed of the surface too. A surface buried inside another
     // part must still count as buried there: its front side is solid, as a sealed gap is; the difference is that a gap's
     // far wall is within kHug of the probe and has the sample on its outer side as well.
-    constexpr float kSealed = 2.5f, kHug = 2.0f;
-    auto outsideFarWall = [&](size_t probeIndex, const glm::vec3& p) {
-        return nearest[probeIndex] >= 0 && dist2[probeIndex] < kHug * kHug && sideOfTriangle(mesh, uint32_t(nearest[probeIndex]), p) > 0.0f;
+    constexpr float kSealed = 2.5f, kHug = 2.0f, kBack = -0.3f, kProbe = 2.5f, kGap = 1.25f;
+    // A crease's far wall: the surface nearest the probe (within kHug cells) has this sample on its outer side too, faces back at
+    // this sample's own surface (`n`: its unit normal; normals more than ~107 degrees apart: neighbouring triangles of one smooth
+    // surface, a pole's fan, a terrace step are never a crease's wall), and the gap between the two walls (kProbe along the normal
+    // from the near wall, less or plus the probe's distance to the far wall, by its side of it) is at least kGap cells: a closed
+    // slit (the lips) is narrower than the grid can hold, and opening it only chips its edge. `pw`: the probe's position.
+    auto outsideFarWall = [&](size_t probeIndex, const glm::vec3& p, const glm::vec3& pw, const glm::vec3& n) {
+        if (nearest[probeIndex] < 0 || dist2[probeIndex] >= kHug * kHug) return false;
+        const glm::uvec3 t = mesh.triangles[size_t(nearest[probeIndex])];
+        const glm::vec3 m = glm::cross(P[t.y] - P[t.x], P[t.z] - P[t.x]);
+        const float l = glm::length(m);
+        if (!(l > 0.0f) || glm::dot(m / l, n) >= kBack || sideOfTriangle(mesh, uint32_t(nearest[probeIndex]), p) <= 0.0f) return false;
+        const glm::vec3 d = pw - closestOnTriangle(pw, P[t.x], P[t.y], P[t.z]);
+        const float e = glm::length(d) / grid.cell;
+        const float gap = glm::dot(d, m) > 0.0f ? kProbe + e : kProbe - e; // (the probe in the gap, or past the far wall)
+        return gap >= kGap;
     };
     std::vector<uint8_t> inside(n);
     std::atomic<size_t> opened{0};
@@ -1386,11 +1399,11 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
                         const glm::vec3 onSurface = closestOnTriangle(p, P[tri.x], P[tri.y], P[tri.z]);
                         // A surface buried inside another part (solid just outside it too) doesn't bound the solid.
                         const float len = glm::length(nrm);
-                        const glm::ivec3 probe(glm::round((onSurface + nrm * (2.5f * grid.cell / std::max(len, 1e-20f)) -
-                                                           grid.origin) / grid.cell));
+                        const glm::vec3 probeAt = onSurface + nrm * (kProbe * grid.cell / std::max(len, 1e-20f));
+                        const glm::ivec3 probe(glm::round((probeAt - grid.origin) / grid.cell));
                         const bool buried = len > 0.0f && glm::all(glm::greaterThanEqual(probe, glm::ivec3(0))) &&
                                             glm::all(glm::lessThan(probe, dims)) && solid[grid.index(probe.x, probe.y, probe.z)] &&
-                                            !outsideFarWall(grid.index(probe.x, probe.y, probe.z), p);
+                                            !outsideFarWall(grid.index(probe.x, probe.y, probe.z), p, probeAt, nrm / len);
                         inside[i] = buried || glm::dot(p - onSurface, nrm) < 0.0f;
                         openedHere += sealed && !inside[i];
                     }
