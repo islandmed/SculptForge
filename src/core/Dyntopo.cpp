@@ -1108,10 +1108,8 @@ bool DynamicTopology::collapseKeepsTopology(uint32_t keep, uint32_t drop) const 
     uint32_t tris[4];
     const int n = edgeTriangles(keep, drop, tris);
     if (n < 1 || n > 2) return false;
-    // (A seam vertex stays where it is, the other merges into it: only vertices with one UV each meet at the midpoint.)
-    if (!m.uvs.empty() && p != m.positions[keep] && (seamVertex(keep) || seamVertex(drop))) return false;
     // (Two vertices with one UV each, drop inside the mesh: nothing to judge. Most candidates are like that.)
-    if (!m.uvs.empty() && p == m.positions[keep] && (seamVertex(drop) || seamVertex(keep) || openVertex(drop)) &&
+    if (!m.uvs.empty() && (seamVertex(drop) || seamVertex(keep) || openVertex(drop)) &&
         (!outlineStaysInChart(keep, drop) || !collapseUvPlan(keep, drop, tris, n, uvPlan_)))
         return false;
     uint32_t opposite[2] = {kNone, kNone};
@@ -1147,6 +1145,8 @@ bool DynamicTopology::collapseKeepsTopology(uint32_t keep, uint32_t drop) const 
 }
 
 bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3& p) const {
+    // (A seam vertex stays where it is, the other merges into it: only vertices with one UV each meet at the midpoint.)
+    if (!mesh_->uvs.empty() && p != mesh_->positions[keep] && (seamVertex(keep) || seamVertex(drop))) return false;
     if (!collapseKeepsTopology(keep, drop)) return false;
     const Mesh& m = *mesh_;
     uint32_t tris[4];
