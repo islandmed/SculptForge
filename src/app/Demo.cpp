@@ -71,9 +71,10 @@ ItemTable& items() {
 void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb, const ImGuiLastItemData*) {
     sf::ui::NoteItem(ctx, id, bb.Min, bb.Max); // the hover and focus rings (Ui.cpp)
     ImRect clip = bb;
-    // My Panel shows one control of a section by drawing the section cropped to it (PanelMyPanel.cpp, "##mypanel.control."
-    // and "##mypanel.measure." children): what the crop hides is not in the interface, and is no item here.
-    if (ctx && ctx->CurrentWindow && std::strstr(ctx->CurrentWindow->Name, "/##mypanel.") && !ctx->CurrentWindow->ClipRect.Overlaps(bb)) {
+    // My Panel and the shelves show one control of a section by drawing the section cropped to it (PanelMyPanel.cpp
+    // drawPinnedControl, "##pinned.control." and "##pinned.measure." children): what the crop hides is not in the interface,
+    // and is no item here.
+    if (ctx && ctx->CurrentWindow && std::strstr(ctx->CurrentWindow->Name, "/##pinned.") && !ctx->CurrentWindow->ClipRect.Overlaps(bb)) {
         items().rects.erase(id); // (a child window's name is "<parent>/<child>_<id>"; rects outlive the frame: none for it)
         return;
     }

@@ -1050,7 +1050,8 @@ void App::initActions() {
             status_ = layout_.customize ? "Customize: Ctrl+Alt+drag to move or remove items" : "Customize off";
         },
         ICON_LC_LAYOUT_TEMPLATE, nullptr, [this] { return layout_.customize; }, nullptr,
-        "Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it.");
+        "Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it. (At any "
+        "time, Customize off too, hold Alt and drag any button, checkbox, slider or choice from a palette onto a shelf.)");
 
     // The shell's actions (Shell.cpp: brushes, shelves, palettes, trays): they replace any of the above with
     // the same id and own P (Paint), the symmetry toggles and Tab.

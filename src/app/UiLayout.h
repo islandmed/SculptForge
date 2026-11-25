@@ -38,7 +38,8 @@ struct UiLayout {
     // or one control, "control:<scope>/<key>" (scope: the section id or, outside any section, the palette id; key: the
     // control's help title, or its action id; "#2" behind a repeated one).
     std::vector<std::string> myPanel;
-    // Item ids: action ids, "widget.*", "sep", "row" (top shelf line break).
+    // Item ids: action ids, "widget.*", "sep", "row" (top shelf line break), and (0.14) any one control of a palette,
+    // "control:<scope>/<key>" as My Panel stores it (myPanelEntry): hold Alt and drag it from its palette onto a shelf.
     std::vector<std::string> topShelf, leftShelf, rightShelf, bottomShelf;
     bool consoleOpen = false;
     float consoleHeight = 160;

@@ -193,6 +193,27 @@ bool g_captureNext = false;
 
 namespace tray {
 
+// While a scope is drawn for one entry (App::drawMyPanelScope), the rest of the palette body runs with items skipped; drawing
+// that is not an item (an icon put straight on the draw list) would still land at the stuck cursor, inside the cropped control
+// (11-24: three stray icons over a shelf's Backface culling). So skipping also means an empty clip rect: nothing of it shows.
+namespace {
+bool g_scopeClip = false;
+}
+void scopeSkip(bool skip) {
+    ImGui::GetCurrentWindow()->SkipItems = skip;
+    if (skip && !g_scopeClip) {
+        ImGui::PushClipRect(ImVec2(-1.0f, -1.0f), ImVec2(-1.0f, -1.0f), false);
+        g_scopeClip = true;
+    } else if (!skip && g_scopeClip) {
+        ImGui::PopClipRect();
+        g_scopeClip = false;
+    }
+}
+void scopeSkipEnd() {
+    if (g_scopeClip) ImGui::PopClipRect();
+    g_scopeClip = false;
+}
+
 Section::Section() {
     ImGui::Indent(kSectionInset * ImGui::GetFontSize() / 15.0f);
     capture_ = std::exchange(g_captureNext, false);
@@ -203,7 +224,7 @@ Section::~Section() {
     ImGui::Unindent(kSectionInset * s);
     ImGui::Dummy(ImVec2(0, 4.0f * s));
     ui::PinSection(""); // controls after it belong to the palette (My Panel entries, Ui.h)
-    if (capture_) ImGui::GetCurrentWindow()->SkipItems = true; // the rest of the palette body is not wanted
+    if (capture_) scopeSkip(true); // the rest of the palette body is not wanted
 }
 
 Style::Style() { ImGui::PushStyleColor(ImGuiCol_CheckMark, checkMark()); }
@@ -264,7 +285,7 @@ bool App::subpalette(const char* id, const char* englishTitle) {
             if (title != englishTitle) title = englishTitle;
         }
         const bool draw = mine && !myPanelProbe_;
-        ImGui::GetCurrentWindow()->SkipItems = !draw;
+        tray::scopeSkip(!draw);
         g_captureNext = draw;
         if (draw) ui::PinSection(id);
         return draw;

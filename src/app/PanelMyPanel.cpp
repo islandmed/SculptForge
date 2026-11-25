@@ -79,7 +79,7 @@ void App::drawMyPanelScope(const std::string& scope) {
     const bool paletteLevel = scope.find('.') == std::string::npos;
     myPanelSection_ = scope;
     myPanelPaletteLevel_ = paletteLevel;
-    window->SkipItems = !paletteLevel;
+    tray::scopeSkip(!paletteLevel);
     ImGui::PushID(scope.c_str());
     ui::PinPalette(def->id); // its controls are My Panel entries (Ui.h), here as in the palette
     const bool readOnly = ui::BeginPaletteItems();
@@ -87,6 +87,7 @@ void App::drawMyPanelScope(const std::string& scope) {
     ui::EndPaletteItems(readOnly);
     ui::PinPalette("");
     ImGui::PopID();
+    tray::scopeSkipEnd();
     window->SkipItems = wasSkipping;
     myPanelSection_.clear();
     myPanelPaletteLevel_ = false;
@@ -102,25 +103,38 @@ static std::string controlWords(App& app, const MyPanelEntry& e) {
     return tr(key.c_str());
 }
 
-bool App::drawMyPanelControl(const std::string& entry, const MyPanelEntry& e, ImRect& rect, bool& remove) {
+std::string App::shelfItemForEntry(const std::string& entry) const {
+    const MyPanelEntry e = myPanelEntry(entry);
+    if (!e.valid() || e.section) return {};
+    if (e.control) return paletteOfSection(e.scope()) ? entry : std::string();
+    return actions_.find(e.id) ? e.id : std::string();
+}
+
+bool App::drawPinnedControl(const std::string& entry, const MyPanelEntry& e, int host, float layoutWidth, bool fit, float rowH,
+                            ImRect& rect, bool& remove) {
     const std::string scope = e.scope(), key = e.key();
     if (!paletteOfSection(scope)) return false;
     const float s = uiScale_;
-    const float width = ImGui::GetContentRegionAvail().x;
-    MyPanelControlPlace& place = myPanelControls_[entry];
+    const bool panel = host == ui::HostMyPanel;
+    const float width = std::max(layoutWidth, 1.0f);
+    PinnedControlPlace& place = pinnedControls_[pinnedPlaceKey(host, entry)];
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBackground |
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav; // (nav would scroll it to a hidden neighbour)
     ImGui::PushID(entry.c_str());
-    if (!place.known) { // the first time (and after it went missing): lay the body out unseen and find the control
+    // The first time, and after it went missing (then twice a second, not every frame): lay the body out unseen and find the control.
+    if (!place.known && !(place.missing && ImGui::GetTime() - place.measured < 0.5)) {
         const ImVec2 start = ImGui::GetCursorScreenPos();
-        if (ImGui::BeginChild(("##mypanel.measure." + entry).c_str(), ImVec2(width, 1.0f), ImGuiChildFlags_None,
+        place.missing = true;
+        place.measured = ImGui::GetTime();
+        if (ImGui::BeginChild(("##pinned.measure." + entry).c_str(), ImVec2(width, 1.0f), ImGuiChildFlags_None,
                               flags | ImGuiWindowFlags_NoInputs)) {
             const ImVec2 origin = ImGui::GetCursorScreenPos();
-            ui::BeginPinnedControl(scope, key, true);
+            ui::BeginPinnedControl(scope, key, true, host);
             drawMyPanelScope(scope);
             const ui::PinnedControl r = ui::EndPinnedControl();
             if (r.found) {
                 place.known = true;
+                place.missing = false;
                 place.x = r.min.x - origin.x;
                 place.y = r.min.y - origin.y;
                 place.w = r.max.x - r.min.x;
@@ -132,43 +146,63 @@ bool App::drawMyPanelControl(const std::string& entry, const MyPanelEntry& e, Im
         ImGui::SetCursorScreenPos(start); // (the 1 px child took no room)
     }
     if (!place.known || place.h < 1.0f || place.w < 1.0f) { // hidden in this state (a readout of levels the Part has none of)
+        if (!panel && !layout_.customize) { // a shelf: a contextual item, not shown (from the next frame on, not laid out either)
+            ImGui::Dummy(ImVec2(0, 0));
+            rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+            ImGui::PopID();
+            return true;
+        }
         const std::string words = controlWords(*this, e);
         const ImVec2 p = ImGui::GetCursorScreenPos();
-        const float h = ImGui::GetFrameHeight();
-        ImGui::InvisibleButton("##mypanel.control.missing", ImVec2(width, h));
+        const float h = std::max(ImGui::GetFrameHeight(), rowH);
+        const float w = panel ? width : std::min(width, ImGui::CalcTextSize(words.c_str()).x + 16.0f * s);
+        ImGui::InvisibleButton("##pinned.control.missing", ImVec2(w, h));
         rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-        ui::MyPanelDragEntry(entry, words.c_str(), true);
-        if (ImGui::BeginPopupContextItem("##mypanel.ctx")) {
-            if (ImGui::MenuItem(tr("Remove from My Panel"))) remove = true;
+        ui::MyPanelDragEntry(entry, words.c_str(), panel);
+        if (ImGui::BeginPopupContextItem("##pinned.ctx")) {
+            if (ImGui::MenuItem(tr(panel ? "Remove from My Panel" : "Remove from shelf"))) remove = true;
             ImGui::EndPopup();
         }
         ImDrawList* dl = ImGui::GetWindowDrawList();
         const float ty = std::floor(p.y + (h - ImGui::GetFontSize()) * 0.5f);
         dl->AddText(ImVec2(p.x + 8.0f * s, ty), theme::u32(theme::textDim, 0.7f), words.c_str());
-        const std::string note = tr("(not shown now)");
-        const float nw = ImGui::CalcTextSize(note.c_str()).x;
-        dl->AddText(ImVec2(std::max(p.x + 8.0f * s + ImGui::CalcTextSize(words.c_str()).x + 8.0f * s, p.x + width - nw), ty),
-                    theme::u32(theme::textDim, 0.5f), note.c_str());
+        if (panel) {
+            const std::string note = tr("(not shown now)");
+            const float nw = ImGui::CalcTextSize(note.c_str()).x;
+            dl->AddText(ImVec2(std::max(p.x + 8.0f * s + ImGui::CalcTextSize(words.c_str()).x + 8.0f * s, p.x + width - nw), ty),
+                        theme::u32(theme::textDim, 0.5f), note.c_str());
+        }
         ui::DelayedTooltip(tr("Its palette does not show this control right now (it depends on the Part or the mode). It comes back when it does."));
         ImGui::PopID();
         return true;
     }
     // The control, live: the body drawn so the control lands at the top of a child as tall as it, cropped to its width.
-    // One from the middle of a row ("Mask" between Wireframe and Groups) is moved left to where its row starts.
-    // (Every line of the body starts at the child's left edge, so the move left is the child's scroll: its content is told
-    // to be that much wider and it is scrolled by as much, every frame; no scrollbar, no wheel.)
-    const ImVec2 childMin = ImGui::GetCursorScreenPos();
-    const float shift = std::max(0.0f, place.x - place.lineX);
-    if (shift > 0.0f) ImGui::SetNextWindowContentSize(ImVec2(width + shift, 0.0f));
+    // In My Panel one from the middle of a row ("Mask" between Wireframe and Groups) is moved left to where its row starts;
+    // on a shelf every control sits flush left. (Every line of the body starts at the child's left edge, so the move left is
+    // the child's scroll: its content is told to be that much wider and it is scrolled by as much, every frame; no scrollbar,
+    // no wheel. The content width is set every time, so the body is laid out at `width` however wide the item is.)
+    const float shift = panel ? std::max(0.0f, place.x - place.lineX) : std::max(0.0f, place.x);
+    const float itemW = fit ? std::clamp(place.w + 2.0f * s, 1.0f, width) : width;
+    const float itemH = std::max(place.h, rowH);
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    ImGui::BeginGroup();
+    ImGui::Dummy(ImVec2(itemW, itemH)); // the item's room; the child sits in it, centred
+    const ImVec2 childMin(start.x, std::floor(start.y + (itemH - place.h) * 0.5f));
+    ImGui::SetCursorScreenPos(childMin);
+    ImGui::SetNextWindowContentSize(ImVec2(width + shift, 0.0f));
     ImGui::SetNextWindowScroll(ImVec2(shift, 0.0f)); // (every frame: a row that stops being one keeps no stale scroll)
     ui::PinnedControl r;
-    const bool drawn = ImGui::BeginChild(("##mypanel.control." + entry).c_str(), ImVec2(width, place.h), ImGuiChildFlags_None, flags);
+    // A shelf in Customize Shelves with Ctrl+Alt held: the control is grabbed through a button the shelf lays over it (Shell.cpp
+    // drawShelfItem), so its child takes no input, or the pointer would hover the child and the shelf's press never lands.
+    const bool inert = !panel && layout_.customize && ui::CtrlHeld() && ui::AltHeld();
+    const bool drawn = ImGui::BeginChild(("##pinned.control." + entry).c_str(), ImVec2(itemW, place.h), ImGuiChildFlags_None,
+                                         flags | (inert ? ImGuiWindowFlags_NoInputs : 0));
     if (drawn) {
         const ImVec2 origin(childMin.x - shift, childMin.y - place.y);
-        const float left = childMin.x + place.lineX;
+        const float left = childMin.x + place.x - shift;
         ImGui::PushClipRect(ImVec2(left - 1.0f, childMin.y), ImVec2(left + place.w + 1.0f, childMin.y + place.h), true);
         ImGui::SetCursorScreenPos(origin);
-        ui::BeginPinnedControl(scope, key, false);
+        ui::BeginPinnedControl(scope, key, false, host);
         drawMyPanelScope(scope);
         r = ui::EndPinnedControl();
         ImGui::PopClipRect();
@@ -179,9 +213,21 @@ bool App::drawMyPanelControl(const std::string& entry, const MyPanelEntry& e, Im
             place.h = r.max.y - r.min.y;
             place.lineX = r.lineX - origin.x;
         }
+        // A control wider than its host (a long checkbox label on a side shelf, or in a narrow tray): the cut is visible, "..."
+        // over its last letters in the host's background, with the full name on hover or Ctrl help as before (cto 11-24: a
+        // silent cut reads as a different, wrong label).
+        if (r.found && r.max.x > childMin.x + itemW + 1.0f && itemW > 40.0f * s) {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const char* dots = "...";
+            const float dw = ImGui::CalcTextSize(dots).x, right = childMin.x + itemW, x0 = right - dw - 1.0f * s;
+            dl->AddRectFilled(ImVec2(x0 - 2.0f * s, childMin.y), ImVec2(right, childMin.y + place.h),
+                              panel ? ImGui::GetColorU32(ImGuiCol_WindowBg) : theme::u32(theme::shellBg));
+            dl->AddText(ImVec2(x0, std::floor(childMin.y + (place.h - ImGui::GetFontSize()) * 0.5f)), ImGui::GetColorU32(ImGuiCol_Text), dots);
+        }
     }
     ImGui::EndChild();
-    rect = ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    ImGui::EndGroup();
+    rect = ImRect(start, ImVec2(start.x + itemW, start.y + itemH));
     if (drawn && !r.found) place.known = false; // gone this frame: measured again next frame, the placeholder meanwhile
     if (r.remove) remove = true;
     ImGui::PopID();
@@ -203,7 +249,7 @@ void App::drawPalette_MyPanel() {
         const MyPanelEntry e = myPanelEntry(entries[i]);
         if (e.control) {
             bool removeThis = false;
-            if (!drawMyPanelControl(entries[i], e, rects[i], removeThis)) continue; // a palette this version no longer has
+            if (!drawPinnedControl(entries[i], e, ui::HostMyPanel, width, false, 0.0f, rects[i], removeThis)) continue; // a palette this version no longer has
             prevButton = false;
             isSection[i] = true;
             if (removeThis) remove = entries[i];

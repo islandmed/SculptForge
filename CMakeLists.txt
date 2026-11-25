@@ -1824,6 +1824,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(my_panel_1440_200 sizes/my_panel --size 2880x1800)
     sculptforge_ui_test(my_panel_controls_1440 sizes/my_panel_controls --size 1440x900)
     sculptforge_ui_test(my_panel_controls_1440_200 sizes/my_panel_controls --size 2880x1800)
+    sculptforge_ui_test(shelves_anything_1440 sizes/shelves_anything --size 1440x900)
+    sculptforge_ui_test(shelves_anything_1440_200 sizes/shelves_anything --size 2880x1800)
     sculptforge_ui_test(my_panel_paths_1440 sizes/my_panel_paths --size 1440x900)
     sculptforge_ui_test(my_panel_paths_1440_200 sizes/my_panel_paths --size 2880x1800)
     # A crash leaves a note in the log file (#16). Needs no window.
