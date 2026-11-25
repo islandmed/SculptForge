@@ -77,8 +77,9 @@ substep (one left edges 8-28% long under its drive). A sheet edge-on to the wind
 catches the wind and streams along it. Gusts (0..1) make the wind a field over place and time: three sine waves
 (along the wind, across it and up; about half the cloth's size long; 0.7-1.1 Hz) plus a slow swell of the steady
 part, scaled by the gust share of the speed. It is a function, not noise: the same drape on every run and thread
-count. In wind the panel paces the simulation to real time (it is watched); in gusts the cloth never rests, so it runs
-up to a minute of cloth time and Keep takes a frame.
+count. In wind the cloth folds onto itself (a flag), so a windy drape runs with self-collision (particles half an edge
+apart, as the brush); a still drape runs as before. In wind the panel paces the simulation to real time (it is
+watched); in gusts the cloth never rests, so it runs up to a minute of cloth time and Keep takes a frame.
 
 ## 5. Cloth brush (phase 1)
 

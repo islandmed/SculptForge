@@ -59,13 +59,13 @@ void App::startDrape() {
     job->part = doc_.activePartInfo().id;
     job->vertices = doc_.mesh.vertexCount();
     job->start = doc_.mesh.positions;
-    if (!job->sim.init(job->scene.setup, job->scene.fabric, drapeSettings(drapeRequest_))) {
+    if (!job->sim.init(job->scene.setup, job->scene.fabric, drapeSettings(drapeRequest_, job->scene.meanEdge))) {
         status_ = "Drape: the Part can't be simulated";
         return;
     }
     job->sim.setColliders(&job->scene.colliders);
     job->baseFrames = job->cap = drapeRequest_.maxFrames;
-    job->setSettings(drapeSettings(drapeRequest_)); // (the pacing and cap for this wind; applied again at frame 0, harmless)
+    job->setSettings(drapeSettings(drapeRequest_, job->scene.meanEdge)); // (pacing and cap for this wind; applied at frame 0, harmless)
     DrapeJob* j = job.get();
     job->worker = std::thread([j] {
         auto due = std::chrono::steady_clock::now();
@@ -237,7 +237,7 @@ void App::drawDrapeSection() {
                      "quite settles, so press Keep at the frame you like (it stops by itself after a minute).",
                      help);
     }
-    if (windChanged && running) drape_->setSettings(drapeSettings(drapeRequest_));
+    if (windChanged && running) drape_->setSettings(drapeSettings(drapeRequest_, drape_->scene.meanEdge));
     if (!running) {
         if (ImGui::Button(tr("Simulate##drape"), ImVec2(w, 0))) startDrape();
         ui::HelpText("Simulate", nullptr,

@@ -160,7 +160,8 @@ TEST(cloth_wind_blows_the_face_and_streams_the_edge) {
 
 TEST(cloth_wind_gusts_keep_moving_and_repeat) {
     // Gusts: the sheet keeps moving (it never rests, so Drape runs until Keep), with the same positions on every run
-    // and thread count (the gust field is a function of place and time, nothing random). A steady wind holds the
+    // and thread count (the gust field is a function of place and time, nothing random; self-collision on, as the
+    // panel runs windy drapes). A steady wind holds the
     // sheet in a blown pose; its folds may keep fluttering (a flag in a steady wind does), but slowly next to the
     // wind, so Drape ends it at its frame cap with the pose.
     const int res = 16;
@@ -173,6 +174,7 @@ TEST(cloth_wind_gusts_keep_moving_and_repeat) {
         ClothSettings set;
         set.wind = glm::vec3(0.0f, 0.0f, 4.0f);
         set.turbulence = 0.6f;
+        set.selfDistance = 0.5f / float(res);
         sim.setSettings(set);
         float slowest = 1e9f;
         for (int f = 0; f < 300; ++f) {
@@ -1268,6 +1270,7 @@ TEST(cloth_bench_drape_and_brush_on_a_dense_body) {
         o.maxFrames = 300;
         o.settings.wind = glm::vec3(0.0f, 0.0f, 5.0f);
         o.settings.turbulence = windy ? 0.5f : 0.0f;
+        o.settings.selfDistance = 0.5f / 140.0f; // (as drapeSettings sets it in wind: half the sheet's edge)
         last = clock::now();
         const DrapeResult w = drapeToRest(s, colliders, fabricPreset(FabricPreset::Cotton), o);
         std::sort(frames.begin(), frames.end());

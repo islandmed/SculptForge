@@ -33,9 +33,11 @@ struct DrapeRequest {
     float windLift = 0.0f;
     float gusts = 0.0f;
 };
-// The request's wind as a velocity (m/s, the sculpt's axes), and the solver settings for it.
+// The request's wind as a velocity (m/s, the sculpt's axes), and the solver settings for it. In wind the cloth folds
+// onto itself (a flag), so with the scene's mean edge given it also keeps particles half an edge apart; a still drape
+// runs as it always has.
 glm::vec3 drapeWind(const DrapeRequest& request);
-ClothSettings drapeSettings(const DrapeRequest& request);
+ClothSettings drapeSettings(const DrapeRequest& request, float meanEdge = 0.0f);
 
 // The active Part's simulation, ready to step: positions and colliders in metres (divided by `scale`).
 struct DrapeScene {
@@ -43,6 +45,7 @@ struct DrapeScene {
     ClothColliders colliders;
     Fabric fabric;
     float scale = 1.0f;
+    float meanEdge = 0.0f; // the sheet's mean edge, metres (self-collision in wind keeps particles half of it apart)
 };
 // False (and `error`) when the active Part can't drape (empty, a micro level, Forge Spheres, a stroke running).
 bool drapeScene(const Document& doc, const DrapeRequest& request, DrapeScene& out, std::string& error);

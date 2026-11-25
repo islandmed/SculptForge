@@ -17,10 +17,11 @@ glm::vec3 drapeWind(const DrapeRequest& q) {
     return glm::vec3(std::sin(h) * std::cos(l), std::sin(l), -std::cos(h) * std::cos(l)) * speed;
 }
 
-ClothSettings drapeSettings(const DrapeRequest& q) {
+ClothSettings drapeSettings(const DrapeRequest& q, float meanEdge) {
     ClothSettings s;
     s.wind = drapeWind(q);
     s.turbulence = std::clamp(q.gusts, 0.0f, 1.0f);
+    if (glm::dot(s.wind, s.wind) > 0.0f && meanEdge > 0.0f) s.selfDistance = 0.5f * meanEdge;
     return s;
 }
 
@@ -42,6 +43,11 @@ bool drapeScene(const Document& doc, const DrapeRequest& request, DrapeScene& ou
     for (uint32_t t = 0; t < mesh.triangleCount(); ++t)
         if (!mesh.triangleHidden(t)) s.triangles.push_back(mesh.triangles[t]);
     if (s.triangles.empty()) return error = "Drape: every face of the active Part is hidden", false;
+    double edges = 0.0;
+    for (const glm::uvec3& t : s.triangles)
+        edges += glm::length(s.positions[t.y] - s.positions[t.x]) + glm::length(s.positions[t.z] - s.positions[t.y]) +
+                 glm::length(s.positions[t.x] - s.positions[t.z]);
+    out.meanEdge = float(edges / (3.0 * double(s.triangles.size())));
     // Pins: the mask, and the vertices only hidden faces touch (they stay with the hidden part).
     const bool masked = request.useMask && mesh.hasMask();
     if (masked || mesh.hasHidden()) {
@@ -130,7 +136,7 @@ void registerDrapeCommands(CommandRegistry& reg) {
                  if (!drapeScene(doc, q, scene, err)) return {false, err};
                  DrapeOptions o;
                  o.maxFrames = q.maxFrames;
-                 o.settings = drapeSettings(q);
+                 o.settings = drapeSettings(q, scene.meanEdge);
                  const DrapeResult r = drapeToRest(scene.setup, scene.colliders, scene.fabric, o);
                  const size_t moved = applyDrape(doc, r.positions, scene.scale, err);
                  if (moved == 0) return {false, err};
