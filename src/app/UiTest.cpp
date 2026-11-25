@@ -152,6 +152,7 @@
 //                            right_tray_open, left_tray_open, right_tray_shown / left_tray_shown (drawn), shell_narrow, title_overlaps (top bar widgets over each other), timeline_overlaps (the timeline header's pieces over each other), menu_rect_changes (the open task menu moved or resized since last read), offscreen_items (past the window edge), clipped_labels / clipped_labels@SCOPE (controls whose label is wider than they are, e.g. @Extract), hscroll_windows (shown vertical windows wider inside than out), hscrolled_windows (shown windows scrolled sideways), Library_open, guide_open, guide_hits (search results), shelves (1 shown), left_tray / right_tray (palettes in
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
+//                            view_others_marks (the view vs only the active Part shown: pixels off by > 25 grey levels),
 //                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
 //                            view_vs_mark (mean pixel difference to mark_view's view), view_nearer_mark (that, less the same to mark_view other's),
 //                            micro_pending_coarse (Focus Detail: tiles whose coarse shading still waits for a frame),
@@ -1941,6 +1942,32 @@ double Demo::query(const std::string& name, bool& known) const {
         if (name == "view_clipped_share") return 100.0 * double(clipped) / double(luma.size());
         std::sort(luma.begin(), luma.end());
         return double(luma[std::min(luma.size() - 1, size_t(double(luma.size()) * 0.995))]);
+    }
+    if (name == "view_others_marks") {
+        // Near-coplanar Parts (a garment, a Shell or a copy 0.5-2% off the body): the view against the same view with only
+        // the active Part shown, as pixels whose grey level differs by more than 25. With the others wholly behind the
+        // active Part (or it wholly over them) that is 0; each Part's fill stepped back by its own slope made them fight.
+        const int w = 960, h = 540;
+        Camera cam = app_.camera_;
+        cam.aspect = float(w) / float(h);
+        std::vector<uint8_t> all, solo;
+        std::string error;
+        app_.syncScene();
+        if (!app_.renderer_.renderToImage(cam, w, h, app_.renderSettings_, all, error)) return -1.0;
+        std::vector<bool> was;
+        for (int i = 0; i < app_.doc_.partCount(); ++i) {
+            was.push_back(app_.doc_.parts[size_t(i)].visible);
+            if (i != app_.doc_.activePart) app_.doc_.parts[size_t(i)].visible = false;
+        }
+        app_.syncScene();
+        const bool ok = app_.renderer_.renderToImage(cam, w, h, app_.renderSettings_, solo, error);
+        for (size_t i = 0; i < was.size(); ++i) app_.doc_.parts[i].visible = was[i];
+        app_.syncScene();
+        if (!ok || solo.size() != all.size()) return -1.0;
+        const auto luma = [](const std::vector<uint8_t>& v, size_t i) { return 0.2126 * v[i] + 0.7152 * v[i + 1] + 0.0722 * v[i + 2]; };
+        size_t marks = 0;
+        for (size_t i = 0; i < all.size(); i += 4) marks += std::abs(luma(all, i) - luma(solo, i)) > 25.0;
+        return double(marks);
     }
     if (name == "view_stale") {
         // gh#184: the view as the GPU holds it after the edits so far, against the same mesh sent up whole again: the

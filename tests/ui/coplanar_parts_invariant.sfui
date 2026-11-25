@@ -1,0 +1,32 @@
+# Near-coplanar Parts (a garment, a Shell, Drape or a Duplicate 0.5% off the body) draw without fighting at rest: the view
+# with both Parts is the view with the front one alone (view_others_marks: pixels off by > 25 grey levels). Each Part's fill
+# used to step back by its own triangles' slope (for the wireframe's lines), and a thin rod showed ~2600 marked px at 0.5%.
+run ui_look look=classic layout=classic
+env SF_TRIANGLE_BUDGET 100000000
+
+# A copy 0.5% inside a thin rod, painted dark: none of it shows through the body.
+run new_sphere triangles=2000000
+run transform scale=0.08,0.08,1 pivot=origin
+run part_duplicate
+run transform scale=0.995,0.995,0.995 pivot=origin
+run paint_fill color=0.06,0.06,0.06
+run part_select index=0
+camera 20 80
+
+wait 0.5
+expect_value view_others_marks == 0
+
+# The same copy as a layer 0.5% over the body: none of the body shows through it.
+run part_select index=1
+run transform scale=1.0100503,1.0100503,1.0100503 pivot=origin
+wait 0.5
+expect_value view_others_marks == 0
+
+# A sparser garment (decimated) under the body: its flatter triangles stay behind too.
+run part_select index=1
+run decimate triangles=60000
+run transform scale=0.99,0.99,0.99 pivot=origin
+run part_select index=0
+wait 0.5
+expect_value view_others_marks == 0
+shot coplanar-parts
