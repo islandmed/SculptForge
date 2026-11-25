@@ -1,7 +1,8 @@
 ---
-whats_new: **Dynamic** keeps a painted Part's texture: sculpting with Dynamic on no longer erases the paint. A few light specks can appear where it rebuilds triangles; a fix follows.
-fixed: Dynamic topology no longer erases a Part's painted texture: the UVs are kept through the stroke (new triangles get UVs from the ones they split; at a UV seam the remesh merges and relaxes only along the seam), so the paint stays in place and Undo restores the UVs exactly.
+whats_new: **Dynamic** keeps a painted Part's texture: sculpting with Dynamic on no longer erases the paint.
+fixed: Dynamic topology no longer erases a Part's painted texture: the UVs are kept through the stroke (new triangles get UVs from the ones they split; at a UV seam the remesh merges and relaxes only along the seam), so the paint stays in place and Undo restores the UVs exactly. A collapse that would leave a triangle off the painted area of its chart (no white specks where big brushes simplify a painted head), and a collapse, flip or relax that would turn a triangle's texture over, are refused; no vertex of a painted Part grows into a hub of thousands of neighbours.
 testers:
+  - Windows or macOS: Auto UV the Human head, paint a few colours, turn Dynamic on and drag big Smooth, Standard and Clay brushes across the eyes and forehead; no white specks or streaks appear on the paint, and painting over grown geometry (a Tendril) covers it.
   - Windows or macOS: paint a Part into its texture (Paint into Texture), turn Dynamic on and sculpt over the paint, big and small strokes, across a seam if the Part has one; the paint stays. Undo, then redo; save and reopen.
 ---
 Reviewers: src/core/Dyntopo.cpp (UVs per triangle slot in TopologyTriangleValues; split/collapse/flip/relax), src/render/Renderer.cpp (patches carry their triangles' UVs), tests/test_dyntopo.cpp, tests/e2e/dynamic_keeps_texture.sfui.
