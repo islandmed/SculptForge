@@ -85,6 +85,15 @@ releases (the checksum-list key is an Actions secret there); a developer-signed 
 - **Dry run**: `SF_UPDATE_DRY_RUN=1` does everything up to and including the signature checks, then removes the copy
   and the download; the status line says what would have happened. Linux/Windows: the same variable skips the install
   and removes the download.
+- **Feed hold**: the Update button replaces a Mac bundle only when `latest.json` carries a top-level
+  `"self_update": {"macos": true}` (`UpdateInfo::macSelfUpdate`; missing, unreadable, any other value, or the key inside
+  a channel = no offer, the banner's Download link). Checked where the button is drawn and again where the download
+  starts, and read through a strict parse (a duplicate key anywhere in the feed keeps the hold). It only ever removes
+  behaviour. Turning it on is a release decision, not a routine site push: the real-Mac tester's run of the swap against
+  a public release (through a local feed copy with the flag, `SF_UPDATE_FEED=<file>`) plus OKs from input and cto, logged
+  in reviews.tsv, then sitepush. The same key set back to false is the kill switch if a swap ever goes wrong in the
+  field: it stops new swaps within a day (the feed is read once a day, or on Help > Check for updates) but cannot undo
+  one that already happened (that Mac keeps the `.old` bundle only until the new version has run 5 s).
 - **Build switch**: CMake `SCULPTFORGE_MAC_SELF_UPDATE` (default ON; `SF_MAC_SELF_UPDATE` in core/SelfUpdate.h). OFF
   builds the leg out: a Mac gets the banner's Download link as before and `downloadUpdate` refuses a bundle install; the
   release manager ships OFF when no real-Mac tester has run the checklist by the cut. Nothing else changes.

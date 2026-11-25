@@ -36,6 +36,37 @@ TEST(update_feed_parses) {
           u.notesUrl == "https://example.org/dl" && u.highlights.empty());
 }
 
+// The macOS in-app update is offered only when the feed's top-level self_update.macos is a JSON true; anything else
+// (missing, a string, a number, null, the key at the wrong level, or inside a channel) keeps the hold.
+TEST(update_feed_mac_self_update_hold) {
+    const std::string head = "{\"version\":\"0.14.2\",\"download\":\"https://sculptforge.app/#download\",\"notes\":\"https://sculptforge.app/guide/whats-new.html\"";
+    UpdateInfo u;
+    std::string err;
+    CHECK(parseUpdateFeed(head + "}", u, err) && !u.macSelfUpdate);
+    CHECK(parseUpdateFeed(head + ",\"self_update\":{\"macos\":true}}", u, err) && u.macSelfUpdate);
+    for (const char* bad : {",\"self_update\":{\"macos\":false}}", ",\"self_update\":{\"macos\":\"true\"}}", ",\"self_update\":{\"macos\":1}}",
+                            ",\"self_update\":{\"macos\":null}}", ",\"self_update\":true}", ",\"self_update\":{}}", ",\"self_update\":[true]}",
+                            ",\"macos\":true}", ",\"self_update\":{\"linux\":true}}",
+                            // duplicate keys, either order: the strict read refuses the feed for the hold (the banner still works)
+                            ",\"self_update\":{\"macos\":false,\"macos\":true}}", ",\"self_update\":{\"macos\":true,\"macos\":false}}",
+                            ",\"self_update\":{\"macos\":true},\"self_update\":{\"macos\":false}}",
+                            ",\"self_update\":{\"macos\":false},\"self_update\":{\"macos\":true}}",
+                            ",\"self_update\":{\"macos\":true},\"highlights\":[],\"highlights\":[]}",
+                            ",\"channels\":{\"preview\":{\"version\":\"0.15.0-beta.1\",\"download\":\"https://sculptforge.app/#download\",\"self_update\":{\"macos\":true}}}}"}) {
+        UpdateInfo v;
+        CHECK(parseUpdateFeed(head + bad, v, err) && !v.macSelfUpdate && v.version == "0.14.2"); // (the update itself still parses)
+        CHECK(parseUpdateFeed(head + bad, v, err, UpdateChannel::Preview) && !v.macSelfUpdate);
+    }
+    // Set at the top level, it holds for the preview entry too (one hold for the site).
+    CHECK(parseUpdateFeed(head + ",\"self_update\":{\"macos\":true},\"channels\":{\"preview\":{\"version\":\"0.15.0-beta.1\",\"download\":\"https://sculptforge.app/#download\"}}}",
+                          u, err, UpdateChannel::Preview) && u.version == "0.15.0-beta.1" && u.macSelfUpdate);
+    // The live feed ships with the hold on (nothing to flip until the swap has been tested on a real Mac).
+    std::ifstream f(SF_TEST_DATA_DIR "/../../website/latest.json", std::ios::binary);
+    CHECK(bool(f));
+    const std::string live((std::istreambuf_iterator<char>(f)), {});
+    CHECK(parseUpdateFeed(live, u, err) && !u.macSelfUpdate);
+}
+
 TEST(update_versions_order_prereleases) {
     CHECK(compareVersions("9.0.0-beta.1", "9.0.0") < 0);
     CHECK(compareVersions("9.0.0", "9.0.0-beta.1") > 0);

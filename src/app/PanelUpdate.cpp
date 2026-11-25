@@ -174,7 +174,9 @@ const update::Install& App::updateInstall() {
 bool App::selfUpdateOffered(const UpdateInfo& u) {
     uint8_t key[32];
     const bool keyed = releaseKey(key) || !options_.uiTest.empty(); // no key compiled in yet: Download only
-    return keyed && update::selfUpdates(updateInstall().kind) && update::safeVersion(u.version);
+    // A Mac bundle only while the feed says so (UpdateInfo::macSelfUpdate; missing = no): the hold the site lane lifts.
+    const bool held = updateInstall().kind == update::InstallKind::MacApp && !u.macSelfUpdate;
+    return keyed && !held && update::selfUpdates(updateInstall().kind) && update::safeVersion(u.version);
 }
 
 void App::initSelfUpdate() {
@@ -279,7 +281,7 @@ void App::tickSelfUpdate() {
 }
 
 void App::startSelfUpdate(const UpdateInfo& u) {
-    if (selfUpdateStage_ == SelfUpdateStage::Downloading) return;
+    if (selfUpdateStage_ == SelfUpdateStage::Downloading || !selfUpdateOffered(u)) return; // (the feed's hold, among the rest)
     selfUpdateVersion_ = u.version;
     selfUpdateError_.clear();
     installAtQuit_ = false;

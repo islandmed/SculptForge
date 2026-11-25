@@ -4,8 +4,21 @@
 # download (SF_UPDATE_TEST_INSTALL only works in them), and nothing is sent: no request at all.
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=3
-env SF_UPDATE_FEED $SCRIPT_DIR/data/update_newer.json
 env SF_UPDATE_TEST_INSTALL macapp
+# The feed's hold (core/UpdateCheck.h macSelfUpdate): a feed without "self_update": {"macos": true} offers a Mac the
+# Download link only, as before 0.14.1.
+env SF_UPDATE_FEED $SCRIPT_DIR/data/update_newer.json
+click "Help##palette.help"
+click "Check for updates##help.check_updates"
+wait_idle 20
+expect_text "SculptForge 99.0.0 is available"
+expect_not "Update##update.update"
+expect "Download"
+shot update-mac-held
+click "Later"
+expect_not "Skip this version"
+# The hold lifted in the feed: Update is there.
+env SF_UPDATE_FEED $SCRIPT_DIR/data/update_newer_mac.json
 click "Help##palette.help"
 click "Check for updates##help.check_updates"
 wait_idle 20
