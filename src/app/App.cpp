@@ -2922,10 +2922,9 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_;
     strokePaint_ = strokeColourSmooth_ || (strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_));
     strokeSculpt_ = !(strokePaint_ && paintMode_);
-    // Show SculptForge on Discord: the one word about the work (Sculpting or Painting; Idle five minutes after the
-    // last stroke). When it started, never where, what or on which file (PanelIntegrations.cpp).
+    // Show SculptForge on Discord: a stroke counts as activity (Idle five minutes after the last input or stroke).
+    // When it started, never where, what or on which file (PanelIntegrations.cpp).
     discordStrokeAt_ = double(SDL_GetTicksNS()) * 1e-9;
-    discordStrokePaint_ = !strokeSculpt_;
     const BrushRecipe* recipe = strokeRecipe();
     { // the brush's own pressure curve (Precision.cpp)
         const auto it = brushCurves_.find(pressureCurveKey(strokeBrush_, recipe));

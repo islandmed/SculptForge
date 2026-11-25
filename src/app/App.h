@@ -715,8 +715,7 @@ private:
     std::unique_ptr<discord::Client, DiscordClientDelete> discordClient_; // made on the first switch-on
     bool discordClosed_ = false;                 // quitting: cleared and closed, never made again (shutdown)
     int64_t discordStart_ = 0;                   // seconds since 1970 when this session started (the elapsed time)
-    double discordStrokeAt_ = -1e9;              // SDL seconds of the last stroke's start (Idle five minutes after it)
-    bool discordStrokePaint_ = false;            // that stroke painted colour only (Painting), else Sculpting
+    double discordStrokeAt_ = -1e9;              // SDL seconds of the last stroke's start (with lastInputAt_: Idle 5 min after)
     bool discordPresenceAvailable() const;       // an application ID is compiled in
     discord::Mode discordMode() const;           // Sculpting, Painting or Idle: the one word about the work that is sent
     void updateDiscordPresence();                // every frame (tickProject): sends only when what's shown changes

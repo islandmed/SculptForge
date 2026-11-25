@@ -25,7 +25,7 @@ so does a crash. If you quit and restart Discord, your status comes back within 
 |---|---|
 | The SculptForge icon (Discord loads it from sculptforge.app) and name | while it's on |
 | The time you started (Discord shows the elapsed time) | while it's on |
-| One word: **Sculpting**, **Painting** (the Paint brush) or **Idle** (no stroke for five minutes) | while it's on |
+| One word: **Sculpting**, **Painting** (the Paint brush in hand) or **Idle** (nothing done for five minutes) | while it's on |
 
 Nothing else: no file names, folders or paths, no Part names, no user name, no details about your model, nothing
 you type. The three words are fixed; nothing from your scene can get into them. SculptForge passes this to the

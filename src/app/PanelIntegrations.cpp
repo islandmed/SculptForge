@@ -14,13 +14,14 @@
 #include <SDL3/SDL_video.h>
 #include <imgui.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 
 namespace sf {
 
 namespace {
-constexpr double kDiscordIdleSeconds = 5 * 60.0; // no stroke for this long: Idle
+constexpr double kDiscordIdleSeconds = 5 * 60.0; // no input or stroke for this long: Idle
 }
 
 void App::DiscordClientDelete::operator()(discord::Client* c) const { delete c; }
@@ -33,10 +34,13 @@ bool App::discordAgentRun() const {
     return agent;
 }
 
+// Idle: nothing done at the window (a key, a click, the pen, a stroke) for five minutes; else the word for the tool in
+// hand: Painting with the Paint brush (colour only), Sculpting otherwise. Turning the view or adjusting a slider is
+// activity too (the design critique: artists study the model for minutes between strokes).
 discord::Mode App::discordMode() const {
     const double now = double(SDL_GetTicksNS()) * 1e-9;
-    if (now - discordStrokeAt_ > kDiscordIdleSeconds) return discord::Mode::Idle;
-    return discordStrokePaint_ ? discord::Mode::Painting : discord::Mode::Sculpting;
+    if (now - std::max(lastInputAt_, discordStrokeAt_) > kDiscordIdleSeconds) return discord::Mode::Idle;
+    return paintMode_ ? discord::Mode::Painting : discord::Mode::Sculpting;
 }
 
 void App::updateDiscordPresence() {
@@ -53,7 +57,8 @@ void App::updateDiscordPresence() {
         a.start = discordStart_;
         a.mode = discordMode();
         // The flip to Idle must go out while the window sleeps too: one wake-up when it is due.
-        if (a.mode != discord::Mode::Idle) redrawIn(kDiscordIdleSeconds - (double(SDL_GetTicksNS()) * 1e-9 - discordStrokeAt_) + 0.1);
+        if (a.mode != discord::Mode::Idle)
+            redrawIn(kDiscordIdleSeconds - (double(SDL_GetTicksNS()) * 1e-9 - std::max(lastInputAt_, discordStrokeAt_)) + 0.1);
     }
     discordClient_->set(a); // sends only when this changed (one activity every 4 s at most)
 }
@@ -62,14 +67,14 @@ void App::drawIntegrationsPrefs() {
     const char* path = "Preferences > Integrations";
     bool changed = ImGui::Checkbox(tr("Show SculptForge on Discord##prefs.discord"), &discordPrefs_.enabled);
     ui::HelpText("Show SculptForge on Discord", nullptr,
-                 "Your Discord profile shows SculptForge, its icon, how long you've been at it and one word for what "
+                 "Your Discord profile shows SculptForge, its icon, the time since you started it and one word for what "
                  "you're doing: Sculpting, Painting or Idle. Sent only to the Discord app on this computer, which shows "
-                 "it to your friends. Off by default.",
+                 "it to your friends. Needs the Discord app running. Off by default.",
                  path);
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", tr("Shared: the name SculptForge, its icon, your time in the app and Sculpting, Painting or Idle. "
-                                "Nothing else: no file names, folders, Part names, user name or model details. Needs the Discord "
-                                "app running on this computer."));
+    ImGui::TextWrapped("%s", tr("Shown on your Discord profile: SculptForge, its icon, the time since you started it, and Sculpting, "
+                                "Painting or Idle (nothing done for five minutes). Sent only to the Discord app on this computer. "
+                                "Nothing else: no file names, folders, Part names, user name or model details."));
     ImGui::PopStyleColor();
     if (discordPrefs_.optionsNote) { // had Show the file name or Show the monthly challenge on up to 0.14.0
         ImGui::Spacing();
