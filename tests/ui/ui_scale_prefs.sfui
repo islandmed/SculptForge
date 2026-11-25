@@ -25,8 +25,8 @@ expect "Automatic##ui_scale_auto"
 shot prefs_scale_80
 
 # Saved: a restart (ui.json written and read back, uiScale + uiScaleByDisplay) comes up at 80 %. (The open Interface
-# section is part of the layout, which saves itself too: only the palette needs opening again.)
-wait_value ui_config == 1 5
+# section is part of the layout, which saves itself too: only the palette needs opening again.) The restart writes the
+# prefs itself: no wait on the autosave (wall clock) in a frame-time test.
 restart
 wait 0.2
 expect_value ui_scale == 80
