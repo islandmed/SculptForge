@@ -5,7 +5,8 @@ whats_new: **Numbered duplicates**: **Duplicate** names copies `Head.01`, `Head.
 added: **Floor grid at Y=0** (View > Display and Tool > Viewport Look, next to Floor grid; requested by members): the floor
   grid stays at world height zero instead of following the lowest point of the visible Parts, a fixed reference while
   you move Parts up and down or work on a base. Off by default (the grid follows the model, as before); saved in the
-  preferences.
+  preferences. In the Classic layout the row shows with Edit > Preferences > Interface > Show newer menu rows (the
+  command palette reaches it either way; once on, the row stays).
 added: **Centre view on the pointer** (#209, requested by members): Alt+middle click on the canvas (press and let go
   without dragging) slides the point under the pointer to the middle of the view, keeping the zoom and the angle; the
   view then orbits about that point. Over the background it centres on that spot. Works in every key style (an
@@ -15,6 +16,7 @@ changed: **Duplicate** numbers the copies (Discord ask): `Head` gives `Head.01`,
   from the same name (`Head.03`), the lowest free number first. Before: `Head copy`, `Head copy copy`.
 testers:
   - Any OS: View > Floor grid on, then Floor grid at Y=0 on; Gizmo-move the model up and down: the grid stays put. Off again: it follows the lowest point. Restart: both switches are kept.
+  - Classic layout: the Floor grid at Y=0 row is absent until Edit > Preferences > Interface > Show newer menu rows is on; the command palette (F3) finds it either way.
   - Mouse, every key style (Edit > Preferences > Input): Alt+middle click a spot on the model: it slides to the middle, same size; orbit afterwards turns about it. Alt+middle drag still pans (Blender keys: orbits) exactly as before.
   - Pen with a button set to Middle click: Alt + that button, tap without moving: centres; a drag pans.
   - Parts: rename a Part Head, Duplicate twice, Duplicate the first copy: Head.01, Head.02, Head.03; delete Head.02 and Duplicate again: Head.02.

@@ -122,7 +122,9 @@ and tilt and line up Parts; the red line is the X axis, the blue one Z.
 
 The floor moves when a stroke or a move ends (not during it). **Floor grid at Y=0** (next to it; off by default,
 remembered) keeps the grid at the world's height zero instead, a fixed reference while you move Parts up and down or
-work on a base: a Part below it then shows through the grid from above. The squares step up by ten as you zoom out, and
+work on a base: a Part below it then shows through the grid from above. In the Classic layout its row shows with
+**Edit > Preferences > Interface > Show newer menu rows** (the command palette and a hotkey reach it either way, and once
+it is on the row stays). The squares step up by ten as you zoom out, and
 the grid fades into the distance; it never draws over the model, even seen from below.
 
 "Background" means any part of the canvas where the cursor isn't over the model. A left-drag that starts on

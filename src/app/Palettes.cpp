@@ -824,8 +824,10 @@ void App::drawPalette_Render() {
     if (ImGui::Checkbox(tr("Floor grid##render"), &renderSettings_.floorGrid))
         uiPrefs_.floorGrid = renderSettings_.floorGrid; // (a preference: on in every session until turned off)
     ui::HelpAction(*this, "view.floor_grid");
-    ImGui::Checkbox(tr("Floor grid at Y=0##render"), &uiPrefs_.floorGridFixed);
-    ui::HelpAction(*this, "view.floor_grid_fixed");
+    if (newerMenuRows() || uiPrefs_.floorGridFixed) { // (a row after 0.13.0: Classic keeps its old rows unless asked; once on, it stays reachable)
+        ImGui::Checkbox(tr("Floor grid at Y=0##render"), &uiPrefs_.floorGridFixed);
+        ui::HelpAction(*this, "view.floor_grid_fixed");
+    }
     bool xray = renderSettings_.xray;
     if (ui::Checkbox("X-Ray##render", &xray)) runCommand("xray", {{"on", xray}});
     ui::HelpAction(*this, "view.xray");
@@ -1085,8 +1087,10 @@ void App::drawPalette_Tool() {
         if (ImGui::Checkbox(tr("Floor grid##display"), &renderSettings_.floorGrid))
             uiPrefs_.floorGrid = renderSettings_.floorGrid;
         ui::HelpAction(*this, "view.floor_grid");
-        ImGui::Checkbox(tr("Floor grid at Y=0##display"), &uiPrefs_.floorGridFixed);
-        ui::HelpAction(*this, "view.floor_grid_fixed");
+        if (newerMenuRows() || uiPrefs_.floorGridFixed) { // (as the View row above)
+            ImGui::Checkbox(tr("Floor grid at Y=0##display"), &uiPrefs_.floorGridFixed);
+            ui::HelpAction(*this, "view.floor_grid_fixed");
+        }
         ImGui::ColorEdit3(tr("Material colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
         ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Viewport Look");
         drawShadingControls();
