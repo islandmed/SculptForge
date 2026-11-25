@@ -285,6 +285,7 @@ void App::commitSolverBatch() {
     StrokeSolver& s = *solver_;
     s.done = false;
     if (strokeFinishing_) strokeEndWorkMs_ += s.endWorkSeconds * 1000.0, s.endWorkSeconds = 0.0;
+    if (strokeFinishing_ && s.finalize) ++strokeFinalizeCount_; // (more than one a release: the end work done twice)
     ++commits_;
     // SF_MEASURE_POP: the view before the commit, with and without the batch's preview.
     std::vector<uint8_t> withPreview, withoutPreview, after;

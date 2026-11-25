@@ -392,6 +392,7 @@ struct PhaseResult {
     // how long depends on where the stroke ends, a big brush's dabs costing 40-370 ms each on Lucy 28M, which made the
     // 240 px release 0.55 or 0.95 s). The end work is the part to compare between builds.
     double releaseCatchUpMs = -1, releaseEndMs = -1;
+    int finalizeCount = -1; // the stroke's finalize batches after the release (1 expected)
     float pathRadiusPx = 0; // the stroke path's size (strokePoint's R, fitted to the model)
     double pathLaps = 1.0;  // ... how often round it relative to the full-size path (ProofState::laps)
     bool pathUpright = false;
@@ -1132,6 +1133,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             if (doc_.sculptor.strokeActive()) break;
             p.releasing = false;
             ph.releaseDoneMs = (nowSeconds() - p.releaseAt) * 1000.0;
+            ph.finalizeCount = strokeFinalizeCount_;
             if (strokeEndWorkMs_ > 0.0) {
                 ph.releaseEndMs = std::min(strokeEndWorkMs_, ph.releaseDoneMs);
                 ph.releaseCatchUpMs = ph.releaseDoneMs - ph.releaseEndMs;
@@ -1461,6 +1463,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     if (ph.releaseEndMs >= 0) {
                         j.set("release_catchup_ms", std::round(ph.releaseCatchUpMs * 10) / 10);
                         j.set("release_end_ms", std::round(ph.releaseEndMs * 10) / 10);
+                        j.set("finalize_count", double(ph.finalizeCount));
                     }
                     if (ph.stroke.dabs > 0) { // where the stroke's time went, beside frame_split_ms (which is the main thread's)
                         Json t = Json::object();
@@ -1483,6 +1486,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     if (ph.releaseEndMs >= 0) {
                         j.set("release_catchup_ms", std::round(ph.releaseCatchUpMs * 10) / 10);
                         j.set("release_end_ms", std::round(ph.releaseEndMs * 10) / 10);
+                        j.set("finalize_count", double(ph.finalizeCount));
                     }
                 }
                 phases.push(j);
