@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.13.14 LANGUAGES C CXX)
+project(SculptForge VERSION 0.14.0 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -87,6 +87,7 @@ add_library(sculptforge_core STATIC
   src/core/Commands.cpp
   src/core/CommandParse.cpp
   src/core/FaceGroups.cpp
+  src/core/PolyExtrude.cpp
   src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
   src/core/Parts.cpp
@@ -136,6 +137,9 @@ add_library(sculptforge_core STATIC
   src/core/MeshBoolean.cpp
   src/core/PartBoolean.cpp
   src/core/CloseHoles.cpp
+  src/core/PolySpan.cpp
+  src/core/PolyBevel.cpp
+  src/core/PolyInset.cpp
   src/core/MeshCheck.cpp
   src/core/BrushAlpha.cpp
   src/core/CreatureSkin.cpp
@@ -157,6 +161,10 @@ add_library(sculptforge_core STATIC
   src/core/Texture.cpp
   src/core/TextureCommands.cpp
   src/core/EdgeSelect.cpp
+  src/core/PolyMode.cpp
+  src/core/PolyOps.cpp
+  src/core/EdgeLoopInsert.cpp
+  src/core/PolyEdgeLoop.cpp
   src/core/Uv.cpp
   src/core/UvCommands.cpp
   src/core/UvPack.cpp
@@ -187,6 +195,7 @@ add_library(sculptforge_core STATIC
   src/core/SurfaceQuery.cpp
   src/core/QRemesh.cpp
   src/core/GeneratedRemesh.cpp
+  src/core/AiProvenance.cpp
   src/core/MeshPreview.cpp
   src/core/Backdrop.cpp
   src/core/QRemeshGuides.cpp
@@ -507,6 +516,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelMasking.cpp
     src/app/PanelCut.cpp
     src/app/PanelView.cpp
+    src/app/SplitView.cpp
     src/app/PanelFaceGroups.cpp
     src/app/PanelSelectionSets.cpp
     src/app/Selection.cpp
@@ -537,7 +547,9 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelFill.cpp
     src/app/PanelGeometry.cpp
     src/app/PanelEdges.cpp
+    src/app/PanelPolygon.cpp
     src/app/Gizmo.cpp
+    src/app/CornerGizmo.cpp
     src/app/PanelBake.cpp
     src/app/FocusDetailApp.cpp
     src/app/PanelRetopo.cpp
@@ -1327,6 +1339,10 @@ if(SCULPTFORGE_BUILD_TESTS)
       get_filename_component(name ${script} NAME_WE)
       sculptforge_ui_test(${name} ${name})
     endforeach()
+    sculptforge_ui_test(split_view_1440 split_view --size 1440x900) # View > Split view: both panes, the divider, the chips
+    sculptforge_ui_test(split_view_2880 split_view --size 2880x1800)
+    sculptforge_ui_test(curve_edit_1440 curve_edit --size 1440x900) # standalone curves: Points, Straight / Smooth, gizmo on points
+    sculptforge_ui_test(curve_edit_2880 curve_edit --size 2880x1800)
     sculptforge_ui_test(color_material_entries_1440 color_material_entries --size 1440x900) # Color > Material rows before any channel is on
     sculptforge_ui_test(color_material_entries_2880 color_material_entries --size 2880x1800)
     sculptforge_ui_test(fill_effect_slider_keeps_1440 fill_effect_slider_keeps --size 1440x900)
@@ -1335,6 +1351,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(scatter_2880 scatter --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
+    sculptforge_ui_test(orientation_widget_1440 orientation_widget --size 1440x900) # Draw > Camera > Corner gizmo > Orientation
+    sculptforge_ui_test(orientation_widget_2880 orientation_widget --size 2880x1800)
     sculptforge_ui_test(guide_window_look_1440 guide_window_look --size 1440x900) # the guide's Learn edge, strip and surface
     sculptforge_ui_test(guide_window_look_2880 guide_window_look --size 2880x1800)
     sculptforge_ui_test(guide_window_look_800 guide_window_look --size 800x1280)
@@ -1346,6 +1364,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(keep_strokes_editable_checkbox_2880 keep_strokes_editable_checkbox --size 2880x1800)
     sculptforge_ui_test(undo_no_replay_lod_1440 undo_no_replay_lod --size 1440x900) # gh#184: the view after undo + a stroke
     sculptforge_ui_test(undo_no_replay_lod_2880 undo_no_replay_lod --size 2880x1800)
+    sculptforge_ui_test(generate_candidates_1440 generate_candidates --size 1440x900) # Generate 3D's Result choice + the AI tag (0.14)
+    sculptforge_ui_test(generate_candidates_2880 generate_candidates --size 2880x1800)
+    sculptforge_ui_test(remesh_quickmenu_1440 remesh_quickmenu --size 1440x900) # the Quick Menu's remesh row (0.14.0)
+    sculptforge_ui_test(remesh_quickmenu_2880 remesh_quickmenu --size 2880x1800)
     # (gh#184, the stroke thread: settings read once at startup, so these run cold with their environment set here)
     sculptforge_ui_test(async_stroke_undo_view_1440 async_stroke_undo_view --size 1440x900)
     sculptforge_ui_test(async_stroke_undo_view_2880 async_stroke_undo_view --size 2880x1800)
@@ -1608,6 +1630,18 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Edges mode and creases (tests/ui/edge_select.sfui) at 1440 px of UI, 100% and 200% (#108).
     sculptforge_ui_test(edge_select_1440 edge_select --size 1440x900)
     sculptforge_ui_test(edge_select_2880 edge_select --size 2880x1800) # its 200% shots: 1440 px of UI
+    # Polygon mode (tests/ui/polygon_mode.sfui) at 1440 px of UI, 100% and 200%.
+    sculptforge_ui_test(polygon_mode_1440 polygon_mode --size 1440x900)
+    sculptforge_ui_test(polygon_mode_2880 polygon_mode --size 2880x1800)
+    # Extrude in Polygon mode (tests/ui/polygon_extrude.sfui): faces as a region, individual, undo, then open border edges.
+    sculptforge_ui_test(polygon_extrude_1440 polygon_extrude --size 1440x900)
+    sculptforge_ui_test(polygon_extrude_2880 polygon_extrude --size 2880x1800)
+    # Span (tests/ui/polygon_span.sfui): the same two sizes.
+    sculptforge_ui_test(polygon_span_1440 polygon_span --size 1440x900)
+    sculptforge_ui_test(polygon_span_2880 polygon_span --size 2880x1800)
+    # Bevel (tests/ui/polygon_bevel.sfui): the op's panel entry, preview and result at 100% and 200%.
+    sculptforge_ui_test(polygon_bevel_1440 polygon_bevel --size 1440x900)
+    sculptforge_ui_test(polygon_bevel_2880 polygon_bevel --size 2880x1800)
     # The Transform gizmo's look, each mode front and 3/4, 100% and 200% (tests/ui/gizmo/look.sfui).
     sculptforge_ui_test(gizmo_look_1440 gizmo/look --size 1440x900)
     sculptforge_ui_test(gizmo_look_2880 gizmo/look --size 2880x1800)

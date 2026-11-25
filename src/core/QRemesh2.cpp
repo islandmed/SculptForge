@@ -1260,7 +1260,7 @@ bool remeshPieceOnce(const WorkMesh& piece, int axis, double wantQuads, const QR
 
     // Source structures: the surface, its feature lines.
     TriangleBVH surface;
-    surface.build(piece.P, piece.T);
+    if (!surface.build(piece.P, piece.T, [&] { return !isCancelled(); })) return false; // (half a second at 5M: Cancel lands inside)
     mark("surface bvh");
     if (isCancelled()) return false;
     const float sharpCos = opt.detectEdges ? std::cos(glm::radians(60.0f)) : 2.0f;

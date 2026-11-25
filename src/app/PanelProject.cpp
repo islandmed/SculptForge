@@ -1082,7 +1082,7 @@ void App::drawUpdateBanner() {
     tickSelfUpdate();  // (and in run() on the passes that draw nothing: asleep, hidden for a restart)
     if (!updateAvailable_) return;
     const UpdateInfo& u = *updateAvailable_;
-    const CanvasRect c = canvasRect(); // top centre of the 3D view, clear of the shelves
+    const CanvasRect c = wholeCanvasRect(); // top centre of the 3D view, clear of the shelves
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + timelineTopInset_ + 12.0f * uiScale_), ImGuiCond_Always,
                             ImVec2(0.5f, 0.0f)); // (below the timeline strip when it is at the top)
     ImGui::SetNextWindowBgAlpha(0.96f);

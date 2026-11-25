@@ -37,6 +37,19 @@ struct HistoryWalk {
 // `groupId` every step it moves gets that batch id, so one undo (or redo) undoes (or redoes) the whole walk.
 HistoryWalk walkToMark(Document& doc, const HistoryMark& mark, uint64_t groupId = 0);
 
+// Why `mark` can't be reached, found WITHOUT touching the scene (empty = nothing against it): the history was cleared, or a
+// step the mark points at is gone (replaced by a newer edit, or dropped by the byte budget).
+std::string markUnreachable(const Document& doc, const HistoryMark& mark);
+
+// walkToMark as a transaction (a checkpoint restore): checks markUnreachable first, and when the walk still ends off the
+// mark (or the scene's hash is not `mark.hash`) walks back to where it started, so a failed restore leaves the scene,
+// the history and the active Part as they were. `untouched` says so (true too when nothing was tried); on failure the
+// step counts are 0. `exact` = at the mark, hash and all.
+struct HistoryRestore : HistoryWalk {
+    bool untouched = false;
+};
+HistoryRestore restoreToMark(Document& doc, const HistoryMark& mark, uint64_t groupId);
+
 // How far the history is from `mark`: steps to undo and to redo to get there (-1, -1: the history was cleared since).
 struct HistoryDistance {
     int back = 0, ahead = 0;

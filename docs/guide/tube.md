@@ -31,6 +31,7 @@ will be. Press **Draw Tube** again, <kbd>Esc</kbd>, any brush, or **Draw** / **M
 
 | Setting | What it does |
 |---|---|
+| **Draw** | **Freehand**: drag to draw a stroke. **Points**: click to place the points one by one (below) |
 | **Size** | How thick new tubes are: their radius on screen at the depth you draw at |
 | **Pressure** | How much a light touch of the pen thins the tube (0: the same thickness all along). A mouse draws at full size |
 | **Smoothing** | How much of the stroke's wobble is smoothed out before the tube is made |
@@ -40,6 +41,7 @@ will be. Press **Draw Tube** again, <kbd>Esc</kbd>, any brush, or **Draw** / **M
 | **Shape** | The cross-section and taper (below) |
 | **Ends** | **Rounded** or **Flat** |
 | **Result** | **New Part**: each stroke is a Tube Part you can edit. **Merge**: the stroke goes into the active Part. **Curve**: each stroke is a Curve Part (below) |
+| **Line** | **Smooth**: a smooth curve through the points. **Straight**: straight spans with sharp corners, a polyline. Switch at any time; the points stay |
 
 **Symmetry** (<kbd>X</kbd>) draws the mirror copy across the X plane too, and keeps it as you edit the tube.
 
@@ -115,7 +117,33 @@ Set **Result > Curve** and each stroke becomes a **Curve Part**: a thin guide li
 - **Tube from curve** turns it into a tube with the Shape, Ends, Taper and the modifiers above. Undo brings the
   curve back; **Size** sets the tube's thickness when you draw, and the point **Radius** changes it per point.
 
-*Requested by Hameron, GABO and Artizmo.*
+### Point by point: polylines
+
+Set **Draw** to **Points** and, with **Draw Tube** on, each click adds a point to the curve (or tube) being built: a
+line from its last point follows the pointer to show the span the next click adds. Clicks on the model land on it
+when **Snap to surfaces** is on; clicks beside it use the Depth rule, like a stroke. <kbd>Enter</kbd>, **Next line**,
+<kbd>Esc</kbd> or Draw Tube off ends the line, and the next click starts a new one. Each click is one undo step.
+
+**Line** sets what passes through the points: **Straight** keeps every corner (a polyline: frames, chain runs,
+piping, fence lines), **Smooth** curves through the same points. Switch whenever you like, for the curve you have
+selected or the next one you draw: the points never move, only the line between them, so a polyline sketched with a
+few clicks becomes a flowing curve, and back. Resample, Tube from curve and Repeat along curve follow whichever line
+the curve has.
+
+### Select points, move them with the gizmo
+
+<kbd>Shift</kbd>+click a dot to select it (orange), and more dots to select several; <kbd>Shift</kbd>+click again to
+let one go. **Move**, **Scale** and **Rotate** (<kbd>W</kbd>, <kbd>E</kbd>, <kbd>R</kbd>) then work on the selected
+points instead of the whole mesh: the gizmo sits on their centre, an arrow drag moves them along an axis, a ring
+turns them about the centre, a ball scales their spread and their thickness. One selected point: Move places it
+exactly, Scale sets its thickness. No selection: the gizmo moves the whole curve. The tube follows live, each drag
+is one undo step, and the points stay editable afterwards (the Transform panel's numbers work the same way).
+
+**Snap points to surface** puts the selected points (or all of them) on the nearest surface of the other Parts: a curve lies
+on it, a tube half sunk in, so a line drawn in the air drops onto the model. With **Snap to surfaces** on, a curve's
+dot you drag over another Part lands on it too. **Delete Point** removes every selected point.
+
+*Requested by Hameron and GABO.*
 
 ## Edit the points
 
@@ -124,6 +152,8 @@ Part show, but a plain drag always draws a new tube, even over a dot: hold <kbd>
 <kbd>Alt</kbd>) to edit a dot instead, which also selects its Part.
 
 - **Drag** a dot to move it across the screen (<kbd>Shift</kbd>+drag while Draw Tube is on); the tube follows as you drag.
+  A curve's dot dragged over another Part lands on its surface while Snap to surfaces is on.
+- <kbd>Shift</kbd>+click dots to select several, then move, turn or scale them with the gizmo (above).
 - <kbd>Ctrl</kbd>+drag a dot up or right to make the tube thicker there, down or left to make it thinner.
 - <kbd>Alt</kbd>+click a dot to delete it.
 - The dot you last dragged is selected (orange): **Radius** sets its thickness exactly, **Insert Point** adds a
@@ -167,6 +197,12 @@ tube_new points="0,0,0 1,0.5,0 2,0,0.4" curve=true
 tube_resample count=24
 tube_from_curve radius=0.08 profile=rope twist=180 spread=0.6
 tube_bake uniform=true
+tube_new points="0,0,0" radius=0.05 curve=true straight=true
+tube_add_point position="1,0,0"
+tube_add_point position="1,1,0" snap=true
+tube_set straight=false
+tube_delete_point indices="1 3"
+tube_snap_points indices="0 2" sink=0.5
 ```
 
 `profile` is `round`, `square`, `triangle`, `ribbon`, `rope`, `braid` or `sleeve` (with `twist`, `spin`, `spread`); `up="x,y,z"` sets which way the cross-section's first flat
@@ -174,3 +210,6 @@ side faces.
 
 Each point is `x,y,z` or `x,y,z,radius`. With `smooth=0.5` the points are treated as raw pen samples: smoothed and
 simplified into control points, as a drawn stroke is (`spacing=` sets how far apart, in radii). `merge=true` puts the tube into the active Part.
+`straight=true` makes a polyline (`tube_set straight=false` smooths it, the points stay); `tube_add_point` adds a point
+at the end (or after `index`; `snap=true` puts it on the nearest other Part); `tube_delete_point indices=` removes
+several; `tube_snap_points` lays the points on the other Parts' surfaces (`sink` radii below it).

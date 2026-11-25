@@ -1,0 +1,38 @@
+name: DCO
+
+# Every commit of a pull request carries a Signed-off-by line for its author (CONTRIBUTING.md, "Sign-off"): the
+# contributor certifies the change is their own work or properly licensed, not copied from proprietary software.
+# Pull requests only, forks included: read-only token, no secrets, no write (tools/release/check_workflows.py).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    name: DCO sign-off
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          bad=0
+          for c in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            want="Signed-off-by: $(git show -s --format='%an <%ae>' "$c")"
+            if ! git show -s --format=%B "$c" | grep -qiF -- "$want"; then
+              echo "::error::$(git show -s --format='%h %s' "$c"): no \"$want\" line (git commit --amend -s, or git rebase --signoff $BASE)"
+              bad=1
+            fi
+          done
+          [ "$bad" = 0 ] && echo "Every commit is signed off."
+          exit $bad

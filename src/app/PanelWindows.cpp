@@ -333,7 +333,7 @@ App::PanelEvent App::panelWindowEvent(const SDL_Event& e) {
     case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_KEY_UP:
         // Shortcuts work with a panel focused, unless it's typing into a field; a key's release always goes through.
-        toMain = e.type == SDL_EVENT_KEY_UP || !io.WantTextInput;
+        toMain = e.type == SDL_EVENT_KEY_UP || !ui::TextFieldFocused();
         ImGui_ImplSDL3_ProcessEvent(&e);
         result = PanelEvent::Main;
         break;

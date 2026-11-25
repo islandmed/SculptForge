@@ -182,7 +182,7 @@ void App::drawDeckWindow() {
 
     // The banner: visible whenever a phone is paired with the Deck, over every other window.
     if (ds.connected) {
-        const CanvasRect c = canvasRect();
+        const CanvasRect c = wholeCanvasRect();
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w * 0.5f, c.y + 8 * scale), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
         ImGui::SetNextWindowBgAlpha(0.95f);
         ImGui::PushStyleColor(ImGuiCol_Border, kOk);
@@ -204,7 +204,7 @@ void App::drawDeckWindow() {
 
     ImGui::SetNextWindowSize(ImVec2(360 * scale, 0), ImGuiCond_Always);
     {
-        const CanvasRect c = canvasRect();
+        const CanvasRect c = wholeCanvasRect();
         ImGui::SetNextWindowPos(ImVec2(c.x + c.w - 12 * scale, c.y + 60 * scale), ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
     }
     ImGui::SetNextWindowBgAlpha(1.0f);

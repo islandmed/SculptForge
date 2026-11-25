@@ -25,6 +25,16 @@
 
 namespace sf::ui {
 
+std::string AiProvenanceText(const AiProvenance& ai) {
+    if (ai.empty()) return {};
+    AiProvenance shown = ai;
+    shown.role = ai.role == AiProvenance::kGenerated        ? tr("generated")
+                 : ai.role == AiProvenance::kSculptingBase ? tr("sculpting base")
+                 : ai.role == AiProvenance::kReference     ? tr("reference")
+                                                           : ai.role;
+    return shown.line();
+}
+
 namespace {
 
 // The Ctrl-help request for this frame: the last hovered item that asked for help wins.
@@ -143,6 +153,15 @@ bool MyPanelDragged() {
     if (!AltHeld() || CtrlHeld()) return false;
     const ImGuiIO& io = ImGui::GetIO();
     return std::abs(io.MousePos.x - io.MouseClickedPos[0].x) + std::abs(io.MousePos.y - io.MouseClickedPos[0].y) >= 4.0f;
+}
+
+bool TextFieldFocused() {
+    const ImGuiContext& g = *GImGui;
+    if (g.IO.WantTextInput) return true;
+    // A field that took the keyboard in the frame just drawn: its flag comes with the next frame's start. (Only a field
+    // that is new: one that went away with its window, the console closing, keeps ActiveId until that frame clears it.)
+    return g.ActiveId != 0 && g.ActiveId != g.ActiveIdPreviousFrame && g.ActiveIdIsAlive == g.ActiveId &&
+           (g.ActiveId == g.TempInputId || g.ActiveId == g.InputTextState.ID);
 }
 
 const char* FloatingWindowAt(ImVec2 p) {
