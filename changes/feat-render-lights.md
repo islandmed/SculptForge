@@ -19,7 +19,8 @@ member_request: true
 member_credit: KKolombre, fxrtst, Artizmo
 testers:
   - Any OS, Material > Light > Lights: click Key, then Fill, then Rim. The head gets a warm key from the upper left, a cool
-    lift on the right and a bright edge from behind; the shadows (Shadows & AO on) fall away from the key light.
+    lift on the right and a bright edge from behind; the shadows (Shadows & AO on) fall away from the key light. Four lights at
+    their starting intensities run bright on a white Lit Sphere: turn a light's Intensity down to taste (presets get a trim next).
   - Drag a light's ball past its edge: the dot turns into a ring and the light comes from behind the model. Double-click the
     ball puts the light back where its role starts.
   - Tick Shadows on the Fill: the cast shadows swing to its side; the Key's tick goes off.
