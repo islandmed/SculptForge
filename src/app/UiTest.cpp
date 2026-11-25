@@ -1859,6 +1859,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "added_light_yaw") return app_.renderSettings_.lights.empty() ? 0.0 : double(app_.renderSettings_.lights.back().yaw);
     if (name == "added_light_intensity") return app_.renderSettings_.lights.empty() ? 0.0 : double(app_.renderSettings_.lights.back().intensity);
     if (name == "shadow_strength") return double(app_.renderSettings_.shadowStrength);
+    if (name == "lights_balance") return double(viewLightsBalance(app_.renderSettings_.lights)); // 1 = each light as its slider says
     if (name == "shadow_light_count") { // added lights that cast the shadows (0 or 1)
         int n = 0;
         for (const ViewLight& l : app_.renderSettings_.lights) n += l.shadows ? 1 : 0;

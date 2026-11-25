@@ -44,6 +44,11 @@ const char* viewLightRoleName(ViewLight::Role role);    // "Key", "Fill", "Rim"
 bool parseViewLightRole(const std::string& text, ViewLight::Role& out); // either name, any case
 // The direction towards the light in view space (yaw / pitch as lightRotation turns it from straight ahead).
 glm::vec3 viewLightDirection(float yawDegrees, float pitchDegrees);
+// Balance of the added lights: the factor every light's colour is scaled by so that together they add one light's worth
+// of exposure (their luminance-weighted intensities sum to at most the strongest light's own intensity, or 1 if that is
+// less). 1 with no light or one light: a single light is exactly what its slider says; four at their presets share it
+// instead of washing the model out.
+float viewLightsBalance(const std::vector<ViewLight>& lights);
 // The share of the light a cast shadow takes away: the light's own share `base` times RenderSettings::shadowStrength,
 // at most 1 (black).
 float shadowDarknessFor(float base, float strength);

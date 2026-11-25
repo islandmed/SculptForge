@@ -4440,10 +4440,11 @@ void Renderer::setLightUniforms(const MeshProgram& p, const RenderSettings& sett
     gl::Uniform1i(p.lightCount, count);
     if (count > 0) {
         glm::vec3 dirs[kMaxViewLights], cols[kMaxViewLights];
+        const float balance = viewLightsBalance(settings.lights);
         for (int i = 0; i < count; ++i) {
             const ViewLight& l = settings.lights[size_t(i)];
             dirs[i] = viewLightDirection(l.yaw, l.pitch);
-            cols[i] = glm::max(l.color, glm::vec3(0.0f)) * std::max(l.intensity, 0.0f);
+            cols[i] = glm::max(l.color, glm::vec3(0.0f)) * (std::max(l.intensity, 0.0f) * balance);
         }
         gl::Uniform3fv(p.lightDirs, count, glm::value_ptr(dirs[0]));
         gl::Uniform3fv(p.lightCols, count, glm::value_ptr(cols[0]));
@@ -4452,6 +4453,20 @@ void Renderer::setLightUniforms(const MeshProgram& p, const RenderSettings& sett
 
 glm::vec3 viewLightDirection(float yawDegrees, float pitchDegrees) {
     return lightRotation(yawDegrees, pitchDegrees) * glm::vec3(0.0f, 0.0f, 1.0f);
+}
+
+float viewLightsBalance(const std::vector<ViewLight>& lights) {
+    const glm::vec3 lum(0.2126f, 0.7152f, 0.0722f);
+    float total = 0.0f, strongest = 0.0f;
+    int n = 0;
+    for (const ViewLight& l : lights) {
+        if (++n > kMaxViewLights) break;
+        const float k = std::max(l.intensity, 0.0f) * glm::dot(glm::clamp(l.color, 0.0f, 1.0f), lum);
+        total += k;
+        strongest = std::max(strongest, k);
+    }
+    const float cap = std::max(strongest, 1.0f);
+    return total > cap ? cap / total : 1.0f;
 }
 
 float shadowDarknessFor(float base, float strength) {

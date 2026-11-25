@@ -1,0 +1,41 @@
+# Added lights share one light's worth of exposure (viewLightsBalance): with one light nothing changes, with more the
+# colours are scaled so their luminance-weighted intensities sum to the strongest light's own intensity (at least 1),
+# so four lights at their presets stay balanced instead of washing the model out.
+run ui_look look=classic layout=classic
+run new_head
+camera 25 5
+key f
+run lights remove=all
+expect_value lights_balance == 1
+run view_shadows ao=on shadows=on lit_sphere=true shadow_strength=1
+wait 0.3
+shot no-lights
+
+run lights add=key
+expect_value light_count == 1
+expect_value lights_balance == 1
+wait 0.3
+shot one-light
+
+run lights add=fill
+expect_value light_count == 2
+expect_value lights_balance < 1
+expect_value lights_balance > 0.6
+wait 0.3
+shot two-lights
+
+run lights add=rim
+run lights add=fill
+expect_value light_count == 4
+expect_value lights_balance < 0.5
+wait 0.3
+shot four-lights
+
+# A single bright light keeps what its slider says; two bright ones share the brightest one's level.
+run lights remove=all
+run lights add=key intensity=1.5
+expect_value lights_balance == 1
+run lights add=rim intensity=1.5
+expect_value lights_balance < 0.6
+run lights remove=all
+run view_shadows ao=auto shadows=auto lit_sphere=false shadow_strength=1

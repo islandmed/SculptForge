@@ -112,8 +112,10 @@ material's light in the Lit Sphere and studio views): a **Key** (warm, from the 
 (cool and soft, from the right) or a **Rim** (from behind and above, along the silhouette). Each has its own ball
 to drag the direction on (past the edge sends the light round the back, where it shows as a ring; double-click
 puts it back where its role starts), a colour, an intensity and a **Shadows** tick: the ticked light is the one the
-cast shadows come from. In the PBR view they light the material channels with their roughness and metallic; the
-lights turn with the view, like the material's light. None are there until you add one, and they are saved with
+cast shadows come from. Together the lights add one light's worth of exposure: a fill shares it with the key rather
+than piling on, so four lights at their starting intensities look balanced, not washed out; the brightest light's
+intensity is the total they share. In the PBR view they light the material channels with their roughness and metallic;
+the lights turn with the view, like the material's light. None are there until you add one, and they are saved with
 the project (`lights add=key`, `lights light=1 color=ff8040 intensity=1.5`, `lights remove=all`).
 
 ![The environment behind the model: Outdoor Sky with the AgX tone map](images/pbr-environment.jpg)

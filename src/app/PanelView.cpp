@@ -513,7 +513,8 @@ void App::drawAddedLightControls() {
                  "Up to four lights of your own on top of the material's light or the PBR environment: a Key (the main "
                  "light; it starts with the view's shadows), a Fill (soft, from the other side) and a Rim (from behind, "
                  "along the edges). Each has a direction pad, a colour, an intensity and a Shadows tick (one light casts "
-                 "them). Saved in the project.",
+                 "them). Together they add one light's worth of exposure: a second light shares it with the first instead "
+                 "of piling on, up to the strongest light's own intensity. Saved in the project.",
                  kPath);
     int removeAt = -1;
     for (size_t i = 0; i < lights.size(); ++i) {
@@ -557,7 +558,8 @@ void App::drawAddedLightControls() {
         ImGui::SetNextItemWidth(-1);
         ui::SliderInside("##intensity", &l.intensity, 0.0f, 3.0f, tr("Intensity %.2f"));
         if (ImGui::IsItemDeactivatedAfterEdit()) runCommand("lights", {{"light", double(i + 1)}, {"intensity", double(l.intensity)}});
-        ui::HelpText("Intensity", nullptr, "How bright this light is.", kPath);
+        ui::HelpText("Intensity", nullptr,
+                     "How bright this light is. With several lights, the brightest one's intensity is the total they share.", kPath);
         ImGui::EndGroup();
         ImGui::PopID();
     }
