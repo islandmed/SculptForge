@@ -256,7 +256,8 @@ uint64_t undoClearEpoch();
 // applied step (0 = none), plus what the scene looked like then. No copies of the scene: going back is undo.
 struct HistoryMark {
     uint64_t epoch = 0; // undoClearEpoch() when made
-    uint64_t hash = 0;  // sceneHash() when made
+    uint64_t hash = 0;  // sceneHash() when made, of the scope below
+    bool everything = false; // HashScope::Everything (a checkpoint) rather than Mesh (a batch)
     std::map<uint32_t, uint64_t> tops;
 };
 

@@ -270,7 +270,7 @@ struct Snapshot {
     bool operator==(const Snapshot&) const = default;
 };
 Snapshot snapshotOf(const Document& d) {
-    return {sceneHash(d), d.undo.undoCount(), d.undo.redoCount(), d.activePart, d.partCount()};
+    return {sceneHash(d, HashScope::Everything), d.undo.undoCount(), d.undo.redoCount(), d.activePart, d.partCount()};
 }
 } // namespace
 
@@ -299,7 +299,7 @@ TEST(mcp_failed_checkpoint_restore_changes_nothing) {
     }
     // The newest step is still ordinary: one undo takes it back.
     CHECK(!failed(call(reg, d, "undo")));
-    CHECK(sceneHash(d) != before.hash);
+    CHECK(sceneHash(d, HashScope::Everything) != before.hash);
 }
 
 TEST(mcp_checkpoint_restore_that_ends_off_the_mark_puts_the_scene_back) {
@@ -344,7 +344,7 @@ TEST(mcp_checkpoint_replaced_by_a_new_edit_leaves_the_scene_alone) {
     CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"d"})")));
     CHECK(!failed(call(reg, d, "stroke", kStroke)));
     CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"d"})")));
-    CHECK(sceneHash(d) == fresh.hash);
+    CHECK(sceneHash(d, HashScope::Everything) == fresh.hash);
 }
 
 // ---- The root and the retained base, the hash's reach, and a history that was replaced (#236) ----
@@ -396,16 +396,16 @@ TEST(mcp_checkpoint_at_the_retained_base_is_still_reachable) {
     Document d = sphere(reg);
     d.undo.byteBudget = 1;
     CHECK(!failed(call(reg, d, "stroke", kStroke)));
-    const uint64_t atBase = sceneHash(d);
+    const uint64_t atBase = sceneHash(d, HashScope::Everything);
     save(reg, d, "base");
     CHECK(!failed(call(reg, d, "stroke", kStroke))); // drops the step "base" points at: the empty stack IS "base"
     CHECK(d.undo.undoCount() == 1);
-    CHECK(sceneHash(d) != atBase);
+    CHECK(sceneHash(d, HashScope::Everything) != atBase);
     const Json r = call(reg, d, "checkpoint_restore", R"({"name":"base"})");
     CHECK(!failed(r));
-    CHECK(sceneHash(d) == atBase);
+    CHECK(sceneHash(d, HashScope::Everything) == atBase);
     CHECK(!failed(call(reg, d, "redo"))); // and the way forward is kept
-    CHECK(sceneHash(d) != atBase);
+    CHECK(sceneHash(d, HashScope::Everything) != atBase);
 }
 
 TEST(mcp_root_checkpoint_across_an_evicted_selection_set_is_refused) {
@@ -424,9 +424,9 @@ TEST(mcp_root_checkpoint_across_an_evicted_selection_set_is_refused) {
 TEST(mcp_scene_hash_sees_what_the_history_does_not) {
     CommandRegistry reg;
     Document d = sphere(reg);
-    uint64_t h = sceneHash(d);
+    uint64_t h = sceneHash(d, HashScope::Everything);
     const auto changed = [&] {
-        const uint64_t now = sceneHash(d);
+        const uint64_t now = sceneHash(d, HashScope::Everything);
         const bool differs = now != h;
         h = now;
         return differs;
@@ -479,15 +479,15 @@ TEST(mcp_checkpoint_restore_covers_subdivision_uv_and_paint) {
     CommandRegistry reg;
     Document d = sphere(reg);
     save(reg, d, "plain");
-    const uint64_t plain = sceneHash(d);
+    const uint64_t plain = sceneHash(d, HashScope::Everything);
     CHECK(!failed(call(reg, d, "subdivide", R"({"levels":1})")));
     CHECK(!failed(call(reg, d, "uv_seam", R"({"op":"path","from":0,"to":40})")));
     CHECK(!failed(call(reg, d, "paint_layer_add", R"({"name":"L"})")));
-    CHECK(sceneHash(d) != plain);
+    CHECK(sceneHash(d, HashScope::Everything) != plain);
     CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"plain"})")));
-    CHECK(sceneHash(d) == plain && d.mesh.paintLayers.empty());
+    CHECK(sceneHash(d, HashScope::Everything) == plain && d.mesh.paintLayers.empty());
     CHECK(!failed(call(reg, d, "redo"))); // the restore only undid steps: one redo puts it all back
-    CHECK(sceneHash(d) != plain);
+    CHECK(sceneHash(d, HashScope::Everything) != plain);
     CHECK(d.undo.redoCount() == 0);
     // The same with the budget dropping the early steps: refused, nothing moves.
     save(reg, d, "later");

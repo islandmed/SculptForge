@@ -82,6 +82,16 @@ struct SelectionSet {
 };
 
 struct SelectionSetList {
+    // The content hash undo's scene hash (core/UndoBatch.cpp) keeps here: a list is never changed once shared, so it is worked
+    // out once. A copy (or a move) starts without it, so a list edited after being copied never carries a stale one.
+    struct HashCache {
+        mutable uint64_t value = 0; // 0 = not worked out yet
+        HashCache() = default;
+        HashCache(const HashCache&) {}
+        HashCache(HashCache&&) noexcept {}
+        HashCache& operator=(const HashCache&) { value = 0; return *this; }
+        HashCache& operator=(HashCache&&) noexcept { value = 0; return *this; }
+    } hashCache;
     std::vector<std::shared_ptr<const SelectionSet>> sets; // in the order they were made
     std::string morphTarget;                               // the set the Morph brush pulls toward ("" = none)
     int find(const std::string& name) const;               // index, or -1

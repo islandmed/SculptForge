@@ -78,6 +78,19 @@ struct Hasher {
         word(n);
         const auto* b = static_cast<const unsigned char*>(p);
         size_t i = 0;
+        if (n >= 256) { // four independent chains, so the multiplies overlap (a mesh is hundreds of MB): ~3x the one-chain speed
+            constexpr uint64_t kMul = 0xFF51AFD7ED558CCDull;
+            uint64_t lane[4] = {h, h + 1, h + 2, h + 3};
+            for (; i + 32 <= n; i += 32) {
+                uint64_t w[4];
+                std::memcpy(w, b + i, 32);
+                for (int k = 0; k < 4; ++k) {
+                    lane[k] = (lane[k] ^ w[k]) * kMul;
+                    lane[k] ^= lane[k] >> 31;
+                }
+            }
+            for (uint64_t l : lane) word(l);
+        }
         for (; i + 8 <= n; i += 8) {
             uint64_t w;
             std::memcpy(&w, b + i, 8);
@@ -97,8 +110,7 @@ struct Hasher {
     template <class T> void pod(const T& v) { bytes(&v, sizeof v); }
 };
 
-void hashSelectionSets(Hasher& h, const SelectionSetList* list) {
-    if (!list) return h.word(0x5E7);
+void hashSelectionSetContent(Hasher& h, const SelectionSetList* list) {
     h.word(list->sets.size());
     h.str(list->morphTarget);
     for (const auto& s : list->sets) {
@@ -114,6 +126,16 @@ void hashSelectionSets(Hasher& h, const SelectionSetList* list) {
         h.vec(s->uvs);
         h.vec(s->positions);
     }
+}
+
+void hashSelectionSets(Hasher& out, const SelectionSetList* list) {
+    if (!list) return out.word(0x5E7);
+    if (!list->hashCache.value) {
+        Hasher h;
+        hashSelectionSetContent(h, list);
+        list->hashCache.value = h.h | 1; // (never 0)
+    }
+    out.word(list->hashCache.value);
 }
 
 } // namespace
@@ -153,7 +175,8 @@ bool redoStepOrBatch(Document& doc) {
     return true;
 }
 
-uint64_t sceneHash(const Document& doc) {
+uint64_t sceneHash(const Document& doc, HashScope scope) {
+    const bool all = scope == HashScope::Everything;
     Hasher h;
     h.word(uint64_t(doc.partCount()));
     for (int i = 0; i < doc.partCount(); ++i) {
@@ -171,51 +194,57 @@ uint64_t sceneHash(const Document& doc) {
         h.attribute(m.hidden, uint8_t(0));
         h.attribute(m.uvs, glm::vec2(0.0f));
         h.attribute(m.creases, 0.0f);
-        h.vec(m.uvFlags);
-        h.vec(m.quadPartners);
         h.vec(m.base);
         h.vec(m.paintBase);
-        h.word(uint64_t(uint32_t(m.activePaintLayer)));
-        h.word(m.paintLayers.size());
-        for (const PaintLayer& l : m.paintLayers) {
-            h.str(l.name);
-            h.vec(l.color);
-            h.vec(l.alpha);
-            h.word(uint64_t(l.blend) | uint64_t(l.visible) << 8 | uint64_t(l.locked) << 16);
-            h.pod(l.opacity);
+        if (all) {
+            h.vec(m.uvFlags);
+            h.vec(m.quadPartners);
+            h.word(uint64_t(uint32_t(m.activePaintLayer)));
+            h.word(m.paintLayers.size());
+            for (const PaintLayer& l : m.paintLayers) {
+                h.str(l.name);
+                h.vec(l.color);
+                h.vec(l.alpha);
+                h.word(uint64_t(l.blend) | uint64_t(l.visible) << 8 | uint64_t(l.locked) << 16);
+                h.pod(l.opacity);
+            }
+            hashSelectionSets(h, m.selectionSets.get());
         }
-        hashSelectionSets(h, m.selectionSets.get());
         for (const SculptLayer& l : m.layers) {
             h.str(l.name);
             h.bytes(&l.weight, sizeof l.weight);
             h.vec(l.delta);
         }
     }
-    h.word(doc.partFolders.size());
-    for (const PartFolder& f : doc.partFolders) {
-        h.word(uint64_t(f.id) | uint64_t(f.collapsed) << 32);
-        h.str(f.name);
-    }
-    h.word(doc.references.size());
-    for (const ReferenceImage& r : doc.references) {
-        h.str(r.name);
-        h.str(r.path);
-        h.word(uint64_t(r.mode) | uint64_t(r.plane) << 8 | uint64_t(r.flipX) << 16 | uint64_t(r.flipY) << 17 |
-               uint64_t(r.locked) << 18 | uint64_t(r.visible) << 19 | uint64_t(r.inRenders) << 20 | uint64_t(r.embed) << 21);
-        h.pod(r.center);
-        h.pod(r.origin);
-        h.pod(r.height);
-        h.pod(r.sceneHeight);
-        h.pod(r.stretch);
-        h.pod(r.opacity);
-        if (r.image) {
-            h.word(uint64_t(uint32_t(r.image->width)) | uint64_t(uint32_t(r.image->height)) << 32);
-            h.vec(r.image->rgba);
-        } else {
-            h.word(0);
+    if (all) {
+        h.word(doc.partFolders.size());
+        for (const PartFolder& f : doc.partFolders) {
+            h.word(uint64_t(f.id) | uint64_t(f.collapsed) << 32);
+            h.str(f.name);
+        }
+        h.word(doc.references.size());
+        for (const ReferenceImage& r : doc.references) {
+            h.str(r.name);
+            h.str(r.path);
+            h.word(uint64_t(r.mode) | uint64_t(r.plane) << 8 | uint64_t(r.flipX) << 16 | uint64_t(r.flipY) << 17 |
+                   uint64_t(r.locked) << 18 | uint64_t(r.visible) << 19 | uint64_t(r.inRenders) << 20 | uint64_t(r.embed) << 21);
+            h.pod(r.center);
+            h.pod(r.origin);
+            h.pod(r.height);
+            h.pod(r.sceneHeight);
+            h.pod(r.stretch);
+            h.pod(r.opacity);
+            if (r.image) {
+                h.word(uint64_t(uint32_t(r.image->width)) | uint64_t(uint32_t(r.image->height)) << 32);
+                h.vec(r.image->rgba);
+            } else {
+                h.word(0);
+            }
         }
     }
     // Splats are not in the undo history at all: any change to them is a change outside it.
+    h.word(doc.splats.size());
+    if (!all) return h.h;
     const SplatCloud& sp = doc.splats;
     h.word(doc.splatsVersion);
     h.word(uint64_t(uint32_t(sp.shDegree)));
@@ -229,10 +258,11 @@ uint64_t sceneHash(const Document& doc) {
     return h.h;
 }
 
-HistoryMark markHistory(const Document& doc) {
+HistoryMark markHistory(const Document& doc, HashScope scope) {
     HistoryMark m;
     m.epoch = undoClearEpoch();
-    m.hash = sceneHash(doc);
+    m.everything = scope == HashScope::Everything;
+    m.hash = sceneHash(doc, scope);
     m.tops = topsOf(doc);
     return m;
 }
@@ -300,12 +330,13 @@ HistoryRestore restoreToMark(Document& doc, const HistoryMark& mark, uint64_t gr
         out.untouched = true;
         return out;
     }
-    const HistoryMark before = markHistory(doc);
+    const HashScope scope = mark.everything ? HashScope::Everything : HashScope::Mesh;
+    const HistoryMark before = markHistory(doc, scope);
     std::map<uint64_t, uint64_t> batchOf; // step seq -> batch id, as the walk restamps the steps it moves
     for (int i : historyParts(doc)) doc.partUndo(i).forEachStep([&](UndoRecord& r) { batchOf[r.seq] = r.batch; });
 
     static_cast<HistoryWalk&>(out) = walkToMark(doc, mark, groupId);
-    out.exact = out.exact && sceneHash(doc) == mark.hash;
+    out.exact = out.exact && sceneHash(doc, scope) == mark.hash;
     if (out.exact) return out;
 
     out.offHistory = out.problem.empty();
@@ -319,7 +350,7 @@ HistoryRestore restoreToMark(Document& doc, const HistoryMark& mark, uint64_t gr
         doc.partUndo(i).forEachStep([&](UndoRecord& r) {
             if (const auto it = batchOf.find(r.seq); it != batchOf.end()) r.batch = it->second;
         });
-    out.untouched = back.exact && sceneHash(doc) == before.hash;
+    out.untouched = back.exact && sceneHash(doc, scope) == before.hash;
     if (!out.untouched) problem += "; going back to where it was did not work out exactly (" + back.problem + ")";
     out.problem = std::move(problem);
     out.exact = false;
