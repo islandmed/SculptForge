@@ -144,6 +144,26 @@ TEST(thread_pool_second_run_gets_workers) {
     CHECK(std::unique(who.begin(), who.end()) - who.begin() >= 2);
 }
 
+// Callers sharing the workers while their jobs nest two deep (a job calling poolFor, whose job calls it again): every
+// job runs once and nothing waits for ever (the nested runs go inline on the thread running the job).
+TEST(thread_pool_nested_runs_under_contention) {
+    std::atomic<size_t> leaves{0};
+    auto nest = [&] {
+        for (int k = 0; k < 20; ++k)
+            poolFor(16, [&](size_t b, size_t e) {
+                for (size_t i = b; i < e; ++i)
+                    poolFor(32, [&](size_t b2, size_t e2) {
+                        for (size_t j = b2; j < e2; ++j) poolFor(8, [&](size_t b3, size_t e3) { leaves += e3 - b3; }, 2);
+                    }, 4);
+            }, 1);
+    };
+    std::vector<std::thread> callers;
+    for (int t = 0; t < 4; ++t) callers.emplace_back(nest);
+    nest();
+    for (auto& t : callers) t.join();
+    CHECK(leaves.load() == size_t(5) * 20 * 16 * 32 * 8);
+}
+
 // A job that throws (on the calling thread or a worker): the exception comes out of poolFor once the workers have
 // left, and the pool still runs every job of the next call. (It used to leave the pool pointing at the finished
 // call: the next one waited for ever, every thread asleep.)
