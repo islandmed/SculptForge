@@ -1,7 +1,7 @@
 # Polygon mode: modelling with points, edges and faces
 
 > **In short:**
-> - **Tool > Polygon > Polygon mode** turns a Part into a cage you edit polygon by polygon.
+> - In the **Tool** panel on the right (not the Library's **Tool** tab), **Polygon > Polygon mode** turns a Part into a cage you edit polygon by polygon.
 > - Pick **Points**, **Edges** or **Faces**, select them on the model, and move them with the Gizmo.
 > - **Extrude**, **Inset**, **Bevel**, **Edge loop** and **Span** build on the selection, each as one undo step.
 
@@ -13,7 +13,7 @@ any brush takes you back to sculpting.
 
 ## Where to find it
 
-Open **Tool > Polygon**. The panel has, from the top:
+Open the **Tool** panel on the right (not the Library's **Tool** tab, which holds starter meshes), then **Polygon**. The panel has, from the top:
 
 - **Polygon mode**, the button that turns the mode on and off.
 - **Points**, **Edges** and **Faces**: what a click selects.
