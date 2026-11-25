@@ -19,7 +19,9 @@
 #include <algorithm>
 #include <atomic>
 #include <bit>
+#include <chrono>
 #include <cmath>
+#include <mutex>
 #include <stdexcept>
 #include <thread>
 
@@ -115,6 +117,31 @@ TEST(thread_pool_runs_every_job_once) {
     std::thread::id where;
     poolFor(10, [&](size_t, size_t) { where = std::this_thread::get_id(); }, 4096);
     CHECK(where == std::this_thread::get_id());
+}
+
+// A run started while another thread's long run holds the workers still gets them as they come free (it used to run
+// inline: a big brush's release on Lucy 28M took 0.95 s instead of 0.55 s when the frame's run had the pool first).
+TEST(thread_pool_second_run_gets_workers) {
+    if (ThreadPool::shared().threads() < 3) return;
+    std::atomic<bool> holding{false};
+    std::thread first([&] {
+        poolFor(2, [&](size_t, size_t) { // (two blocks: the caller and one worker, each busy for 150 ms)
+            holding = true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(150));
+        }, 1, 2);
+    });
+    while (!holding) std::this_thread::yield();
+    std::mutex m;
+    std::vector<std::thread::id> who;
+    poolFor(64, [&](size_t, size_t) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        std::lock_guard lock(m);
+        who.push_back(std::this_thread::get_id());
+    }, 1);
+    first.join();
+    std::sort(who.begin(), who.end());
+    CHECK(who.size() == 64);
+    CHECK(std::unique(who.begin(), who.end()) - who.begin() >= 2);
 }
 
 // A job that throws (on the calling thread or a worker): the exception comes out of poolFor once the workers have

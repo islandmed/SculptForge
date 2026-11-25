@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -23,6 +25,13 @@ namespace sf {
 
 namespace {
 thread_local bool insidePoolJob = false;
+long long tid() {
+#if defined(__linux__)
+    return static_cast<long long>(syscall(SYS_gettid));
+#else
+    return static_cast<long long>(std::hash<std::thread::id>()(std::this_thread::get_id()));
+#endif
+}
 }
 
 LowerThreadPriority::LowerThreadPriority() {
@@ -49,6 +58,7 @@ LowerThreadPriority::~LowerThreadPriority() {
 }
 
 ThreadPool::ThreadPool(int threads) {
+    runs_.reserve(kMaxRuns);
     for (int i = 1; i < threads; ++i) workers_.emplace_back([this] { workerLoop(); });
 }
 
@@ -105,20 +115,30 @@ size_t ThreadPool::drain(Run& run) {
     return ran;
 }
 
+// The run an idle worker joins: the newest with jobs left (a frame's short run, started while a stroke's long one goes on).
+ThreadPool::Run* ThreadPool::pickRun() const {
+    for (size_t i = runs_.size(); i-- > 0;)
+        if (runs_[i]->next.load(std::memory_order_relaxed) < runs_[i]->count) return runs_[i];
+    return nullptr;
+}
+
 void ThreadPool::workerLoop() {
     uint64_t seen = 0;
     std::unique_lock lock(mutex_);
     for (;;) {
-        // Brush strokes run one job after another: spin a little before sleeping, so the next dab's job
-        // doesn't wait for the thread to wake up.
-        lock.unlock();
-        for (int i = 0; i < 1000 && generation_.load(std::memory_order_relaxed) == seen; ++i) std::this_thread::yield();
-        lock.lock();
-        wake_.wait(lock, [&] { return stop_ || generation_ != seen; });
-        if (stop_) return;
-        seen = generation_;
-        Run* run = current_;
-        if (!run) continue;
+        Run* run = pickRun(); // (another thread's run still has jobs: straight on to it)
+        if (!run) {
+            // Brush strokes run one job after another: spin a little before sleeping, so the next dab's job
+            // doesn't wait for the thread to wake up.
+            lock.unlock();
+            for (int i = 0; i < 1000 && generation_.load(std::memory_order_relaxed) == seen; ++i) std::this_thread::yield();
+            lock.lock();
+            wake_.wait(lock, [&] { return stop_ || generation_ != seen || (run = pickRun()) != nullptr; });
+            if (stop_) return;
+            seen = generation_;
+            if (!run) run = pickRun();
+            if (!run) continue;
+        }
         ++run->users;
         lock.unlock();
         const size_t ran = drain(*run);
@@ -130,17 +150,39 @@ void ThreadPool::workerLoop() {
 
 void ThreadPool::run(size_t count, const std::function<void(size_t)>& job) {
     if (count == 0) return;
+    // Another thread's run going on: this one goes beside it (kMaxRuns), and the workers join it as they come free.
+    // Before (SF_POOL_SHARED=0), it ran inline: a big brush's last normals on Lucy 28M then took one thread, and its
+    // release 0.95 s instead of 0.55 s, as the frame's run or the stroke's had taken the pool first.
+    static const bool shared = [] {
+        const char* e = std::getenv("SF_POOL_SHARED");
+        return !e || *e != '0';
+    }();
     std::unique_lock runLock(runMutex_, std::defer_lock);
-    if (count == 1 || workers_.empty() || serial_ || insidePoolJob || !runLock.try_lock()) {
-        for (size_t i = 0; i < count; ++i) job(i);
-        return;
-    }
+    bool serialRun = count == 1 || workers_.empty() || serial_ || insidePoolJob;
+    if (!serialRun && !shared) serialRun = !runLock.try_lock();
     Run run;
     run.job = &job;
     run.count = count;
-    {
+    if (!serialRun && shared) {
         std::lock_guard lock(mutex_);
-        current_ = &run;
+        if (runs_.size() < kMaxRuns) runs_.push_back(&run), ++generation_;
+        else serialRun = true;
+    }
+    if (serialRun) {
+        // SF_POOL_LOG=1: the runs that went inline because other threads held the pool, from 2 ms.
+        static const bool log = std::getenv("SF_POOL_LOG") != nullptr;
+        const bool contended = log && count > 1 && !workers_.empty() && !serial_ && !insidePoolJob;
+        const auto t0 = std::chrono::steady_clock::now();
+        for (size_t i = 0; i < count; ++i) job(i);
+        if (contended) {
+            const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            if (ms >= 2.0) std::fprintf(stderr, "pool: busy, %zu jobs inline on thread %lld: %.1f ms\n", count, tid(), ms);
+        }
+        return;
+    }
+    if (!shared) {
+        std::lock_guard lock(mutex_);
+        runs_.push_back(&run);
         ++generation_;
     }
     wake_.notify_all();
@@ -148,7 +190,7 @@ void ThreadPool::run(size_t count, const std::function<void(size_t)>& job) {
     std::unique_lock lock(mutex_);
     run.finished += ran;
     done_.wait(lock, [&] { return run.users == 0 && (run.finished == run.count || run.error); });
-    current_ = nullptr;
+    runs_.erase(std::find(runs_.begin(), runs_.end(), &run));
     if (run.error) std::rethrow_exception(run.error);
 }
 
