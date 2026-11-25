@@ -34,5 +34,5 @@ and tone map; Lit Sphere / studio: Lambert in the surface colour (0.55) + a smal
 light with `shadows` on replaces the shadow light in Renderer::prepareOcclusion (direction + its share of the light), the
 existing key stays otherwise; Shadow strength multiplies the share (shadowDarknessFor). Lights live in RenderSettings and
 the project JSON (`render.lights`), Shadow strength in UiPrefs. UI test tests/ui/render_lights.sfui (+ 1440 / 2880 variants).
-Member consent for the credits: feedback/feature-queue.md rows (consent yes). Floor-tier frame times with 0 / 1 / 4 lights
-in REPORT.md.
+Member consent for the credits: feedback/feature-queue.md rows (consent yes). Floor-tier frame times with 0 / 1 / 4 lights are in the
+branch's status note (laptop, 5M-triangle sphere: within 0.2 ms of each other). Render matrix: lights=1 cells on every mesh path.
