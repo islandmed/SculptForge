@@ -1,5 +1,5 @@
 ---
-fixed: **Android**: on graphics chips with a small buffer limit (some Mali tablets), a Micro level on a mesh of more than about 33,000 triangles now draws and takes strokes.
+fixed: **Android**: on graphics chips with a small buffer limit (some Mali phones and tablets), a Micro level on a mesh of more than about 33,000 triangles now draws and takes strokes.
 testers:
   - Android with a Mali GPU: Sphere at 6 subdivisions, Tool > Geometry > Micro (Add Micro, level 2), sculpt a few strokes and turn the model; it stays visible and the strokes show.
 ---
