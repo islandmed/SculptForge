@@ -295,7 +295,8 @@ Nothing about you or your computer is sent. **Help > Check for updates** asks ri
 for early builds).
 
 **One-click update.** The Linux AppImage, the Windows installer and portable zip, and the macOS app also get an
-**Update** button on the banner. It downloads the new version in the background (with a progress bar and **Cancel**), checks it, and
+**Update** button on the banner (on a Mac from the moment the project switches it on for everyone; until then the banner
+offers **Download**). It downloads the new version in the background (with a progress bar and **Cancel**), checks it, and
 then asks: **Restart now** installs it and starts the new version; **Later** installs it when you quit, so the
 next start is the new version. If you have unsaved changes, Restart now asks first, as quitting does.
 

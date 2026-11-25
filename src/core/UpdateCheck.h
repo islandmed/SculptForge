@@ -47,6 +47,11 @@ struct UpdateInfo {
     // "Creatures"}): the membership card's moment, once per id. Empty when missing or odd; id letters, digits and
     // '-' (32 at most), title printable text (48 bytes at most).
     std::string challengeId, challengeTitle;
+    // The feed's hold on the macOS in-app update (the top-level "self_update": {"macos": true}): the Update button
+    // replaces a Mac bundle only when this is true; missing, unreadable or anything but a JSON true = the banner's
+    // Download link on a Mac (core/SelfUpdate.h). The site lane turns it on for everyone once the swap has been
+    // tested on a real Mac against a public release. Linux and Windows don't read it.
+    bool macSelfUpdate = false;
     SupportFeed support;
     std::vector<SpaceHealthFeed> spaceHealth; // at most 16
 };

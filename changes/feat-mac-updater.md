@@ -7,7 +7,9 @@ added: **One-click update on macOS** (update banner > **Update**): the Mac app d
   check (`codesign --verify --deep --strict`), and swaps the bundles in one step on **Restart now** (or at quit
   with **Later**). The old bundle is kept as `SculptForge.app.old` until the new version has started once, and put back
   when it doesn't start. No administrator password is ever asked for. Homebrew installs keep their `brew upgrade`
-  line. `SF_UPDATE_DRY_RUN=1` runs every check and replaces nothing.
+  line. `SF_UPDATE_DRY_RUN=1` runs every check and replaces nothing. The in-app swap is offered on a Mac only once the
+  update feed says so (`"self_update": {"macos": true}` in latest.json; anything else keeps the Download link): it is
+  switched on for everyone after the first swap has been tested on a real Mac against a public release.
 testers:
   - macOS (an older release in /Applications, Help > Check for updates): Update downloads with a progress bar; the next
     screen names the version, its size and github.com/islandmed/SculptForge; Restart now starts the new version; About
@@ -17,5 +19,7 @@ testers:
     from Terminal): the status line says it was unpacked and removed; /Applications unchanged.
   - macOS, a bundle in a folder you can't write to (an admin's /Applications as a standard user): the banner says it can't
     write there; nothing changed, Download still opens the page.
+  - macOS, the feed hold: with the public feed (no self_update flag yet) the banner shows Download, not Update; with a
+    local feed copy that has `"self_update": {"macos": true}` (SF_UPDATE_FEED=<file>) Update appears.
   - Windows and Linux: Update unchanged (progress, Restart now, Later).
 ---
