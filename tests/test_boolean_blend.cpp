@@ -52,10 +52,11 @@ Mesh bolt() {
     return b;
 }
 
-Mesh blended(const Mesh& a, const Mesh& b, BooleanOp op, double radius, BooleanInfo* info = nullptr, bool weld = true) {
+Mesh blended(const Mesh& a, const Mesh& b, BooleanOp op, double radius, BooleanInfo* info = nullptr, bool weld = true, int segments = 0) {
     BooleanOptions o;
     o.blend = radius;
     o.weld = weld;
+    if (segments > 0) o.blendSegments = segments;
     if (const char* s = std::getenv("SF_BLEND_SEGMENTS")) o.blendSegments = std::atoi(s); // (an experiment's knob)
     Mesh out;
     std::string error;
@@ -129,6 +130,8 @@ struct Quality {
     double minAngle = 180.0;
     double foldArea = 0.0, foldMaxArea = 0.0; // of the folded triangles
     glm::vec3 foldAt{0.0f};                   // the largest one's centroid
+    glm::vec3 foldCorner[3]{};                // its corners
+    glm::vec3 minAngleAt{0.0f};               // the thinnest triangle's centroid
 };
 Quality quality(const Mesh& m, float minArea = 0.0f) { // (folds counted on triangles of at least minArea: the visible ones)
     Quality q;
@@ -149,6 +152,7 @@ Quality quality(const Mesh& m, float minArea = 0.0f) { // (folds counted on tria
         const glm::vec3 &p0 = m.positions[tri.x], &p1 = m.positions[tri.y], &p2 = m.positions[tri.z];
         if (normal[t] == glm::vec3(0.0f)) { // (a collapsed sliver: no area, so nothing to see; a sliver, not a fold)
             q.minAngle = 0.0;
+            q.minAngleAt = (p0 + p1 + p2) / 3.0f;
             continue;
         }
         int against = 0, neighbours = 0;
@@ -166,12 +170,19 @@ Quality quality(const Mesh& m, float minArea = 0.0f) { // (folds counted on tria
             if (area > q.foldMaxArea) {
                 q.foldMaxArea = area;
                 q.foldAt = (p0 + p1 + p2) / 3.0f;
+                q.foldCorner[0] = p0;
+                q.foldCorner[1] = p1;
+                q.foldCorner[2] = p2;
             }
         }
         const glm::vec3 c[3] = {p0, p1, p2};
         for (int i = 0; i < 3; ++i) {
             const glm::vec3 u = glm::normalize(c[(i + 1) % 3] - c[i]), v = glm::normalize(c[(i + 2) % 3] - c[i]);
-            q.minAngle = std::min(q.minAngle, std::acos(glm::clamp(double(glm::dot(u, v)), -1.0, 1.0)) * 180.0 / 3.14159265358979323846);
+            const double angle = std::acos(glm::clamp(double(glm::dot(u, v)), -1.0, 1.0)) * 180.0 / 3.14159265358979323846;
+            if (angle < q.minAngle) {
+                q.minAngle = angle;
+                q.minAngleAt = (p0 + p1 + p2) / 3.0f;
+            }
         }
     }
     return q;
@@ -212,7 +223,11 @@ TEST(boolean_blend_union_fills_the_crease) {
     CHECK(sym < 0.05 * r);
     // No folds, no needles.
     const Quality q = quality(soft);
-    std::printf("union: inverted %zu, min angle %.2f degrees\n", q.inverted, q.minAngle);
+    std::printf("union: inverted %zu, min angle %.2f degrees at %.3f %.3f %.3f\n", q.inverted, q.minAngle, q.minAngleAt.x, q.minAngleAt.y, q.minAngleAt.z);
+    if (q.inverted > 0)
+        std::printf("  fold at %.4f %.4f %.4f: [%.4f %.4f %.4f] [%.4f %.4f %.4f] [%.4f %.4f %.4f]\n", q.foldAt.x, q.foldAt.y, q.foldAt.z,
+                    q.foldCorner[0].x, q.foldCorner[0].y, q.foldCorner[0].z, q.foldCorner[1].x, q.foldCorner[1].y, q.foldCorner[1].z,
+                    q.foldCorner[2].x, q.foldCorner[2].y, q.foldCorner[2].z);
     CHECK(q.inverted == 0);
     CHECK(q.minAngle > 1.0);
 }
@@ -259,8 +274,8 @@ TEST(boolean_blend_thin_wall_and_triple_junction) {
     CHECK(measureDeviation(soft, sharp, true).max <= r * 1.05);
     const float visibleWall = 1e-2f * float(r * r);
     const Quality q = quality(soft, visibleWall), qs = quality(sharp, visibleWall);
-    std::printf("thin wall: folds %zu (sharp %zu), min angle %.2f degrees (sharp %.2f), moved %zu\n", q.inverted, qs.inverted,
-                q.minAngle, qs.minAngle, info.blendMoved);
+    std::printf("thin wall: folds %zu (sharp %zu), min angle %.2f degrees at %.3f %.3f %.3f (sharp %.2f), moved %zu\n", q.inverted, qs.inverted,
+                q.minAngle, q.minAngleAt.x, q.minAngleAt.y, q.minAngleAt.z, qs.minAngle, info.blendMoved);
     CHECK(q.inverted <= qs.inverted);
     CHECK(q.minAngle > 0.1);
 
@@ -319,6 +334,104 @@ TEST(boolean_blend_seam_corners) {
     // per-vertex projection at a three-surface corner). The bound guards against folds (180) and regressions.
     CHECK(after < 125.0);
     CHECK(q.inverted <= qs.inverted);
+}
+
+// How far a mesh strays from being a surface of revolution about the x axis, over its vertices with x >= xMin within
+// rhoMax of the axis: the largest distance from such a vertex to the mesh turned by an odd angle about the axis. A dish
+// cut into a flat face by a sphere on the face's normal is one; the notches artist-qa saw along the rim (11-24) are not.
+glm::vec3 gAsymAt{0.0f};
+double axisymmetryError(const Mesh& m, float rhoMax, float xMin) {
+    Mesh turned = m;
+    const float c = std::cos(0.6435f), s = std::sin(0.6435f); // (36.87 degrees: no symmetry of a square grid)
+    for (glm::vec3& p : turned.positions) p = {p.x, c * p.y - s * p.z, s * p.y + c * p.z};
+    TriangleBVH bvh;
+    bvh.build(turned);
+    double worst = 0.0;
+    SurfaceHit hit;
+    for (const glm::vec3& p : m.positions) {
+        if (p.x < xMin || p.y * p.y + p.z * p.z > rhoMax * rhoMax) continue;
+        if (!bvh.closestPoint(p, 1.0f, hit)) continue;
+        if (hit.distance > worst) {
+            worst = hit.distance;
+            gAsymAt = p;
+        }
+    }
+    return worst;
+}
+
+// The largest distance between two meshes' surfaces, and where (a vertex of the first or the second).
+double apartness(const Mesh& a, const Mesh& b, glm::vec3& at) {
+    double worst = 0.0;
+    for (int k = 0; k < 2; ++k) {
+        TriangleBVH bvh;
+        bvh.build(k == 0 ? b : a);
+        SurfaceHit hit;
+        for (const glm::vec3& p : (k == 0 ? a : b).positions)
+            if (bvh.closestPoint(p, 1.0f, hit) && hit.distance > worst) {
+                worst = hit.distance;
+                at = p;
+            }
+    }
+    return worst;
+}
+
+TEST(boolean_blend_dish_stays_round) {
+    // artist-qa 11-24 (BAD 1): the Parts panel's cube (48 cells a side) minus the appended sphere pushed 0.3 into its +x
+    // face, blend 0.3: a sawtooth ring of notches where the sharp rim was, at the preview's 4 segments and at Make
+    // Boolean Mesh's 6; 0.08 and 0.15 were clean. The scene is a surface of revolution about x, so the blend must be one.
+    const Mesh a = makeCube(48);
+    const Mesh b = moved(makeIcosphere(5, 0.35f), {1.12f, 0.0f, 0.0f});
+    for (const double r : {0.08, 0.15, 0.3})
+        for (const int segments : {4, 6}) {
+            BooleanInfo info;
+            const Mesh soft = blended(a, b, BooleanOp::Subtract, r, &info, true, segments);
+            CHECK(isWatertight(soft));
+            const double err = axisymmetryError(soft, 0.33f + float(r), 0.5f);
+            // (visible: slivers under a quarter of the sphere's own triangles are left out, not the sphere's triangles
+            // themselves as 1e-2 r^2 would at r 0.3)
+            const float visible = 2e-5f;
+            const double after = maxDihedralInBand(soft, a, b, float(r) * 0.5f, visible);
+            const Quality q = quality(soft, visible);
+            std::printf("dish r %.2f / %d: axisymmetry error %.4f (%.3f r) at %.3f %.3f %.3f, max dihedral in the band %.1f degrees at %.3f %.3f %.3f, folds %zu, min angle %.2f\n",
+                        r, segments, err, err / r, gAsymAt.x, gAsymAt.y, gAsymAt.z, after, gWorstEdge.x, gWorstEdge.y, gWorstEdge.z, q.inverted, q.minAngle);
+            if (q.inverted > 0)
+                std::printf("  fold at %.4f %.4f %.4f: [%.4f %.4f %.4f] [%.4f %.4f %.4f] [%.4f %.4f %.4f]\n", q.foldAt.x, q.foldAt.y, q.foldAt.z,
+                            q.foldCorner[0].x, q.foldCorner[0].y, q.foldCorner[0].z, q.foldCorner[1].x, q.foldCorner[1].y, q.foldCorner[1].z,
+                            q.foldCorner[2].x, q.foldCorner[2].y, q.foldCorner[2].z);
+            CHECK(err < 0.03 * r);
+            CHECK(after < 60.0); // (the preview's 4 segments turn up to ~45 degrees per facet at a small radius)
+            CHECK(q.inverted == 0);
+        }
+}
+
+TEST(boolean_blend_box_on_face_preview_matches) {
+    // artist-qa 11-24 (BAD 2): the Parts panel's cube with the appended cube at half size pushed 0.4 into its +x face,
+    // Union, blend 0.15: the preview (4 segments) tore along the cutter's vertical seam, Make Boolean Mesh (6) was clean.
+    // The band's density must not change the shape: both watertight, no folds, the seam's crease rounded, and the two
+    // within a small part of r of each other.
+    const Mesh a = makeCube(48);
+    const Mesh b = moved(makeCube(48, 0.35f), {1.02f, 0.0f, 0.0f});
+    const double r = 0.15;
+    const Mesh sharp = blended(a, b, BooleanOp::Union, 0.0);
+    Mesh soft[2];
+    for (int k = 0; k < 2; ++k) {
+        const int segments = k == 0 ? 4 : 6;
+        BooleanInfo info;
+        soft[k] = blended(a, b, BooleanOp::Union, r, &info, true, segments);
+        CHECK(isWatertight(soft[k]));
+        CHECK(measureDeviation(soft[k], sharp, true).max <= r * 1.05);
+        const float visible = 1e-2f * float(r * r);
+        const double after = maxDihedralInBand(soft[k], a, b, float(r) * 0.5f, visible);
+        const Quality q = quality(soft[k], visible);
+        std::printf("box on face / %d: volume +%.4f, max dihedral in the band %.1f degrees (worst edge at %.3f %.3f %.3f), folds %zu, min angle %.2f\n",
+                    segments, meshVolume(soft[k]) - meshVolume(sharp), after, gWorstEdge.x, gWorstEdge.y, gWorstEdge.z, q.inverted, q.minAngle);
+        CHECK(q.inverted == 0);
+        CHECK(after < 125.0); // (the seam's four corners: the known crease edge, as in boolean_blend_seam_corners)
+    }
+    glm::vec3 at;
+    const double apart = apartness(soft[0], soft[1], at);
+    std::printf("box on face: preview (4) vs made (6) %.4f (%.3f r) at %.3f %.3f %.3f\n", apart, apart / r, at.x, at.y, at.z);
+    CHECK(apart < 0.25 * r); // (the seam's corners: the known crease edge is where the band's density still tells)
 }
 
 TEST(boolean_blend_intersect_rounds_the_edge) {

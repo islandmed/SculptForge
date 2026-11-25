@@ -932,7 +932,11 @@ void App::drawBooleanBlendSlider() {
     const bool base = takes && parts.front() == doc_.activePart;
     const AABB box = doc_.visibleBounds();
     const float size = box.valid() ? std::max({box.extent().x, box.extent().y, box.extent().z}) : 2.0f;
-    const float maxBlend = std::max(size * 0.25f, active.booleanBlend);
+    // The slider runs to a quarter of the scene, or half the Part's smallest side: a radius past that has the fillets of
+    // the Part's two sides meet across it and its faces go saddle-shaped (artist-qa 11-24, a half-size box at 0.15).
+    const AABB own = takes ? doc_.partBounds(doc_.activePart) : AABB();
+    const float side = own.valid() ? std::min({own.extent().x, own.extent().y, own.extent().z}) : size;
+    const float maxBlend = std::max(std::min(size * 0.25f, side * 0.5f), active.booleanBlend);
     float blend = active.booleanBlend;
     ImGui::BeginDisabled(!takes || base);
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.6f);

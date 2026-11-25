@@ -34,6 +34,7 @@ struct BooleanBlendOptions {
 };
 
 struct BooleanBlendStats {
+    size_t collapsed = 0; // seam slivers collapsed before the refinement
     size_t refined = 0;   // triangles the band refinement added
     size_t moved = 0;     // vertices the projection moved
     double maxMove = 0.0; // the farthest any vertex moved (<= radius)

@@ -196,7 +196,9 @@ or keep only where they overlap.
 A Boolean seam is sharp by default. The **Blend** slider under the **Boolean** row gives the active Part a soft fillet
 where it meets the Parts above it, the way distance-field modellers round a merge or a cut:
 
-- The value is the fillet's radius in scene units; 0 is sharp. Drag it with **Preview** on and the view follows.
+- The value is the fillet's radius in scene units; 0 is sharp. Drag it with **Preview** on and the view follows. The
+  slider runs up to a quarter of the scene's size, or half the Part's smallest side: past that the fillets of the Part's
+  two sides would meet across it.
 - **Add** fills the crease between the shapes; **Subtract** and **Intersect** round the rim of the cut. Each Part below
   the base has a blend of its own, so a bolt can merge softly while a slot stays crisp. (The base, the first Part with
   a Boolean, has nothing above it to blend with: its slider is off.)

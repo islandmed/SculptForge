@@ -9,6 +9,7 @@
 #include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <iterator>
 #include <cmath>
 #include <limits>
 #include <unordered_map>
@@ -142,7 +143,7 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
     // result triangle near the seam came from. A piece the Boolean removed (a cutter's wall inside the base, the sphere
     // inside a slab, the cap beyond a cut) is no crease on the result and must not pull the band: with the whole
     // operands, boxes standing on one floor grew a ridge under the floor along the footprint, and a lens's flat face
-    // sank towards the cap that was cut away. The set is grown by a few rings of neighbours across smooth edges only: a
+    // sank towards the cap that was cut away. The set is grown across smooth edges only, as far as the band can probe: a
     // triangle cut by the seam counts whole, and the field must stay smooth for the band's width past the seam (the
     // parents alone end in a jagged rim, and the fillet's depth then rippled along it: 108 degrees on a lens's rim
     // instead of 12); across a sharp edge the growth would bring back a removed face (a cutter's wall under its own
@@ -183,18 +184,31 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
                     auto [it, fresh] = across.emplace(edgeKey(o.triangles[t][i], o.triangles[t][(i + 1) % 3]), std::array<uint32_t, 2>{uint32_t(t), ~0u});
                     if (!fresh) it->second[1] = uint32_t(t);
                 }
-            for (int ring = 0; ring < 3; ++ring) {
-                std::vector<uint8_t> grown = used[s];
-                for (size_t t = 0; t < used[s].size(); ++t) {
-                    if (!used[s][t]) continue;
-                    for (int i = 0; i < 3; ++i) {
-                        const auto it = across.find(edgeKey(o.triangles[t][i], o.triangles[t][(i + 1) % 3]));
-                        if (it == across.end()) continue;
-                        const uint32_t u = it->second[0] == t ? it->second[1] : it->second[0];
-                        if (u != ~0u && glm::dot(fn[t], fn[u]) > 0.5f) grown[u] = 1; // (a smooth edge: under 60 degrees)
-                    }
+            // Grown as far as the band can probe (2r past the seam: a Newton step looks that far), not by a count of
+            // rings: a count is a mesh's own distance (three rings of a dense cutter are a hair; three of a coarse
+            // face's are a quarter of it), and where the piece ended short of that a wide fillet felt the piece's
+            // jagged rim instead of the surface's own continuation (a sawtooth ring on a dish's rim following the
+            // face's grid; spikes along a dense box's seam at the preview's coarser band: artist-qa 11-24).
+            const float grow = 2.0f * r;
+            std::vector<uint32_t> queue;
+            for (size_t t = 0; t < used[s].size(); ++t)
+                if (used[s][t]) queue.push_back(uint32_t(t));
+            SurfaceHit hit;
+            for (size_t qi = 0; qi < queue.size(); ++qi) {
+                const uint32_t t = queue[qi];
+                for (int i = 0; i < 3; ++i) {
+                    const auto it = across.find(edgeKey(o.triangles[t][i], o.triangles[t][(i + 1) % 3]));
+                    if (it == across.end()) continue;
+                    const uint32_t u = it->second[0] == t ? it->second[1] : it->second[0];
+                    if (u == ~0u || used[s][u] || !(glm::dot(fn[t], fn[u]) > 0.5f)) continue; // (a smooth edge: under 60 degrees)
+                    const glm::uvec3 tu = o.triangles[u];
+                    const vec3 &p0 = o.positions[tu.x], &p1 = o.positions[tu.y], &p2 = o.positions[tu.z];
+                    const vec3 c = (p0 + p1 + p2) / 3.0f;
+                    const float rad = std::sqrt(std::max({glm::dot(p0 - c, p0 - c), glm::dot(p1 - c, p1 - c), glm::dot(p2 - c, p2 - c)}));
+                    if (!seamBvh.closestPoint(c, grow + rad, hit)) continue;
+                    used[s][u] = 1;
+                    queue.push_back(u);
                 }
-                used[s].swap(grown);
             }
             std::vector<glm::uvec3> part;
             for (size_t t = 0; t < used[s].size(); ++t)
@@ -212,6 +226,7 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
         std::unordered_map<uint64_t, std::array<uint32_t, 2>> edgeTris; // the two triangles on an edge (~0u: one)
         std::vector<uint32_t> vertStart, vertTris;                     // each vertex's triangles
         std::vector<uint8_t> open;                                     // vertex on an edge with one triangle (the piece's rim)
+        std::vector<uint8_t> smooth;                                   // every triangle at the vertex within 60 degrees of its pseudonormal
     } normals[2];
     for (int s = 0; s < 2; ++s) {
         const auto& P = bvh[s].positions();
@@ -257,6 +272,10 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
             const float l = glm::length(e);
             if (l > 0.0f) e /= l;
         }
+        n.smooth.assign(P.size(), 1);
+        for (size_t v = 0; v < P.size(); ++v)
+            for (uint32_t k = n.vertStart[v]; k < n.vertStart[v + 1]; ++k)
+                if (glm::dot(n.face[n.vertTris[k]], n.vertex[v]) < 0.5f) n.smooth[v] = 0;
     }
     // The distance from `p` to operand s at its closest point `hit`, signed (positive outside), and its gradient. Inside
     // a face: the distance itself, along the face normal. At an edge or a vertex of the operand: the offset-planes
@@ -301,10 +320,19 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
                 pseudo = n.vertex[v];
             }
         }
-        np = pseudo; // (the surface's normal at the closest point: what the two surfaces' alignment is read from)
+        // The surface's normal at the closest point, what the two surfaces' alignment (the vertex's radius) is read
+        // from: the vertices' pseudonormals blended by the barycentrics where the surface is smooth there (a faceted
+        // sphere's face normals swing a few degrees from facet to facet, and the radii read off them put neighbouring
+        // band vertices on iso-surfaces a few percent apart: a serrated rim, artist-qa 11-24); the face's own normal
+        // where a vertex sits on a sharp edge (the pseudonormal there is the edge's bisector, which no face has).
+        np = vec3(0.0f);
+        for (int i = 0; i < 3; ++i) np += hit.bary[i] * (n.smooth[tri[i]] ? n.vertex[tri[i]] : n.face[hit.prim]);
+        {
+            const float l = glm::length(np);
+            np = l > 0.0f ? np / l : n.face[hit.prim];
+        }
         if (count < 2) { // inside a face
             const vec3 fn = n.face[hit.prim];
-            np = fn;
             if (hit.distance <= eps) {
                 u = 0.0f;
                 g = fn;
@@ -351,9 +379,223 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
         g = best - second < 1e-3f * r ? pseudo : bestN;
     };
 
+    const float target = 2.0f * r / float(std::max(o.segments, 1)); // (the band's edge length)
+    // 1b. The cut's slivers: the seam has a point wherever an edge of either mesh crosses the other (as dense as the
+    // denser mesh, and two points a hair apart where a grid line and a diagonal cross the other mesh near the same
+    // spot), and the cut triangles fan out from the coarser mesh's vertices to all of them. Those slivers tilt at
+    // random once the band moves (their facing is noise), and the vertex normals built from them put a dotted ring
+    // along a fillet's rim (artist-qa 11-24). The seam is resampled first: a seam edge shorter than a third of the
+    // band's edge collapses into one of its ends, as does a vertex a twentieth of it from a seam point; one collapse
+    // per vertex per pass (else a run of short edges would collapse into one point), and only where the result stays
+    // a manifold (the two ends share exactly the two corners across the edge). Welded results only: an unwelded
+    // seam's twin copies would have to collapse alike.
+    if (o.relax) {
+        const float seamTol = 1e-6f * glm::length(seamBox.max - seamBox.min);
+        std::vector<uint8_t> onSeam(m.vertexCount(), 0);
+        poolFor(m.vertexCount(), [&](size_t b0, size_t e0) {
+            SurfaceHit hit;
+            for (size_t v = b0; v < e0; ++v) onSeam[v] = seamBvh.closestPoint(m.positions[v], seamTol, hit) ? 1 : 0;
+        }, 4096);
+        const float shortSeam = target / 3.0f, nearSeam = target / 20.0f;
+        // A seam vertex where the seam turns (over 30 degrees between its two seam edges), or where three or more
+        // meet, stays: it is the seam's shape (a box's corner, a junction), not a sample of it.
+        std::vector<uint8_t> corner(m.vertexCount(), 0);
+        {
+            std::vector<std::array<uint32_t, 2>> along(m.vertexCount(), std::array<uint32_t, 2>{~0u, ~0u});
+            std::vector<uint8_t> many(m.vertexCount(), 0);
+            for (const glm::uvec3& tri : m.triangles)
+                for (int i = 0; i < 3; ++i) {
+                    const uint32_t a = tri[i], b = tri[(i + 1) % 3];
+                    if (!onSeam[a] || !onSeam[b]) continue;
+                    std::array<uint32_t, 2>& n = along[a];
+                    if (n[0] == b || n[1] == b) continue;
+                    if (n[0] == ~0u) n[0] = b;
+                    else if (n[1] == ~0u) n[1] = b;
+                    else many[a] = 1;
+                }
+            for (size_t v = 0; v < m.vertexCount(); ++v) {
+                if (!onSeam[v]) continue;
+                const std::array<uint32_t, 2>& n = along[v];
+                if (many[v] || n[0] == ~0u || n[1] == ~0u) {
+                    corner[v] = 1;
+                    continue;
+                }
+                const vec3 d0 = m.positions[n[0]] - m.positions[v], d1 = m.positions[n[1]] - m.positions[v];
+                const float l0 = glm::length(d0), l1 = glm::length(d1);
+                if (!(l0 > 0.0f && l1 > 0.0f) || glm::dot(d0, d1) / (l0 * l1) > -0.866f) corner[v] = 1; // (a turn over 30 degrees)
+            }
+        }
+        std::vector<uint32_t> vertStart(m.vertexCount() + 1, 0), vertTris;
+        for (const glm::uvec3& tri : m.triangles)
+            for (int i = 0; i < 3; ++i) ++vertStart[tri[i] + 1];
+        for (size_t v = 0; v < m.vertexCount(); ++v) vertStart[v + 1] += vertStart[v];
+        vertTris.resize(vertStart.back());
+        {
+            std::vector<uint32_t> fill(vertStart.begin(), vertStart.end() - 1);
+            for (size_t t = 0; t < m.triangleCount(); ++t)
+                for (int i = 0; i < 3; ++i) vertTris[fill[m.triangles[t][i]]++] = uint32_t(t);
+        }
+        std::unordered_map<uint32_t, std::vector<uint32_t>> grown; // a survivor's triangles, once it inherited some
+        auto trisOf = [&](uint32_t v, std::vector<uint32_t>& out) {
+            out.clear();
+            if (const auto it = grown.find(v); it != grown.end()) out = it->second;
+            else out.assign(vertTris.begin() + vertStart[v], vertTris.begin() + vertStart[v + 1]);
+        };
+        std::vector<uint8_t> dead(m.triangleCount(), 0), gone(m.vertexCount(), 0);
+        std::vector<vec3> facing0(m.triangleCount()); // (as the cut left it: a collapse must keep every triangle facing so)
+        for (size_t t = 0; t < m.triangleCount(); ++t) {
+            const glm::uvec3 tri = m.triangles[t];
+            facing0[t] = glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]);
+        }
+        size_t collapsed = 0;
+        for (int pass = 0; pass < 6; ++pass) {
+            struct Short {
+                float length;
+                uint32_t u, v; // u goes, v stays
+            };
+            std::vector<Short> shorts;
+            for (size_t t = 0; t < m.triangleCount(); ++t) {
+                if (dead[t]) continue;
+                const glm::uvec3 tri = m.triangles[t];
+                for (int i = 0; i < 3; ++i) {
+                    const uint32_t a = tri[i], b = tri[(i + 1) % 3];
+                    if (!onSeam[a] && !onSeam[b]) continue;
+                    if (a > b && onSeam[a] == onSeam[b]) continue; // (each seam-seam edge once; a seam-other edge once by its direction below)
+                    const float l = glm::length(m.positions[a] - m.positions[b]);
+                    if (onSeam[a] && onSeam[b]) {
+                        if (l < shortSeam && !(corner[a] && corner[b])) shorts.push_back({l, corner[a] ? b : a, corner[a] ? a : b});
+                    } else if (onSeam[b]) {
+                        if (l < nearSeam) shorts.push_back({l, a, b});
+                    }
+                }
+            }
+            if (shorts.empty()) break;
+            std::sort(shorts.begin(), shorts.end(), [](const Short& x, const Short& y) { return x.length < y.length; });
+            std::vector<uint8_t> touched(m.vertexCount(), 0);
+            std::vector<uint32_t> tu, tv;
+            size_t before = collapsed;
+            // A collapse may turn none of the going vertex's other triangles over (a sliver whose far corner would
+            // cross its base): then the other way round for a seam-seam edge, or not at all.
+            auto flips = [&](uint32_t u, uint32_t v, const std::vector<uint32_t>& tris) {
+                for (uint32_t t : tris) {
+                    if (dead[t]) continue;
+                    glm::uvec3 tri = m.triangles[t];
+                    bool hasV = false;
+                    for (int i = 0; i < 3; ++i) hasV |= tri[i] == v;
+                    if (hasV) continue;
+                    const vec3 before = glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]);
+                    for (int i = 0; i < 3; ++i)
+                        if (tri[i] == u) tri[i] = v;
+                    const vec3 after = glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]);
+                    // (against the cut's own facing too: a triangle an earlier collapse left near-degenerate has noise
+                    // for a normal, and the next collapse could turn it over against the mesh around it)
+                    if (!(glm::dot(before, after) > 0.0f) || !(glm::dot(facing0[t], after) > 0.0f)) return true;
+                }
+                return false;
+            };
+            for (Short e : shorts) {
+                if (gone[e.u] || gone[e.v] || touched[e.u] || touched[e.v]) continue;
+                trisOf(e.u, tu);
+                trisOf(e.v, tv);
+                if (flips(e.u, e.v, tu)) {
+                    if (!onSeam[e.u] || corner[e.u] || flips(e.v, e.u, tv)) continue;
+                    std::swap(e.u, e.v);
+                    std::swap(tu, tv);
+                }
+                // The link condition: the two ends' other neighbours in common are exactly the corners across the edge.
+                std::vector<uint32_t> nu, nv, apex;
+                for (uint32_t t : tu) {
+                    if (dead[t]) continue;
+                    const glm::uvec3 tri = m.triangles[t];
+                    bool hasV = false;
+                    for (int i = 0; i < 3; ++i) hasV |= tri[i] == e.v;
+                    for (int i = 0; i < 3; ++i) {
+                        if (tri[i] == e.u || tri[i] == e.v) continue;
+                        nu.push_back(tri[i]);
+                        if (hasV) apex.push_back(tri[i]);
+                    }
+                }
+                for (uint32_t t : tv) {
+                    if (dead[t]) continue;
+                    const glm::uvec3 tri = m.triangles[t];
+                    for (int i = 0; i < 3; ++i)
+                        if (tri[i] != e.u && tri[i] != e.v) nv.push_back(tri[i]);
+                }
+                std::sort(nu.begin(), nu.end());
+                nu.erase(std::unique(nu.begin(), nu.end()), nu.end());
+                std::sort(nv.begin(), nv.end());
+                nv.erase(std::unique(nv.begin(), nv.end()), nv.end());
+                std::sort(apex.begin(), apex.end());
+                apex.erase(std::unique(apex.begin(), apex.end()), apex.end());
+                std::vector<uint32_t> common;
+                std::set_intersection(nu.begin(), nu.end(), nv.begin(), nv.end(), std::back_inserter(common));
+                if (apex.size() != 2 || common != apex) continue;
+                // Collapse: u's triangles go to v; those on the edge die.
+                std::vector<uint32_t>& mine = grown[e.v];
+                if (mine.empty()) mine = tv;
+                for (uint32_t t : tu) {
+                    if (dead[t]) continue;
+                    glm::uvec3& tri = m.triangles[t];
+                    bool hasV = false;
+                    for (int i = 0; i < 3; ++i) hasV |= tri[i] == e.v;
+                    if (hasV) {
+                        dead[t] = 1;
+                        continue;
+                    }
+                    for (int i = 0; i < 3; ++i)
+                        if (tri[i] == e.u) tri[i] = e.v;
+                    mine.push_back(t);
+                }
+                gone[e.u] = 1;
+                touched[e.u] = touched[e.v] = 1;
+                ++collapsed;
+            }
+            if (collapsed == before) break;
+        }
+        if (collapsed > 0) {
+            // Compact: dead triangles out (with their corners' UVs, groups and side), gone vertices out (remapped).
+            const bool colors = m.hasColors();
+            const size_t oldNv = m.vertexCount();
+            std::vector<uint32_t> remap(oldNv, ~0u);
+            uint32_t next = 0;
+            for (size_t v = 0; v < oldNv; ++v)
+                if (!gone[v]) remap[v] = next++;
+            auto compactVerts = [&](auto& arr) {
+                if (arr.size() != oldNv) return;
+                size_t w = 0;
+                for (size_t v = 0; v < oldNv; ++v)
+                    if (!gone[v]) arr[w++] = arr[v];
+                arr.resize(w);
+            };
+            compactVerts(m.positions);
+            compactVerts(m.normals);
+            compactVerts(m.mask);
+            if (colors) compactVerts(m.colors);
+            const size_t oldNt = m.triangleCount();
+            auto compactTris = [&](auto& arr, size_t per) {
+                if (arr.size() != oldNt * per) return;
+                size_t w = 0;
+                for (size_t t = 0; t < oldNt; ++t) {
+                    if (dead[t]) continue;
+                    for (size_t i = 0; i < per; ++i) arr[w * per + i] = arr[t * per + i];
+                    ++w;
+                }
+                arr.resize(w * per);
+            };
+            for (glm::uvec3& tri : m.triangles) tri = {remap[tri.x], remap[tri.y], remap[tri.z]}; // (dead ones carry ~0u: dropped next)
+            compactTris(m.uvs, 3);
+            compactTris(m.uvFlags, 3);
+            compactTris(m.creases, 3);
+            compactTris(m.facegroups, 1);
+            compactTris(m.hidden, 1);
+            compactTris(side, 1);
+            compactTris(m.triangles, 1);
+        }
+        if (stats) stats->collapsed = collapsed;
+    }
+
     // 2. Refinement: a triangle with a vertex within r + its longest edge of the other operand may carry part of the
     // fillet, so its edges longer than the target are split (conformally: the neighbour across a split edge splits too).
-    const float target = 2.0f * r / float(std::max(o.segments, 1));
     const size_t before = m.triangleCount();
     std::vector<float> dist[2];   // per vertex: distance to each operand, kFar when beyond `queried`
     std::vector<float> queried;   // the reach it was looked up with
@@ -482,6 +724,10 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
             kOf[i] = r * (1.0f - align);
         }
     }, 256);
+    // Evened out over the band (each radius halfway to the mean of its moved neighbours, three rounds): what the
+    // closest points' normals still carry of the operands' facets, or of the cut's slivers, must not make a fillet
+    // whose depth changes from vertex to vertex. (Not on an unwelded seam: the two copies of a seam vertex have
+    // different neighbours, and must land on the same surface.)
     auto faceNormal = [&](const glm::uvec3& tri) {
         return glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]);
     };
@@ -495,27 +741,39 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
     // halfway to the mean of its neighbours and is put back onto the fillet, sixteen times (at a seam's corner the
     // moves of neighbouring vertices converge, and the rounds are what untangles the triangles there). Tangential only
     // in effect (the projection undoes the rest), so the surface stays where the fillet runs and the triangles even
-    // out. The slide is capped at a part of the vertex's median edge: at the band's edge, where the refined triangles
-    // meet the coarse ones, a vertex pulled towards its far neighbours would land across its near ones (the median, not
-    // the shortest: a sliver's one tiny edge may not freeze the vertex that would mend it).
+    // out. The mean weighs each neighbour by the area of the two triangles on its edge: a vertex of a coarse face next
+    // to a dense cutter has a fan of slivers to the seam's many points, and their plain mean dragged it onto the seam
+    // (the band crushed to a line, and every sliver turned over: artist-qa 11-24). The slide is capped at a part of
+    // the vertex's median edge (at the band's edge, where the refined triangles meet the coarse ones, a vertex pulled
+    // towards its far neighbours would land across its near ones; the median, not the shortest: a sliver's one tiny
+    // edge may not freeze the vertex that would mend it). A slide that still turns a triangle over (an uneven star at
+    // the band's edge) is undone by the fold pass below.
     if (o.relax) {
         std::vector<uint32_t> slot(nv, ~0u);
         for (size_t i = 0; i < todo.size(); ++i) slot[todo[i]] = uint32_t(i);
         std::vector<vec3> sum(todo.size());
+        std::vector<float> weight(todo.size());
         std::vector<uint32_t> count(todo.size());
         std::vector<vec3> next(todo.size());
         std::vector<uint32_t> offset(todo.size() + 1);
         std::vector<float> lengths;
         for (int round = 0; round < 16; ++round) {
             std::fill(sum.begin(), sum.end(), vec3(0.0f));
+            std::fill(weight.begin(), weight.end(), 0.0f);
             std::fill(count.begin(), count.end(), 0u);
-            for (const glm::uvec3& tri : m.triangles)
+            for (const glm::uvec3& tri : m.triangles) {
+                if (slot[tri.x] == ~0u && slot[tri.y] == ~0u && slot[tri.z] == ~0u) continue;
+                const vec3 &p0 = m.positions[tri.x], &p1 = m.positions[tri.y], &p2 = m.positions[tri.z];
+                const float area2 = glm::length(glm::cross(p1 - p0, p2 - p0));
                 for (int i = 0; i < 3; ++i) {
                     const uint32_t v = tri[i];
                     if (slot[v] == ~0u) continue;
-                    sum[slot[v]] += m.positions[tri[(i + 1) % 3]] + m.positions[tri[(i + 2) % 3]];
+                    const vec3 &q1 = m.positions[tri[(i + 1) % 3]], &q2 = m.positions[tri[(i + 2) % 3]];
+                    sum[slot[v]] += (q1 + q2) * area2; // (each of the two edges gets this triangle's area)
+                    weight[slot[v]] += 2.0f * area2;
                     count[slot[v]] += 2;
                 }
+            }
             offset[0] = 0;
             for (size_t i = 0; i < todo.size(); ++i) offset[i + 1] = offset[i] + count[i];
             lengths.assign(offset.back(), 0.0f);
@@ -533,14 +791,14 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
                 SurfaceHit hit;
                 for (size_t i = b0; i < e0; ++i) {
                     const vec3 p = m.positions[todo[i]];
-                    if (count[i] == 0) {
+                    if (count[i] == 0 || !(weight[i] > 0.0f)) {
                         next[i] = p;
                         continue;
                     }
                     float* l = lengths.data() + offset[i];
                     std::nth_element(l, l + count[i] / 2, l + count[i]);
                     const float limit = 0.3f * l[count[i] / 2];
-                    vec3 slide = (sum[i] / float(count[i]) - p) * 0.5f;
+                    vec3 slide = (sum[i] / weight[i] - p) * 0.5f;
                     const float sl = glm::length(slide);
                     if (sl > limit) slide *= limit / std::max(sl, 1e-30f);
                     next[i] = project(p + slide, start[i], kOf[i], hit);
@@ -549,16 +807,20 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
             for (size_t i = 0; i < todo.size(); ++i) m.positions[todo[i]] = next[i];
         }
     }
-    // 5. No folds: a sliver of the cut whose vertex moved more than the sliver is high turns over. Any triangle facing
-    // against the way it faced before the projection has its moved vertices pulled halfway back to where they started,
-    // until none is left (at the start it faced as it did, so this ends). Triangles too small to see at the fillet's
-    // scale are left alone: their facing is noise, and pinning a seam vertex for one would crease the fillet.
+    // 5. No folds: a sliver of the cut whose vertex moved more than the sliver is high turns over, and a relaxation
+    // slide can cross an edge of an uneven star. Any triangle facing against the way it faced before the projection
+    // has a vertex pulled: four rounds towards its neighbours' mean, then halfway back to where it started and onto
+    // the fillet again, and at the last back to where it started, until none is left (at the start it faced as it
+    // did, so this ends). Triangles too small to see at the fillet's scale are
+    // left alone: their facing is noise, and pinning a seam vertex for one would crease the fillet.
     if (o.relax) { // (not on an unwelded seam: it could pull one copy of a seam vertex back and not its twin, and open a crack)
         const float tiny = 2e-3f * r * r; // twice an area (as cross products come): a sliver 0.1 r long and 0.02 r wide
         std::vector<uint32_t> slot(nv, ~0u);
         for (size_t i = 0; i < todo.size(); ++i) slot[todo[i]] = uint32_t(i);
+        std::vector<uint8_t> again(m.triangleCount(), 0); // (folded in the round before: then all its vertices)
         for (int round = 0; round < 8; ++round) {
             std::vector<uint8_t> pull(todo.size(), 0);
+            std::vector<uint8_t> now(m.triangleCount(), 0);
             size_t folded = 0;
             for (size_t t = 0; t < m.triangleCount(); ++t) {
                 const glm::uvec3 tri = m.triangles[t];
@@ -567,12 +829,57 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
                 if (glm::dot(n, facing[t]) >= 0.0f) continue;
                 if (glm::length(n) < tiny || glm::length(facing[t]) < tiny) continue; // (noise before, or nothing to see after)
                 ++folded;
-                for (uint32_t v : {tri.x, tri.y, tri.z})
-                    if (slot[v] != ~0u) pull[slot[v]] = 1;
+                now[t] = 1;
+                // (first the vertex that moved farthest: pulling all three left the other two folded against their
+                // own neighbours, and the pulls then ran along the seam, one vertex per round: a torn edge; all three
+                // once that alone did not mend it, as at the band's edge, where the one that slid across moved least)
+                if (again[t]) {
+                    for (uint32_t v : {tri.x, tri.y, tri.z})
+                        if (slot[v] != ~0u) pull[slot[v]] = 1;
+                    continue;
+                }
+                uint32_t worst = ~0u;
+                float far = -1.0f;
+                for (uint32_t v : {tri.x, tri.y, tri.z}) {
+                    if (slot[v] == ~0u) continue;
+                    const float d = glm::length(m.positions[v] - start[slot[v]]);
+                    if (d > far) {
+                        far = d;
+                        worst = v;
+                    }
+                }
+                if (worst != ~0u) pull[slot[worst]] = 1;
             }
             if (folded == 0) break;
-            for (size_t i = 0; i < todo.size(); ++i)
-                if (pull[i]) m.positions[todo[i]] = start[i] + (m.positions[todo[i]] - start[i]) * (round < 7 ? 0.5f : 0.0f);
+            again.swap(now);
+            if (round < 4) {
+                // First towards the mean of the vertex's neighbours (where they are now: on the fillet, so the vertex
+                // stays on it, and a slide that crossed an edge comes back inside its star); only then, when that did
+                // not mend it (a seam corner, where the moves converge), back towards where it started.
+                std::vector<vec3> sum(todo.size(), vec3(0.0f));
+                std::vector<uint32_t> count(todo.size(), 0);
+                for (const glm::uvec3& tri : m.triangles)
+                    for (int i = 0; i < 3; ++i) {
+                        const uint32_t v = tri[i];
+                        if (slot[v] == ~0u || !pull[slot[v]]) continue;
+                        sum[slot[v]] += m.positions[tri[(i + 1) % 3]] + m.positions[tri[(i + 2) % 3]];
+                        count[slot[v]] += 2;
+                    }
+                for (size_t i = 0; i < todo.size(); ++i)
+                    if (pull[i] && count[i] > 0) m.positions[todo[i]] = 0.5f * (m.positions[todo[i]] + sum[i] / float(count[i]));
+                continue;
+            }
+            // (halfway back, then onto the fillet again from there: the fold came from a slide, and the projection
+            // alone makes none; the last round leaves the vertex where it started, the one place sure to be folded
+            // against nothing)
+            poolFor(todo.size(), [&](size_t b0, size_t e0) {
+                SurfaceHit hit;
+                for (size_t i = b0; i < e0; ++i) {
+                    if (!pull[i]) continue;
+                    if (round < 7) m.positions[todo[i]] = project(start[i] + (m.positions[todo[i]] - start[i]) * 0.5f, start[i], kOf[i], hit);
+                    else m.positions[todo[i]] = start[i];
+                }
+            }, 256);
         }
     }
     std::vector<float> moved(todo.size(), 0.0f);
