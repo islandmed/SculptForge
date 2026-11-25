@@ -50,10 +50,13 @@ key escape
 wait 0.3
 expect_value floor_height < -3.9
 
-# Kept after a restart; the command palette flips it.
+# Kept after a restart; the command palette flips it. (A frame for the click to land before the restart's flush: without
+# it the toggle raced the save, 1 run in 3.)
 click "View##menu.view"
 click "Floor grid at Y=0##render"
 key escape
+wait 0.3
+expect_value floor_grid_fixed == 1
 restart
 expect_value floor_grid == 1
 expect_value floor_grid_fixed == 1
