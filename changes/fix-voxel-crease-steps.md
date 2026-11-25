@@ -4,7 +4,7 @@ fixed: **Voxel Remesh: creases came out stair-stepped** (#240). A crease about 1
   lip lines, hard edges) came out serrated, or faded in patches along its length, because the surface was rebuilt from
   samples a voxel apart. Voxel Remesh now moves the points along such a crease back onto the sculpt's own surface. On a
   test sphere with creases 1.6 voxels wide at the default Resolution (200), the crease's depth varies 40% less along its
-  length, its sides are tilted half as far off (normal error 44 to 24 degrees) and its cross-section sits 41% closer to
+  length, its sides are tilted half as far off (normal error 44 to 24 degrees) and its cross-section sits 43% closer to
   the original; a cube's edges come out sharper. Smooth surfaces and fine bumps come out exactly as before, there are no
   new self-intersections, and the remesh takes about 1% longer. Creases finer than that can't be held by a remesh at
   that Resolution: when a remesh loses a good share of them, the status line says which Resolution keeps them and
