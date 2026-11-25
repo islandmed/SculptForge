@@ -1,10 +1,11 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Moving along the scene's history as a whole. Every Part has its own undo stack; steps carry a number (UndoRecord::seq)
-// that orders them across Parts, and the steps of one batch (an AI agent's `batch`, a checkpoint restore) share an id,
-// so the undo and redo commands take them as ONE step. Checkpoints and a failed batch's rollback are walks along that
-// numbering: nothing is copied, they reuse the steps the history already keeps.
+// Moving along the scene's history as a whole. Every Part has its own undo stack; steps carry a number
+// (UndoRecord::seq) that orders them across Parts, and the steps of one batch (an AI agent's `batch`, a checkpoint
+// restore) share an id, so the undo and redo commands take them as ONE step. Checkpoints and a failed batch's rollback
+// are walks along that numbering. Saving a checkpoint records its position and scene hash; restoring reuses the
+// retained steps.
 #pragma once
 
 #include "core/Document.h"
@@ -22,11 +23,11 @@ bool redoOnce(Document& doc);
 bool undoStepOrBatch(Document& doc);
 bool redoStepOrBatch(Document& doc);
 
-// A hash of everything a rollback must bring back: each Part's name, visibility, placement and its mesh (positions,
-// triangles, mask, paint, face groups, hidden, UVs, creases, sculpt layers), and the splat count. Same scene, same hash.
+// Fingerprints Part layout, references, mesh geometry and attributes, remesh guides and the splat count.
 uint64_t sceneHash(const Document& doc);
 
-HistoryMark markHistory(const Document& doc); // the place the history is at now (includes sceneHash)
+// A batch rollback only needs the cursors and scene hash. Named checkpoints also guard selection sets and splat edits.
+HistoryMark markHistory(const Document& doc, bool checkpoint = true);
 
 struct HistoryWalk {
     int undone = 0, redone = 0; // steps taken
@@ -36,8 +37,10 @@ struct HistoryWalk {
 // Undoes / redoes steps, newest first / oldest first across all Parts, until the history is at `mark`. With
 // `groupId` every step it moves gets that batch id, so one undo (or redo) undoes (or redoes) the whole walk.
 HistoryWalk walkToMark(Document& doc, const HistoryMark& mark, uint64_t groupId = 0);
+// Check both the history position and the scene it would produce before moving the live document.
+HistoryWalk restoreCheckpointMark(Document& doc, const HistoryMark& mark);
 
-// How far the history is from `mark`: steps to undo and to redo to get there (-1, -1: the history was cleared since).
+// Steps to undo and redo on the current Parts; (-1, -1) if the history was cleared or a required step was lost.
 struct HistoryDistance {
     int back = 0, ahead = 0;
     bool valid = true;

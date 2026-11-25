@@ -330,6 +330,7 @@ bool UndoStack::redo(Mesh& mesh, BVH& bvh) {
 
 void UndoStack::clear() {
     ++gClearEpoch;
+    retainedBase_ = 0;
     undo_.clear();
     redo_.clear();
     if (listener) listener->undoCleared();
@@ -357,6 +358,7 @@ void UndoStack::enforceBudget() {
     const size_t before = droppedPending_;
     while (undo_.size() > 1 && total > limit) {
         total -= undo_.front().budgetBytes();
+        retainedBase_ = undo_.front().seq;
         undo_.pop_front();
         ++droppedPending_;
         ++droppedTotal_;

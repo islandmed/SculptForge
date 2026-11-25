@@ -988,8 +988,10 @@ bool Timeline::load(Document& doc, const std::vector<uint8_t>& in, std::string* 
         if (t->nodes_[k].parent != k - 1) return fail("The history file is damaged");
     UndoStack& s = doc.undo;
     s.listener.reset();
-    s.undo_.clear();
-    s.redo_.clear();
+    s.clear(); // the replaced history and its checkpoints no longer belong to this mesh
+    // Sidecars store the parent before its children. Give restored edges fresh session-local sequence numbers.
+    for (uint32_t k = 1; k < count; ++k)
+        records[k]->seq = nextUndoSeq();
     t->path_.resize(pathLen);
     for (uint32_t k = 0; k < pathLen; ++k) t->path_[k] = k;
     t->cursor_ = cursor;

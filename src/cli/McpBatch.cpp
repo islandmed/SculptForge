@@ -75,7 +75,7 @@ HistoryToolReply runBatch(const CommandRegistry& registry, Document& doc, const 
         if (!mcpToolCallable(registry, n)) return fail(where + ": unknown tool " + n);
     }
 
-    const HistoryMark before = markHistory(doc); // (what the scene looks like, and where its history is)
+    const HistoryMark before = markHistory(doc, false);
     const uint32_t activeBefore = doc.parts[size_t(doc.activePart)].id;
     Json steps = Json::array();
     std::vector<std::string> wroteFiles;
@@ -204,28 +204,22 @@ HistoryToolReply restoreCheckpoint(Document& doc, const Json& arguments) {
     const std::string name = arguments["name"].asString();
     const auto it = std::find_if(doc.checkpoints.begin(), doc.checkpoints.end(), [&](const auto& c) { return c.first == name; });
     if (it == doc.checkpoints.end()) return fail("No checkpoint named '" + name + "' (checkpoint_list shows them)");
-    const HistoryMark mark = it->second; // (a copy: a restore never changes the list)
-    const uint64_t group = nextUndoSeq();
-    const HistoryWalk w = walkToMark(doc, mark, group);
-    const bool same = w.exact && sceneHash(doc) == mark.hash;
+    const HistoryWalk w = restoreCheckpointMark(doc, it->second);
     HistoryToolReply r;
-    r.ok = same;
+    r.ok = w.exact;
     r.structured = Json::object();
-    r.structured.set("ok", same);
+    r.structured.set("ok", w.exact);
     r.structured.set("name", name);
     r.structured.set("steps_undone", w.undone);
     r.structured.set("steps_redone", w.redone);
-    if (same) {
+    if (w.exact) {
         r.text = w.undone + w.redone == 0 ? "Already at checkpoint '" + name + "'"
                                           : "Restored checkpoint '" + name + "': " + plural(size_t(w.undone), "step", "steps") +
                                                 " undone, " + std::to_string(w.redone) + " redone. undo takes it back";
     } else {
-        const std::string problem = !w.problem.empty() ? w.problem
-                                                       : "the scene differs from the checkpoint (something in it was changed "
-                                                         "outside the undo history)";
-        r.text = "Could not restore checkpoint '" + name + "' exactly: " + problem + " (" + std::to_string(w.undone) +
+        r.text = "Could not restore checkpoint '" + name + "' exactly: " + w.problem + " (" + std::to_string(w.undone) +
                  " undone, " + std::to_string(w.redone) + " redone)";
-        r.structured.set("problem", problem);
+        r.structured.set("problem", w.problem);
     }
     return r;
 }
@@ -236,11 +230,12 @@ HistoryToolReply listCheckpoints(const Document& doc) {
     std::string text;
     for (const auto& [name, mark] : doc.checkpoints) {
         const HistoryDistance d = distanceToMark(doc, mark);
-        std::string where = !d.valid ? "lost (the history was cleared)"
-                            : d.back == 0 && d.ahead == 0 ? "here"
-                            : (d.back ? plural(size_t(d.back), "step", "steps") + " back" : "") +
-                                  (d.back && d.ahead ? ", " : "") +
-                                  (d.ahead ? plural(size_t(d.ahead), "step", "steps") + " ahead" : "");
+        std::string where = !d.valid ? "lost (the checkpoint is outside the retained history)"
+                            : d.back == 0 && d.ahead == 0
+                                ? "here"
+                                : (d.back ? plural(size_t(d.back), "step", "steps") + " back" : "") +
+                                      (d.back && d.ahead ? ", " : "") +
+                                      (d.ahead ? plural(size_t(d.ahead), "step", "steps") + " ahead" : "");
         Json c = Json::object();
         c.set("name", name);
         c.set("valid", d.valid);

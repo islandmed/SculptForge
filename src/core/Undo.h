@@ -252,17 +252,20 @@ private:
 uint64_t undoClearEpoch();
 
 // A place in the whole scene's history (core/UndoBatch.h): for every Part's history (by mesh key) the `seq` of its top
-// applied step (0 = none), plus what the scene looked like then. No copies of the scene: going back is undo.
+// applied step, or the last evicted step at the retained boundary (zero at the original root).
 struct HistoryMark {
     uint64_t epoch = 0; // undoClearEpoch() when made
     uint64_t hash = 0;  // sceneHash() when made
+    uint64_t splatsVersion = 0, splatsHash = 0; // splat edits do not go through a Part's undo history
     std::map<uint32_t, uint64_t> tops;
+    std::map<uint32_t, std::weak_ptr<const SelectionSetList>> selectionSets; // immutable lists; a mark owns no payload
 };
 
 class Timeline;
 
 class UndoStack {
     friend class Timeline; // moves steps between undo and redo without applying them (core/Timeline.h)
+    friend struct CheckpointPreview; // simulates coupled history cursors without pushing live undo records
 public:
     UndoStack() = default;
     UndoStack(UndoStack&&) = default; // move-only (records own mesh snapshots)
@@ -308,6 +311,7 @@ public:
     };
     Notice takeNotice();
     size_t droppedTotal() const { return droppedTotal_; }
+    uint64_t retainedBase() const { return retainedBase_; } // position reached by undoing all retained steps
     bool lastStepOverBudget() const { return lastStepOver_; }
     std::shared_ptr<UndoListener> listener; // the Sculpt Timeline (core/Timeline.h), if one watches this history
 
@@ -317,6 +321,7 @@ private:
 
     std::deque<UndoRecord> undo_, redo_;
     uint64_t revision_ = 0, microRevisions_ = 0;
+    uint64_t retainedBase_ = 0;
     size_t droppedPending_ = 0, droppedTotal_ = 0;
     bool lastStepOver_ = false, overPending_ = false;
 };

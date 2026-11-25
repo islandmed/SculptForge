@@ -241,7 +241,14 @@ TEST(timeline_history_sidecar_round_trip) {
     Document e;
     CHECK(loadProject(project, e, err));
     CHECK(maxDiff(e.mesh.positions, saved) == 0.0f);
+    const auto beforeLoad = undoClearEpoch();
     CHECK(loadHistorySidecar(e, project, &err) == 1);
+    CHECK(undoClearEpoch() != beforeLoad);
+    CHECK(e.undo.undoCount() == 3);
+    if (e.undo.undoCount() == 3) {
+        CHECK(e.undo.undoStep(2)->seq > e.undo.retainedBase());
+        CHECK(e.undo.undoStep(2)->seq < e.undo.undoStep(1)->seq && e.undo.undoStep(1)->seq < e.undo.undoStep(0)->seq);
+    }
     Timeline* u = Timeline::of(e.undo);
     CHECK(u != nullptr);
     if (!u) return;

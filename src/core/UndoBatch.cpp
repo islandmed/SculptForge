@@ -11,6 +11,8 @@ namespace sf {
 
 namespace {
 
+constexpr int kMaxWalkSteps = 1 << 20;
+
 // The Parts that have a history of their own: one index per PartData (linked copies share theirs).
 std::vector<int> historyParts(const Document& doc) {
     std::vector<int> out;
@@ -52,7 +54,7 @@ void followBatch(Document& doc, uint64_t batch, bool isUndo) {
     }
 }
 
-uint64_t topSeq(const UndoStack& s) { return s.canUndo() ? s.undoStep(0)->seq : 0; }
+uint64_t topSeq(const UndoStack& s) { return s.canUndo() ? s.undoStep(0)->seq : s.retainedBase(); }
 
 std::map<uint32_t, uint64_t> topsOf(const Document& doc) {
     std::map<uint32_t, uint64_t> tops;
@@ -63,6 +65,28 @@ std::map<uint32_t, uint64_t> topsOf(const Document& doc) {
 uint64_t targetOf(const HistoryMark& m, uint32_t key) {
     const auto it = m.tops.find(key);
     return it == m.tops.end() ? 0 : it->second;
+}
+
+// Sequence numbers identify positions. Depth alone aliases discarded branches and the root left by eviction.
+struct StackRange {
+    size_t back = 0, ahead = 0;
+    uint64_t destination = 0;
+};
+
+StackRange rangeTo(const UndoStack& stack, uint64_t target) {
+    StackRange range;
+    while (const UndoRecord* r = stack.undoStep(range.back)) {
+        if (r->seq <= target) break;
+        ++range.back;
+    }
+    const UndoRecord* top = stack.undoStep(range.back);
+    range.destination = top ? top->seq : stack.retainedBase();
+    while (const UndoRecord* r = stack.redoStep(range.ahead)) {
+        if (r->seq > target) break;
+        range.destination = r->seq;
+        ++range.ahead;
+    }
+    return range;
 }
 
 // 64-bit hash of raw bytes, eight at a time.
@@ -131,41 +155,150 @@ bool redoStepOrBatch(Document& doc) {
     return true;
 }
 
-uint64_t sceneHash(const Document& doc) {
-    Hasher h;
-    h.word(uint64_t(doc.partCount()));
-    for (int i = 0; i < doc.partCount(); ++i) {
-        const Part& p = doc.parts[size_t(i)];
-        h.word(p.id);
-        h.str(p.name);
-        h.word(uint64_t(p.visible) | uint64_t(p.boolean) << 8 | uint64_t(p.shading) << 16 | uint64_t(p.folder) << 24);
-        h.bytes(&p.transform, sizeof p.transform);
-        const Mesh& m = doc.partMesh(i);
-        h.vec(m.positions);
-        h.vec(m.triangles);
-        h.attribute(m.mask, 0.0f);
-        h.attribute(m.colors, glm::vec3(1.0f));
-        h.attribute(m.facegroups, uint32_t(0));
-        h.attribute(m.hidden, uint8_t(0));
-        h.attribute(m.uvs, glm::vec2(0.0f));
-        h.attribute(m.creases, 0.0f);
-        h.vec(m.base);
-        h.vec(m.paintBase);
-        for (const SculptLayer& l : m.layers) {
+// A whole-mesh record supplies its own destination. Sparse records carry the destination values of
+// their changed elements. Neither requires building a BVH, computing normals or copying an undo stack.
+struct CheckpointMesh {
+    const Mesh& mesh;
+    std::vector<const UndoRecord*> changes;
+    std::shared_ptr<const SelectionSetList> sets = mesh.selectionSets;
+    std::span<const QRemeshGuide> guides;
+
+    template <class T>
+    bool channel(Hasher& h, const std::vector<T>& current, UndoChannel<T> UndoRecord::* field, size_t size,
+                 const T& fill, bool positions = false, std::vector<T> UvUndo::* wholeUv = nullptr,
+                 UndoChannel<T> UvUndo::* sparseUv = nullptr) const {
+        const std::vector<T>* values = &current;
+        std::vector<T> edited;
+        auto apply = [&](const UndoChannel<T>& delta) {
+            if (delta.empty()) return true;
+            if (values != &edited) {
+                if (values->size() == size)
+                    edited = *values;
+                else
+                    edited.assign(size, fill);
+                values = &edited;
+            }
+            for (size_t i = 0; i < delta.indices.size(); ++i) {
+                if (delta.indices[i] >= size) return false;
+                edited[delta.indices[i]] = delta.values[i];
+            }
+            return true;
+        };
+        for (const UndoRecord* r : changes) {
+            if (wholeUv && r->uv) {
+                if (!r->uv->sparse)
+                    values = &(r->uv.get()->*wholeUv);
+                else if (values->size() == size && !apply(r->uv.get()->*sparseUv))
+                    return false;
+            }
+            if (field && !apply(r->*field)) return false;
+        }
+        if (positions)
+            h.vec(*values);
+        else
+            h.attribute(*values, fill);
+        return true;
+    }
+
+    bool hash(Hasher& h) const {
+        const size_t nv = mesh.vertexCount(), nt = mesh.triangleCount();
+        if (!channel(h, mesh.positions, &UndoRecord::positions, nv, glm::vec3(0.0f), true)) return false;
+        h.vec(mesh.triangles);
+        if (!channel(h, mesh.mask, &UndoRecord::mask, nv, 0.0f) ||
+            !channel(h, mesh.colors, &UndoRecord::colors, nv, glm::vec3(1.0f)) ||
+            !channel(h, mesh.facegroups, &UndoRecord::facegroups, nt, uint32_t(0)) ||
+            !channel(h, mesh.hidden, &UndoRecord::hidden, nt, uint8_t(0)) ||
+            !channel(h, mesh.uvs, &UndoRecord::uvs, nt * 3, glm::vec2(0.0f), false, &UvUndo::uvs, &UvUndo::uvCorners) ||
+            !channel<uint8_t>(h, mesh.uvFlags, nullptr, nt * 3, 0, false, &UvUndo::flags, &UvUndo::flagCorners) ||
+            !channel(h, mesh.creases, &UndoRecord::creases, nt * 3, 0.0f))
+            return false;
+        h.vec(mesh.base);
+        h.vec(mesh.paintBase);
+        h.attribute(mesh.quadPartners, Mesh::kNoQuad);
+        for (const PaintLayer& l : mesh.paintLayers) {
+            h.str(l.name);
+            h.bytes(&l.opacity, sizeof l.opacity);
+            h.word(uint64_t(l.blend) | uint64_t(l.visible) << 8 | uint64_t(l.locked) << 9);
+            h.vec(l.color);
+            h.vec(l.alpha);
+        }
+        for (const SculptLayer& l : mesh.layers) {
             h.str(l.name);
             h.bytes(&l.weight, sizeof l.weight);
             h.vec(l.delta);
         }
+        return true;
+    }
+};
+
+static void hashPart(Hasher& h, const Part& p) {
+    h.word(p.id);
+    h.str(p.name);
+    h.word(uint64_t(p.visible) | uint64_t(p.boolean) << 8 | uint64_t(p.shading) << 16 | uint64_t(p.folder) << 24);
+    h.bytes(&p.transform, sizeof p.transform);
+}
+
+// These scene edits have no undo record. The projected Part list can differ from the current one,
+// but folder and reference edits would survive the walk unchanged.
+static void hashLayout(Hasher& h, const Document& source, int partCount) {
+    h.word(partCount);
+    for (const PartFolder& folder : source.partFolders) {
+        h.word(folder.id);
+        h.str(folder.name);
+    }
+    for (const ReferenceImage& ref : source.references) {
+        h.str(referenceToJson(ref).dump());
+        if (ref.image) {
+            h.word(ref.image->width);
+            h.word(ref.image->height);
+            h.vec(ref.image->rgba);
+        }
+    }
+}
+
+static void hashGuides(Hasher& h, std::span<const QRemeshGuide> guides) {
+    for (const QRemeshGuide& guide : guides) {
+        h.word(guide.stroke);
+        h.word(guide.closed);
+        h.vec(guide.points);
+    }
+}
+
+uint64_t sceneHash(const Document& doc) {
+    Hasher h;
+    hashLayout(h, doc, doc.partCount());
+    for (int i = 0; i < doc.partCount(); ++i) {
+        hashPart(h, doc.parts[size_t(i)]);
+        hashGuides(h, doc.checkedOut(i) ? doc.qremeshGuides : doc.parts[size_t(i)].data->qremeshGuides);
+        CheckpointMesh{doc.partMesh(i), {}}.hash(h);
     }
     h.word(doc.splats.size());
     return h.h;
 }
 
-HistoryMark markHistory(const Document& doc) {
+static uint64_t splatHash(const SplatCloud& cloud) {
+    Hasher h;
+    h.str(cloud.name);
+    h.bytes(&cloud.transform, sizeof cloud.transform);
+    h.word(cloud.shDegree);
+    h.vec(cloud.positions);
+    h.vec(cloud.rotations);
+    h.vec(cloud.scales);
+    h.vec(cloud.opacities);
+    h.vec(cloud.sh);
+    return h.h;
+}
+
+HistoryMark markHistory(const Document& doc, bool checkpoint) {
     HistoryMark m;
     m.epoch = undoClearEpoch();
     m.hash = sceneHash(doc);
     m.tops = topsOf(doc);
+    if (!checkpoint) return m;
+    m.splatsVersion = doc.splatsVersion;
+    m.splatsHash = splatHash(doc.splats);
+    for (int i : historyParts(doc))
+        if (const auto& sets = doc.partMesh(i).selectionSets) m.selectionSets.emplace(doc.meshKey(i), sets);
     return m;
 }
 
@@ -176,7 +309,7 @@ HistoryWalk walkToMark(Document& doc, const HistoryMark& mark, uint64_t groupId)
         return w;
     }
     KeepActive keep(doc);
-    for (int guard = 0; guard < (1 << 20); ++guard) {
+    for (int guard = 0; guard < kMaxWalkSteps; ++guard) {
         int undoPart = -1, redoPart = -1;
         uint64_t undoSeq = 0, redoSeq = 0;
         for (int i : historyParts(doc)) {
@@ -215,16 +348,214 @@ HistoryWalk walkToMark(Document& doc, const HistoryMark& mark, uint64_t groupId)
     return w;
 }
 
+// Validate coupled Part histories using only their cursors and structural steps. Geometry stays in the source
+// document and the retained undo records until a destination channel needs to be read.
+struct CheckpointPreview {
+    const Document& source;
+    const HistoryMark& mark;
+    std::map<const PartData*, std::shared_ptr<PartData>> data;
+    std::map<uint32_t, CheckpointMesh> projected;
+    bool lost = false;
+    size_t independentSteps = 0;
+
+    ~CheckpointPreview() {
+        // A stashed linked Part can refer back to the history that owns it.
+        for (auto& [original, copy] : data) {
+            copy->undo.undo_.clear();
+            copy->undo.redo_.clear();
+        }
+    }
+
+    static std::shared_ptr<MultiresStack> levels(const std::shared_ptr<MultiresStack>& src) {
+        if (!src) return {};
+        auto copy = std::make_shared<MultiresStack>(*src); // level data is copy-on-write, the working cache is not
+        copy->cache.reset();
+        return copy;
+    }
+
+    Part part(const Part& src) {
+        Part p;
+        p.id = src.id;
+        p.name = src.name;
+        p.visible = src.visible;
+        p.shading = src.shading;
+        p.boolean = src.boolean;
+        p.folder = src.folder;
+        p.transform = src.transform;
+        auto [it, fresh] = data.try_emplace(src.data.get(), p.data);
+        p.data = it->second;
+        if (fresh) {
+            const bool active = src.data == source.activePartInfo().data;
+            p.data->key = src.data->key;
+            const UndoStack& stack = active ? source.undo : src.data->undo;
+            const uint64_t target = targetOf(mark, p.data->key);
+            const Mesh& mesh = active ? source.mesh : src.data->mesh;
+            const StackRange range = rangeTo(stack, target);
+            if (range.destination != target && mark.tops.contains(p.data->key)) {
+                lost = true;
+                return p;
+            }
+            std::vector<const UndoRecord*> changes;
+            changes.reserve(range.back + range.ahead);
+            for (size_t i = 0; i < range.back; ++i)
+                changes.push_back(stack.undoStep(i));
+            for (size_t i = 0; i < range.ahead; ++i)
+                changes.push_back(stack.redoStep(i));
+
+            // Part steps and Figure Pose groups can move another Part's cursor or change the Part list.
+            // For independent stacks the sequence check above already established their destination.
+            const auto structural = [](const UndoRecord& r) { return r.part || r.group; };
+            const bool coupled = std::any_of(stack.undo_.begin(), stack.undo_.end(), structural) ||
+                                 std::any_of(stack.redo_.begin(), stack.redo_.end(), structural);
+            const Mesh* base = &mesh;
+            const auto snapshot = std::find_if(changes.rbegin(), changes.rend(),
+                                               [](const UndoRecord* r) { return r->mesh && !r->subdiv && !r->ink; });
+            if (snapshot != changes.rend()) {
+                base = (*snapshot)->mesh.get();
+                changes.erase(changes.begin(), snapshot.base());
+            }
+            // Ink moves only micro-displacement and takes precedence over base channels in UndoStack::apply.
+            std::erase_if(changes, [](const UndoRecord* r) { return bool(r->ink) && !r->subdiv; });
+            auto& view = projected.emplace(p.data->key, CheckpointMesh{*base, std::move(changes)}).first->second;
+            view.guides = active ? source.qremeshGuides : src.data->qremeshGuides;
+            for (const UndoRecord* r : view.changes)
+                if (r->sets) view.sets = r->sets->list;
+
+            if (!coupled) {
+                p.data->undo.retainedBase_ = range.destination;
+                independentSteps += range.back + range.ahead;
+            } else {
+                p.data->undo.retainedBase_ = stack.retainedBase();
+                for (const UndoRecord& r : stack.undo_)
+                    p.data->undo.undo_.push_back(cursor(r, r.seq > target));
+                for (const UndoRecord& r : stack.redo_)
+                    p.data->undo.redo_.push_back(cursor(r, r.seq <= target));
+            }
+        }
+        return p;
+    }
+
+    UndoRecord cursor(const UndoRecord& r, bool crosses) {
+        UndoRecord copy;
+        copy.seq = r.seq;
+        copy.group = r.group;
+        if (!crosses && !r.group) return copy;
+        if (r.part) {
+            copy.part = std::make_shared<PartStep>();
+            copy.part->id = r.part->id;
+            copy.part->at = r.part->at;
+            copy.part->isTransform = r.part->isTransform;
+            copy.part->transform = r.part->transform;
+            copy.part->hid = r.part->hid;
+            copy.part->returnTo = r.part->returnTo;
+            if (r.part->stashed) copy.part->stashed = std::make_unique<Part>(part(*r.part->stashed));
+        }
+        return copy;
+    }
+
+    // Only steps that derive values (e.g. subdivision or layered paint) need the undo engine during validation.
+    // The last whole-mesh snapshot is already our base. Hold at most one working Part and one inverse record.
+    static UndoRecord geometryStep(const UndoRecord& r) {
+        UndoRecord copy;
+        copy.layer = r.layer;
+        copy.paintLayer = r.paintLayer;
+        copy.positions = r.positions;
+        copy.layerOffsets = r.layerOffsets;
+        copy.colors = r.colors;
+        copy.paintAlpha = r.paintAlpha;
+        copy.mask = r.mask;
+        copy.facegroups = r.facegroups;
+        copy.hidden = r.hidden;
+        copy.uvs = r.uvs;
+        copy.creases = r.creases;
+        if (r.paint) copy.paint = std::make_unique<PaintStackUndo>(*r.paint);
+        if (r.uv) copy.uv = std::make_unique<UvUndo>(*r.uv);
+        if (r.topology) copy.topology = std::make_unique<TopologyUndo>(*r.topology);
+        if (r.subdiv) {
+            copy.subdiv = std::make_unique<SubdivUndo>(*r.subdiv);
+            copy.subdiv->stack = levels(r.subdiv->stack);
+        }
+        return copy;
+    }
+
+    static bool hashMesh(Hasher& h, const CheckpointMesh& view) {
+        const bool derived = std::any_of(view.changes.begin(), view.changes.end(), [&](const UndoRecord* r) {
+            return r->subdiv || r->topology || r->paint || (!r->positions.empty() && !view.mesh.layers.empty()) ||
+                   (!r->colors.empty() && !view.mesh.paintLayers.empty());
+        });
+        if (!derived) return view.hash(h);
+        Mesh working = view.mesh;
+        working.multires = levels(working.multires);
+        BVH bvh;
+        bvh.build(working);
+        for (const UndoRecord* r : view.changes) {
+            UndoRecord step = geometryStep(*r);
+            UndoStack::apply(step, working, bvh);
+        }
+        return CheckpointMesh{working, {}}.hash(h);
+    }
+
+    std::string problem() {
+        Document preview;
+        preview.parts.clear();
+        for (const Part& p : source.parts)
+            preview.parts.push_back(part(p));
+        if (lost) return "the checkpoint is outside the retained undo or redo history";
+        preview.activePart = source.activePart;
+        PartData& active = *preview.activePartInfo().data;
+        std::swap(preview.undo, active.undo);
+        const HistoryWalk w = walkToMark(preview, mark);
+        if (!w.exact) return w.problem;
+        if (independentSteps + w.undone + w.redone > kMaxWalkSteps)
+            return "the checkpoint exceeds the history walk limit";
+        Hasher h;
+        hashLayout(h, source, preview.partCount());
+        for (int i = 0; i < preview.partCount(); ++i) {
+            hashPart(h, preview.parts[size_t(i)]);
+            const uint32_t key = preview.meshKey(i);
+            const CheckpointMesh& view = projected.at(key);
+            hashGuides(h, view.guides);
+            const auto saved = mark.selectionSets.find(key);
+            if (saved == mark.selectionSets.end() ? bool(view.sets) : !view.sets || saved->second.lock() != view.sets)
+                return "the named selection sets differ from the checkpoint";
+            if (!hashMesh(h, view)) return "the mesh differs from the checkpoint";
+        }
+        h.word(source.splats.size());
+        if (h.h != mark.hash)
+            return "the scene differs from the checkpoint (something in it was changed outside the undo history)";
+        return {};
+    }
+};
+
+HistoryWalk restoreCheckpointMark(Document& doc, const HistoryMark& mark) {
+    HistoryWalk result;
+    if (mark.epoch != undoClearEpoch()) {
+        result.problem = "the history was cleared since (a new scene, an open or a step that can't be undone)";
+        return result;
+    }
+    if (doc.splatsVersion != mark.splatsVersion && splatHash(doc.splats) != mark.splatsHash) {
+        result.problem = "the splat cloud differs from the checkpoint";
+        return result;
+    }
+    try {
+        result.problem = CheckpointPreview{doc, mark, {}, {}}.problem();
+    } catch (const std::bad_alloc&) {
+        result.problem = "not enough memory to verify the checkpoint";
+    }
+    if (!result.problem.empty()) return result;
+    return walkToMark(doc, mark, nextUndoSeq());
+}
+
 HistoryDistance distanceToMark(const Document& doc, const HistoryMark& mark) {
     HistoryDistance d;
     if (mark.epoch != undoClearEpoch()) return {-1, -1, false};
     for (int i : historyParts(doc)) {
         const UndoStack& s = doc.partUndo(i);
         const uint64_t target = targetOf(mark, doc.meshKey(i));
-        for (size_t k = 0; k < s.undoCount(); ++k)
-            if (s.undoStep(k)->seq > target) ++d.back;
-        for (size_t k = 0; k < s.redoCount(); ++k)
-            if (s.redoStep(k)->seq <= target) ++d.ahead;
+        const StackRange range = rangeTo(s, target);
+        if (mark.tops.contains(doc.meshKey(i)) && range.destination != target) return {-1, -1, false};
+        d.back += int(range.back);
+        d.ahead += int(range.ahead);
     }
     return d;
 }

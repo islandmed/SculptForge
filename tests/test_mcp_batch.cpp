@@ -10,6 +10,7 @@
 #include "core/Commands.h"
 #include "core/Json.h"
 #include "core/ManagedPolicy.h"
+#include "core/SelectionSets.h"
 #include "core/UndoBatch.h"
 
 #include <string>
@@ -218,20 +219,184 @@ TEST(mcp_checkpoints_walk_the_history_across_parts) {
 
 TEST(mcp_checkpoint_after_a_new_edit_says_what_was_lost) {
     CommandRegistry reg;
-    Document d = sphere(reg);
+    Document d;
+    CHECK(!failed(call(reg, d, "new_sphere", R"({"subdivisions":2})")));
+    CHECK(d.mesh.triangleCount() == 320);
+    const uint64_t atStart = sceneHash(d);
     CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"a"})")));
-    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "transform", R"({"translate":"1,0,0"})")));
     CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"b"})")));
     CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"a"})")));
-    CHECK(!failed(call(reg, d, "mask_all"))); // a new edit: "b"'s step is gone
+    CHECK(!failed(call(reg, d, "transform", R"({"translate":"0,0.25,0"})"))); // discards b's redo step
+    CHECK(glm::length(d.mesh.bounds().center() - glm::vec3(0, 0.25f, 0)) < 1e-6f);
+    const auto positions = d.mesh.positions;
+    const uint64_t edited = sceneHash(d), revision = d.undo.revision();
+    const uint32_t active = d.activePartInfo().id;
+    const size_t undos = d.undo.undoCount(), redos = d.undo.redoCount();
+    CHECK(undos == 1 && redos == 0);
+
     const Json r = call(reg, d, "checkpoint_restore", R"({"name":"b"})");
     CHECK(failed(r) && !text(r).empty());
+    CHECK(structured(r)["steps_undone"].asNumber(-1) == 0 && structured(r)["steps_redone"].asNumber(-1) == 0);
+    CHECK(d.mesh.positions == positions);
+    CHECK(sceneHash(d) == edited);
+    CHECK(d.activePartInfo().id == active);
+    CHECK(d.undo.undoCount() == undos && d.undo.redoCount() == redos);
+    CHECK(d.undo.revision() == revision);
+    CHECK(!failed(call(reg, d, "undo")) && sceneHash(d) == atStart);
+    CHECK(!failed(call(reg, d, "redo")) && sceneHash(d) == edited);
     // A new scene clears the history: every checkpoint is lost, and says so.
     CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"c"})")));
     CHECK(!failed(call(reg, d, "new_sphere", R"({"subdivisions":2})")));
     const Json lost = call(reg, d, "checkpoint_restore", R"({"name":"c"})");
     CHECK(failed(lost) && text(lost).find("cleared") != std::string::npos);
     CHECK(call(reg, d, "checkpoint_list")["result"]["content"][0]["text"].asString().find("lost") != std::string::npos);
+}
+
+TEST(mcp_checkpoint_rejects_scene_changes_outside_the_history) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"start"})")));
+    CHECK(!failed(call(reg, d, "batch", batchOf({{"stroke", kStroke}, {"mask_all", "{}"}}))));
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"edited"})")));
+    CHECK(!failed(call(reg, d, "part_rename", R"({"to":"Renamed"})"))); // outside the undo history
+    d.markClean();
+    const uint64_t before = sceneHash(d), revision = d.undo.revision();
+    const Json r = call(reg, d, "checkpoint_restore", R"({"name":"start"})");
+    CHECK(failed(r) && text(r).find("scene differs") != std::string::npos);
+    CHECK(sceneHash(d) == before && d.undo.revision() == revision && !d.dirty());
+    CHECK(d.undo.undoCount() == 2 && d.undo.redoCount() == 0);
+    CHECK(!failed(call(reg, d, "undo")) && d.undo.undoCount() == 0); // the batch is still one edit
+    const uint64_t undone = sceneHash(d), undoRevision = d.undo.revision();
+    CHECK(failed(call(reg, d, "checkpoint_restore", R"({"name":"edited"})")));
+    CHECK(sceneHash(d) == undone && d.undo.revision() == undoRevision);
+    CHECK(d.undo.undoCount() == 0 && d.undo.redoCount() == 2);
+    CHECK(!failed(call(reg, d, "redo")) && sceneHash(d) == before);
+    CHECK(!failed(call(reg, d, "part_rename", R"({"to":"Sphere"})")));
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"start"})")));
+}
+
+TEST(mcp_checkpoint_rejects_a_root_before_the_retained_undo_history) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"root"})")));
+    d.undo.byteBudget = 1; // only the newest step is kept
+    CHECK(!failed(call(reg, d, "transform", R"({"translate":"1,0,0"})")));
+    CHECK(!failed(call(reg, d, "transform", R"({"translate":"0,1,0"})")));
+    const uint64_t before = sceneHash(d), revision = d.undo.revision();
+    const Json r = call(reg, d, "checkpoint_restore", R"({"name":"root"})");
+    CHECK(failed(r));
+    CHECK(sceneHash(d) == before && d.undo.revision() == revision);
+    CHECK(d.undo.undoCount() == 1 && d.undo.redoCount() == 0);
+}
+
+TEST(mcp_checkpoint_root_cannot_cross_an_evicted_selection_set) {
+    CommandRegistry reg;
+    Document d;
+    CHECK(!failed(call(reg, d, "new_sphere", R"({"subdivisions":2})")));
+    CHECK(d.mesh.triangleCount() == 320);
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"root"})")));
+    d.undo.byteBudget = 1;
+    CHECK(!failed(call(reg, d, "selection_set_store", R"({"name":"fixture"})")));
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"after set"})")));
+    CHECK(!failed(call(reg, d, "transform", R"({"translate":"0,0.25,0"})")));
+    CHECK(d.undo.droppedTotal() == 1 && d.undo.undoCount() == 1 && d.undo.redoCount() == 0);
+    CHECK(glm::length(d.mesh.bounds().center() - glm::vec3(0, 0.25f, 0)) < 1e-6f);
+    CHECK(!failed(call(reg, d, "edge_select", R"({"op":"edge","edge":0})")));
+    const auto edges = d.edgeSelection.selected;
+    d.uvSelection.faces.assign(d.mesh.triangleCount(), 0);
+    d.uvSelection.faces[0] = 1;
+    d.markClean();
+    const auto faces = d.uvSelection.faces;
+    const auto positions = d.mesh.positions;
+    const auto triangles = d.mesh.triangles;
+    const auto sets = d.mesh.selectionSets;
+    CHECK(sets && sets->find("fixture") == 0);
+    const auto active = d.activePartInfo().id;
+    const uint64_t hash = sceneHash(d), revision = d.undo.revision();
+
+    const Json r = call(reg, d, "checkpoint_restore", R"({"name":"root"})");
+    CHECK(failed(r));
+    CHECK(structured(r)["steps_undone"].asNumber(-1) == 0 && structured(r)["steps_redone"].asNumber(-1) == 0);
+    CHECK(d.mesh.positions == positions && d.mesh.triangles == triangles && sceneHash(d) == hash);
+    CHECK(d.mesh.selectionSets == sets && d.activePartInfo().id == active && d.uvSelection.faces == faces);
+    CHECK(d.edgeSelection.selected == edges && d.uvSelection.valid(d.mesh));
+    CHECK(d.undo.undoCount() == 1 && d.undo.redoCount() == 0 && d.undo.revision() == revision && !d.dirty());
+    const Json list = structured(call(reg, d, "checkpoint_list"))["checkpoints"];
+    CHECK(!list[0]["valid"].asBool() && list[1]["valid"].asBool());
+
+    // The state immediately after the evicted edit is still the start of the retained history.
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"after set"})")));
+    CHECK(d.undo.undoCount() == 0 && d.undo.redoCount() == 1 && d.mesh.selectionSets == sets);
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"retained base"})")));
+    CHECK(!failed(call(reg, d, "redo")) && sceneHash(d) == hash);
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"retained base"})")));
+    CHECK(d.undo.undoCount() == 0 && d.undo.redoCount() == 1 && d.mesh.selectionSets == sets);
+}
+
+TEST(mcp_checkpoint_validates_named_sets_and_same_count_splat_edits) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    d.splats.resize(1, 0);
+    d.splatsChanged();
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"root"})")));
+    CHECK(!failed(call(reg, d, "selection_set_store", R"({"name":"fixture"})")));
+    const auto sets = d.mesh.selectionSets;
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"set"})")));
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"root"})")) && !d.mesh.selectionSets);
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"set"})")) && d.mesh.selectionSets == sets);
+    CHECK(!failed(call(reg, d, "transform", R"({"translate":"0,0.25,0"})")));
+    const uint64_t edited = sceneHash(d), revision = d.undo.revision();
+    d.mesh.selectionSets.reset(); // an out-of-history replacement at an otherwise reachable cursor
+    CHECK(failed(call(reg, d, "checkpoint_restore", R"({"name":"set"})")));
+    CHECK(!d.mesh.selectionSets && sceneHash(d) == edited && d.undo.revision() == revision);
+    d.mesh.selectionSets = sets;
+    CHECK(!failed(call(reg, d, "splat_transform", R"({"rotate_x":45})")));
+    const auto placement = d.splats.transform;
+    CHECK(failed(call(reg, d, "checkpoint_restore", R"({"name":"set"})")));
+    CHECK(d.splats.transform == placement && sceneHash(d) == edited && d.undo.revision() == revision);
+    CHECK(!failed(call(reg, d, "splat_transform", R"({"reset":true})")));
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"set"})")) && d.mesh.selectionSets == sets);
+}
+
+TEST(mcp_checkpoint_restores_subdivision_and_detects_edits_outside_mesh_history) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"plain"})")));
+    const auto plain = d.mesh.positions;
+    CHECK(!failed(call(reg, d, "subdiv_divide")));
+    CHECK(!failed(call(reg, d, "transform", R"({"translate":"0,0.25,0"})")));
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"divided"})")));
+    const auto divided = d.mesh.positions;
+    const uint64_t revision = d.undo.revision();
+    const auto stack = d.mesh.multires;
+    CHECK(stack && divided.size() > plain.size());
+    const uint32_t folder = d.addPartFolder("Fixture");
+    CHECK(failed(call(reg, d, "checkpoint_restore", R"({"name":"plain"})")));
+    CHECK(d.partFolderIndex(folder) >= 0 && d.undo.revision() == revision);
+    CHECK(d.mesh.multires == stack && d.mesh.positions == divided && d.undo.redoCount() == 0);
+    d.removePartFolder(folder);
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"plain"})")));
+    CHECK(!d.mesh.multires && d.mesh.positions == plain);
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"divided"})")));
+    CHECK(d.mesh.multires && d.mesh.positions == divided);
+}
+
+TEST(mcp_checkpoint_restores_uv_seams_and_paint_layers) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"plain"})")));
+    CHECK(!failed(call(reg, d, "uv_seam", R"({"op":"path","from":0,"to":17})")));
+    const auto flags = d.mesh.uvFlags;
+    CHECK(!flags.empty());
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"seams"})")));
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"plain"})")) && d.mesh.uvFlags.empty());
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"seams"})")) && d.mesh.uvFlags == flags);
+    CHECK(!failed(call(reg, d, "paint_layer_add", R"({"name":"Fixture"})")));
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"paint"})")));
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"plain"})")) && d.mesh.paintLayers.empty());
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"paint"})")));
+    CHECK(d.mesh.uvFlags == flags && d.mesh.paintLayers.size() == 1 && d.mesh.paintLayers[0].name == "Fixture");
 }
 
 TEST(mcp_checkpoints_are_capped_and_named) {
