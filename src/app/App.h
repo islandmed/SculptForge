@@ -504,6 +504,7 @@ private:
     const DabView* dabView_ = nullptr; // set while the solver thread places dabs (dabAt reads it)
     bool asyncStroke_ = false;         // this stroke's dabs go to the solver thread
     bool strokeFinishing_ = false;     // released: the solver places the last dabs, the UI carries on
+    double strokeFinalizeAt_ = 0.0;    // when the released stroke's end work went to the solver (steady_clock seconds: the bench's release split)
     bool predictiveStrokes() const;    // the preference (and its environment override)
     bool previewStrokes() const;       // the stroke's dabs draw the predictive preview (predictive, or SF_BG_GHOST)
     bool fastBigBrushes() const;       // Preferences > Performance > Fast Big Brushes (SF_ADAPTIVE_DABS=0 / 1 overrides it)
