@@ -11,6 +11,7 @@
 #include "core/Multires.h"
 #include "core/PathStroke.h"
 #include "core/Primitives.h"
+#include "core/Texture.h"
 #include "core/ThreadPool.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -491,6 +492,43 @@ TEST(dyntopo_carries_attributes_and_drops_uvs) {
     d.undo.undo(m, d.bvh);
     CHECK(m.uvs.size() == m.triangleCount() * 3);
     CHECK(borderVerts(m).size() == borderBefore);
+}
+
+// Measured for the one-time "Dynamic drops this Part's painted texture" notice (fix/dynamic-paint-notice): the
+// texture stays on the Part but its UVs go, so it is not shown; Undo brings UVs and texels back exactly, and a
+// second Dynamic stroke after undo does the same again.
+TEST(dyntopo_on_a_painted_part_drops_the_texture_and_undo_restores_it_exactly) {
+    Document d = sphereDoc(2);
+    Mesh& m = d.mesh;
+    m.uvs.resize(m.triangleCount() * 3);
+    for (size_t t = 0; t < m.triangleCount(); ++t)
+        for (int c = 0; c < 3; ++c) {
+            const glm::vec3 p = glm::normalize(m.positions[m.triangles[t][c]]);
+            m.uvs[t * 3 + size_t(c)] = glm::vec2(0.5f + std::atan2(p.z, p.x) / 6.2831853f, 0.5f + std::asin(p.y) / 3.1415927f);
+        }
+    m.texture = makeTexture(64, 64);
+    m.paintToTexture = true;
+    for (size_t i = 0; i < m.texture->pixels.size(); i += 4) { // (a pattern: every texel differs)
+        m.texture->pixels[i] = uint8_t(i / 4 * 7);
+        m.texture->pixels[i + 1] = uint8_t(i / 4 * 13);
+        m.texture->pixels[i + 2] = uint8_t(255 - i / 4);
+    }
+    m.rebuildTopology();
+    d.bvh.build(m);
+    CHECK(hasTexture(m));
+    const std::vector<uint8_t> texels = m.texture->pixels;
+    const std::vector<glm::vec2> uvs = m.uvs;
+    for (int round = 0; round < 2; ++round) {
+        CHECK(d.sculptor.beginStroke(m, "Standard"));
+        CHECK(dabToward(d, glm::vec3(0.0f, 0.1f, 3.0f), 0.35f, BrushType::Standard, Symmetry{}));
+        d.undo.push(d.sculptor.endStroke());
+        CHECK(!hasTexture(m)); // dropped: no UVs to show it with
+        CHECK(m.texture && m.texture->pixels == texels); // (the texels themselves are not touched)
+        CHECK(d.undo.undo(m, d.bvh));
+        CHECK(hasTexture(m));
+        CHECK(m.uvs == uvs);
+        CHECK(m.texture->pixels == texels);
+    }
 }
 
 TEST(dyntopo_keeps_boundaries_and_masked_areas) {

@@ -285,6 +285,12 @@ private:
     void freezeLevelsAndDynamic();
     void drawDynamicOffer(); // the pop-up setDynamic opens instead of a dead-end message
     bool openDynamicOffer_ = false;
+    // The first Dynamic stroke on a Part with a painted texture asks first (Shell.cpp): Dynamic rebuilds the
+    // triangles, so the Part loses its UVs and the texture isn't shown; Undo restores both exactly (test_dyntopo).
+    // Continue sets the flag for the session; Don't show again is the hint's (Preferences > Hints).
+    bool openDynamicPaintNotice_ = false;
+    bool dynamicPaintAcked_ = false;
+    bool dynamicPaintNoticeDue() const;
     // Remove Below / Remove Above from the interface: a confirmation naming the levels that go (scripts run directly).
     void confirmLevelDelete(const std::string& command);
     std::string pendingLevelDelete_;

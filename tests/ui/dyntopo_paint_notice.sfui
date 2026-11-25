@@ -1,0 +1,70 @@
+# Dynamic on a Part with a painted texture asks once before its first stroke (0.14.2; goes when the UV-keeping Dynamic
+# lands): Dynamic rebuilds the triangles, the Part loses its UVs and the texture isn't shown, and Undo brings both back
+# exactly (tests/test_dyntopo.cpp). The press that asks makes no dab: Cancel changes nothing and asks again, Continue
+# lets the next stroke through, and after that it doesn't ask again this session.
+# A Part without a texture never asks (nothing is dropped).
+run new_sphere subdivisions=4
+run dyntopo enabled=true
+click "Standard##brush.standard"
+stroke 0.3 0.45 0.7 0.5
+expect_not "Dynamic Paint/Continue##dynamic_paint"
+expect_value can_undo == 1
+run dyntopo enabled=false
+
+# A painted texture: it asks.
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+expect_value paint_texture == 1
+run set_color color=ff0000
+action draw.paint
+stroke 0.3 0.4 0.7 0.4
+run set_color color=0000ff
+stroke 0.3 0.55 0.7 0.55
+action draw.sculpt
+click "Standard##brush.standard"
+snapshot
+expect_value texture_painted > 500
+run dyntopo enabled=true
+expect_value dynamic == 1
+remember undo_steps steps
+remember triangles tris
+
+# Cancel: the stroke never happens, nothing changes, and the next stroke asks again.
+stroke 0.3 0.45 0.7 0.5
+expect "Dynamic Paint/Continue##dynamic_paint"
+expect_text "drops this Part's painted texture. Undo brings it back."
+shot notice
+click "Dynamic Paint/Cancel##dynamic_paint"
+expect_not "Dynamic Paint/Continue##dynamic_paint"
+expect_value undo_steps == $steps
+expect_value triangles == $tris
+expect_value uvs == 1
+stroke 0.3 0.45 0.7 0.5
+expect "Dynamic Paint/Continue##dynamic_paint"
+key escape
+expect_not "Dynamic Paint/Continue##dynamic_paint"
+expect_value undo_steps == $steps
+
+# Continue: that press made no dab either, the next stroke remeshes (the texture goes), Undo brings it back exactly.
+stroke 0.3 0.45 0.7 0.5
+click "Dynamic Paint/Continue##dynamic_paint"
+expect_value undo_steps == $steps
+expect_value uvs == 1
+stroke 0.3 0.45 0.7 0.5
+expect_not "Dynamic Paint/Continue##dynamic_paint"
+expect_value triangles > $tris
+expect_value uvs == 0
+expect_value undo_steps == $steps+1
+key ctrl+z
+expect_value uvs == 1
+expect_value triangles == $tris
+expect_value texture_changed == 0
+
+# Once per session: the next Dynamic stroke goes straight through.
+stroke 0.3 0.45 0.7 0.5
+expect_not "Dynamic Paint/Continue##dynamic_paint"
+expect_value uvs == 0
+expect_value undo_steps == $steps+1
+key ctrl+z
+expect_value texture_changed == 0
