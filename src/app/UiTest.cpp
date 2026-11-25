@@ -1871,6 +1871,53 @@ double Demo::query(const std::string& name, bool& known) const {
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.lastDrawnTriangles());
     }
+    if (name == "view_mean_luma" || name == "view_max_luma" || name == "view_clipped_share") {
+        // The model's exposure in the view as drawn now (render/Occlusion.h pass included): over the pixels of the scene's
+        // projected box in a 480x270 render with a black flat background, the mean luminance (0-255), the 99.5th
+        // percentile (the highlights, one stray pixel apart) and the share of pixels at 250 or more (clipped), in percent.
+        // The lights' balance test keeps a three-light setup within the one-light look's range (render_lights_balance.sfui).
+        const int w = 480, h = 270;
+        Camera cam = app_.camera_;
+        cam.aspect = float(w) / float(h);
+        RenderSettings rs = app_.renderSettings_;
+        rs.gradientBackground = false;
+        rs.backgroundColor = glm::vec3(0.0f);
+        rs.environmentBackground = false;
+        const AABB b = app_.sceneBounds();
+        if (!b.valid()) return -1.0;
+        const glm::mat4 vp = cam.projection() * cam.view();
+        int x0 = w, x1 = -1, y0 = h, y1 = -1;
+        for (int k = 0; k < 8; ++k) {
+            const glm::vec3 q((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z);
+            const glm::vec4 hc = vp * glm::vec4(q, 1.0f);
+            if (hc.w <= 0.0f) return -1.0;
+            const int px = int((hc.x / hc.w * 0.5f + 0.5f) * float(w)), py = int((0.5f - hc.y / hc.w * 0.5f) * float(h)); // (rows top-down)
+            x0 = std::min(x0, px), x1 = std::max(x1, px), y0 = std::min(y0, py), y1 = std::max(y1, py);
+        }
+        x0 = std::clamp(x0, 0, w - 1), x1 = std::clamp(x1, 0, w - 1), y0 = std::clamp(y0, 0, h - 1), y1 = std::clamp(y1, 0, h - 1);
+        if (x1 < x0 || y1 < y0) return -1.0;
+        std::vector<uint8_t> rgba;
+        std::string error;
+        app_.syncScene();
+        if (!app_.renderer_.renderToImage(cam, w, h, rs, rgba, error) || rgba.size() != size_t(w) * size_t(h) * 4) return -1.0;
+        std::vector<float> luma;
+        luma.reserve(size_t(x1 - x0 + 1) * size_t(y1 - y0 + 1));
+        double sum = 0.0;
+        size_t clipped = 0;
+        for (int y = y0; y <= y1; ++y)
+            for (int x = x0; x <= x1; ++x) {
+                const uint8_t* px = &rgba[(size_t(y) * size_t(w) + size_t(x)) * 4];
+                const float l = 0.2126f * px[0] + 0.7152f * px[1] + 0.0722f * px[2];
+                luma.push_back(l);
+                sum += l;
+                if (l >= 250.0f) ++clipped;
+            }
+        if (luma.empty()) return -1.0;
+        if (name == "view_mean_luma") return sum / double(luma.size());
+        if (name == "view_clipped_share") return 100.0 * double(clipped) / double(luma.size());
+        std::sort(luma.begin(), luma.end());
+        return double(luma[std::min(luma.size() - 1, size_t(double(luma.size()) * 0.995))]);
+    }
     if (name == "view_stale") {
         // gh#184: the view as the GPU holds it after the edits so far, against the same mesh sent up whole again: the
         // mean per-pixel difference (0-255) of the two renders. Stale GPU data (an undone stroke still drawn) shows here.
