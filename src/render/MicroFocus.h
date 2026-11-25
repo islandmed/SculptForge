@@ -19,6 +19,7 @@
 
 #include "core/Micro.h"
 #include "render/GL.h"
+#include "render/TexelStore.h"
 
 #include <cstdint>
 #include <vector>
@@ -86,7 +87,8 @@ private:
     MicroMesh coarse_;               // the coarse level: every tile's coarse grid (shading only)
     MicroShader shader_;             // coarse shading
     // The pool
-    GLuint poolDisp_ = 0, poolDispTex_ = 0, poolShade_ = 0, poolShadeTex_ = 0, pageData_ = 0, pageTex_ = 0;
+    GLuint poolDisp_ = 0, poolDispTex_ = 0, poolShade_ = 0, poolShadeTex_ = 0;
+    TexelStore pageStore_;           // the page table (2D when the renderer's tables are: MicroRenderer::wide)
     uint32_t capacity_ = 0;          // pages the pool holds
     std::vector<uint32_t> page_;     // per slot: 0 = none, else page + 1 | shaded << 31 (the page table)
     std::vector<uint32_t> owner_;    // per page: its slot (~0 = free)

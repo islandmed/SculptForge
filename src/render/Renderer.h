@@ -190,7 +190,7 @@ public:
     // `features` unchanged when nothing more can go (then the mesh isn't drawn, and the log says why).
     static int simplerMeshFeatures(int features) {
         for (int bit : {kGhost, kPbr, kNormalMap, kTextured, kPrim, kFlat})
-            if (features & bit) return features & ~bit;
+            if ((features & bit) && !(bit == kGhost && (features & kMicro))) return features & ~bit; // (a micro level's kWide stays)
         return features;
     }
     // Makes `scene` what draw() shows, in order: uploads whatever each visible
@@ -241,6 +241,7 @@ public:
     bool textureNotShown(uint32_t id) const;
     // The GPU rejected drawing the texture (a GL error at its first textured draw, logged): the Part draws plain, with a status.
     bool textureRejected(uint32_t id) const;
+    bool microWide(uint32_t id) const; // (tests: Part `id` is a micro level whose per-slot tables are 2D textures)
     uint32_t emptyBufferSamplers() const { return emptyBufferSamplers_; } // (tests: gl_limits)
     // How Part `id`'s UVs reach the shader, for tests: 0 a texture buffer, N rows of N texels in a 2D texture.
     int textureUvWidth(uint32_t id) const;
@@ -706,6 +707,7 @@ private:
     static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64,
                          kPbr = 128;
     static constexpr int kFocus = kPaint; // with kMicro: a streamed level (render/MicroFocus.h; micro programs never paint)
+    static constexpr int kWide = kGhost;  // with kMicro: the per-slot tables are 2D textures (past the GPU's buffer-texture limit: TexelStore.h)
     static constexpr int kTiles = kPrim;  // with kMicro: Adaptive Detail tile pages (render/MicroTilePages.h; only while a Part has some)
     MeshProgram programs_[256];
     void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);

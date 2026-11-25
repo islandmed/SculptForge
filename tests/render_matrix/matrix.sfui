@@ -111,6 +111,18 @@ render_cell "flat x dense Micro, over the buffer limit" mode=flat
 render_cell "wire x dense Micro, over the buffer limit" mode=wire
 gl_limits texels=0
 
+# --- dense Micro, the per-slot tables over the buffer limit (2D textures, render/TexelStore.h; a Mali-G72's 65536 texels pass at 33k base triangles)
+gl_limits texels=4096
+run new_sphere subdivisions=4
+run micro_divide level=3
+wait 0.3
+expect_value micro_wide == 1
+render_cell "Lit Sphere x dense Micro, tables over the buffer limit" mode=lit
+render_cell "PBR x dense Micro, tables over the buffer limit" mode=pbr
+render_cell "flat x dense Micro, tables over the buffer limit" mode=flat
+render_cell "wire x dense Micro, tables over the buffer limit" mode=wire
+gl_limits texels=0
+
 # --- Focus Detail, over the buffer limit
 gl_limits texels=16384
 env SF_FOCUS_DETAIL 1

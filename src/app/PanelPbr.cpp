@@ -452,6 +452,7 @@ double App::pbrTestValue(const std::string& name) const {
     if (name == "texture_rejected") return renderer_.textureRejected(doc_.meshKey(doc_.activePart)) ? 1.0 : 0.0;
     if (name == "empty_buffer_samplers") return double(renderer_.emptyBufferSamplers());
     if (name == "texbuffer_over_limit") return double(gl::texBufferOverLimit());
+    if (name == "micro_wide") return renderer_.microWide(doc_.meshKey(doc_.activePart)) ? 1.0 : 0.0;
     if (name == "texture_not_shown") return renderer_.textureNotShown(doc_.meshKey(doc_.activePart)) ? 1.0 : 0.0;
     if (name == "pbr_planes") return double(renderer_.pbrPlanes(doc_.meshKey(doc_.activePart)));
     if (name == "brush_channels") return double(doc_.paintMaterial.channels);

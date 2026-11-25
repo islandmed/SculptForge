@@ -12,6 +12,8 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include <SDL3/SDL_log.h>
+
 #include <algorithm>
 #include <chrono>
 #include <atomic>
@@ -34,10 +36,23 @@ const char* kMicroVS = R"(
 layout(location = 0) in uvec2 aIJ; // the patch's grid point at uLevel
 uniform mat4 uView;
 uniform mat4 uProj;
-uniform usamplerBuffer uTris;   // per slot: (corner vertices, wireframe edges + 8 if hidden), (cluster across each edge, face group)
-uniform samplerBuffer uBase;    // per base vertex: position, normal
+// The per-slot tables (render/TexelStore.h) are buffer textures, or with WIDE (a base mesh past the GPU's buffer-texture limit) 2D
+// textures of 4096-texel rows: fetchU / fetchF read either.
+#ifdef WIDE
+#define SAMPLER_U usampler2D
+#define SAMPLER_F sampler2D
+uvec4 fetchU(usampler2D s, int i) { return texelFetch(s, ivec2(i & 4095, i >> 12), 0); }
+vec4 fetchF(sampler2D s, int i) { return texelFetch(s, ivec2(i & 4095, i >> 12), 0); }
+#else
+#define SAMPLER_U usamplerBuffer
+#define SAMPLER_F samplerBuffer
+uvec4 fetchU(usamplerBuffer s, int i) { return texelFetch(s, i); }
+vec4 fetchF(samplerBuffer s, int i) { return texelFetch(s, i); }
+#endif
+uniform SAMPLER_U uTris;   // per slot: (corner vertices, wireframe edges + 8 if hidden), (cluster across each edge, face group)
+uniform SAMPLER_F uBase;   // per base vertex: position, normal
 uniform isamplerBuffer uDisp;   // this chunk's displacement grids
-uniform usamplerBuffer uLevels; // per cluster: the level it draws
+uniform SAMPLER_U uLevels; // per cluster: the level it draws
 uniform samplerBuffer uShade;   // this chunk's shading grids (the fragment stage's; here for the micro-level Phong pull)
 uniform int uSlotBase, uChunkSlot, uLevel, uStored, uN, uSamples; // uStored: the stored level (uLevel may be above it)
 #ifdef FOCUS
@@ -45,7 +60,7 @@ uniform int uSlotBase, uChunkSlot, uLevel, uStored, uN, uSamples; // uStored: th
 // slot a record (the coarse grid, uCN segments, then the inner points of the three edges at full resolution, uRecord
 // values in all); the tiles with a page (uPages: page + 1, bit 31 its shading is in, 0 = none) hold their full grid in uPool.
 uniform int uCN, uCSamples, uRecord, uCShift;
-uniform usamplerBuffer uPages;
+uniform SAMPLER_U uPages;
 uniform isamplerBuffer uPool;
 uniform samplerBuffer uPoolShade; // the pages' full shading grids (gShadePage >= 0: this tile's is in)
 flat out int vPage; // the page whose full shading to use (-1: the coarse shading)
@@ -58,7 +73,7 @@ uniform float uStep;
 #ifdef TILES
 // Adaptive Detail tiles (render/MicroTilePages.h): per slot a delta page (uTilePages: page + 1, 0 = none) of
 // uTileSamples values at level uTilePageLevel (-1 = no pages), whole units of uStep along the base's Phong normal.
-uniform usamplerBuffer uTilePages;
+uniform SAMPLER_U uTilePages;
 uniform isamplerBuffer uTilePool;
 uniform samplerBuffer uTileSlope; // per page point: the delta's slopes along i and j (step units per page cell)
 uniform int uTilePageLevel, uTileSamples;
@@ -216,7 +231,7 @@ vec3 posAt(int i, int j) {
 // The page's slopes (microTileSlopes: step units per page cell along i and j) -> the surface gradient on the base
 // triangle's plane, for the fragment stage: G = s.x * vTileGi + s.y * vTileGj (corners in corner order).
 void tileFrame(uvec4 t) {
-    vec3 c0 = texelFetch(uBase, int(t.x) * 2).xyz, c1 = texelFetch(uBase, int(t.y) * 2).xyz, c2 = texelFetch(uBase, int(t.z) * 2).xyz;
+    vec3 c0 = fetchF(uBase, int(t.x) * 2).xyz, c1 = fetchF(uBase, int(t.y) * 2).xyz, c2 = fetchF(uBase, int(t.z) * 2).xyz;
     float M = float(1 << uTilePageLevel);
     vec3 ei = (c1 - c0) / M, ej = (c2 - c0) / M;
     float a11 = dot(ei, ei), a12 = dot(ei, ej), a22 = dot(ej, ej), det = a11 * a22 - a12 * a12;
@@ -244,13 +259,13 @@ void main() {
     int slot = uSlotBase + instance;
     localSlot = slot - uChunkSlot;
     vSlot = localSlot;
-    vGroup = int(texelFetch(uTris, slot * 2 + 1).w);
-    if ((texelFetch(uTris, slot * 2).w & 8u) != 0u) { // a hidden base triangle (kHiddenTri): every vertex outside the view
+    vGroup = int(fetchU(uTris, slot * 2 + 1).w);
+    if ((fetchU(uTris, slot * 2).w & 8u) != 0u) { // a hidden base triangle (kHiddenTri): every vertex outside the view
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         return;
     }
 #ifdef FOCUS
-    uint pg = texelFetch(uPages, slot).r;
+    uint pg = fetchU(uPages, slot).r;
     gPage = int(pg & 0x7FFFFFFFu) - 1;
     vPage = (pg & 0x80000000u) != 0u ? gPage : -1;
     gShadePage = vPage;
@@ -258,17 +273,17 @@ void main() {
 #ifdef TILES
     vTilePage = -1;
     vTileGi = vTileGj = vec3(0.0);
-    if (uTilePageLevel >= 0) gTilePage = int(texelFetch(uTilePages, slot).r) - 1;
-    if (gTilePage >= 0) tileFrame(texelFetch(uTris, slot * 2));
+    if (uTilePageLevel >= 0) gTilePage = int(fetchU(uTilePages, slot).r) - 1;
+    if (gTilePage >= 0) tileFrame(fetchU(uTris, slot * 2));
 #endif
     if (uLevel == 0) {
         // The base triangle alone (a cluster far away, a scan's millions of tiny patches): each vertex is one
         // corner, where the weights below are (1, 0, 0) and the bulge 0, so the same point from one base vertex.
-        uvec4 t0 = texelFetch(uTris, slot * 2);
+        uvec4 t0 = fetchU(uTris, slot * 2);
         vEdges = int(t0.w);
         int corner = int(ij.x) + 2 * int(ij.y);
         int vi = int(corner == 0 ? t0.x : corner == 1 ? t0.y : t0.z);
-        vec3 bp = texelFetch(uBase, vi * 2).xyz, bn = texelFetch(uBase, vi * 2 + 1).xyz;
+        vec3 bp = fetchF(uBase, vi * 2).xyz, bn = fetchF(uBase, vi * 2 + 1).xyz;
         float bl = length(bn);
         vec3 nrm = bl > 1e-20 ? bn / bl : vec3(0.0, 0.0, 1.0);
         int I0 = int(ij.x) * uN, J0 = int(ij.y) * uN;
@@ -289,8 +304,8 @@ void main() {
         gl_Position = uProj * p0;
         return;
     }
-    uvec4 tv = texelFetch(uTris, slot * 2);
-    uvec4 nb = texelFetch(uTris, slot * 2 + 1);
+    uvec4 tv = fetchU(uTris, slot * 2);
+    uvec4 nb = fetchU(uTris, slot * 2 + 1);
     vEdges = int(tv.w);
     uint v[3] = uint[3](tv.x, tv.y, tv.z);
     ord[0] = 0; ord[1] = 1; ord[2] = 2;
@@ -299,8 +314,8 @@ void main() {
     if (v[ord[0]] > v[ord[1]]) { int t = ord[0]; ord[0] = ord[1]; ord[1] = t; }
     for (int k = 0; k < 3; ++k) {
         int vi = int(v[ord[k]]);
-        P[k] = texelFetch(uBase, vi * 2).xyz;
-        Nn[k] = texelFetch(uBase, vi * 2 + 1).xyz;
+        P[k] = fetchF(uBase, vi * 2).xyz;
+        Nn[k] = fetchF(uBase, vi * 2 + 1).xyz;
     }
     int m = 1 << uLevel;
     float toStored = float(uN) / float(m); // drawn grid units -> stored grid units (exact: powers of two)
@@ -313,7 +328,7 @@ void main() {
     int elevel = uLevel;
     if (edge >= 0) {
         uint c = edge == 0 ? nb.x : edge == 1 ? nb.y : nb.z;
-        if (c != 0xFFFFFFFFu) elevel = min(uLevel, int(texelFetch(uLevels, int(c)).r));
+        if (c != 0xFFFFFFFFu) elevel = min(uLevel, int(fetchU(uLevels, int(c)).r));
     }
     int stepE = 1 << (uLevel - elevel);
     int r = k % stepE;
@@ -355,10 +370,9 @@ void MicroRenderer::release() {
         gl::DeleteTextures(1, &c.shadeTex);
     }
     chunks_.clear();
-    for (GLuint* b : {&triData_, &baseData_, &levelData_})
-        if (*b) gl::DeleteBuffers(1, b), *b = 0;
-    for (GLuint* t : {&triTex_, &baseTex_, &levelTex_})
-        if (*t) gl::DeleteTextures(1, t), *t = 0;
+    triStore_.release();
+    baseStore_.release();
+    levelStore_.release();
     for (Patch& p : patches_) {
         if (p.vao) gl::DeleteVertexArrays(1, &p.vao);
         if (p.vbo) gl::DeleteBuffers(1, &p.vbo);
@@ -412,6 +426,8 @@ void MicroRenderer::ensurePatches(int maxLevel) {
 void MicroRenderer::buildLayout(const Mesh& mesh) {
     const MicroMesh& mm = *mesh.micro;
     const uint32_t nt = mm.baseTriangles;
+    // Two texels per base triangle (uTris) and per base vertex (uBase): past the GPU's buffer-texture limit they are 2D textures.
+    wide_ = !TexelStore::fitsBuffer(2 * std::max<size_t>(nt, mesh.vertexCount()));
     // Slots in Morton order of the triangle centres: clusters of consecutive slots are compact.
     box_ = AABB();
     for (const glm::vec3& p : mesh.positions) box_.expand(p);
@@ -443,7 +459,7 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     // Adaptive Detail tiles: delta pages at the finest level a cluster may draw (plain program only).
     if (!focus_) {
         if (!tilePages_) tilePages_ = std::make_unique<MicroTilePages>();
-        tilePages_->setup(nt, tilePageLevel());
+        tilePages_->setup(nt, tilePageLevel(), wide_);
     } else {
         tilePages_.reset();
     }
@@ -452,7 +468,7 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     clusterShift_ = uint32_t(std::countr_zero(clusterSize));
     chunkSlots_ = std::max(clusterSize, (gl::bufferChunkTexels(kChunkTexels) / dispPer) & ~(clusterSize - 1));
     const uint32_t clusters = (nt + clusterSize - 1) >> clusterShift_;
-    auto makeTex = [&](GLuint& buffer, GLuint& tex, GLenum format, const void* data, size_t bytes) {
+    auto makeTex = [&](GLuint& buffer, GLuint& tex, GLenum format, const void* data, size_t bytes) { // (the grid chunks)
         if (!buffer) gl::GenBuffers(1, &buffer);
         if (!tex) gl::GenTextures(1, &tex);
         gl::BindBuffer(GL_TEXTURE_BUFFER, buffer);
@@ -465,7 +481,8 @@ void MicroRenderer::buildLayout(const Mesh& mesh) {
     uploadTris(mesh);
     bytes_ += size_t(nt) * 8 * 4;
     levels_.assign(clusters, 0);
-    makeTex(levelData_, levelTex_, GL_R32UI, levels_.data(), levels_.size() * 4);
+    levelStore_.create(TexelStore::Format::R32UI, levels_.size(), levels_.data(), wide_);
+    bytes_ += levels_.size() * 4;
     // Grid chunks.
     for (Chunk& c : chunks_) {
         gl::DeleteBuffers(1, &c.disp);
@@ -521,12 +538,7 @@ void MicroRenderer::uploadTris(const Mesh& mesh) {
             o[7] = mesh.facegroupAt(t);
         }
     }, 1 << 14);
-    if (!triData_) gl::GenBuffers(1, &triData_);
-    if (!triTex_) gl::GenTextures(1, &triTex_);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, triData_);
-    gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(tri.size() * 4), tri.data(), GL_STATIC_DRAW);
-    gl::BindTexture(GL_TEXTURE_BUFFER, triTex_);
-    gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32UI, triData_);
+    triStore_.create(TexelStore::Format::RGBA32UI, size_t(nt) * 2, tri.data(), wide_);
 }
 
 void MicroRenderer::uploadBase(const Mesh& mesh) {
@@ -537,14 +549,7 @@ void MicroRenderer::uploadBase(const Mesh& mesh) {
             data[v * 2 + 1] = glm::vec4(mesh.normals[v], 0.0f);
         }
     }, 1 << 14);
-    if (!baseData_) gl::GenBuffers(1, &baseData_);
-    if (!baseTex_) gl::GenTextures(1, &baseTex_);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, baseData_);
-    gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(data.size() * sizeof(glm::vec4)), data.data(), GL_STATIC_DRAW);
-    gl::BindTexture(GL_TEXTURE_BUFFER, baseTex_);
-    gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, baseData_);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
-    gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+    baseStore_.create(TexelStore::Format::RGBA32F, data.size(), data.data(), wide_);
     bytes_ += data.size() * sizeof(glm::vec4);
 }
 
@@ -801,6 +806,12 @@ bool MicroRenderer::sync(Mesh& mesh) {
         level_ = mm.level;
         n_ = mm.n;
         samples_ = mm.samples;
+        // A mesh whose tables (two texels a triangle or vertex) fit neither a buffer texture nor a 2D texture of this GPU isn't drawn.
+        const size_t tableTexels = 2 * std::max<size_t>(mm.baseTriangles, mesh.vertexCount());
+        if (!TexelStore::fitsBuffer(tableTexels) && !TexelStore::fitsWide(tableTexels)) {
+            SDL_Log("Micro level not drawn: %zu table texels are past this GPU's texture buffer and texture limits", tableTexels);
+            return false;
+        }
         buildLayout(mesh);
         uploadBase(mesh);
         if (focus_) {
@@ -859,11 +870,16 @@ bool MicroRenderer::sync(Mesh& mesh) {
                             part[(at[k] + o) * 2 + 1] = glm::vec4(mesh.normals[v], 0.0f);
                         }
                 }, 64);
-                upload_.stage(part.data(), part.size() * sizeof(glm::vec4));
-                for (size_t k = 0; k < runs.size(); ++k)
-                    upload_.copy(baseData_, at[k] * 2 * sizeof(glm::vec4), size_t(runs[k].first) * 2 * sizeof(glm::vec4),
-                                 (runs[k].second - runs[k].first) * 2 * sizeof(glm::vec4));
-                BufferUpload::done();
+                if (wide_) {
+                    for (size_t k = 0; k < runs.size(); ++k)
+                        baseStore_.writeWide(size_t(runs[k].first) * 2, size_t(runs[k].second - runs[k].first) * 2, part.data() + at[k] * 2);
+                } else {
+                    upload_.stage(part.data(), part.size() * sizeof(glm::vec4));
+                    for (size_t k = 0; k < runs.size(); ++k)
+                        upload_.copy(baseStore_.buffer(), at[k] * 2 * sizeof(glm::vec4), size_t(runs[k].first) * 2 * sizeof(glm::vec4),
+                                     (runs[k].second - runs[k].first) * 2 * sizeof(glm::vec4));
+                    BufferUpload::done();
+                }
             }
         }
         // This sync's triangles whose heights changed: their tiles go to the GPU (a moved base sends no heights).
@@ -889,7 +905,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
         }
         if (tilePages_) { // (before the shading below: it reuses scratch_)
             const bool relevel = tilePages_->pageLevel() != tilePageLevel(); // (drawAbove changed: pages at the new finest level)
-            if (relevel) tilePages_->setup(baseTriangles_, tilePageLevel());
+            if (relevel) tilePages_->setup(baseTriangles_, tilePageLevel(), wide_);
             tilePages_->sync(mesh, *this, scratch_, relevel || mm.allDirty || mm.rescaled);
         }
         // Bounds: the clusters whose base moved in full, those whose heights alone changed by their range.
@@ -1000,7 +1016,8 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
         std::fprintf(stderr, "\n");
     }
     for (uint32_t c = 0; c < clusters; ++c) levels_[c] = uint32_t(want_[c]);
-    upload_.write(levelData_, 0, levels_.data(), levels_.size() * 4);
+    if (wide_) levelStore_.writeWide(0, levels_.size(), levels_.data());
+    else upload_.write(levelStore_.buffer(), 0, levels_.data(), levels_.size() * 4);
 
     if (u_.program != program) {
         u_.program = program;
@@ -1032,11 +1049,11 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     gl::Uniform1i(u_.samples, int(samples_));
     gl::Uniform1f(u_.step, step_);
     gl::ActiveTexture(kUnitTris);
-    gl::BindTexture(GL_TEXTURE_BUFFER, triTex_);
+    triStore_.bind();
     gl::ActiveTexture(kUnitBase);
-    gl::BindTexture(GL_TEXTURE_BUFFER, baseTex_);
+    baseStore_.bind();
     gl::ActiveTexture(kUnitLevels);
-    gl::BindTexture(GL_TEXTURE_BUFFER, levelTex_);
+    levelStore_.bind();
     if (focus_) focus_->bind(program, visible, want_);
     if (tilePages_) tilePages_->bind(program, visible, want_, maxDraw);
     if (closed_) gl::Enable(GL_CULL_FACE);
@@ -1088,6 +1105,7 @@ size_t MicroRenderer::draw(GLuint program, const CullView& cullIn, const glm::ma
     for (GLenum unit : {kUnitTris, kUnitBase, kUnitDisp, kUnitLevels, kUnitShade}) {
         gl::ActiveTexture(unit);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::BindTexture(GL_TEXTURE_2D, 0);
     }
     gl::ActiveTexture(GL_TEXTURE0);
     return drawn;
