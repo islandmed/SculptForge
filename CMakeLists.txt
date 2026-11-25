@@ -1254,6 +1254,11 @@ if(SCULPTFORGE_BUILD_TESTS)
       add_test(NAME release_rerun COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_rerun_test.sh)
       set_tests_properties(release_rerun PROPERTIES TIMEOUT 60)
     endif()
+    # scripts/merge-queue.sh wait_ci: a gh watch error while the run is still going is retried, never read as red.
+    if(UNIX AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+      add_test(NAME merge_queue_wait_ci COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/merge_queue_wait_ci_test.sh)
+      set_tests_properties(merge_queue_wait_ci PROPERTIES TIMEOUT 60)
+    endif()
     # packaging/linux/apt-retry.sh: apt-get through a mirror that fails DNS (stand-in apt-get, sandbox /etc/apt).
     if(UNIX AND NOT APPLE)
       add_test(NAME apt_retry COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/apt_retry_test.sh)
