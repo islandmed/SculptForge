@@ -73,18 +73,15 @@ click "Viewport Look##tool.display"
 expect "Floor grid##display"
 expect_not "Floor grid at Y=0##display"
 shot classic-off
+# (The Viewport Look section stays open across ui_look: clicking it again would fold it.)
 run ui_look layout=classic newer_rows=true
 expect_value newer_menu_rows == 1
-click "Tool##palette.tool"
-click "Viewport Look##tool.display"
 expect "Floor grid at Y=0##display"
 click "Floor grid at Y=0##display"
 expect_value floor_grid_fixed == 1
 shot classic-on
 run ui_look layout=classic newer_rows=false
 expect_value newer_menu_rows == 0
-click "Tool##palette.tool"
-click "Viewport Look##tool.display"
 expect "Floor grid at Y=0##display"
 click "Floor grid at Y=0##display"
 expect_value floor_grid_fixed == 0
