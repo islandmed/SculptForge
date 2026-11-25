@@ -2,21 +2,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Preferences > Integrations > Show SculptForge on Discord (off by default; core/DiscordPresence.h): the icon, the
-// name SculptForge and the elapsed time, and on request the monthly challenge's theme and the file's name. Only
-// to the Discord app on this computer; it shows it to the user's friends. Tests, scripts, renders and CI never
-// connect (supportCardTestMode), nor do runs by agents (discord::agentRun).
+// name SculptForge, the elapsed time and one word for the work, Sculpting, Painting or Idle. Nothing from the scene
+// (the owner's conditions, 11-23: no file names, Part names, paths or user names; the file-name and challenge
+// options of 0.11 to 0.14.0 are gone). Only to the Discord app on this computer; it shows it to the user's friends.
+// Tests, scripts, renders and CI never connect (supportCardTestMode), nor do runs by agents (discord::agentRun).
 #include "app/App.h"
 #include "app/Ui.h"
 #include "core/NetworkPolicy.h"
 
+#include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_video.h>
 #include <imgui.h>
 
 #include <chrono>
-#include <cstdio>
 #include <cstdlib>
 
 namespace sf {
+
+namespace {
+constexpr double kDiscordIdleSeconds = 5 * 60.0; // no stroke for this long: Idle
+}
 
 void App::DiscordClientDelete::operator()(discord::Client* c) const { delete c; }
 
@@ -26,6 +31,12 @@ bool App::discordPresenceAvailable() const { return net::localIpcAllowed() && di
 bool App::discordAgentRun() const {
     static const bool agent = discord::agentRun([](const char* n) { return std::getenv(n); }, SDL_GetCurrentVideoDriver());
     return agent;
+}
+
+discord::Mode App::discordMode() const {
+    const double now = double(SDL_GetTicksNS()) * 1e-9;
+    if (now - discordStrokeAt_ > kDiscordIdleSeconds) return discord::Mode::Idle;
+    return discordStrokePaint_ ? discord::Mode::Painting : discord::Mode::Sculpting;
 }
 
 void App::updateDiscordPresence() {
@@ -40,40 +51,35 @@ void App::updateDiscordPresence() {
     a.show = discordPrefs_.enabled;
     if (a.show) {
         a.start = discordStart_;
-        if (discordPrefs_.showChallenge) a.challenge = discordPrefs_.challenge;
-        if (discordPrefs_.showFileName) a.fileName = doc_.path; // cut to its name (never the folder) when sent
+        a.mode = discordMode();
+        // The flip to Idle must go out while the window sleeps too: one wake-up when it is due.
+        if (a.mode != discord::Mode::Idle) redrawIn(kDiscordIdleSeconds - (double(SDL_GetTicksNS()) * 1e-9 - discordStrokeAt_) + 0.1);
     }
-    discordClient_->set(a); // sends only when this changed
+    discordClient_->set(a); // sends only when this changed (one activity every 4 s at most)
 }
 
 void App::drawIntegrationsPrefs() {
     const char* path = "Preferences > Integrations";
     bool changed = ImGui::Checkbox(tr("Show SculptForge on Discord##prefs.discord"), &discordPrefs_.enabled);
     ui::HelpText("Show SculptForge on Discord", nullptr,
-                 "Your Discord profile shows SculptForge, its icon and how long you've been sculpting. Sent only to "
-                 "the Discord app on this computer, which shows it to your friends. Off by default.",
+                 "Your Discord profile shows SculptForge, its icon, how long you've been at it and one word for what "
+                 "you're doing: Sculpting, Painting or Idle. Sent only to the Discord app on this computer, which shows "
+                 "it to your friends. Off by default.",
                  path);
-    ImGui::BeginDisabled(!discordPrefs_.enabled);
-    changed |= ImGui::Checkbox(tr("Show the monthly challenge##prefs.discord"), &discordPrefs_.showChallenge);
-    ui::HelpText("Show the monthly challenge", nullptr, "Adds \"Monthly challenge: <theme>\", with the theme you type below.", path);
-    ImGui::BeginDisabled(!discordPrefs_.showChallenge);
-    ImGui::SetNextItemWidth(-1);
-    if (ImGui::InputTextWithHint("##prefs.discord.challenge", tr("Theme (64 characters at most)"), discordChallengeBuf_,
-                                 sizeof discordChallengeBuf_)) {
-        discordPrefs_.challenge = discord::sanitize(discordChallengeBuf_, discord::kChallengeMax);
-    }
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        std::snprintf(discordChallengeBuf_, sizeof discordChallengeBuf_, "%s", discordPrefs_.challenge.c_str());
-        changed = true;
-    }
-    ImGui::EndDisabled();
-    changed |= ImGui::Checkbox(tr("Show the file name##prefs.discord"), &discordPrefs_.showFileName);
-    ui::HelpText("Show the file name", nullptr, "Adds the name of the file you're working on (never its folder). Off by default.",
-                 path);
-    ImGui::EndDisabled();
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", tr("Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running."));
+    ImGui::TextWrapped("%s", tr("Shared: the name SculptForge, its icon, your time in the app and Sculpting, Painting or Idle. "
+                                "Nothing else: no file names, folders, Part names, user name or model details. Needs the Discord "
+                                "app running on this computer."));
     ImGui::PopStyleColor();
+    if (discordPrefs_.optionsNote) { // had Show the file name or Show the monthly challenge on up to 0.14.0
+        ImGui::Spacing();
+        ImGui::TextWrapped("%s", tr("Discord now shows only SculptForge and what you're doing, never the file name or a challenge "
+                                    "theme. Those two options are gone."));
+        if (ImGui::Button(tr("Got it##prefs.discord.note"))) {
+            discordPrefs_.optionsNote = false;
+            changed = true;
+        }
+    }
     if (changed) {
         saveProjectPrefs();
         updateDiscordPresence();

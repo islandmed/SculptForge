@@ -2922,6 +2922,10 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_;
     strokePaint_ = strokeColourSmooth_ || (strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_));
     strokeSculpt_ = !(strokePaint_ && paintMode_);
+    // Show SculptForge on Discord: the one word about the work (Sculpting or Painting; Idle five minutes after the
+    // last stroke). When it started, never where, what or on which file (PanelIntegrations.cpp).
+    discordStrokeAt_ = double(SDL_GetTicksNS()) * 1e-9;
+    discordStrokePaint_ = !strokeSculpt_;
     const BrushRecipe* recipe = strokeRecipe();
     { // the brush's own pressure curve (Precision.cpp)
         const auto it = brushCurves_.find(pressureCurveKey(strokeBrush_, recipe));
@@ -3907,7 +3911,7 @@ void App::updateTitle() {
     std::string name = doc_.path.empty()
                            ? std::string("Untitled")
                            : fileNameUtf8(doc_.path);
-    updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
+    updateDiscordPresence(); // every frame: the switch and Sculpting / Painting / Idle (sends only on a change)
     // "Head.sfproj* — SculptForge 0.11.13": the document first (taskbars and Alt-Tab cut the end off), the version
     // last, so support screenshots show it.
     std::string title = name + (doc_.dirty() ? "*" : "") + " — SculptForge " + appShownVersion().text();

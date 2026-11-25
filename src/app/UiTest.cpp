@@ -1443,6 +1443,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "connect_ai_open") return app_.showConnectAi_ ? 1.0 : 0.0; // Help > Connect an AI tool (PanelConnectAi.cpp)
     if (name == "discord_connects") return double(discord::connectAttempts()); // Show SculptForge on Discord: never in tests
     if (name == "discord_presence") return app_.discordPrefs_.enabled ? 1.0 : 0.0;
+    if (name == "discord_mode") return double(int(app_.discordMode())); // what would be sent: 0 Idle, 1 Sculpting, 2 Painting
+    if (name == "discord_options_note") return app_.discordPrefs_.optionsNote ? 1.0 : 0.0;
     if (name == "http_requests") return double(ai::httpRequestCount()); // every request this process started
     if (name == "generate_candidates") return double(app_.candidates_.size()); // Generate 3D's, waiting for a pick
     if (name == "generated_part") return double(app_.doc_.partIndex(app_.generatedPart_)); // the pick's Part (-1 none)

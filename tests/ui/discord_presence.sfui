@@ -1,19 +1,28 @@
 # Preferences > Integrations > Show SculptForge on Discord (PanelIntegrations.cpp, core/DiscordPresence.h): off by
-# default; its options wait for it; the theme is capped at 64 characters; a UI test never connects to Discord.
+# default; the preferences spell out what is shared; the one word about the work follows the last stroke (Idle,
+# Sculpting, Painting); a UI test never connects to Discord.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 expect_value discord_presence == 0
+expect_value discord_mode == 0                 # Idle until a stroke
+run new_sphere subdivisions=4
+stroke 0.35 0.4 0.65 0.6
+expect_value discord_mode == 1                 # Sculpting
+action draw.paint
+expect_value paint_mode == 1
+stroke 0.3 0.5 0.7 0.5
+expect_value discord_mode == 2                 # Painting
+expect_value discord_connects == 0
+
 click "Preferences##palette.preferences"
 click "Integrations##preferences.integrations"
 expect "Show SculptForge on Discord##prefs.discord"
-expect_text "Nothing else is sent"
+expect_text "Nothing else"
+expect_text "Sculpting, Painting or Idle"
+expect_value discord_options_note == 0         # a fresh install never had the removed options
 shot discord-prefs-off
 
 click "Show SculptForge on Discord##prefs.discord"
 expect_value discord_presence == 1
-click "Show the monthly challenge##prefs.discord"
-type "##prefs.discord.challenge" "Sea monsters"
-key enter
-click "Show the file name##prefs.discord"
 shot discord-prefs-on
 expect_value discord_connects == 0
 
