@@ -551,6 +551,9 @@ void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& ma
         g_seen.clear();
         g_noRing.clear();
     }
+    // Cropped out of its window (a neighbour of a pinned control, PanelMyPanel.cpp drawPinnedControl): no ring, or the ring's
+    // margin would show as a sliver at the crop's edge.
+    if (!ctx->CurrentWindow->ClipRect.Overlaps(ImRect(min, max))) return;
     bool want = id == ctx->HoveredIdPreviousFrame || id == ctx->HoveredId || id == ctx->NavId || id == ctx->ActiveId;
     for (size_t i = 0; !want && i < g_rings.size(); ++i) want = g_rings[i] == id;
     if (!want) return;

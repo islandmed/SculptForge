@@ -81,7 +81,7 @@ void App::drawMyPanelScope(const std::string& scope) {
     const bool paletteLevel = scope.find('.') == std::string::npos;
     myPanelSection_ = scope;
     myPanelPaletteLevel_ = paletteLevel;
-    window->SkipItems = !paletteLevel;
+    tray::scopeSkip(!paletteLevel);
     ImGui::PushID(scope.c_str());
     ui::PinPalette(def->id); // its controls are My Panel entries (Ui.h), here as in the palette
     const bool readOnly = ui::BeginPaletteItems();
@@ -89,6 +89,7 @@ void App::drawMyPanelScope(const std::string& scope) {
     ui::EndPaletteItems(readOnly);
     ui::PinPalette("");
     ImGui::PopID();
+    tray::scopeSkipEnd();
     window->SkipItems = wasSkipping;
     myPanelSection_.clear();
     myPanelPaletteLevel_ = false;
