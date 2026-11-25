@@ -45,13 +45,13 @@ public:
     void setSerial(bool serial) { serial_ = serial; }
     bool serial() const { return serial_; }
     // Calls job(i) for every i in [0, count), spread over the pool and the calling thread; returns when all
-    // are done. Runs inline when called from inside a job or when count <= 1; called while other threads' runs go
-    // on, it goes beside them and the workers join it as they finish theirs. A job that throws stops the jobs not yet started; run() rethrows the first exception once every
+    // are done. Runs inline when called from inside a job, while another thread is using the pool, or when
+    // count <= 1. A job that throws stops the jobs not yet started; run() rethrows the first exception once every
     // worker has left (the pool stays usable).
     void run(size_t count, const std::function<void(size_t)>& job);
 
 private:
-    // One run(): workers join it under mutex_ while it is in runs_, and run() waits until every job is done and
+    // One run(): workers join it under mutex_ while it is current, and run() waits until every job is done and
     // every worker that joined has left, so a late worker can never touch a finished run.
     struct Run {
         const std::function<void(size_t)>* job = nullptr;
@@ -63,14 +63,12 @@ private:
     };
     void workerLoop();
     size_t drain(Run& run);
-    Run* pickRun() const; // (under mutex_)
-    static constexpr size_t kMaxRuns = 8; // runs going on at once (threads calling run()); more go inline
 
     std::vector<std::thread> workers_;
-    std::mutex runMutex_; // one run() at a time (SF_POOL_SHARED=0 only)
+    std::mutex runMutex_; // one run() at a time
     std::mutex mutex_;
     std::condition_variable wake_, done_;
-    std::vector<Run*> runs_; // the runs going on, oldest first (guarded by mutex_)
+    Run* current_ = nullptr;
     std::atomic<uint64_t> generation_{0};
     bool stop_ = false;
     std::atomic<bool> serial_{false};
