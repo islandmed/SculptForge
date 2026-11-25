@@ -4,7 +4,7 @@ highlight: Any option on a shelf
 added: **Shelves**: any control, any shelf (requested by members). Hold Alt and drag a checkbox, slider, choice, readout or
   button from any palette onto the top, left, right or bottom shelf, Customize Shelves off or on, Classic or Streamlined
   setup: a line shows where it lands, and it is the palette's own control, live, so a change on the shelf is a change
-  everywhere. While Alt is held a slider is picked up, not changed. On a side shelf a control takes the column's width (drag the left shelf's inner edge wider for a long label); on
+  everywhere. While Alt is held a slider is picked up, not changed. On a side shelf a control takes the column's width (a long label ends in "..."; drag the left shelf's inner edge wider); on
   the top or bottom shelf it is as wide as it is in its palette, centred in the row. Ctrl+Alt in Customize Shelves moves it
   along or between shelves and off them, as for every item; right-click > Remove from shelf; saved with the layout. A
   control its palette shows only sometimes is hidden on the shelf until it is back (shown dim in Customize Shelves so it can

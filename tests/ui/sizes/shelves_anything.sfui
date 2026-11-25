@@ -37,6 +37,10 @@ expect_value "shelf_has_control:preferences.input/Orbit around the pointer" == 1
 hover "Top shelf/Backface culling##display"
 wait 0.3
 shot classic
+# The left shelf's long label is cut short with "..." (painted in the shelf's background); hovered, the row's tint covers it too.
+hover "Left shelf/Orbit around the pointer##input.orbit_at_pointer"
+wait 0.3
+shot classic_cut_hover
 # Alt held over a palette control: the hand says it can be picked up; the shelf's copy is a drop target's neighbour.
 hold alt
 hover "Preferences/Orbit around the pointer##input.orbit_at_pointer"

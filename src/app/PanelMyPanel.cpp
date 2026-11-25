@@ -215,6 +215,17 @@ bool App::drawPinnedControl(const std::string& entry, const MyPanelEntry& e, int
             place.h = r.max.y - r.min.y;
             place.lineX = r.lineX - origin.x;
         }
+        // A control wider than its host (a long checkbox label on a side shelf, or in a narrow tray): the cut is visible, "..."
+        // over its last letters in the host's background, with the full name on hover or Ctrl help as before (cto 11-24: a
+        // silent cut reads as a different, wrong label).
+        if (r.found && r.max.x > childMin.x + itemW + 1.0f && itemW > 40.0f * s) {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const char* dots = "...";
+            const float dw = ImGui::CalcTextSize(dots).x, right = childMin.x + itemW, x0 = right - dw - 1.0f * s;
+            dl->AddRectFilled(ImVec2(x0 - 2.0f * s, childMin.y), ImVec2(right, childMin.y + place.h),
+                              panel ? ImGui::GetColorU32(ImGuiCol_WindowBg) : theme::u32(theme::shellBg));
+            dl->AddText(ImVec2(x0, std::floor(childMin.y + (place.h - ImGui::GetFontSize()) * 0.5f)), ImGui::GetColorU32(ImGuiCol_Text), dots);
+        }
     }
     ImGui::EndChild();
     ImGui::EndGroup();
