@@ -1122,7 +1122,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"How much the wind varies from place to place and moment to moment: the cloth ripples and flaps and never quite settles, so press Keep at the frame you like (it stops by itself after a minute).", "风力随地点和时间的变化程度：布料会起伏飘动且始终不会完全静止，因此请在喜欢的帧按下 保留（一分钟后会自动停止）。"},
     {"Lift", "抬升"},
     {"Lift %.0f deg", "抬升 %.0f deg"},
-    {"Points the wind away from you: it blows from the camera toward the model.", "将风向背向你：从摄像机吹向模型。"},
+    {"Points the wind away from you: it blows from the camera toward the model (heading and lift).", "将风向背向你：从摄像机吹向模型（航向和抬升）。"},
     {"Tilts the wind up from level (a skirt lifts) or down, in degrees.", "将风向从水平方向向上倾斜（裙子扬起）或向下倾斜，单位为度。"},
     {"Toward", "朝向"},
     {"Toward %.0f deg", "朝向 %.0f deg"},

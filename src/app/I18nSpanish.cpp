@@ -1334,7 +1334,7 @@ constexpr Entry kSpanish[] = {
     {"How much the wind varies from place to place and moment to moment: the cloth ripples and flaps and never quite settles, so press Keep at the frame you like (it stops by itself after a minute).", "Cuánto varía el viento de un lugar a otro y de un momento a otro: la tela ondula y aletea y nunca se asienta del todo, así que pulsa Conservar en el fotograma que te guste (se detiene solo después de un minuto)."},
     {"Lift", "Elevación"},
     {"Lift %.0f deg", "Elevación %.0f deg"},
-    {"Points the wind away from you: it blows from the camera toward the model.", "Apunta el viento lejos de ti: sopla desde la cámara hacia el modelo."},
+    {"Points the wind away from you: it blows from the camera toward the model (heading and lift).", "Apunta el viento lejos de ti: sopla desde la cámara hacia el modelo (rumbo y elevación)."},
     {"Tilts the wind up from level (a skirt lifts) or down, in degrees.", "Inclina el viento hacia arriba desde el nivel horizontal (una falda se levanta) o hacia abajo, en grados."},
     {"Toward", "Hacia"},
     {"Toward %.0f deg", "Hacia %.0f deg"},

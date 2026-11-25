@@ -68,14 +68,17 @@ Pins from the **mask**: masked vertices (mask 1) are fixed, partly masked ones p
 a real size drapes right; Drape has a **Scale** field (shows "body height 1.8 m") for sculpts made at another size.
 
 Wind (Tool > Drape > Wind) is an air velocity: speed in m/s, a heading (where it blows toward) and a lift. Each
-particle's normal is gathered once a frame from its triangles; the air moving through the face pushes along the
-normal with half the air's density (1.2 kg/m^3) times the squared normal speed over the fabric's mass per area
-(drag coefficient 1), and the air along the face skims it at 2% of that, so a sail fills and an edge-on sheet barely
-leans. Neither takes a particle past the air's own speed within a substep (the velocity change is capped at the
-relative speed), which keeps a 20 m/s wind stable at h = 1/720 s. Gusts (0..1) make the wind a field over place and
-time: three sine waves (along the wind, across it and up; about half the cloth's size long; 0.7-1.1 Hz) plus a slow
-swell of the steady part, scaled by the gust share of the speed. It is a function, not noise: the same drape on every
-run and thread count. In gusts the cloth never rests, so the panel runs up to a minute and Keep takes a frame.
+particle's normal is gathered each substep from its triangles (a frame-old normal flutters in a hard wind); the air
+moving through the face pushes along the normal with half the air's density (1.2 kg/m^3) times the squared normal
+speed over the fabric's mass per area (drag coefficient 1), and the air along the face skims it at 2% of that, so a
+sail fills. Each is a relaxation toward the air's speed by a / (1 + a) of the difference (a = the substep times the
+drag rate), never past it, which keeps a 20 m/s wind stable at h = 1/720 s; wind also takes two constraint passes per
+substep (one left edges 8-28% long under its drive). A sheet edge-on to the wind is unstable, as a flag is: it turns,
+catches the wind and streams along it. Gusts (0..1) make the wind a field over place and time: three sine waves
+(along the wind, across it and up; about half the cloth's size long; 0.7-1.1 Hz) plus a slow swell of the steady
+part, scaled by the gust share of the speed. It is a function, not noise: the same drape on every run and thread
+count. In wind the panel paces the simulation to real time (it is watched); in gusts the cloth never rests, so it runs
+up to a minute of cloth time and Keep takes a frame.
 
 ## 5. Cloth brush (phase 1)
 
