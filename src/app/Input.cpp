@@ -862,22 +862,38 @@ int App::navMoveForPress(Uint8 button) const {
     return navDragMatch(uiPrefs_.nav, int(button), ctrlDown(keys), (keys & SDL_KMOD_SHIFT) != 0, (keys & SDL_KMOD_ALT) != 0);
 }
 
-// How many of the panel's rows carry a warning: a hold key another action has too, two equal drag gestures, a gesture the
-// key style already uses, or a left-button gesture with no modifier (never active).
-int App::navConflictCount() const {
-    int n = 0;
-    for (int i = 0; i < kNavMoves; ++i) {
-        bool warn = false;
+// The panel's warnings, one line per problem, each saying who wins and what to change: a hold key another action has
+// too; a left-button gesture with no modifier (never active); one gesture on two moves (the first in the list wins);
+// a gesture the key style already uses for something else (the custom one wins; a gesture that already does this very
+// move, like Shift+Middle for Pan, is no clash and gets no line).
+std::vector<std::string> App::navWarningLines() const {
+    std::vector<std::string> out;
+    char line[512];
+    for (int i = 0; i < kNavMoves; ++i)
         for (const std::string& alt : shortcutAlternatives(actions_.shortcutText(kNavHoldActions[i])))
-            if (!actions_.holdersOfShortcut(alt, kNavHoldActions[i]).empty()) warn = true;
+            for (const Action* h : actions_.holdersOfShortcut(alt, kNavHoldActions[i]))
+                out.push_back(std::string(tr(kNavMoveLabels[i])) + ": " + alt + " " + tr("is also") + " " + trAction(h->id, h->label));
+    for (int i = 0; i < kNavMoves; ++i)
+        if (const NavDrag& d = uiPrefs_.nav.drag[i]; d.set() && !d.usable())
+            out.push_back(std::string(tr(kNavMoveLabels[i])) + ": " + tr("a plain left drag sculpts: add Ctrl, Shift or Alt"));
+    for (int i = 0; i < kNavMoves; ++i) {
         const NavDrag& d = uiPrefs_.nav.drag[i];
-        if (d.set() && !d.usable()) warn = true;
-        if (d.usable() && navStyleGesture(uiPrefs_.inputStyle, d)[0]) warn = true;
-        for (int j = 0; j < kNavMoves; ++j)
-            if (j != i && d.usable() && uiPrefs_.nav.drag[j] == d) warn = true;
-        n += warn;
+        if (!d.usable()) continue;
+        bool first = true; // the first move with this gesture: it wins, and its line speaks for the clash
+        for (int j = 0; j < i; ++j)
+            if (uiPrefs_.nav.drag[j] == d) first = false;
+        if (!first) continue;
+        for (int j = i + 1; j < kNavMoves; ++j)
+            if (uiPrefs_.nav.drag[j] == d) {
+                std::snprintf(line, sizeof line, tr("%s and %s both use %s: %s wins. Change one of them."), tr(kNavMoveLabels[i]),
+                              tr(kNavMoveLabels[j]), navDragText(d).c_str(), tr(kNavMoveLabels[i]));
+                out.emplace_back(line);
+            }
+        const char* was = navStyleGesture(uiPrefs_.inputStyle, d);
+        if (was[0] && navStyleGestureMove(was) != i)
+            out.push_back(std::string(tr(kNavMoveLabels[i])) + ": " + navDragText(d) + " " + tr("takes over") + " " + tr(was));
     }
-    return n;
+    return out;
 }
 
 // Navigation defaults: the hold keys unbound, no custom gestures, the view keys the panel lists back to the key style's

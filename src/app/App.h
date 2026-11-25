@@ -1708,7 +1708,8 @@ private:
     // camera drag (navMoveForPress); the drag goes on to the button's release, as Hold Space does.
     void navHoldKey(SDL_Keycode key, SDL_Keymod mods, bool down); // tracks it (dispatchEvent, as quickRemeshKey)
     int navMoveForPress(Uint8 button) const; // the move a press starts: a held key's, or a custom drag gesture's; -1 none
-    int navConflictCount() const;            // the panel's warnings (UI tests: nav_conflicts)
+    std::vector<std::string> navWarningLines() const; // Preferences > Navigation's warnings, one line per problem
+    int navConflictCount() const { return int(navWarningLines().size()); } // (UI tests: nav_conflicts)
     void resetNavigationBindings();          // Preferences > Navigation > Navigation defaults
     SDL_Keycode navHoldKey_ = SDLK_UNKNOWN;
     int navHoldMove_ = -1;

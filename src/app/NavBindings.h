@@ -163,6 +163,15 @@ inline const char* navStyleGesture(int style, const NavDrag& d) {
     return "Pan (middle-drag)";
 }
 
+// The move a navStyleGesture text drives (0 orbit, 1 pan, 2 zoom), or -1 for anything else (a stroke, a mask, a menu).
+inline int navStyleGestureMove(const char* gesture) {
+    const std::string_view g = gesture;
+    if (g.rfind("Turn the view", 0) == 0) return 0;
+    if (g.rfind("Pan", 0) == 0) return 1;
+    if (g.rfind("Zoom", 0) == 0) return 2;
+    return -1;
+}
+
 inline Json toJson(const NavBindings& nav) {
     Json j = Json::object();
     for (int i = 0; i < kNavMoves; ++i)

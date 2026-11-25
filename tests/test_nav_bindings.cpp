@@ -79,6 +79,12 @@ TEST(nav_style_gestures) {
     CHECK(std::string(navStyleGesture(3, altLeft)).find("Turn") != std::string::npos);
     CHECK(std::string(navStyleGesture(3, altRight)).find("Zoom") != std::string::npos);
     CHECK(std::string(navStyleGesture(3, right)).find("Turn") != std::string::npos); // Maya keeps the classic right drag
+    // Which move a style gesture drives: a custom gesture that already does that move is no clash.
+    CHECK(navStyleGestureMove(navStyleGesture(1, NavDrag{2, false, true, false})) == 1); // Shift+Middle pans
+    CHECK(navStyleGestureMove(navStyleGesture(1, ctrlMiddle)) == 2);
+    CHECK(navStyleGestureMove(navStyleGesture(1, right)) == 0);
+    CHECK(navStyleGestureMove(navStyleGesture(1, shiftLeft)) == -1); // Smooth: not a camera move
+    CHECK(navStyleGestureMove("") == -1);
 }
 
 TEST(nav_bindings_json_round_trip) {

@@ -7099,6 +7099,7 @@ constexpr Entry kJapanese[] = {
     {"to %.2f",
      "最大 %.2f"},
     // --- Preferences > Navigation (NavBindings.h, Config.cpp drawNavigationSection) ---
+    {"%s and %s both use %s: %s wins. Change one of them.", "%s と %s がどちらも %s を使っています。%s が有効です。どちらかを変更してください。"},
     {"Hold to orbit", "押しながら回転"},
     {"Hold to pan", "押しながらパン"},
     {"Hold to zoom", "押しながらズーム"},
@@ -7117,9 +7118,7 @@ constexpr Entry kJapanese[] = {
     {"The hold keys unbound, no drag gestures, the view keys above back to the key style's defaults, and the pen's side buttons as the Tablet defaults. Other shortcuts stay as they are.", "ホールドキーを解除し、ドラッグジェスチャーをなくし、上のビューキーをキースタイルの初期設定に、ペンのサイドボタンをタブレットの初期設定に戻します。他のショートカットはそのままです。"},
     {"a plain left drag sculpts: add Ctrl, Shift or Alt", "ただの左ドラッグはスカルプトします。Ctrl・Shift・Alt を加えてください"},
     {"is also", "は次にも割り当て済み："},
-    {"is also the drag for", "は次のドラッグでもあります："},
     {"takes over", "が置き換えるもの："},
-    {"which comes first and wins", "（先に並ぶ方が優先）"},
     {"Orbit", "回転"},
     {"Pan", "パン"},
     {"Middle", "中"},

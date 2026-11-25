@@ -2488,27 +2488,22 @@ void drawNavDragPicker(App& app, int move, float s, const char* path) {
     }
 }
 
-// The warnings for one move's row: a hold key another action has, an unusable or doubled gesture, a gesture the key
-// style already uses (the custom one wins; this says what it takes over).
-std::vector<std::string> navWarnings(App& app, int move) {
-    std::vector<std::string> out;
-    const ActionRegistry& reg = app.actions();
-    const UiPrefs& p = app.uiPrefs();
-    const char* label = tr(kNavMoveLabels[move]);
-    for (const std::string& alt : shortcutAlternatives(reg.shortcutText(kNavHoldActions[move])))
-        for (const Action* h : reg.holdersOfShortcut(alt, kNavHoldActions[move]))
-            out.push_back(std::string(label) + ": " + alt + " " + tr("is also") + " " + trAction(h->id, h->label));
-    const NavDrag& d = p.nav.drag[move];
-    if (d.set() && !d.usable()) out.push_back(std::string(label) + ": " + tr("a plain left drag sculpts: add Ctrl, Shift or Alt"));
-    if (d.usable()) {
-        for (int j = 0; j < kNavMoves; ++j)
-            if (j != move && p.nav.drag[j] == d)
-                out.push_back(std::string(label) + ": " + navDragText(d) + " " + tr("is also the drag for") + " " + tr(kNavMoveLabels[j]) +
-                              (j < move ? std::string(" (") + tr("which comes first and wins") + ")" : ""));
-        if (const char* was = navStyleGesture(p.inputStyle, d); was[0])
-            out.push_back(std::string(label) + ": " + navDragText(d) + " " + tr("takes over") + " " + tr(was));
+// A row label in a narrow column: whole when it fits, otherwise ellipsized with the full name as a tooltip (the
+// Preferences popup is narrow; "Frame last stroke" was cut at 1440 px, cto 11-24).
+void cellLabel(const char* text) {
+    const float avail = ImGui::GetContentRegionAvail().x;
+    const ImVec2 size = ImGui::CalcTextSize(text);
+    ImGui::AlignTextToFramePadding();
+    if (size.x <= avail) {
+        ImGui::TextUnformatted(text);
+        return;
     }
-    return out;
+    ImVec2 pos = ImGui::GetCursorScreenPos();
+    pos.y += ImGui::GetStyle().FramePadding.y;
+    ImGui::RenderTextEllipsis(ImGui::GetWindowDrawList(), pos, ImVec2(pos.x + avail, pos.y + size.y), pos.x + avail, pos.x + avail,
+                              text, nullptr, &size);
+    ImGui::Dummy(ImVec2(avail, ImGui::GetFrameHeight()));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", text);
 }
 
 } // namespace
@@ -2537,8 +2532,7 @@ void drawNavigationSection(App& app) {
         for (int i = 0; i < kNavMoves; ++i) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(tr(kNavMoveLabels[i]));
+            cellLabel(tr(kNavMoveLabels[i]));
             ui::HelpAction(app, kNavHoldActions[i]);
             ImGui::TableNextColumn();
             if (const Action* a = reg.find(kNavHoldActions[i])) drawShortcutCell(app, *a, s, path);
@@ -2561,14 +2555,13 @@ void drawNavigationSection(App& app) {
         }
         ImGui::EndTable();
     }
-    for (int i = 0; i < kNavMoves; ++i)
-        for (const std::string& w : navWarnings(app, i)) {
-            ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::danger));
-            ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextUnformatted((std::string(ICON_LC_TRIANGLE_ALERT) + "  " + w).c_str());
-            ImGui::PopTextWrapPos();
-            ImGui::PopStyleColor();
-        }
+    for (const std::string& w : app.navWarningLines()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::danger));
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted((std::string(ICON_LC_TRIANGLE_ALERT) + "  " + w).c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::PopStyleColor();
+    }
     ImGui::Spacing();
     ImGui::TextDisabled("%s", tr("View keys"));
     static const char* const kViewKeys[] = {"view.frame", "view.frame_selected", "view.frame_last_stroke", "view.reset",
@@ -2583,8 +2576,7 @@ void drawNavigationSection(App& app) {
             if (!a) continue;
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(trAction(a->id, a->label));
+            cellLabel(trAction(a->id, a->label));
             ui::HelpAction(app, a->id.c_str());
             ImGui::TableNextColumn();
             drawShortcutCell(app, *a, s, path);

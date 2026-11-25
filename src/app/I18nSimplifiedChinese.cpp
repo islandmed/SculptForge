@@ -764,6 +764,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"press a key", "按下任意按键"},
     {"Default shortcuts", "默认快捷键"},
     // --- Preferences > Navigation (NavBindings.h, Config.cpp drawNavigationSection) ---
+    {"%s and %s both use %s: %s wins. Change one of them.", "%s 和 %s 都使用 %s：%s 生效。请更改其中一个。"},
     {"Hold to orbit", "按住以环绕"},
     {"Hold to pan", "按住以平移"},
     {"Hold to zoom", "按住以缩放"},
@@ -782,9 +783,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"The hold keys unbound, no drag gestures, the view keys above back to the key style's defaults, and the pen's side buttons as the Tablet defaults. Other shortcuts stay as they are.", "解除按住键的绑定、清除拖动手势、上方的视图按键回到按键风格的默认值，数位笔侧键回到数位板默认值。其他快捷键保持不变。"},
     {"a plain left drag sculpts: add Ctrl, Shift or Alt", "单纯的左键拖动会雕刻：请加上 Ctrl、Shift 或 Alt"},
     {"is also", "同时也是"},
-    {"is also the drag for", "同时也是此动作的拖动："},
     {"takes over", "取代"},
-    {"which comes first and wins", "（排在前面，先生效）"},
     {"Orbit", "环绕"},
     {"Pan", "平移"},
     {"Middle", "中键"},

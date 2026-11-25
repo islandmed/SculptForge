@@ -928,6 +928,7 @@ constexpr Entry kSpanish[] = {
     {"Default shortcuts", "Atajos predeterminados"},
 
     // --- Preferences > Navigation (NavBindings.h, Config.cpp drawNavigationSection) ---
+    {"%s and %s both use %s: %s wins. Change one of them.", "%s y %s usan %s: gana %s. Cambia uno de los dos."},
     {"Hold to orbit", "Mantener para orbitar"},
     {"Hold to pan", "Mantener para desplazar"},
     {"Hold to zoom", "Mantener para hacer zoom"},
@@ -946,9 +947,7 @@ constexpr Entry kSpanish[] = {
     {"The hold keys unbound, no drag gestures, the view keys above back to the key style's defaults, and the pen's side buttons as the Tablet defaults. Other shortcuts stay as they are.", "Las teclas mantenidas sin asignar, sin gestos de arrastre, las teclas de vista de arriba a los valores del estilo de teclas y los botones laterales del lápiz como en Tableta por defecto. Los demás atajos quedan como están."},
     {"a plain left drag sculpts: add Ctrl, Shift or Alt", "un arrastre izquierdo sin más esculpe: añade Ctrl, Mayús o Alt"},
     {"is also", "también es"},
-    {"is also the drag for", "también es el arrastre de"},
     {"takes over", "sustituye a"},
-    {"which comes first and wins", "que va primero y gana"},
     {"Orbit", "Orbitar"},
     {"Pan", "Desplazar"},
     {"Middle", "Central"},
