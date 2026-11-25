@@ -36,6 +36,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <unordered_map>
 #include <array>
 #include <cctype>
 #include <cfloat>
@@ -130,6 +131,7 @@ Json toJson(const UiPrefs& p) {
     j.set("librarySort", p.librarySort);
     if (!p.brushSet.empty()) j.set("brushSet", p.brushSet);
     j.set("spaceCamera", p.spaceCamera);
+    if (p.nav.any()) j.set("navDrag", toJson(p.nav)); // Preferences > Navigation's custom drag gestures (NavBindings.h)
     j.set("emulate3Button", p.emulate3Button);
     j.set("mayaZoomHorizontal", p.mayaZoomHorizontal);
     j.set("wheelZoomToPointer", p.wheelZoomToPointer);
@@ -265,6 +267,7 @@ void fromJson(const Json& j, UiPrefs& p) {
         if (j[key].isString()) *v = listSortId(listSortFromId(j[key].asString()));
     if (j["brushSet"].isString() && j["brushSet"].asString().size() <= 64) p.brushSet = j["brushSet"].asString();
     p.spaceCamera = j["spaceCamera"].asBool(p.spaceCamera);
+    fromJson(j["navDrag"], p.nav);
     p.emulate3Button = j["emulate3Button"].asBool(p.emulate3Button);
     p.mayaZoomHorizontal = j["mayaZoomHorizontal"].asBool(p.mayaZoomHorizontal);
     p.wheelZoomToPointer = j["wheelZoomToPointer"].asBool(p.inputStyle == 3); // (inputStyle is read above)
@@ -2315,6 +2318,7 @@ void drawInterfaceSection(App& app) {
 }
 
 void drawHotkeysSection(App& app) {
+    const char* hotkeysPath = "Preferences > Hotkeys"; // (the help footer; its steps are translated)
     char (&filter)[64] = g_hotkeysFilter;
     ImGui::SetNextItemWidth(-FLT_MIN);
     ImGui::InputTextWithHint("##hotkeys_filter", tr(ICON_LC_SEARCH "  Filter"), filter, sizeof filter);
@@ -2344,56 +2348,7 @@ void drawHotkeysSection(App& app) {
             ImGui::TextUnformatted(trAction(a->id, a->label));
             ui::HelpAction(app, a->id.c_str());
             ImGui::TableNextColumn();
-            const std::string chord = reg.shortcutText(a->id);
-            const bool capturing = app.capturingShortcut() == a->id;
-            const bool sequencing = capturing && app.capturingSequence();
-            const std::string text = sequencing ? (app.captureFirstKey().empty() ? std::string(tr("press 2 keys..."))
-                                                                                 : app.captureFirstKey() + " " + tr("then..."))
-                                     : capturing ? tr("press a key...") : chord.empty() ? "-" : chord;
-            if (reg.hasOverride(a->id)) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::accent));
-            const bool modified = reg.hasOverride(a->id); // the arrow beside it puts the default back
-            const float tile = ImGui::GetFrameHeight() + 2.0f * s; // each small button beside the key (reset, two keys)
-            if (ImGui::Button((text + "##hk." + a->id).c_str(), ImVec2(-(tile * (modified ? 2.0f : 1.0f)), 0)))
-                app.beginShortcutCapture(a->id);
-            if (reg.hasOverride(a->id)) ImGui::PopStyleColor();
-            ui::HelpText((std::string(tr("Shortcut for")) + " " + trAction(a->id, a->label)).c_str(), chord.c_str(),
-                         chord.find(kThen) != std::string::npos
-                             ? "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
-                               "the arrow beside it puts the default back. A two-key shortcut (C then V) also works with "
-                               "both keys pressed together."
-                             : "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
-                               "the arrow beside it puts the default back.",
-                         "Preferences > Hotkeys");
-            ImGui::SameLine(0.0f, 2.0f * s);
-            const bool sequenceClicked = ImGui::SmallButton(("##hkseq." + a->id).c_str());
-            {   // the chevrons drawn over the button, which keeps a plain id (scripts click it by "##hkseq.<action>")
-                const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
-                const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_CHEVRONS_RIGHT);
-                ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
-                                                    ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_CHEVRONS_RIGHT);
-            }
-            if (sequenceClicked) app.beginShortcutCapture(a->id, true);
-            ui::HelpText("Two keys in a row", nullptr,
-                         "Adds a second shortcut that takes two different keys one after the other, like A then S (within the Two-key "
-                         "window in Preferences > Input), or both pressed together. Each key still works alone if it is "
-                         "bound; it runs when the window is up and the other key did not come.",
-                         "Preferences > Hotkeys");
-            if (reg.hasOverride(a->id)) {
-                ImGui::SameLine(0.0f, 2.0f * s);
-                const bool resetClicked = ImGui::SmallButton(("##hkreset." + a->id).c_str());
-                {   // the arrow drawn over the button, which keeps a plain id (scripts click it by "##hkreset.<action>")
-                    const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
-                    const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_ROTATE_CCW);
-                    ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
-                                                        ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_ROTATE_CCW);
-                }
-                if (resetClicked) {
-                    const std::string lost = reg.resetShortcut(a->id);
-                    app.status_ = std::string(trAction(a->id, a->label)) + ": default " + reg.shortcutText(a->id) +
-                                  (lost.empty() ? "" : " (was " + lost + ")");
-                }
-                ui::HelpText("Reset to default", nullptr, "Puts this action's default shortcut back.", "Preferences > Hotkeys");
-            }
+            drawShortcutCell(app, *a, s, hotkeysPath);
         }
         ImGui::EndTable();
     }
@@ -2402,6 +2357,245 @@ void drawHotkeysSection(App& app) {
         app.status_ = "Default shortcuts restored";
     }
     ui::HelpText("Default shortcuts", nullptr, "Undo every shortcut change.", "Preferences > Hotkeys");
+    app.drawShortcutConflict(); // inside the Preferences popup stack: Esc closes only the box
+}
+
+namespace {
+
+// The labels of the other actions that share one of this action's keys, ", " separated ("" for none). Every action's
+// answer is worked out once per registry revision (the Hotkeys list asks for hundreds of rows a frame: asking the
+// registry per row would be quadratic).
+std::string sharedKeyHolders(const ActionRegistry& reg, const Action& a) {
+    static unsigned revision = ~0u;
+    static Language language = Language::English; // (the names are translated: a language switch rebuilds)
+    static std::unordered_map<std::string, std::string> byId;
+    if (revision != reg.revision() || language != sf::language()) {
+        revision = reg.revision();
+        language = sf::language();
+        byId.clear();
+        std::unordered_map<std::string, std::vector<const Action*>> byKey; // one alternative -> the actions that have it
+        for (const Action& x : reg.all()) {
+            if (!x.run) continue;
+            for (const std::string& alt : shortcutAlternatives(reg.shortcutText(x.id))) byKey[alt].push_back(&x);
+        }
+        // In the registry's order, each action's alternatives in their order: the same text every frame and run.
+        for (const Action& mine : reg.all()) {
+            if (!mine.run) continue;
+            std::string out;
+            std::vector<const Action*> named;
+            for (const std::string& alt : shortcutAlternatives(reg.shortcutText(mine.id)))
+                for (const Action* other : byKey[alt]) {
+                    if (other == &mine || std::find(named.begin(), named.end(), other) != named.end()) continue;
+                    named.push_back(other);
+                    out += (out.empty() ? "" : ", ") + std::string(trAction(other->id, other->label));
+                }
+            if (!out.empty()) byId[mine.id] = std::move(out);
+        }
+    }
+    const auto it = byId.find(a.id);
+    return it == byId.end() ? std::string() : it->second;
+}
+
+} // namespace
+
+// The key button (click, then press the new key), the two-keys button and, once changed, the reset arrow: one action's
+// shortcut as the Hotkeys list shows it, in the table column it is called from. A key another action has as well
+// (an imported keymap, a style's default meeting an override) shows in the warning colour, and the help names it.
+void drawShortcutCell(App& app, const Action& a, float s, const char* path) {
+    ActionRegistry& reg = app.actions();
+    const std::string chord = reg.shortcutText(a.id);
+    const bool capturing = app.capturingShortcut() == a.id;
+    const bool sequencing = capturing && app.capturingSequence();
+    const std::string text = sequencing ? (app.captureFirstKey().empty() ? std::string(tr("press 2 keys..."))
+                                                                         : app.captureFirstKey() + " " + tr("then..."))
+                             : capturing ? tr("press a key...") : chord.empty() ? "-" : chord;
+    const std::string shared = sharedKeyHolders(reg, a); // the other actions that have one of these keys too
+    const bool modified = reg.hasOverride(a.id); // the arrow beside it puts the default back
+    if (!shared.empty()) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::danger));
+    else if (modified) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::accent));
+    const float tile = ImGui::GetFrameHeight() + 2.0f * s; // each small button beside the key (reset, two keys)
+    if (ImGui::Button((text + "##hk." + a.id).c_str(), ImVec2(-(tile * (modified ? 2.0f : 1.0f)), 0)))
+        app.beginShortcutCapture(a.id);
+    if (!shared.empty() || modified) ImGui::PopStyleColor();
+    const std::string title = std::string(tr("Shortcut for")) + " " + trAction(a.id, a.label);
+    std::string help = chord.find(kThen) != std::string::npos
+                           ? "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
+                             "the arrow beside it puts the default back. A two-key shortcut (C then V) also works with "
+                             "both keys pressed together."
+                           : "Click, then press the new key. Esc cancels, Backspace clears. Orange: changed from the default; "
+                             "the arrow beside it puts the default back.";
+    if (!shared.empty()) help = std::string(tr("Also bound to:")) + " " + shared + ". " + help;
+    ui::HelpText(title.c_str(), chord.c_str(), help.c_str(), path);
+    ImGui::SameLine(0.0f, 2.0f * s);
+    const bool sequenceClicked = ImGui::SmallButton(("##hkseq." + a.id).c_str());
+    {   // the chevrons drawn over the button, which keeps a plain id (scripts click it by "##hkseq.<action>")
+        const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+        const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_CHEVRONS_RIGHT);
+        ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
+                                            ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_CHEVRONS_RIGHT);
+    }
+    if (sequenceClicked) app.beginShortcutCapture(a.id, true);
+    ui::HelpText("Two keys in a row", nullptr,
+                 "Adds a second shortcut that takes two different keys one after the other, like A then S (within the Two-key "
+                 "window in Preferences > Input), or both pressed together. Each key still works alone if it is "
+                 "bound; it runs when the window is up and the other key did not come.",
+                 path);
+    if (modified) {
+        ImGui::SameLine(0.0f, 2.0f * s);
+        const bool resetClicked = ImGui::SmallButton(("##hkreset." + a.id).c_str());
+        {   // the arrow drawn over the button, which keeps a plain id (scripts click it by "##hkreset.<action>")
+            const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+            const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_ROTATE_CCW);
+            ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
+                                                ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_ROTATE_CCW);
+        }
+        if (resetClicked) {
+            const std::string lost = reg.resetShortcut(a.id);
+            app.status_ = std::string(trAction(a.id, a.label)) + ": default " + reg.shortcutText(a.id) +
+                          (lost.empty() ? "" : " (was " + lost + ")");
+        }
+        ui::HelpText("Reset to default", nullptr, "Puts this action's default shortcut back.", path);
+    }
+}
+
+namespace {
+
+// The drag gesture of one camera move (Preferences > Navigation): a mouse button, then Ctrl / Shift / Alt toggles. Items
+// keep plain ids (scripts: "##navdrag.pan", "Ctrl##navmod.pan").
+void drawNavDragPicker(App& app, int move, float s, const char* path) {
+    NavDrag& d = app.uiPrefs().nav.drag[move];
+    const std::string id = kNavMoveIds[move];
+    // the combo takes what the three toggles leave (each a frame high plus padding), so the row fits a narrow panel
+    const float toggle = ImGui::CalcTextSize(tr("Shift")).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    ImGui::SetNextItemWidth(std::max(56.0f * s, ImGui::GetContentRegionAvail().x - 3.0f * (toggle + 2.0f * s)));
+    if (ImGui::BeginCombo(("##navdrag." + id).c_str(), d.set() ? tr(navButtonName(d.button)) : tr("None"))) {
+        for (int b = 0; b <= 3; ++b) {
+            const char* name = b ? navButtonName(b) : "None";
+            if (ImGui::Selectable((std::string(tr(name)) + "##navdrag." + id).c_str(), d.button == b)) d.button = b;
+        }
+        ImGui::EndCombo();
+    }
+    ui::HelpText("Drag gesture", nullptr,
+                 "The mouse button that drags this camera move, with the keys beside it held: Left needs Ctrl, Shift or Alt "
+                 "(a plain left drag sculpts). None: the key style's own gestures. A gesture set here comes first, before "
+                 "what the key style does with that button; the warning under the list says what it takes over.",
+                 path);
+    struct Mod { const char* name; bool* on; } mods[] = {{"Ctrl", &d.ctrl}, {"Shift", &d.shift}, {"Alt", &d.alt}};
+    for (const Mod& m : mods) {
+        ImGui::SameLine(0.0f, 2.0f * s);
+        const bool on = *m.on; // (read once: the click below flips it, and the push and pop must pair)
+        if (on) ImGui::PushStyleColor(ImGuiCol_Button, col(ui::color::accent));
+        if (ImGui::Button((std::string(tr(m.name)) + "##navmod." + id).c_str())) *m.on = !on;
+        if (on) ImGui::PopStyleColor();
+        ui::HelpText(m.name, nullptr, "Hold this key with the button for the gesture. Orange: part of the gesture.", path);
+    }
+}
+
+// A row label in a narrow column: whole when it fits, otherwise ellipsized with the full name as a tooltip (the
+// Preferences popup is narrow; "Frame last stroke" was cut at 1440 px, cto 11-24).
+void cellLabel(const char* text) {
+    const float avail = ImGui::GetContentRegionAvail().x;
+    const ImVec2 size = ImGui::CalcTextSize(text);
+    ImGui::AlignTextToFramePadding();
+    if (size.x <= avail) {
+        ImGui::TextUnformatted(text);
+        return;
+    }
+    ImVec2 pos = ImGui::GetCursorScreenPos();
+    pos.y += ImGui::GetStyle().FramePadding.y;
+    ImGui::RenderTextEllipsis(ImGui::GetWindowDrawList(), pos, ImVec2(pos.x + avail, pos.y + size.y), pos.x + avail, pos.x + avail,
+                              text, nullptr, &size);
+    ImGui::Dummy(ImVec2(avail, ImGui::GetFrameHeight()));
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", text);
+}
+
+} // namespace
+
+// Preferences > Navigation (members on Discord): the camera's bindings in one place. Per move a hold key (any
+// key; held, every press on the canvas is that drag) and a drag gesture (button + modifiers), the view keys, the pen's
+// side buttons (as Preferences > Tablet), and Navigation defaults. Nothing is set by default: every key style keeps
+// its gestures, so this is a choice, never a change.
+void drawNavigationSection(App& app) {
+    const float s = ImGui::GetFontSize() / 15.0f;
+    const char* path = "Preferences > Navigation";
+    ActionRegistry& reg = app.actions();
+    ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextUnformatted(tr("Hold a key and drag with any button or the pen, or drag with a mouse button and Ctrl, Shift or Alt. "
+                              "Nothing is set until you choose it: the key style's own gestures stay."));
+    ImGui::PopTextWrapPos();
+    ImGui::PopStyleColor();
+    // Two short tables, one under the other (the Preferences popup is narrow): the hold keys as Hotkeys shows a key,
+    // then the drag gestures.
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", tr("Hold key"));
+    if (ImGui::BeginTable("##nav_moves", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX)) {
+        ImGui::TableSetupColumn("move", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("key", ImGuiTableColumnFlags_WidthFixed, 165.0f * s);
+        for (int i = 0; i < kNavMoves; ++i) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            cellLabel(tr(kNavMoveLabels[i]));
+            ui::HelpAction(app, kNavHoldActions[i]);
+            ImGui::TableNextColumn();
+            if (const Action* a = reg.find(kNavHoldActions[i])) drawShortcutCell(app, *a, s, path);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", tr("Drag gesture"));
+    if (ImGui::BeginTable("##nav_drags", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX)) {
+        ImGui::TableSetupColumn("move", ImGuiTableColumnFlags_WidthFixed, 52.0f * s);
+        ImGui::TableSetupColumn("drag", ImGuiTableColumnFlags_WidthStretch);
+        for (int i = 0; i < kNavMoves; ++i) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(tr(kNavMoveLabels[i]));
+            ui::HelpAction(app, kNavHoldActions[i]);
+            ImGui::TableNextColumn();
+            drawNavDragPicker(app, i, s, path);
+        }
+        ImGui::EndTable();
+    }
+    for (const std::string& w : app.navWarningLines()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::danger));
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted((std::string(ICON_LC_TRIANGLE_ALERT) + "  " + w).c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::PopStyleColor();
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", tr("View keys"));
+    static const char* const kViewKeys[] = {"view.frame", "view.frame_selected", "view.frame_last_stroke", "view.reset",
+                                            "view.orbit_left", "view.orbit_right", "view.orbit_up", "view.orbit_down",
+                                            "view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down",
+                                            "view.zoom_in", "view.zoom_out"};
+    if (ImGui::BeginTable("##nav_keys", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_PadOuterX)) {
+        ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("key", ImGuiTableColumnFlags_WidthFixed, 165.0f * s);
+        for (const char* id : kViewKeys) {
+            const Action* a = reg.find(id);
+            if (!a) continue;
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            cellLabel(trAction(a->id, a->label));
+            ui::HelpAction(app, a->id.c_str());
+            ImGui::TableNextColumn();
+            drawShortcutCell(app, *a, s, path);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", tr("Pen buttons"));
+    const float width = ImGui::GetContentRegionAvail().x;
+    for (int b = 0; b < kPenButtons; ++b) app.drawPenButtonRow(b, path, width);
+    ImGui::Spacing();
+    if (ImGui::Button(tr("Navigation defaults##nav.defaults"), ImVec2(-FLT_MIN, 0))) app.resetNavigationBindings();
+    ui::HelpText("Navigation defaults", nullptr,
+                 "The hold keys unbound, no drag gestures, the view keys above back to the key style's defaults, and the "
+                 "pen's side buttons as the Tablet defaults. Other shortcuts stay as they are.",
+                 path);
     app.drawShortcutConflict(); // inside the Preferences popup stack: Esc closes only the box
 }
 

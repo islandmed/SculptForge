@@ -60,6 +60,7 @@
       "Hints##preferences.hints",
       "Experimental##preferences.experimental",
       "Hotkeys##preferences.hotkeys",
+      "Navigation##preferences.navigation",
       "Display##preferences.display",
       "Library##preferences.library",
       "Tablet##preferences.tablet",

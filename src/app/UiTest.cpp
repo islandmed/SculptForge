@@ -78,6 +78,7 @@
 //                            N (A first) gets the Nth shape (cycling): sphere cube torus capsule cone, or fail, textoff, nomodel (the free Spaces' real refusal / empty answers); off = the services
 //   key_nav_speed X          the pan and zoom key speed (Preferences > Input), 0.1 to 5
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
+//   set_nav_drag MOVE GESTURE  Preferences > Navigation's drag gesture for orbit, pan or zoom, e.g. set_nav_drag zoom Shift+Middle (none clears)
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
 //                            $LIBRARY in DST (and in env values) is the test's Library library folder; a
@@ -1074,6 +1075,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "emulate_3_button") return app_.uiPrefs_.emulate3Button ? 1.0 : 0.0; // Blender style (#77)
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
+    if (name == "nav_hold") return double(app_.navHoldMove_ + 1);        // a Hold to orbit / pan / zoom key down: 1 / 2 / 3, 0 none
+    if (name == "nav_conflicts") return double(app_.navConflictCount()); // Preferences > Navigation's warnings
+    for (int i = 0; i < kNavMoves; ++i)                                  // nav_drag_orbit / pan / zoom: the gesture's button (0 none)
+        if (name == std::string("nav_drag_") + kNavMoveIds[i]) return double(app_.uiPrefs_.nav.drag[i].button);
     if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
     if (name == "stroke_popup_open") return app_.strokePopup_.open ? 1.0 : 0.0;
     if (name == "stroke_popup_held") return app_.strokePopup_.open && app_.strokePopup_.held ? 1.0 : 0.0;
@@ -2283,7 +2288,7 @@ enum class StepVerb { None,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
     Orbit, Camera, Zoom, HideUi, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
-    PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
+    PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, SetNavDrag, Restart,
     GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
     Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, DumpUi, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
@@ -2357,6 +2362,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"mouse_orbit_speed", StepVerb::MouseOrbitSpeed},
         {"two_key_window", StepVerb::TwoKeyWindow},
         {"input_style", StepVerb::InputStyle},
+        {"set_nav_drag", StepVerb::SetNavDrag},
         {"restart", StepVerb::Restart},
         {"generator_stub", StepVerb::GeneratorStub},
         {"env", StepVerb::Env},
@@ -3944,6 +3950,21 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         }
         run([this, style] { app_.setInputStyle(style); });
+        break;
+    }
+    case StepVerb::SetNavDrag: {
+        // set_nav_drag orbit|pan|zoom GESTURE: Preferences > Navigation's drag gesture, e.g. set_nav_drag zoom Shift+Middle (none clears)
+        if (!need(2)) return false;
+        const std::string n = w[1], text = restOf(lineText_, 2);
+        int move = -1;
+        for (int i = 0; i < kNavMoves; ++i)
+            if (n == kNavMoveIds[i]) move = i;
+        NavDrag d;
+        if (move < 0 || !parseNavDrag(text, d)) {
+            fail(line, "set_nav_drag takes orbit, pan or zoom and a gesture like Ctrl+Middle, Shift+Left, Right or none");
+            return false;
+        }
+        run([this, move, d] { app_.uiPrefs_.nav.drag[move] = d; });
         break;
     }
     case StepVerb::Restart: {
@@ -5614,7 +5635,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "drag_item", "drag_to", "drag_item_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
                 "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover", "pen_move",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
-                "touch_stroke", "touch_pinch", "touch_tap", "touch_tap_at", "touch_drag_at", "touch_tap_welcome_x", "android_back", "safe_area", "palm_guard", "classic_keys", "input_style"};
+                "touch_stroke", "touch_pinch", "touch_tap", "touch_tap_at", "touch_drag_at", "touch_tap_welcome_x", "android_back", "safe_area", "palm_guard", "classic_keys", "input_style", "set_nav_drag"};
             if (!allowed.count(verb)) {
                 error = scriptName_ + ":" + std::to_string(n) + ": '" + verb +
                         "' can't be used in a benchmark take (only input, the camera and waits play in real time)";

@@ -2026,6 +2026,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = selectSpace_ = false; // Space let go in another window never reaches us
         quickRemeshDragKey_ = SDLK_UNKNOWN; // (the same for the Quick Remesh drag key)
+        navHoldKey_ = SDLK_UNKNOWN, navHoldMove_ = -1; // (and a Hold to orbit / pan / zoom key)
         break;
 #ifdef __ANDROID__
     case SDL_EVENT_WINDOW_RESIZED: // rotation, split screen, a free-form window: the geometry the touches map onto changed
@@ -2128,6 +2129,9 @@ void App::dispatchEvent(const SDL_Event& event) {
             selectSpace_ = true; // (before the camera and the QuickMenu: Space mid-drag is only for this)
             break;
         }
+        // A key bound to Hold to orbit / pan / zoom (Preferences > Navigation): held, the next press on the canvas moves the
+        // camera. Before the Space branch below, so Space bound to one of them works with Hold Space on as well.
+        if (!io.WantCaptureKeyboard && !e.key.repeat) navHoldKey(e.key.key, e.key.mod, true);
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
             spaceCameraKeyDown(uiPrefs_.spaceCamera, io.WantTextInput || io.WantCaptureKeyboard)) {
             spaceHeld_ = true;
@@ -2144,6 +2148,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
         if (e.key.key == SDLK_SPACE) spaceHeld_ = selectSpace_ = false;
         quickRemeshKey(e.key.key, e.key.mod, false);
+        navHoldKey(e.key.key, e.key.mod, false);
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
         radialKeyUp(e.key.key);                        // a radial menu's held key: run the slot pointed at
         strokePopupKeyUp(e.key.key);                   // the stroke popup's held key: pick the item pointed at
@@ -2315,6 +2320,13 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     if (button == SDL_BUTTON_RIGHT && forgesphereActive() && !doc_.mesh.forgespherePreview &&
         !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)))
         forgesphereRightDown(x, y);
+    // Preferences > Navigation: a Hold to orbit / pan / zoom key held, or a custom drag gesture (button + modifiers), in
+    // every key style and with any button or the pen's tip (NavBindings.h). The drag goes on to the release, as Space's.
+    if (const int move = navMoveForPress(button); move >= 0) {
+        drag_ = move == 0 ? Drag::Orbit : move == 1 ? Drag::Pan : Drag::Zoom;
+        rightClick_.pending = false;
+        return;
+    }
     if (spaceHeld_) { // Preferences > Input > Hold Space and drag to move the camera (#43)
         switch (spaceCameraMove(button, ctrlDown(SDL_GetModState()))) {
         case SpaceCameraMove::Orbit: drag_ = Drag::Orbit; break;

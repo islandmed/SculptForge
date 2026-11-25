@@ -394,6 +394,28 @@ void App::registerViewActions() {
         "Maya keys: Alt+F).", [this] { frameActivePart(); });
     add("view.frame_last_stroke", "Frame last stroke", "", "Move in on where you last sculpted (no key by default: bind one "
         "in Preferences > Hotkeys). The view keeps its angle; Frame fits the whole model.", [this] { frameLastStroke(); });
+    // Hold to orbit / pan / zoom (Preferences > Navigation; members on Discord): no key by default. Bound to one,
+    // the key held turns any press on the canvas (any button, the pen's tip) into that camera drag, in every key style:
+    // left-handed and tablet users navigate from the hand on the keyboard. navHoldKey tracks the key, navMoveForPress
+    // starts the drag (App.cpp onMouseDown), which goes on to the button's release as Hold Space does.
+    auto holdHint = [this](const char* id, const char* label, const char* verb) { // the key pressed alone: a hint in the status bar
+        const std::string key = actions_.shortcutText(id);
+        status_ = key.empty() ? std::string(label) + ": give it a key in Preferences > Navigation, then hold it and drag"
+                              : std::string("Hold ") + key + " and drag anywhere to " + verb;
+    };
+    add("view.hold_orbit", "Hold to orbit", "",
+        "No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, "
+        "to turn the view: it never sculpts while the key is down. Preferences > Navigation sets it beside the other camera keys.",
+        [holdHint] { holdHint("view.hold_orbit", "Hold to orbit", "turn the view"); });
+    add("view.hold_pan", "Hold to pan", "",
+        "No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, "
+        "to pan the view: it never sculpts while the key is down. Preferences > Navigation sets it beside the other camera keys.",
+        [holdHint] { holdHint("view.hold_pan", "Hold to pan", "pan the view"); });
+    add("view.hold_zoom", "Hold to zoom", "",
+        "No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, "
+        "to zoom: drag up to come closer, down to back away (the Classic sculpting keys the other way round). Preferences > "
+        "Navigation sets it beside the other camera keys.",
+        [holdHint] { holdHint("view.hold_zoom", "Hold to zoom", "zoom"); });
     add("view.centre_pointer", "Centre view on the pointer", "",
         "Slide the view so the point under the pointer is in the middle, keeping the zoom and the angle; the view then "
         "turns about that point. Alt+middle click on the canvas does it in every key style (a drag still pans); this "
@@ -805,6 +827,88 @@ bool App::importBlenderKeymap(const std::string& path) {
               " Blender keys have no SculptForge equivalent). Saved automatically.";
     lastCommandOk_ = true;
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// Preferences > Navigation: hold keys and drag gestures (NavBindings.h)
+// ---------------------------------------------------------------------------
+
+// A key down that is bound to Hold to orbit / pan / zoom is remembered until it goes up (one at a time: the last pressed
+// wins). Not while a shortcut is being captured (the press is the new key) and never from a text field (the caller gates
+// on WantCaptureKeyboard, as quickRemeshKey's does).
+void App::navHoldKey(SDL_Keycode key, SDL_Keymod mods, bool down) {
+    if (!down) {
+        if (key == navHoldKey_) navHoldKey_ = SDLK_UNKNOWN, navHoldMove_ = -1;
+        return;
+    }
+    if (!capturingShortcut_.empty() || shortcutConflictOpen() || isModifierKey(key)) return;
+    const Action* a = actions_.actionForChord(chordFromEvent(key, mods));
+    if (!a) return;
+    for (int i = 0; i < kNavMoves; ++i)
+        if (a->id == kNavHoldActions[i]) {
+            navHoldKey_ = key;
+            navHoldMove_ = i;
+            return;
+        }
+}
+
+// The camera move a press on the canvas starts under Preferences > Navigation, or -1 for the key style's own gestures:
+// a held hold key first, then a custom drag gesture matching the button and the keyboard's Ctrl / Shift / Alt exactly
+// (the keyboard's, not the style's remapping or a pen button's Alt: the panel shows keyboard names).
+int App::navMoveForPress(Uint8 button) const {
+    if (navHoldMove_ >= 0) return navHoldMove_;
+    if (!uiPrefs_.nav.any()) return -1;
+    const SDL_Keymod keys = SDL_GetModState();
+    return navDragMatch(uiPrefs_.nav, int(button), ctrlDown(keys), (keys & SDL_KMOD_SHIFT) != 0, (keys & SDL_KMOD_ALT) != 0);
+}
+
+// The panel's warnings, one line per problem, each saying who wins and what to change: a hold key another action has
+// too; a left-button gesture with no modifier (never active); one gesture on two moves (the first in the list wins);
+// a gesture the key style already uses for something else (the custom one wins; a gesture that already does this very
+// move, like Shift+Middle for Pan, is no clash and gets no line).
+std::vector<std::string> App::navWarningLines() const {
+    std::vector<std::string> out;
+    char line[512];
+    for (int i = 0; i < kNavMoves; ++i)
+        for (const std::string& alt : shortcutAlternatives(actions_.shortcutText(kNavHoldActions[i])))
+            for (const Action* h : actions_.holdersOfShortcut(alt, kNavHoldActions[i]))
+                out.push_back(std::string(tr(kNavMoveLabels[i])) + ": " + alt + " " + tr("is also") + " " + trAction(h->id, h->label));
+    for (int i = 0; i < kNavMoves; ++i)
+        if (const NavDrag& d = uiPrefs_.nav.drag[i]; d.set() && !d.usable())
+            out.push_back(std::string(tr(kNavMoveLabels[i])) + ": " + tr("a plain left drag sculpts: add Ctrl, Shift or Alt"));
+    for (int i = 0; i < kNavMoves; ++i) {
+        const NavDrag& d = uiPrefs_.nav.drag[i];
+        if (!d.usable()) continue;
+        bool first = true; // the first move with this gesture: it wins, and its line speaks for the clash
+        for (int j = 0; j < i; ++j)
+            if (uiPrefs_.nav.drag[j] == d) first = false;
+        if (!first) continue;
+        for (int j = i + 1; j < kNavMoves; ++j)
+            if (uiPrefs_.nav.drag[j] == d) {
+                std::snprintf(line, sizeof line, tr("%s and %s both use %s: %s wins. Change one of them."), tr(kNavMoveLabels[i]),
+                              tr(kNavMoveLabels[j]), navDragText(d).c_str(), tr(kNavMoveLabels[i]));
+                out.emplace_back(line);
+            }
+        const char* was = navStyleGesture(uiPrefs_.inputStyle, d);
+        if (was[0] && navStyleGestureMove(was) != i)
+            out.push_back(std::string(tr(kNavMoveLabels[i])) + ": " + navDragText(d) + " " + tr("takes over") + " " + tr(was));
+    }
+    return out;
+}
+
+// Navigation defaults: the hold keys unbound, no custom gestures, the view keys the panel lists back to the key style's
+// defaults, and the pen's side buttons as Preferences > Tablet's defaults.
+void App::resetNavigationBindings() {
+    for (const char* id : kNavHoldActions) actions_.resetShortcut(id);
+    for (const char* id : {"view.frame", "view.frame_selected", "view.reset", "view.frame_last_stroke", "view.orbit_left", "view.orbit_right",
+                           "view.orbit_up", "view.orbit_down", "view.pan_left", "view.pan_right", "view.pan_up", "view.pan_down",
+                           "view.zoom_in", "view.zoom_out"})
+        if (actions_.find(id)) actions_.resetShortcut(id);
+    uiPrefs_.nav = NavBindings();
+    uiPrefs_.tablet.buttons = TabletSettings().buttons;
+    navHoldKey_ = SDLK_UNKNOWN;
+    navHoldMove_ = -1;
+    status_ = "Navigation bindings back to their defaults";
 }
 
 void App::drawInputStyleRow(float width) {

@@ -774,6 +774,10 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         config::drawHotkeysSection(*this);
     }
+    if (subpalette("preferences.navigation", "Navigation")) {
+        tray::Section section;
+        config::drawNavigationSection(*this);
+    }
     if (subpalette("preferences.display", "Display")) {
         tray::Section section;
         drawBackgroundControls("prefs");
