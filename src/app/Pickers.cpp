@@ -6,6 +6,7 @@
 #include "app/Theme.h"
 #include "app/NativeDialog.h"
 #include "app/Pickers.h"
+#include "app/TypedNumber.h"
 
 #include "app/App.h"
 #include "app/I18n.h"
@@ -1302,12 +1303,6 @@ constexpr float kFollowPerPx = 0.5f;
 constexpr float kFollowSlopPx = 2.0f; // less than this is a click on the knob, not a move
 // A hovering pen drifts a few pixels as the tip comes down onto the knob: that is still a press on the knob (gh#184).
 constexpr float kFollowSlopPenPx = 8.0f;
-// A typed Intensity (U / I pop-ups) as a 0-1 value: a percentage (1 -> 1%, 30 -> 30%), except a number below 1 written with a
-// decimal point, which is a fraction (0.5 -> 50%, 0.05 -> 5%): typing 1 used to mean 1.0, full strength.
-float typedIntensity(const std::string& typed) {
-    const float v = std::strtof(typed.c_str(), nullptr);
-    return v < 1.0f && typed.find('.') != std::string::npos ? v : v / 100.0f;
-}
 } // namespace
 
 bool PickerUi::sliderFollowing(const App& app) {
@@ -1495,23 +1490,29 @@ void drawPickers(App& app) {
                     if (ImGui::IsKeyPressed(ImGuiKey(ImGuiKey_0 + k), false) ||
                         ImGui::IsKeyPressed(ImGuiKey(ImGuiKey_Keypad0 + k), false))
                         s.sliderTyped += char('0' + k);
-                if (ImGui::IsKeyPressed(ImGuiKey_Period, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadDecimal, false))
-                    s.sliderTyped += '.';
+                // '.' or ',' is the decimal separator (0,5 = 0.5); a second one is ignored (1,000.5 cannot be typed).
+                if ((ImGui::IsKeyPressed(ImGuiKey_Period, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadDecimal, false) ||
+                     ImGui::IsKeyPressed(ImGuiKey_Comma, false)) &&
+                    s.sliderTyped.find_first_of(".,") == std::string::npos)
+                    s.sliderTyped += ImGui::IsKeyPressed(ImGuiKey_Comma, false) ? ',' : '.';
                 if ((ImGui::IsKeyPressed(ImGuiKey_Minus, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract, false)) &&
                     s.sliderTyped.empty() && d.lo < 0.0f)
                     s.sliderTyped += '-';
                 if (ImGui::IsKeyPressed(ImGuiKey_Backspace) && !s.sliderTyped.empty()) s.sliderTyped.pop_back();
                 if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
                     if (!s.sliderTyped.empty()) {
-                        float v = std::strtof(s.sliderTyped.c_str(), nullptr);
-                        // Intensities: 0-100 (a fraction below 1 with a decimal point still works: typedIntensity).
-                        if (which == PickerUi::Slider::ZIntensity || which == PickerUi::Slider::RgbIntensity)
-                            v = typedIntensity(s.sliderTyped);
-                        else if (which == PickerUi::Slider::FocalShift)
-                            v /= 100.0f;
-                        *d.value = std::clamp(v, d.lo, d.hi);
+                        // Intensities: 0-100 (a fraction below 1 with a decimal point still works: typedIntensity). Text that is
+                        // not a number ("-", ".") is not applied and the pop-up stays open to fix it.
+                        const auto n = parseTypedNumber(s.sliderTyped);
+                        const bool intensity = which == PickerUi::Slider::ZIntensity || which == PickerUi::Slider::RgbIntensity;
+                        const auto v = intensity ? typedIntensity(s.sliderTyped) : n ? std::optional<float>(n->value) : std::nullopt;
+                        if (v) {
+                            *d.value = std::clamp(which == PickerUi::Slider::FocalShift ? *v / 100.0f : *v, d.lo, d.hi);
+                            close = true;
+                        }
+                    } else {
+                        close = true;
                     }
-                    close = true;
                 }
                 if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
                     *d.value = s.sliderBase; // Esc cancels: back to what it was
@@ -1593,10 +1594,10 @@ bool PickerUi::sliderPreview(const App& app, ImVec2& at, Slider& which, float& v
     } else {
         value = which == Slider::DrawSize ? app.radiusPx_ : app.focalShift_;
     }
-    if (!s.sliderTyped.empty() && s.sliderTyped != "-" && s.sliderTyped != ".") {
-        const float v = std::strtof(s.sliderTyped.c_str(), nullptr); // as Enter would apply it
+    if (const auto typed = parseTypedNumber(s.sliderTyped)) { // as Enter would apply it (not a number yet: the value shows)
+        const float v = typed->value;
         value = which == Slider::DrawSize ? std::clamp(v, kMinDrawSizePx, kMaxDrawSizePx)
-                : intensity               ? std::clamp(typedIntensity(s.sliderTyped), 0.01f, 1.0f)
+                : intensity               ? std::clamp(*typedIntensity(s.sliderTyped), 0.01f, 1.0f)
                                           : std::clamp(v / 100.0f, -1.0f, 1.0f);
     }
     return true;
