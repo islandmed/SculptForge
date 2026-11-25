@@ -222,7 +222,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil, Tube, Reference,
+                      AirStroke, UvTool, SizeScrub, QuickRemesh, RefreshTopology, Gradient, Stencil, Tube, Reference,
                       NavWidget }; // AirStroke: a stroke begun off the model, waiting to reach it (#62); NavWidget: a press on the orientation widget, a click until it moves
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
@@ -868,6 +868,11 @@ private:
     int generatedRemesh_ = int(GeneratedRemesh::Quad); // Generate 3D's sculpting base: Quad (Voxel, then Quad Remesh) or Voxel
     int voxelResolution_ = 200;
     bool voxelKeepMasked_ = false; // Voxel Remesh's Keep Masked (#43)
+    bool voxelKeepGroups_ = false; // Voxel Remesh's Keep Face Groups (core/Voxel.h transferFaceGroups)
+    static constexpr const char* kKeepGroupsHelp =
+        "The new surface keeps the Part's face groups: each new polygon takes the group of the original surface "
+        "nearest its centre, so the borders stay hard lines (stepped at the voxel size). Off: one face group, as before. "
+        "Quad Remesh's Follow Face Groups does the same for quads.";
     static constexpr const char* kKeepMaskedHelp =
         "Masked areas keep their triangles exactly as they are (their detail too); only the rest is rebuilt, and "
         "it's joined to them along the mask's edge so the model stays closed. Mask what to keep first (Ctrl). "
@@ -1679,9 +1684,19 @@ private:
     void drawQuickRemeshContents();          // their checkboxes under Tool > Remesh (PanelRetopo.cpp)
     std::string remeshSkippedNote(int reason);           // why Remesh after each stroke passed over this Part (0 levels, 1 layers, 2 texture)
     void strokeEndedForRemesh(const UndoRecord& stroke); // Remesh after each stroke: did it stretch the surface?
-    bool quickRemeshDragDown(float x, float y);          // a press on the background with the drag key held
+    bool quickRemeshDragDown(float x, float y);          // a press with the drag key held: background = whole Part, model = refresh
     void quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down); // tracks the held drag key
     SDL_Keycode quickRemeshDragKey_ = SDLK_UNKNOWN; // the "hold and drag" key while it is down
+    // The topology refresh gesture (PanelRetopo.cpp): the drag key held and a drag on the model refreshes the stretched
+    // triangles under the brush (Sculptor::refreshTopologyDab), one undo step per drag, no dialog.
+    void refreshTopologyDown(float x, float y, const RayHit& hit);
+    void refreshTopologyTo(float x, float y);
+    void refreshTopologyRelease();
+    float refreshEdge_ = 0.0f;              // the edge length this gesture refreshes towards
+    glm::vec3 refreshLast_{0.0f};           // the last dab's centre (dabs are spaced along the surface)
+    bool refreshHaveLast_ = false, refreshChanged_ = false;
+    size_t refreshTrianglesBefore_ = 0;
+    int refreshDabs_ = 0, lastRefreshDabs_ = 0; // dabs this gesture / the last finished one (UI tests: refresh_dabs)
     bool autoRemeshDue_ = false;                    // a stroke stretched the surface: remesh once nothing waits
     size_t lastStrokeStretched_ = 0;                // the last stroke's stretched edges (UI tests: stroke_stretched)
     std::set<std::pair<uint32_t, int>> remeshSkipNoted_; // (Part id, reason) already told why a remesh was skipped
@@ -1696,7 +1711,7 @@ private:
         uint32_t part = 0;
         size_t triangles = 0;
         int resolution = 200;
-        bool keepMasked = false, keepTexture = true;
+        bool keepMasked = false, keepTexture = true, keepGroups = false;
         bool allowSwap = false; // the person agreed to a remesh past the free memory (MemoryTier::NeedsSwap)
         int restarts = 0;       // quick ones: how often this job started again because the Part changed meanwhile
     };

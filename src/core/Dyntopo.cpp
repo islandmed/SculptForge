@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Dyntopo.h"
+#include "core/SurfaceQuery.h"
 
 #include "core/ThreadPool.h"
 
@@ -1013,6 +1014,7 @@ void DynamicTopology::collapsePass() {
     heap_.clear();
     uint32_t tris[4];
     for (uint32_t t : regionTris_) {
+        if (refineOnly) break; // (refine only: slivers alone, below)
         if (t >= mesh_->triangleCount() || deadT_[t]) continue;
         const glm::uvec3 tri = mesh_->triangles[t];
         for (int c = 0; c < 3; ++c) {
@@ -1023,6 +1025,7 @@ void DynamicTopology::collapsePass() {
         }
     }
     for (uint32_t t : mirrorTris_) { // (as in splitPass)
+        if (refineOnly) break;
         if (t >= mesh_->triangleCount() || deadT_[t]) continue;
         const glm::uvec3 tri = mesh_->triangles[t];
         for (int c = 0; c < 3; ++c) {
@@ -1227,6 +1230,7 @@ void DynamicTopology::relaxPass() {
     const float r2 = radius_ * radius_;
     for (uint32_t v : changedV_) {
         if (deadV_[v] || locked(v)) continue;
+        if (refineOnly && v < startVertices_) continue; // (refine only: the vertices that were there stay put; the new ones settle)
         bool in = glm::dot(m.positions[v] - center_, m.positions[v] - center_) <= r2;
         for (const SymCopy& s : mirrorSigns_) {
             const glm::vec3 d0 = m.positions[v] - s.point(center_);
@@ -1247,7 +1251,21 @@ void DynamicTopology::relaxPass() {
     // Applied one by one, each only if no triangle around it turns over or goes flat.
     const float minArea = 1e-4f * target_ * target_;
     for (const auto& [v, d] : moves) {
-        const glm::vec3 to = m.positions[v] + d;
+        glm::vec3 to = m.positions[v] + d;
+        if (refineOnly) {
+            // Refine only: the vertex slides on the surface itself, not in its tangent plane: the target's closest point on
+            // the fan around v (the fan is the surface there), so a refresh never lifts the new vertices off the sculpt.
+            float best = std::numeric_limits<float>::max();
+            glm::vec3 on = to;
+            for (uint32_t t : m.vertexTriangles(v)) {
+                const glm::uvec3& tri = m.triangles[t];
+                glm::vec3 bary;
+                const glm::vec3 p = closestPointOnTriangle(to, m.positions[tri.x], m.positions[tri.y], m.positions[tri.z], bary);
+                const float d2 = glm::dot(p - to, p - to);
+                if (d2 < best) best = d2, on = p;
+            }
+            to = on;
+        }
         bool ok = true;
         for (uint32_t t : m.vertexTriangles(v)) {
             const glm::uvec3& tri = m.triangles[t];
@@ -1379,7 +1397,10 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
     center_ = center;
     radius_ = radius;
     target_ = edgeLength;
-    splitLen2_ = (edgeLength * 4.0f / 3.0f) * (edgeLength * 4.0f / 3.0f);
+    // Refine only: an edge counts as stretched at 1.5 times the target (a surface dynamic topology made has edges up to
+    // 4/3 of its target, and an even sphere's vary by a quarter: neither is "stretched"), else 4/3 as always.
+    const float splitAt = refineOnly ? 1.5f : 4.0f / 3.0f;
+    splitLen2_ = (edgeLength * splitAt) * (edgeLength * splitAt);
     collapseLen2_ = (edgeLength * 0.6f) * (edgeLength * 0.6f);
     mirrorSigns_.assign(mirrors.size() > 1 ? mirrors.begin() + 1 : mirrors.end(), mirrors.end());
     // Each copy's inverse (a mirror is its own; a radial turn's is the opposite turn), without the identity.

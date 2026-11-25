@@ -2545,6 +2545,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Tube: tubeDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::QuickRemesh: break; // (remeshes when let go)
+    case Drag::RefreshTopology: refreshTopologyTo(x, y); break; // (the drag key held, on the model: PanelRetopo.cpp)
     case Drag::SizeScrub:
         sizeScrubDx_ += dx;
         radiusPx_ = drawSizeScrub(sizeScrubStart_, sizeScrubDx_);
@@ -2742,6 +2743,7 @@ void App::onMouseUp() {
     if (drag_ == Drag::NavWidget) navWidgetRelease(); // the orientation widget: a click (turn there) or a double-click (frame)
     if (drag_ == Drag::Select) selectionMouseUp();
     if (drag_ == Drag::QuickRemesh) quickRemesh(RemeshTrigger::Quick);
+    if (drag_ == Drag::RefreshTopology) refreshTopologyRelease();
     if (drag_ == Drag::Insert) {
         // The drag's length on screen, as a size at the surface point's depth (at least a small default).
         const float px = std::max(insertPx_, 12.0f * uiScale_);

@@ -84,12 +84,21 @@ void setVoxelSparseAbove(int resolution);
 // Mask and colours transfer from the nearest original vertex; face groups,
 // hidden flags and UVs reset (all visible, group 0, no UVs); the original's
 // quads are dropped and the result is all quads of its own. `progress` (0..1) returning false cancels (empty result).
+// `keepGroups` (Keep Face Groups): each new quad takes the face group of the original surface nearest its centre
+// (transferFaceGroups below), so the groups come through with crisp borders.
 // Parallel and narrow-band throughout: well under a second at the default resolution; run it off the UI thread.
 // Resolutions 32-4096; a remesh that won't fit in the free memory gives an empty result and `error` says what it needs
 // and which Resolution would fit. `allowSwap`: the person agreed to one that is past the free memory but within RAM +
 // swap (core/MemoryGuard.h, MemoryTier::NeedsSwap); past that it still refuses. Running out of memory midway
 // (bad_alloc) is caught: an empty result, `error` says so, the source is never touched.
 Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error = nullptr,
-                 const std::function<bool(float)>& progress = {}, bool allowSwap = false);
+                 const std::function<bool(float)>& progress = {}, bool allowSwap = false, bool keepGroups = false);
+
+// Face groups of `source` carried onto a rebuilt surface `dst` (Keep Face Groups): each polygon of `dst` (a quad pair
+// from Mesh::quadPartners, else a triangle) takes the group of the source triangle nearest its centre, then isolated
+// polygons whose edge neighbours all agree on another group take that one (no salt and pepper along a border; a border
+// stays a hard line, one group per polygon). Nothing happens when `source` has no face groups. Safe to call from a
+// worker thread (read-only on `source`).
+void transferFaceGroups(const Mesh& source, Mesh& dst);
 
 } // namespace sf
