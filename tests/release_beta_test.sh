@@ -116,6 +116,9 @@ for a in "\$@"; do
 done
 echo "curl stand-in: unexpected curl \$*" >&2; exit 1
 EOF
+# herdr: release.sh prompts live agents (the CMO's headline pick, sfmonitor, SignPath approval). The sandbox has no
+# launch headline, so every stage asks the CMO; without this stand-in that went to the real herdr (11-24).
+printf '#!/bin/sh\necho "$*" >> "%s/herdr.log"\n' "$S" > "$S/bin/herdr"
 printf '#!/bin/sh\nexit 0\n' > "$S/bin/cmake"
 printf '#!/bin/sh\nexit 0\n' > "$S/bin/ctest"
 chmod +x "$S/bin/"*
@@ -261,4 +264,7 @@ quiet scripts/release.sh 9.0.1 --only ci
 grep -q "Packages run 77 built and tested 9.0.1" "$S/out.log" || fail "promote ci: $(cat "$S/out.log")"
 quiet scripts/release.sh 9.0.1 --only tag
 [ "$(git -C "$S/origin.git" rev-parse 'v9.0.1^{commit}')" = "$staged" ] || fail "v9.0.1 doesn't tag the staged commit"
+# The headline check still asks the CMO (the stand-in got it, so nothing real did). It runs in the background.
+for _ in $(seq 1 20); do grep -q 'pick the 9.0.1 headline' "$S/herdr.log" 2>/dev/null && break; sleep 0.5; done
+grep -q '^agent prompt cmo pick the 9.0.1 headline' "$S/herdr.log" || fail "the CMO was not asked for the 9.0.1 headline: $(cat "$S/herdr.log" 2>&1)"
 echo "release.sh beta, promotion, build once: ok"

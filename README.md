@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.13.14:</strong> scatter covers a Part with copies and Keep apart stops them overlapping, Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth (<a href="https://sculptforge.app/guide/scatter.md">how it works</a>)
+  <strong>New in 0.14.0:</strong> polygon mode lets you pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span, and Split view shows a second live view of your scene (<a href="https://sculptforge.app/guide/polygon-mode.md">how it works</a>)
 </p>
 
 <p align="center">

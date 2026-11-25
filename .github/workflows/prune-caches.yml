@@ -24,9 +24,10 @@ jobs:
     name: Prune caches
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: tools/ci
+          persist-credentials: false
       - env:
           GH_TOKEN: ${{ github.token }}
         run: python3 tools/ci/prune_caches.py ccache-ci- cmake-ci- ccache-pkg- ccache-t0-

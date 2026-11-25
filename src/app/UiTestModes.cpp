@@ -76,6 +76,9 @@ std::vector<std::string> App::latchedForTest() const {
     add(strokeLatch() == StrokeLatch::Mask, "mode: Mask latch");
     add(strokeLatch() == StrokeLatch::Select, "mode: Select latch");
     add(guidesMode_, "mode: QRemesh Guides");
+    // Polygon mode holds the viewport (clicks and drags select; PanelPolygon.cpp) except while a gizmo mode is on, which is
+    // named above and works inside it (W / E / R move the selection; Draw, Esc and a brush leave both).
+    add(polyMode_ && gizmo_.mode == GizmoMode::Off, "mode: Polygon");
     add(maskBrushActive(), "mode: Mask brush");
     add(stencil_.adjust, "mode: Stencil adjust");
     add(!cutPolyline_.empty(), "mode: Cut Polyline points");
@@ -111,6 +114,7 @@ void App::unlatchForTest() {
     gizmo_.hover = GizmoHandle::None;
     strokeLatch_ = {};
     guidesMode_ = false;
+    if (polyMode_) setPolyMode(false); // (restores the wireframe toggle too)
     maskBrush_.on = false;
     stencil_.adjust = false;
     cutPolyline_.clear();
@@ -739,6 +743,10 @@ bool Demo::buildMonkey(int line, uint64_t seed, int count, std::string& error) {
         if (neverRun(a.id) || !a.run || !a.checked) continue;
         // (known=FILE: actions whose modes have filed failures are left out: the monkey looks for new ones)
         if (std::any_of(known_.begin(), known_.end(), [&](const auto& k) { return k.first.rfind(a.id + " | ", 0) == 0; })) continue;
+        // A toggle that opens a floating window over the model (the Community brushes gallery) is no mode: Esc and a brush
+        // leave it open, and the final stroke lands on the window instead of the model (seed 9 once Polygon mode's
+        // toggles shifted the sequences). The mode matrix covers it as "opens a window: not a mode".
+        if (a.id == "ui.brush_gallery") continue;
         (a.id.rfind("brush.", 0) == 0 ? brushes : toggles).push_back(a.id);
     }
     if (brushes.empty()) {
@@ -768,8 +776,11 @@ bool Demo::buildMonkey(int line, uint64_t seed, int count, std::string& error) {
             lines.push_back("key escape");
         }
     }
-    // The way out, then the invariants.
-    for (const char* l : {"release", "hold none", "key escape", "close_floating", "action brush.clay", "action tool.draw", "expect_latched none",
+    // The way out, then the invariants. Frame (by its action: the key differs between layouts) because the sequence may
+    // have left the model off the canvas (a mirror deformation, Rotate drags, numpad views: seed 9 once Solidify's toggle
+    // shifted it), and expect_sculpts' stroke walks the model's screen bounds: the check is about latches, not the camera.
+    for (const char* l : {"release", "hold none", "key escape", "close_floating", "action brush.clay", "action tool.draw", "action view.frame",
+                          "expect_latched none",
                           "expect_mesh_valid", "expect_sculpts", "undo_all", "expect_restored", "expect_mesh_valid"})
         lines.emplace_back(l);
     return addCase(line, "monkey " + std::to_string(seed), nullptr, lines, error);

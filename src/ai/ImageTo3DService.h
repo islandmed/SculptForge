@@ -17,6 +17,7 @@
 #pragma once
 
 #include "ai/BrushAssistant.h"
+#include "core/AiProvenance.h"
 #include "ai/Generator3D.h"
 #include "core/Json.h"
 
@@ -103,6 +104,13 @@ extern const char* kTrellisNoTokenNote;
 const HfPreset& resolveHfPreset(const AiSettings& settings, bool text, std::string* note = nullptr);
 // Free text-to-3D models ("$PROMPT" in step args is the description).
 const std::vector<HfPreset>& hfTextPresets();
+
+// The provenance tag (core/AiProvenance.h) a model generated with these settings gets: the public provider's name
+// ("Hugging Face", "fal.ai", "Meshy", "Hyper3D", "Tripo", "ComfyUI", "Your generator command"), the model when it is one
+// of the built-in ids (a typed id may name the user's own deployment: no model then), today's date, this SculptForge
+// version, role kGenerated. Never a host, URL, path, workflow or key name: the tag ends up in files people share. Empty
+// for the offline blockout (not AI).
+AiProvenance generateProvenance(const AiSettings& settings, bool text);
 
 // Blocking; run on a worker thread. Writes `<outputStem>.glb` (or .obj) and
 // returns its path in `outputPath`.

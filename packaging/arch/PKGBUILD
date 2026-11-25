@@ -1,6 +1,6 @@
 # Maintainer: The SculptForge contributors <https://github.com/islandmed/SculptForge>
 pkgname=sculptforge
-pkgver=0.13.13
+pkgver=0.13.14
 pkgrel=1
 pkgdesc="Free, open-source digital sculpting app with classic sculpting keys, for artists and game pipelines"
 arch=('x86_64' 'aarch64')
@@ -18,7 +18,7 @@ _wasmtime=51.0.0 # the plugin sandbox (cmake/Fetch.cmake pins the same archives)
 source=("$pkgname-$pkgver.tar.gz::https://github.com/islandmed/SculptForge/archive/refs/tags/v$pkgver.tar.gz"
         "imgui-$_imgui.tar.gz::https://github.com/ocornut/imgui/archive/refs/tags/v$_imgui.tar.gz"
         "glm-$_glm.tar.gz::https://github.com/g-truc/glm/archive/refs/tags/$_glm.tar.gz")
-sha256sums=('1d089470d35f1a4fd2e834e91ca2c19b1e2adff39c89923e8b621c6fc45ec12b'
+sha256sums=('f97e9015b09576dec3bb0f5db8a41654849c2fdf9b79b5d9e08f1260cc951412'
             '3872a5f90df78fced023c1945f4466b654fd74573370b77b17742149763a7a7c'
             '9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c')
 source_x86_64=("https://github.com/bytecodealliance/wasmtime/releases/download/v$_wasmtime/wasmtime-v$_wasmtime-x86_64-linux-c-api.tar.xz")

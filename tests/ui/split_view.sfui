@@ -1,0 +1,95 @@
+# Split view (GitHub #171, Discord #wip-and-feedback): a second live view of the scene beside or below the first, each pane
+# with its own camera. The pane under the pointer is the working one: strokes, orbit and framing go there; the other
+# pane follows every stroke. Shift+V toggles it; View > Split view picks Beside / Below and each pane's lens.
+run new_sphere subdivisions=4
+key f
+wait 0.2
+expect_value split_view == 0
+expect_value checked@view.split == 0
+
+# Shift+V: two panes beside each other; the new (right) pane is a fixed front view, the left one stays free.
+key shift+v
+expect_value split_view == 1
+expect_value checked@view.split == 1
+expect_value split_lens_first == 0
+expect_value split_lens_second == 1
+expect_value split_active == 0
+expect_value camera_ortho == 0
+shot split_beside
+
+# The pointer's pane is the working view: over the right pane the camera is the front view (orthographic).
+remember split_second_u ru
+remember split_second_v rv
+remember split_first_u lu
+remember split_first_v lv
+hover_window $ru $rv
+expect_value split_active == 1
+expect_value camera_ortho == 1
+hover_window $lu $lv
+expect_value split_active == 0
+expect_value camera_ortho == 0
+
+# A stroke in the right pane lands on the model (the pane frames the sphere on its middle).
+snapshot
+hover_window $ru $rv
+expect_value split_active == 1
+drag $ru-0.03 $rv $ru+0.03 $rv 0.4
+expect_value moved > 0
+expect_mesh_valid
+shot split_after_stroke
+
+# A fixed lens holds its direction: an orbit drag in the right pane leaves it a front view.
+orbit 120 60
+expect_value camera_ortho == 1
+hover_window $lu $lv
+expect_value split_active == 0
+
+# The corner gizmo (the axes, or the orientation widget) sits in the pointer's pane and acts on that pane's camera:
+# its +X end turns the left (Free) pane to the right side view; the right pane keeps its Front lens.
+expect_value split_active == 0
+axis_click +x
+expect_value split_active == 0
+expect_value camera_yaw >= 89
+expect_value camera_yaw <= 91
+hover_window $ru $rv
+expect_value split_active == 1
+expect_value camera_yaw >= -1
+expect_value camera_yaw <= 1
+hover_window $lu $lv
+expect_value split_active == 0
+
+# Below: the panes change shape, the views stay. Swap: the lenses trade places.
+action view.split_below
+expect_value split_view == 2
+expect_value checked@view.split_below == 1
+shot split_below
+action view.split_swap
+expect_value split_lens_first == 1
+expect_value split_lens_second == 0
+action view.split_swap
+expect_value split_lens_first == 0
+
+# The second pane's lens from the palette: Top (the second pane is the lower one now).
+action view.split_second_top
+expect_value split_lens_second == 3
+remember split_second_u bu
+remember split_second_v bv
+remember split_first_u tu
+remember split_first_v tv
+hover_window $bu $bv
+expect_value split_active == 1
+expect_value camera_ortho == 1
+hover_window $tu $tv
+expect_value split_active == 0
+
+# Off and on again by the key; the choice survives a restart (saved with the preferences).
+key shift+v
+expect_value split_view == 0
+expect_value checked@view.split == 0
+key shift+v
+expect_value split_view == 1
+restart
+expect_value split_view == 1
+expect_value split_lens_second == 3
+action view.split_off
+expect_value split_view == 0
