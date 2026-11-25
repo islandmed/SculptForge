@@ -99,6 +99,7 @@ struct TopologyUndo {
 
 struct DyntopoStats {
     size_t splits = 0, collapses = 0, flips = 0;
+    size_t dissolved = 0; // vertices merged away by dissolvePass (hair-thin strands; 0 on any mesh without needles)
     size_t collapseTries = 0; // collapse candidates looked at (most can fail: features, link condition)
     size_t maxRegion = 0, maxOps = 0; // the most triangles one remesh looked at, and the most operations it did
     size_t limited = 0;  // remeshes whose region was cut to maxRegionTriangles
@@ -142,6 +143,11 @@ public:
     // finish() for the mesh the stroke remeshed (null when none).
     Mesh* strokeMesh() const { return mesh_; }
     BVH* strokeBvh() const { return bvh_; }
+
+    // Smooth dabs set it: remesh() also dissolves hair-thin strands (see dissolvePass). Other brushes leave strands alone.
+    bool dissolveNeedles = false;
+    // A triangle is a needle when its height over its longest edge is under this fraction of the target edge length.
+    static constexpr float kNeedleWidth = 0.05f;
 
     DyntopoStats stats;   // since the last reset
     double lastMs = 0.0;  // the last remesh's time
@@ -197,7 +203,12 @@ private:
     uint32_t split(uint32_t a, uint32_t b);
     void collapsePass();
     bool collapseTarget(uint32_t a, uint32_t b, uint32_t& keep, uint32_t& drop, glm::vec3& p) const;
+    bool collapseKeepsTopology(uint32_t keep, uint32_t drop) const;
     bool canCollapse(uint32_t keep, uint32_t drop, const glm::vec3& p) const;
+    // Smooth only (dissolveNeedles): a vertex all of whose triangles are needles (a hair-thin strand) is merged onto a
+    // neighbour, a strand at a time from its end, until nothing of it is left.
+    void dissolvePass();
+    bool needleTriangle(uint32_t t) const;
     void collapse(uint32_t keep, uint32_t drop, const glm::vec3& p);
     void flipPass();
     bool flipGain(uint32_t a, uint32_t b, uint32_t& c, uint32_t& d) const;
