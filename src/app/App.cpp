@@ -444,7 +444,7 @@ void App::shutdown() {
     saveWindowState();
     closePanelWindows(); // (panels.json keeps them for the next start)
     autosavePrefs(true); // a change still waiting for its moment
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     if (!drainQueue_.empty()) runDrainQueue(); // (a save asked during the stroke's end still happens)
     solver_.reset(); // (its thread uses the renderer)
     flushBrushEdits();
@@ -729,6 +729,7 @@ int App::runUiTest(int w, int h, int fps) {
                 drainNextFrame_ = false;
                 runDrainQueue();
             } else if (asyncStroke_) pumpStroke();
+            else if (doc_.sculptor.settling()) pumpSettle();
             else drainStrokeDabs(0.010);
         }
 
@@ -1083,6 +1084,7 @@ bool App::wantsFrames(double now) const {
            proofRunning() || takeRunning() || // (not a keep-alive from the last frame: building a scene takes longer than any timeout)
            !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
            strokeFinishing_ || solverBusy() || // the solver thread is placing a stroke's dabs (AsyncStroke.cpp)
+           doc_.sculptor.settling() || // ... or catching up with the last one's exact normals (pumpSettle)
            backgroundBusy() || playingLayer_ >= 0 || faceTakePlaying_ ||
            timelapseBusy() || hardwareCalibrating() || // both render a step per frame: they stop when the frames do
            keyNavMoving() || // a held pan or zoom key sends no events after its first repeat
@@ -1468,6 +1470,7 @@ int App::run() {
             drainNextFrame_ = false;
             runDrainQueue();
         } else if (asyncStroke_) pumpStroke();
+        else if (doc_.sculptor.settling()) pumpSettle(); // (the last stroke's exact normals, a batch a frame)
         else drainStrokeDabs(kStrokeBudgetSeconds);
         mark();
         kelvinCatchUp(); // a long Kelvinlet move, a bounded part per frame (PanelKelvinlet.cpp)
@@ -1475,7 +1478,7 @@ int App::run() {
         Uint64 now = SDL_GetTicksNS();
         float dt = float(double(now - lastTicks) * 1e-9);
         lastTicks = now;
-        if (!solverBusy()) { // (the solver thread owns the document's mesh until the stroke's end)
+        if (!solverBusy() && !doc_.sculptor.settling()) { // (the solver thread owns the document's mesh until the stroke's end)
             processPendingFiles();
             animateLayers(dt);
             pollBrushRequest();
@@ -2220,6 +2223,7 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         return;
     }
     if (strokeFinishing_) endStroke(); // (a stroke ending on this thread)
+    settleForPress(); // (the last stroke's normals still settling: the batch in flight first)
     cancelCameraMove(); // the orientation widget's eased turn ends where it is: a stroke or drag never runs under a moving view
     mouseX_ = x;
     mouseY_ = y;
@@ -2944,6 +2948,13 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     if (drape_) finishDrape(true); // (PanelDrape.cpp: the stroke sculpts the kept result)
     if (strokeSculpt_ && !recipe && strokeBrush_ == BrushType::Cloth) prepareClothColliders(); // (PanelCloth.cpp)
     BrushAlpha::finishCreature(doc_.brushAlpha, true); // (picked a moment ago: the full alpha, never its tile)
+    // A background stroke takes the last one's settling normals over (its first batch); any other settles them first.
+    strokeFirstCommitAt_ = 0.0;
+    // (Not Kelvinlet, Cloth or fused batches: their dabs reach past the ball Sculptor::flushInheritedAround works out.)
+    strokeTakeOver_ = doc_.sculptor.settling() && asyncStrokeAllowed() && solver_ && !solver_->busy() && !kelvinStrokeBrush() &&
+                      strokeBrush_ != BrushType::Cloth && !fastBigBrushes();
+    if (!strokeTakeOver_) settleNow();
+    doc_.sculptor.takeOverSettle = strokeTakeOver_;
     if (!doc_.sculptor.beginStroke(doc_.mesh,
                                    !strokeSculpt_ ? std::string("Paint") : recipe ? recipe->name : brushLabel(strokeBrush_),
                                    strokeSculpt_ ? doc_.activeLayer : -1)) {
@@ -3497,7 +3508,7 @@ void App::runCommand(const std::string& name, const Args& args) {
         lastCommandOk_ = false;
         return;
     }
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     if (!drainQueue_.empty()) runDrainQueue(); // (what a shortcut queued runs before this, as it was asked first)
     if (drape_) finishDrape(true); // (a running Drape keeps where it got to first: undo, save... see a real step)
     if (name == "garment_drape") garmentDraped(); // (the placement preview would be a collider: it goes first)

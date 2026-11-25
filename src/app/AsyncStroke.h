@@ -40,6 +40,10 @@ struct App::StrokeSolver {
     bool finalize = false;        // before the batch: Sculptor::flushDraft (a draft stroke's end)
     bool catchUp = false;         // after the batch (no dabs were waiting): Sculptor::catchUpNormals, this many leaves
     size_t catchUpLeaves = 16384; // (about 150,000 vertices: a few ms)
+    bool deferEnd = false;        // finalize: without the flush and the exact bounds (App::deferNormals: they settle after)
+    bool settle = false;          // a settle batch (App::pumpSettle): catchUp, then the exact bounds once none are left
+    bool settled = false;         // ... it took the last leaves and the bounds
+    double catchUpSeconds = 0.0;  // what the batch's catch-up and packing cost
     // Kelvinlet strokes (PanelKelvinlet.cpp): after the batch's dabs, these moves (taken on the main thread, by
     // value) and, when kelvinFar, one group of the deferred far field.
     std::vector<KelvinletStep> kelvinSteps;

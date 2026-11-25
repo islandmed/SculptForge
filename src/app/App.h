@@ -518,6 +518,18 @@ private:
     bool solverBusy() const;
     void solverWait();                 // waits for the dabs in flight and commits them
     void pumpStroke();                 // per frame: commit what the solver finished, start its next batch
+    // Deferred exact normals (SF_DEFER_NORMALS=0: off): a background stroke ends after its last dab and its undo step;
+    // the exact normals behind it, their upload and the exact culling bounds follow on the solver thread, a batch a
+    // frame (pumpSettle), while the stroke still counts as draining (a press or a shortcut waits as it did for the end).
+    bool deferNormals() const;
+    void pumpSettle();                 // per frame while the last stroke's normals settle
+    void settleNow();                  // the rest at once, here (what reads or edits the document calls it first)
+    void finishSculpting();            // the stroke in progress ends (endStroke) and the last one's normals settle
+    void settleForPress();             // a press: the settle batch in flight is committed (the rest is the new stroke's)
+    bool strokeTakeOver_ = false;
+    double strokeFirstCommitAt_ = 0.0; // this stroke's first dabs on the GPU (steady_clock seconds; the bench's restroke_ms)      // this stroke took the last one's pending normals over: its first batch does them
+    double settleStartAt_ = 0.0, settledAt_ = 0.0; // (steady_clock seconds: the bench's settled_ms)
+    size_t settleLeaves_ = 0;          // leaves per settle batch (toward kSettleBatchSeconds of work)
     void commitSolverBatch();
     void finishStrokeNow();            // the rest of endStroke: undo step, timings
     void buildGhost();                 // per frame: the dabs not yet on the GPU, for the renderer's preview

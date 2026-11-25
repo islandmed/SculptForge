@@ -223,7 +223,8 @@ int App::viewSamples() {
 // (Renderer::coarsePreviewOnly).
 void App::noteStillness() {
     renderSettings_.stillSeconds = perf_.movingNow ? 0.0 : ImGui::GetTime() - perf_.stillSince;
-    renderSettings_.stroking = doc_.sculptor.strokeActive() || strokeFinishing_ || !dabQueue_.empty();
+    // (settling: the coarse levels take the exact normals once they are all in, PanelPerformance's budgets as in the stroke)
+    renderSettings_.stroking = doc_.sculptor.strokeActive() || strokeFinishing_ || !dabQueue_.empty() || doc_.sculptor.settling();
     renderer_.setStroking(renderSettings_.stroking);
 }
 

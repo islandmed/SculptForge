@@ -36,7 +36,7 @@ struct App::DrapeJob {
 
 void App::startDrape() {
     if (drape_) return;
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     auto job = std::make_shared<DrapeJob>();
     std::string err;
     if (!drapeScene(doc_, drapeRequest_, job->scene, err)) {

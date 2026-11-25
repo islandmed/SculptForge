@@ -340,6 +340,25 @@ void BVH::forEachLeafInSphere(const glm::vec3& center, float radius,
     }
 }
 
+void BVH::leavesInSphere(const glm::vec3& center, float radius, std::vector<uint32_t>& out) const {
+    if (nodes_.empty()) return;
+    const float r2 = radius * radius;
+    std::vector<uint32_t> stack;
+    stack.reserve(64);
+    stack.push_back(0);
+    while (!stack.empty()) {
+        const uint32_t i = stack.back();
+        const Node& n = nodes_[i];
+        stack.pop_back();
+        if (!sphereBox(n.box, center, r2)) continue;
+        if (n.count > 0) out.push_back(i);
+        else if (n.first != kNoLeaf) {
+            stack.push_back(n.first);
+            stack.push_back(n.first + 1);
+        }
+    }
+}
+
 template <class Shape>
 void BVH::queryVerticesIn(const Mesh& mesh, const Shape& shape, std::vector<uint32_t>& out) const {
     out.clear();

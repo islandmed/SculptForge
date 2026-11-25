@@ -69,7 +69,7 @@ void App::startPluginRun(const InstalledPlugin& p) {
         return;
     }
     if (plugins_.worker.joinable()) plugins_.worker.join();
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     doc_.syncBvh();
     plugins_.runKey = p.key;
     plugins_.input = pluginInputFrom(doc_.mesh);

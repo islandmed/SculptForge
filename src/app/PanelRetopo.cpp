@@ -127,7 +127,7 @@ void App::startQRemesh() {
     if (qremesh_ || doc_.mesh.triangleCount() == 0) return;
     if (!unhideAllows("Quad Remesh", [this] { startQRemesh(); })) return; // #163
     if (!levelsAllow("Quad Remesh", [this] { startQRemesh(); })) return;  // #173
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     bool allMasked = false;
     std::vector<uint8_t> keep = keptForRemesh(doc_.mesh, retopo_.keepMasked, allMasked);
     if (allMasked) {
@@ -444,7 +444,7 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     }
     // Always in the background with progress, so the UI never freezes (keeping a texture adds Auto UV of the
     // result, seconds to minutes); the result lands as the remesh command's would (pollVoxelRemesh).
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     if (allowSwap && interactive() && !prefDir_.empty() && doc_.dirty()) { // (the crash recovery path: Restore on the next start)
         if (!autosaveNow()) { // (sets status_ "Autosave failed: ...")
             status_ = "Voxel Remesh not started: the recovery copy couldn't be saved first (" + status_ + "). Save the project, then try again";

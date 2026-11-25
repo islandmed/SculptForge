@@ -182,7 +182,7 @@ Args App::sculptableArgs(int stage) const {
 void App::startSculptable(int stage) {
     SculptableUiState& s = *sculptable_;
     if (s.job) return;
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     Args args = sculptableArgs(stage);
     if (stage == 2) { // the frame the face was found in, whatever the view is now
         args.erase("front");
@@ -267,7 +267,7 @@ void App::pollSculptable() {
         lastCommandOk_ = false;
         return;
     }
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     CommandResult r{true, {}};
     SculptableResult& res = *job->result;
     if (job->stage == 0) {

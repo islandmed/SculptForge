@@ -391,6 +391,12 @@ struct PhaseResult {
     // stroke ends, a big brush's dabs costing 40-370 ms each on Lucy 28M, which made the 240 px release 0.55 or 0.95 s)
     // and its end work (the last batch with the normals and bounds, the undo step): the part to compare between builds.
     double releaseCatchUpMs = -1, releaseEndMs = -1;
+    // Deferred exact normals (App::deferNormals): pen-up until they are on the GPU too (the next phase waits for them).
+    double settledMs = -1;
+    // SF_BENCH_RESTROKE=<ms> (the 240 px phase): a new press that long after pen-up, then pen-up to its first dabs on
+    // the GPU (what a quick second stroke waits for: the last one's end work, or with deferred normals what is left of it).
+    double restrokeMs = -1;
+    int restroke = 0; // 0 not yet, 1 pressed, 2 measured
     float pathRadiusPx = 0; // the stroke path's size (strokePoint's R, fitted to the model)
     double pathLaps = 1.0;  // ... how often round it relative to the full-size path (ProofState::laps)
     bool pathUpright = false;
@@ -1124,17 +1130,39 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         const PhaseSpec& spec = p.phases[p.phaseIndex];
         PhaseResult& ph = p.results.back().phases.back();
         if (p.releasing) { // (frames while the last dabs land aren't the stroke's)
-            if (ph.releaseFrames[0].size() < 10000) { // (but where they went is the release's: release_frames)
+            if (ph.releaseFrames[0].size() < 10000 && ph.releaseDoneMs <= 0.0) { // (but where they went is the release's: release_frames)
                 ph.releaseFrames[0].push_back(frameMs);
                 for (int k = 0; k < 6; ++k) ph.releaseFrames[k + 1].push_back(frameSplitMs_[k]);
             }
-            if (doc_.sculptor.strokeActive()) break;
-            p.releasing = false;
-            ph.releaseDoneMs = (nowSeconds() - p.releaseAt) * 1000.0;
-            if (strokeFinalizeAt_ >= p.releaseAt) {
-                ph.releaseCatchUpMs = (strokeFinalizeAt_ - p.releaseAt) * 1000.0;
-                ph.releaseEndMs = ph.releaseDoneMs - ph.releaseCatchUpMs;
+            static const double restrokeAfter = [] {
+                const char* e = std::getenv("SF_BENCH_RESTROKE");
+                return e && *e ? std::atof(e) / 1000.0 : -1.0;
+            }();
+            if (restrokeAfter >= 0.0 && std::string(spec.name) == "240 px brush" && ph.restroke < 2) {
+                const glm::vec2 at = p.samples.back().p;
+                if (ph.restroke == 0 && nowSeconds() - p.releaseAt >= restrokeAfter) {
+                    onMouseDown(at.x, at.y, SDL_BUTTON_LEFT); // (held while the stroke drains, as a person's press is)
+                    onMouseMove(at.x + 2.0f, at.y, 0.0f, 0.0f, false);
+                    ph.restroke = 1;
+                } else if (ph.restroke == 1 && drag_ == Drag::Stroke && !holdingPointer_ && strokeFirstCommitAt_ > p.releaseAt) {
+                    ph.restrokeMs = (strokeFirstCommitAt_ - p.releaseAt) * 1000.0;
+                    ph.restroke = 2;
+                    onMouseUp();
+                    if (std::getenv("SF_STROKE_LOG")) SDL_Log("bench: restroke first dabs %.1f ms after pen-up", ph.restrokeMs);
+                }
+                break;
             }
+            if (doc_.sculptor.strokeActive()) break;
+            if (ph.releaseDoneMs <= 0.0) {
+                ph.releaseDoneMs = (nowSeconds() - p.releaseAt) * 1000.0;
+                if (strokeFinalizeAt_ >= p.releaseAt) {
+                    ph.releaseCatchUpMs = (strokeFinalizeAt_ - p.releaseAt) * 1000.0;
+                    ph.releaseEndMs = ph.releaseDoneMs - ph.releaseCatchUpMs;
+                }
+            }
+            if (doc_.sculptor.settling()) break; // (the exact normals still to come: the next stroke would wait for them too)
+            if (settledAt_ >= p.releaseAt) ph.settledMs = (nowSeconds() - p.releaseAt) * 1000.0;
+            p.releasing = false;
             ph.stroke = perf_.lastStroke;
             ph.strokeSyncMs = perf_.lastStrokeSyncMs;
             ph.strokeFrames = perf_.lastStrokeFrames;
@@ -1153,6 +1181,11 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 if (std::ofstream out(file, std::ios::binary); out)
                     out.write(reinterpret_cast<const char*>(doc_.mesh.positions.data()),
                               std::streamsize(doc_.mesh.positions.size() * sizeof(glm::vec3)));
+                // SF_BENCH_DUMP_NORMALS=1: the normals too (<prefix>-<phase>.normals.bin; after deferred ones have settled).
+                if (const char* n = std::getenv("SF_BENCH_DUMP_NORMALS"); n && *n == '1')
+                    if (std::ofstream out(file.substr(0, file.size() - 4) + ".normals.bin", std::ios::binary); out)
+                        out.write(reinterpret_cast<const char*>(doc_.mesh.normals.data()),
+                                  std::streamsize(doc_.mesh.normals.size() * sizeof(glm::vec3)));
             }
             nextPhase();
             break;
@@ -1461,6 +1494,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                         j.set("release_catchup_ms", std::round(ph.releaseCatchUpMs * 10) / 10);
                         j.set("release_end_ms", std::round(ph.releaseEndMs * 10) / 10);
                     }
+                    if (ph.settledMs >= 0) j.set("settled_ms", std::round(ph.settledMs * 10) / 10);
+                    if (ph.restrokeMs >= 0) j.set("restroke_ms", std::round(ph.restrokeMs * 10) / 10);
                     if (ph.stroke.dabs > 0) { // where the stroke's time went, beside frame_split_ms (which is the main thread's)
                         Json t = Json::object();
                         t.set("kernel", std::round(ph.stroke.kernelMs * 10) / 10);
@@ -1483,6 +1518,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                         j.set("release_catchup_ms", std::round(ph.releaseCatchUpMs * 10) / 10);
                         j.set("release_end_ms", std::round(ph.releaseEndMs * 10) / 10);
                     }
+                    if (ph.settledMs >= 0) j.set("settled_ms", std::round(ph.settledMs * 10) / 10);
+                    if (ph.restrokeMs >= 0) j.set("restroke_ms", std::round(ph.restrokeMs * 10) / 10);
                 }
                 phases.push(j);
             }

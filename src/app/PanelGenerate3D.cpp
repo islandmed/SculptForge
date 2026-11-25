@@ -363,7 +363,7 @@ void App::clearCandidates() {
 
 void App::pickCandidate(int index) {
     if (index < 0 || index >= int(candidates_.size()) || !candidates_[size_t(index)].mesh) return;
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     GeneratedCandidate& c = candidates_[size_t(index)];
     const size_t tris = c.mesh->triangleCount();
     // An untitled scene nobody has touched (the starting sphere): the model takes its place, as opening a file does.
@@ -430,7 +430,7 @@ void App::useAsSculptingBase() {
         status_ = "The generated Part is gone: generate a model first";
         return;
     }
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     if (index != doc_.activePart) doc_.selectPart(index);
     baseSource_ = std::make_shared<Mesh>(doc_.mesh);
     baseTriangles_ = doc_.mesh.triangleCount();

@@ -156,7 +156,7 @@ bool App::garmentPlaceMouseDown(float x, float y, SDL_Keymod mod) {
 
 void App::startGarmentDrape() {
     if (garmentDrape_) return;
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     auto job = std::make_shared<GarmentDrapeJob>();
     std::string err;
     if (!documentPattern(doc_, job->pat)) return void(status_ = "Drape: no garment pattern");

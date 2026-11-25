@@ -489,6 +489,11 @@ void Sculptor::clearRecorded() {
 }
 
 bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
+    // The last stroke's exact normals, before this one's dabs read them: here, or (taken over) in its first batch.
+    const bool takeOver = settling_ && takeOverSettle && lazyMesh_ == &mesh;
+    takeOverSettle = false;
+    if (takeOver) settling_ = false;
+    else settleNormals();
     if (layer >= static_cast<int>(mesh.layers.size())) layer = -1;
     if (std::abs(mesh.layerTargetWeight(layer)) < 1e-3f) return false;
     clearRecorded(); // a stroke that never ended
@@ -507,7 +512,14 @@ bool Sculptor::beginStroke(const Mesh& mesh, std::string label, int layer) {
     draft_ = draftStrokes && !dyntopo.enabled;
     draftStrokes = false; // (asked for per stroke)
     draftLeaves_.clear();
-    dropLazy(); // (a stroke that never ended)
+    if (!takeOver) {
+        dropLazy(); // (a stroke that never ended)
+    } else { // (the stroke before's pending leaves: flushInheritedAround, before a dab reads them)
+        lastLazyLeaves_.clear();
+        inherited_ = 0;
+        for (size_t i = lazyHead_; i < lazyLeaves_.size(); ++i)
+            if (uint8_t& f = lazyFlag_[lazyLeaves_[i]]; f == 1 || f == 2) f = 3, ++inherited_;
+    }
     pending_.clear();
     lockedPlanes_.clear();
     lastRegion_ = 0;
@@ -1055,11 +1067,29 @@ void Sculptor::flushLazy(Mesh& mesh, const BVH& bvh, std::span<const uint32_t> l
     if (leaves.empty()) return;
     const std::vector<uint32_t> keep = std::move(dabLeaves_);
     dabLeaves_.assign(leaves.begin(), leaves.end());
-    const bool draft = draft_;
+    const bool draft = draft_, deferred = deferDabNormals;
     draft_ = false; // (updateDabNormals in full)
+    deferDabNormals = false;
     updateDabNormals(mesh, bvh);
     draft_ = draft;
+    deferDabNormals = deferred;
     dabLeaves_ = keep;
+}
+
+void Sculptor::flushInheritedAround(Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, Symmetry sym) {
+    if (inherited_ == 0 || &mesh != lazyMesh_) return;
+    std::vector<uint32_t> near, leaves;
+    // (kAlphaReach is the widest: an alpha's or a VDM's square corners; Clay Block's 1.3)
+    for (const SymCopy& m : copies(sym)) bvh.leavesInSphere(m.point(center), radius * kAlphaReach * 1.01f, near);
+    for (uint32_t l : near)
+        if (l < lazyFlag_.size() && lazyFlag_[l] == 3) {
+            lazyFlag_[l] = 0; // (its list entry stays: takeLazy skips it)
+            leaves.push_back(l);
+        }
+    if (leaves.empty()) return;
+    inherited_ -= leaves.size();
+    lazyCount_ -= leaves.size();
+    flushLazy(mesh, bvh, leaves);
 }
 
 void Sculptor::dropLazy() {
@@ -1069,6 +1099,7 @@ void Sculptor::dropLazy() {
     lazyLeaves_.clear();
     lazyHead_ = 0;
     lazyCount_ = 0;
+    inherited_ = 0;
     lastLazyLeaves_.clear();
 }
 
@@ -1078,6 +1109,8 @@ void Sculptor::addLazyLeaves(const BVH& bvh, std::span<const uint32_t> leaves) {
         if (lazyFlag_[l] == 0) {
             lazyLeaves_.push_back(l);
             ++lazyCount_;
+        } else if (lazyFlag_[l] == 3) {
+            --inherited_;
         }
         lazyFlag_[l] = 2; // (moved by the batch being placed: catchUpBehind leaves it for now)
     }
@@ -1086,11 +1119,13 @@ void Sculptor::addLazyLeaves(const BVH& bvh, std::span<const uint32_t> leaves) {
 // Takes up to `maxLeaves` pending leaves, oldest first, skipping (and keeping, at the back) those flagged 2 when
 // `skipLast`.
 static std::vector<uint32_t> takeLazy(std::vector<uint32_t>& list, size_t& head, std::vector<uint8_t>& flag, size_t& count,
-                                      size_t maxLeaves, bool skipLast) {
+                                      size_t maxLeaves, bool skipLast, size_t& inherited) {
     std::vector<uint32_t> out, kept;
     const size_t end = list.size();
     for (size_t i = head; i < end && out.size() < maxLeaves; ++i, ++head) {
         const uint32_t l = list[i];
+        if (flag[l] == 0) continue; // (worked out ahead: flushInheritedAround)
+        if (flag[l] == 3) --inherited;
         if (skipLast && flag[l] == 2) {
             kept.push_back(l);
             continue;
@@ -1109,7 +1144,7 @@ static std::vector<uint32_t> takeLazy(std::vector<uint32_t>& list, size_t& head,
 
 void Sculptor::catchUpNormals(Mesh& mesh, const BVH& bvh, size_t maxLeaves) {
     if (lazyCount_ == 0 || &mesh != lazyMesh_) return;
-    const std::vector<uint32_t> leaves = takeLazy(lazyLeaves_, lazyHead_, lazyFlag_, lazyCount_, maxLeaves, false);
+    const std::vector<uint32_t> leaves = takeLazy(lazyLeaves_, lazyHead_, lazyFlag_, lazyCount_, maxLeaves, false, inherited_);
     flushLazy(mesh, bvh, leaves);
 }
 
@@ -1117,7 +1152,7 @@ void Sculptor::catchUpBehind(Mesh& mesh, const BVH& bvh, double share) {
     if (lazyCount_ == 0 || &mesh != lazyMesh_) return;
     const size_t budget = size_t(double(lastLazyLeaves_.size()) * share);
     if (budget > 0) {
-        const std::vector<uint32_t> leaves = takeLazy(lazyLeaves_, lazyHead_, lazyFlag_, lazyCount_, budget, true);
+        const std::vector<uint32_t> leaves = takeLazy(lazyLeaves_, lazyHead_, lazyFlag_, lazyCount_, budget, true, inherited_);
         flushLazy(mesh, bvh, leaves);
     }
     for (uint32_t l : lastLazyLeaves_) // (the next batch's own are what count as recent then)
@@ -1126,7 +1161,7 @@ void Sculptor::catchUpBehind(Mesh& mesh, const BVH& bvh, double share) {
 
 void Sculptor::flushDraft(Mesh& mesh, const BVH& bvh) {
     if (lazyCount_ > 0 && &mesh == lazyMesh_) {
-        const std::vector<uint32_t> leaves = takeLazy(lazyLeaves_, lazyHead_, lazyFlag_, lazyCount_, SIZE_MAX, false);
+        const std::vector<uint32_t> leaves = takeLazy(lazyLeaves_, lazyHead_, lazyFlag_, lazyCount_, SIZE_MAX, false, inherited_);
         lastLazyLeaves_.clear();
         flushLazy(mesh, bvh, leaves);
     }
@@ -1140,14 +1175,38 @@ void Sculptor::flushDraft(Mesh& mesh, const BVH& bvh) {
     draftLeaves_.clear();
 }
 
+void Sculptor::settleNormals() {
+    if (settling_) endSettle();
+}
+
+void Sculptor::endSettle() {
+    if (lazyCount_ > 0 && lazyMesh_ && lazyBvh_) { // (what the batches haven't caught up yet: at once)
+        const std::vector<uint32_t> leaves = takeLazy(lazyLeaves_, lazyHead_, lazyFlag_, lazyCount_, SIZE_MAX, false, inherited_);
+        flushLazy(*lazyMesh_, *lazyBvh_, leaves);
+    }
+    settling_ = false;
+    dropLazy();
+    lazyMesh_ = nullptr;
+    lazyBvh_ = nullptr;
+}
+
 UndoRecord Sculptor::endStroke() {
     if (!pending_.empty() && pendingMesh_ && pendingBvh_) flushBatch(*pendingMesh_, *pendingBvh_); // (callers that didn't)
     pending_.clear();
     batching_ = false;
-    if (lazyCount_ > 0 && lazyMesh_ && lazyBvh_) flushDraft(*lazyMesh_, *lazyBvh_); // (callers that didn't)
-    dropLazy();
-    lazyMesh_ = nullptr;
-    lazyBvh_ = nullptr;
+    // Deferred: only the adaptive dabs' exact normals (a draft's, a micro level's, dynamic topology's are done here).
+    const bool defer = deferNormals && lazyCount_ > 0 && lazyMesh_ && lazyBvh_ && !(draft_ && !draftLeaves_.empty()) &&
+                       !dynTopo_.active() && !microMesh_ && !inkMesh_;
+    deferNormals = false;
+    if (defer) {
+        settling_ = true;
+        lastLazyLeaves_.clear();
+    } else {
+        if (lazyCount_ > 0 && lazyMesh_ && lazyBvh_) flushDraft(*lazyMesh_, *lazyBvh_); // (callers that didn't)
+        dropLazy();
+        lazyMesh_ = nullptr;
+        lazyBvh_ = nullptr;
+    }
     if (dynTopo_.active()) {
         Mesh& mesh = *dynTopo_.strokeMesh();
         std::unique_ptr<TopologyUndo> topo = dynTopo_.finish(mesh, *dynTopo_.strokeBvh());
@@ -1211,6 +1270,7 @@ int groupBorderNeighbours(const Mesh& mesh, uint32_t v, uint32_t out[3]) {
 
 void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    flushInheritedAround(mesh, bvh, p.center, p.radius, sym); // (a stroke taken over mid-settle: the normals it reads)
     if (mesh.micro) inkMesh_ = &mesh; // (Forge Ink: endStroke settles this mesh's kept strokes)
     // Morph: nothing without a target (Tool > Selection Sets > Morph Target); not on micro levels (no grid shapes).
     if (type == BrushType::Morph && (mesh.micro || !morphTarget(mesh))) return;
@@ -2261,6 +2321,20 @@ void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
         timings.normalsMs += lapMs(clock);
         return;
     }
+    if (deferDabNormals && !dynTopo_.active() && !dabLeaves_.empty() && mesh.normals.size() == mesh.vertexCount()) {
+        // Deferred (the stroke's last dab): the vertices it moved go to the GPU with the normals and cavity terms they
+        // had (their rings' normals wait too, so only the moved ones are marked), and its leaves pending (flushLazy
+        // later works out exactly what updateNormalsAround below would, marking the whole set then).
+        mesh.markDirtyAround(dabVerts_.size(), 4096, [&](size_t b, size_t e, IndexBits& set) {
+            for (size_t i = b; i < e; ++i) set.insertLocal(dabVerts_[i]);
+        }, curvature_.data());
+        lazyMesh_ = &mesh;
+        lazyBvh_ = &bvh;
+        addLazyLeaves(bvh, dabLeaves_);
+        dabLeaves_.clear();
+        timings.normalsMs += lapMs(clock);
+        return;
+    }
     if (dynTopo_.active() || dabLeaves_.empty()) {
         mesh.updateNormals(dabVerts_, curvature_.data());
     } else {
@@ -2280,6 +2354,7 @@ void Sculptor::updateDabNormals(Mesh& mesh, const BVH& bvh) {
 
 void Sculptor::dabRecipe(Mesh& mesh, BVH& bvh, const BrushRecipe& recipe, const DabParams& p, Symmetry sym) {
     if (!active_) return;
+    flushInheritedAround(mesh, bvh, p.center, p.radius, sym); // (as dab)
     if (microReady(mesh)) {
         // A micro level: the grid takes a Standard dab with the recipe's depth (its sign carves or builds) and its
         // surface pattern (Dragon Scales, Skin Pores..., #120: they sculpted plain blobs there). Planes, pinch and

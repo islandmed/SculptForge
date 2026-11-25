@@ -39,6 +39,10 @@ constexpr double kFusedBatchSeconds = 0.05;
 // Meshes from this many vertices place a stroke's dabs on the solver thread even without predictive strokes: one
 // 240 px dab there moves millions of vertices (100-300 ms at 33M triangles), more than a frame can hold.
 constexpr size_t kBackgroundDabVertices = 2'000'000;
+// A settle batch (the exact normals after a deferred stroke end) takes about this much work: one goes on while a
+// frame draws, so the surface sharpens over a few frames and a press or shortcut waiting for it waits about one.
+constexpr double kSettleBatchSeconds = 0.033;
+constexpr size_t kSettleFirstLeaves = 65536; // (about 600,000 vertices, ~15 ms on the floor tier)
 
 } // namespace
 
@@ -103,7 +107,7 @@ void App::StrokeSolver::loop() {
         const SculptTimings before = app.doc_.sculptor.timings;
         view.lastHitSeen = false;
         app.dabView_ = &view;
-        if (finalize) { // a draft stroke's end: every normal and cavity term it touched
+        if (finalize && !deferEnd) { // a draft stroke's end: every normal and cavity term it touched
             const auto t0 = std::chrono::steady_clock::now();
             app.doc_.sculptor.flushDraft(app.doc_.mesh, app.doc_.bvh);
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
@@ -111,11 +115,15 @@ void App::StrokeSolver::loop() {
         app.doc_.sculptor.beginBatch(); // (a big brush's dabs go through the vertices together: core/SculptBatch.cpp)
         for (const PathDab& d : batch) {
             const auto t0 = std::chrono::steady_clock::now();
+            // The stroke's last dab, deferred: its exact normals settle after the stroke's end (App::deferNormals).
+            app.doc_.sculptor.deferDabNormals = finalize && deferEnd && &d == &batch.back();
             app.dabAt(d.x, d.y, d.pressure, d.stamp);
+            app.doc_.sculptor.deferDabNormals = false;
             spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         }
         {
             const auto t0 = std::chrono::steady_clock::now();
+            catchUpSeconds = 0.0;
             app.doc_.sculptor.endBatch(app.doc_.mesh, app.doc_.bvh);
             // Nothing more waiting: the exact normals behind the brush catch up (a frame's share of them).
             if (catchUp && !finalize) app.doc_.sculptor.catchUpNormals(app.doc_.mesh, app.doc_.bvh, catchUpLeaves);
@@ -136,15 +144,20 @@ void App::StrokeSolver::loop() {
         }
         dabSeconds = batch.empty() ? 0.0 : spent / double(batch.size());
         const auto prepStart = std::chrono::steady_clock::now();
+        if (finalize && deferEnd && !app.doc_.sculptor.normalsPending()) deferEnd = false; // (nothing to settle: as before)
         uploadReady = prepare && app.renderer_.prepareStrokeUpload(uploadId, app.doc_.mesh, upload, app.doc_.sculptor.strokeCurvature());
-        if (finalize && uploadReady) app.renderer_.refineStrokeBoundsInto(uploadId, app.doc_.mesh, upload);
-        prepSeconds = finalize ? 0.0 : std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
+        // The exact culling bounds: at the stroke's end, or (deferred) once the settle batches have caught up.
+        settled = settle && !app.doc_.sculptor.normalsPending();
+        if (((finalize && !deferEnd) || settled) && uploadReady) app.renderer_.refineStrokeBoundsInto(uploadId, app.doc_.mesh, upload);
+        prepSeconds = finalize || settle ? 0.0 : std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
+        if (settle) catchUpSeconds = spent + std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
         static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
         if (log) {
             const SculptTimings& t = app.doc_.sculptor.timings;
             SDL_Log("solver: at %.3f s%s on cpu %d, %zu dabs %.1f ms (kernel %.1f, normals %.1f, BVH %.1f), upload packed in %.1f ms (vertices %.1f, "
                     "bounds %.1f), %.1f MB",
-                    double(SDL_GetTicksNS()) * 1e-9, finalize ? " (finalize)" : catchUp ? " (catch-up)" : "", currentCpu(), batch.size(),
+                    double(SDL_GetTicksNS()) * 1e-9, finalize ? (deferEnd ? " (finalize, deferred)" : " (finalize)") : settle ? " (settle)" : catchUp ? " (catch-up)" : "",
+                    currentCpu(), batch.size(),
                     spent * 1000.0, t.kernelMs - before.kernelMs, t.normalsMs - before.normalsMs,
                     t.bvhMs - before.bvhMs,
                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - prepStart).count(),
@@ -244,6 +257,80 @@ bool App::solverBusy() const { return solver_ && solver_->busy(); }
 
 bool App::strokeDraining() const { return asyncStroke_ && strokeFinishing_ && drag_ != Drag::Stroke; }
 
+bool App::deferNormals() const {
+    static const int env = [] {
+        const char* v = std::getenv("SF_DEFER_NORMALS");
+        return v && *v ? (*v == '0' ? 0 : 1) : -1;
+    }();
+    return env != 0 && !doc_.sculptor.draftActive();
+}
+
+void App::pumpSettle() {
+    if (!doc_.sculptor.settling()) return;
+    if (!solver_) { // (can't happen: a deferred end came from the solver)
+        settleNow();
+        return;
+    }
+    StrokeSolver& s = *solver_;
+    if (s.busy()) return;
+    if (s.done) {
+        const bool last = s.settle && s.settled;
+        if (s.settle && s.catchUpSeconds > 0.0) // (the next batch toward kSettleBatchSeconds of work)
+            settleLeaves_ = size_t(std::clamp(double(s.catchUpLeaves) * kSettleBatchSeconds / s.catchUpSeconds, 4096.0, 4194304.0));
+        commitSolverBatch();
+        if (last) {
+            s.settle = s.settled = false;
+            doc_.sculptor.endSettle();
+            renderer_.refineStrokeBounds(doc_.meshKey(doc_.activePart), displayedMesh()); // (when the batch couldn't pack)
+            settledAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+            static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
+            if (log) SDL_Log("settled: at %.3f s, %.1f ms after the stroke end", double(SDL_GetTicksNS()) * 1e-9, (settledAt_ - settleStartAt_) * 1000.0);
+            return;
+        }
+    }
+    s.batch.clear();
+    s.finalize = s.deferEnd = false;
+    s.catchUp = true;
+    s.settle = true;
+    s.catchUpLeaves = std::max<size_t>(settleLeaves_, 1);
+    s.view.camera = partCamera();
+    s.view.canvas = canvasRect();
+    s.view.probe = nullptr;
+    s.view.radiusProbe = nullptr;
+    s.view.hitProbe = nullptr;
+    s.view.settings = dabSettings();
+    s.uploadId = doc_.meshKey(doc_.activePart);
+    renderer_.bindStrokeUpload(s.uploadId, s.upload);
+    s.prepare = &displayedMesh() == &doc_.mesh;
+    s.start();
+}
+
+void App::settleNow() {
+    if (!doc_.sculptor.settling()) return;
+    if (solver_) {
+        solver_->wait();
+        if (solver_->done) commitSolverBatch();
+        solver_->settle = solver_->settled = false;
+    }
+    doc_.sculptor.settleNormals(); // the rest here (marked dirty: the next sync sends them)
+    renderer_.refineStrokeBounds(doc_.meshKey(doc_.activePart), displayedMesh());
+    settledAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+void App::settleForPress() {
+    // A press while the last stroke settles: the batch in flight first (at most one, ~kSettleBatchSeconds), so the
+    // pick and the stroke's start see the mesh; a sculpt stroke then takes the rest over (beginStroke).
+    if (!doc_.sculptor.settling() || !solver_) return;
+    solver_->wait();
+    if (solver_->done) commitSolverBatch();
+    solver_->settle = solver_->settled = false;
+}
+
+void App::finishSculpting() {
+    if (doc_.sculptor.strokeActive()) endStroke();
+    settleNow();
+}
+
 void App::runDrainQueue() {
     std::vector<std::pair<std::string, Args>> queued;
     queued.swap(drainQueue_); // (each runs once; one that queues again waits for the next stroke's end)
@@ -316,6 +403,8 @@ void App::commitSolverBatch() {
     if (strokeRadiusProbe_) strokeRadiusProbe_->insert(strokeRadiusProbe_->end(), s.radiusProbe.begin(), s.radiusProbe.end());
     if (strokeHitProbe_) strokeHitProbe_->insert(strokeHitProbe_->end(), s.hitProbe.begin(), s.hitProbe.end());
     if (s.prepSeconds > 0.0) prepSeconds_ = prepSeconds_ > 0.0 ? prepSeconds_ * 0.7 + s.prepSeconds * 0.3 : s.prepSeconds;
+    if (!s.batch.empty() && strokeFirstCommitAt_ == 0.0)
+        strokeFirstCommitAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     if (!s.batch.empty()) {
         lastDabScreen_ = glm::vec2(s.batch.back().x, s.batch.back().y);
         if (s.view.lastHitSeen) noteStrokePoint(s.view.lastHit);
@@ -371,6 +460,7 @@ void App::pumpStroke() {
         StrokeSolver& s = *solver_;
         s.batch.clear();
         s.finalize = true;
+        s.deferEnd = deferNormals();
         strokeFinalizeAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
         s.catchUp = false;
         s.view.camera = partCamera();
@@ -390,8 +480,9 @@ void App::pumpStroke() {
         if (strokeFinishing_) {
             static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
             const auto t0 = std::chrono::steady_clock::now();
-            finishStrokeNow(); // released, and every dab is on the GPU
-            drainNextFrame_ = !drainQueue_.empty(); // then what a shortcut asked for meanwhile, in order, next frame
+            finishStrokeNow(); // released, and every dab is on the GPU (deferred: its exact normals settle after)
+            // Then what a shortcut asked for meanwhile, in order, next frame (deferred: once the normals have settled).
+            drainNextFrame_ = !drainQueue_.empty();
             if (log) SDL_Log("stroke end: at %.3f s, %.1f ms", double(SDL_GetTicksNS()) * 1e-9, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
             return;
         }
@@ -430,8 +521,10 @@ void App::pumpStroke() {
     s.batch.clear();
     while (!dabQueue_.empty() && s.batch.size() < n) s.batch.push_back(dabQueue_.pop());
     s.finalize = strokeFinishing_ && dabQueue_.empty();
+    s.deferEnd = s.finalize && deferNormals();
     if (s.finalize) strokeFinalizeAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     s.catchUp = false; // (dabs are coming: the exact normals wait for a pause or the release)
+
     lastDabsQueued_ = double(SDL_GetTicksNS()) * 1e-9;
     s.view.camera = partCamera();
     s.view.canvas = canvasRect();
@@ -486,10 +579,13 @@ void App::commitLiveMove() {
 
 void App::finishStrokeNow() {
     commitLiveMove();
-    if (solver_) solver_->finalize = false;
-    doc_.sculptor.flushDraft(doc_.mesh, doc_.bvh); // (a draft stroke ended here rather than on the solver thread)
+    // A finalize batch without the flush (deferNormals) that ended the stroke: the normals settle after it. Any other
+    // end (a command's endStroke while the last dabs were still going) does it all here.
+    const bool defer = asyncStroke_ && solver_ && solver_->finalize && solver_->deferEnd && !solver_->busy();
+    if (solver_) solver_->finalize = solver_->deferEnd = false;
+    if (!defer) doc_.sculptor.flushDraft(doc_.mesh, doc_.bvh); // (a draft stroke ended here rather than on the solver thread)
     renderer_.setDraftNormals(0);
-    if (asyncStroke_) renderer_.refineStrokeBounds(doc_.meshKey(doc_.activePart), displayedMesh()); // (the quick ones)
+    if (asyncStroke_ && !defer) renderer_.refineStrokeBounds(doc_.meshKey(doc_.activePart), displayedMesh()); // (the quick ones)
     strokeFinishing_ = false;
     asyncStroke_ = false;
     renderer_.setGhost(0, GhostStroke());
@@ -510,7 +606,14 @@ void App::finishStrokeNow() {
     if (const size_t bad = doc_.sculptor.nonFiniteDabs) // (gh#229: the dabs were dropped, the mesh is as it was)
         SDL_Log("stroke: %zu dabs of %s dropped: the brush computed a non-finite offset (pressure %.3f)", bad,
                 brushLabel(strokeBrush_), double(strokePressure()));
+    doc_.sculptor.deferNormals = defer;
     UndoRecord r = doc_.sculptor.endStroke();
+    if (defer && !doc_.sculptor.settling()) renderer_.refineStrokeBounds(doc_.meshKey(doc_.activePart), displayedMesh()); // (nothing left to settle)
+    if (doc_.sculptor.settling()) {
+        settleStartAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        settledAt_ = 0.0;
+        settleLeaves_ = kSettleFirstLeaves;
+    }
     if (traceStroke) tracePerfStroke(r.label);
     finishPaintStroke(r);
     if (r.topology && !r.topology->uvs.empty())
@@ -744,6 +847,7 @@ static uint64_t positionsHash(const Mesh& mesh) {
 }
 
 bool App::verifyStroke(uint64_t before, const std::vector<glm::vec2>& dabs, const std::vector<float>& radii) {
+    settleNow(); // (deferred normals: compared once they are all in)
     const uint64_t after = meshStateHash(doc_.mesh);
     const uint64_t afterPositions = positionsHash(doc_.mesh);
     const std::vector<glm::vec3> afterNormals = doc_.mesh.normals;

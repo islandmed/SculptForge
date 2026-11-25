@@ -277,8 +277,10 @@ public:
     void updateNormalsAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill,
                              float* curvature = nullptr);
     // Marks the vertices fill() lists dirty for the GPU without recomputing their normals (a draft stroke, whose
-    // normals wait for its end: Sculptor::draftStrokes).
-    void markDirtyAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill);
+    // normals wait for its end: Sculptor::draftStrokes). `keep` (optional, by vertex): set to NaN for each of them
+    // (Sculptor's kKeepCurvature: the GPU keeps their cavity terms until the normals follow).
+    void markDirtyAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill,
+                         float* keep = nullptr);
     // The renderer's cavity term at `v` (render/Clusters.h): how far the average of the other corners of its
     // triangles sits above the vertex along its normal (> 0 in a crease), over their mean distance. Each
     // neighbour of an inner vertex of a manifold is the corner of two of its triangles, so this is the average

@@ -675,10 +675,15 @@ void Mesh::updateNormalsAround(size_t count, size_t grain, const std::function<v
     finishNormals(curvature);
 }
 
-void Mesh::markDirtyAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill) {
+void Mesh::markDirtyAround(size_t count, size_t grain, const std::function<void(size_t, size_t, IndexBits&)>& fill,
+                           float* keep) {
     if (!beginNormalSet()) return;
     normalBits_.insertParallel(count, grain, fill);
     finishNormals(nullptr, false);
+    if (keep)
+        poolFor(scratchVerts_.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) keep[scratchVerts_[i]] = std::numeric_limits<float>::quiet_NaN();
+        }, 8192);
 }
 
 float Mesh::curvatureAt(uint32_t v) const {

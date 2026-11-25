@@ -46,6 +46,8 @@ public:
     // no per-triangle test, for callers that only need where the triangles are (texture painting's tiles).
     void forEachLeafInSphere(const glm::vec3& center, float radius,
                              const std::function<void(std::span<const uint32_t>)>& fn) const;
+    // The same leaves' node indices (appended to `out`).
+    void leavesInSphere(const glm::vec3& center, float radius, std::vector<uint32_t>& out) const;
     // Updates bounds after the given vertices moved. A few leaves grow their ancestors' bounds (conservatively,
     // which keeps queries correct); many leaves (a big brush) recompute their ancestors from their children, in
     // parallel.

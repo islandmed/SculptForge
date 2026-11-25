@@ -63,6 +63,7 @@ void App::beginMaskStroke(float x, float y) {
     // Ctrl+Alt erases, and so does the pen's eraser end (set to Invert or Erase mask).
     strokeInvert_ = (inputMods() & SDL_KMOD_ALT) != 0 ||
                     (erasing() && (eraserAction() == PenAction::Invert || eraserAction() == PenAction::EraseMask));
+    settleNow(); // (the last stroke's normals: here, with the solver idle)
     if (!doc_.sculptor.beginStroke(doc_.mesh, strokeInvert_ ? "Unmask" : "Mask", -1)) return;
     strokeMask_ = true;
     strokePaint_ = false; // mask strokes never paint or sculpt

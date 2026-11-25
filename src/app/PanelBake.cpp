@@ -282,7 +282,7 @@ void App::startBake() {
             return;
         }
     }
-    if (doc_.sculptor.strokeActive()) endStroke();
+    finishSculpting();
     BakeSettings st = b.settings;
     st.size = kSizes[std::clamp(b.sizeChoice, 0, 3)];
     st.front = b.frontPct / 100.0f;

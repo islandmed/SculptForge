@@ -371,7 +371,7 @@ public:
     // The cavity term (Mesh::curvatureAt) of every vertex whose normal this stroke's dabs updated, by vertex,
     // worked out with the normals (the renderer packs it instead of walking the rings again); null outside a
     // stroke. Entries of other vertices are stale.
-    const float* strokeCurvature() const { return active_ && !curvature_.empty() ? curvature_.data() : nullptr; }
+    const float* strokeCurvature() const { return (active_ || settling_) && !curvature_.empty() ? curvature_.data() : nullptr; }
 
     // Draft strokes (Preferences > Performance > Draft Strokes): when set before beginStroke (it asks once), dabs move the vertices
     // and refit the BVH but leave the normals and the cavity term as they were (the brushes that read normals see
@@ -407,6 +407,23 @@ public:
     // `maxLeaves` of them (in leaf order). The app calls it when no dabs are waiting (the pen rests or slows).
     bool normalsPending() const { return lazyCount_ > 0; }
     void catchUpNormals(Mesh& mesh, const BVH& bvh, size_t maxLeaves);
+    // Deferred exact normals (the app's background strokes): set before endStroke, the exact normals still pending
+    // then stay pending after it (settling()): the stroke ends after its last dab and its undo step, and the app
+    // catches them up on its solver thread (catchUpNormals, batch by batch, the same leaves in the same order as
+    // the flush endStroke does otherwise), then calls endSettle once their upload is packed. strokeCurvature() holds
+    // till then. Whatever reads or edits the mesh first calls settleNormals (the rest at once; beginStroke does).
+    bool deferNormals = false;
+    // The same for the stroke's last dab (set just before it; the app's finalize batch): its exact normals and cavity
+    // terms join the pending ones instead of being worked out now (the GPU gets its moved vertices with the normals
+    // and cavity terms they had; nothing reads them before they settle, as no dab of this stroke comes after it).
+    bool deferDabNormals = false;
+    // Set before beginStroke while settling: the new stroke takes the pending leaves over. Each dab first works out the
+    // exact normals of those its region query lists (every triangle round its vertices), so it reads what it would
+    // after a full settle; the rest follow behind (catchUpNormals, the stroke's end). Unset, beginStroke settles them.
+    bool takeOverSettle = false;
+    bool settling() const { return settling_; }
+    void settleNormals(); // (nothing settling: nothing)
+    void endSettle();
     // After each batch: the exact normals of up to `share` x as many leaves as the batch moved, of those the brush
     // has left (the oldest first), so lifting the pen only waits for the last stretch of the stroke.
     void catchUpBehind(Mesh& mesh, const BVH& bvh, double share);
@@ -651,13 +668,19 @@ private:
     // and per vertex the stroke whose cavity term curvature_ holds (taken once, before the stroke moved it).
     std::vector<uint32_t> lazyLeaves_;  // pending, oldest first (each once: lazyFlag_)
     size_t lazyHead_ = 0;               // lazyLeaves_[lazyHead_..] are the pending ones
-    std::vector<uint8_t> lazyFlag_;     // per BVH node: 1 pending, 2 pending and moved by the last batch
+    std::vector<uint8_t> lazyFlag_;     // per BVH node: 1 pending, 2 pending and moved by the last batch, 3 the stroke before's
+                                        // (0 with an entry still in the list: worked out ahead, skipped when reached)
     size_t lazyCount_ = 0;              // pending leaves
     std::vector<uint32_t> lastLazyLeaves_;
     void addLazyLeaves(const BVH& bvh, std::span<const uint32_t> leaves);
     void dropLazy(); // (empties the set without the normals)
+    // A dab, before any of its mirror copies moves a vertex: the taken-over leaves (lazyFlag_ 3) whose boxes touch any
+    // copy's ball (radius x the widest reach any brush's region takes), so every normal it reads is as after a settle.
+    void flushInheritedAround(Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, Symmetry sym);
+    size_t inherited_ = 0;                            // taken-over leaves still pending
     Mesh* lazyMesh_ = nullptr;
     const BVH* lazyBvh_ = nullptr;
+    bool settling_ = false; // deferNormals: the ended stroke's exact normals are still being caught up
     std::vector<uint32_t> curvatureStamp_;
     bool adaptiveDab_ = false; // the dab dabSingle is placing takes the adaptive path
     bool earlyNormals_ = false; // dab(): this copy's normals go ahead (analytically) for the next mirror copy that meets it
