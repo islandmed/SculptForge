@@ -357,7 +357,7 @@ void App::registerViewActions() {
         "Maya keys: Alt+F).", [this] { frameActivePart(); });
     add("view.frame_last_stroke", "Frame last stroke", "", "Move in on where you last sculpted (no key by default: bind one "
         "in Preferences > Hotkeys). The view keeps its angle; Frame fits the whole model.", [this] { frameLastStroke(); });
-    // Hold to orbit / pan / zoom (Preferences > Navigation; David and Fenix on Discord): no key by default. Bound to one,
+    // Hold to orbit / pan / zoom (Preferences > Navigation; members on Discord): no key by default. Bound to one,
     // the key held turns any press on the canvas (any button, the pen's tip) into that camera drag, in every key style:
     // left-handed and tablet users navigate from the hand on the keyboard. navHoldKey tracks the key, navMoveForPress
     // starts the drag (App.cpp onMouseDown), which goes on to the button's release as Hold Space does.

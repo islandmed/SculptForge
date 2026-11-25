@@ -2417,7 +2417,7 @@ std::vector<std::string> navWarnings(App& app, int move) {
 
 } // namespace
 
-// Preferences > Navigation (David and Fenix on Discord): the camera's bindings in one place. Per move a hold key (any
+// Preferences > Navigation (members on Discord): the camera's bindings in one place. Per move a hold key (any
 // key; held, every press on the canvas is that drag) and a drag gesture (button + modifiers), the view keys, the pen's
 // side buttons (as Preferences > Tablet), and Navigation defaults. Nothing is set by default: every key style keeps
 // its gestures, so this is a choice, never a change.
