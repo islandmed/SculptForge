@@ -193,6 +193,27 @@ bool g_captureNext = false;
 
 namespace tray {
 
+// While a scope is drawn for one entry (App::drawMyPanelScope), the rest of the palette body runs with items skipped; drawing
+// that is not an item (an icon put straight on the draw list) would still land at the stuck cursor, inside the cropped control
+// (11-24: three stray icons over a shelf's Backface culling). So skipping also means an empty clip rect: nothing of it shows.
+namespace {
+bool g_scopeClip = false;
+}
+void scopeSkip(bool skip) {
+    ImGui::GetCurrentWindow()->SkipItems = skip;
+    if (skip && !g_scopeClip) {
+        ImGui::PushClipRect(ImVec2(-1.0f, -1.0f), ImVec2(-1.0f, -1.0f), false);
+        g_scopeClip = true;
+    } else if (!skip && g_scopeClip) {
+        ImGui::PopClipRect();
+        g_scopeClip = false;
+    }
+}
+void scopeSkipEnd() {
+    if (g_scopeClip) ImGui::PopClipRect();
+    g_scopeClip = false;
+}
+
 Section::Section() {
     ImGui::Indent(kSectionInset * ImGui::GetFontSize() / 15.0f);
     capture_ = std::exchange(g_captureNext, false);
@@ -202,7 +223,8 @@ Section::~Section() {
     const float s = ImGui::GetFontSize() / 15.0f;
     ImGui::Unindent(kSectionInset * s);
     ImGui::Dummy(ImVec2(0, 4.0f * s));
-    if (capture_) ImGui::GetCurrentWindow()->SkipItems = true; // the rest of the palette body is not wanted
+    ui::PinSection(""); // controls after it belong to the palette (My Panel entries, Ui.h)
+    if (capture_) scopeSkip(true); // the rest of the palette body is not wanted
 }
 
 Style::Style() { ImGui::PushStyleColor(ImGuiCol_CheckMark, checkMark()); }
@@ -254,15 +276,18 @@ bool SliderInt(const char* id, int* v, int lo, int hi, const char* format, ImGui
 } // namespace tray
 
 bool App::subpalette(const char* id, const char* englishTitle) {
+    ui::PinSection(""); // (set below while the section is open; its Section object clears it)
     if (!myPanelSection_.empty()) { // My Panel draws this section's body and nothing else of the palette
+        if (myPanelPaletteLevel_) return false; // ... or only the palette's own controls, outside every section
         const bool mine = myPanelSection_ == id;
         if (mine) {
             auto& title = myPanelTitles_[id];
             if (title != englishTitle) title = englishTitle;
         }
         const bool draw = mine && !myPanelProbe_;
-        ImGui::GetCurrentWindow()->SkipItems = !draw;
+        tray::scopeSkip(!draw);
         g_captureNext = draw;
+        if (draw) ui::PinSection(id);
         return draw;
     }
     const char* title = tr(englishTitle); // the interface language (I18n.h); the id keeps the item's identity
@@ -345,6 +370,7 @@ bool App::subpalette(const char* id, const char* englishTitle) {
         isOpen = !isOpen;
     }
     if (isOpen) ImGui::Dummy(ImVec2(0, 2.0f * s));
+    if (isOpen) ui::PinSection(id);
     return isOpen;
 }
 
@@ -517,9 +543,12 @@ void App::drawPalette_Draw() {
             std::snprintf(label, sizeof label, "%.0f##focal%d", presets[i], i);
             if (ImGui::Button(label, ImVec2(w, 0))) camera_.fovY = toFov(presets[i]);
         }
-        ui::Checkbox("Axes##draw.axes", &uiPrefs_.showAxes);
-        ui::HelpText("Axes", nullptr, "Show the X / Y / Z directions in the corner of the canvas.", "Draw > Camera");
-        ImGui::SameLine();
+        // The corner gizmo (CornerGizmo.cpp): the X / Y / Z axes (the Classic layout's default), the orientation
+        // widget (the SculptForge layout's), or hidden. The View Figure sits under either.
+        hint(*this, "Corner gizmo");
+        segmented(*this, {"view.corner_axes", "view.corner_widget", "view.corner_off"});
+        hint(*this, "Position");
+        segmented(*this, {"view.corner_top_left", "view.corner_top_right"});
         ui::Checkbox("View Figure##draw.view_figure", &uiPrefs_.showViewFigure);
         ui::HelpText("View Figure", nullptr,
                      "Show a small shaded head in the corner of the canvas that turns with the view. Click it to look "
@@ -745,6 +774,10 @@ void App::drawPalette_Preferences() {
         tray::Section section;
         config::drawHotkeysSection(*this);
     }
+    if (subpalette("preferences.navigation", "Navigation")) {
+        tray::Section section;
+        config::drawNavigationSection(*this);
+    }
     if (subpalette("preferences.display", "Display")) {
         tray::Section section;
         drawBackgroundControls("prefs");
@@ -821,6 +854,10 @@ void App::drawPalette_Render() {
     if (ImGui::Checkbox(tr("Floor grid##render"), &renderSettings_.floorGrid))
         uiPrefs_.floorGrid = renderSettings_.floorGrid; // (a preference: on in every session until turned off)
     ui::HelpAction(*this, "view.floor_grid");
+    if (newerMenuRows() || uiPrefs_.floorGridFixed) { // (a row after 0.13.0: Classic keeps its old rows unless asked; once on, it stays reachable)
+        ImGui::Checkbox(tr("Floor grid at Y=0##render"), &uiPrefs_.floorGridFixed);
+        ui::HelpAction(*this, "view.floor_grid_fixed");
+    }
     bool xray = renderSettings_.xray;
     if (ui::Checkbox("X-Ray##render", &xray)) runCommand("xray", {{"on", xray}});
     ui::HelpAction(*this, "view.xray");
@@ -837,6 +874,7 @@ void App::drawPalette_Render() {
     ImGui::TextDisabled("%s", tr("View resolution"));
     ui::Segmented(*this, {"perf.res_100", "perf.res_75", "perf.res_50"});
     drawViewsSection();
+    drawSplitViewSection(); // View > Split view (SplitView.cpp)
     drawReferencesSection(); // View > Reference images (ReferenceImages.cpp)
     actionRow(*this, {"view.frame", "view.fullscreen"});
     actionRow(*this, {"ui.library", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
@@ -905,7 +943,9 @@ void App::drawPalette_Tool() {
         char tris[64];
         std::snprintf(tris, sizeof tris, "%zu tris", doc_.mesh.triangleCount());
         ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(tris).x);
-        ImGui::TextDisabled("%s", tris);
+        ui::Readout("##part.tris", tris);
+        ui::HelpText("Triangle count", nullptr, "How many triangles the active Part has at its current level. Hold Alt and drag it into My Panel to keep it in view.",
+                     "Tool");
         // The Part's size, width x height x depth, in the Units preference (#148).
         if (const AABB b = sizeBounds().part; b.valid()) {
             ImGui::TextDisabled("%s", formatSize(b.extent(), lengthUnit()).c_str());
@@ -953,6 +993,12 @@ void App::drawPalette_Tool() {
         drawGeometrySection(); // PanelGeometry.cpp
         Demo::popScope();
     }
+    if (subpalette("tool.polygon", "Polygon")) {
+        tray::Section section;
+        Demo::pushScope("Polygon");
+        drawPolygonContents(); // Polygon mode: Points / Edges / Faces and the operations (PanelPolygon.cpp)
+        Demo::popScope();
+    }
     if (subpalette("tool.remesh", "Remesh")) {
         tray::Section section;
         // QRemesh (quad retopology) first: the same controls and settings as in Tool > Geometry.
@@ -985,6 +1031,8 @@ void App::drawPalette_Tool() {
                 ImGui::SameLine();
                 drawKeepTextureCheckbox("Keep Texture##remesh", "Tool > Remesh"); // only for a painted Part
             }
+            ImGui::Checkbox(tr("Keep Face Groups##remesh"), &voxelKeepGroups_); // (its own row: three boxes don't fit a tray)
+            ui::HelpText("Keep Face Groups", nullptr, kKeepGroupsHelp, "Tool > Remesh");
         }
         drawQuickRemeshContents(); // Quick Remesh, Remesh after each stroke (#121, PanelRetopo.cpp)
     }
@@ -993,6 +1041,11 @@ void App::drawPalette_Tool() {
         Demo::pushScope("Reshape");
         drawDeformationContents(); // Smooth, Relax, Polish, Balloon, Size, Stack (PanelExtract.cpp)
         Demo::popScope();
+    }
+    // Added after 0.13.0: in the Classic layout only with Show newer menu rows (next to Drape, which it also holds).
+    if (newerMenuRows() && subpalette("tool.cloth", "Cloth")) {
+        tray::Section section;
+        drawClothPanel(); // PanelCloth.cpp
     }
     if (subpalette("tool.drape", "Drape")) {
         tray::Section section;
@@ -1074,9 +1127,21 @@ void App::drawPalette_Tool() {
         if (ImGui::Checkbox(tr("Floor grid##display"), &renderSettings_.floorGrid))
             uiPrefs_.floorGrid = renderSettings_.floorGrid;
         ui::HelpAction(*this, "view.floor_grid");
+        if (newerMenuRows() || uiPrefs_.floorGridFixed) { // (as the View row above)
+            ImGui::Checkbox(tr("Floor grid at Y=0##display"), &uiPrefs_.floorGridFixed);
+            ui::HelpAction(*this, "view.floor_grid_fixed");
+        }
         ImGui::ColorEdit3(tr("Material colour"), &renderSettings_.baseColor.x, ImGuiColorEditFlags_NoInputs);
         ui::HelpText("Material colour", nullptr, "Colour of the Studio material (the clay colour).", "Tool > Viewport Look");
         drawShadingControls();
+    }
+    // Added after 0.13.0: in the Classic layout only with Show newer menu rows (or while a Scatter is still live). Last,
+    // so the rows above sit in the same place in both looks.
+    if ((newerMenuRows() || scatterRevision_) && subpalette("tool.scatter", "Scatter")) {
+        tray::Section section;
+        Demo::pushScope("Scatter");
+        drawScatterContents(); // PanelScatter.cpp
+        Demo::popScope();
     }
 }
 

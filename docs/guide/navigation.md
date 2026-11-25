@@ -52,6 +52,15 @@ the axes.
 
 Drag on the disc between the ends to orbit.
 
+**Orientation widget** (**Sculpt > Draw & Tablet > Camera > Corner gizmo > Orientation**, the SculptForge layout's default):
+the same axes through a ball of dark glass, a dot at each end and no letters. Click a dot to look from that side
+(orthographic, like the numpad views; the dot facing you again shows the opposite side): the camera glides there in a
+short eased move (none with **Edit > Preferences > Interface > Reduce motion**). The dot under the pointer lights up in
+the accent and its side is named under the disc. Drag the ball or the disc to orbit; double-click a dot to frame the
+model. **Corner gizmo** picks the widget, the X / Y / Z axes (the Classic layout's default) or **Hidden**, and
+**Position** puts the corner gizmo (and the View Figure) at the top left or the top right; both choices are kept in
+the preferences.
+
 **Sculpt > Draw & Tablet > Camera > Gizmo size** makes the axes **Small**, **Medium** (the default) or **Large**; they grow with the
 UI scale too, and clicking an end works at every size. **View Figure** (beside **Axes**, off until you turn it on)
 adds a small shaded head in the corner that turns with the camera, so you can tell front from back at a glance.
@@ -78,14 +87,16 @@ camera.
 | Zoom | Mouse wheel (toward the middle of the view, or toward the pointer with **Edit > Preferences > Input > Wheel zooms toward the pointer**, on in the Maya style); <kbd>Alt</kbd>+left-drag on the background, then let go of <kbd>Alt</kbd> and keep dragging; <kbd>Ctrl</kbd>+right-drag; <kbd>Ctrl</kbd>+middle-drag; <kbd>Ctrl</kbd>+left-drag on the background when nothing is masked (not with the Classic sculpting keys) |
 | Frame the model | <kbd>F</kbd> (Blender style: <kbd>Home</kbd>), or **Frame** on the right shelf. Classic sculpting keys, several Parts: <kbd>F</kbd> frames the active Part, <kbd>F</kbd> twice quickly frames the whole scene (**Frame scene** can take a key of its own) |
 | Front, right, top view | <kbd>Numpad 1</kbd>, <kbd>Numpad 3</kbd>, <kbd>Numpad 7</kbd>; <kbd>Ctrl</kbd> for the back, left and bottom |
-| Front, side, top or bottom view with the mouse | Click an end of the axis gizmo in the canvas corner |
+| Front, side, top or bottom view with the mouse | Click an end of the axis gizmo in the canvas corner, or a dot of the orientation widget (it glides there) |
 | Orthographic on or off | <kbd>Numpad 5</kbd> |
 | Turn in 15 degree steps | <kbd>Numpad 4</kbd> / <kbd>Numpad 6</kbd> (around), <kbd>Numpad 8</kbd> / <kbd>Numpad 2</kbd> (over); <kbd>Numpad 9</kbd>: the other side |
 | Frame the active Part | <kbd>Numpad .</kbd> (Maya style: also <kbd>Alt</kbd>+<kbd>F</kbd>) |
+| Centre the view on the pointer | <kbd>Alt</kbd>+middle click (press and let go without dragging; every key style): the point under the pointer slides to the middle of the view, the zoom and the angle stay, and the view then turns about that point. Off the model it centres on that spot of the background. **Centre view on the pointer** in the Controls window (<kbd>F1</kbd>) can take a key, which does the same wherever the pointer is |
 | Reset the view | Maya style: <kbd>Alt</kbd>+<kbd>H</kbd> (front, upright, everything in view); any style: **Reset view** in the Controls window (<kbd>F1</kbd>), where you can give it a key |
 | Frame one Part | <kbd>Shift</kbd>+<kbd>Alt</kbd>+click it, or triple-click another Part (it becomes the active Part) |
 | Sculpt from the background | Turn on **Edit > Preferences > Input > Start strokes off the model**, **View > Lock camera**, or press <kbd>Shift</kbd>+<kbd>L</kbd>: a left-drag that starts beside the model sculpts once it reaches the surface |
 | Move the camera with Space held | Turn on **Edit > Preferences > Input > Hold Space and drag to move the camera**, then hold <kbd>Space</kbd>: left-drag rotates, right- or middle-drag pans, <kbd>Ctrl</kbd>+drag zooms, anywhere on the canvas (on the model too) |
+| Hold a key of your own to rotate, pan or zoom | **Edit > Preferences > Navigation**: give **Hold to orbit**, **Hold to pan** and **Hold to zoom** a key each (no key by default). Hold it and drag anywhere on the canvas, with any mouse button or the pen: the view moves and nothing is sculpted. The same panel binds a mouse button plus <kbd>Ctrl</kbd>, <kbd>Shift</kbd> or <kbd>Alt</kbd> to a move, and sets the pen's side buttons |
 
 Zoom drags: drag up to come closer, down to back away. With the Classic sculpting keys (**Edit > Preferences > Input**)
 they go: drag up to zoom out, down to zoom in.
@@ -93,6 +104,29 @@ they go: drag up to zoom out, down to zoom in.
 **Hold Space and drag to move the camera** is off by default, because with the Classic sculpting keys <kbd>Space</kbd> opens the
 Quick Menu. With it on, <kbd>Space</kbd> no longer opens the Quick Menu (a right click still does), and a space typed in
 a text field is never taken.
+
+### Navigation bindings
+
+**Edit > Preferences > Navigation** keeps the camera's bindings in one place, for left-handed and tablet users who want
+to navigate from whichever hand rests on the keyboard. Nothing in it is set until you choose it, so every key style keeps
+its own gestures:
+
+- **Hold keys.** Click the key button beside **Orbit**, **Pan** or **Zoom** and press any key (or two keys with the **>>**
+  button, as in Hotkeys). While that key is held, a drag anywhere on the canvas, with any mouse button or the pen's tip,
+  is that camera move: it never sculpts, and the drag goes on until you let the button go, even if you release the key
+  first. While the key is down, a label in the status bar (**HOLD TO ORBIT**, **HOLD TO PAN** or **HOLD TO ZOOM**, beside
+  **CAMERA LOCKED**'s place) names the move, and it goes when you let go. A key typed into a text field is never taken.
+  Pressed on its own, the key shows what to do in the status bar.
+- **Drag gestures.** Pick a mouse button (**Left**, **Middle** or **Right**) and turn on <kbd>Ctrl</kbd>, <kbd>Shift</kbd>
+  or <kbd>Alt</kbd> beside it. That exact combination drags the move, before anything the key style does with the button.
+  The left button needs a modifier, because a plain left drag sculpts.
+- **Warnings.** A hold key another action also has shows in the warning colour, and a line under the list says what a
+  gesture takes over (for example, <kbd>Shift</kbd>+middle-drag already pans) or that two moves share one gesture (the
+  first in the list wins). You can keep it: the panel only tells you.
+- **View keys** lists Frame, Reset view and the orbit, pan and zoom step keys with the same key buttons as Hotkeys.
+- **Pen buttons** sets the pen's side buttons as **Edit > Preferences > Tablet** does; **Zoom view** joins Rotate view and Pan view.
+- **Navigation defaults** unbinds the hold keys, clears the gestures, puts the view keys back to the key style's defaults
+  and the pen's buttons back to the Tablet defaults. Other shortcuts stay as they are. Everything saves itself.
 
 **Start strokes off the model** (also **View > Lock camera**) is off by default. With it on (a label at the top of the
 canvas says so, and in the SculptForge layout the status bar shows **CAMERA LOCKED**), a left-drag on the background
@@ -110,8 +144,12 @@ Rectangle Mask and the <kbd>Ctrl</kbd>+<kbd>Shift</kbd> hide and show shapes wor
 on the floor the model stands on: its lowest point, with the up axis (Y) standing on it. It helps judge perspective
 and tilt and line up Parts; the red line is the X axis, the blue one Z.
 
-The floor moves when a stroke or a move ends (not during it). The squares step up by ten as you zoom out, and the grid
-fades into the distance; it never draws over the model, even seen from below.
+The floor moves when a stroke or a move ends (not during it). **Floor grid at Y=0** (next to it; off by default,
+remembered) keeps the grid at the world's height zero instead, a fixed reference while you move Parts up and down or
+work on a base: a Part below it then shows through the grid from above. In the Classic layout its row shows with
+**Edit > Preferences > Interface > Show newer menu rows** (the command palette and a hotkey reach it either way, and once
+it is on the row stays). The squares step up by ten as you zoom out, and
+the grid fades into the distance; it never draws over the model, even seen from below.
 
 "Background" means any part of the canvas where the cursor isn't over the model. A left-drag that starts on
 the model sculpts instead, so with a pen or a one-button mouse, start rotations beside the model. When the
@@ -253,6 +291,28 @@ Type a name (or leave it empty for "View 1", "View 2" ...) and click **Save View
 
 Click a name to go back to that view, or press <kbd>Numpad 0</kbd> for the one used last; **x** forgets it. Saved
 views are kept in the project.
+
+## Split view
+
+**View > Split view** (or <kbd>Shift</kbd>+<kbd>V</kbd>) shows two live views of the same scene, **Beside** each
+other or one **Below** the other. Each view has its own camera, so you can sculpt in a perspective view while a front
+view beside it follows every stroke, or work in the front view and watch the perspective one.
+
+The view under the pointer is the one you work in: strokes, orbit, pan, zoom, <kbd>F</kbd> and the axis keys all go
+to it, and the brush cursor and the axis gizmo move with it. The other view redraws as you sculpt. Drag the divider
+between the views to give one more room.
+
+Each view has a direction, shown on the small chip at its top right (click it to change, swap the views or go back
+to one view; **View > Split view** has the same choices):
+
+| Direction | What it does |
+|---|---|
+| **Free** | Turns like any view: perspective, or orthographic with <kbd>Numpad 5</kbd> |
+| **Front**, **Right**, **Top** | Holds that side, orthographic; pan and zoom still work, orbiting leaves it where it is |
+
+New installs start with a Free view beside a Front one. The split, its directions and the divider are saved with your
+preferences; the cameras themselves are not. While a stroke runs or a view moves, the other view draws at a lower
+resolution (half of it on the Essential tier) and comes back sharp as soon as you stop.
 
 ## Display toggles that help navigation
 

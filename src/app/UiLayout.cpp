@@ -114,7 +114,17 @@ MyPanelEntry myPanelEntry(const std::string& entry) {
     MyPanelEntry e;
     if (entry.rfind("action:", 0) == 0) e.section = false, e.id = entry.substr(7);
     else if (entry.rfind("section:", 0) == 0) e.section = true, e.id = entry.substr(8);
+    else if (entry.rfind("control:", 0) == 0) { // a scope, a slash, a key: both non-empty
+        const std::string rest = entry.substr(8);
+        const size_t slash = rest.find('/');
+        if (slash != std::string::npos && slash > 0 && slash + 1 < rest.size()) e.control = true, e.id = rest;
+    }
     return e;
+}
+
+std::string myPanelControlEntry(const std::string& scope, const std::string& key) {
+    if (scope.empty() || key.empty() || scope.find('/') != std::string::npos) return {};
+    return "control:" + scope + "/" + key;
 }
 
 bool shelfEmpty(const std::vector<std::string>& items) {

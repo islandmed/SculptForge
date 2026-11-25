@@ -106,6 +106,14 @@ bool parseUpdateFeed(const std::string& json, UpdateInfo& out, std::string& erro
         if (readRelease(j["channels"]["preview"], preview) && compareVersions(preview.version, info.version) > 0)
             info = std::move(preview); // never older than stable: once stable passes the beta, it is offered
     }
+    // The macOS hold, read fail-closed: a strict parse (a duplicate key anywhere in the feed is an error there, so no
+    // second "macos" can win), then a JSON true at the top level and nowhere else; the banner itself still works off `j`.
+    {
+        Json strict;
+        std::string strictError;
+        info.macSelfUpdate = Json::parseStrict(json, strict, strictError) && strict.isObject() && strict["self_update"].isObject() &&
+                             strict["self_update"]["macos"].isBool() && strict["self_update"]["macos"].asBool();
+    }
     const Json& challenge = j["challenge"];
     if (challenge.isObject() && challenge["id"].isString()) {
         const std::string& id = challenge["id"].asString();

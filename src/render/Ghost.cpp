@@ -97,7 +97,7 @@ glm::vec3 ghostMove(const GhostStroke& g, glm::vec3 x, const glm::vec3& n) {
             break;
         case GhostKind::Trim: {
             const float h = glm::dot(x - (d.areaCenter - an * (sign * r * 0.02f * s)), an);
-            if (sign * h > 0.0f) x -= an * (h * std::min(1.0f, std::sqrt(f) * (0.5f + s)));
+            if (sign * h > 0.0f) x -= an * (h * std::min(1.0f, std::sqrt(f) * trimGain(s)));
             break;
         }
         case GhostKind::Move: break; // (below: measured from the start position, not the moved one)

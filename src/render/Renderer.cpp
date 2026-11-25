@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <bit>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <thread>
@@ -179,8 +180,9 @@ vec3 ghostMove(vec3 x, vec3 n, int first, int end, inout vec3 g, inout float lap
         } else if (kind == 9) { // Trim: what sticks out above a plane cut off
             float h = dot(x - (ac - an * (sgn * r * 0.02 * s)), an);
             if (sgn * h > 0.0) {
-                float q = sqrt(max(f, 0.0)) * (0.5 + s);
-                float m = min(1.0, q), dm = q < 1.0 && f > 1e-6 ? (0.5 + s) * F.y / (2.0 * sqrt(f)) : 0.0;
+                float gain = s < 0.5 ? 2.0 * s : 0.5 + s; // (trimGain, core/SculptKernel.h)
+                float q = sqrt(max(f, 0.0)) * gain;
+                float m = min(1.0, q), dm = q < 1.0 && f > 1e-6 ? gain * F.y / (2.0 * sqrt(f)) : 0.0;
                 x -= an * (h * m);
                 lap -= cn * (2.0 * dm * dot(radial, dh) + m * cn * lap + h * dm * inv);
                 g -= cn * (m * dh + h * dm * radial);
@@ -479,6 +481,9 @@ uniform vec2 uLightLevels;    // light intensity, ambient
 uniform float uAlpha;         // X-Ray: the see-through Parts' opacity (1 = opaque)
 uniform int uOccAlpha;        // 1: alpha carries the shading normal's facing to the shadow light (render/Occlusion.h)
 uniform vec3 uOccLight;       // that light, view space
+uniform int uLightCount;      // added lights (RenderSettings::lights; 0 = none, the view as it always drew)
+uniform vec3 uLightDir[4];    // towards each one, view space
+uniform vec3 uLightCol[4];    // its linear colour times its intensity
 vec3 gShadeN = vec3(0.0, 0.0, 1.0); // (main sets it: the normal the pixel is shaded with)
 uniform int uTwoSided;        // 1: back faces shade with the normal turned towards the viewer; 0: the motion proxy,
                               // whose folds face backwards on the outside of the surface
@@ -516,6 +521,20 @@ vec3 groupColor(uint id) {
 }
 vec3 faceColor(uint c) {
     return pow(vec3(float(c & 255u), float((c >> 8) & 255u), float((c >> 16) & 255u)) / 255.0, vec3(2.2));
+}
+// The added lights on the Lit Sphere and studio shading: Lambert diffuse in the surface's colour and a small
+// Blinn highlight per light, in the material's own units (no tone map here, so a light at 1 adds about half
+// the surface colour on a facing surface, like the studio key does).
+vec3 addedLights(vec3 n, vec3 v, vec3 albedo, float shine) {
+    vec3 sum = vec3(0.0);
+    for (int i = 0; i < uLightCount; ++i) {
+        vec3 L = uLightDir[i];
+        float ndl = max(dot(n, L), 0.0);
+        // (the highlight fades out as the surface turns away from the light: no glint from a light behind it)
+        float sp = pow(max(dot(n, normalize(L + v)), 0.0), shine) * 0.18 * smoothstep(0.0, 0.08, dot(n, L));
+        sum += uLightCol[i] * (albedo * ndl * 0.55 + sp);
+    }
+    return sum;
 }
 // The UV checker: light and dark squares, the whole tile tinted by its UDIM number so tiles tell apart.
 vec3 checkerColor(vec2 uv) {
@@ -578,6 +597,26 @@ vec3 toneMapped(vec3 c) {
     }
     return clamp(c, 0.0, 1.0);
 }
+// The added lights in the PBR view: GGX (Smith height-correlated visibility, Schlick Fresnel) plus Lambert, each
+// light's colour as its radiance over pi, so a light at 1 on a facing white surface adds its colour once.
+vec3 directLights(vec3 albedo, vec3 n, vec3 v, float rough, float metal, vec3 F0, float NdotV) {
+    vec3 sum = vec3(0.0);
+    float a = max(rough * rough, 0.002), a2 = a * a;
+    for (int i = 0; i < uLightCount; ++i) {
+        vec3 L = uLightDir[i];
+        float NdotL = dot(n, L);
+        if (NdotL <= 0.0) continue;
+        vec3 H = normalize(L + v);
+        float NdotH = max(dot(n, H), 0.0), VdotH = max(dot(v, H), 0.0);
+        float d = NdotH * NdotH * (a2 - 1.0) + 1.0;
+        float D = a2 / (3.14159265 * d * d);
+        float Vis = 0.5 / (NdotL * sqrt(NdotV * NdotV * (1.0 - a2) + a2) + NdotV * sqrt(NdotL * NdotL * (1.0 - a2) + a2) + 1e-5);
+        vec3 F = F0 + (1.0 - F0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
+        vec3 kd = (1.0 - F) * (1.0 - metal);
+        sum += (kd * albedo + D * Vis * F * 3.14159265) * uLightCol[i] * NdotL;
+    }
+    return sum;
+}
 vec3 pbrShade(vec3 albedo, vec3 n, vec3 v, float rough, float metal, float ao, float curvature, vec3 emissive) {
     rough = clamp(rough, 0.03, 1.0);
     metal = clamp(metal, 0.0, 1.0);
@@ -593,7 +632,8 @@ vec3 pbrShade(vec3 albedo, vec3 n, vec3 v, float rough, float metal, float ao, f
     vec3 diffuse = (1.0 - F) * (1.0 - metal) * albedo * irr;
     float specOcc = clamp(pow(NdotV + ao, exp2(-16.0 * rough - 1.0)) - 1.0 + ao, 0.0, 1.0); // Lagarde & de Rousiers
     float cavity = 1.0 - uPbrCavity * 0.6 * smoothstep(0.0, 0.16, curvature);
-    return ((diffuse * ao + spec * specOcc) * cavity + emissive) * exp2(uExposure);
+    vec3 direct = uLightCount > 0 ? directLights(albedo, n, v, rough, metal, F0, NdotV) : vec3(0.0);
+    return ((diffuse * ao + spec * specOcc + direct) * cavity + emissive) * exp2(uExposure);
 }
 #endif
 void main() {
@@ -684,6 +724,7 @@ void main() {
         float mcrease = smoothstep(0.03, 0.18, curvature);
         float mridge = smoothstep(0.03, 0.2, -curvature);
         vec3 c = mc * tint * (1.0 - uLitSphereCavity.x * mcrease) * (1.0 + uLitSphereCavity.y * mridge);
+        if (uLightCount > 0) c += addedLights(n, v, tint, 40.0) * (1.0 - uLitSphereCavity.x * mcrease);
         if (uShowMask == 1) c = maskTint(c, V_MASK);
         fragColor = finish(c);
         return;
@@ -706,6 +747,7 @@ void main() {
     c += albedo * ridge * 0.3 * diff;                           // ridges catch the key light
     c += vec3(spec) * (1.0 - crease) + rim * vec3(0.8, 0.85, 1.0);
     c = c * uLightLevels.x + albedo * uLightLevels.y * 0.6;
+    if (uLightCount > 0) c += addedLights(n, v, albedo, 40.0) * cavity;
     if (uShowMask == 1) c = maskTint(c, V_MASK);
     fragColor = finish(c);
 }
@@ -1150,7 +1192,10 @@ void Renderer::keepPrograms(bool keep) {
     }
 }
 
+static GLenum noteGlError(const char* what);
+
 bool Renderer::init(std::string& error) {
+    gl::enableDebugLog();
     {   // (the lines a graphics-driver report needs: who made it, which shader language, the limits the renderer leans on)
         GLint samples = 0, texels = 0, vecs = 0;
         gl::GetIntegerv(GL_MAX_SAMPLES, &samples);
@@ -1195,6 +1240,33 @@ bool Renderer::init(std::string& error) {
     gl::BindBuffer(GL_ARRAY_BUFFER, 0);
 
     gl::GenVertexArrays(1, &emptyVao_);
+    {
+        const float zero[2] = {0.0f, 0.0f};
+        gl::GenBuffers(1, &dummyUvBufferData_);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, dummyUvBufferData_);
+        gl::BufferData(GL_TEXTURE_BUFFER, sizeof zero, zero, GL_STATIC_DRAW);
+        gl::GenTextures(1, &dummyUvBufferTexture_);
+        gl::BindTexture(GL_TEXTURE_BUFFER, dummyUvBufferTexture_);
+        gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, dummyUvBufferData_);
+        gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+        const uint32_t zeroUint = 0;
+        gl::GenBuffers(1, &dummyUintBufferData_);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, dummyUintBufferData_);
+        gl::BufferData(GL_TEXTURE_BUFFER, sizeof zeroUint, &zeroUint, GL_STATIC_DRAW);
+        gl::GenTextures(1, &dummyUintBufferTexture_);
+        gl::BindTexture(GL_TEXTURE_BUFFER, dummyUintBufferTexture_);
+        gl::TexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, dummyUintBufferData_);
+        gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+        gl::GenTextures(1, &dummyUv2D_);
+        gl::BindTexture(GL_TEXTURE_2D, dummyUv2D_);
+        gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RG32F), 1, 1, 0, GL_RG, GL_FLOAT, zero);
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_NEAREST));
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_NEAREST));
+        gl::BindTexture(GL_TEXTURE_2D, 0);
+    }
 
     // Built-in lit spheres, generated once (256 KB each, together on the thread pool) and uploaded (with keepPrograms,
     // kept for the next Renderer: an upload is slow on some drivers, WSL's d3d12); custom ones upload in syncLitSpheres.
@@ -1212,6 +1284,7 @@ bool Renderer::init(std::string& error) {
     }
     litsphereHashes_.assign(size_t(builtinLitSphereCount()), 0);
     syncLitSpheres();
+    noteGlError("start-up (shader programs, Lit Spheres)");
     // SF_NO_VERTEXID_BASE=1 takes the other path, to check it on drivers that don't need it.
     if (g_keptVertexIdBase < 0 || !g_keepPrograms) g_keptVertexIdBase = checkVertexIdBase() ? 1 : 0;
     vertexIdHasBase_ = g_keptVertexIdBase == 1 && !std::getenv("SF_NO_VERTEXID_BASE");
@@ -1219,9 +1292,9 @@ bool Renderer::init(std::string& error) {
 }
 
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
-    if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
+    if (!(features & kMicro) && (features & (kTextured | kNormalMap))) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
-    if (features & kMicro) features &= kMicro | kFlat | kPbr | ((features & kFocus) ? kFocus : kTiles);
+    if (features & kMicro) features &= kMicro | kFlat | kPbr | kWide | ((features & kFocus) ? kFocus : kTiles);
     MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
     const auto simpler = [&]() -> const MeshProgram* {
@@ -1232,12 +1305,13 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     std::string prefix = "#version 330 core\n";
     if (features & kMicro)
         prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : (features & kTiles) ? "#define MICRO\n#define TILES\n" : "#define MICRO\n";
+    if ((features & kMicro) && (features & kWide)) prefix += "#define WIDE\n";
     else if (features & kPaint) prefix += "#define PAINT\n";
     if ((features & kPrim) && !(features & kMicro)) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
     if (features & kFlat) prefix += "#define FLAT\n";
-    if (features & kGhost) prefix += "#define GHOST\n";
+    if ((features & kGhost) && !(features & kMicro)) prefix += "#define GHOST\n";
     if (features & kPbr) prefix += "#define PBR\n";
     const std::string vs = prefix + ((features & kMicro) ? microVertexShaderSource() : kMeshVS), fs = prefix + kMeshFS,
                       gs = prefix + kMeshGS;
@@ -1277,6 +1351,11 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.alpha = at("uAlpha");
     p.occAlpha = at("uOccAlpha");
     p.occLight = at("uOccLight");
+    p.lightCount = at("uLightCount");
+    p.lightDirs = at("uLightDir[0]"); // (an array's location: by its first element; some drivers want the bare name)
+    if (p.lightDirs < 0) p.lightDirs = at("uLightDir");
+    p.lightCols = at("uLightCol[0]");
+    if (p.lightCols < 0) p.lightCols = at("uLightCol");
     p.microWire = at("uMicroWire");
     p.primBase = at("uPrimBase");
     p.hasPaint = at("uHasPaint");
@@ -1365,8 +1444,7 @@ bool Renderer::checkVertexIdBase() {
     gl::DeleteFramebuffers(1, &fbo);
     gl::DeleteRenderbuffers(1, &rb);
     deleteProgram(prog);
-    for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
-    }
+    noteGlError("the gl_VertexID probe");
     return id == 1002;
 }
 
@@ -1473,10 +1551,9 @@ void Renderer::freeSlot(MeshSlot& s) {
     }
     s.micro.reset();
     if (s.patchVao) {
-        for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData, &s.patchUvData})
+        for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData})
             gl::DeleteBuffers(1, b);
         gl::DeleteTextures(1, &s.patchGroupTexture);
-        gl::DeleteTextures(1, &s.patchUvTexture);
         gl::DeleteVertexArrays(1, &s.patchVao);
         gl::DeleteVertexArrays(1, &s.patchLineVao);
     }
@@ -1586,6 +1663,11 @@ void Renderer::shutdown() {
     referenceTextures_.clear();
     references_.clear();
     gl::DeleteVertexArrays(1, &emptyVao_);
+    gl::DeleteBuffers(1, &dummyUvBufferData_);
+    gl::DeleteTextures(1, &dummyUvBufferTexture_);
+    gl::DeleteBuffers(1, &dummyUintBufferData_);
+    gl::DeleteTextures(1, &dummyUintBufferTexture_);
+    gl::DeleteTextures(1, &dummyUv2D_);
     for (MeshProgram& p : programs_) {
         deleteProgram(p.id);
         p = MeshProgram();
@@ -2142,19 +2224,26 @@ void Renderer::uploadIndices(MeshSlot& s, const Mesh& mesh) {
     gl::BindVertexArray(0);
 }
 
-// A GL error after one of the calls a mesh upload makes, named once per call and code (Mali-G72, 11-22: a textured mesh
-// drew nothing and the log had only "GL error 0x0501 after drawing the view", from no call in particular).
-static void noteUploadError(const char* what) {
-    static unsigned seen = 0;
+// A GL error after one of the calls a mesh upload or a textured draw makes, named once per call and code (Mali-G72, 11-22:
+// a textured mesh drew nothing and the log had only "GL error 0x0501 after drawing the view", from no call in particular;
+// that check stops after 300 frames, long before a texture exists). Returns the first error, GL_NO_ERROR when there was none.
+static void noteGlErrorCode(const char* what, GLenum e) {
+    static std::vector<std::pair<const char*, GLenum>> seen;
+    const std::pair<const char*, GLenum> key{what, e};
+    if (seen.size() < 64 && std::find(seen.begin(), seen.end(), key) == seen.end()) {
+        seen.push_back(key);
+        SDL_Log("GL error 0x%04x after %s (logged once per call and code)", unsigned(e), what);
+    }
+}
+static GLenum noteGlError(const char* what) {
+    GLenum first = GL_NO_ERROR;
     for (int i = 0; i < 16; ++i) {
         const GLenum e = gl::GetError();
-        if (e == GL_NO_ERROR) return;
-        const unsigned bit = 1u << (e & 15u);
-        if (!(seen & bit)) {
-            seen |= bit;
-            SDL_Log("GL error 0x%04x after %s (logged once per code)", unsigned(e), what);
-        }
+        if (e == GL_NO_ERROR) break;
+        if (first == GL_NO_ERROR) first = e;
+        noteGlErrorCode(what, e);
     }
+    return first;
 }
 
 // The index buffer (unless `indicesDone`), the first drawn triangle of each cluster, and the face group id and
@@ -2273,7 +2362,7 @@ void Renderer::uploadFaces(MeshSlot& s, const Mesh& mesh, bool wantUvs, bool ind
             gl::BindBuffer(GL_TEXTURE_BUFFER, s.uvData); // (the buffer texture keeps nothing: it is not sampled)
             gl::BufferData(GL_TEXTURE_BUFFER, 0, nullptr, GL_STATIC_DRAW);
             gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
-            noteUploadError("the UV texture upload");
+            noteGlError("the UV texture upload");
             s.bytes[7] = uvs.size() * sizeof(glm::vec2);
         } else {
             gl::BindBuffer(GL_TEXTURE_BUFFER, s.uvData);
@@ -2282,7 +2371,7 @@ void Renderer::uploadFaces(MeshSlot& s, const Mesh& mesh, bool wantUvs, bool ind
             gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, s.uvData);
             gl::BindTexture(GL_TEXTURE_BUFFER, 0);
             gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
-            noteUploadError("the UV texture buffer");
+            noteGlError("the UV texture buffer");
             s.bytes[7] = uvs.size() * sizeof(glm::vec2);
         }
         s.uvWidth = uvWidth;
@@ -2505,7 +2594,6 @@ bool Renderer::preparePatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
         for (MeshSlot::Patch& p : s.patches) p.stale = true;
     const bool hidden = mesh.hidden.size() == nt && nt > 0;
     const bool groups = mesh.facegroups.size() == nt && nt > 0;
-    const bool uvs = mesh.uvs.size() == size_t(nt) * 3 && nt > 0;
     for (MeshSlot::Patch& p : s.patches) {
         if (!p.stale) continue;
         if (++patchStampValue_ == 0) {
@@ -2515,7 +2603,6 @@ bool Renderer::preparePatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
         p.verts.clear();
         p.local.clear();
         p.groups.clear();
-        p.uvs.clear();
         auto add = [&](uint32_t t) {
             if (t >= nt || (hidden && mesh.hidden[t])) return;
             const glm::uvec3& tri = mesh.triangles[t];
@@ -2529,7 +2616,6 @@ bool Renderer::preparePatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
                 p.local.push_back(uint16_t(std::min<uint32_t>(patchLocal_[v], 0xFFFF)));
             }
             if (groups) p.groups.push_back(mesh.facegroups[t]);
-            if (uvs) p.uvs.insert(p.uvs.end(), mesh.uvs.begin() + std::ptrdiff_t(t) * 3, mesh.uvs.begin() + std::ptrdiff_t(t) * 3 + 3);
         };
         if (p.key < kTailPatch) {
             for (uint32_t i = 0; i < s.order.clusterTriangles(p.key); ++i) add(s.order.triangle(p.key, i));
@@ -2552,10 +2638,9 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
     if (!s.patchVao) {
         gl::GenVertexArrays(1, &s.patchVao);
         gl::GenVertexArrays(1, &s.patchLineVao);
-        for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData, &s.patchUvData})
+        for (GLuint* b : {&s.patchVertices, &s.patchIndices, &s.patchLines, &s.patchColors, &s.patchMask, &s.patchGroupData})
             gl::GenBuffers(1, b);
         gl::GenTextures(1, &s.patchGroupTexture);
-        gl::GenTextures(1, &s.patchUvTexture);
         for (GLuint vao : {s.patchVao, s.patchLineVao}) {
             gl::BindVertexArray(vao);
             gl::BindBuffer(GL_ARRAY_BUFFER, s.patchVertices);
@@ -2586,19 +2671,16 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
         alloc(GL_ARRAY_BUFFER, s.patchColors, parts * kPatchVertices * sizeof(uint32_t));
         alloc(GL_ARRAY_BUFFER, s.patchMask, parts * kPatchVertices);
         alloc(GL_TEXTURE_BUFFER, s.patchGroupData, parts * kPatchTriangles * sizeof(uint32_t));
-        alloc(GL_TEXTURE_BUFFER, s.patchUvData, parts * kPatchTriangles * 3 * sizeof(glm::vec2));
         gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
         gl::BindTexture(GL_TEXTURE_BUFFER, s.patchGroupTexture);
         gl::TexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, s.patchGroupData);
-        gl::BindTexture(GL_TEXTURE_BUFFER, s.patchUvTexture);
-        gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, s.patchUvData);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
         gl::BindVertexArray(s.patchVao);
         gl::BufferData(GL_ELEMENT_ARRAY_BUFFER, GLsizeiptr(parts * kPatchTriangles * 3 * sizeof(uint16_t)), nullptr, GL_DYNAMIC_DRAW);
         gl::BindVertexArray(s.patchLineVao);
         gl::BufferData(GL_ELEMENT_ARRAY_BUFFER, GLsizeiptr(parts * kPatchLineIndices * sizeof(uint16_t)), nullptr, GL_DYNAMIC_DRAW);
         gl::BindVertexArray(0);
-        s.patchBytes = parts * (kPatchVertices * (sizeof(PackedVertex) + 5) + kPatchTriangles * (3 * 2 + 4 + 3 * sizeof(glm::vec2)) + kPatchLineIndices * 2);
+        s.patchBytes = parts * (kPatchVertices * (sizeof(PackedVertex) + 5) + kPatchTriangles * (3 * 2 + 4) + kPatchLineIndices * 2);
         for (MeshSlot::Patch& p : s.patches) p.uploaded = false;
         all = true;
     }
@@ -2678,15 +2760,9 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
                                   GLsizeiptr(p.groups.size() * sizeof(uint32_t)), p.groups.data());
                 gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
             }
-            if (!p.uvs.empty()) { // (into the shadow; sent after the loop in runs of neighbouring parts: a call per patch is slow)
-                if (s.patchUvShadow.size() < s.patchParts * kPatchTriangles * 3) s.patchUvShadow.resize(s.patchParts * kPatchTriangles * 3);
-                std::copy(p.uvs.begin(), p.uvs.end(), s.patchUvShadow.begin() + std::ptrdiff_t(p.part) * kPatchTriangles * 3);
-                s.patchUvParts.push_back(p.part);
-            }
             if (p.stale) {
                 std::vector<uint16_t>().swap(p.local);
                 std::vector<uint32_t>().swap(p.groups);
-                std::vector<glm::vec2>().swap(p.uvs);
             }
             p.stale = false;
             p.uploaded = true;
@@ -2722,20 +2798,6 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
             gl::BindBuffer(GL_ARRAY_BUFFER, s.patchMask);
             gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(size_t(p.part) * kPatchVertices), GLsizeiptr(n), packedMask.data());
         }
-    }
-    if (!s.patchUvParts.empty()) {
-        std::sort(s.patchUvParts.begin(), s.patchUvParts.end());
-        gl::BindBuffer(GL_TEXTURE_BUFFER, s.patchUvData);
-        for (size_t i = 0; i < s.patchUvParts.size();) {
-            size_t j = i + 1;
-            while (j < s.patchUvParts.size() && s.patchUvParts[j] <= s.patchUvParts[j - 1] + 1) ++j; // (or the same part again)
-            const size_t first = size_t(s.patchUvParts[i]) * kPatchTriangles * 3, last = (size_t(s.patchUvParts[j - 1]) + 1) * kPatchTriangles * 3;
-            gl::BufferSubData(GL_TEXTURE_BUFFER, GLintptr(first * sizeof(glm::vec2)), GLsizeiptr((last - first) * sizeof(glm::vec2)),
-                              s.patchUvShadow.data() + first);
-            i = j;
-        }
-        gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
-        s.patchUvParts.clear();
     }
     gl::BindBuffer(GL_ARRAY_BUFFER, 0);
     s.patchGrid = s.grid;
@@ -2794,12 +2856,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     // A stroke that remeshes (dynamic topology: only it fills changedTriangles) is under way on this mesh.
     if (!stroking_) s.remeshing = false;
     else if (!mesh.changedTriangles.empty()) s.remeshing = true;
-    // A Part with UVs patches too (the patches carry their triangles' UVs), unless the UVs are in a 2D texture, a
-    // normal map or the material's tangents (PBR) need per-triangle data of the layout.
-    const size_t patchPartsWanted = std::max<size_t>({s.patches.size() + 1, s.patchParts * 2, 8}); // (the patch UV buffer is a texture buffer too)
-    const bool patchUvs = s.hasUvs && s.uvWidth == 0 && !normalMap && !pbr && mesh.uvs.size() == mesh.triangleCount() * 3 &&
-                          patchPartsWanted * kPatchTriangles * 3 <= size_t(std::max(gl::maxTextureBufferTexels(), 0));
-    bool full = s.fresh || mesh.topologyDirty || (nv != s.vertexCapacity && !patched) || (patched && wantUvs && !patchUvs);
+    bool full = s.fresh || mesh.topologyDirty || (nv != s.vertexCapacity && !patched) || (patched && wantUvs);
     if (!full && !mesh.changedTriangles.empty() && !notePatches(s, mesh)) full = true;
     if (!full && !s.patches.empty() && mesh.facesDirty)
         for (MeshSlot::Patch& p : s.patches) p.stale = true; // (groups or hidden triangles changed)
@@ -2868,6 +2925,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
     };
     if (full || ranged) {
         uploadVertices(s, mesh, full);
+        noteGlError("the vertex upload");
         if (syncLog) vertsMs = lapMs(lap);
         updateBounds(s, mesh, full, full); // (a full upload computed them while building)
         if (syncLog) boundsMs = lapMs(lap);
@@ -2879,6 +2937,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         // (closedOriented also accepts unwelded seams, the same point twice, which the layout's check doesn't.)
         s.closed = s.order.closed() || closedOriented(mesh);
         uploadFaces(s, mesh, wantUvs, indicesDone);
+        s.texturedChecked = s.texturedFailed = false; // (a new layout: the next textured draw is looked at again)
         s.vertexCapacity = nv;
         // A mesh too big for the GPU's memory isn't drawn (rather than taking the driver down); the next full
         // upload (e.g. after Lower Level or a decimation) tries again.
@@ -2886,6 +2945,7 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         for (int i = 0; i < 16; ++i) {
             const GLenum e = gl::GetError();
             if (e == GL_NO_ERROR) break;
+            noteGlErrorCode("the mesh upload (vertices, indices, face data)", e);
             s.outOfMemory = s.outOfMemory || e == GL_OUT_OF_MEMORY;
         }
         if (s.outOfMemory) {
@@ -3034,6 +3094,7 @@ void Renderer::syncTexture(MeshSlot& s, Mesh& mesh, bool pbr) {
         s.textureW = tex->width;
         s.textureH = tex->height;
         gl::GenerateMipmap(GL_TEXTURE_2D);
+        noteGlError("the paint texture's upload");
     } else if (changed) {
         gl::BindTexture(GL_TEXTURE_2D, s.paintTexture);
         gl::PixelStorei(GL_UNPACK_ROW_LENGTH, tex->width);
@@ -3046,6 +3107,7 @@ void Renderer::syncTexture(MeshSlot& s, Mesh& mesh, bool pbr) {
         else dirtyRuns(upload); // only the dirty tiles of the rectangle, as runs along each tile row
         gl::PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
         gl::GenerateMipmap(GL_TEXTURE_2D);
+        noteGlError("the paint texture's update");
     }
     // PBR planes: packed rectangle by rectangle (a staging buffer the size of what is sent).
     std::vector<uint8_t> staging;
@@ -3254,6 +3316,18 @@ int Renderer::textureUvWidth(uint32_t id) const {
     return 0;
 }
 
+bool Renderer::textureRejected(uint32_t id) const {
+    for (const auto& s : slots_)
+        if (s.id == id) return s.texturedFailed;
+    return false;
+}
+
+bool Renderer::microWide(uint32_t id) const {
+    for (const auto& s : slots_)
+        if (s.id == id) return s.micro && s.micro->wide();
+    return false;
+}
+
 bool Renderer::textureNotShown(uint32_t id) const {
     for (const auto& s : slots_)
         if (s.id == id) return s.uvsLost;
@@ -3321,8 +3395,7 @@ bool Renderer::viewTarget(int width, int height, int samples) {
         gl::DeleteRenderbuffers(3, viewRb_);
         viewFbo_ = viewResolveFbo_ = 0;
     }
-    for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
-    }
+    noteGlError("the frame's draws before the view target was made");
     gl::GenFramebuffers(1, &viewFbo_);
     gl::GenFramebuffers(1, &viewResolveFbo_);
     gl::GenRenderbuffers(3, viewRb_);
@@ -3363,10 +3436,8 @@ bool Renderer::viewTarget(int width, int height, int samples) {
 static void logViewFrame(const char* what, int width, int height, int samples, float scale, size_t triangles, bool fbo) {
     static int frames = 0;
     static unsigned seen = 0;
-    if (frames >= 300) { // (the first seconds only: after that the target's draws clear their errors unlogged, as before)
-        if (fbo)
-            for (int i = 0; i < 16 && gl::GetError() != GL_NO_ERROR; ++i) {
-            }
+    if (frames >= 300) { // (the per-frame lines stop; an error is still named once per code, a texture comes long after the first seconds)
+        if (fbo) noteGlError("drawing the view, after the first seconds");
         return;
     }
     for (int i = 0; i < 16; ++i) {
@@ -3418,10 +3489,20 @@ void Renderer::prepareOcclusion(const RenderSettings& settings, bool pbr, const 
         const float l0 = 0.282095f * glm::dot(envSh_.c[0], lum), l1 = 0.488603f * glm::length(dirEnv);
         o.light = l1 > 1e-6f ? glm::transpose(frameViewToEnv_) * (dirEnv / glm::length(dirEnv)) : glm::vec3(0.0f, 1.0f, 0.0f);
         o.shadowDarkness = std::clamp(l1 / std::max(l0 + l1, 1e-6f), 0.3f, 0.55f);
-        } else {
+    } else {
         o.light = lightRotation(settings.lightYaw, settings.lightPitch) * glm::normalize(glm::vec3(0.45f, 0.65f, 0.6f));
         o.shadowDarkness = 0.6f; // (the studio key's share of the light)
     }
+    // An added light with Shadows on is where the shadows come from: its share of the light grows with its
+    // intensity against the rest (the environment's even part, or the studio's fill and ambient).
+    for (const ViewLight& l : settings.lights)
+        if (l.shadows) {
+            const float k = std::max(l.intensity, 0.0f) * glm::dot(glm::max(l.color, glm::vec3(0.0f)), glm::vec3(0.2126f, 0.7152f, 0.0722f));
+            o.light = viewLightDirection(l.yaw, l.pitch);
+            o.shadowDarkness = std::clamp(k / (k + 0.5f), 0.3f, 0.75f);
+            break;
+        }
+    o.shadowDarkness = shadowDarknessFor(o.shadowDarkness, settings.shadowStrength);
     frameOcclusionWanted_ = true;
 }
 
@@ -3450,7 +3531,42 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     if (directView_) samples = 1;
     // Resolution scale (#80): the view drawn into a smaller target and scaled up into the window.
     const float scale = std::clamp(settings.resolutionScale, 0.25f, 1.0f);
-    if (scale < 0.999f && !directView_ && !scaleFailed_) {
+    const bool pane = viewport.multi && viewport.w > 0 && viewport.h > 0; // one pane of a split view (RenderViewport)
+    if (scale < 0.999f && !directView_ && !scaleFailed_ && pane) {
+        // Split view: the pane drawn smaller in its own corner of the frame-size target (the same target every pane
+        // uses: a target per size would be remade twice a frame), then stretched into its place in the window.
+        Viewport small = viewport;
+        small.w = std::max(1, int(std::lround(viewport.w * scale)));
+        small.h = std::max(1, int(std::lround(viewport.h * scale)));
+        int s = samples;
+        while (s > 1 && !viewTarget(width, height, s)) s /= 2;
+        if (s > 1 || viewTarget(width, height, 1)) {
+            gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
+            draw(camera, width, height, settings, small);
+            logViewFrame("scaled pane", small.w, small.h, s, scale, lastDrawn_, true);
+            gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_);
+            gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
+            gl::BlitFramebuffer(small.x, small.y, small.x + small.w, small.y + small.h, small.x, small.y, small.x + small.w,
+                                small.y + small.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            applyOcclusion(viewFbo_, viewResolveFbo_, width, height);
+            gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+            gl::Disable(GL_SCISSOR_TEST);
+            gl::Viewport(0, 0, width, height);
+            if (!viewport.keep) { // the window around the panes, once a frame (as draw() leaves it)
+                gl::ClearColor(viewport.surround.x, viewport.surround.y, viewport.surround.z, 1.0f);
+                gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            }
+            gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_);
+            gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            gl::BlitFramebuffer(small.x, small.y, small.x + small.w, small.y + small.h, viewport.x, viewport.y,
+                                viewport.x + viewport.w, viewport.y + viewport.h, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+            const GLenum blitError = gl::GetError();
+            gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+            if (blitError == GL_NO_ERROR) return s;
+            scaleFailed_ = true;
+            SDL_Log("Scaled pane copy to the window failed (GL error 0x%04x); drawing at full resolution", unsigned(blitError));
+        }
+    } else if (scale < 0.999f && !directView_ && !scaleFailed_) {
         const int sw = std::max(1, int(std::lround(width * scale))), sh = std::max(1, int(std::lround(height * scale)));
         const bool inset = viewport.w > 0 && viewport.h > 0;
         Viewport small = viewport;
@@ -3493,7 +3609,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     while (samples > 1 && !viewTarget(width, height, samples)) samples /= 2;
     screenStrokeDrawn_ = false;
     // A screen stroke needs the view in a target it can read back: through the single-sample one when no AA.
-    const bool screen = !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr() && !settings.unlit;
+    const bool screen = !viewport.secondary && !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr() && !settings.unlit;
     // ... and so do the view's shadows and AO (they read its depth).
     const bool occlusion = occlusionWanted(settings);
     if (samples <= 1 && !((screen || occlusion) && viewTarget(width, height, 1))) {
@@ -3507,7 +3623,12 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     logViewFrame("view target", width, height, samples, 1.0f, lastDrawn_, true);
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_); // resolve: same format and size on both sides
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
-    gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    // A later pane of a split view copies only its own rect: the rest of the target is the panes before it (or stale).
+    const bool keepPane = pane && viewport.keep;
+    if (keepPane)
+        gl::BlitFramebuffer(viewport.x, viewport.y, viewport.x + viewport.w, viewport.y + viewport.h, viewport.x, viewport.y,
+                            viewport.x + viewport.w, viewport.y + viewport.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    else gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     if (occlusion) applyOcclusion(viewFbo_, viewResolveFbo_, width, height);
     if (screen)
         screenStrokeDrawn_ = screenPass_.apply(screenStroke_, viewFbo_, viewResolveFbo_, width, height, frameView_, frameProj_,
@@ -3515,7 +3636,10 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
                                                lightRotation(settings.lightYaw, settings.lightPitch));
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_); // single-sample blit: may convert to the window's format
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    if (keepPane)
+        gl::BlitFramebuffer(viewport.x, viewport.y, viewport.x + viewport.w, viewport.y + viewport.h, viewport.x, viewport.y,
+                            viewport.x + viewport.w, viewport.y + viewport.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    else gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     const GLenum blitError = gl::GetError();
     gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
     if (blitError != GL_NO_ERROR) { // the view never reached the window: draw this frame and later ones directly
@@ -3701,8 +3825,10 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     gl::Viewport(0, 0, targetWidth, targetHeight);
     const bool inset = viewport.w > 0 && viewport.h > 0;
     if (inset) {
-        gl::ClearColor(viewport.surround.x, viewport.surround.y, viewport.surround.z, 1.0f);
-        gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        if (!viewport.keep) { // (a second pane of a split view keeps what the first drew around it)
+            gl::ClearColor(viewport.surround.x, viewport.surround.y, viewport.surround.z, 1.0f);
+            gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
         gl::Viewport(viewport.x, viewport.y, viewport.w, viewport.h);
         gl::Scissor(viewport.x, viewport.y, viewport.w, viewport.h);
         gl::Enable(GL_SCISSOR_TEST);
@@ -3799,7 +3925,10 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     gl::ActiveTexture(kTexture2);
     gl::BindTexture(GL_TEXTURE_2D, litsphereTexture(settings.litsphere));
     gl::ActiveTexture(GL_TEXTURE0);
-    gl::Enable(GL_POLYGON_OFFSET_FILL);
+    // The fills step back (by their slope) only under the wireframe, so its lines win over their own triangles. Always
+    // on, each Part stepped back by its own triangles' slope: a garment or a copy 0.5-2% off the body fought it at rest.
+    const bool offsetFills = settings.wireframe;
+    if (offsetFills) gl::Enable(GL_POLYGON_OFFSET_FILL);
     gl::PolygonOffset(1.0f, 1.0f);
     // X-Ray (#80, #91): the other Parts are see-through, or the active one when it is the only one shown.
     const bool xray = settings.xray && !thumbnailPass_;
@@ -3815,7 +3944,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     if (!references_.empty()) { // In the scene: behind or in front of the opaque Parts, under the see-through ones
         gl::Disable(GL_POLYGON_OFFSET_FILL);
         drawReferences(false, view, proj, camera.ortho, viewAspect);
-        gl::Enable(GL_POLYGON_OFFSET_FILL);
+        if (offsetFills) gl::Enable(GL_POLYGON_OFFSET_FILL);
     }
     if (xray) {
         gl::Enable(GL_BLEND);
@@ -4275,7 +4404,7 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
 
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0) |
-                                       (s.micro && s.micro->focus() ? kFocus : 0) | (s.micro && s.micro->tilePagesOn() ? kTiles : 0));
+                                       (s.micro && s.micro->focus() ? kFocus : 0) | (s.micro && s.micro->tilePagesOn() ? kTiles : 0) | (s.micro && s.micro->wide() ? kWide : 0));
     if (!p) return;
     gl::UseProgram(p->id);
     setPbrUniforms(*p, settings, false, s);
@@ -4328,6 +4457,77 @@ void Renderer::setLightUniforms(const MeshProgram& p, const RenderSettings& sett
     const bool occ = frameOcclusionWanted_ && frameOcclusion_.shadows;
     gl::Uniform1i(p.occAlpha, occ ? 1 : 0);
     if (occ) gl::Uniform3fv(p.occLight, 1, glm::value_ptr(glm::normalize(frameOcclusion_.light)));
+    // The added lights: direction towards each (view space) and colour times intensity; none = the shader's old path.
+    const int count = std::min(int(settings.lights.size()), kMaxViewLights);
+    gl::Uniform1i(p.lightCount, count);
+    if (count > 0) {
+        glm::vec3 dirs[kMaxViewLights], cols[kMaxViewLights];
+        const float balance = viewLightsBalance(settings.lights);
+        for (int i = 0; i < count; ++i) {
+            const ViewLight& l = settings.lights[size_t(i)];
+            dirs[i] = viewLightDirection(l.yaw, l.pitch);
+            cols[i] = glm::max(l.color, glm::vec3(0.0f)) * (std::max(l.intensity, 0.0f) * balance);
+        }
+        gl::Uniform3fv(p.lightDirs, count, glm::value_ptr(dirs[0]));
+        gl::Uniform3fv(p.lightCols, count, glm::value_ptr(cols[0]));
+    }
+}
+
+glm::vec3 viewLightDirection(float yawDegrees, float pitchDegrees) {
+    return lightRotation(yawDegrees, pitchDegrees) * glm::vec3(0.0f, 0.0f, 1.0f);
+}
+
+float viewLightsBalance(const std::vector<ViewLight>& lights) {
+    const glm::vec3 lum(0.2126f, 0.7152f, 0.0722f);
+    float total = 0.0f, strongest = 0.0f;
+    int n = 0;
+    for (const ViewLight& l : lights) {
+        if (++n > kMaxViewLights) break;
+        const float k = std::max(l.intensity, 0.0f) * glm::dot(glm::clamp(l.color, 0.0f, 1.0f), lum);
+        total += k;
+        strongest = std::max(strongest, k);
+    }
+    const float cap = std::max(strongest, 1.0f);
+    return total > cap ? cap / total : 1.0f;
+}
+
+float shadowDarknessFor(float base, float strength) {
+    return std::clamp(std::clamp(base, 0.0f, 1.0f) * std::clamp(strength, 0.0f, 2.0f), 0.0f, 1.0f);
+}
+
+ViewLight viewLightPreset(ViewLight::Role role) {
+    ViewLight l;
+    l.role = role;
+    switch (role) {
+    case ViewLight::Role::Key: // warm, from the upper left in front; it casts the shadows
+        l.yaw = -35.0f, l.pitch = 30.0f, l.color = glm::vec3(1.0f, 0.95f, 0.88f), l.intensity = 1.0f, l.shadows = true;
+        break;
+    case ViewLight::Role::Fill: // cool and soft, from the right, a little low
+        l.yaw = 55.0f, l.pitch = -5.0f, l.color = glm::vec3(0.78f, 0.86f, 1.0f), l.intensity = 0.4f;
+        break;
+    case ViewLight::Role::Rim: // from behind and above: it catches the silhouette
+        l.yaw = 145.0f, l.pitch = 35.0f, l.color = glm::vec3(1.0f), l.intensity = 0.9f;
+        break;
+    }
+    return l;
+}
+
+const char* viewLightRoleName(ViewLight::Role role) {
+    switch (role) {
+    case ViewLight::Role::Fill: return "Fill";
+    case ViewLight::Role::Rim: return "Rim";
+    default: return "Key";
+    }
+}
+
+bool parseViewLightRole(const std::string& text, ViewLight::Role& out) {
+    std::string s;
+    for (char c : text) s += char(std::tolower(static_cast<unsigned char>(c)));
+    if (s == "key") out = ViewLight::Role::Key;
+    else if (s == "fill") out = ViewLight::Role::Fill;
+    else if (s == "rim") out = ViewLight::Role::Rim;
+    else return false;
+    return true;
 }
 
 void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
@@ -4336,9 +4536,9 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         return;
     }
     // The UV Editor's checker on the model.
-    const bool checker = active && s.hasUvs && s.overlay && s.overlay->checker;
+    const bool checker = active && s.hasUvs && !s.texturedFailed && s.overlay && s.overlay->checker;
     // A painted texture shows through the textured program (vertex paint still multiplies it).
-    const bool textured = s.hasUvs && ((s.paintTexture && settings.showVertexPaint && settings.showTexture) || checker);
+    const bool textured = s.hasUvs && !s.texturedFailed && ((s.paintTexture && settings.showVertexPaint && settings.showTexture) || checker);
     const bool pbr = settings.pbr() && envTexture_;
     // A baked normal map preview bends the shading normal (core/Bake.h), and in the PBR view the texture's
     // Normal / Height channels do (syncTexture's material normal, with tangents from syncNormalMap).
@@ -4374,9 +4574,9 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform2f(p->litsphereCavity, cavity.crease, cavity.ridge);
     if (textured || normalMapped) {
         gl::ActiveTexture(GL_TEXTURE3);
-        gl::BindTexture(GL_TEXTURE_BUFFER, s.uvTexture);
+        gl::BindTexture(GL_TEXTURE_BUFFER, s.uvWidth > 0 || !s.uvTexture ? dummyUvBufferTexture_ : s.uvTexture);
         gl::ActiveTexture(GL_TEXTURE0 + 12);
-        gl::BindTexture(GL_TEXTURE_2D, s.uvWidth > 0 ? s.uvTexture2D : 0);
+        gl::BindTexture(GL_TEXTURE_2D, s.uvWidth > 0 ? s.uvTexture2D : dummyUv2D_);
         gl::Uniform1i(p->uvWidth, s.uvWidth);
         gl::ActiveTexture(GL_TEXTURE4);
         gl::BindTexture(GL_TEXTURE_2D, textured ? s.paintTexture : 0);
@@ -4393,7 +4593,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::ActiveTexture(kTexture7);
     gl::BindTexture(GL_TEXTURE_BUFFER, s.primTexture);
     gl::ActiveTexture(GL_TEXTURE1);
-    gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.groupTexture : 0);
+    gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.groupTexture : dummyUintBufferTexture_);
     gl::ActiveTexture(GL_TEXTURE0);
     gl::Uniform1i(p->paint, settings.showVertexPaint && s.hasColors ? 1 : 0);
     gl::Uniform1i(p->showMask, active && settings.showMask && s.hasMask ? 1 : 0);
@@ -4405,6 +4605,15 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform1i(p->twoSided, 1);
     gl::Uniform1i(p->checker, checker ? 1 : 0);
     gl::Uniform1f(p->checkerScale, checker ? s.overlay->checkerScale : 8.0f);
+    if (gl::testTexelLimitSet()) { // (a UI test: a driver that checks every sampler, Mali, rejects the draw when one buffer unit is empty)
+        for (const GLenum unit : {kTexture7, GL_TEXTURE1, textured || normalMapped ? GL_TEXTURE3 : kTexture7, normalMapped ? kTexture6 : kTexture7}) {
+            GLint bound = 0;
+            gl::ActiveTexture(unit);
+            gl::GetIntegerv(0x8C2C /* GL_TEXTURE_BINDING_BUFFER */, &bound);
+            if (!bound) ++emptyBufferSamplers_;
+        }
+        gl::ActiveTexture(GL_TEXTURE0);
+    }
     };
     bind(p);
     gl::BindVertexArray(s.vao);
@@ -4516,7 +4725,20 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         }
         drawClusters_.resize(kept);
     }
+    // A textured draw the driver rejects (Mali-G72, 11-22: the model vanished after New Texture and the log said nothing) names
+    // its error once and the Part draws without the texture from the next frame, with a status, instead of not at all.
+    if (textured && !s.texturedChecked) noteGlError("the frame's earlier draws, before the first textured draw");
     drawClusters(s, drawClusters_, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);
+    if (textured && !s.texturedChecked) {
+        s.texturedChecked = true;
+        GLenum e = noteGlError("the first textured draw");
+        if (!e && gl::testRejectTextured()) e = 0x0502; // GL_INVALID_OPERATION
+        if (e) {
+            s.texturedFailed = true;
+            SDL_Log("Texture not shown: the GPU rejected the textured draw (GL error 0x%04x, %zu triangles, UVs in %s)", unsigned(e),
+                    s.drawnTriangles, s.uvWidth > 0 ? "a 2D texture" : "a texture buffer");
+        }
+    }
     for (int k = 1; k < 4; ++k) {
         if (extraClusters_[k].empty()) continue;
         if (const MeshProgram* pg = meshProgram(features | ((k & 1) ? kGhost : 0) | ((k & 2) ? kFlat : 0))) {
@@ -4532,17 +4754,10 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         if (!s.patchMaskOn) gl::VertexAttrib1f(3, 0.0f);
         if (perTriangle) {
             gl::ActiveTexture(GL_TEXTURE1);
-            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : 0);
-            gl::ActiveTexture(GL_TEXTURE3); // (the patches' triangles have their UVs in their own buffer)
-            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasUvs ? s.patchUvTexture : 0);
+            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : dummyUintBufferTexture_);
             gl::ActiveTexture(GL_TEXTURE0);
         }
         drawPatches(s, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);
-        if (perTriangle) {
-            gl::ActiveTexture(GL_TEXTURE3);
-            gl::BindTexture(GL_TEXTURE_BUFFER, s.uvTexture);
-            gl::ActiveTexture(GL_TEXTURE0);
-        }
         gl::BindVertexArray(s.vao);
     }
     if (coarse && !coarseClusters_.empty()) { // the spike's coarse levels: one multi-draw, 32-bit indices

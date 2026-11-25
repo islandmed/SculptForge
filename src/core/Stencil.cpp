@@ -193,18 +193,39 @@ void StencilView::setSpacing(const glm::vec3& center, const glm::vec3& viewDir, 
     spacing = r * std::sqrt(3.14159265f / float(vertices)) / stencil->size * float(stencil->image->height);
 }
 
+// Outside an untiled image (Sculpt): the edge texel's own value fades to "no Stencil" over kStencilEdgeFeather past the edge, so
+// a stroke across the edge leaves no wall where a dark border meets full effect (artist-qa 11-24). 0 on the image; 1 past it.
+static float outsideFade(const Stencil& st, glm::vec2 uv) {
+    const glm::vec2 over = uv - glm::clamp(uv, glm::vec2(0.0f), glm::vec2(1.0f));
+    const float dist = glm::length(glm::vec2(over.x * st.size * st.aspect(), over.y * st.size)); // canvas heights
+    const float t = std::clamp(dist / kStencilEdgeFeather, 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
 float StencilView::weight(const glm::vec3& world) const {
     glm::vec2 c, uv;
-    if (!canvasAt(world, c) || !stencil->imageCoord(c, canvasAspect, uv)) return 0.0f;
-    return stencil->value(uv, spacing);
+    if (!canvasAt(world, c)) return 0.0f; // behind the camera
+    if (stencil->imageCoord(c, canvasAspect, uv)) return stencil->value(uv, spacing);
+    if (!stencil->outsideSculpts) return 0.0f;
+    const float t = outsideFade(*stencil, uv);
+    return t >= 1.0f ? 1.0f : glm::mix(stencil->value(glm::clamp(uv, glm::vec2(0.0f), glm::vec2(1.0f)), spacing), 1.0f, t);
 }
 
 glm::vec4 StencilView::paint(const glm::vec3& world, const glm::vec3& paintColor) const {
     glm::vec2 c, uv;
-    if (!canvasAt(world, c) || !stencil->imageCoord(c, canvasAspect, uv)) return glm::vec4(paintColor, 0.0f);
-    if (!stencil->colors) return glm::vec4(paintColor, stencil->value(uv, spacing));
-    const glm::vec4 col = stencil->color(uv, spacing);
-    return col.w > 1e-6f ? glm::vec4(glm::vec3(col) / col.w, col.w) : glm::vec4(paintColor, 0.0f); // (un-premultiplied)
+    if (!canvasAt(world, c)) return glm::vec4(paintColor, 0.0f);
+    const bool inside = stencil->imageCoord(c, canvasAspect, uv);
+    if (!inside && !stencil->outsideSculpts) return glm::vec4(paintColor, 0.0f);
+    const float t = inside ? 0.0f : outsideFade(*stencil, uv);
+    if (t >= 1.0f) return glm::vec4(paintColor, 1.0f); // (as if there were no Stencil)
+    const glm::vec2 at = inside ? uv : glm::clamp(uv, glm::vec2(0.0f), glm::vec2(1.0f)); // (outside: the edge texel, fading out)
+    glm::vec4 own;
+    if (!stencil->colors) own = glm::vec4(paintColor, stencil->value(at, spacing));
+    else {
+        const glm::vec4 col = stencil->color(at, spacing);
+        own = col.w > 1e-6f ? glm::vec4(glm::vec3(col) / col.w, col.w) : glm::vec4(paintColor, 0.0f); // (un-premultiplied)
+    }
+    return t <= 0.0f ? own : glm::vec4(glm::mix(glm::vec3(own), paintColor, t), glm::mix(own.w, 1.0f, t));
 }
 
 void registerStencilCommands(CommandRegistry& registry) {
@@ -261,6 +282,7 @@ void registerStencilCommands(CommandRegistry& registry) {
                    {"opacity", T::Number, "How strongly the overlay shows, 0-1 (the brushes take it whole).", false},
                    {"invert", T::Bool, "Use the image's negative.", false},
                    {"tile", T::Bool, "Repeat the image across the whole view.", false},
+                   {"outside", T::String, "Outside the image: 'sculpt' (strokes work as if there were no Stencil) or 'block' (they do nothing).", false},
                    {"visible", T::Bool, "Show it (hidden: the brushes ignore it).", false},
                    {"colors", T::Bool, "Vertex Paint lays the image's colours (off: its brightness masks the paint colour).", false},
                    {"reset", T::Bool, "Centre it, upright, 80% of the view's height (before the values above).", false}},
@@ -283,6 +305,11 @@ void registerStencilCommands(CommandRegistry& registry) {
                       st.angle = glm::radians(angleDeg);
                       if (a.contains("invert")) st.invert = argBool(a, "invert", st.invert);
                       if (a.contains("tile")) st.tile = argBool(a, "tile", st.tile);
+                      if (a.contains("outside")) {
+                          const std::string o = argString(a, "outside", "");
+                          if (o != "sculpt" && o != "block") return {false, "stencil_set: outside is 'sculpt' or 'block'"};
+                          st.outsideSculpts = o == "sculpt";
+                      }
                       if (a.contains("visible")) st.visible = argBool(a, "visible", st.visible);
                       if (a.contains("colors")) st.colors = argBool(a, "colors", st.colors);
                       return {true, st.image ? "Stencil '" + st.name + "'" : std::string("Stencil set (no image loaded)")};

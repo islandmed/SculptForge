@@ -19,14 +19,19 @@
 #include "core/Dyntopo.h"
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
+#include "core/PrimitiveKit.h"
+#include "core/Solidify.h"
 #include "core/Face.h"
 #include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
 #include "core/Masking.h"
 #include "core/Backdrop.h"
 #include "core/CloseHoles.h"
+#include "core/EdgeLoopInsert.h"
 #include "core/Cut.h"
 #include "core/Multires.h"
+#include "core/PolyMode.h"
+#include "core/PolyOps.h"
 #include "core/Micro.h"
 #include "core/FigurePose.h"
 #include "core/UndoBatch.h"
@@ -44,6 +49,7 @@
 #include "core/QRemesh.h"
 #include "core/ForgeSpheres.h"
 #include "core/Tube.h"
+#include "core/Scatter.h"
 #include "core/Garment.h"
 #include "core/GarmentDrape.h"
 #include "core/Deform.h"
@@ -292,18 +298,21 @@ CommandRegistry::CommandRegistry() {
           {"keep_texture", T::Bool, "Keep a painted texture: Auto UV the result and project the texture onto it. "
                                     "Default true.", false},
           {"keep_masked", T::Bool, "Keep masked: masked areas keep their triangles exactly; the rest is remeshed and "
-                                   "joined to them watertight. Default false.", false}},
+                                   "joined to them watertight. Default false.", false},
+          {"keep_groups", T::Bool, "Keep Face Groups: each new polygon takes the face group of the original surface nearest "
+                                   "its centre (hard borders). Default false: one face group.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              std::string err;
              const std::vector<uint8_t> keep = argBool(a, "keep_masked", false) ? keepMaskedTriangles(doc.mesh) : std::vector<uint8_t>();
              const bool keeping = std::find(keep.begin(), keep.end(), 1) != keep.end();
              if (keeping && std::find(keep.begin(), keep.end(), 0) == keep.end())
                  return {false, "Remesh: everything is masked, so nothing would change"};
-             Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), kVoxelResolutionMin, kVoxelResolutionMax), &err,
+             VoxelRemeshNotes notes;
+             Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", kVoxelResolutionDefault)), kVoxelResolutionMin, kVoxelResolutionMax), &err,
                                   [](float f) { // (progress and cancel for an MCP call, core/OpControl.h)
                                       opProgress(0.9f * f, "Remeshing");
                                       return !opCancelled();
-                                  });
+                                  }, false, argBool(a, "keep_groups", false), &notes);
              if (m.triangleCount() == 0) return {false, err};
              if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
              std::string keepNote;
@@ -316,7 +325,7 @@ CommandRegistry::CommandRegistry() {
              if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
              const std::string texture = carryTextureNote(doc.mesh, m, argBool(a, "keep_texture", true));
              doc.replaceMeshUndoable(std::move(m), "Remesh", true);
-             return {true, "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture +
+             return {true, voxelRemeshNote(notes) + "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture +
                            (keepNote.empty() ? "" : "; Keep masked: " + keepNote)};
          }});
 
@@ -739,6 +748,7 @@ CommandRegistry::CommandRegistry() {
     registerQRemeshGuideCommands(*this); // qremesh_guide, ... (QRemeshGuides.cpp)
     registerForgeSphereCommands(*this);      // Forge Sphere_new, ... (Forge Spheres.cpp)
     registerTubeCommands(*this);             // tube_new, ... (Tube.cpp)
+    registerScatterCommands(*this);          // scatter (Scatter.cpp)
     registerAgentTools(*this);               // blockout, measure, scene_overview (core/AgentTools.cpp)
     registerDetailCommands(*this);           // detail_pass (core/DetailPass.cpp)
     registerDrapeCommands(*this);        // cloth_drape (Drape.cpp)
@@ -941,8 +951,11 @@ CommandRegistry::CommandRegistry() {
     registerMaskingCommands(*this);
     registerCutCommands(*this); // cut (core/Cut.h)
     registerCloseHolesCommands(*this); // close_holes (core/CloseHoles.h)
+    registerEdgeLoopCommands(*this);   // edge_loop (core/EdgeLoopInsert.h)
     registerBackdropCommands(*this);   // remove_flat_background (core/Backdrop.h)
     registerFaceGroupCommands(*this);
+    registerPolySelectCommands(*this); // poly_mode, poly_select (core/PolyMode.h)
+    registerPolyOpCommands(*this);     // poly_op (core/PolyOps.h)
     registerSelectionSetCommands(*this); // selection_set_* (core/SelectionSets.h)
     registerPartCommands(*this);
     registerBooleanCommands(*this); // part_boolean, boolean_parts, make_boolean_mesh (core/PartBoolean.h)
@@ -953,6 +966,8 @@ CommandRegistry::CommandRegistry() {
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
     registerFigurePoseCommands(*this); // figure_pose_* (core/FigurePose.h)
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
+    registerSolidifyCommands(*this); // solidify (core/Solidify.h)
+    registerPrimitiveCommands(*this); // part_primitive (core/PrimitiveKit.h)
     registerMeshCheckCommands(*this);     // weld_points, mesh_check, mesh_fix (core/MeshCheck.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
     registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)

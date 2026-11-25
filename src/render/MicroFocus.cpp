@@ -38,9 +38,10 @@ constexpr uint32_t kShaded = 0x80000000u;
 MicroFocus::~MicroFocus() { release(); }
 
 void MicroFocus::release() {
-    for (GLuint* b : {&poolDisp_, &poolShade_, &pageData_})
+    pageStore_.release();
+    for (GLuint* b : {&poolDisp_, &poolShade_})
         if (*b) gl::DeleteBuffers(1, b), *b = 0;
-    for (GLuint* t : {&poolDispTex_, &poolShadeTex_, &pageTex_})
+    for (GLuint* t : {&poolDispTex_, &poolShadeTex_})
         if (*t) gl::DeleteTextures(1, t), *t = 0;
     capacity_ = 0;
     bytes_ = 0;
@@ -341,14 +342,7 @@ void MicroFocus::syncAll(Mesh& mesh, MicroRenderer& r) {
     std::vector<uint32_t> none;
     writeRecords(mm, r, none, true);
     shadeCoarse(mesh, r, none, true);
-    if (!pageData_) gl::GenBuffers(1, &pageData_);
-    if (!pageTex_) gl::GenTextures(1, &pageTex_);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, pageData_);
-    gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(size_t(slots_) * 4), page_.data(), GL_DYNAMIC_DRAW);
-    gl::BindTexture(GL_TEXTURE_BUFFER, pageTex_);
-    gl::TexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, pageData_);
-    gl::BindTexture(GL_TEXTURE_BUFFER, 0);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+    pageStore_.create(TexelStore::Format::R32UI, slots_, page_.data(), r.wide(), GL_DYNAMIC_DRAW);
     bytes_ += size_t(slots_) * 4;
     pageTableDirty_ = false;
     lap(kSyncAll);
@@ -499,7 +493,8 @@ void MicroFocus::sync(Mesh& mesh, MicroRenderer& r, const std::vector<uint32_t>&
     }
     lap(kShadePages);
     if (pageTableDirty_) {
-        r.upload_.write(pageData_, 0, page_.data(), size_t(slots_) * 4);
+        if (pageStore_.wide()) pageStore_.writeWide(0, slots_, page_.data());
+        else r.upload_.write(pageStore_.buffer(), 0, page_.data(), size_t(slots_) * 4);
         pageTableDirty_ = false;
     }
     lap(kPages);
@@ -525,7 +520,7 @@ void MicroFocus::bind(GLuint program, const std::vector<uint8_t>& visible, const
     gl::Uniform1i(u_.record, int(record_));
     gl::Uniform1i(u_.shift, int(shift_));
     gl::ActiveTexture(kUnitPages);
-    gl::BindTexture(GL_TEXTURE_BUFFER, pageTex_);
+    pageStore_.bind();
     gl::ActiveTexture(kUnitPool);
     gl::BindTexture(GL_TEXTURE_BUFFER, poolDispTex_);
     gl::ActiveTexture(kUnitPoolShade);
@@ -536,6 +531,7 @@ void MicroFocus::unbind() {
     for (GLenum unit : {kUnitPages, kUnitPool, kUnitPoolShade}) {
         gl::ActiveTexture(unit);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::BindTexture(GL_TEXTURE_2D, 0);
     }
 }
 

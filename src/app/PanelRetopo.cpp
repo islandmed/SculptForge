@@ -16,6 +16,8 @@
 #include "core/HardwareProfile.h"
 #include "core/KeepMasked.h"
 #include "core/MemoryGuard.h"
+#include "core/Dyntopo.h"
+#include "core/Texture.h"
 #include "core/QuickRemesh.h"
 #include "core/TextureTransfer.h"
 #include "core/Voxel.h"
@@ -454,12 +456,14 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     }
     auto job = std::make_unique<VoxelRemeshJob>();
     job->trigger = trigger;
+    job->restarts = std::exchange(voxelRemeshRestarts_, 0);
     job->revision = doc_.undo.revision();
     job->progress = std::make_shared<std::atomic<float>>(0.0f);
     job->cancel = std::make_shared<std::atomic<bool>>(false);
     job->result = std::make_shared<Mesh>();
     job->error = std::make_shared<std::string>();
     job->note = std::make_shared<std::string>();
+    job->lead = std::make_shared<std::string>();
     job->part = doc_.activePartInfo().id;
     job->triangles = doc_.mesh.triangleCount();
     job->resolution = voxelResolution_;
@@ -471,6 +475,7 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     }
     job->keepMasked = !keep.empty();
     job->keepTexture = keepTexture_;
+    job->keepGroups = voxelKeepGroups_ && doc_.mesh.hasFaceGroups();
     job->allowSwap = allowSwap;
     const bool texture = hasTexture(doc_.mesh) && keepTexture_;
     std::promise<bool> promise;
@@ -485,15 +490,18 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     }
     std::thread([promise = std::move(promise), source = std::move(source), res = job->resolution, allowSwap,
                  progress = job->progress, cancel = job->cancel, result = job->result, error = job->error,
-                 note = job->note, keep = std::move(keep), texture, keepTexture = keepTexture_]() mutable {
+                 note = job->note, lead = job->lead, keep = std::move(keep), texture, keepTexture = keepTexture_,
+                 keepGroups = job->keepGroups]() mutable {
         bool ok = false;
         try {
             progress->store(0.02f);
             const float remeshShare = texture ? 0.13f : 0.9f; // the rest: Keep Masked, then the texture's Auto UV
+            VoxelRemeshNotes notes;
             *result = voxelRemesh(*source, res, error.get(), [&](float f) {
                 progress->store(0.02f + remeshShare * f);
                 return !cancel->load();
-            }, allowSwap);
+            }, allowSwap, keepGroups, &notes);
+            *lead = voxelRemeshNote(notes); // (first on the status line: a long one is cut short)
             ok = result->triangleCount() > 0;
             if (ok && !keep.empty()) { // Keep Masked: the masked part goes back in, joined to the new surface
                 Mesh stitched;
@@ -551,7 +559,14 @@ void App::pollVoxelRemesh() {
     }
     if (job->trigger != RemeshTrigger::Button && doc_.undo.revision() != job->revision) {
         // Sculpted (or undone) while it ran: landing would throw that work away, so it remeshes the Part as it is now.
+        // Twice at most in a row (Quick Remesh is on by default since 0.14.0): a key pressed by mistake mid-stroke must
+        // not keep the computer remeshing for as long as the sculpting goes on.
+        if (job->restarts >= 2) {
+            status_ = std::string(name) + "the Part kept changing while it was remeshed; nothing landed. Remesh again when you pause";
+            return;
+        }
         status_ = std::string(name) + "the Part changed while it was remeshed, remeshing again...";
+        voxelRemeshRestarts_ = job->restarts + 1;
         startVoxelRemesh(job->trigger);
         return;
     }
@@ -570,9 +585,14 @@ void App::pollVoxelRemesh() {
         lastCommandOk_ = false;
         return;
     }
-    CommandResult r{true, std::string(job->trigger == RemeshTrigger::Quick         ? "Quick Remesh: remeshed"
-                                      : job->trigger == RemeshTrigger::AfterStroke ? "Remeshed after the stroke"
-                                                                                   : "Remeshed") +
+    // The fine-crease hint: not after the person raised the Resolution past the default themselves, and once per Part
+    // and Resolution a session (a common remesh would repeat it every time).
+    if (!job->lead->empty() && (job->resolution > kVoxelResolutionDefault || !creaseHintShown_.insert({job->part, job->resolution}).second))
+        job->lead->clear();
+    CommandResult r{true, *job->lead +
+                              std::string(job->trigger == RemeshTrigger::Quick         ? "Quick Remesh: remeshed"
+                                          : job->trigger == RemeshTrigger::AfterStroke ? "Remeshed after the stroke"
+                                                                                       : "Remeshed") +
                               " to " + std::to_string(doc_.mesh.triangleCount()) + " triangles" + *job->note};
     if (job->trigger != RemeshTrigger::Button) r.message += " (resolution " + std::to_string(job->resolution) + "; " +
                                                           actions_.shortcutText("edit.undo") + " undoes it)";
@@ -585,6 +605,7 @@ void App::pollVoxelRemesh() {
     updateTitle();
     Args echo{{"resolution", double(job->resolution)}};
     if (job->keepMasked) echo["keep_masked"] = true;
+    if (job->keepGroups) echo["keep_groups"] = true;
     if (!job->keepTexture && job->note->find("texture") != std::string::npos) echo["keep_texture"] = false;
     consoleEcho("remesh", echo, r);
 }
@@ -634,7 +655,7 @@ std::string App::remeshSkippedNote(int reason) {
         tr("Remesh after each stroke: skipped, this Part has subdivision levels (a remesh would remove them). %s"),
         tr("Remesh after each stroke: skipped, this Part has sculpt layers (a remesh would remove them). %s"),
         tr("Remesh after each stroke: skipped, this Part has a painted texture (carrying it over takes a while). %s")};
-    const std::string key = uiPrefs_.quickRemesh ? actions_.shortcutText("geometry.quick_remesh") : std::string();
+    const std::string key = quickRemeshOn() ? actions_.shortcutText("geometry.quick_remesh") : std::string();
     char way[160], line[512];
     if (key.empty()) std::snprintf(way, sizeof way, "%s", tr("Tool > Remesh > Remesh remeshes it anyway."));
     else std::snprintf(way, sizeof way, tr("%s remeshes it anyway."), key.c_str());
@@ -648,32 +669,118 @@ void App::quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down) {
         return;
     }
     const Action* a = actions_.actionForChord(chordFromEvent(key, mods));
-    if (a && a->id == "geometry.quick_remesh_drag" && uiPrefs_.quickRemesh) quickRemeshDragKey_ = key;
+    if (a && a->id == "geometry.quick_remesh_drag" && quickRemeshOn()) quickRemeshDragKey_ = key;
 }
 
 // With the drag key held (N by default, Preferences > Hotkeys), a press on the background (no surface under it)
-// remeshes when it's let go. On the model the press stays a stroke. The key is unbound in every input style, so
-// no empty-canvas drag of any style (turn, pan, zoom, mask and hide shapes) changes.
+// remeshes the whole Part when it's let go; a press on the model refreshes the stretched topology under the brush
+// as you drag (refreshTopologyDown). The key is unbound in every input style, so no empty-canvas drag of any style
+// (turn, pan, zoom, mask and hide shapes) changes.
 bool App::quickRemeshDragDown(float x, float y) {
-    if (quickRemeshDragKey_ == SDLK_UNKNOWN || !uiPrefs_.quickRemesh) return false;
+    if (quickRemeshDragKey_ == SDLK_UNKNOWN || !quickRemeshOn()) return false;
     RayHit hit;
-    if (previewLod_ < 0 && pick(x, y, hit)) return false;
+    if (previewLod_ < 0 && pick(x, y, hit)) {
+        refreshTopologyDown(x, y, hit);
+        return true;
+    }
     drag_ = Drag::QuickRemesh;
     status_ = "Quick Remesh: let go to remesh the active Part";
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Topology refresh: the drag key held and a drag on the model (Fenix + Rand_gogh: one gesture to even out stretched
+// triangles, no dialog). Dynamic topology's remesher in its refine-only mode, under the brush, towards the Part's
+// current detail (dynamic topology's edge length when it is on, else the Part's own typical edge): stretched edges
+// are split and the new vertices relaxed along the surface, nothing is moved or coarsened, one undo step per drag.
+// ---------------------------------------------------------------------------
+
+void App::refreshTopologyDown(float x, float y, const RayHit& hit) {
+    std::string why = dyntopoBlocker(doc_.mesh);
+    // A painted texture lives on the UVs a remesh drops (as Remesh after each stroke passes such a Part over).
+    if (why.empty() && hasTexture(doc_.mesh) && keepTexture_) why = "this Part has a painted texture (a refresh would drop its UVs)";
+    if (!why.empty()) {
+        status_ = "Refresh topology: " + why + ". " + actions_.shortcutText("geometry.quick_remesh_drag") +
+                  " on the background remeshes the whole Part";
+        lastCommandOk_ = false;
+        drag_ = Drag::None;
+        return;
+    }
+    if (doc_.sculptor.strokeActive()) endStroke();
+    refreshSymmetryPivot();
+    doc_.syncBvh();
+    if (!doc_.sculptor.beginStroke(doc_.mesh, "Refresh Topology", -1)) {
+        drag_ = Drag::None;
+        return;
+    }
+    const Camera cam = partCamera();
+    const float radius = worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : radiusPx_ * cam.worldPerPixel(hit.position, canvasRect().h);
+    refreshEdge_ = doc_.sculptor.refreshEdgeLength(doc_.mesh, doc_.bvh, hit.position, radius);
+    refreshHaveLast_ = false;
+    refreshChanged_ = false;
+    refreshDabs_ = 0;
+    refreshTrianglesBefore_ = doc_.mesh.triangleCount();
+    refreshPart_ = doc_.activePartInfo().id;
+    drag_ = Drag::RefreshTopology;
+    status_ = "Refresh topology: drag over stretched triangles to even them out at the Part's detail; let go to finish";
+    refreshTopologyTo(x, y);
+}
+
+void App::refreshTopologyTo(float x, float y) {
+    if (drag_ != Drag::RefreshTopology || !doc_.sculptor.strokeActive()) return;
+    if (doc_.activePartInfo().id != refreshPart_) return; // (another Part picked mid-drag: the release ends the gesture)
+    RayHit hit;
+    if (!pick(x, y, hit)) return;
+    const Camera cam = partCamera();
+    const float radius = worldSize_ && worldRadius_ > 0.0f ? worldRadius_ : radiusPx_ * cam.worldPerPixel(hit.position, canvasRect().h);
+    if (!(radius > 0.0f) || !(refreshEdge_ > 0.0f)) return;
+    // Dabs a quarter radius apart along the surface: a drag refreshes its whole path, a held pointer does it once.
+    if (refreshHaveLast_ && glm::distance(hit.position, refreshLast_) < 0.25f * radius) return;
+    refreshLast_ = hit.position;
+    refreshHaveLast_ = true;
+    ++refreshDabs_;
+    if (doc_.sculptor.refreshTopologyDab(doc_.mesh, doc_.bvh, hit.position, radius, refreshEdge_, symmetry_)) refreshChanged_ = true;
+}
+
+void App::refreshTopologyRelease() {
+    if (!doc_.sculptor.strokeActive()) return;
+    if (doc_.activePartInfo().id != refreshPart_) { // (the Part changed under the gesture: nothing lands; the stroke's mesh is gone)
+        endStroke();
+        status_ = "Refresh topology: the Part changed during the drag; nothing changed";
+        return;
+    }
+    UndoRecord r = doc_.sculptor.endStroke();
+    lastRefreshDabs_ = refreshDabs_;
+    const size_t before = refreshTrianglesBefore_, after = doc_.mesh.triangleCount();
+    if (r.empty() || !refreshChanged_) {
+        status_ = "Refresh topology: nothing under the brush was stretched (edges are near the Part's detail already)";
+        lastCommandOk_ = true;
+        return;
+    }
+    if (r.topology && !r.topology->uvs.empty()) status_ = "Refresh topology removed the UVs of the remeshed Part (Undo brings them back). ";
+    else status_.clear();
+    doc_.undo.push(std::move(r));
+    doc_.modified = true;
+    updateTitle();
+    clearLods();
+    status_ += "Refreshed the topology under the brush: " + std::to_string(before) + " to " + std::to_string(after) + " triangles (" +
+               actions_.shortcutText("edit.undo") + " undoes it)";
+    lastCommandOk_ = true;
+}
+
 void App::drawQuickRemeshContents() {
     tray::GroupLabel(*this, "Quick Remesh");
-    bool quick = uiPrefs_.quickRemesh;
-    if (ImGui::Checkbox(tr("Quick Remesh##remesh.quick"), &quick)) uiPrefs_.quickRemesh = quick;
+    bool quick = quickRemeshOn();
+    if (ImGui::Checkbox(tr("Quick Remesh##remesh.quick"), &quick)) uiPrefs_.quickRemesh = quick ? 1 : 0;
     const std::string key = actions_.shortcutText("geometry.quick_remesh");
     const std::string drag = actions_.shortcutText("geometry.quick_remesh_drag");
     const std::string help =
         "When on, " + (key.empty() ? std::string("the Quick Remesh key (Preferences > Hotkeys)") : key) +
         " remeshes the active Part at the Resolution above, in the background (progress and Cancel here)" +
         (drag.empty() ? std::string(".") : "; so does holding " + drag + " and clicking or dragging on the background.") +
-        " Keep Masked and Keep Texture apply. Both keys change in Preferences > Hotkeys.";
+        " Keep Masked, Keep Face Groups and Keep Texture apply." +
+        (drag.empty() ? std::string() : " Holding " + drag + " and dragging on the model instead refreshes only the stretched triangles under the brush, at the Part's detail (dynamic topology's when it is on), without a remesh of the whole Part.") +
+        " Both keys change in Preferences > Hotkeys.";
     ui::HelpText("Quick Remesh", nullptr, help.c_str(), "Tool > Remesh");
     bool after = uiPrefs_.remeshAfterStroke;
     if (ImGui::Checkbox(tr("Remesh after each stroke##remesh.after_stroke"), &after)) uiPrefs_.remeshAfterStroke = after;

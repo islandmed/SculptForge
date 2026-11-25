@@ -332,7 +332,7 @@ void App::penButton(int button, bool down, float x, float y) {
     if (radialPenButton(button, down, x, y)) return; // a radial menu's button (RadialMenu.cpp)
     // Invert and Smooth need nothing here: inputMods() reports them as Alt / Shift while held.
     const PenAction a = penButtonAction(button);
-    if (a != PenAction::RotateView && a != PenAction::PanView && a != PenAction::RightClick) return;
+    if (a != PenAction::RotateView && a != PenAction::PanView && a != PenAction::ZoomView && a != PenAction::RightClick) return;
     ImGuiIO& io = ImGui::GetIO();
     if (a == PenAction::RightClick) { // context menus and right-click items in the UI
         io.AddMouseSourceEvent(ImGuiMouseSource_Pen);
@@ -346,7 +346,7 @@ void App::penButton(int button, bool down, float x, float y) {
         if (a == PenAction::RightClick) {
             onMouseDown(x, y, SDL_BUTTON_RIGHT); // drag to rotate (Shift: pan), as with the mouse
         } else {
-            drag_ = a == PenAction::RotateView ? Drag::Orbit : Drag::Pan;
+            drag_ = a == PenAction::RotateView ? Drag::Orbit : a == PenAction::PanView ? Drag::Pan : Drag::Zoom;
             dragFromPen_ = true;
         }
         if (drag_ != Drag::None) penNavButton_ = button;
@@ -759,30 +759,11 @@ void App::drawTabletSection() {
 
     // --- Eraser and side buttons ---
     ImGui::Spacing();
-    auto mapping = [&](const char* label, PenAction& value, std::initializer_list<PenAction> choices, const char* help) {
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(label);
-        ImGui::SameLine(width * 0.42f);
-        ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::BeginCombo((std::string("##") + label).c_str(), penActionLabel(value))) {
-            for (PenAction a : choices)
-                if (ImGui::Selectable((std::string(penActionLabel(a)) + "##" + label).c_str(), a == value)) value = a;
-            ImGui::EndCombo();
-        }
-        ui::HelpText(label, nullptr, help, path);
-    };
-    mapping(tr("Eraser"), t.eraser, {PenAction::Invert, PenAction::Smooth, PenAction::EraseMask, PenAction::None},
-            "What the pen's eraser end does. Invert: brushes subtract, like holding Alt (with Ctrl it erases mask). "
-            "Erase mask: removes mask wherever it draws.");
-    static const char* kButtonHelp[kPenButtons] = {
-        "The side button nearer the tip. Right-click: drag to rotate the view (Shift: pan) and open context menus.",
-        "The side button further from the tip. Invert (Alt): brushes subtract while it is held.",
-        "A third button, on pens that have one (e.g. Wacom Pro Pen 3D)."};
-    for (int b = 0; b < kPenButtons; ++b)
-        mapping(kButtonNames[b], t.buttons[size_t(b)],
-                {PenAction::RightClick, PenAction::Invert, PenAction::Smooth, PenAction::RotateView, PenAction::PanView,
-                 PenAction::None},
-                kButtonHelp[b]);
+    drawPenActionRow(tr("Eraser"), t.eraser, {PenAction::Invert, PenAction::Smooth, PenAction::EraseMask, PenAction::None},
+                     "What the pen's eraser end does. Invert: brushes subtract, like holding Alt (with Ctrl it erases mask). "
+                     "Erase mask: removes mask wherever it draws.",
+                     path, width);
+    for (int b = 0; b < kPenButtons; ++b) drawPenButtonRow(b, path, width);
     if (ImGui::SmallButton(tr(ICON_LC_ROTATE_CCW "  Tablet defaults"))) {
         const PressureCurve keep = t.curve;
         const bool mouseMode = t.mouseMode; // (follows the driver's setting, not a preference)
@@ -800,6 +781,35 @@ void App::drawTabletSection() {
 
     ImGui::Spacing();
     drawTabletDiagnostics();
+}
+
+// One pen mapping row (Preferences > Tablet, and the side buttons again in Preferences > Navigation): the label, then
+// a combo of what the eraser or that button does. `width`: the row's width (the combo starts at 42 % of it).
+void App::drawPenActionRow(const char* label, PenAction& value, std::initializer_list<PenAction> choices, const char* help,
+                           const char* path, float width) {
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label);
+    ImGui::SameLine(width * 0.42f);
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ImGui::BeginCombo((std::string("##") + label).c_str(), tr(penActionLabel(value)))) {
+        for (PenAction a : choices)
+            if (ImGui::Selectable((std::string(tr(penActionLabel(a))) + "##" + label).c_str(), a == value)) value = a;
+        ImGui::EndCombo();
+    }
+    ui::HelpText(label, nullptr, help, path);
+}
+
+// Side button B (0 lower, 1 upper, 2 third): Right-click, Invert, Smooth, Rotate / Pan / Zoom view or Nothing.
+void App::drawPenButtonRow(int b, const char* path, float width) {
+    static const char* kButtonHelp[kPenButtons] = {
+        "The side button nearer the tip. Right-click: drag to rotate the view (Shift: pan) and open context menus.",
+        "The side button further from the tip. Invert (Alt): brushes subtract while it is held.",
+        "A third button, on pens that have one (e.g. Wacom Pro Pen 3D)."};
+    if (b < 0 || b >= kPenButtons) return;
+    drawPenActionRow(kButtonNames[b], uiPrefs_.tablet.buttons[size_t(b)],
+                     {PenAction::RightClick, PenAction::Invert, PenAction::Smooth, PenAction::RotateView, PenAction::PanView,
+                      PenAction::ZoomView, PenAction::None},
+                     kButtonHelp[b], path, width);
 }
 
 // What a bug report about the pen needs (Preferences > Tablet > Troubleshooting details, Copy details): which SDL

@@ -87,6 +87,12 @@ Two thirds of the slider covers 32 to 512, the everyday range; the last third go
 (Ctrl+click it to type a number). The line under it estimates the result, *About 1.6M triangles*, from the Part's
 surface area (fine detail smaller than a voxel counts there, so a dense scan comes out somewhat lower).
 
+Creases and hard edges a little wider than the voxels (wrinkles, eyelid and lip lines) keep a clean, even line. A
+crease narrower than about two voxels can't be held at that Resolution: when a remesh loses a good share of such
+creases, the status line starts *Resolution 384 keeps fine creases (about 1.1M triangles)*. Undo, set that
+Resolution and remesh again to keep them. The hint only appears when that Resolution fits in the free memory, once per
+Part and Resolution in a session, and not when you have already raised the Resolution above the default.
+
 512 is safe on an 8 GB computer: a 28M-triangle scan remeshes at 512 in about 8 s (14 s on 4 cores) into about
 760,000 triangles; a round 2M-triangle sculpt, which fills its box, in about 3 s (5 s on 4 cores) into about 2.5
 million triangles, with about 2 GB of memory at its peak.
@@ -101,7 +107,8 @@ triangles and needs over 16 GB, so on most computers it says so instead of start
   been back at 512 or less;
 - a remesh that won't fit in the free memory doesn't start: the status line says how much it needs and how much is
   free. Lower the Resolution or close other apps;
-- it runs in the background with a progress bar; **Cancel** stops it within seconds and the Part stays as it was.
+- it runs in the background with a progress bar that moves through every stage; **Cancel** stops it at once (within a
+  blink even on a 5M-triangle sculpt) and the Part stays as it was.
 
 Sculpting tens of millions of triangles needs a fast computer: **Decimate** or a lower Resolution makes the result
 lighter.
@@ -112,8 +119,11 @@ What happens to your data:
 
 - Sculpt layers are baked into the surface: the result has no layers.
 - Mask and vertex paint are transferred from the nearest original vertex.
-- Face Groups, hidden faces and UVs are reset (everything becomes visible, one face group). Hidden parts are
-  remeshed too.
+- Hidden faces and UVs are reset (everything becomes visible). Hidden parts are remeshed too.
+- Face groups are reset to one group unless **Keep Face Groups** (under the button, off by default) is on: then each
+  new polygon takes the group of the original surface nearest its centre, so the groups come through with hard borders
+  (stepped at the voxel size, as the surface itself is) and no stray polygons along them. Quad Remesh's **Follow Face
+  Groups** does the same for quads. Command: `remesh keep_groups=true`.
 - A painted texture is kept with **Keep Texture** (on by default, shown next to the button when the Part has a
   texture): the result gets Auto UVs and the texture is projected onto it, every layer included, in the same undo
   step. This runs in the background (Auto UV of a few hundred thousand triangles takes several seconds) with a
@@ -133,14 +143,14 @@ To remesh several Parts into one, first combine them with **Merge visible...** o
 
 ### Quick Remesh
 
-Remesh as you sculpt, without going to the palette (#121). Turn on **Tool > Remesh > Quick Remesh**, then:
+Remesh as you sculpt, without going to the palette (#121). On by default in the SculptForge layout; in the Classic layout tick
+**Tool > Remesh > Quick Remesh** first (the checkbox switches it either way). Then:
 
 - press <kbd>Shift</kbd>+<kbd>R</kbd>, or
-- hold <kbd>N</kbd> and click or drag on the background (anywhere off the model; on the model it stays a brush
-  stroke).
+- hold <kbd>N</kbd> and click or drag on the background (anywhere off the model).
 
-Either one remeshes the active Part at the **Resolution** above, with **Keep Masked** and **Keep Texture** as set
-there. It runs in the background with the same progress bar and **Cancel**, so you can keep sculpting; the status bar
+Either one remeshes the active Part at the **Resolution** above, with **Keep Masked**, **Keep Face Groups** and
+**Keep Texture** as set there. It runs in the background with the same progress bar and **Cancel**, so you can keep sculpting; the status bar
 says when it's done and how many triangles the Part has now.
 
 Each remesh is one undo step. If you sculpt or undo while it runs, it doesn't throw that work away: it remeshes the
@@ -149,7 +159,21 @@ Part again as it is now.
 Both keys change in **Edit > Preferences > Hotkeys** (*Quick Remesh* and *Quick Remesh (hold and drag)*). Neither
 <kbd>Shift</kbd>+<kbd>R</kbd> nor <kbd>N</kbd> is used by any key style, and holding <kbd>N</kbd> changes no other
 drag on the background: without it, a drag there turns, pans or zooms the view, or draws the mask and hide shapes,
-exactly as your key style says. With Quick Remesh off, the keys only tell you where to turn it on.
+exactly as your key style says. With Quick Remesh off, the keys only tell you where to turn it on. The right-click
+[Quick Menu](sculpting.md#the-quick-menu) has a **Quick Remesh** button too, beside **Quad Remesh** and **Remove Hidden**.
+
+### Refresh the topology under the brush
+
+The same key, on the model: hold <kbd>N</kbd> and drag over the stretched part of the surface (the long triangles a
+Move or Tendril pull leaves) and only that part is remeshed, as you drag, with no dialog and no remesh of the whole
+Part. Edges longer than one and a half times the surface's own edge length (the detail around the brush, or the
+Part's where everything near is stretched) are split, the new points following the surface's curve as dynamic topology
+splits do; the points that were there don't move and nothing finer is coarsened, so detail next to the stretched area
+stays as it is. The refresh follows wherever the pull stretched: a big Move brush stretches a wide area, so a drag some
+way from the tendril itself can still split a few triangles there. With [dynamic topology](performance.md#dynamic-topology)
+on, the refresh aims for its edge length instead (what the brush would make). Masked and hidden parts, face group borders, open borders and symmetry are respected exactly as dynamic
+topology respects them. Each drag is one undo step; the status bar says how many triangles the Part has now. A Part
+with subdivision levels can't be refreshed (the status bar says so; <kbd>N</kbd> on the background remeshes it whole).
 
 **Remesh after each stroke** (off by default) does it for you: when you lift the pen after a stroke that stretched the
 surface (edges pulled to more than 1.6 times their length, as a long Move or Tendril pull does), the active Part is

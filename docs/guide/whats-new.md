@@ -5,19 +5,195 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.14.1
+
+```features
+date: 2026-11-25
+tagline: Up to four lights of your own with a shadow strength, any control on any shelf, and one place for the camera's navigation bindings.
+highlight: Up to four lights of your own, balanced to one light's exposure, and a Shadow strength slider
+highlight: Any control on any shelf: hold Alt and drag a checkbox, slider or readout where you want it
+highlight: Navigation bindings: hold a key and drag to orbit, pan or zoom, set up in one place
+highlight: Primitive settings for appended Parts, and Solidify gives a flat Part thickness
+highlight: Keep Face Groups through Voxel Remesh, and N-drag refreshes stretched topology under the brush
+highlight: UI scale from 70% to 300%, remembered per monitor
+highlight: One-click update on macOS
+highlight: Any control in My Panel (requested by a member)
+highlight: Hold any key and drag to orbit, pan or zoom (requested by a member)
+highlight: Blockout primitives with live settings, and Solidify
+highlight: Face groups survive Voxel Remesh; N-drag refreshes stretched topology (requested by a member)
+highlight: Up to four lights of your own, and deeper shadows (requested by a member)
+highlight: Any option on a shelf (requested by a member)
+highlight: UI scale down to 70% for high-resolution screens (requested by a member)
+title: Lights of your own
+line: Render > Materials > Light > Lights adds up to four lights on top of the environment; together they keep one light's exposure, and Shadow strength sets how dark the cast shadows are.
+action: guide:pbr-painting.md
+title: Any control on any shelf
+line: Hold Alt and drag a checkbox, slider, choice or readout from a palette onto a shelf or My Panel; it works there just as it does in its palette.
+action: guide:interface.md
+title: Navigation bindings
+line: Edit > Preferences > Navigation: hold a key and drag to orbit, pan or zoom, set drag gestures and the pen's Zoom view, with a warning for every clash.
+action: guide:navigation.md
+```
+
+- **Lights** (**Render > Materials > Light > Lights**): up to four directional lights on top of the environment, balanced so
+  together they add one light's worth of exposure; **Shadow strength** sets how dark cast shadows are.
+- **Shelves and My Panel**: any single control can go on any shelf or on My Panel; a floating My Panel keeps its size.
+- **Navigation bindings** (**Edit > Preferences > Navigation**): hold-to-orbit, pan and zoom keys, drag gestures and the
+  pen's Zoom view in one place; the status bar shows the held key.
+- **Parts**: **Primitive settings** for a Part from Append, and **Solidify** (**Tool > Parts > Extract**) gives a flat,
+  single-sided Part thickness. **Tool > Cloth** gathers the Cloth brush and Drape settings in one section.
+- **Remesh**: **Keep Face Groups** carries face groups through Voxel Remesh; with Quick Remesh on, hold <kbd>N</kbd> and
+  drag to refresh stretched topology under the brush. Narrow creases come out cleaner (#240).
+- **View**: **UI scale** from 70% to 300%, a **Floor grid at Y=0**, <kbd>Alt</kbd>+middle click centres the view on the
+  pointer, and Duplicate numbers the copies.
+- **Fixes**: Android on some Mali phones and tablets draws large models and Micro levels; Dynamic + Smooth no longer
+  leaves a hair-thin strand (#238); Clay keeps a slot's lip clean; Stencil strokes outside the image work; Trim
+  Intensity scales all the way down; typing 1 in the Intensity pop-up means 1%, and a decimal comma works; layered
+  Parts no longer flicker against the body.
+- "**Tool > Cloth**: the Cloth brush settings and Drape together in one place; **Cloth settings...** under the Cloth
+  brush and under Drape opens it. **Wind for Drape**: speed, heading, lift and gusts, live while it runs." *Requested
+  by a member*
+- **Show SculptForge on Discord** (Edit > Preferences > Integrations) now shows one word for what you're doing,
+  **Sculpting**, **Painting** or **Idle**, and nothing from your scene: the file name and monthly challenge options
+  are gone.
+- **One-click update on macOS**: the update banner's **Update** button now works for the Mac app too. It downloads the
+  new release, checks it, and **Restart now** swaps it into place; the old version is kept until the new one has
+  started.
+- **My Panel takes single controls**: hold <kbd>Alt</kbd> and drag any slider, checkbox, choice or readout (**Backface
+  culling**, the brush **Size**, the triangle count, **Edit > Preferences > Input** options) from any palette into
+  **Edit > My Panel**, next to the buttons and sections it already holds. Reorder and remove them the same way; saved
+  with the layout; in both setups. *Requested by a member*
+- **Blockout primitives with settings** (Tool > Parts > Append): Cylinder, Cone, Torus, Capsule and the new Pipe come
+  with Segments, Rings, Cap rings, Quad caps, Radius and Height sliders that stay editable until you sculpt; a
+  **Low-poly** switch in the Append menu gives the clean quad cages Polygon mode starts from.
+- **Solidify** (Tool > Parts > Extract): gives a flat, single-sided Part real thickness in place, both sides joined by
+  a rim of quads.
+- **Keep Face Groups** (Tool > Remesh, under Voxel Remesh): the new surface keeps your face groups with hard borders.
+  **Refresh the topology under the brush**: hold <kbd>N</kbd> and drag over stretched triangles to even them out at
+  the Part's detail, no dialog, one undo step (on the background <kbd>N</kbd> still remeshes the whole Part).
+  Requested by members. *Requested by a member*
+- **Shelves for every option**: hold <kbd>Alt</kbd> and drag any checkbox, slider, choice, readout or button from any
+  palette (**Backface culling**, the brush **Size**, **Edit > Preferences > Input > Orbit around the pointer**,
+  **Subdivide**) onto any of the four shelves around the canvas, no Customize mode needed; a line shows where it
+  lands. It stays the palette's own control, live. Rearrange with Customize Shelves as before, right-click to remove,
+  saved with the layout, in both setups. *Requested by a member*
+- **UI scale** (**Edit > Preferences > Interface**) now goes down to **70%** for 4K and 5K screens: a slider from 70%
+  to 300%, text built sharp at every size, and the size remembered per monitor. *Requested by a member*
+- **Floor grid at Y=0** (**View > Display**, next to Floor grid): keep the grid at the world's height zero instead of
+  under the model. *Requested by a member*
+- **Centre view on the pointer**: <kbd>Alt</kbd>+middle click on the canvas slides the point under the pointer to the
+  middle of the view, zoom and angle unchanged; the view then turns about it. Can take a key (Controls window,
+  <kbd>F1</kbd>). *Requested by a member*
+- **Numbered duplicates**: **Duplicate** names copies `Head.01`, `Head.02`, ... (a copy of a copy counts on), no more
+  `copy copy`. *Requested by a member*
+- **Clay** builds a smooth slab along the lip of a squeezed band or a deep fold: passes no longer leave ribs at the
+  edge of the brush.
+- **Smooth with Dynamic on** now melts away a hair-thin strand (a Tendril pulled long and thin) instead of leaving a
+  line of triangles standing out of the surface.
+- **AI agents (MCP)**: a checkpoint restore now notices more cases where the checkpoint can't be reached exactly (the
+  start of a history the undo budget has trimmed, selection sets, paint layers, UV seams, splat edits) and leaves your
+  scene as it was.
+- **Stencil**: a stroke past the image's edge now sculpts and paints as if there were no Stencil; **Outside the image:
+  Block** keeps the old behaviour.
+- **Voxel Remesh** keeps creases and hard edges 1.5-3 voxels wide cleaner; finer creases need a higher Resolution, and
+  Remesh now tells you which.
+- **Layered Parts at rest**: a garment, Shell, Drape result or Duplicate lying close over or under the body no longer
+  flickers or shows through in patches when the view stands still.
+
+## Version 0.14.0
+
+```features
+date: 2026-11-24
+tagline: Polygon mode lets you pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span, and Split view shows a second live view of your scene.
+highlight: Polygon mode: pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span
+highlight: Split view shows a second live view of your scene, each with its own camera
+highlight: Place curves point by point, straight or smooth, and edit their points with the Gizmo
+highlight: An orientation widget in the canvas corner: click a dot to look from that side
+highlight: Remesh one click away: right-click or Space for Quick Remesh, Quad Remesh and Remove Hidden
+highlight: Generate 3D: one clear choice, and AI output tagged with its provenance
+highlight: Polyline curves, edited with the gizmo (requested by a member)
+highlight: Orientation widget: click a dot to turn there, drag to orbit, double-click to frame (requested by a member)
+highlight: Polygon mode: model with points, edges and faces (requested by a member)
+highlight: Split view: sculpt from the side, watch the front
+highlight: Remesh one right click away; Cancel answers at once (requested by a member)
+title: Polygon mode
+line: Tool > Polygon: select Points, Edges or Faces on the model, move them with the Gizmo, then Extrude, Inset, Bevel, add Edge loops or Span a gap, each one undo step.
+action: guide:polygon-mode.md
+title: Split view
+line: View > Split view (Shift+V): a second live view beside or below the first, each with its own camera; sculpt in one and watch the other follow.
+action: guide:navigation.md
+title: Curves, point by point
+line: Tool > Tube > Draw > Points places a curve point by point; Straight keeps the corners, Smooth curves through them, and the Gizmo moves selected points.
+action: guide:tube.md
+```
+
+- **Polygon mode** (**Tool > Polygon**): select Points, Edges or Faces of a Part on the model, move them with the
+  Gizmo and run **Extrude**, **Inset**, **Bevel**, **Edge loops** and **Span** on them, each one undo step.
+- **Split view** (**View > Split view**, <kbd>Shift</kbd>+<kbd>V</kbd>): a second live view of your scene beside or
+  below the first, each with its own camera.
+- **Curves**: **Tool > Tube > Draw > Points** places a curve point by point; **Line: Straight** keeps the corners and
+  **Smooth** curves through the same points; select points and move them with the Gizmo.
+- **Orientation widget**: the axes in the canvas corner; click a dot to look from that side, drag it to orbit.
+- **Remesh one click away**: right-click the canvas (or press <kbd>Space</kbd>) for Quick Remesh, Quad Remesh and
+  Remove Hidden. Quick Remesh is on in the SculptForge layout; in Classic, tick **Tool > Remesh > Quick Remesh**.
+- **Generate 3D** asks one question under **Result**: **Sculpting base** or **Reference**, and every Part it made
+  carries a provenance tag (provider, model, date, app version, pass).
+- **Text fields**: single-letter shortcuts no longer fire while you type in a field (Ctrl+A in a slider's typed
+  value no longer runs Mask All).
+- **AI agents (MCP)**: restoring a checkpoint that is no longer in the undo history fails cleanly and leaves the
+  scene as it was.
+- **Extrude** (Polygon mode): push selected faces out or in with quad side walls, as one region or face by face;
+  selected open border edges extrude into a strip.
+- **Inset** (Polygon mode): shrink selected faces inward with a rim of quads, and sink them in or raise them with
+  Depth, as one shape or each face by itself.
+- **Edge loops** (Polygon mode): add one or more loops across the ring of quads through the selected edge, with a live
+  preview of where they go.
+- **Span** (Polygon mode): join two edge loops or two sides of a model with a band of quads, a tunnel through a block
+  or a handle between two shells.
+- **Curves, part 2**: **Tool > Tube > Draw > Points** places a curve point by point; **Line: Straight** keeps the
+  corners (a polyline) and **Smooth** curves through the same points, switch any time; **Shift+click** selects points
+  and the Move / Scale / Rotate gizmo moves, turns and scales them; **Snap points to surface** lays a curve on the
+  model. *Requested by a member*
+- **Bevel** (Polygon mode): round or chamfer selected edges or points with a width, segments and a profile; the width
+  is held back so cuts never cross. *Requested by a member*
+- **Remesh and Remove Hidden one click away**: right-click the canvas (or press <kbd>Space</kbd>) for Quick Remesh,
+  Quad Remesh and Remove Hidden; <kbd>Shift</kbd>+<kbd>R</kbd> remeshes without a visit to Tool > Remesh (SculptForge
+  layout; Classic keeps the Tool > Remesh > Quick Remesh checkbox off until you tick it), and
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> removes the hidden part. Cancel stops a Voxel Remesh at once.
+  *Requested by a member*
+
 ## Version 0.13.14
 
 ```features
-date: 2026-11-23
-tagline: Sculpting with Dynamic on no longer erases the texture of a painted Part.
-highlight: Sculpting with Dynamic on no longer erases the texture of a painted Part
-title: Dynamic keeps your paint
-line: Sculpt with Dynamic on over a painted Part and the texture stays, through Undo, Redo and reopening the file.
-action: guide:texture-painting.md
+date: 2026-11-24
+tagline: Scatter covers a Part with copies and Keep apart stops them overlapping, Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth.
+highlight: Scatter covers a Part or its masked area with copies, and Keep apart stops them overlapping
+highlight: Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth
+highlight: Fill layer mask sliders keep the value you drag to
+highlight: Scatter copies over a surface, kept apart
+title: Scatter
+line: Tool > Scatter covers a Part, or its masked area, with copies of a pebble, a cube, a hex or any other Part; Keep apart stops them overlapping.
+action: guide:scatter.md
+title: Trim on thin Parts
+line: On a shell or a thin wing, Trim trims the side you see and leaves the wall behind it alone.
+action: guide:sculpting.md
 ```
 
-- **Dynamic** keeps a painted Part's texture: on 0.13.11 and 0.13.12, sculpting with Dynamic on could erase the
-  paint. If you lost paint to this, we are sorry; it won't happen again.
+- **Scatter** (Tool > Scatter): copies of a pebble, a cube, a hex or any other Part over a Part or its masked area,
+  each at a random size and turn. **Keep apart** slides them over the surface until no two overlap.
+- **Trim** no longer tears holes in thin walls: on a shell or a thin wing it trims the side you see and stops short
+  of the wall behind it, and along a thin edge it no longer saws the rim into spikes.
+- **Make Shell** rims come out smooth, with no spikes or ridged walls.
+- **Fill layers**: mask effect sliders (Noise, Levels, Blur...) and the material sliders keep the value you drag to.
+- **Android**: if a graphics driver can't draw a texture, the model stays visible without it and the status bar
+  says so.
+- **Stencil**: a stroke that starts where the Stencil's image is dark or off the model now says so in the status bar,
+  and how to remove the Stencil.
+- **A model never disappears after New Texture on Android**: if a phone or tablet's graphics driver rejects drawing
+  the texture, the model now stays visible without it and the status bar and the Texture Image panel say so. Painting
+  still goes into the texture.
+- **Paint > Material** lists every material channel as soon as the Part has a texture; tick one there to add it, no
+  trip to **Tool > Texture Image**. *Requested by a member*
 
 ## Version 0.13.13
 

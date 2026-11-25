@@ -1,0 +1,68 @@
+# Preferences > Interface > UI scale is a slider from 70 % to 300 % beside an Automatic tick (Fenix 11-22: below 100 %
+# for high-resolution screens). A typed value applies when it is entered; Automatic brings the display's scale back;
+# a dragged slider applies when it is let go. The test's display scale is its window height over 900 (App.cpp), so
+# Automatic is 100 % at 1440x900 and 200 % at 2880x1800: remembered first, compared at the end.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+remember ui_scale auto
+remember font_height fauto
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+expect "Automatic##ui_scale_auto"
+expect "##ui_scale"
+shot prefs_scale_auto
+
+# Typed: 80 %, entered (the first click of the double-click lands on the slider, its value is not applied).
+double_click "##ui_scale"
+expect_value typing == 1
+type_here 80
+key enter
+wait 0.3
+expect_value ui_scale == 80
+expect_value font_height >= 11.5
+expect_value font_height <= 12.5
+expect "Automatic##ui_scale_auto"
+shot prefs_scale_80
+
+# Saved: a restart (ui.json written and read back, uiScale + uiScaleByDisplay) comes up at 80 %. (The open Interface
+# section is part of the layout, which saves itself too: only the palette needs opening again.) The restart writes the
+# prefs itself: no wait on the autosave (wall clock) in a frame-time test.
+restart
+wait 0.2
+expect_value ui_scale == 80
+expect_value font_height >= 11.5
+expect_value font_height <= 12.5
+click "Preferences##palette.preferences"
+expect "##ui_scale"
+
+# Typed below the range: held at 70 %.
+double_click "##ui_scale"
+expect_value typing == 1
+type_here 40
+key enter
+wait 0.3
+expect_value ui_scale == 70
+expect_value font_height >= 10
+expect_value font_height <= 11
+shot prefs_scale_70
+
+# Dragged: pressing the slider puts it where the pointer is, a glide far past its left end holds it at 70 %, and the
+# UI follows once it is let go (ui_scale is still 80 while the pointer is down: pending, not applied).
+double_click "##ui_scale"
+expect_value typing == 1
+type_here 80
+key enter
+wait 0.3
+expect_value ui_scale == 80
+drag_to "##ui_scale" "##ui_scale" -3000 0 0.6
+expect_value ui_scale == 80
+wait 0.8
+expect_value ui_scale == 70
+shot prefs_scale_dragged_70
+
+# Automatic again: the display decides.
+click "Automatic##ui_scale_auto"
+wait 0.3
+expect_value ui_scale == $auto
+expect_value font_height == $fauto
+shot prefs_scale_auto_again

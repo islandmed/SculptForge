@@ -1,0 +1,123 @@
+# Tool > Polygon > Bevel (Polygon mode op, core/PolyBevel.h): on a six-sided box (new_sphere triangles=12 is a cube), the
+# Width slider previews the bevel while it drags and never touches the Part; Bevel on every edge with 4 segments gives a
+# rounded box in one undo step with the bevel faces selected; one edge with 1 segment is a flat chamfer whose ends cut
+# the neighbouring faces' corners; a point is cut off; an empty selection is refused in words. Members' top wish.
+run new_sphere triangles=12
+expect_value quads == 6
+remember undo_steps base
+remember triangles tris
+orbit 120 -60
+key f
+zoom 0.75
+click "Polygon##tool.polygon"
+click "Polygon/Polygon mode"
+expect_value poly_mode == 1
+expect_text "Bevel"
+click "Polygon/Edges"
+expect_value poly_element == 1
+click "Polygon/All"
+expect_value poly_selected == 12
+expect_value undo_steps == $base
+
+# The slider previews while it is held; the Part is untouched.
+drag_item "Polygon/##width" 40 0 keep
+expect_value poly_preview == 1
+expect_value triangles == $tris
+expect_value undo_steps == $base
+release
+expect_value triangles == $tris
+expect_value undo_steps == $base
+
+# Every edge, 4 segments: a rounded box, one undo step, the bevel faces selected afterwards.
+double_click "Polygon/##width"
+expect_value typing == 1
+type_here 0.05
+key enter
+expect_value typing == 0
+expect_value undo_steps == $base
+double_click "Polygon/##segments"
+expect_value typing == 1
+type_here 4
+key enter
+expect_value typing == 0
+expect_value undo_steps == $base
+click "Polygon/Bevel"
+expect_status "Bevelled 12 edges"
+expect_value undo_steps == $base+1
+expect_value triangles > $tris
+expect_value open_edges == 0
+expect_value poly_element == 2
+expect_value poly_selected > 0
+shot polygon-bevel-round
+ui_scale 200
+key f
+zoom 0.65
+shot polygon-bevel-round-200
+ui_scale 100
+key f
+zoom 0.75
+key ctrl+z
+expect_value triangles == $tris
+expect_value undo_steps == $base
+expect_value poly_mode == 1
+
+# One edge, 1 segment: a flat chamfer (one quad) whose two ends cut the neighbouring faces' corners (12 + 4 triangles).
+click "Polygon/Edges"
+click "Polygon/None"
+click_part Sphere 0.5 0.5 1
+expect_value poly_selected == 1
+double_click "Polygon/##segments"
+expect_value typing == 1
+type_here 1
+key enter
+expect_value typing == 0
+double_click "Polygon/##width"
+expect_value typing == 1
+type_here 0.08
+key enter
+expect_value typing == 0
+click "Polygon/Bevel"
+expect_status "Bevelled 1 edge"
+expect_value triangles == $tris+4
+expect_value open_edges == 0
+expect_value undo_steps == $base+1
+shot polygon-bevel-chamfer
+ui_scale 200
+key f
+zoom 0.65
+shot polygon-bevel-chamfer-200
+ui_scale 100
+key f
+zoom 0.75
+key ctrl+z
+expect_value triangles == $tris
+
+# Points: a corner is cut off (a triangle; the three faces around it gain a corner each: 12 + 4 triangles).
+click "Polygon/Points"
+expect_value poly_element == 0
+click "Polygon/None"
+run poly_select op=point index=0
+expect_value poly_selected == 1
+double_click "Polygon/##width"
+expect_value typing == 1
+type_here 0.12
+key enter
+expect_value typing == 0
+click "Polygon/Bevel"
+expect_status "Bevelled 1 point"
+expect_value triangles == $tris+4
+expect_value open_edges == 0
+shot polygon-bevel-point
+key ctrl+z
+expect_value triangles == $tris
+expect_value undo_steps == $base
+
+# Nothing selected: the panel's operations are disabled, and the command refuses in words; nothing changes.
+click "Polygon/Edges"
+click "Polygon/None"
+expect_value poly_selected == 0
+click "Polygon/Bevel"
+expect_value undo_steps == $base
+expect_value triangles == $tris
+run_fails poly_op op=bevel
+expect_value undo_steps == $base

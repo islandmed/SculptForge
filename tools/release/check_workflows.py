@@ -9,7 +9,10 @@
     (contents: write) or isn't limited to betas,
   - any workflow's job reads INSIDERS_REPO_TOKEN outside a GitHub Environment (environment secrets are invisible
     there anyway, so such a job is a sign someone put the token back at repository level),
-  - any workflow uses pull_request_target, or release.yml turns on shell tracing (set -x) that would log values,
+  - any workflow uses pull_request_target; a workflow pull requests run (forks too) reads a secret or asks for write;
+    a workflow_run job uses the triggering run's branch/commit without the head_repository guard; any `uses:` isn't
+    pinned to a full commit SHA (the repository also requires that, Settings > Actions),
+  - release.yml turns on shell tracing (set -x) that would log values,
   - build once, promote (docs/releasing.md): a job reads UPDATE_SIGNING_KEY outside the environments `release` and
     `member-release`; release.yml's publish isn't in `release`; locate doesn't pick the packages with
     tools/release/staged_run.py; a publisher doesn't need job verify or re-check the checksums
@@ -169,6 +172,21 @@ def check(files):
     for name, text in files.items():
         if re.search(r"^\s*pull_request_target\s*:", text, re.M) or re.search(r"\bpull_request_target\b", text.split("jobs:")[0]):
             errs.append(f"{name}: pull_request_target (runs outside code with this repository's secrets)")
+        on = re.search(r"^on:\s*\n(?:[ \t]+.*\n|\s*\n|#.*\n)*", text, re.M)
+        on = on.group(0) if on else text.split("\njobs:")[0]
+        if re.search(r"^\s+pull_request\s*:", on, re.M):  # forks run these: outside code, so nothing to steal or write
+            for n, line in enumerate(text.splitlines(), 1):
+                if re.search(r"secrets\.(?!GITHUB_TOKEN\b)\w+", line):
+                    errs.append(f"{name}:{n}: reads a secret in a workflow pull requests (forks too) run")
+                if re.match(r"^\s*[\w-]+:\s*write\b", line) or re.match(r"^\s*permissions:\s*write-all\b", line):
+                    errs.append(f"{name}:{n}: write permission in a workflow pull requests (forks too) run")
+        if re.search(r"^\s+workflow_run\s*:", on, re.M) and "github.event.workflow_run.head_" in text \
+                and "github.event.workflow_run.head_repository.full_name == github.repository" not in text:
+            errs.append(f"{name}: uses a triggering run's branch/commit without checking it came from this repository (a fork's)")
+        for n, line in enumerate(text.splitlines(), 1):
+            m = re.match(r"^\s*(?:-\s+)?uses:\s*([^.\s]\S*(?:\s+#.*)?)\s*$", line)
+            if m and not m.group(1).startswith("docker://") and not PINNED.match(m.group(1)):
+                errs.append(f"{name}:{n}: `uses: {m.group(1)}` is not pinned to a full commit SHA")
         for job, lines in jobs(text).items():
             if any(TOKEN in l for l in lines) and not environment(lines):
                 errs.append(f"{name}: job {job} reads INSIDERS_REPO_TOKEN outside a GitHub Environment")
@@ -343,7 +361,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: |
             build/*.deb
@@ -355,7 +373,7 @@ jobs:
             build/*.mcpb
   sums:
     steps:
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
 """
 
 
@@ -383,7 +401,7 @@ SIGNED = PACKAGES.replace("  sums:", f"""  windows:
       - {SIGN_IF}
         run: ./tools/ci/verify_signed.ps1 -Path build/x.exe
       - run: Write-Host "::notice title=Windows signing::$line" >> $env:GITHUB_STEP_SUMMARY
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows
           path: |
@@ -575,6 +593,13 @@ def self_test():
         "pypi without verify": ({"release.yml": GOOD + PYPI.replace("verify_staged.py", "x.py")}, 1),
         "pypi with a token": ({"release.yml": GOOD + PYPI.replace("packages-dir: dist", "password: ${{ secrets.PYPI_TOKEN }}")}, 1),
         "pypi outside its environment": ({"release.yml": GOOD + PYPI.replace("    environment: pypi\n", "")}, 1),
+        "pr reads a secret": ({"release.yml": GOOD, "x.yml": "on:\n  pull_request:\njobs:\n  a:\n    env:\n      T: ${{ secrets.X }}\n"}, 1),
+        "pr can write": ({"release.yml": GOOD, "x.yml": "on:\n  pull_request:\njobs:\n  a:\n    permissions:\n      contents: write\n"}, 1),
+        "pr read-only ok": ({"release.yml": GOOD, "x.yml": "on:\n  pull_request:\npermissions:\n  contents: read\njobs:\n  a:\n    env:\n      T: ${{ secrets.GITHUB_TOKEN }}\n"}, 0),
+        "push may write": ({"release.yml": GOOD, "x.yml": "on:\n  push:\njobs:\n  a:\n    permissions:\n      contents: write\n"}, 0),
+        "workflow_run unguarded": ({"release.yml": GOOD, "x.yml": "on:\n  workflow_run:\n    workflows: [CI]\njobs:\n  a:\n    env:\n      B: ${{ github.event.workflow_run.head_branch }}\n"}, 1),
+        "workflow_run guarded": ({"release.yml": GOOD, "x.yml": "on:\n  workflow_run:\n    workflows: [CI]\njobs:\n  a:\n    if: github.event.workflow_run.head_repository.full_name == github.repository\n    env:\n      B: ${{ github.event.workflow_run.head_branch }}\n"}, 0),
+        "action unpinned": ({"release.yml": GOOD, "x.yml": "on:\n  push:\njobs:\n  a:\n    steps:\n      - uses: actions/checkout@v7\n"}, 1),
         "env reader ok": ({"release.yml": GOOD, "x.yml": f"jobs:\n  a:\n    environment: other-env\n    env:\n      T: ${{{{ {TOKEN} }}}}\n"}, 0),
     }
     bad = [f"{k}: {check(f)}" for k, (f, n) in cases.items() if bool(check(f)) != bool(n)]

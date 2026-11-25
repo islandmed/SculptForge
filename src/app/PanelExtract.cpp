@@ -78,6 +78,24 @@ void App::drawExtractContents() {
     // Both Sides, Corners, Border: one row, or as many as the column needs (Segmented wraps them).
     ui::Segmented(*this, {"part.extract_double", "part.extract_triangle_corners", "part.extract_triangle_border"}, -1.0f);
     if (changed && doc_.extractPreviewCurrent()) runExtract();
+
+    // Solidify (core/Solidify.h): thickness for a flat, single-sided Part, in place (an Extract made with Thickness 0,
+    // a Plane): the button, its Thickness, Centred. Rows added after 0.13.0: in the Classic layout only with Preferences >
+    // Interface > Show newer menu rows (Classic keeps its old rows unless asked). Last, so the rows above stay put.
+    if (newerMenuRows()) {
+        tray::GroupLabel(*this, "Solidify");
+        const bool solidPair = actionW("part.solidify") <= half && ui::SliderWidth("Thickness %.3f", -0.1) <= half;
+        ui::ActionButton(*this, "part.solidify", ImVec2(solidPair ? half : -1.0f, 0));
+        ui::HelpAction(*this, "part.solidify");
+        if (solidPair) ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1);
+        ui::SliderInside("##solidify_thick", &solidifyThick_, -0.2f, 0.2f, "Thickness %.3f");
+        ui::HelpText("Thickness", nullptr,
+                     "Thickness Solidify adds, as a fraction of the Part's size (0.03 is 3%). Positive grows behind the surface, "
+                     "negative in front of it.",
+                     "Tool > Parts > Extract");
+        ui::Segmented(*this, {"part.solidify_both"}, -1.0f);
+    }
     Demo::popScope();
 }
 

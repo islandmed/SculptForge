@@ -15,6 +15,11 @@
 
 namespace sf {
 
+// Trim's gain on the height above its plane (Intensity x pressure `s`, 0..1): proportional to s below 0.5 (Intensity 1 is
+// a light touch), 0.5 + s from there up, where it always was (the default and every higher setting are bit for bit as
+// before). Continuous at 0.5. The kernel, the micro grid and tiles, the brush ghost and Renderer.cpp's GLSL share it.
+inline float trimGain(float s) { return s < 0.5f ? 2.0f * s : 0.5f + s; }
+
 // Standard, Clay, Flatten, Crease, Pinch, Sharp Crease and Trim: the offset of a point from its place alone.
 // Fused batches take all but Trim (its crisp cut shows where a centre moved by a hair).
 inline bool isPlaneKernelBrush(BrushType t) {
@@ -90,7 +95,7 @@ struct PlaneKernel {
             // above it (fills up to it when inverted). sqrt falloff for a crisp edge.
             const glm::vec3 planePoint = areaCenter - areaNormal * (sign * r * 0.02f * s);
             const float h = glm::dot(x - planePoint, areaNormal);
-            if (sign * h > 0.0f) d = -areaNormal * (h * std::min(1.0f, std::sqrt(f) * (0.5f + s)));
+            if (sign * h > 0.0f) d = -areaNormal * (h * std::min(1.0f, std::sqrt(f) * trimGain(s)));
             break;
         }
         default:
@@ -161,9 +166,9 @@ struct PlaneKernel {
                 const glm::vec3 planePoint = areaCenter - areaNormal * (sign * r * 0.02f * s);
                 const float h = glm::dot(x - planePoint, areaNormal);
                 if (!(sign * h > 0.0f)) return glm::vec3(0.0f);
-                const float sf = std::sqrt(f), w = sf * (0.5f + s);
+                const float gain = trimGain(s), sf = std::sqrt(f), w = sf * gain;
                 if (w >= 1.0f) return -areaNormal * glm::dot(areaNormal, tv);
-                const float dw = sf > 1e-12f ? (0.5f + s) * 0.5f / sf * gf : 0.0f;
+                const float dw = sf > 1e-12f ? gain * 0.5f / sf * gf : 0.0f;
                 return -areaNormal * (w * glm::dot(areaNormal, tv) + h * dw);
             }
             default:

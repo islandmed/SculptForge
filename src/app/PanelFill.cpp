@@ -249,9 +249,8 @@ void App::drawFillLayerControls() {
     auto materialSlider = [&](const char* id, const char* key, float value, const char* fmt, Channel c) {
         if (!(f.material.channels & channelBit(c))) return;
         ImGui::SetNextItemWidth(-1);
-        float v = value;
-        ImGui::SliderFloat(id, &v, 0.0f, 1.0f, fmt);
-        if (ImGui::IsItemDeactivatedAfterEdit()) run("fill_layer", withLayer({{"action", std::string("set")}, {key, double(v)}}));
+        float v = 0.0f;
+        if (ui::SliderOnRelease(id, value, 0.0f, 1.0f, fmt, &v)) run("fill_layer", withLayer({{"action", std::string("set")}, {key, double(v)}}));
     };
     materialSlider("##fillrough", "roughness", f.material.roughness, tr("Roughness %.2f"), Channel::Roughness);
     materialSlider("##fillmetal", "metallic", f.material.metallic, tr("Metallic %.2f"), Channel::Metallic);
@@ -288,9 +287,8 @@ void App::drawFillLayerControls() {
         if (ImGui::SmallButton(ICON_LC_X "##remove")) remove = int(k);
         auto slider = [&](const char* id, const char* key, float value, float lo, float hi, const char* fmt) {
             ImGui::SetNextItemWidth(-1);
-            float v = value;
-            ImGui::SliderFloat(id, &v, lo, hi, fmt);
-            if (ImGui::IsItemDeactivatedAfterEdit()) run("fill_layer", effectArgs({{key, double(v)}}));
+            float v = 0.0f;
+            if (ui::SliderOnRelease(id, value, lo, hi, fmt, &v)) run("fill_layer", effectArgs({{key, double(v)}}));
         };
         switch (e.kind) {
         case MaskEffectKind::Generator:
@@ -354,6 +352,28 @@ double App::fillTestValue(const std::string& name) const {
         double s = 0;
         for (size_t i = 3; i < px.size(); i += 4) s += px[i];
         return px.empty() ? 0.0 : s / double(px.size() / 4);
+    }
+    if (name == "layer_roughness_opacity") // the active layer's Roughness channel opacity, 0-1 (the channel chip's menu)
+        return tex ? layerChannelOpacity(*m.texture, m.texture->activeLayer, Channel::Roughness) : 0.0;
+    if (name == "fill_levels_gamma" || name == "fill_blur_radius" || name == "fill_generator_level") {
+        // The active Fill layer's first Levels / Blur / Generator effect value.
+        if (!tex || !isFillLayer(*m.texture, m.texture->activeLayer)) return 0.0;
+        const FillLayer& f = *m.texture->layers[size_t(m.texture->activeLayer)].fill;
+        const MaskEffectKind want = name == "fill_levels_gamma" ? MaskEffectKind::Levels
+                                    : name == "fill_blur_radius" ? MaskEffectKind::Blur : MaskEffectKind::Generator;
+        for (const MaskEffect& e : f.effects)
+            if (e.kind == want) return name == "fill_levels_gamma" ? e.gamma : name == "fill_blur_radius" ? e.radius : e.level;
+        return 0.0;
+    }
+    if (name == "fill_noise_scale" || name == "fill_noise_contrast" || name == "fill_fill_value" || name == "fill_roughness") {
+        // The active Fill layer's first Noise / Fill effect value, or its roughness (the sliders' stored values).
+        if (!tex || !isFillLayer(*m.texture, m.texture->activeLayer)) return 0.0;
+        const FillLayer& f = *m.texture->layers[size_t(m.texture->activeLayer)].fill;
+        if (name == "fill_roughness") return f.material.roughness;
+        const MaskEffectKind want = name == "fill_fill_value" ? MaskEffectKind::Fill : MaskEffectKind::Noise;
+        for (const MaskEffect& e : f.effects)
+            if (e.kind == want) return name == "fill_noise_scale" ? e.scale : name == "fill_noise_contrast" ? e.contrast : e.value;
+        return 0.0;
     }
     return std::numeric_limits<double>::quiet_NaN();
 }

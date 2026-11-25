@@ -1,0 +1,97 @@
+# Typing an Intensity in the U / I pop-ups: a percentage (1 -> 1%, 30 -> 30%, 100 -> 100%), except a number below 1 written
+# with a decimal point, which is a fraction (0.5 -> 50%, 0.05 -> 5%). Typing 1 used to give Intensity 100 (full strength).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+input_style classic
+mouse_move 0.5 0.5
+
+# 1 -> 1%, and the live preview of the typed number says so before Enter.
+key u
+key 1
+expect_value size_ring_value < 0.02
+key enter
+expect_value z_intensity == 1
+
+# 30 -> 30%
+key u
+key 3
+key 0
+key enter
+expect_value z_intensity == 30
+
+# 0.5 -> 50%
+key u
+key 0
+key .
+key 5
+expect_value size_ring_value > 0.49
+expect_value size_ring_value < 0.51
+key enter
+expect_value z_intensity == 50
+
+# 0.05 -> 5%
+key u
+key 0
+key .
+key 0
+key 5
+key enter
+expect_value z_intensity == 5
+
+# 1.0 is a percentage like 1 (not 100%)
+key u
+key 1
+key .
+key 0
+key enter
+expect_value z_intensity == 1
+
+# 100 -> 100%
+key u
+key 1
+key 0
+key 0
+key enter
+expect_value z_intensity == 100
+
+# Colour intensity (I) reads the same way: 1 -> 1%, 0.5 -> 50%.
+key i
+key 1
+key enter
+expect_value rgb_intensity == 1
+key i
+key 0
+key .
+key 5
+key enter
+expect_value rgb_intensity == 50
+
+# A decimal comma is a decimal point (0,5 -> 50%), as Spanish and many European users type it; ",5" too; "1," is 1%.
+key u
+key 0
+key comma
+key 5
+expect_value size_ring_value > 0.49
+expect_value size_ring_value < 0.51
+key enter
+expect_value z_intensity == 50
+key u
+key comma
+key 2
+key 5
+key enter
+expect_value z_intensity == 25
+key u
+key 1
+key comma
+key enter
+expect_value z_intensity == 1
+# A second separator is ignored: 0,5 then "." then 7 is 0,57 (57%), so 1,000.5 cannot be typed.
+key u
+key 0
+key comma
+key 5
+key .
+key 7
+key enter
+expect_value z_intensity == 57

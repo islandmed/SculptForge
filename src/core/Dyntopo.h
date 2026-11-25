@@ -13,13 +13,7 @@
 // Masked and hidden parts are left alone. With symmetry on, every operation is done on its mirror images at the
 // same time, so mirrored dabs make mirrored topology.
 //
-// Quads under the brush become triangles. UVs (and so the painted texture) are kept, so the paint stays on the surface
-// and the texture is never touched: a split's new corners take the midpoint of the UVs it splits, a collapse merges
-// into the end that stays (the UV that end has) and a flip reuses the corners' UVs, and relaxing moves a vertex's UV
-// the same fraction of the way to the middle of its ring's UVs (a convex mix stays in its chart however often it is
-// relaxed). A vertex on a UV seam (its triangles have more than one UV for it) merges into a neighbour with the UV
-// that neighbour has on each side of the seam, is never relaxed, and a seam edge is never flipped: those would
-// stretch the texture or take a corner out of its chart.
+// Quads under the brush become triangles; UVs are dropped (a remeshed surface has none) and come back on undo.
 // Meshes with subdivision levels can't be remeshed (as , delete the levels first).
 //
 // The mesh stays valid after every dab (no dead entries): elements a dab removed are filled from the end of
@@ -84,7 +78,6 @@ struct TopologyTriangleValues {
     std::vector<glm::uvec3> triangles;
     std::vector<uint32_t> facegroups, quadPartners;
     std::vector<uint8_t> hidden;
-    std::vector<glm::vec2> uvs; // 3 per slot (the corners' texture coordinates)
     size_t bytes() const;
 };
 
@@ -96,6 +89,7 @@ struct TopologyUndo {
     std::vector<uint32_t> vertexSlots, triangleSlots;
     TopologyVertexValues vertices;
     TopologyTriangleValues triangles;
+    std::vector<glm::vec2> uvs; // the whole UVs of the other state, when it had them (dynamic topology drops them)
     // Slots whose positions / colours must be worked out again from layers after applying (only when brush undo
     // entries from before the stroke's first remesh were merged in; normally every value is exact).
     std::vector<uint32_t> reevaluate;
@@ -105,6 +99,7 @@ struct TopologyUndo {
 
 struct DyntopoStats {
     size_t splits = 0, collapses = 0, flips = 0;
+    size_t dissolved = 0; // vertices merged away by dissolvePass (hair-thin strands; 0 on any mesh without needles)
     size_t collapseTries = 0; // collapse candidates looked at (most can fail: features, link condition)
     size_t maxRegion = 0, maxOps = 0; // the most triangles one remesh looked at, and the most operations it did
     size_t limited = 0;  // remeshes whose region was cut to maxRegionTriangles
@@ -124,6 +119,12 @@ public:
     // everywhere (a collapse needs a free end or a feature edge), and a pass that only stopped at its operations
     // scanned every edge of the brush's disc, seconds a dab on a dense Part.
     static constexpr size_t kTriesPerOp = 4;
+    // Refine only (the topology refresh gesture, Sculptor::refreshTopologyDab): edges longer than 1.5 times the target
+    // (4/3 for a brush) are split, valences evened and the changed vertices relaxed as always, but no edge is collapsed for being short (a
+    // squashed sliver is still repaired), and only the vertices the stroke added are relaxed (the ones that were there
+    // stay bit for bit), so detail finer than the target is never coarsened and nothing is moved: only the stretched part of
+    // the surface under the brush changes.
+    bool refineOnly = false;
     // Remeshes within `radius` of `center` and of its symmetric copies (`mirrors` as Sculptor::copies makes them:
     // mirror images and radial turns, the identity first) towards edges of `edgeLength`. Returns false when
     // nothing changed.
@@ -148,6 +149,11 @@ public:
     // finish() for the mesh the stroke remeshed (null when none).
     Mesh* strokeMesh() const { return mesh_; }
     BVH* strokeBvh() const { return bvh_; }
+
+    // Smooth dabs set it: remesh() also dissolves hair-thin strands (see dissolvePass). Other brushes leave strands alone.
+    bool dissolveNeedles = false;
+    // A triangle is a needle when its height over its longest edge is under this fraction of the target edge length.
+    static constexpr float kNeedleWidth = 0.05f;
 
     DyntopoStats stats;   // since the last reset
     double lastMs = 0.0;  // the last remesh's time
@@ -176,23 +182,6 @@ private:
     void vtReplace(uint32_t v, uint32_t from, uint32_t to);
     void moveVertex(uint32_t from, uint32_t to);
     void moveTriangle(uint32_t from, uint32_t to);
-    // UVs (corner c of triangle t is mesh.uvs[3 t + c]; all of this is a no-op on a mesh without UVs).
-    glm::vec2 cornerUv(uint32_t t, uint32_t v) const;
-    void setCornerUv(uint32_t t, uint32_t v, const glm::vec2& uv); // (t is recorded already)
-    bool seamVertex(uint32_t v) const;                              // its corners don't all have one UV
-    bool seamEdge(uint32_t a, uint32_t b) const;                    // the triangles on it differ at an end
-    void slideUvs(uint32_t v, const glm::vec3& to);                 // before v moves to `to` along the surface
-    // The UV keep's corner takes in each triangle around `drop` (the edge's own n <= 2 triangles aside) when drop
-    // merges into it: the one keep has in the edge triangle on the same side of the seam (the same UV at drop).
-    // Where keep has no UV for a triangle of drop's (a chart it has no corner in) the plan is false: moving drop's corner
-    // there would take it out of the paint, and errors of that kind add up over a long stroke.
-    bool collapseUvPlan(uint32_t keep, uint32_t drop, const uint32_t* edgeTris, int n,
-                        std::vector<std::pair<uint32_t, glm::vec2>>& out) const;
-    // Whether merging drop into keep leaves each chart's outline where its paint is: a vertex on a chart's outline (a
-    // seam or an open edge) that is merged along it replaces two outline segments by one chord, which lies outside the
-    // chart where the outline bends in (the texture has nothing there). Refused when it moves the outline out.
-    bool outlineStaysInChart(uint32_t keep, uint32_t drop) const;
-    bool openVertex(uint32_t v) const; // on an open edge of the mesh (its triangles don't close into a fan)
     void compact();
     // Queries (from the triangle lists, which are always current).
     int edgeTriangles(uint32_t a, uint32_t b, uint32_t* out) const; // up to 4
@@ -220,7 +209,12 @@ private:
     uint32_t split(uint32_t a, uint32_t b);
     void collapsePass();
     bool collapseTarget(uint32_t a, uint32_t b, uint32_t& keep, uint32_t& drop, glm::vec3& p) const;
+    bool collapseKeepsTopology(uint32_t keep, uint32_t drop) const;
     bool canCollapse(uint32_t keep, uint32_t drop, const glm::vec3& p) const;
+    // Smooth only (dissolveNeedles): a vertex all of whose triangles are needles (a hair-thin strand) is merged onto a
+    // neighbour, a strand at a time from its end, until nothing of it is left.
+    void dissolvePass();
+    bool needleTriangle(uint32_t t) const;
     void collapse(uint32_t keep, uint32_t drop, const glm::vec3& p);
     void flipPass();
     bool flipGain(uint32_t a, uint32_t b, uint32_t& c, uint32_t& d) const;
@@ -266,8 +260,6 @@ private:
     mutable std::vector<std::pair<uint32_t, uint32_t>> orbitScratch_; // candidate()
     size_t ops_ = 0, maxOps_ = 0;
     mutable std::vector<uint32_t> scratch_, scratch2_, ringA_, ringB_, ringC_, lockScratch_;
-    mutable std::vector<uint32_t> openScratch_;
-    mutable std::vector<std::pair<uint32_t, glm::vec2>> uvPlan_; // collapseUvPlan's result (triangle, UV of the merged vertex)
 };
 
 } // namespace sf

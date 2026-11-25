@@ -6,12 +6,352 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
-## [0.13.14] - 2026-11-23
+## [0.14.1] - 2026-11-25
+
+### Added
+- "**Tool > Cloth**: the Cloth brush's settings (mode, fabric, gravity, reach, steps, soft body, collisions) and Drape
+  (fabric, units per metre, pins, Simulate) in one section with a line on what each part does. Brush > Cloth and Tool
+  > Drape get a **Cloth settings...** link to it; the controls are the same ones, so all three agree. In the Classic
+  layout it is a newer row: on with **Show newer menu rows**. Requested by Hameron. **Wind for Drape** (Tool > Drape
+  and Tool > Cloth): a wind speed in m/s, where it blows toward (a heading, or **From view**), its lift and **Gusts**;
+  the wind pushes on the cloth's face and skims along its edge, and all of it can change while the simulation runs. In
+  gusts the cloth ripples on until Keep. The cloth_drape command takes wind, heading, lift and gusts. Requested by
+  members."
+- **One-click update on macOS** (update banner > **Update**): the Mac app downloads the release's disk image from
+  SculptForge's GitHub releases to `~/Library/Caches/SculptForge/updates`, checks the download arrived intact (its
+  checksum must match the release's checksum list), copies the app out of it beside the current one, runs macOS's code
+  signature check (`codesign --verify --deep --strict`), and swaps the bundles in one step on **Restart now** (or at
+  quit with **Later**). The old bundle is kept as `SculptForge.app.old` until the new version has started once, and
+  put back when it doesn't start. No administrator password is ever asked for. Homebrew installs keep their `brew
+  upgrade` line. `SF_UPDATE_DRY_RUN=1` runs every check and replaces nothing. The in-app swap is offered on a Mac only
+  once the update feed says so (`"self_update": {"macos": true}` in latest.json; anything else keeps the Download
+  link): it is switched on for everyone after the first swap has been tested on a real Mac against a public release.
+- **My Panel**: single controls (Edit > My Panel; requested by Hameron and ebarranco on Discord). Hold Alt and drag a
+  slider, checkbox, choice or readout from any palette into My Panel, Classic or Streamlined setup: it is the
+  palette's own control, live, so a change in My Panel is a change everywhere. Alt+drag to reorder, drag out or
+  right-click to remove, saved with the layout. A control its palette shows only sometimes (the Levels line of a Part
+  without levels) shows as its dim name until it is back. While Alt is held a slider is picked up, not changed. The
+  triangle count (Tool) and the Levels line (Tool > Geometry) can be pointed at with Ctrl for help, and dragged, like
+  any control. The floating My Panel (its key) is now as tall as what it holds, up to 70 % of the view, instead of a
+  fixed tall window.
+- **Navigation bindings** (Edit > Preferences > Navigation): one place for the camera's bindings, for left-handed and
+  tablet users who navigate from the hand on the keyboard. **Hold to orbit**, **Hold to pan** and **Hold to zoom** are
+  actions with no key by default: give one a key (there, in Hotkeys, or Ctrl+Alt+click) and, while it is held, a drag
+  anywhere on the canvas with any mouse button or the pen's tip is that camera move and never a stroke; the drag goes
+  on to the button's release. Each move can also take a drag gesture of its own (Left, Middle or Right with Ctrl,
+  Shift or Alt), checked before the key style's gestures; the left button needs a modifier. The panel lists the view
+  keys (Frame, Reset view, the orbit, pan and zoom step keys) and the pen's side buttons, where **Zoom view** joins
+  Rotate view and Pan view (Preferences > Tablet has it too). A hold key another action also has, two moves with the
+  same gesture, or a gesture the key style already uses show a warning naming the other meaning; **Navigation
+  defaults** puts all of it back. While a hold key is down a label (HOLD TO ORBIT, PAN or ZOOM) shows in the status
+  bar where Camera locked does, and the warning lines and gesture names are translated. Everything saves itself; every
+  key style's defaults are unchanged. Requested by Fenix and other members on Discord.
+- **Primitive settings** (Tool > Parts): a Part from **Append** (Sphere, Cube, Plane, Cylinder, Cone, Torus, Capsule,
+  the new **Pipe**, Icosphere, Quad Sphere) keeps its settings editable below the Parts list for as long as it is
+  still the generated mesh: Segments (cells or subdivisions for cubes, planes and spheres), Rings, Cap rings (0 = open
+  ends), Quad caps (an all-quad cap with no pole), Radius, a second radius (a cone's top, a torus's tube, a pipe's
+  inside), Height and Axis (Y, X or Z), plus Low-poly and Dense presets. Each change rebuilds the Part as one undo
+  step. Sculpting, remeshing or editing faces turns it into an ordinary mesh; undo brings the settings back, and
+  moving the whole Part with the Gizmo keeps them. Saved in projects. Appended primitives are unchanged by default;
+  the **Low-poly (Polygon mode)** switch at the top of the Append menu (a saved preference) gives 12-segment, 1-ring
+  cages with quad caps instead, the clean quads polygon modelling starts from. Commands: `part_append` takes
+  `low_poly=`, `segments=`, `rings=`, `caps=`, `quad_caps=`, `radius=`, `radius2=`, `height=`; `part_primitive`
+  changes them later. In the Classic layout the Primitive group shows with **Preferences > Interface > Show newer menu
+  rows** (Classic keeps its old rows unless asked). Requested by members.
+- **Solidify** (Tool > Parts > Extract, beside Make Shell): gives a flat, single-sided Part thickness in place: a copy
+  of the surface pushed along the normals becomes the back, a rim of quads joins the two along every open edge, and
+  the result is one closed mesh. Thickness is a fraction of the Part's size (negative grows in front; Centred puts
+  half each way). Face groups, UVs and paint stay on both sides; the rim gets a new face group. Pairs with Extract's
+  Thickness 0: extract the flat surface first, give it thickness later. Command: `solidify thickness= both=`. In the
+  Classic layout the rows show with **Preferences > Interface > Show newer menu rows**. Requested by members.
+- **Keep Face Groups** (Tool > Remesh, beside Keep Masked; off by default): Voxel Remesh carries the Part's face
+  groups onto the new surface. Each new polygon takes the group of the original surface nearest its centre, stray
+  polygons along a border take their neighbours' group, so borders stay hard lines (stepped at the voxel size). Quick
+  Remesh and Remesh after each stroke follow the checkbox; command `remesh keep_groups=true`. Requested by a Founding
+  Member.
+- **Refresh the topology under the brush**: with Quick Remesh on, hold <kbd>N</kbd> (the Quick Remesh drag key) and
+  drag on the model to remesh only the stretched triangles under the brush at the Part's detail (dynamic topology's
+  edge length when it is on, else the Part's own typical edge), as you drag, with no dialog. Edges are split and the
+  new points relaxed along the surface; nothing is moved and nothing finer is coarsened. Masks, hidden faces, face
+  group borders and symmetry are respected as in dynamic topology. One undo step per drag. On the background
+  <kbd>N</kbd> remeshes the whole Part as before. Requested by members (a Founding Member and Rand_gogh).
+- **Lights** (Material > Light > Lights, `lights` command): up to four directional lights on top of the material's
+  light or the PBR environment. Add a **Key** (warm, from the upper left; it casts the view's shadows), a **Fill**
+  (cool and soft, from the right) or a **Rim** (from behind, along the silhouette), then drag each one's direction on
+  its own pad (past the edge of the ball sends a light round the back), pick its colour and intensity, and tick which
+  one casts the shadows (Shadows & AO). In the PBR view they light the material channels with their roughness and
+  metallic; in the Lit Sphere and studio views they add to the material. None by default, so the view draws as before
+  until you add one; saved in the project. Requested by members.
+- **Shadow strength** (Material > Viewport Shading and Preferences > Display, under Shadows & AO): how dark the cast
+  shadows get, 1 being what they were, towards 2 they deepen to black; `view_shadows shadow_strength=`. Saved with the
+  preferences. Requested by a member.
+- **Shelves**: any control, any shelf (requested by members). Hold Alt and drag a checkbox, slider, choice, readout or
+  button from any palette onto the top, left, right or bottom shelf, Customize Shelves off or on, Classic or
+  Streamlined setup: a line shows where it lands, and it is the palette's own control, live, so a change on the shelf
+  is a change everywhere. While Alt is held a slider is picked up, not changed. On a side shelf a control takes the
+  column's width (a long label ends in "..."; drag the left shelf's inner edge wider); on the top or bottom shelf it
+  is as wide as it is in its palette, centred in the row. Ctrl+Alt in Customize Shelves moves it along or between
+  shelves and off them, as for every item; right-click > Remove from shelf; saved with the layout. A control its
+  palette shows only sometimes is hidden on the shelf until it is back (shown dim in Customize Shelves so it can be
+  removed). The same drag puts it into My Panel, and an entry dragged out of My Panel onto a shelf moves there.
+- **UI scale below 100%** (**Edit > Preferences > Interface > UI scale**): the setting is a slider from **70%** to
+  **300%** in 5% steps (double-click it to type a value), applied the moment you let it go, with an **Automatic** tick
+  that follows the monitor. Text and icons are built again at the chosen size, so they stay sharp (no shrunk bitmaps),
+  and below 100% buttons and sliders keep a little more room around their text than the text loses, so they stay easy
+  to hit with a mouse or a pen. The size is remembered per monitor: a laptop screen and a 4K monitor each keep their
+  own. Requested for a Retina display whose system scaling made the interface too large.
+- **Floor grid at Y=0** (View > Display and Tool > Viewport Look, next to Floor grid; requested by members): the floor
+  grid stays at world height zero instead of following the lowest point of the visible Parts, a fixed reference while
+  you move Parts up and down or work on a base. Off by default (the grid follows the model, as before); saved in the
+  preferences. In the Classic layout the row shows with Edit > Preferences > Interface > Show newer menu rows (the
+  command palette reaches it either way; once on, the row stays).
+- **Centre view on the pointer** (#209, requested by members): Alt+middle click on the canvas (press and let go
+  without dragging) slides the point under the pointer to the middle of the view, keeping the zoom and the angle; the
+  view then orbits about that point. Over the background it centres on that spot. Works in every key style (an
+  Alt+middle drag still pans, or orbits with Blender keys). The action can take a key in Preferences > Hotkeys and
+  then works wherever the pointer is over the view.
+- **Lights** (Material > Light > Lights): the added lights together add one light's worth of exposure. With one light
+  nothing changes (it is exactly what its Intensity says); with more, their colours are scaled so their intensities
+  sum to the strongest light's own intensity (at least 1), so Key + Fill + Rim at their starting values look balanced
+  instead of washing the model out. A deliberately bright single light stays bright. Requested by members.
+
+### Changed
+- **Show SculptForge on Discord** (Preferences > Integrations, off by default): the status shows SculptForge, its
+  icon, the elapsed time and one of three fixed words, Sculpting, Painting (the Paint brush in hand) or Idle (nothing
+  done for five minutes). The "Show the monthly challenge" and "Show the file name" options are gone: nothing typed
+  and nothing from the scene is sent any more, and the preferences spell out what is shared. If you had one of them
+  on, Preferences > Integrations tells you once; your on/off choice is kept.
+- **Material > Light**: dragging past the edge of the light's ball now takes the light round the back of the model
+  (shown as a ring), where it only used to stop at the edge.
+- **Duplicate** numbers the copies (Discord ask): `Head` gives `Head.01`, then `Head.02`; duplicating a copy counts on
+  from the same name (`Head.03`), the lowest free number first. Before: `Head copy`, `Head copy copy`.
+- Nothing a user sees: the UI test for the view after Undo while a stroke is still finishing no longer fails now and
+  then on slow machines. It asked whether the view was within half of the undone stroke's difference from the saved
+  view, but a stroke running shades the whole model a little differently; it now asks whether the view is nearer the
+  saved view than the undone stroke's (`mark_view other`, `view_nearer_mark` in the UI test harness); with the undone
+  stroke still showing it reads about -0.11 and the test fails.
+- Release tooling: the guide check (What's New tagline, links, images) runs before the version bump instead of an hour
+  into the stage, and T0 stops a branch that changes the brush gallery's files until the public gallery repository has
+  the same change.
+- **Trim**: Intensity and pen pressure now scale all the way down: Intensity 1 or a light pen stroke is a light touch.
+  With a mouse, or at full pressure, Intensity 50 and above is unchanged.
 
 ### Fixed
-- Dynamic topology no longer erases a Part's painted texture: the UVs are kept through the stroke (new triangles get
-  UVs from the ones they split; at a UV seam the remesh merges and relaxes only along the seam), so the paint stays in
-  place and Undo restores the UVs exactly.
+- **Android**: on graphics chips with a small buffer limit (some Mali phones and tablets), a model with more than
+  about 65,000 triangles no longer disappears, with or without a texture.
+- **Clay** along the lip of a deep slot or a squeezed band built vertical ribs after a few passes: a wall that leans
+  away from the brush plane was pulled toward the dab, so the brush weighed it more with every dab (a runaway at the
+  edge of its reach). The brush now weighs such a vertex by where the stroke found it. Ordinary Clay strokes are
+  unchanged.
+- **Contact facing** with Trim: in a narrow gap the brush could start measuring from the wall across it once the
+  stroke's own cut had lowered the surface under the cursor, and cut that wall.
+- **Dynamic + Smooth leaves a hair-thin filament** (#238, reported by @nino3thd): a strand whose cross-section had
+  shrunk to a hair kept its long edges, which Dynamic never collapses, and smoothing a straight line of vertices moves
+  nothing, so it stood out of the surface after any number of Smooth strokes (16 strokes: 650 sliver triangles still
+  out). Smooth strokes with Dynamic on now merge away a vertex whose every triangle is a needle (height under 5% of
+  the Detail's edge length), a strand at a time from its end; a solid form, a Part with even triangles, and Smooth
+  without Dynamic are untouched.
+- **Intensity** typed in the **U** and **I** pop-ups with a decimal comma (0,5, as Spanish and many European users
+  type it) was read as 0; the comma is now a decimal point, like the point. A second separator is ignored.
+- **MCP `checkpoint_restore`**: a checkpoint made at the very start of the history, after the undo memory budget had
+  dropped the oldest steps, still reported success and left the scene on whatever the trimmed history started from.
+  The history now remembers where it was trimmed, so such a checkpoint is refused up front, while a checkpoint exactly
+  at the trimmed edge still restores. The scene check behind it now also covers selection sets, paint layers, UV seams
+  and pins, quad pairs, Part folders, reference images and splats, so a restore that would end somewhere else says
+  "could not be restored exactly" and changes nothing. Opening a saved history now gives its steps new numbers and
+  counts as a new history, so checkpoints made before it are refused instead of pointing into it. Reported and
+  reproduced by SurrealByDesign.
+- "**AI tools (live mode)**: the tool list a paired AI tool gets no longer offers `batch` and the `checkpoint_*`
+  tools, which only work in the headless server and answered \"Unknown tool\" when called; the list now matches what a
+  live session can call. Reported by SurrealByDesign."
+- **Android**: on graphics chips with a small buffer limit (some Mali phones and tablets), a Micro level on a mesh of
+  more than about 33,000 triangles now draws and takes strokes.
+- **Stencil** (Sculpt > Alpha): strokes outside the Stencil's image did nothing, which read as a broken brush. Now
+  they work as if there were no Stencil, and the image weighs only where it covers the model. New option **Outside the
+  image: Sculpt | Block** (Sculpt is the default, in Classic too); Block keeps the old behaviour. Past the image's
+  edge the Stencil fades out over a short distance, so a stroke across a dark border leaves no wall. Tiled images are
+  unchanged. Reported by a member.
+- **Intensity** typed in the **U** and **I** pop-ups: 1 now means 1%, not 100% (full strength). A number is a
+  percentage (1, 30, 100); a number below 1 with a decimal point is still a fraction (0.5 is 50%, 0.05 is 5%).
+- **Voxel Remesh: creases came out stair-stepped** (#240). A crease about 1.5-3 voxels wide (wrinkles, eyelid and lip
+  lines, hard edges) came out serrated, or faded in patches along its length, because the surface was rebuilt from
+  samples a voxel apart. Voxel Remesh now moves the points along such a crease back onto the sculpt's own surface. On
+  a test sphere with creases 1.6 voxels wide at the default Resolution (200), the crease's depth varies 40% less along
+  its length, its sides are tilted half as far off (normal error 44 to 24 degrees) and its cross-section sits 41%
+  closer to the original; a cube's edges come out sharper. Smooth surfaces and fine bumps come out exactly as before,
+  there are no new self-intersections, and the remesh takes about 1% longer. Creases finer than that can't be held by
+  a remesh at that Resolution: when a remesh loses a good share of them, the status line says which Resolution keeps
+  them and about how many triangles it makes, first on the line (only when it fits the free memory, once per Part and
+  Resolution in a session, and not once you have raised the Resolution above the default); in the title bar, a status
+  message too long to show whole now shows it all on hover. Creases no remesh at that Resolution can hold (a closed
+  slit such as the lips, or a crease under a voxel wide) are left as before. Reported by @nino3thd.
+- Parts lying close together (a garment, Shell, Drape result or Duplicate 0.2-2% off the body) showed patches of each
+  other at rest, worst on thin curved forms: each Part's surface was drawn pushed back by its own slope (for the
+  wireframe's lines), more than the gap between them. Only the wireframe view still does that.
+
+### Security
+- **Show SculptForge on Discord** tries the Discord app again no sooner than 30 s after a failed or lost connection
+  (was 2 s), and switching it off ends its thread as well as clearing the status. Only fixed strings leave the app.
+
+## [0.14.0] - 2026-11-24
+
+### Added
+- **Guide: Polygon mode**: a chapter for Tool > Polygon (selecting points, edges and faces, moving the selection,
+  Extrude, Inset, Bevel, Edge loops, Span, block out then sculpt).
+- **Generate 3D > Result**: one clear choice for what the picked candidate becomes. **Sculpting base: moderate
+  density, clean quads** (the default) remeshes the pick at once (Voxel Remesh, then Quad Remesh, about 32768 quads
+  with one subdivision level) and keeps the model as generated hidden as the Reference for Project Detail;
+  **Reference: high fidelity** keeps the pick exactly as generated. The remesh knobs (Then Quad Remesh, Resolution,
+  Keep a high-detail copy) moved under **Advanced**; **Use as sculpting base** remains to do it again after Undo or
+  for a pick made as a reference. Existing services only; nothing new is sent anywhere.
+- **AI provenance tag**: a Part made by Generate 3D (or `image_to_3d` / `text_to_3d`) records the public provider
+  (Hugging Face, fal.ai, Meshy, Hyper3D, Tripo, ComfyUI, your generator command), the model when it is a built-in
+  choice, the local date, the SculptForge version and the pass (generated, sculpting base, reference); never a host,
+  URL, path, workflow or key name. It shows in the Parts list tooltip and `scene_overview`, follows Duplicate, Split
+  and linked copies, is saved in projects (`ai_provenance`, an optional per-Part key older versions ignore) and kept
+  on export where the format has a place for it: glTF node `extras.sculptforge_ai`, USD prim `customData`
+  (`sculptforge_ai`), an OBJ comment under the object line. FBX, PLY and STL have no place for it. Nothing in the tag
+  leaves your computer on its own.
+- **Standalone curves, part 2** (Tool > Tube): **Draw > Points** adds a point per click to the curve or tube being
+  built (Enter, Next line or Draw Tube off ends the line; `tube_add_point`). **Line: Smooth / Straight** switches a
+  curve or tube between a smooth curve through its points and a polyline with sharp corners, keeping the points
+  (`tube_set straight=true`; Resample, Tube from curve and Repeat along curve follow it). **Shift+click** selects
+  several points (Delete Point removes them all; `tube_delete_point indices=`). The **Transform gizmo** (W / E / R)
+  moves, turns and scales the selected points, or the whole curve, re-sweeping the tube live, one undo step per drag
+  (before, it moved the mesh and the points could no longer be edited). **Snap points to surface** puts the selected
+  points on the nearest other Part (`tube_snap_points`), and with Snap to surfaces on a curve's dragged point lands on
+  the model under it. Requested by Hameron and GABO.
+- **Orientation widget** (Draw > Camera > Corner gizmo > Orientation): the world axes through a ball of dark glass in
+  the corner of the canvas, a dot at each of the six ends (X red, Y green, Z blue; no letters), the dot under the
+  pointer lit in the accent and its side named under the disc. Click a dot to look from that side (orthographic, as
+  the numpad views; the dot facing you again shows the opposite side) with a short eased move (none with Preferences >
+  Interface > Reduce motion); drag it to orbit; double-click to frame the model. The SculptForge layout shows it by
+  default, the Classic layout keeps the X / Y / Z axes; **Corner gizmo** picks either or hides the corner, and
+  **Position** puts it at the top left (as before) or the top right. Saved in the preferences. Requested by members.
+- **Polygon mode** (Tool > Polygon): the foundation for polygon modelling. Turn a Part into a cage (plain meshes up to
+  2 million triangles; Parts with subdivision or Micro levels are told what to do first), pick Points, Edges or Faces
+  and select them on the model (click, Shift adds, Ctrl removes, drag a box; double-click an edge for its loop, a face
+  for its face group; Grow, Shrink, All, None, Invert, Loop, Ring, By Group), see the selection drawn over the model
+  (the Part shows its wireframe and flat faces while the mode is on, its own shading comes back after), move it with
+  the Transform gizmo (W / E / R) as one undo step, and run operations on it from the panel, each one undo step:
+  Delete and Flip ship with the mode, the modelling operations (Extrude, Inset, Bevel, Edge loop, Span) plug into the
+  same registry. **Extrude**: the selected faces move out along their normals (in, with a negative Distance) and get
+  quad side walls in a face group of their own, as one connected region or face by face (Individual) with a groove
+  between neighbours; Even thickness moves every face the full distance where the selection bends, Keep shape moves a
+  region along one direction, Inset narrows the cap first; in Edges, selected open border edges extrude into a strip
+  that extends the surface (or stands on it). The slider shows a live preview. **Span** joins two edge loops or two
+  face selections with new faces: two open borders get a band of quads (Segments adds rings across, Twist turns the
+  pairing, Reverse for a piece wound inside out), faces on two sides are removed and their openings joined (a tunnel
+  through a block, a handle between two shells), and one whole border loop is closed across its width. Borders of
+  different lengths pair by distance along each, with the odd triangles spread evenly; the band is a face group of its
+  own and stays selected afterwards. **Edge loop**: new loops of edges across the ring of quads through the selected
+  edge (or every ring the selected edges are on), Loops per ring evenly spaced, Position across the quads with a live
+  preview; the loop runs round the model or stops at a border, a triangle (split in two) or a quad it already crossed,
+  keeps face groups, UVs, seams, creases, paint and mask, and the new loops stay selected. **Bevel**: selected edges
+  (or the edges of selected faces) become a strip of 1 to 12 faces across, shaped by a profile (flat chamfer, round,
+  square-ish or concave); edges meeting at a vertex join in a mitre or a rounded corner (a box corner becomes a sphere
+  piece), a bevel ending at a face cuts that face's corner round, and two bevels running through a vertex join into
+  one strip. Selected points are cut off instead, flat or as a rounded cap. The width is a share of the Part's size
+  and is held back so no two cuts meet (Limit width). Faces keep their groups, UVs, mask and paint; the bevel faces
+  get a face group of their own. Open and non-manifold edges are left alone and counted. **Inset**: shrinks the
+  selected faces inward by a Thickness and moves them in or out by a Depth (the Thickness as a share of the most the
+  selected faces can take, so a short drag is a clear inset on a Part of any density and the end of the slider is as
+  deep as it goes; the Depth as a fraction of the Part's size; a slider drag previews the result), the selection as
+  one shape or Each face by itself. The rim of quads between the old border and the new one keeps the faces' groups
+  (or joins one new Rim group), UVs stay continuous, creases and UV seams stay on the old edge, and the thickness is
+  held a fifth short of the point where the inner faces would meet, so an inset is never a fan of slivers. Commands:
+  `poly_mode`, `poly_select`, `poly_op`, and `transform selection=true` (`edge_loop` and `edge_select op=ring` do the
+  same from Edges mode for scripts). Nothing changes for sculpting: the mode is off until you turn it on. Members' top
+  wish (#225 and the ideas threads).
+- **Split view** (View > Split view, Shift+V; #171, requested by members): a second live view of the same scene beside
+  or below the first. Each view has its own camera: Free turns like any view, Front / Right / Top hold that side
+  (orthographic; pan and zoom still work). The view under the pointer is the one you sculpt, orbit and frame in; the
+  other updates with every stroke. Drag the divider to share the canvas; the chip at a view's top right switches its
+  direction, swaps the views or goes back to one view. While a stroke runs or the view moves, the other view draws at
+  a lower resolution (half on the Essential tier) and comes back sharp when you stop. Off by default; saved with the
+  preferences.
+- **Remove Hidden** is an action: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> in the SculptForge key style
+  (Preferences > Hotkeys changes it; the Classic, Maya and Blender styles keep their keys as they were), in the
+  command palette, and as a Quick Menu button.
+- **Quick Menu** (right click on the canvas, or <kbd>Space</kbd>): a third row with Quick Remesh, Quad Remesh and
+  Remove Hidden, in the SculptForge layout (the Classic layout's menu is as it was).
+
+### Changed
+- UI test harness (tests/ui, the monkey): the monkey's way out frames the model (the Frame action) before the sculpt
+  check, so a sequence that mirrors, rotates or views the model off the canvas fails only for a latch, never for the
+  camera (ui_monkey seed 9 went red on every branch that added a checked toggle).
+- **Quick Remesh is on by default in the SculptForge layout**: <kbd>Shift</kbd>+<kbd>R</kbd>, and <kbd>N</kbd> held
+  while clicking or dragging on the background, remesh the active Part at the Voxel Remesh resolution in the
+  background without first ticking Tool > Remesh > Quick Remesh (the checkbox switches it). The Classic layout keeps
+  it off until you tick that box. Reported by a Founding Member: remeshing mid-sculpt took too many clicks, and a slow
+  remesh was cancelled instead.
+
+### Fixed
+- **MCP `checkpoint_restore`**: restoring a checkpoint whose steps were no longer in the undo history (dropped by the
+  undo memory budget, or replaced by a newer edit) returned an error but had already undone your current changes on
+  the way. The restore is now checked before any step is taken, and a restore that still ends off the checkpoint puts
+  the scene, the undo and redo steps and the active Part back as they were. The error reads "checkpoint no longer in
+  undo history" and says the scene was not changed. Reported by a member.
+- **Typing in a field**: while a text field has the keyboard (a slider's typed number, the command palette's search,
+  any text box), no shortcut runs. Ctrl+A selects the field's text instead of Mask All (one undo step), Ctrl+Z, Ctrl+Y
+  and plain letters stay in the field. It could happen when the key came right after the click that opened the field.
+
+## [0.13.14] - 2026-11-24
+
+### Added
+- **Scatter** (Tool > Scatter, the `scatter` command): copies of a built-in shape or another Part over the active Part
+  or only its masked area. Count, random size range, random turn and tilt, follow the surface or stay upright, lie
+  flat, height, seed. **Keep apart** relaxes the copies over the surface until none overlap or touch (Tight fit: their
+  boxes; off: a round space each), with a **Spacing** gap; copies with no room are left out and the status line says
+  how many. One joined Part (a face group per copy) or separate Parts; one undo step; changing a setting redoes the
+  last scatter in place.
+- "Brush cursor: a note appears under the cursor when Shift (or the Smooth brush) would seem to do nothing: \"Smooth
+  face group borders only\" when that Brush option is on for a mesh without face groups, and \"Shift smooths the
+  colour; Sculpt mode smooths the shape\" when Shift is held in Paint mode."
+- "The cursor on a very dense Micro level (the base mesh much coarser than the detail) tests only the part of each
+  triangle's detail grid the ray can reach: about 17% less pick time on the billion-triangle scene (picking was over
+  half of the main thread there); the surface found is the same, point for point."
+
+### Changed
+- **Stencil** (Sculpt > Alpha): a stroke that begins where the image is dark or off the model shows "Stencil on: only
+  its light parts (X removes it)", naming the X that removes it (Alpha > Stencil). Strokes stayed held back with no
+  sign why, which read as sculpting that had stopped.
+- **Paint > Material** (texture painting): the section now appears as soon as paint goes into a texture and lists
+  every material channel, the ones the texture does not have yet in grey. Ticking a greyed channel adds it to the
+  texture (the same undoable step as Material Channels in Tool > Texture Image) and makes the brush paint it; a
+  material swatch adds Roughness and Metallic in one click. Texture Image keeps the same ticks and stays the place to
+  turn a channel off. Requested by a member.
+- UI test harness (tests/ui, the monkey): unlatch closes the Community brushes and AI Brush windows, the monkey's way
+  out closes the floating windows (close_floating), and expect_sculpts reads the window over the stroke where the
+  stroke starts, so a slow runner can't flip the verdict either way (ui_monkey was red on the Actions runner only).
+
+### Fixed
+- **Android: the model vanished after Texture Image > New Texture on some Mali tablets.** The first textured draw is
+  now checked for a GL error: on one, the Part draws without its texture (status bar and Texture Image panel say so)
+  instead of not at all. The UV samplers of the textured shader always have a texture bound, and the log names the
+  call behind each GL error (start-up, mesh upload, texture upload, textured draw) and the driver's own message (debug
+  output, ES builds), so **Help > Copy log to clipboard** shows what failed.
+- "**Fill layer sliders jumping back**: letting go of a Mask effect slider (Noise Size and Contrast, Fill Value,
+  Levels, Blur, the generators) or a Fill layer's Roughness, Metallic or Height slider put the old value back, so the
+  effect never changed. The dragged value now stays, and Undo and Redo move between the old and new values. The same
+  fix covers the Opacity slider in a layer channel's right-click menu."
+- "**Extract > Make Shell**: with Edge Smooth above 0 the outline of a shell made from masked areas follows a smooth
+  line again. Before, the rim came out raised, ridged and jagged (spiky even with Edge Smooth turned up), most of all
+  around thin necks and tips of the mask."
+- "**Trim** on a thin Part (a shell, a wing, a cloth-thin sheet): the wall behind the one you trim stayed in the
+  brush's reach, so the plane ran through the middle of the wall and stroke after stroke sank the near side through
+  the far one, leaving holes. Over a thin sheet, Trim now takes its plane from the side facing you, leaves what faces
+  away (the inner face of a shell, an underside) alone, and stops a fraction of the brush size (2%) short of the wall
+  below, so a thin wall is thinned, never torn (front faces only on or off). On a solid form, a head with its nostrils
+  and lips, Trim is unchanged."
+- "**Trim** on the tapering edge of a thin wing or sheet (the brush bigger than the sheet is thick there): the skin
+  sank through the underside and left a sawtooth of spikes along the rim, with Front faces only on or off. Each point
+  now stops short of the wall straight down its own path, so the sheet is thinned, never torn through. On the wing in
+  the test session the largest point moved differently from before is 0.03 on a 2.8-long wing."
+
+### Known issues
+- Sculpting with Dynamic on a painted Part can still erase its texture; workaround: turn Dynamic off
+  on painted Parts or save first. The fix ships in the next release (0.14.1).
 
 ## [0.13.13] - 2026-11-23
 

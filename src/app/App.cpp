@@ -421,6 +421,8 @@ bool App::init(const AppOptions& options) {
     }
     initHardwareProfile(); // the cached hardware profile, or calibration over the first frames (PanelPerformanceProfile.cpp)
     timer.step("hardware profile");
+    if (const char* v = std::getenv("SF_SPLIT_VIEW"); v && *v) // SF_SPLIT_VIEW=1 (beside) / 2 (below): split from the start (benchmarks, tests)
+        splitSetMode(std::atoi(v));
     splashCheckpoint();
     initialised_ = true;
     return true;
@@ -781,11 +783,11 @@ int App::runUiTest(int w, int h, int fps) {
             SDL_Log("%s", err.c_str());
             return 1;
         }
-        renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        drawSceneCapture(w, h);
         // (a streamed level's detail pages come a frame after the first draw that shows them: a shot waits as a window would)
         for (int k = 0; k < 24 && !shot.empty() && renderer_.microPendingPages() > 0; ++k) {
             syncScene();
-            renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+            drawSceneCapture(w, h);
         }
         renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -1002,7 +1004,7 @@ int App::runRecording() {
             SDL_Log("%s", err.c_str());
             break;
         }
-        renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        drawSceneCapture(w, h);
         renderer_.captureViewDrawn();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         renderer_.endCapture(rgba);
@@ -1076,6 +1078,7 @@ bool App::focusKeepsDrawing(double now) const {
 
 bool App::wantsFrames(double now) const {
     return now < activeUntil_ || focusKeepsDrawing(now) || drag_ != Drag::None || ui::HoverAnimating() || // a hover ring easing in or out
+           cameraMoving() || // the orientation widget's eased turn
            doc_.sculptor.strokeActive() ||
            proofRunning() || takeRunning() || // (not a keep-alive from the last frame: building a scene takes longer than any timeout)
            !dabQueue_.empty() || // a stroke's dabs still waiting (drainStrokeDabs) are placed a few each frame
@@ -1572,6 +1575,7 @@ int App::run() {
         syncScene();
         mark();
         notePerformanceFrame(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - syncStart).count());
+        splitSync(); // Split view: fixed lenses hold, aspects follow the panes (before the view is compared for motion)
         const int samples = viewSamples();
         renderSettings_.motionProxy = perf_.proxyNow; // big meshes draw their lighter proxy while the view moves
         noteStillness();
@@ -1581,7 +1585,7 @@ int App::run() {
         if (perf_.movingNow) // while the view moves, the floor tier draws fewer pixels; full resolution when it stops
             renderSettings_.resolutionScale = std::min(renderSettings_.resolutionScale, turbo_ ? std::min(motionResolution(), 0.75f) : motionResolution());
         hardwareProfileDrawStart();
-        perf_.samplesUsed = renderer_.drawView(camera_, fbW, fbH, renderSettings_, canvasViewport(fbW, fbH), samples);
+        drawSceneViews(fbW, fbH, samples); // the view, or both panes of a split view (SplitView.cpp)
         if (snapshotEnv && *snapshotEnv && (sm.moving || sm.releasing)) {
             // Three points of the stroke, and the end (the frame the last dab reached the screen).
             const double u = sm.moving ? (seconds() - sm.start) / double(options_.measureStroke) : 2.0;
@@ -1713,7 +1717,39 @@ float App::targetUiScale() const {
     if (displayScaleOverride_ > 0.0f) automatic = displayScaleOverride_; // UI tests: display_scale
     else if (!options_.recordPath.empty() || !options_.uiTest.empty()) automatic = float(options_.height) / 900.0f;
     else if (window_) automatic = automaticUiScale(SDL_GetWindowDisplayScale(window_), SDL_GetWindowPixelDensity(window_));
-    return resolveUiScale(uiPrefs_.uiScale, automatic);
+    return resolveUiScale(uiScalePreference(), automatic);
+}
+
+// The display's name and its size in physical pixels (its mode's size times its pixel density: 3840x2160 for a 4K
+// monitor whether Windows runs it at 150 % or macOS at 2x), so the key is the monitor's, not the window's.
+std::string App::displayScaleKey() const {
+    if (!window_) return "";
+    const SDL_DisplayID display = SDL_GetDisplayForWindow(window_);
+    if (!display) return "";
+    int w = 0, h = 0;
+    if (const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(display); mode && mode->w > 0 && mode->h > 0) {
+        const float d = mode->pixel_density > 0.0f && std::isfinite(mode->pixel_density) ? mode->pixel_density : 1.0f;
+        w = int(std::lround(mode->w * d));
+        h = int(std::lround(mode->h * d));
+    } else {
+        SDL_Rect bounds{};
+        if (!SDL_GetDisplayBounds(display, &bounds)) return "";
+        w = bounds.w;
+        h = bounds.h;
+    }
+    return sf::displayScaleKey(SDL_GetDisplayName(display), w, h);
+}
+
+float App::uiScalePreference() const {
+    const std::string key = displayScaleKey();
+    return key.empty() ? uiPrefs_.uiScale : displayScaleFor(uiPrefs_.uiScaleByDisplay, key, uiPrefs_.uiScale);
+}
+
+void App::setUiScalePreference(float scale) {
+    scale = scale > 0.0f ? std::clamp(scale, kMinUiScale, kMaxUiScale) : 0.0f;
+    uiPrefs_.uiScale = scale;
+    if (const std::string key = displayScaleKey(); !key.empty()) setDisplayScale(uiPrefs_.uiScaleByDisplay, key, scale);
+    requestUiScale();
 }
 
 // Live, between frames (the atlas can't change inside one): the fonts rasterised again at the new size, the style
@@ -1913,6 +1949,16 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) androidBack();
         return;
     }
+    // An Alt+middle click (centreViewOnPointer) is over once anything moves the pointer past the slop: here, before a
+    // pen in range makes the mouse's moves strays (strayMouseMotion) or a pointer drag drops the pen's samples
+    // (onMouseMove), so whichever device carries the drag, a drag never ends in a centring (artist-qa 11-24).
+    if (centreClick_.pending) {
+        float px = 0.0f, py = 0.0f;
+        bool moved = false;
+        if (event.type == SDL_EVENT_MOUSE_MOTION) { px = event.motion.x; py = event.motion.y; moved = true; }
+        else if (event.type == SDL_EVENT_PEN_MOTION) { px = event.pmotion.x; py = event.pmotion.y; moved = true; }
+        if (moved && std::hypot(px - centreClick_.x, py - centreClick_.y) > kRightClickSlop) centreClick_.pending = false;
+    }
     if (strayMouseMotion(event)) { // neither the canvas nor the UI follows a driver's stray mouse events
         ++penDiag_.strayMouse;
         return;
@@ -1936,7 +1982,7 @@ void App::dispatchEvent(const SDL_Event& event) {
     if (radialMouseEvent(e)) return;  // clicks on an open radial menu, and the buttons that open one (RadialMenu.cpp)
     if (strokePopupMouseEvent(e)) return; // clicks on the open stroke popup (StrokePopup.cpp)
     if (tierCardEvent(e)) return;     // the first-run tier card's buttons and keys (PanelHardwareTier.cpp)
-    if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !e.key.repeat && !ImGui::GetIO().WantTextInput &&
+    if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !e.key.repeat && !ui::TextFieldFocused() &&
         closeTopPopupOnEscape())
         return; // Esc closes the top context menu or combo list and nothing else sees it (#210; the Library's Esc would close it)
     pressSpent_ = closePopupsOnPressOutside(e); // a press outside open menus and popups acts, not only closes them (Shell.cpp)
@@ -1980,6 +2026,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (strokePopup_.held) closeStrokePopup();
         spaceHeld_ = selectSpace_ = false; // Space let go in another window never reaches us
         quickRemeshDragKey_ = SDLK_UNKNOWN; // (the same for the Quick Remesh drag key)
+        navHoldKey_ = SDLK_UNKNOWN, navHoldMove_ = -1; // (and a Hold to orbit / pan / zoom key)
         break;
 #ifdef __ANDROID__
     case SDL_EVENT_WINDOW_RESIZED: // rotation, split screen, a free-form window: the geometry the touches map onto changed
@@ -2045,7 +2092,11 @@ void App::dispatchEvent(const SDL_Event& event) {
         // A right click that didn't drag: the QuickMenu (#22). (SDL's click for a pen button doesn't count: a pen
         // button opens it only when set to Right click, in penButton.)
         if (e.button.button == SDL_BUTTON_RIGHT && e.button.which != SDL_PEN_MOUSEID) rightClickRelease();
+        centreClick_.release = e.button.button == SDL_BUTTON_MIDDLE; // (only its own release centres the view)
+        centreClick_.upX = e.button.x; // (the event's own place: mouseX_ may be stale when a pen in range made the mouse's moves strays)
+        centreClick_.upY = e.button.y;
         onMouseUp();
+        centreClick_.release = false;
         break;
     case SDL_EVENT_MOUSE_MOTION:
         pointerEventNs_ = e.motion.timestamp; // (the pen predictor's sample time: a batch is handled all at once)
@@ -2056,17 +2107,31 @@ void App::dispatchEvent(const SDL_Event& event) {
         // (Not the scroll a trackpad sends during a pinch or twist: Touch.cpp zooms for that.)
         ++penDiag_.wheel;
         if (penInProximity_) ++penDiag_.wheelPenInRange;
+        if (uiPrefs_.splitView && drag_ == Drag::None && !io.WantCaptureMouse) { // (the wheel zooms the pane under the pointer)
+            const int pane = splitPaneAt(e.wheel.mouse_x, e.wheel.mouse_y);
+            if (pane >= 0) splitActivate(pane);
+        }
         if (!io.WantCaptureMouse && !touchPinching_ && canvasRect().contains(e.wheel.mouse_x, e.wheel.mouse_y) &&
             !ui::FloatingWindowAt(ImVec2(e.wheel.mouse_x, e.wheel.mouse_y)))
             wheelZoom(e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y);
         break;
     case SDL_EVENT_KEY_DOWN:
+        // While a text field has the keyboard (live: io's flags are a frame behind) the keys are the field's alone: ImGui
+        // has them, no shortcut, camera key or Space menu runs (Ctrl+A is Select All there, B types a B). The one key that
+        // still works is the console's own, which closes it while typing (the console's field only filters it a few frames in).
+        if (ui::TextFieldFocused()) {
+            const Action* act = io.WantTextInput ? nullptr : actions_.actionForKey(e.key.key, e.key.mod);
+            if (!(act && act->id == "ui.console" && layout_.consoleOpen && !e.key.repeat)) break;
+        }
         if (!isModifierKey(e.key.key) && std::none_of(keysDown_.begin(), keysDown_.end(), [&](const auto& k) { return k.first == e.key.key; }))
             keysDown_.emplace_back(e.key.key, e.key.mod);
         if (e.key.key == SDLK_SPACE && drag_ == Drag::Select && !io.WantTextInput) { // #214: slide the shape
             selectSpace_ = true; // (before the camera and the QuickMenu: Space mid-drag is only for this)
             break;
         }
+        // A key bound to Hold to orbit / pan / zoom (Preferences > Navigation): held, the next press on the canvas moves the
+        // camera. Before the Space branch below, so Space bound to one of them works with Hold Space on as well.
+        if (!io.WantCaptureKeyboard && !e.key.repeat) navHoldKey(e.key.key, e.key.mod, true);
         if (e.key.key == SDLK_SPACE && !e.key.repeat && // hold Space and drag: the camera (#43; not while typing)
             spaceCameraKeyDown(uiPrefs_.spaceCamera, io.WantTextInput || io.WantCaptureKeyboard)) {
             spaceHeld_ = true;
@@ -2083,6 +2148,7 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (isModifierKey(e.key.key)) keysDown_.clear(); // Ctrl let go: a Ctrl chord's key stops (it must be pressed again)
         if (e.key.key == SDLK_SPACE) spaceHeld_ = selectSpace_ = false;
         quickRemeshKey(e.key.key, e.key.mod, false);
+        navHoldKey(e.key.key, e.key.mod, false);
         if (e.key.key == SDLK_SPACE) quickMenuKeyUp(); // a held Space closes the QuickMenu when let go
         radialKeyUp(e.key.key);                        // a radial menu's held key: run the slot pointed at
         strokePopupKeyUp(e.key.key);                   // the stroke popup's held key: pick the item pointed at
@@ -2205,8 +2271,13 @@ void App::onMouseDown(float x, float y, Uint8 button) {
         return;
     }
     if (strokeFinishing_) endStroke(); // (a stroke ending on this thread)
+    cancelCameraMove(); // the orientation widget's eased turn ends where it is: a stroke or drag never runs under a moving view
     mouseX_ = x;
     mouseY_ = y;
+    if (uiPrefs_.splitView && drag_ == Drag::None && !ImGui::GetIO().WantCaptureMouse) { // (a press with no move before it: a tap)
+        const int pane = splitPaneAt(x, y);
+        if (pane >= 0) splitActivate(pane);
+    }
     const SDL_Keymod mod = inputMods();
     const SDL_Keymod nav = inputMods(false); // (navigation ignores the stroke popup's latched Smooth / Mask / Select)
     // A pen button is already driving the view: touching down with the tip keeps navigating.
@@ -2237,11 +2308,25 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     rightClick_.x = x;
     rightClick_.y = y;
     rightClick_.dx = rightClick_.dy = 0.0f;
+    // Alt+middle click (no drag) centres the view on the pointer (centreViewOnPointer, every key style: an Alt+middle
+    // drag still pans, or orbits with Blender keys, from the press on).
+    centreClick_.pending = button == SDL_BUTTON_MIDDLE && (SDL_GetModState() & SDL_KMOD_ALT) &&
+                           !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_GUI)) && previewLod_ < 0;
+    centreClick_.x = x;
+    centreClick_.y = y;
+    centreClick_.dx = centreClick_.dy = 0.0f;
     zsMenu_.armed = false;
     // A right click on a Forge Sphere opens its menu (#8): Delete, Insert Between, Set as Root.
     if (button == SDL_BUTTON_RIGHT && forgesphereActive() && !doc_.mesh.forgespherePreview &&
         !(SDL_GetModState() & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)))
         forgesphereRightDown(x, y);
+    // Preferences > Navigation: a Hold to orbit / pan / zoom key held, or a custom drag gesture (button + modifiers), in
+    // every key style and with any button or the pen's tip (NavBindings.h). The drag goes on to the release, as Space's.
+    if (const int move = navMoveForPress(button); move >= 0) {
+        drag_ = move == 0 ? Drag::Orbit : move == 1 ? Drag::Pan : Drag::Zoom;
+        rightClick_.pending = false;
+        return;
+    }
     if (spaceHeld_) { // Preferences > Input > Hold Space and drag to move the camera (#43)
         switch (spaceCameraMove(button, ctrlDown(SDL_GetModState()))) {
         case SpaceCameraMove::Orbit: drag_ = Drag::Orbit; break;
@@ -2269,12 +2354,13 @@ void App::onMouseDown(float x, float y, Uint8 button) {
     if (blenderStyle() && blenderNavigationDown(button)) return; // middle / Alt+left / right drags navigate
     if (mayaStyle() && mayaNavigationDown(button)) return;       // Alt+left / middle / right: orbit / pan / zoom
     if (button == SDL_BUTTON_LEFT) {
-        if (axisGizmoMouseDown(x, y)) return;   // the axis gizmo's ends snap to a side view (#43)
+        if (cornerGizmoMouseDown(x, y)) return; // the axis gizmo's ends snap to a side view (#43); the orientation widget (CornerGizmo.cpp)
         if (forgesphereMouseDown(x, y, mod)) return; // a Forge Sphere Part takes clicks on it (PanelForge Spheres.cpp)
         if (tubeMouseDown(x, y, mod)) return;        // Draw Tube, a Tube Part's points (PanelTube.cpp)
         if (referenceMouseDown(x, y, nav)) return; // Adjust Reference: move, scale it (ReferenceImages.cpp)
         if (stencilMouseDown(x, y, nav)) return; // Adjust Stencil: move, scale, turn it (StencilOverlay.cpp)
         if (gradientMouseDown(x, y, nav)) return; // Line Gradient: a new line or an end handle (LineGradient.cpp)
+        if (polyMouseDown(x, y, mod)) return;  // Polygon mode: clicks and boxes select points / edges / faces (PanelPolygon.cpp)
         if (edgesMouseDown(x, y, mod)) return; // Edges mode: clicks select edges (PanelEdges.cpp)
         if (facegroupMouseDown(x, y, mod)) return;
         if (maskSelectMouseDown(x, y, mod)) return;
@@ -2406,6 +2492,11 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
         mouseY_ = y;
         return;
     }
+    // Split view: the pane the pointer moves into is the working view (not in the middle of a drag or stroke, nor over the UI).
+    if (uiPrefs_.splitView && drag_ == Drag::None && !ImGui::GetIO().WantCaptureMouse) {
+        const int pane = splitPaneAt(x, y);
+        if (pane >= 0) splitActivate(pane);
+    }
     // (A driver's stray mouse events beside the pen's never get here: strayMouseMotion.) A pen that went quiet
     // without saying it left (some drivers never do) hands the cursor back to the mouse.
     // A view drag a mouse button began (a compositor that maps the pen's barrel buttons to a right / middle click, KDE's
@@ -2415,7 +2506,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     // carried twice (#216). (A pointer that never moves, a driver's click only: the pen's samples are the drag.) The pen
     // is not gone for that pointer (it would let go of the side buttons held), the drag goes by the pointer's position,
     // not SDL's steps (which the pen's own mouse events may have moved on), and at the pen's view speed.
-    const bool viewDrag = drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom || drag_ == Drag::Roll;
+    const bool viewDrag = drag_ == Drag::Orbit || drag_ == Drag::Pan || drag_ == Drag::Zoom || drag_ == Drag::Roll || drag_ == Drag::NavWidget;
     const bool pointerDrag = viewDrag && !dragFromPen_;
     const bool withPen = !fromPen && pointerDrag && penInProximity_ && clickClockNs() - lastPenNs_ < 1000000000ull;
     if (!fromPen && penInProximity_ && !withPen) penLeft();
@@ -2451,6 +2542,13 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     mouseX_ = x;
     mouseY_ = y;
     lastInputPen_ = fromPen;
+    if (centreClick_.pending) { // an Alt+middle click so far (as the right click's slop below; the drag never waits)
+        centreClick_.dx += dx;
+        centreClick_.dy += dy;
+        const float steps = std::hypot(centreClick_.dx, centreClick_.dy);
+        const float away = std::hypot(x - centreClick_.x, y - centreClick_.y);
+        if (std::max(steps, away) > kRightClickSlop) centreClick_.pending = false;
+    }
     if (rightClick_.pending) { // a right click so far: the view waits until it is a drag
         // (By the motion's own steps, not the position: some input moves only relatively.) Past the slop, the
         // drag goes on by everything since the press, so it loses nothing.
@@ -2491,6 +2589,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     switch (drag_) {
     case Drag::Stroke: strokeTo(x, y); break;
     case Drag::Orbit: orbitBy(x, y, dx, dy, !(fromPen || withPen)); break;
+    case Drag::NavWidget: navWidgetMove(x, y, dx, dy, fromPen || withPen); break; // the orientation widget: a click until it moves
     case Drag::Roll:
         if (rollSideways_) camera_.setOrientation(camera_.orientation() * glm::angleAxis(dx * 0.008f, glm::vec3(0, 0, 1)));
         else rollBy(x, y, dx, dy);
@@ -2518,6 +2617,7 @@ void App::onMouseMove(float x, float y, float dx, float dy, bool fromPen) {
     case Drag::Tube: tubeDragTo(x, y); break;
     case Drag::AirStroke: airStrokeTo(x, y); break;
     case Drag::QuickRemesh: break; // (remeshes when let go)
+    case Drag::RefreshTopology: refreshTopologyTo(x, y); break; // (the drag key held, on the model: PanelRetopo.cpp)
     case Drag::SizeScrub:
         sizeScrubDx_ += dx;
         radiusPx_ = drawSizeScrub(sizeScrubStart_, sizeScrubDx_);
@@ -2578,6 +2678,9 @@ void App::resetView() {
 }
 
 void App::orbitBy(float x, float y, float dx, float dy, bool mouse) {
+    // Split view: a pane with a fixed lens (Front, Right, Top) keeps its direction; the drag turns nothing (not even about a
+    // pivot, which would slide the target).
+    if (uiPrefs_.splitView && uiPrefs_.splitLens[splitActive_]) return;
     if (autoOrtho_) { // an axis view turned: back to perspective (Blender's Auto Perspective)
         camera_.ortho = false;
         autoOrtho_ = false;
@@ -2704,13 +2807,20 @@ void App::onMouseUp() {
     rollPending_ = false;
     rollSideways_ = false;
     rightClick_.pending = rightClick_.down = false;
+    if (centreClick_.pending) { // Alt+middle click: pressed and let go without moving
+        const bool fire = centreClick_.release; // another button's, a pen's or a touch's release only drops it
+        centreClick_.pending = false;
+        if (fire) centreViewOnPointer(centreClick_.upX, centreClick_.upY);
+    }
     zsMenu_.armed = false;
     orbitStarted_ = false;
     orbitPivotPicked_ = false;
     orbitPivot_.reset();
     panFromAlt_ = false;
+    if (drag_ == Drag::NavWidget) navWidgetRelease(); // the orientation widget: a click (turn there) or a double-click (frame)
     if (drag_ == Drag::Select) selectionMouseUp();
     if (drag_ == Drag::QuickRemesh) quickRemesh(RemeshTrigger::Quick);
+    if (drag_ == Drag::RefreshTopology) refreshTopologyRelease();
     if (drag_ == Drag::Insert) {
         // The drag's length on screen, as a size at the surface point's depth (at least a small default).
         const float px = std::max(insertPx_, 12.0f * uiScale_);
@@ -2783,6 +2893,10 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
     if (key == SDLK_ESCAPE && guidesMode_ && drag_ != Drag::Guide) { // the QRemesh Guides brush off
         leaveGuides();
         status_ = "Quad Remesh Guides off";
+        return;
+    }
+    if (key == SDLK_ESCAPE && polyMode_ && drag_ == Drag::None) { // Polygon mode off (PanelPolygon.cpp)
+        setPolyMode(false);
         return;
     }
     if (key == SDLK_ESCAPE && (!insertType_.empty() || tubeDraw_ || edgesMode_ || facePlacing_)) { // Append > Insert
@@ -2887,6 +3001,9 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_;
     strokePaint_ = strokeColourSmooth_ || (strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_));
     strokeSculpt_ = !(strokePaint_ && paintMode_);
+    // Show SculptForge on Discord: a stroke counts as activity (Idle five minutes after the last input or stroke).
+    // When it started, never where, what or on which file (PanelIntegrations.cpp).
+    discordStrokeAt_ = double(SDL_GetTicksNS()) * 1e-9;
     const BrushRecipe* recipe = strokeRecipe();
     { // the brush's own pressure curve (Precision.cpp)
         const auto it = brushCurves_.find(pressureCurveKey(strokeBrush_, recipe));
@@ -3343,6 +3460,12 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
         p.stencil.stencil = &st.stencil;
         p.stencil.viewProj = cam.projection() * cam.view();
         p.stencil.canvasAspect = cr.h > 0.0f ? cr.w / cr.h : 1.0f;
+        if (!haveLastDab_ && p.stencil.weight(p.center) < 0.05f) { // (a stroke that starts where the image is dark or off it)
+            glm::vec2 at, uv;
+            const bool off = !p.stencil.canvasAt(p.center, at) || !st.stencil.imageCoord(at, p.stencil.canvasAspect, uv);
+            status_ = off ? "Stencil blocks outside: set to Sculpt"
+                          : "Stencil on: only its light parts (X removes it)";
+        }
     }
     p.strokeDelta = haveLastDab_ ? hit.position - lastDabHit_ : glm::vec3(0.0f);
     lastDabHit_ = hit.position;
@@ -3646,8 +3769,9 @@ AABB App::sceneBounds() const {
 }
 
 void App::updateFloorHeight() {
-    if (!renderSettings_.floorGrid) {
-        floorKey_ = 0; // (measured again when it is turned on)
+    if (!renderSettings_.floorGrid || uiPrefs_.floorGridFixed) {
+        floorKey_ = 0; // (measured again when it is turned on, or set to follow the model again)
+        if (uiPrefs_.floorGridFixed) renderSettings_.floorHeight = 0.0f; // View > Display > Floor grid at Y=0
         return;
     }
     if (renderSettings_.stroking || drag_ != Drag::None) return; // after the stroke or the drag, not during it
@@ -3771,7 +3895,11 @@ void App::syncScene() {
         Mesh* mesh = doc_.checkedOut(i) ? &shown : &s.data->mesh;
         // Solo channel view (channel_view): the texture's shown texels follow before the renderer uploads them.
         if (mesh->texture) syncChannelView(*mesh->texture, doc_.channelView);
-        const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading);
+        // Polygon mode (PanelPolygon.cpp): its Part is drawn with flat faces while the mode is on, so a cage's hard edges,
+        // bevels and extrusions read as built instead of as smooth-shaded gradients and bands; display only, the Part's own
+        // shading setting is untouched and comes back when the mode exits.
+        const bool flat = s.shading == Shading::Flat || (s.shading == Shading::Default && renderSettings_.flatShading) ||
+                          (polyMode_ && active);
         const uint32_t key = doc_.meshKey(i); // (linked Parts, #94: one GPU mesh, drawn where each is)
         scene.push_back({key, mesh, active, s.visible, bakeNormalMap(s.id, *mesh), renderSettings_.wireframe, flat});
         scene.back().model = gizmoDrawnTransform(i);
@@ -3792,8 +3920,11 @@ void App::syncScene() {
     // A texture the GPU cannot show on this model (renderer: past its limits): say so once, rather than leave a model
     // that paints nothing and no word why.
     {
-        const bool notShown = hasTexture(doc_.mesh) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart));
-        if (notShown && !textureNoticeShown_)
+        const bool rejected = hasTexture(doc_.mesh) && renderer_.textureRejected(doc_.meshKey(doc_.activePart));
+        const bool notShown = rejected || (hasTexture(doc_.mesh) && renderer_.textureNotShown(doc_.meshKey(doc_.activePart)));
+        if (rejected && !textureNoticeShown_)
+            status_ = "This graphics chip rejected drawing the texture: painting goes into the texture (see the UV view); Help > Copy log to clipboard shows what failed";
+        else if (notShown && !textureNoticeShown_)
             status_ = "This graphics chip can't show the texture on a model this dense: painting goes into the texture (see the UV view), lower the triangle count to see it";
         textureNoticeShown_ = notShown;
     }
@@ -3812,6 +3943,7 @@ void App::setLayerWeight(int index, float weight) {
 
 void App::animateLayers(float dt) {
     animateFaceTake(dt); // (PanelFace.cpp)
+    animateCameraMove(dt); // the orientation widget's eased turn (CornerGizmo.cpp)
     if (playingLayer_ < 0 || playingLayer_ >= int(doc_.mesh.layers.size())) {
         playingLayer_ = -1;
         return;
@@ -3862,7 +3994,7 @@ void App::updateTitle() {
     std::string name = doc_.path.empty()
                            ? std::string("Untitled")
                            : fileNameUtf8(doc_.path);
-    updateDiscordPresence(); // the file name, if it's shown (sends only on a change)
+    updateDiscordPresence(); // every frame: the switch and Sculpting / Painting / Idle (sends only on a change)
     // "Head.sfproj* — SculptForge 0.11.13": the document first (taskbars and Alt-Tab cut the end off), the version
     // last, so support screenshots show it.
     std::string title = name + (doc_.dirty() ? "*" : "") + " — SculptForge " + appShownVersion().text();
@@ -3923,6 +4055,7 @@ void App::drawUi() {
     drawGizmo(); // Transform gizmo handles and panel (Gizmo.cpp)
     drawQRemeshGuides(); // QRemesh Guides curves (PanelRetopo.cpp)
     drawEdgeOverlay();   // Edges mode: the selected edges (PanelEdges.cpp)
+    drawPolyOverlay();   // Polygon mode: the selected points / edges / faces (PanelPolygon.cpp)
     drawUvEditorOverlay(); // UV seams on the model, the Seam tool's cursor (PanelUvEditor.cpp)
     drawWeldPreviewOverlay(); // the points Merge by Distance would merge (PanelMeshCheck.cpp)
     drawForgeSphereOverlay(); // the sphere under the cursor (PanelForge Spheres.cpp)
@@ -3940,7 +4073,8 @@ void App::drawUi() {
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     drawGradientOverlay();   // Line Gradient: the line and its end handles (LineGradient.cpp)
-    if (uiPrefs_.showAxes) drawAxisGizmo(); // X / Y / Z in the canvas corner (#31)
+    if (uiPrefs_.showAxes) drawCornerGizmo(); // X / Y / Z or the orientation widget in the canvas corner (#31, CornerGizmo.cpp)
+    drawSplitViewUi();                        // the divider and the lens chips of a split view (SplitView.cpp)
     if (uiPrefs_.showViewFigure) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
     drawViewportToast();
@@ -3951,7 +4085,7 @@ void App::drawUi() {
     }
     // In Gizmo mode (and with the QRemesh Guides brush) the brush ring shows only while Ctrl masks or Shift smooths.
     const bool ringOff = gizmoActive() || stencil_.adjust || (guidesMode_ && !(inputMods() & SDL_KMOD_SHIFT)) || sculptableHot() || forgesphereActive() ||
-                         uvToolActive() || tubeDraw_ || tubeActive() || edgesMode_;
+                         uvToolActive() || tubeDraw_ || tubeActive() || edgesMode_ || polyMode_;
     // (The S / O pop-up holds the mouse, but its ring shows where it opened, #138.)
     ImVec2 sliderOpened;
     PickerUi::Slider sliderWhich;
@@ -4479,7 +4613,7 @@ void App::drawBrushLab() {
     const float scale = uiScale_;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     // First use: the canvas's top-left corner, clear of the model.
-    const CanvasRect canvas = canvasRect();
+    const CanvasRect canvas = wholeCanvasRect();
     ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + canvas.x + 16 * scale, vp->Pos.y + canvas.y + 16 * scale), ImGuiCond_FirstUseEver);
     if (!beginPanel(tr("Brush Lab"), &showBrushLab_, 420 * scale)) {
         ImGui::End();
@@ -4751,7 +4885,7 @@ void App::drawComfyUi() {
 void App::drawImageTo3D() {
     const float scale = uiScale_;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
-    const CanvasRect canvas = canvasRect(); // first use: the canvas's top-right corner
+    const CanvasRect canvas = wholeCanvasRect(); // first use: the canvas's top-right corner
     ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + canvas.x + canvas.w - 306 * scale, vp->Pos.y + canvas.y + 16 * scale),
                             ImGuiCond_FirstUseEver);
     if (!beginPanel(tr("Generate 3D"), &showImageTo3D_, 290 * scale)) {
@@ -5188,7 +5322,8 @@ glm::vec2 App::axisGizmoCentre() const {
     // 10 px from the canvas edges.
     const CanvasRect canvas = canvasRect();
     const float r = kAxisGizmoDisc * axisGizmoUnit() + 10.0f * uiScale_;
-    return glm::vec2(canvas.x + r, canvas.y + timelineTopInset_ + r);
+    // Draw > Camera > Corner gizmo > Position: the top left (as always), or the top right.
+    return glm::vec2(orientationWidgetCentreX(uiPrefs_.cornerPosition, canvas.x, canvas.w, r), canvas.y + timelineTopInset_ + r);
 }
 
 std::array<AxisGizmoEnd, 6> App::axisGizmoLayout() const {
@@ -5211,7 +5346,7 @@ glm::vec2 App::viewFigureCentre() const {
     // In the axes' place when they are off, else just below them (and the view's name under them).
     const CanvasRect canvas = canvasRect();
     const float r = viewFigureRadius();
-    const float x = canvas.x + 18.0f * uiScale_ + r;
+    const float x = orientationWidgetCentreX(uiPrefs_.cornerPosition, canvas.x, canvas.w, 18.0f * uiScale_ + r); // (the gizmo's corner)
     if (!uiPrefs_.showAxes) return glm::vec2(x, canvas.y + timelineTopInset_ + 18.0f * uiScale_ + r);
     const glm::vec2 c = axisGizmoCentre();
     return glm::vec2(x, c.y + kAxisGizmoDisc * axisGizmoUnit() + axisGizmoLabelHeight() + r);
@@ -5228,10 +5363,11 @@ bool App::axisGizmoMouseDown(float x, float y) {
     // the side view nearest the current one.
     const auto ends = axisGizmoLayout();
     const float unit = axisGizmoUnit();
-    int hit = uiPrefs_.showAxes ? axisGizmoSnapEnd(ends, axisGizmoHit(ends, x, y, kAxisGizmoHitRadius * unit)) : -1;
+    const bool axes = uiPrefs_.showAxes && !orientationWidgetOn(); // (the orientation widget takes the disc's presses itself)
+    int hit = axes ? axisGizmoSnapEnd(ends, axisGizmoHit(ends, x, y, kAxisGizmoHitRadius * unit)) : -1;
     // Only a plain press: Alt / Ctrl / Shift drags starting there keep their meaning (pan, mask, roll...).
     const bool plain = !((SDL_GetModState() | keyMods()) & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI));
-    if (hit < 0 && plain && uiPrefs_.showAxes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
+    if (hit < 0 && plain && axes && axisGizmoOnDisc(axisGizmoCentre(), kAxisGizmoDisc * unit, x, y)) {
         drag_ = Drag::Orbit;
         orbitPivotPicked_ = true; // (about the target: the gizmo's disc is not a point on the model)
         rightClick_.pending = false;
@@ -5267,19 +5403,15 @@ void App::drawAxisGizmo() {
     const int aligned = axisGizmoAligned(ends);
     const AxisGizmoEnd hovered = hover >= 0 ? ends[size_t(hover)] : AxisGizmoEnd{};
 
-    // The disc: lighter than a dark background, darker than a light one; a hairline edge gives it a shape.
-    const ImU32 tint = light ? IM_COL32(0, 0, 0, 0) : IM_COL32(255, 255, 255, 0);
+    drawNavDisc(dl, c, discR, onDisc, light); // (the orientation widget shares it, CornerGizmo.cpp)
     auto withAlpha = [](ImU32 col, float a) {
         return (col & 0x00ffffffu) | (ImU32(std::clamp(a, 0.0f, 1.0f) * 255.0f + 0.5f) << 24);
     };
-    dl->AddCircleFilled(centre, discR, withAlpha(tint, onDisc ? 0.17f : light ? 0.08f : 0.07f), 48);
-    dl->AddCircle(centre, discR, withAlpha(tint, onDisc ? 0.22f : 0.10f), 48, 1.0f * uiScale_);
 
     static constexpr ImU32 colours[3] = {IM_COL32(236, 84, 92, 255), IM_COL32(124, 196, 64, 255), IM_COL32(64, 140, 236, 255)};
     static constexpr const char* names[3] = {"X", "Y", "Z"};
     // The locked axis, end to end through the disc (as long as it looks from here: a dot when it points at you).
-    static constexpr int lockAxes[4] = {-1, 1, 0, 2}; // UiPrefs::orbitLock: free, Y, X, Z
-    const int lockAxis = lockAxes[std::clamp(forceTurntable_ ? 1 : uiPrefs_.orbitLock, 0, 3)];
+    const int lockAxis = navLockAxis();
     if (lockAxis >= 0)
         for (const AxisGizmoEnd& e : ends)
             if (e.axis == lockAxis && !e.negative) {
@@ -5322,31 +5454,10 @@ void App::drawAxisGizmo() {
     }
 
     // The view's name on an exact side view ("Front view"), small, under the disc.
-    if (aligned >= 0) {
-        const AxisGizmoView v = axisGizmoView(aligned % 3, aligned >= 3);
-        const char* text = tr(v.label);
-        const float size = ImGui::GetFontSize() * 0.85f;
-        const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, text);
-        const ImVec2 at(std::round(c.x - ts.x * 0.5f), std::round(c.y + discR + 4.0f * uiScale_));
-        dl->AddText(ImGui::GetFont(), size, ImVec2(at.x + 1.0f, at.y + 1.0f), light ? IM_COL32(255, 255, 255, 110) : IM_COL32(0, 0, 0, 150), text);
-        dl->AddText(ImGui::GetFont(), size, at, light ? IM_COL32(30, 30, 34, 230) : IM_COL32(232, 232, 236, 220), text);
-    }
+    if (aligned >= 0) drawNavName(dl, c, discR, tr(axisGizmoView(aligned % 3, aligned >= 3).label), light);
 
     // The orbit lock's badge: a lock and the axis letter in its colour, on a pill at the disc's lower right.
-    if (lockAxis >= 0) {
-        const float size = ImGui::GetFontSize() * 0.8f;
-        ImFont* f = ImGui::GetFont();
-        const ImVec2 iconSize = f->CalcTextSizeA(size, FLT_MAX, 0.0f, ICON_LC_LOCK);
-        const ImVec2 nameSize = font->CalcTextSizeA(size, FLT_MAX, 0.0f, names[lockAxis]);
-        const float gap = 2.0f * uiScale_, padX = 4.0f * uiScale_, padY = 1.0f * uiScale_;
-        const float w = iconSize.x + gap + nameSize.x + 2.0f * padX, h = std::max(iconSize.y, nameSize.y) + 2.0f * padY;
-        const ImVec2 a(std::round(c.x + discR * 0.62f), std::round(c.y + discR * 0.62f));
-        dl->AddRectFilled(a, ImVec2(a.x + w, a.y + h), light ? IM_COL32(255, 255, 255, 200) : IM_COL32(20, 20, 24, 190), h * 0.5f);
-        dl->AddRect(a, ImVec2(a.x + w, a.y + h), withAlpha(colours[lockAxis], 0.8f), h * 0.5f, 0, 1.0f * uiScale_);
-        dl->AddText(f, size, ImVec2(a.x + padX, a.y + padY), light ? IM_COL32(30, 30, 34, 230) : IM_COL32(232, 232, 236, 230),
-                    ICON_LC_LOCK);
-        dl->AddText(font, size, ImVec2(a.x + padX + iconSize.x + gap, a.y + padY), colours[lockAxis], names[lockAxis]);
-    }
+    if (lockAxis >= 0) drawNavLockBadge(dl, c, discR, lockAxis, light);
 }
 
 void App::drawViewFigure() {
@@ -5467,17 +5578,26 @@ void App::drawBrushCursor() {
             dl->AddCircle(c, rr, IM_COL32(255, 255, 255, 230), 64, 1.5f * uiScale_);
         }
     }
-    // Front faces only is easy to leave on and then wonder why Smooth and the other brushes skip the inner side of
-    // a thin Part (an Extract's inside, #bug-reports): say so by the cursor while it is on.
+    // Options that are easy to leave on and then wonder why Smooth and the other brushes do nothing (Front faces only skips the
+    // inner side of a thin Part, #bug-reports; Smooth face group borders only moves nothing on a mesh without borders and is saved
+    // with the scene; Shift in Paint mode smooths the colour, not the shape): say so by the cursor while it applies.
     frontFacesTagShown_ = frontFacesOnly_ && !masking && !sizeRingPreview_;
-    if (frontFacesTagShown_) {
-        const char* label = tr("Front faces only");
+    smoothBordersTagShown_ = smoothGroupBorders_ && shownBrush == BrushType::Smooth && !doc_.mesh.hasFaceGroups() && !masking &&
+                             !sizeRingPreview_;
+    smoothColourTagShown_ = paintMode_ && shownBrush == BrushType::Smooth && !masking && !sizeRingPreview_;
+    const char* tags[3] = {frontFacesTagShown_ ? tr("Front faces only") : nullptr,
+                           smoothBordersTagShown_ ? tr("Smooth face group borders only") : nullptr,
+                           smoothColourTagShown_ ? tr("Shift smooths the colour; Sculpt mode smooths the shape") : nullptr};
+    float tagY = c.y + r + 6.0f * uiScale_;
+    for (const char* label : tags) {
+        if (!label) continue;
         const ImVec2 size = ImGui::CalcTextSize(label);
         const float pad = 3.0f * uiScale_;
-        const ImVec2 at0(c.x - size.x * 0.5f, c.y + r + 6.0f * uiScale_);
+        const ImVec2 at0(c.x - size.x * 0.5f, tagY);
         dl->AddRectFilled(ImVec2(at0.x - pad, at0.y - pad), ImVec2(at0.x + size.x + pad, at0.y + size.y + pad),
                           IM_COL32(20, 20, 24, 190), 3.0f * uiScale_);
         dl->AddText(at0, IM_COL32(255, 210, 130, 255), label);
+        tagY += size.y + 2.0f * pad + 2.0f * uiScale_;
     }
     if (!sizeRingPreview_) drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp; the pop-up shows the size itself)
 }

@@ -10,6 +10,8 @@
 #include "core/Commands.h"
 #include "core/Json.h"
 #include "core/ManagedPolicy.h"
+#include "core/SelectionSets.h"
+#include "core/Timeline.h"
 #include "core/UndoBatch.h"
 
 #include <string>
@@ -258,4 +260,321 @@ TEST(mcp_history_tools_are_listed) {
         if (n == "batch" || n == "checkpoint_save" || n == "checkpoint_restore" || n == "checkpoint_list") ++found;
     }
     CHECK(found == 4);
+}
+
+namespace {
+// What a failed restore must leave alone: the scene, the history's depth both ways, and which Part is active.
+struct Snapshot {
+    uint64_t hash;
+    size_t undoDepth, redoDepth;
+    int active, parts;
+    bool operator==(const Snapshot&) const = default;
+};
+Snapshot snapshotOf(const Document& d) {
+    return {sceneHash(d, HashScope::Everything), d.undo.undoCount(), d.undo.redoCount(), d.activePart, d.partCount()};
+}
+} // namespace
+
+TEST(mcp_failed_checkpoint_restore_changes_nothing) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"old"})")));
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"now"})")));
+    // The memory budget drops every step but the newest: "old" is no longer in the undo history.
+    d.undo.byteBudget = 1;
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(d.undo.undoCount() == 1);
+    const Snapshot before = snapshotOf(d);
+    const uint64_t revision = d.undo.revision();
+
+    for (int attempt = 0; attempt < 3; ++attempt) { // repeated failures don't drift
+        const Json r = call(reg, d, "checkpoint_restore", R"({"name":"old"})");
+        CHECK(failed(r));
+        CHECK(text(r).find("checkpoint no longer in undo history") != std::string::npos);
+        CHECK(text(r).find("not changed") != std::string::npos);
+        CHECK(structured(r)["scene_unchanged"].asBool(false));
+        CHECK(snapshotOf(d) == before);
+        CHECK(d.undo.revision() == revision); // nothing was undone or redone, not even to be put back
+    }
+    // The newest step is still ordinary: one undo takes it back.
+    CHECK(!failed(call(reg, d, "undo")));
+    CHECK(sceneHash(d, HashScope::Everything) != before.hash);
+}
+
+TEST(mcp_checkpoint_restore_that_ends_off_the_mark_puts_the_scene_back) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"start"})"))); // before any step: the walk goes to the bottom
+    d.undo.byteBudget = 1;
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "stroke", kStroke))); // the first stroke was dropped: the bottom is not "start"
+    CHECK(d.undo.undoCount() == 1);
+    const Snapshot before = snapshotOf(d);
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        const Json r = call(reg, d, "checkpoint_restore", R"({"name":"start"})");
+        CHECK(failed(r));
+        CHECK(text(r).find("checkpoint no longer in undo history") != std::string::npos);
+        CHECK(snapshotOf(d) == before);
+    }
+    CHECK(!failed(call(reg, d, "undo"))); // and the history still works
+}
+
+TEST(mcp_checkpoint_replaced_by_a_new_edit_leaves_the_scene_alone) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"a"})")));
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"b"})")));
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"a"})")));
+    CHECK(!failed(call(reg, d, "mask_all"))); // "b"'s step is gone for good
+    const Snapshot before = snapshotOf(d);
+    const Json r = call(reg, d, "checkpoint_restore", R"({"name":"b"})");
+    CHECK(failed(r) && text(r).find("checkpoint no longer in undo history") != std::string::npos);
+    CHECK(snapshotOf(d) == before);
+    // A cleared history (a new scene) is the same: the error, and the new scene untouched.
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"c"})")));
+    CHECK(!failed(call(reg, d, "new_sphere", R"({"subdivisions":2})")));
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    const Snapshot fresh = snapshotOf(d);
+    const Json lost = call(reg, d, "checkpoint_restore", R"({"name":"c"})");
+    CHECK(failed(lost) && text(lost).find("cleared") != std::string::npos);
+    CHECK(snapshotOf(d) == fresh);
+    // A valid restore still works afterwards, and keeps batch grouping of earlier steps intact.
+    CHECK(!failed(call(reg, d, "checkpoint_save", R"({"name":"d"})")));
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"d"})")));
+    CHECK(sceneHash(d, HashScope::Everything) == fresh.hash);
+}
+
+// ---- The root and the retained base, the hash's reach, and a history that was replaced (#236) ----
+
+namespace {
+const char* kNoLonger = "checkpoint no longer in undo history";
+const char* kNotExact = "could not be restored exactly";
+
+// A restore that must fail with `phrase`, three times over, and leave the scene and the history exactly as they were.
+void expectRefused(const CommandRegistry& reg, Document& d, const char* name, const char* phrase) {
+    const Snapshot before = snapshotOf(d);
+    const uint64_t revision = d.undo.revision();
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        const Json r = call(reg, d, "checkpoint_restore", std::string(R"({"name":")") + name + R"("})");
+        CHECK(failed(r));
+        CHECK(text(r).find(phrase) != std::string::npos);
+        CHECK(structured(r)["scene_unchanged"].asBool(false));
+        CHECK(snapshotOf(d) == before);
+        CHECK(d.undo.revision() == revision);
+    }
+}
+void save(const CommandRegistry& reg, Document& d, const char* name) {
+    CHECK(!failed(call(reg, d, "checkpoint_save", std::string(R"({"name":")") + name + R"("})")));
+}
+} // namespace
+
+TEST(mcp_root_checkpoint_after_budget_eviction_is_refused) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    save(reg, d, "root"); // before any step: the bottom of the history
+    d.undo.byteBudget = 1;
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    // One step, nothing dropped yet: the root is still there.
+    CHECK(d.undo.retainedBase() == 0);
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"root"})")));
+    CHECK(d.undo.redoCount() == 1);
+    CHECK(!failed(call(reg, d, "redo")));
+    CHECK(!failed(call(reg, d, "stroke", kStroke))); // the first stroke is dropped: the empty stack is no longer "root"
+    CHECK(d.undo.undoCount() == 1 && d.undo.retainedBase() != 0);
+    expectRefused(reg, d, "root", kNoLonger);
+    // Every step undone, the stack is empty: that is still not the root, and a restore may not call it one.
+    CHECK(!failed(call(reg, d, "undo")));
+    CHECK(d.undo.undoCount() == 0);
+    expectRefused(reg, d, "root", kNoLonger);
+}
+
+TEST(mcp_checkpoint_at_the_retained_base_is_still_reachable) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    d.undo.byteBudget = 1;
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    const uint64_t atBase = sceneHash(d, HashScope::Everything);
+    save(reg, d, "base");
+    CHECK(!failed(call(reg, d, "stroke", kStroke))); // drops the step "base" points at: the empty stack IS "base"
+    CHECK(d.undo.undoCount() == 1);
+    CHECK(sceneHash(d, HashScope::Everything) != atBase);
+    const Json r = call(reg, d, "checkpoint_restore", R"({"name":"base"})");
+    CHECK(!failed(r));
+    CHECK(sceneHash(d, HashScope::Everything) == atBase);
+    CHECK(!failed(call(reg, d, "redo"))); // and the way forward is kept
+    CHECK(sceneHash(d, HashScope::Everything) != atBase);
+}
+
+TEST(mcp_root_checkpoint_across_an_evicted_selection_set_is_refused) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    save(reg, d, "root");
+    d.undo.byteBudget = 1;
+    CHECK(!failed(call(reg, d, "selection_set_store", R"({"name":"keep"})")));
+    CHECK(d.mesh.selectionSets != nullptr);
+    CHECK(!failed(call(reg, d, "transform", R"({"translate":"0.2,0,0","masked":false})"))); // drops the set's step
+    CHECK(d.undo.undoCount() == 1);
+    expectRefused(reg, d, "root", kNoLonger);
+    CHECK(d.mesh.selectionSets != nullptr); // the set is still there
+}
+
+TEST(mcp_scene_hash_sees_what_the_history_does_not) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    uint64_t h = sceneHash(d, HashScope::Everything);
+    const auto changed = [&] {
+        const uint64_t now = sceneHash(d, HashScope::Everything);
+        const bool differs = now != h;
+        h = now;
+        return differs;
+    };
+    // Same number of splats, different content: a splat edit.
+    d.splats.resize(3, 0);
+    d.splatsChanged();
+    CHECK(changed());
+    save(reg, d, "splats");
+    d.splats.positions[1] = glm::vec3(1.0f, 2.0f, 3.0f);
+    CHECK(changed());
+    d.splats.opacities[2] = 0.25f;
+    CHECK(changed());
+    d.splatsChanged();
+    CHECK(changed());
+    // Nothing the undo history knows about: the steps are all there, the scene is not the checkpoint's.
+    expectRefused(reg, d, "splats", kNotExact);
+    // The rest of what the hash reaches: UV seams and paint layers (made through commands), quad pairs, Part folders,
+    // reference images.
+    CHECK(!failed(call(reg, d, "uv_seam", R"({"op":"path","from":0,"to":40})")));
+    CHECK(changed());
+    CHECK(!failed(call(reg, d, "paint_layer_add", R"({"name":"L"})")));
+    CHECK(changed());
+    d.mesh.paintLayers[0].opacity = 0.5f;
+    CHECK(changed());
+    d.mesh.paintLayers[0].blend = BlendMode::Multiply;
+    CHECK(changed());
+    d.mesh.quadPartners.assign(d.mesh.triangleCount(), Mesh::kNoQuad);
+    CHECK(changed());
+    d.mesh.quadPartners[0] = 1, d.mesh.quadPartners[1] = 0;
+    CHECK(changed());
+    d.partFolders.push_back({7, "Folder", false});
+    CHECK(changed());
+    d.partFolders[0].collapsed = true;
+    CHECK(changed());
+    d.references.emplace_back();
+    d.references[0].name = "ref";
+    CHECK(changed());
+    d.references[0].opacity = 0.9f;
+    CHECK(changed());
+    // Selection sets, by name and by content.
+    CHECK(!failed(call(reg, d, "selection_set_store", R"({"name":"a"})")));
+    CHECK(changed());
+    CHECK(!failed(call(reg, d, "mask_all")));
+    CHECK(!failed(call(reg, d, "selection_set_store", R"({"name":"a"})"))); // replaced: a set with other content
+    CHECK(changed());
+}
+
+TEST(mcp_checkpoint_restore_covers_subdivision_uv_and_paint) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    save(reg, d, "plain");
+    const uint64_t plain = sceneHash(d, HashScope::Everything);
+    CHECK(!failed(call(reg, d, "subdivide", R"({"levels":1})")));
+    CHECK(!failed(call(reg, d, "uv_seam", R"({"op":"path","from":0,"to":40})")));
+    CHECK(!failed(call(reg, d, "paint_layer_add", R"({"name":"L"})")));
+    CHECK(sceneHash(d, HashScope::Everything) != plain);
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"plain"})")));
+    CHECK(sceneHash(d, HashScope::Everything) == plain && d.mesh.paintLayers.empty());
+    CHECK(!failed(call(reg, d, "redo"))); // the restore only undid steps: one redo puts it all back
+    CHECK(sceneHash(d, HashScope::Everything) != plain);
+    CHECK(d.undo.redoCount() == 0);
+    // The same with the budget dropping the early steps: refused, nothing moves.
+    save(reg, d, "later");
+    d.undo.byteBudget = 1;
+    CHECK(!failed(call(reg, d, "uv_seam", R"({"op":"clear_all"})")));
+    expectRefused(reg, d, "plain", kNoLonger);
+}
+
+TEST(mcp_checkpoint_does_not_point_into_a_replaced_history) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    auto timeline = Timeline::attach(d);
+    CHECK(timeline != nullptr);
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    CHECK(!failed(call(reg, d, "stroke", kStroke)));
+    save(reg, d, "before");
+    CHECK(!failed(call(reg, d, "undo")));
+    save(reg, d, "mid");
+    std::vector<uint8_t> blob;
+    CHECK(timeline->save(blob, d.mesh));
+    std::string err;
+    CHECK(Timeline::load(d, blob, &err));
+    // The loaded steps have numbers of their own: unique, rising, and none of them is a step "before" or "mid" knew.
+    uint64_t last = 0;
+    for (size_t k = d.undo.undoCount(); k-- > 0;) {
+        const uint64_t seq = d.undo.undoStep(k)->seq;
+        CHECK(seq > last);
+        last = seq;
+    }
+    CHECK(d.undo.undoCount() == 1 && d.undo.redoCount() == 1);
+    CHECK(last > 0);
+    expectRefused(reg, d, "before", "cleared");
+    expectRefused(reg, d, "mid", "cleared");
+    // A checkpoint made on the new history works as usual.
+    save(reg, d, "after");
+    CHECK(!failed(call(reg, d, "redo")));
+    CHECK(!failed(call(reg, d, "checkpoint_restore", R"({"name":"after"})")));
+}
+
+// The hash of a selection set list is kept on the list (SelectionSetList::hashCache). Every way a list changes must show in the
+// hash anyway: a stale one would let a restore pass (it fails open).
+TEST(mcp_selection_set_hash_is_never_stale) {
+    CommandRegistry reg;
+    Document d = sphere(reg);
+    const auto hash = [&] { return sceneHash(d, HashScope::Everything); };
+    // Each command after a hash that has warmed the cache: the hash moves, and undo / redo bring back exactly the old / new value.
+    const auto edit = [&](const char* tool, const char* args) {
+        const uint64_t before = hash();
+        CHECK(hash() == before); // (cached: stable)
+        CHECK(!failed(call(reg, d, tool, args)));
+        const uint64_t after = hash();
+        CHECK(after != before);
+        CHECK(hash() == after);
+        CHECK(!failed(call(reg, d, "undo")));
+        CHECK(hash() == before);
+        CHECK(!failed(call(reg, d, "redo")));
+        CHECK(hash() == after);
+    };
+    edit("selection_set_store", R"({"name":"a","channels":"mask"})");
+    edit("selection_set_store", R"({"name":"a","channels":"visibility"})"); // same name, other content: replaced
+    edit("selection_set_rename", R"({"name":"a","to":"b"})");
+    edit("selection_set_store", R"({"name":"m","channels":"morph"})");
+    edit("selection_set_morph_target", R"({"name":"m"})");
+    edit("selection_set_morph_target", R"({"name":""})");
+    edit("selection_set_delete", R"({"name":"m"})");
+    edit("selection_set_delete", R"({"name":"b"})"); // the last one: no list at all
+    // A set made from a mask, then the mask changed: the stored mask runs are what the hash sees, whatever the mesh holds now.
+    CHECK(!failed(call(reg, d, "mask_all")));
+    edit("selection_set_store", R"({"name":"c","channels":"mask"})");
+    CHECK(!failed(call(reg, d, "selection_set_store", R"({"name":"c","channels":"mask"})")));
+    const uint64_t withMask = hash();
+    CHECK(!failed(call(reg, d, "mask_clear")));
+    CHECK(!failed(call(reg, d, "selection_set_store", R"({"name":"c","channels":"mask"})")));
+    CHECK(hash() != withMask);
+
+    // Outside the history: a copy of a list that was already hashed, then edited, carries no stale hash (the cache starts empty on a
+    // copy), and a checkpoint made on the old one refuses the new one.
+    CHECK(d.mesh.selectionSets != nullptr);
+    save(reg, d, "cp"); // (hashes the list: the cache is warm)
+    auto copy = std::make_shared<SelectionSetList>(*d.mesh.selectionSets);
+    copy->morphTarget = "elsewhere";
+    d.mesh.selectionSets = copy;
+    expectRefused(reg, d, "cp", kNotExact);
+    auto fewer = std::make_shared<SelectionSetList>(*d.mesh.selectionSets);
+    fewer->sets.clear();
+    fewer->morphTarget.clear();
+    d.mesh.selectionSets = fewer;
+    expectRefused(reg, d, "cp", kNotExact);
 }

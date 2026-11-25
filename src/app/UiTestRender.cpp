@@ -9,6 +9,8 @@
 //                            Tests only: no setting or environment reaches it.
 //   gl_limits copies=0|1|auto partial buffer updates as GPU copies (1) or BufferSubData (0) whatever the driver; auto: as the
 //                            driver needs (gl::copyUploads: copies on OpenGL over D3D12). Tests only, as texels=.
+//   gl_limits reject_textured=1 the first textured draw of a Part counts as a driver error (Renderer::drawSlot): the Part draws
+//                            without its texture and the status says so. Tests only, as texels=; 0 turns it off.
 //   render_cell NAME mode=lit|pbr|flat|wire|groups [min=F|max=F] [size=PX] [splats=1]   (groups: Lit Sphere with Show Face Groups)
 //                            the scene drawn offscreen (256 px square) with that shading: at least F (default 0.25) of the pixels
 //                            inside the model's projected box differ from the background, and they are not all one colour. A
@@ -46,11 +48,14 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
             if (w[i].rfind("texels=", 0) == 0) {
                 const unsigned long texels = std::strtoul(w[i].c_str() + 7, nullptr, 10);
                 run([texels] { gl::setTestTexelLimit(uint32_t(texels)); });
+            } else if (w[i] == "reject_textured=0" || w[i] == "reject_textured=1") {
+                const bool reject = w[i] == "reject_textured=1";
+                run([reject] { gl::setTestRejectTextured(reject); });
             } else if (w[i] == "copies=0" || w[i] == "copies=1" || w[i] == "copies=auto") {
                 const int copies = w[i] == "copies=auto" ? -1 : w[i] == "copies=1" ? 1 : 0;
                 run([copies] { gl::setTestCopyUploads(copies); });
             } else {
-                error = "'gl_limits': unknown argument '" + w[i] + "' (texels=N, copies=0|1|auto)";
+                error = "'gl_limits': unknown argument '" + w[i] + "' (texels=N, copies=0|1|auto, reject_textured=0|1)";
                 return false;
             }
         }
@@ -68,6 +73,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
     float distance = 0.0f; // 0 = frame the scene
     glm::vec3 target(0.0f);
     bool splats = false;
+    bool lights = false;
     for (size_t i = 2; i < w.size(); ++i) {
         if (w[i].rfind("mode=", 0) == 0) mode = w[i].substr(5);
         else if (w[i].rfind("min=", 0) == 0) floor = std::strtod(w[i].c_str() + 4, nullptr);
@@ -81,6 +87,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
             }
         }
         else if (w[i] == "splats=1") splats = true;
+        else if (w[i] == "lights=1") lights = true; // four added lights (Key, Fill, Rim, Fill: Material > Light > Lights)
         else {
             error = "'render_cell': unknown argument '" + w[i] + "'";
             return false;
@@ -91,7 +98,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         return false;
     }
     const std::string name = w[1];
-    steps_.push_back([this, line, name, mode, floor, most, size, splats, distance, target](float t) {
+    steps_.push_back([this, line, name, mode, floor, most, size, splats, lights, distance, target](float t) {
         if (t == 0.0f) return false; // a settled frame
         App& app = app_;
         const RenderSettings saved = app.renderSettings_;
@@ -100,6 +107,9 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         s.flatShading = mode == "flat";
         s.wireframe = mode == "wire";
         s.showFaceGroups = mode == "groups";
+        if (lights)
+            s.lights = {viewLightPreset(ViewLight::Role::Key), viewLightPreset(ViewLight::Role::Fill), viewLightPreset(ViewLight::Role::Rim),
+                        viewLightPreset(ViewLight::Role::Fill)};
         s.gradientBackground = false;
         s.backgroundColor = glm::vec3(0.06f, 0.30f, 0.12f); // (unlike any shaded surface's colour)
         s.dimInactive = false;

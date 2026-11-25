@@ -7,6 +7,8 @@
 //     us), and its server process must run as our user. Unix: the socket must be a socket (lstat: no symlink),
 //     owned by our uid, and the peer that accepts must be our uid too.
 //   - Sends HANDSHAKE and SET_ACTIVITY only; replies are drained, never interpreted (FrameReader).
+//   - The activity holds fixed strings only (Sculpting, Painting, Idle) and the start time: nothing from the scene.
+//   - A failed or lost connection is retried no sooner than 30 s later; switching it off ends the thread.
 #include "core/DiscordPresence.h"
 
 #include "core/Json.h"
@@ -46,61 +48,6 @@ using Clock = std::chrono::steady_clock;
 int msLeft(Clock::time_point deadline) {
     const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now()).count();
     return int(std::clamp<int64_t>(left, 0, 60000));
-}
-
-void appendUtf8(std::string& out, uint32_t cp) {
-    if (cp < 0x80) {
-        out += char(cp);
-    } else if (cp < 0x800) {
-        out += char(0xC0 | (cp >> 6));
-        out += char(0x80 | (cp & 0x3F));
-    } else if (cp < 0x10000) {
-        out += char(0xE0 | (cp >> 12));
-        out += char(0x80 | ((cp >> 6) & 0x3F));
-        out += char(0x80 | (cp & 0x3F));
-    } else {
-        out += char(0xF0 | (cp >> 18));
-        out += char(0x80 | ((cp >> 12) & 0x3F));
-        out += char(0x80 | ((cp >> 6) & 0x3F));
-        out += char(0x80 | (cp & 0x3F));
-    }
-}
-
-// The next code point of s at i (advanced); false for a malformed sequence (i skips its first byte).
-bool decodeUtf8(std::string_view s, size_t& i, uint32_t& cp) {
-    const auto b = [&](size_t k) { return uint8_t(s[k]); };
-    const uint8_t c = b(i);
-    size_t n;
-    uint32_t min;
-    if (c < 0x80) { cp = c; ++i; return true; }
-    if ((c & 0xE0) == 0xC0) n = 1, cp = c & 0x1F, min = 0x80;
-    else if ((c & 0xF0) == 0xE0) n = 2, cp = c & 0x0F, min = 0x800;
-    else if ((c & 0xF8) == 0xF0) n = 3, cp = c & 0x07, min = 0x10000;
-    else { ++i; return false; }
-    if (i + n >= s.size()) { ++i; return false; } // truncated
-    for (size_t k = 1; k <= n; ++k) {
-        if ((b(i + k) & 0xC0) != 0x80) { ++i; return false; }
-        cp = (cp << 6) | (b(i + k) & 0x3F);
-    }
-    if (cp < min || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) { ++i; return false; } // overlong, surrogate
-    i += n + 1;
-    return true;
-}
-
-bool isSpace(uint32_t cp) { return cp == ' ' || cp == '\t' || cp == '\n' || cp == '\r' || cp == 0x2028 || cp == 0x2029 || cp == 0xA0; }
-
-bool isDropped(uint32_t cp) {
-    return cp < 0x20 || (cp >= 0x7F && cp <= 0x9F)          // control characters
-           || cp == 0x200E || cp == 0x200F || cp == 0x061C  // direction marks
-           || (cp >= 0x202A && cp <= 0x202E)                // bidirectional embeddings and overrides
-           || (cp >= 0x2066 && cp <= 0x2069)                // bidirectional isolates
-           || cp == 0xFEFF || (cp >= 0xFFF9 && cp <= 0xFFFB) // byte order mark, interlinear annotations
-           || cp == 0xFFFE || cp == 0xFFFF;
-}
-
-std::string fileNameOnly(const std::string& path) {
-    const size_t cut = path.find_last_of("/\\");
-    return cut == std::string::npos ? path : path.substr(cut + 1);
 }
 
 // --- The connection: a named pipe or a Unix socket ---
@@ -342,40 +289,16 @@ bool appIdConfigured(std::string_view id) {
     return std::all_of(id.begin(), id.end(), [](char c) { return c >= '0' && c <= '9'; }) && id.find_first_not_of('0') != std::string_view::npos;
 }
 
-std::string sanitize(std::string_view in, size_t maxCodepoints) {
-    std::string out;
-    size_t count = 0, i = 0;
-    bool space = false; // a space is pending (written only before the next visible character)
-    while (i < in.size() && count < maxCodepoints) {
-        uint32_t cp;
-        if (!decodeUtf8(in, i, cp)) continue;
-        if (isSpace(cp)) {
-            space = !out.empty();
-            continue;
-        }
-        if (isDropped(cp)) continue;
-        if (space) {
-            out += ' ';
-            space = false;
-            if (++count == maxCodepoints) break;
-        }
-        appendUtf8(out, cp);
-        ++count;
+const char* modeName(Mode m) {
+    switch (m) {
+    case Mode::Sculpting: return "Sculpting";
+    case Mode::Painting: return "Painting";
+    default: return "Idle";
     }
-    if (!out.empty() && out.back() == ' ') out.pop_back();
-    return out;
 }
 
-std::string activityState(const Activity& a) {
-    if (!a.show) return {};
-    const std::string theme = sanitize(a.challenge, kChallengeMax);
-    const std::string file = sanitize(fileNameOnly(a.fileName), kFileNameMax);
-    std::string state;
-    if (!theme.empty()) state = "Monthly challenge: " + theme;
-    if (!file.empty()) state += (state.empty() ? "" : " \xC2\xB7 ") + file;
-    state = sanitize(state, kStateMax);
-    return state.size() >= 2 ? state : std::string(); // Discord wants at least 2 characters
-}
+// Only these three words: nothing typed and nothing from the scene ever reaches the state line.
+std::string activityState(const Activity& a) { return a.show ? std::string(modeName(a.mode)) : std::string(); }
 
 std::string encodeFrame(uint32_t op, std::string_view json) {
     std::string out(kHeaderSize, '\0');
@@ -482,6 +405,11 @@ bool socketOwnedBy(const std::string& path, unsigned uid) {
 
 uint64_t connectAttempts() { return g_connectAttempts.load(); }
 
+int retryDelayMs(int failures, int maxMs) {
+    const int64_t wait = int64_t(kRetryMinMs) << std::clamp(failures, 0, 1); // 30 s, then 60 s
+    return int(std::min<int64_t>(std::max(maxMs, 1), wait));
+}
+
 bool agentRun(const std::function<const char*(const char*)>& getenv, const char* videoDriver) {
     const auto is = [](const char* v, const char* want) { return v && std::strcmp(v, want) == 0; };
     const char* noDiscord = getenv("SF_NO_DISCORD");
@@ -496,7 +424,7 @@ Client::~Client() {
         std::lock_guard lock(mutex_);
         stop_ = true;
     }
-    abort_ = true; // a connect in progress gives up
+    abortConnect_ = true; // a connect in progress gives up
     cv_.notify_all();
     if (thread_.joinable()) thread_.join();
 }
@@ -511,11 +439,16 @@ void Client::setTimingForTests(int backoffMs, int connectTimeoutMs, int minGapMs
 void Client::set(const Activity& a) {
     {
         std::lock_guard lock(mutex_);
+        abortConnect_ = !a.show; // off: a connect in progress gives up at once
         if (a == desired_) return;
         desired_ = a;
         dirty_ = true;
+        if (thread_.joinable() && !running_) thread_.join(); // ended when it was switched off (instant: it has returned)
         // Nothing runs until something is shown with a real application ID (off = no thread, no connection).
-        if (!thread_.joinable() && a.show && appIdConfigured(appId_) && !stop_) thread_ = std::thread([this] { run(); });
+        if (!thread_.joinable() && a.show && appIdConfigured(appId_) && !stop_) {
+            running_ = true;
+            thread_ = std::thread([this] { run(); });
+        }
     }
     cv_.notify_all();
 }
@@ -526,7 +459,7 @@ void Client::run() {
     bool sentValid = false; // sent is known (reset on every new connection)
     uint64_t nonce = 0;
     Clock::time_point retryAt{}, nextSendAt{};
-    int failures = 0; // in a row: the back-off doubles from 2 s to backoffMs
+    int failures = 0; // in a row: 30 s, then 60 s (retryDelayMs, capped at backoffMs)
     FrameReader reader;
     constexpr size_t kDrainCap = 256 * 1024; // per wake-up: a flood can't keep the thread reading
     constexpr int kWriteTimeoutMs = 2000;
@@ -536,8 +469,7 @@ void Client::run() {
         connected_ = false;
         sentValid = false;
         reader = FrameReader();
-        const int64_t waitMs = std::min<int64_t>(backoffMs, int64_t(2000) << std::min(failures++, 6));
-        retryAt = Clock::now() + std::chrono::milliseconds(waitMs);
+        retryAt = Clock::now() + std::chrono::milliseconds(retryDelayMs(failures++, backoffMs));
     };
     // Drains replies; false (and closed) on a malformed frame, CLOSE, or a closed connection.
     const auto drain = [&](int waitMs) {
@@ -562,11 +494,12 @@ void Client::run() {
             if (conn.isOpen() && (!sentValid || sent.show)) conn.write(encodeFrame(OpFrame, setActivityJson(processId(), nullptr, ++nonce)), 500);
             conn.close();
             connected_ = false;
+            running_ = false;
             return;
         }
 
         if (want.show && !conn.isOpen() && Clock::now() >= retryAt) {
-            bool ok = conn.open(connectTimeoutMs, abort_) && conn.write(encodeFrame(OpHandshake, handshakeJson(appId_)), kWriteTimeoutMs);
+            bool ok = conn.open(connectTimeoutMs, abortConnect_) && conn.write(encodeFrame(OpHandshake, handshakeJson(appId_)), kWriteTimeoutMs);
             if (ok) { // Discord answers the handshake (READY) or closes: wait for the first frame
                 const auto deadline = Clock::now() + std::chrono::milliseconds(connectTimeoutMs);
                 ok = false;
@@ -607,10 +540,13 @@ void Client::run() {
 
         lock.lock();
         if (stop_ || dirty_) continue;
+        if (!desired_.show && !conn.isOpen()) { // switched off and cleared: no thread is left behind (set() starts a new one)
+            running_ = false;
+            return;
+        }
         if (conn.isOpen() && (!sentValid || !(sent == desired_))) cv_.wait_until(lock, nextSendAt); // the latest, once due
         else if (conn.isOpen()) cv_.wait_for(lock, std::chrono::seconds(5)); // wake up to drain now and then
-        else if (desired_.show) cv_.wait_until(lock, retryAt);
-        else cv_.wait(lock);
+        else cv_.wait_until(lock, retryAt);
     }
 }
 

@@ -1,18 +1,19 @@
 {
-  "version": "0.13.13",
+  "version": "0.14.0",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Contact facing keeps your brush off the far wall of a slot or the other side of a fold",
-    "Engrave and Crease Line keep smooth walls when one stroke runs up and down the same line",
-    "Dense Micro levels show Undo, Redo and Move at once, with fewer pauses as strokes start and end",
-    "Shift with the Paint brush smooths every channel you paint, across UV seams too",
-    "Texture painting works on more Android phones and tablets"
+    "Polygon mode: pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span",
+    "Split view shows a second live view of your scene, each with its own camera",
+    "Place curves point by point, straight or smooth, and edit their points with the Gizmo",
+    "An orientation widget in the canvas corner: click a dot to look from that side",
+    "Remesh one click away: right-click or Space for Quick Remesh, Quad Remesh and Remove Hidden"
   ],
   "support": {
     "founding": {
       "taken": 17,
       "limit": 100
-    }
+    },
+    "member_requests_this_release": 8
   }
 }

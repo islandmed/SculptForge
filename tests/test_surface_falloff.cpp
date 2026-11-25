@@ -73,7 +73,10 @@ struct Spill {
 // One stroke along the slot's upper wall just inside the rim, seen from the front and a little above (the view the
 // report shows), radius 0.2 (five gaps): how far the far (lower) wall moves against the surface under the cursor.
 // `rim`: the cursor on the outer surface just above the slot (the report's view) instead of on its upper wall.
-Spill slotStroke(const Mesh& start, BrushType type, bool micro, const std::function<void(DabParams&)>& tweak = {}, bool rim = false) {
+// `repick`: each dab's centre and pick normal are the ray hit on the surface as the stroke has left it (a cursor follows the
+// surface a cut lowers; held where the surface was, it floats above it and may be nearer the far side of the gap).
+Spill slotStroke(const Mesh& start, BrushType type, bool micro, const std::function<void(DabParams&)>& tweak = {}, bool rim = false,
+                 bool repick = false) {
     geom::Fixture f;
     f.mesh = start;
     if (micro && !start.micro) {
@@ -106,6 +109,11 @@ Spill slotStroke(const Mesh& start, BrushType type, bool micro, const std::funct
             p.center = glm::vec3(std::sin(a) * rho, y0, std::cos(a) * rho);
             p.viewDir = view, p.radius = radius, p.strength = 0.5f;
             p.pickNormal = rim ? glm::normalize(p.center) : glm::vec3(0, -1, 0);
+            if (repick) {
+                RayHit hit;
+                const glm::vec3 n = p.pickNormal, o = p.center + n * (rim ? 0.15f : 0.015f);
+                if (d.bvh.raycast(d.mesh, o, -n, hit)) p.center = hit.position, p.pickNormal = hit.normal;
+            }
             centers.push_back(p.center);
             if (tweak) tweak(p);
             d.sculptor.dab(d.mesh, d.bvh, type, p, none);
@@ -411,4 +419,66 @@ TEST(surface_falloff_contact_facing_micro_sphere_unchanged) {
             CHECK(peak > 0.0f);
             CHECK(worst < 0.02f * peak);
         }
+}
+
+// Trim, Flatten and Clay along a slot's edge with Contact facing on: the far wall stays put, Trim as the others. A Trim stroke lowers
+// the surface it cuts, and the flood that measures the way round started from the vertex nearest the cursor: held where the
+// surface was (or a pick on a wall a gap's width away), that was a vertex of the far wall, which then took the cut (55% of the near
+// side's). It now starts from the nearest vertex that faces the contact. The rim with Trim on a plain mesh is the fold rule's, not
+// held (this slot is 1.75 radii deep, its far wall's rim within the partial weights; a slot past 3.1 radii keeps it): printed.
+TEST(surface_falloff_contact_facing_far_wall_after_a_cut) {
+    const Mesh plain = slotSphere(7);
+    const Mesh base = slotSphere(6);
+    const auto on = [](DabParams& p) { p.contactFacing = true; };
+    for (BrushType t : {BrushType::Trim, BrushType::Flatten, BrushType::Clay})
+        for (bool rim : {false, true})
+            for (bool repick : {false, true})
+                for (int k = 0; k < 2; ++k) {
+                    const Spill a = slotStroke(k == 0 ? plain : base, t, k > 0, on, rim, repick);
+                    std::printf("far wall after a cut %-7s %s %s %-5s near %.4f far %.4f share %.1f%%\n", brushName(t), rim ? "rim " : "wall",
+                                repick ? "picked" : "held  ", k == 0 ? "plain" : "micro", a.nearMax, a.farMax, 100.0f * a.share());
+                    CHECK(a.nearMax > 0.0f);
+                    if (!(rim && t == BrushType::Trim && k == 0)) CHECK(a.share() < 0.05f);
+                }
+}
+
+// Trim with Contact facing on a dense curved sphere, with and without the option (overlapping strokes, varied pressure, X symmetry):
+// a cut only lowers (no vertex rises along its normal), the falloff edge has no spike or step the stroke without the option does
+// not have, the mirror halves stay mirrored, and a smooth form moves as without it (the flood's start, on the cursor's own wall
+// here as before, changes nothing where the nearest vertex already faces the contact).
+TEST(surface_falloff_contact_facing_trim_dense_sphere_invariants) {
+    const float edge = geom::meanEdge(geom::denseSphereFixture().mesh);
+    const std::vector<uint32_t> mirror = geom::mirrorMapX(geom::denseSphereFixture().mesh);
+    const Symmetry sym{true, false, false};
+    std::vector<glm::vec3> moved[2];
+    geom::EdgeReport rep[2];
+    float peak = 0.0f, rise[2] = {}, asym[2] = {};
+    for (int on = 0; on < 2; ++on) {
+        Document d = geom::denseSphere();
+        const std::vector<glm::vec3> before = d.mesh.positions, normals = d.mesh.normals;
+        const auto strokes = geom::overlapStrokes(glm::vec3(0.5f, 0.2f, 0.84f), 0.15f);
+        CHECK(d.sculptor.beginStroke(d.mesh, brushName(BrushType::Trim)));
+        for (const auto& s : strokes)
+            for (DabParams p : s) {
+                p.contactFacing = on == 1;
+                d.sculptor.dab(d.mesh, d.bvh, BrushType::Trim, p, sym);
+            }
+        d.undo.push(d.sculptor.endStroke());
+        moved[on] = d.mesh.positions;
+        rep[on] = geom::edgeOutliers(d.mesh, before, geom::centersOf(strokes), 0.15f, edge);
+        rise[on] = geom::maxRise(before, d.mesh, normals);
+        asym[on] = geom::symmetryError(d.mesh, mirror);
+        if (on == 0) peak = geom::maxMove(before, d.mesh);
+        CHECK(geom::nonFinite(d.mesh) == 0);
+    }
+    float diff = 0.0f;
+    for (size_t v = 0; v < moved[0].size(); ++v) diff = std::max(diff, glm::distance(moved[0][v], moved[1][v]));
+    std::printf("dense sphere Trim peak %.5f diff %.6f rise off %.2e on %.2e spikes off %d on %d worst off %.3f on %.3f asym off %.2e on %.2e\n",
+                peak, diff, rise[0], rise[1], rep[0].spikes, rep[1].spikes, rep[0].worst, rep[1].worst, asym[0], asym[1]);
+    CHECK(peak > 0.0f);
+    CHECK(rise[1] <= std::max(rise[0], 1e-6f)); // (cut only)
+    CHECK(rep[1].spikes <= rep[0].spikes);
+    CHECK(rep[1].worst <= std::max(1.2f * rep[0].worst, geom::kSpike));
+    CHECK(asym[1] <= std::max(asym[0], 1e-5f) + 1e-5f); // (symmetry holds)
+    CHECK(diff < 0.01f * peak);                         // (a smooth form moves as without the option)
 }

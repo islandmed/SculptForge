@@ -26,7 +26,8 @@ float largestSide(const Mesh& mesh) {
     return s > 0.0f ? s : 1.0f;
 }
 
-// The directed edges (a, b) of `tris` that no other triangle shares: the open boundary, wound as in the triangles.
+} // namespace
+
 std::vector<std::pair<uint32_t, uint32_t>> boundaryEdges(const std::vector<glm::uvec3>& tris) {
     std::vector<std::pair<uint64_t, uint32_t>> edges; // undirected key, directed edge index (3 * t + k)
     edges.reserve(tris.size() * 3);
@@ -47,6 +48,136 @@ std::vector<std::pair<uint32_t, uint32_t>> boundaryEdges(const std::vector<glm::
         i = j;
     }
     return out;
+}
+
+namespace {
+
+// Edge Smooth: the staircase the mask's triangles leave along the patch's edge, smoothed (Taubin along the edge loops, so
+// they don't shrink). The edge vertices alone moving would fold the triangles beside them over (a tip of one triangle
+// flips; the shell's offset then runs along flipped normals and stands up as spikes and ridges along the rim), so no
+// vertex moves farther than a few edges or closes more than a quarter of a triangle's height in a step, the rows of
+// vertices inside the edge follow, and a vertex whose triangles still turn over goes back toward where it was.
+void smoothPatchEdge(std::vector<glm::vec3>& p, const std::vector<glm::uvec3>& tris,
+                     const std::vector<std::pair<uint32_t, uint32_t>>& boundary, int smooth) {
+    const uint32_t np = uint32_t(p.size());
+    const std::vector<glm::vec3> orig = p;
+    auto faceNormal = [&](const std::vector<glm::vec3>& q, const glm::uvec3& c) {
+        return glm::cross(q[c.y] - q[c.x], q[c.z] - q[c.x]); // twice the area, along the normal
+    };
+    std::vector<glm::vec3> faceN(tris.size());
+    std::vector<float> edgeSum(np, 0.0f);
+    std::vector<uint32_t> edgeCount(np, 0);
+    std::vector<std::vector<uint32_t>> ring(np);
+    std::vector<std::vector<uint32_t>> around(np); // the triangles at each vertex
+    for (size_t t = 0; t < tris.size(); ++t) {
+        const glm::uvec3 c = tris[t];
+        const glm::vec3 n = faceNormal(orig, c);
+        faceN[t] = glm::length(n) > 0.0f ? glm::normalize(n) : n;
+        for (int k = 0; k < 3; ++k) {
+            const uint32_t a = c[k], b = c[(k + 1) % 3];
+            around[a].push_back(uint32_t(t));
+            const float l = glm::distance(orig[a], orig[b]);
+            edgeSum[a] += l, edgeSum[b] += l;
+            ++edgeCount[a], ++edgeCount[b];
+            ring[a].push_back(b);
+            ring[b].push_back(a);
+        }
+    }
+    for (uint32_t v = 0; v < np; ++v) {
+        std::sort(ring[v].begin(), ring[v].end());
+        ring[v].erase(std::unique(ring[v].begin(), ring[v].end()), ring[v].end());
+    }
+
+    std::vector<std::array<uint32_t, 2>> nb(np, {kNone, kNone});
+    std::vector<uint8_t> count(np, 0);
+    for (const auto& [a, b] : boundary)
+        for (const auto& [v, w] : {std::pair{a, b}, std::pair{b, a}}) {
+            if (count[v] < 2) nb[v][count[v]] = w;
+            count[v] = uint8_t(std::min(3, count[v] + 1));
+        }
+    std::vector<uint32_t> chain; // vertices on one simple boundary loop (pinch points stay put)
+    for (uint32_t v = 0; v < np; ++v)
+        if (count[v] == 2) chain.push_back(v);
+    // How far a vertex may go: the staircase's steps are an edge or so; more would only collapse small islands.
+    const float reach = 1.0f + 0.1f * float(std::min(smooth, 50));
+    auto limit = [&](uint32_t v) { return reach * edgeSum[v] / float(std::max(1u, edgeCount[v])); };
+    // A vertex may close at most a quarter of its height over the edge opposite it in each of its triangles in one step
+    // (the other two corners move too), so no triangle can turn over: a one-triangle tip flattens, it doesn't flip.
+    auto safeScale = [&](uint32_t v, glm::vec3 step) {
+        float scale = 1.0f;
+        for (uint32_t t : around[v]) {
+            const glm::uvec3 c = tris[t];
+            const int k = c.x == v ? 0 : c.y == v ? 1 : 2;
+            const glm::vec3 a = p[c[(k + 1) % 3]], b = p[c[(k + 2) % 3]], ab = b - a;
+            const float len2 = glm::dot(ab, ab);
+            if (len2 <= 0.0f) continue;
+            const glm::vec3 up = (p[v] - a) - ab * (glm::dot(p[v] - a, ab) / len2); // from the edge to the vertex
+            const float h = glm::length(up);
+            const float toward = h > 0.0f ? -glm::dot(step, up) / h : 0.0f;
+            if (toward > 0.25f * h) scale = std::min(scale, 0.25f * h / toward);
+        }
+        return scale;
+    };
+    std::vector<glm::vec3> moved(chain.size());
+    std::vector<float> scale(chain.size(), 1.0f); // the shrinking step's, kept for the growing one that undoes its shrink
+    for (int it = 0; it < 4 * std::min(smooth, 50); ++it) // 4 passes a step: the steps span a few edges
+        for (float f : {0.5f, -0.53f}) {
+            for (size_t i = 0; i < chain.size(); ++i) {
+                const uint32_t v = chain[i];
+                const glm::vec3 mid = (p[nb[v][0]] + p[nb[v][1]]) * 0.5f;
+                glm::vec3 step = f * (mid - p[v]);
+                if (f > 0.0f) scale[i] = safeScale(v, step);
+                step *= scale[i];
+                const glm::vec3 d = p[v] + step - orig[v];
+                const float l = glm::length(d), m = limit(v);
+                moved[i] = orig[v] + (l > m ? d * (m / l) : d);
+            }
+            for (size_t i = 0; i < chain.size(); ++i) p[chain[i]] = moved[i];
+        }
+
+    // The rows of vertices inside the edge follow (the edge stays put): a few rounds of tangential smoothing, four rows deep.
+    std::vector<uint8_t> row(np, 0); // 0 = beyond the rows, 1..4 = how many steps from the edge, 255 = the edge
+    std::vector<uint32_t> front;
+    for (uint32_t v = 0; v < np; ++v)
+        if (count[v] > 0) row[v] = 255, front.push_back(v);
+    for (int r = 1; r <= 4; ++r) {
+        std::vector<uint32_t> next;
+        for (uint32_t v : front)
+            for (uint32_t w : ring[v])
+                if (row[w] == 0) row[w] = uint8_t(r), next.push_back(w);
+        front = std::move(next);
+    }
+    std::vector<uint32_t> inside;
+    for (uint32_t v = 0; v < np; ++v)
+        if (row[v] > 0 && row[v] < 255) inside.push_back(v);
+    std::vector<glm::vec3> follow(inside.size());
+    auto relaxRows = [&] {
+        for (uint32_t v : inside) p[v] = orig[v];
+        for (int it = 0; it < 8; ++it) {
+            for (size_t i = 0; i < inside.size(); ++i) {
+                const uint32_t v = inside[i];
+                glm::vec3 mean(0.0f);
+                for (uint32_t w : ring[v]) mean += p[w];
+                mean /= float(ring[v].size());
+                follow[i] = p[v] + (mean - p[v]) * 0.5f;
+            }
+            for (size_t i = 0; i < inside.size(); ++i) p[inside[i]] = follow[i];
+        }
+    };
+
+    relaxRows();
+    // Backstop: what still turned over (a triangle facing away from where it faced) sends its corners back half of the way.
+    for (int pass = 0; pass < 12; ++pass) {
+        bool any = false;
+        for (size_t t = 0; t < tris.size(); ++t) {
+            const glm::vec3 n = faceNormal(p, tris[t]);
+            const float l = glm::length(n);
+            if (l > 0.0f && glm::dot(n / l, faceN[t]) >= 0.5f) continue;
+            any = true;
+            for (int k = 0; k < 3; ++k) p[tris[t][k]] = glm::mix(orig[tris[t][k]], p[tris[t][k]], pass < 11 ? 0.5f : 0.0f);
+        }
+        if (!any) break;
+    }
 }
 
 int axisIndex(char c) { return c == 'x' ? 0 : c == 'y' ? 1 : c == 'z' ? 2 : -1; }
@@ -105,28 +236,7 @@ Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error)
 
     // Edge Smooth: Taubin smoothing along the patch's edge, which follows the triangles' staircase, so it doesn't shrink.
     const auto boundary = boundaryEdges(tris);
-    if (o.smooth > 0 && !boundary.empty()) {
-        std::vector<std::array<uint32_t, 2>> nb(np, {kNone, kNone});
-        std::vector<uint8_t> count(np, 0);
-        for (const auto& [a, b] : boundary)
-            for (const auto& [v, w] : {std::pair{a, b}, std::pair{b, a}}) {
-                if (count[v] < 2) nb[v][count[v]] = w;
-                count[v] = uint8_t(std::min(3, count[v] + 1));
-            }
-        std::vector<uint32_t> chain; // vertices on one simple boundary loop (pinch points stay put)
-        for (uint32_t v = 0; v < np; ++v)
-            if (count[v] == 2) chain.push_back(v);
-        std::vector<glm::vec3> moved(chain.size());
-        for (int it = 0; it < 4 * std::min(o.smooth, 50); ++it) // 4 passes a step: the steps span a few edges
-            for (float f : {0.5f, -0.53f}) {
-                for (size_t i = 0; i < chain.size(); ++i) {
-                    const uint32_t v = chain[i];
-                    const glm::vec3 mid = (p[nb[v][0]] + p[nb[v][1]]) * 0.5f;
-                    moved[i] = p[v] + f * (mid - p[v]);
-                }
-                for (size_t i = 0; i < chain.size(); ++i) p[chain[i]] = moved[i];
-            }
-    }
+    if (o.smooth > 0 && !boundary.empty()) smoothPatchEdge(p, tris, boundary, o.smooth);
 
     Mesh patch;
     patch.positions = p;
@@ -143,9 +253,21 @@ Mesh extractShell(const Mesh& mesh, const ExtractOptions& o, std::string& error)
 
     Mesh out;
     out.positions.reserve(size_t(np) * layers);
-    for (uint32_t i = 0; i < np; ++i) out.positions.push_back(p[i] + patch.normals[i] * outer);
+    // Along the patch's edge the offset runs along the source's normals: the patch's own are one-sided there, lean over
+    // the staircase, and the rim would follow them (the source's triangles all round the vertex, at the original place).
+    std::vector<glm::vec3> offsetDir = patch.normals;
+    for (const auto& [a, b] : boundary)
+        for (uint32_t v : {a, b}) {
+            glm::vec3 sum(0.0f);
+            for (uint32_t t : mesh.vertexTriangles(kept[v])) {
+                const glm::uvec3 c = mesh.triangles[t];
+                sum += glm::cross(mesh.positions[c.y] - mesh.positions[c.x], mesh.positions[c.z] - mesh.positions[c.x]);
+            }
+            if (glm::length(sum) > 0.0f) offsetDir[v] = glm::normalize(sum);
+        }
+    for (uint32_t i = 0; i < np; ++i) out.positions.push_back(p[i] + offsetDir[i] * outer);
     if (!single)
-        for (uint32_t i = 0; i < np; ++i) out.positions.push_back(p[i] + patch.normals[i] * inner);
+        for (uint32_t i = 0; i < np; ++i) out.positions.push_back(p[i] + offsetDir[i] * inner);
     if (mesh.hasColors()) {
         out.colors.reserve(out.positions.size());
         for (uint32_t l = 0; l < layers; ++l)

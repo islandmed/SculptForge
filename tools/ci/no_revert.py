@@ -6,7 +6,8 @@
     tools/ci/no_revert.py BASE..TIP            every merge commit in the range
     tools/ci/no_revert.py --merge COMMIT       one merge commit
     tools/ci/no_revert.py --squash RESULT BRANCH   RESULT (one commit on main) squashes BRANCH
-    tools/ci/no_revert.py --stale BASE [TIP]   TIP's files against BASE's history (ctest stale_tree: BASE origin/main)
+    tools/ci/no_revert.py --stale BASE [TIP]   TIP's files against the history of BASE as TIP contains it (their merge
+                                               base; ctest stale_tree: BASE origin/main)
     tools/ci/no_revert.py --self-test
 
 A merge X of A and B (merge base M) must keep both sides' changes: no file A changed since M may come out of X as it
@@ -197,7 +198,14 @@ def run(argv, cwd=None):
         except subprocess.CalledProcessError:  # (a shallow CI checkout has no origin/main: nothing to compare with)
             print(f"no_revert --stale: no {argv[1]} here, skipped")
             return 0
-        found = stale(argv[1], argv[2] if len(argv) == 3 else "HEAD", cwd)
+        tip = argv[2] if len(argv) == 3 else "HEAD"
+        # Against the BASE that TIP contains (their merge base), not BASE as it is now: what lands on BASE after TIP was
+        # made (a site-data push during a T0 run, 11-24) is not TIP's to have, and a merge brings it anyway.
+        try:
+            base = git("merge-base", argv[1], tip, cwd=cwd).strip()
+        except subprocess.CalledProcessError:
+            base = argv[1]
+        found = stale(base, tip, cwd)
         for f in found:
             print(f"stale: {f}")
         if found:
@@ -283,6 +291,10 @@ def self_test():
         g("checkout", "-q", "-b", "clean", "main")
         write("d.cpp", ["int d = 4;"]); g("add", "-A"); g("commit", "-qm", "clean feature")
         assert run(["--stale", "main", "clean"], d) == 0, "a clean branch was refused"
+        g("checkout", "-q", "main")  # main moves on after the branch was made (the site lane pushes during a T0 run)
+        write("feed.json", ["0.3"]); g("add", "-A"); g("commit", "-qm", "main: the feed moves on")
+        assert run(["--stale", "main", "clean"], d) == 0, "a branch was refused for main's commits made after it"
+        assert run(["--stale", "main", "stale"], d) == 1, "a stale-tree commit passed once main moved on"
         g("checkout", "-q", "-b", "again", "main")
         write("e.cpp", ["int e = 1;"]); g("add", "-A"); g("commit", "-qm", 'Reapply "e v1"')
         assert run(["--stale", "main", "again"], d) == 0, "a deliberate Reapply was refused"

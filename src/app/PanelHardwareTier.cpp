@@ -448,7 +448,7 @@ bool App::tierCardEvent(const SDL_Event& e) {
         const SDL_Keycode k = e.key.key;
         if (e.key.repeat || (k != SDLK_ESCAPE && k != SDLK_RETURN && k != SDLK_KP_ENTER)) return false;
         if (e.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_SHIFT | SDL_KMOD_GUI)) return false;
-        if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)) return false;
+        if (ui::TextFieldFocused() || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel)) return false;
         if (drag_ != Drag::None) return false; // (Esc cancels a stroke or a drag first)
         dismissTierCard();
         return true;

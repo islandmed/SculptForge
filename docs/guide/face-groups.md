@@ -98,7 +98,7 @@ Open **Tool > Visibility**:
 | **Select Rectangle** / **Select Lasso** / **Select Circle** | The shape <kbd>Ctrl</kbd>+<kbd>Shift</kbd> + drag draws: a rectangle, a free-hand lasso or a circle (sent as a lasso). | `hide_rect` / `hide_lasso` |
 | **Show all** | Show every hidden part again. Available when something is hidden. | `show_all` |
 | **Invert visible** | Hide what is visible and show what is hidden. | `invert_visibility` |
-| **Remove Hidden** | Permanently remove the hidden triangles from the mesh. Undoable. | `delete_hidden` |
+| **Remove Hidden** | Permanently remove the hidden triangles from the mesh. Undoable. Also <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> (SculptForge key style) and a button in the right-click [Quick Menu](sculpting.md#the-quick-menu). | `delete_hidden` |
 | **Delete masked** | Remove the masked triangles (their corners' average mask above 50%). Undoable. Available when something is masked. | `delete_masked` |
 
 **Remove Hidden** and **Delete masked** keep every attribute of what remains (mask, vertex paint, face groups, UVs and sculpt layers).
