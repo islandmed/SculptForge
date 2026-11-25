@@ -806,7 +806,8 @@ cloth follows the brush, bunching into folds on the side you push toward; the fo
 instead of stretching it like rubber. Only the surface within a few brush radii of the stroke moves, and masked
 areas hold still like pins, so mask a seam or a cuff to keep it in place.
 
-Set it up in **Sculpt > Brush > Cloth**:
+Set it up in **Sculpt > Brush > Cloth**, or in **Tool > Cloth**, which shows these settings together with
+[Drape](#drape) in one place (**Cloth settings...** under the Cloth brush's settings and under Drape opens it):
 
 - **Mode**: **Drag** (the cloth follows the stroke), **Push** (presses it in along the surface; <kbd>Alt</kbd>
   pulls it out, and the cloth around follows), **Settle** (only gravity: the cloth under the brush sags and drapes
@@ -832,10 +833,18 @@ levels.
 
 **Drape** drops a whole Part as cloth: it falls under gravity onto the other visible Parts and settles there, the
 way a sheet settles over a chair or a shirt over a body. Make the cloth Part (a plane, an extracted shell, a
-garment you sculpted roughly), place it above the body, and with it active open **Tool > Drape**:
+garment you sculpted roughly), place it above the body, and with it active open **Tool > Drape** (or **Tool > Cloth**,
+which also holds the Cloth brush's settings):
 
 - **Fabric**: **Silk** flows into many fine folds, **Cotton** medium ones, **Denim** holds broad folds,
   **Leather** barely folds.
+- **Wind**: how hard the air blows, in metres per second (3 is a breeze, 8 makes flags fly, 15 is hard to walk
+  in). Above 0 you also get where it blows **Toward** (a heading in degrees; **From view** points it from the camera
+  into the scene), its **Lift** up or down from level, and **Gusts**: how much it varies from place to place and
+  moment to moment. Wind pushes on the cloth's face and skims along its edge, so a sheet side-on to it barely moves.
+  You can change all of it while the simulation runs. In gusts the cloth ripples and never quite settles: press
+  **Keep** at the frame you like (it stops by itself after a minute). A steady wind holds a pose, though its folds
+  may keep fluttering, as a flag's do; the simulation then stops at its frame cap and keeps the pose.
 - **Units per metre**: how big the sculpt is in real life. Cloth falls by real size, so a sculpt modelled at real
   size (a SculptForge unit is a metre) uses 1; a body 2 units tall that should be a 1.8 m person uses 1.11.
 - **Pins from mask**: masked areas hold still, like pins: mask a waistband or a collar to hang the cloth from it.
@@ -846,7 +855,17 @@ garment you sculpted roughly), place it above the body, and with it active open 
 **Resume** stop and continue, **Keep** stops and keeps where it got to, **Reset** puts the Part back. Sculpting or
 running a command while it moves keeps where it got to first.
 
-The result is a normal Part: sculpt it, or give it thickness with Extract. From a script: `cloth_drape fabric=denim`.
+The result is a normal Part: sculpt it, or give it thickness with Extract. From a script: `cloth_drape fabric=denim`,
+with wind `cloth_drape fabric=silk wind=6 heading=90 lift=10 gusts=0.5 frames=600`.
+
+## Tool > Cloth
+
+Everything cloth in one place: **Tool > Cloth** shows the [Cloth brush](#cloth-brush)'s settings (mode, fabric,
+gravity, reach, steps, soft body, collisions) and [Drape](#drape) (fabric, wind, units per metre, pins, Simulate)
+one under the other, with a line on what each part does. They are the same controls as in **Sculpt > Brush > Cloth**
+and **Tool > Drape**, not copies: a fabric picked here is the fabric there. **Cloth settings...** under the Cloth
+brush's settings and under Drape opens it. In the Classic layout it is a row added after 0.13.0: turn on
+**Edit > Preferences > Interface > Show newer menu rows** to see it (the SculptForge layout shows it always).
 
 ## Capture an alpha or a VDM from the model
 

@@ -1015,6 +1015,11 @@ void App::drawPalette_Tool() {
         drawDeformationContents(); // Smooth, Relax, Polish, Balloon, Size, Stack (PanelExtract.cpp)
         Demo::popScope();
     }
+    // Added after 0.13.0: in the Classic layout only with Show newer menu rows (next to Drape, which it also holds).
+    if (newerMenuRows() && subpalette("tool.cloth", "Cloth")) {
+        tray::Section section;
+        drawClothPanel(); // PanelCloth.cpp
+    }
     if (subpalette("tool.drape", "Drape")) {
         tray::Section section;
         drawDrapeSection(); // PanelDrape.cpp
