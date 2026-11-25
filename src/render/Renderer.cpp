@@ -3958,7 +3958,10 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     gl::ActiveTexture(kTexture2);
     gl::BindTexture(GL_TEXTURE_2D, litsphereTexture(settings.litsphere));
     gl::ActiveTexture(GL_TEXTURE0);
-    gl::Enable(GL_POLYGON_OFFSET_FILL);
+    // The fills step back (by their slope) only under the wireframe, so its lines win over their own triangles. Always
+    // on, each Part stepped back by its own triangles' slope: a garment or a copy 0.5-2% off the body fought it at rest.
+    const bool offsetFills = settings.wireframe;
+    if (offsetFills) gl::Enable(GL_POLYGON_OFFSET_FILL);
     gl::PolygonOffset(1.0f, 1.0f);
     // X-Ray (#80, #91): the other Parts are see-through, or the active one when it is the only one shown.
     const bool xray = settings.xray && !thumbnailPass_;
@@ -3974,7 +3977,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     if (!references_.empty()) { // In the scene: behind or in front of the opaque Parts, under the see-through ones
         gl::Disable(GL_POLYGON_OFFSET_FILL);
         drawReferences(false, view, proj, camera.ortho, viewAspect);
-        gl::Enable(GL_POLYGON_OFFSET_FILL);
+        if (offsetFills) gl::Enable(GL_POLYGON_OFFSET_FILL);
     }
     if (xray) {
         gl::Enable(GL_BLEND);

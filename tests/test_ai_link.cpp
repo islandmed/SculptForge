@@ -8,6 +8,9 @@
 #include "TestHarness.h"
 
 #include "cli/McpAttach.h"
+#include "cli/McpBatch.h"
+#include "cli/McpServer.h"
+#include "cli/McpTools.h"
 #include "core/Commands.h"
 #include "core/Json.h"
 #include "link/AiLink.h"
@@ -305,6 +308,7 @@ TEST(ai_link_attach_end_to_end) {
     else unsetenv("XDG_RUNTIME_DIR");
     AiLinkListener listener;
     CHECK(listener.open(endpoint, err));
+    CommandRegistry registry;
     std::thread app([&] {
         AiLinkConn conn;
         if (!listener.accept(conn, 5000)) return;
@@ -312,7 +316,7 @@ TEST(ai_link_attach_end_to_end) {
         std::string line;
         while (conn.readLine(line, 5000) == 1) {
             const auto st = s.handle(line, 0.0);
-            if (st.kind == Kind::ListTools) conn.writeLine(AiLinkSession::listReply(st.call.id, Json::array()));
+            if (st.kind == Kind::ListTools) conn.writeLine(AiLinkSession::listReply(st.call.id, mcpAppToolList(registry))); // (as the window answers)
             else if (st.kind == Kind::Execute) conn.writeLine(AiLinkSession::resultReply(st.call.id, true, "ran " + st.call.name));
             else if (!st.reply.empty()) conn.writeLine(st.reply);
             if (st.kind == Kind::Close) break;
@@ -325,10 +329,10 @@ TEST(ai_link_attach_end_to_end) {
        << call(3, "live_connect", R"({"code":"000000"})") << "\n"         // wrong code
        << call(4, "live_connect", R"({"code":"314159"})") << "\n"         // right code
        << call(5, "mesh_info") << "\n"
+       << R"({"jsonrpc":"2.0","id":10,"method":"tools/list"})" << "\n" // paired: the window's list
        << call(8, "live_connect") << "\n"                                // already connected
        << call(6, "live_disconnect") << "\n"
        << call(7, "mesh_info") << "\n";
-    CommandRegistry registry;
     runMcpAttach(in, out, endpoint, &registry);
     app.join();
     const std::string o = out.str();
@@ -351,6 +355,17 @@ TEST(ai_link_attach_end_to_end) {
                 CHECK(names.count(want) == 1);
             CHECK(names.count("pack_install") == 0); // what the app never offers an AI tool stays out
             CHECK(names.size() > 20);
+        }
+        { // Live lists, before and after pairing: what a live session can call (part_list), not the headless-only history tools.
+            for (int id : {9, 10}) {
+                std::set<std::string> names;
+                for (const Json& t : replies[id]["result"]["tools"].items()) names.insert(t["name"].asString());
+                CHECK(names.count("part_list") == 1);
+                for (const char* gone : {"batch", "checkpoint_save", "checkpoint_list", "checkpoint_restore"})
+                    CHECK(names.count(gone) == 0);
+                for (const std::string& n : names) // (PanelAiLink.cpp's dispatcher: a registry command or a window tool)
+                    CHECK(n == "live_connect" || n == "live_disconnect" || registry.find(n) || mcpIsLiveTool(n));
+            }
         }
         CHECK(replies[2]["result"]["isError"].asBool(false)); // a tool before pairing: the plain line, not a silent pairing
         CHECK(replies[2]["result"]["content"][0]["text"].asString() ==
@@ -378,6 +393,16 @@ TEST(ai_link_attach_end_to_end) {
     std::filesystem::remove(std::filesystem::path(endpoint).parent_path());
 }
 #endif
+
+TEST(mcp_headless_list_keeps_history_tools) {
+    // Only the live list drops them (mcp_attach above): the headless server still offers batch and checkpoints.
+    CommandRegistry registry;
+    std::set<std::string> names;
+    const Json list = mcpToolList(registry);
+    for (const Json& t : list.items()) names.insert(t["name"].asString());
+    for (const char* want : {"batch", "checkpoint_save", "checkpoint_list", "checkpoint_restore", "part_list"}) CHECK(names.count(want) == 1);
+    for (const std::string& n : names) CHECK(isHistoryTool(n) == (n == "batch" || n.rfind("checkpoint_", 0) == 0));
+}
 
 TEST(agent_tools_blockout_measure_overview) {
     CommandRegistry reg;

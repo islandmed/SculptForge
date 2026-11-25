@@ -883,7 +883,10 @@ private:
     bool comfyPickingText_ = false;
     std::string comfyWorkflowError_;
     int generatedRemesh_ = int(GeneratedRemesh::Quad); // Generate 3D's sculpting base: Quad (Voxel, then Quad Remesh) or Voxel
-    int voxelResolution_ = 200;
+    int voxelResolution_ = kVoxelResolutionDefault;
+    // Voxel Remesh's fine-crease hint, once per Part (id) and Resolution a session: a remesh at the default every
+    // starter head triggers would otherwise repeat it every time (cto 11-25).
+    std::set<std::pair<uint32_t, int>> creaseHintShown_;
     bool voxelKeepMasked_ = false; // Voxel Remesh's Keep Masked (#43)
     bool voxelKeepGroups_ = false; // Voxel Remesh's Keep Face Groups (core/Voxel.h transferFaceGroups)
     static constexpr const char* kKeepGroupsHelp =
@@ -1739,7 +1742,7 @@ private:
         std::shared_ptr<std::atomic<float>> progress;
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<Mesh> result;
-        std::shared_ptr<std::string> error, note;
+        std::shared_ptr<std::string> error, note, lead; // (lead: before the message, e.g. Voxel Remesh's Resolution hint)
         uint32_t part = 0;
         size_t triangles = 0;
         int resolution = 200;
