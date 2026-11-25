@@ -1,0 +1,44 @@
+# Member bug (0.14.0, "while in Polygon mode, whenever I rotate I get these holes in my model"): a dense Part over the triangle
+# budget, pulled far out of shape with small-brush Move strokes (a posed arm), drawn while the view turns. The coarse levels it
+# moves on keep the cells they were built with: a push of more than a cell stretches them and folds the coarse triangles over
+# them (back-facing, culled: a hole), so those clusters draw in full. The orbiting frame must show the same surface as the
+# full-detail one: view_lod_diff counts the pixels off by more than 48 grey levels, edges apart.
+run ui_look look=classic layout=classic
+env SF_TRIANGLE_BUDGET 200000
+env SF_STILL_FRAME_MS 0.001
+run new_sphere triangles=3000000
+camera 0 0
+wait 0.8
+expect_value coarse_unsafe == 0
+print view_lod_mean
+click "Move##brush.move"
+brush_size 30
+stroke 0.55 0.45 0.80 0.35 0.6
+wait 1.0
+stroke 0.50 0.60 0.30 0.70 0.6
+wait 1.0
+expect_value coarse_pending == 0
+print coarse_unsafe
+print coarse_clusters
+print view_lod_mean
+print view_lod_diff
+expect_value coarse_unsafe > 0
+expect_value coarse_clusters > 0
+expect_value view_lod_diff < 0.5
+shot orbit-holes-1
+camera 35 20
+wait 0.8
+print view_lod_mean
+print view_lod_diff
+expect_value view_lod_diff < 0.5
+shot orbit-holes-2
+camera 150 -30
+wait 0.8
+expect_value view_lod_diff < 0.5
+shot orbit-holes-3
+key shift+v
+wait 0.4
+orbit 80 30
+wait 0.8
+expect_value view_lod_diff < 0.5
+shot orbit-holes-split

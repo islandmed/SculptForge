@@ -372,6 +372,7 @@ public:
     // are still to be updated (drawn in full until then).
     size_t coarseDrawnClusters() const { return lastCoarseClusters_; }
     size_t coarsePendingClusters() const;
+    size_t coarseUnsafeClusters() const; // pushed far from where the levels were built: drawn in full (render/Clusters.h)
     // Dynamic topology patches (tests): the triangles of mesh slot `id`'s uploaded patches whose indices on the GPU
     // (read back) aren't the mesh's triangles now.
     size_t patchErrors(uint32_t id, const Mesh& mesh);

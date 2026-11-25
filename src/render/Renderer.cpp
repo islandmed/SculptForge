@@ -4112,7 +4112,7 @@ void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budge
     for (int level = 0; level < int(L.levels.size()); ++level) {
         size_t total = 0;
         for (uint32_t c : drawClusters_)
-            total += s.coarseDirty[c] || L.clusters[c].levels <= level ? size_t(s.drawCount[c]) / 3 : L.clusters[c].count[level] / 3;
+            total += s.coarseDirty[c] || L.unsafe[c] || L.clusters[c].levels <= level ? size_t(s.drawCount[c]) / 3 : L.clusters[c].count[level] / 3;
         if (total <= budget) {
             pick = level;
             break;
@@ -4120,7 +4120,7 @@ void Renderer::cullCoarse(const MeshSlot& s, const CullView& frame, size_t budge
     }
     size_t kept = 0;
     for (uint32_t c : drawClusters_) {
-        if (s.coarseDirty[c] || L.clusters[c].levels <= pick) {
+        if (s.coarseDirty[c] || L.unsafe[c] || L.clusters[c].levels <= pick) {
             drawClusters_[kept++] = c;
         } else {
             coarseClusters_.push_back(c);
@@ -4326,6 +4326,13 @@ size_t Renderer::coarsePendingClusters() const {
     return n;
 }
 
+size_t Renderer::coarseUnsafeClusters() const {
+    size_t n = 0;
+    for (const MeshSlot& s : slots_)
+        if (s.coarse) n += size_t(std::count(s.coarse->unsafe.begin(), s.coarse->unsafe.end(), uint8_t(1)));
+    return n;
+}
+
 size_t Renderer::patchErrors(uint32_t id, const Mesh& mesh) {
     size_t errors = 0;
     const uint32_t nt = uint32_t(mesh.triangleCount());
@@ -4380,13 +4387,16 @@ void Renderer::markCoarseDirty(MeshSlot& s, uint32_t c) {
 void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
     const auto start = std::chrono::steady_clock::now();
     const std::vector<uint32_t> changed = updateCoarseLevels(*s.coarse, mesh, s.order, s.coarsePending);
+    // (clusters pushed far from where the levels were built draw in full; SF_COARSE_NO_STALE=1: as before, to compare)
+    static const bool noStale = std::getenv("SF_COARSE_NO_STALE") != nullptr;
+    const size_t unsafe = noStale ? 0 : refreshCoarseUnsafe(*s.coarse, s.bounds);
     gl::BindVertexArray(s.coarseVao);
     if (!changed.empty()) uploadCoarsePoints(s), uploadCoarseAttributes(s);
     gl::BindVertexArray(0);
     gl::BindBuffer(GL_ARRAY_BUFFER, 0);
     for (uint32_t c : s.coarsePending) s.coarseDirty[c] = 0;
     if (std::getenv("SF_COARSE_LOG"))
-        std::fprintf(stderr, "coarse lod: %zu clusters, %zu points updated in %.1f ms\n", s.coarsePending.size(), changed.size(),
+        std::fprintf(stderr, "coarse lod: %zu clusters, %zu points updated, %zu in full (stale), in %.1f ms\n", s.coarsePending.size(), changed.size(), unsafe,
                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     s.coarsePending.clear();
 }

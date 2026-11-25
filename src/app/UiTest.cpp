@@ -154,6 +154,9 @@
 //                            $NAME+K or $NAME-K (see remember)
 //                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
 //                            view_vs_mark (mean pixel difference to mark_view's view), view_nearer_mark (that, less the same to mark_view other's),
+//                            view_lod_diff / view_lod_mean (the view drawn as while orbiting vs in full detail: percent of pixels off by > 48 grey levels,
+//                            edges apart / mean grey-level difference), coarse_unsafe (clusters pushed far from their coarse levels: drawn in full),
+//                            draw_ms_moving (draw_ms for an orbit's frame),
 //                            micro_pending_coarse (Focus Detail: tiles whose coarse shading still waits for a frame),
 //                            micro_pending_shading (a micro level without Focus Detail: patches whose shading still waits),
 //                            micro_widen_deferrals (live strokes' range widens shown a frame late, MicroRenderer::sync),
@@ -1890,6 +1893,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return double(n);
     }
     if (name == "render_aspect") return double(app_.renderAspect_);
+    if (name == "draw_ms_moving") return app_.benchmarkDrawMs(30, true); // as draw_ms, as an orbit draws it (coarse levels)
     if (name == "draw_ms") return app_.benchmarkDrawMs(30); // the 3D view drawn 30 times: ms per frame
     if (name == "drawn_triangles") { // the 3D view drawn once more now: the triangles it drew
         app_.benchmarkDrawMs(0);
@@ -1958,6 +1962,42 @@ double Demo::query(const std::string& name, bool& known) const {
         uint64_t sum = 0;
         for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(whole[i])));
         return double(sum) / double(std::max<size_t>(1, now.size()));
+    }
+    if (name == "view_lod_diff" || name == "view_lod_mean") {
+        // Member bug (0.14.0, "holes in my model whenever I rotate", a 6.4M Part): the view as it is drawn while orbiting
+        // (coarse levels, motion proxies) against the same view in full detail, as the percent of pixels whose grey level
+        // differs by more than 48 away from silhouettes (a coarse surface moves them a little, never a whole patch).
+        const int w = 480, h = 270;
+        Camera cam = app_.camera_;
+        cam.aspect = float(w) / float(h);
+        RenderSettings moving = app_.renderSettings_, full = app_.renderSettings_;
+        moving.motionProxy = true;
+        full.fullDetail = true;
+        std::vector<uint8_t> a, b;
+        std::string error;
+        app_.syncScene();
+        if (!app_.renderer_.renderToImage(cam, w, h, moving, a, error)) return -1.0;
+        if (!app_.renderer_.renderToImage(cam, w, h, full, b, error) || a.size() != b.size()) return -1.0;
+        const auto luma = [](const std::vector<uint8_t>& v, int x, int y) {
+            const uint8_t* p = &v[(size_t(y) * size_t(w) + size_t(x)) * 4];
+            return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
+        };
+        size_t bad = 0;
+        double sumDiff = 0.0;
+        for (int y = 2; y < h - 2; ++y)
+            for (int x = 2; x < w - 2; ++x) {
+                bool edge = false;
+                for (int d = -2; d <= 2 && !edge; d += 2)
+                    for (int e = -2; e <= 2; e += 2)
+                        if (std::abs(luma(b, x + d, y + e) - luma(b, x, y)) > 30.0 || std::abs(luma(a, x + d, y + e) - luma(a, x, y)) > 30.0) {
+                            edge = true;
+                            break;
+                        }
+                if (!edge) sumDiff += std::abs(luma(a, x, y) - luma(b, x, y));
+                if (!edge && std::abs(luma(a, x, y) - luma(b, x, y)) > 48.0) ++bad;
+            }
+        if (name == "view_lod_mean") return sumDiff / double(size_t(w) * size_t(h)); // (grey levels, over the whole image)
+        return 100.0 * double(bad) / double(size_t(w) * size_t(h));
     }
     if (name == "view_vs_mark" || name == "view_nearer_mark") {
         // view_vs_mark: the view as the GPU holds it now (not synced first) against mark_view's: mean pixel difference 0-255.
@@ -2051,6 +2091,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "gizmo_gpu") // a Gizmo drag drawn by one matrix (App::gizmoDrawnTransform)
         return double(std::count(app_.gizmo_.gpu.begin(), app_.gizmo_.gpu.end(), uint8_t(1)));
     if (name == "render_patches") return double(app_.renderer_.patchCount(app_.doc_.parts[size_t(app_.doc_.activePart)].id));
+    if (name == "coarse_unsafe") return double(app_.renderer_.coarseUnsafeClusters()); // pushed far from the built levels: in full
     if (name == "coarse_pending") return double(app_.renderer_.coarsePendingClusters()); // edited, levels not updated yet
     if (name == "panel_drag_scrolls") return double(ui::DragScrolls()); // #100: drags that scrolled a panel
     if (name == "panel_drag_scroll_y") return double(ui::DragScrollY());  // that panel's scroll after the last one

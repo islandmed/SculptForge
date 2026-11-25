@@ -1522,7 +1522,7 @@ private:
     // The channel chips of texture layer `layer` (a row under its name).
     Args drawLayerChannelChips(int layer); // the texture_layer_channel arguments to run (empty: nothing clicked)
     void registerPbrUiActions();
-    double benchmarkDrawMs(int frames); // PanelPbr.cpp: UI tests' draw_ms
+    double benchmarkDrawMs(int frames, bool moving = false); // PanelPbr.cpp: UI tests' draw_ms (moving: an orbit's frame)
     double pbrTestValue(const std::string& name) const; // UI test values (UiTest.cpp), NaN when not one of ours
     // Fill layers, Material Recipes and Mesh Maps (PanelFill.cpp).
     struct MeshMapJob;

@@ -50,7 +50,10 @@ expect_value coarse_clusters == 0
 shot coarse-live-move
 release
 wait 0.6
-expect_value coarse_clusters > 0
+# (a push of more than a few cells stretches the levels built before it: the clusters it moved draw in full, coarse_unsafe,
+# until the levels are rebuilt; the drag here is that big, so none are coarse)
+expect_value coarse_pending == 0
+expect_value coarse_unsafe > 0
 env SF_LIVE_MOVE_VERTICES 100000000
 env SF_LIVE_MOVE_REGION 100000
 

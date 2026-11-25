@@ -454,6 +454,36 @@ Mesh detailedSphere(size_t triangles) {
     return m;
 }
 
+// Level `level`'s coarse triangles of the clusters `use` accepts: how many face against their cells' normals (a fold: drawn
+// back-facing, so culled, a hole) and how many are longer than three of the level's cells (a stretched cell), of how many.
+struct CoarseShape {
+    size_t folded = 0, longer = 0, total = 0;
+};
+template <class Use>
+CoarseShape coarseShape(const CoarseLevels& L, int level, Use use) {
+    CoarseShape r;
+    const float cell = L.cell * float(1 << level);
+    for (uint32_t c = 0; c < L.clusters.size(); ++c) {
+        const CoarseLevels::Lod& lod = L.clusters[c];
+        if (lod.levels <= level || !use(c)) continue;
+        for (uint32_t i = lod.first[level]; i < lod.first[level] + lod.count[level]; i += 3) {
+            const glm::vec3 a = L.positions[L.indices[i]], b = L.positions[L.indices[i + 1]], d = L.positions[L.indices[i + 2]];
+            const glm::vec3 n = glm::cross(b - a, d - a);
+            const glm::vec3 sum = L.normals[L.indices[i]] + L.normals[L.indices[i + 1]] + L.normals[L.indices[i + 2]];
+            r.folded += glm::dot(n, sum) < 0.0f;
+            r.longer += std::max({glm::distance(a, b), glm::distance(b, d), glm::distance(d, a)}) > 3.0f * cell;
+            ++r.total;
+        }
+    }
+    return r;
+}
+
+std::vector<ClusterBounds> allBounds(const Mesh& m, const UploadOrder& order) {
+    std::vector<ClusterBounds> b(order.clusters().size());
+    for (uint32_t c = 0; c < b.size(); ++c) b[c] = clusterBounds(m, order, c);
+    return b;
+}
+
 } // namespace
 
 TEST(coarse_levels_closed_at_each_level_and_light) {
@@ -539,6 +569,55 @@ TEST(coarse_levels_follow_edits) {
     const std::vector<glm::vec3> after(L.positions);
     updateCoarseLevels(L, m, order, dirty);
     CHECK(L.positions == after);
+}
+
+TEST(coarse_levels_stale_clusters_draw_in_full) {
+    // Member bug (0.14.0, a posed dense Part: holes while orbiting): updateCoarseLevels keeps the build's cell membership, so
+    // big pushes (a posed arm) stretch cells and fold the coarse triangles over them; a fold faces away and is culled. The
+    // clusters that hold a vertex more than a few cells from where the levels were built, and those that share cells with them,
+    // are marked (unsafe) and draw in full; the others' coarse triangles fold no more than a fresh build's.
+    Mesh m = detailedSphere(1000000);
+    UploadOrder order;
+    order.build(m);
+    CoarseLevels L = buildCoarseLevels(m, order);
+    const float R = glm::length(m.positions[0]);
+    std::vector<uint32_t> dirty(order.clusters().size());
+    for (uint32_t c = 0; c < dirty.size(); ++c) dirty[c] = c;
+    // A push of a cell or two (a stroke's ordinary reach): nothing is stale.
+    {
+        Mesh small = m;
+        for (size_t v = 0; v < small.vertexCount(); ++v) small.positions[v] += small.normals[v] * (L.cell * 1.5f);
+        CoarseLevels S = buildCoarseLevels(m, order);
+        updateCoarseLevels(S, small, order, dirty);
+        CHECK(refreshCoarseUnsafe(S, allBounds(small, order)) == 0);
+    }
+    for (int s = 0; s < 3; ++s) {
+        const glm::vec3 centre = glm::normalize(glm::vec3(std::sin(float(s) * 1.3f), 0.6f - 0.2f * float(s), std::cos(float(s) * 1.7f))) * R;
+        const float radius = R * 0.3f;
+        for (size_t v = 0; v < m.vertexCount(); ++v) {
+            const float d = glm::distance(m.positions[v], centre);
+            if (d >= radius) continue;
+            const float t = 1.0f - d / radius;
+            m.positions[v] += m.normals[v] * (R * 0.25f * t * t * (3.0f - 2.0f * t));
+        }
+        m.recomputeAllNormals();
+    }
+    updateCoarseLevels(L, m, order, dirty);
+    const size_t unsafe = refreshCoarseUnsafe(L, allBounds(m, order));
+    const CoarseLevels F = buildCoarseLevels(m, order);
+    std::printf("  stale: %zu of %zu clusters in full\n", unsafe, L.clusters.size());
+    CHECK(unsafe > 0);
+    CHECK(unsafe < L.clusters.size());
+    for (int level = 0; level < 3; ++level) {
+        const CoarseShape all = coarseShape(L, level, [](uint32_t) { return true; });
+        const CoarseShape kept = coarseShape(L, level, [&](uint32_t c) { return !L.unsafe[c]; });
+        const CoarseShape fresh = coarseShape(F, level, [](uint32_t) { return true; });
+        std::printf("  level %d: updated %zu folded %zu long of %zu; coarse ones kept %zu folded %zu long of %zu; fresh build %zu folded %zu long of %zu\n",
+                    level, all.folded, all.longer, all.total, kept.folded, kept.longer, kept.total, fresh.folded, fresh.longer, fresh.total);
+        // No more folds than a fresh build has (its share of the kept triangles, with a little room), and no stretched triangle.
+        CHECK(double(kept.folded) <= 1.5 * double(fresh.folded) / double(std::max<size_t>(fresh.total, 1)) * double(kept.total) + 0.002 * double(kept.total));
+        CHECK(kept.longer == 0);
+    }
 }
 
 TEST(coarse_levels_carry_colour_and_mask) {

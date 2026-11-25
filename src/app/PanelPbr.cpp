@@ -416,16 +416,18 @@ void App::prewarmTexturePaint() {
 
 // Benchmarks (UI tests' print draw_ms): the 3D view drawn `frames` times into the window's framebuffer, waiting
 // for the GPU each time, in milliseconds per frame.
-double App::benchmarkDrawMs(int frames) {
+double App::benchmarkDrawMs(int frames, bool moving) {
     int w = 0, h = 0;
     SDL_GetWindowSizeInPixels(window_, &w, &h);
     if (w <= 0 || h <= 0) return 0.0;
     syncScene();
-    renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+    RenderSettings settings = renderSettings_;
+    settings.motionProxy = moving; // (an orbit's frame: the coarse levels and proxies)
+    renderer_.draw(camera_, w, h, settings, canvasViewport(w, h));
     gl::Finish();
     const Uint64 start = SDL_GetTicksNS();
     for (int i = 0; i < frames; ++i) {
-        renderer_.draw(camera_, w, h, renderSettings_, canvasViewport(w, h));
+        renderer_.draw(camera_, w, h, settings, canvasViewport(w, h));
         gl::Finish();
     }
     return double(SDL_GetTicksNS() - start) * 1e-6 / double(std::max(frames, 1));

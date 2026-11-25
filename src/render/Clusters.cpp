@@ -12,6 +12,7 @@
 #include <cstring>
 #include <map>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace sf {
@@ -378,6 +379,8 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
     const size_t nv = mesh.vertexCount(), nt = mesh.triangleCount();
     const uint32_t nc = uint32_t(order.clusters().size());
     L.clusters.resize(nc);
+    L.stale.assign(nc, 0);
+    L.unsafe.assign(nc, 0);
     if (nv == 0 || nt == 0 || nc == 0) return L;
     AABB box;
     for (const glm::vec3& p : mesh.positions) box.expand(p);
@@ -534,12 +537,23 @@ std::vector<uint32_t> updateCoarseLevels(CoarseLevels& L, const Mesh& mesh, cons
     // The level-0 cells of the dirty clusters' vertices (the build's cells: membership doesn't change).
     const size_t cells0 = L.levels[0].keys.size();
     std::vector<uint8_t> flagged(cells0, 0);
+    if (L.stale.size() != L.clusters.size()) L.stale.assign(L.clusters.size(), 0), L.unsafe.assign(L.clusters.size(), 0);
     poolFor(dirty.size(), [&](size_t d0, size_t d1) {
         for (size_t d = d0; d < d1; ++d) {
             const auto& cl = order.clusters()[dirty[d]];
+            bool far = false;
             for (uint32_t l = 0; l < cl.vertexCount; ++l)
-                if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv)
+                if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv) {
                     AtomicRef<uint8_t>(flagged[L.vertexCell[v] - base0]).store(1, std::memory_order_relaxed);
+                    if (!far) { // (bounded by the cluster: no pass over the mesh)
+                        const uint64_t was = L.levels[0].keys[L.vertexCell[v] - base0], now = cellKey(L, mesh.positions[v], 0);
+                        for (int axis = 0; axis < 3 && !far; ++axis) {
+                            const int a = int((was >> (21 * axis)) & 0x1FFFFF), b = int((now >> (21 * axis)) & 0x1FFFFF);
+                            far = std::abs(a - b) > L.staleCells;
+                        }
+                    }
+                }
+            if (dirty[d] < L.stale.size()) L.stale[dirty[d]] = far ? 1 : 0;
         }
     }, 16);
     std::vector<uint32_t> cells;
@@ -590,6 +604,50 @@ std::vector<uint32_t> updateCoarseLevels(CoarseLevels& L, const Mesh& mesh, cons
         cells = std::move(up);
     }
     return changed;
+}
+
+size_t refreshCoarseUnsafe(CoarseLevels& L, const std::vector<ClusterBounds>& bounds) {
+    const size_t nc = L.clusters.size();
+    L.unsafe.assign(nc, 0);
+    if (L.stale.size() != nc) L.stale.assign(nc, 0);
+    std::vector<uint32_t> staleList;
+    float biggest = 0.0f;
+    for (uint32_t c = 0; c < nc; ++c) {
+        if (L.stale[c]) staleList.push_back(c);
+        if (c < bounds.size()) biggest = std::max(biggest, bounds[c].radius);
+    }
+    if (staleList.empty()) return 0;
+    // A grid of the stale clusters' bounds, one cell wide enough that every cluster within reach is in the 27 around its own.
+    const float margin = L.cell * 2.0f, step = std::max(2.0f * biggest + margin, 1e-6f);
+    const auto key = [&](const glm::vec3& p) {
+        const glm::ivec3 q = glm::ivec3(glm::floor(p / step));
+        return uint64_t(uint32_t(q.x)) * 73856093u ^ uint64_t(uint32_t(q.y)) * 19349663u ^ uint64_t(uint32_t(q.z)) * 83492791u;
+    };
+    std::unordered_map<uint64_t, std::vector<uint32_t>> grid;
+    for (uint32_t c : staleList)
+        if (c < bounds.size() && bounds[c].radius >= 0.0f) grid[key(bounds[c].center)].push_back(c);
+    size_t count = 0;
+    for (uint32_t c = 0; c < nc; ++c) {
+        bool bad = L.stale[c] != 0;
+        if (!bad && c < bounds.size() && bounds[c].radius >= 0.0f) {
+            const glm::ivec3 q = glm::ivec3(glm::floor(bounds[c].center / step));
+            for (int dx = -1; dx <= 1 && !bad; ++dx)
+                for (int dy = -1; dy <= 1 && !bad; ++dy)
+                    for (int dz = -1; dz <= 1 && !bad; ++dz) {
+                        const glm::vec3 probe = (glm::vec3(q + glm::ivec3(dx, dy, dz)) + 0.5f) * step;
+                        const auto it = grid.find(key(probe));
+                        if (it == grid.end()) continue;
+                        for (uint32_t s : it->second)
+                            if (glm::distance(bounds[c].center, bounds[s].center) < bounds[c].radius + bounds[s].radius + margin) {
+                                bad = true;
+                                break;
+                            }
+                    }
+        }
+        L.unsafe[c] = bad ? 1 : 0;
+        count += bad;
+    }
+    return count;
 }
 
 bool coarseAttributesMatch(const CoarseLevels& L, const Mesh& mesh) {
