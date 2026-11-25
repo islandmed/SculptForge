@@ -288,8 +288,17 @@ void App::pumpSettle() {
             return;
         }
     }
+    // A press waited for the batch in flight: it goes now (a sculpt stroke takes the rest over, anything else lets it go on).
+    if (!drainQueue_.empty() && drainQueue_.front().first == kHeldPress) {
+        drainNextFrame_ = true;
+        return;
+    }
     // A shortcut waiting for the settle (queued, as for a stroke's end): the rest in one batch, then it runs.
-    startSettleBatch(drainQueue_.empty() ? std::max<size_t>(settleLeaves_, 1) : SIZE_MAX);
+    static const size_t fixedLeaves = [] { // (tests: SF_SETTLE_LEAVES fixes a batch's size, so a small mesh settles in several)
+        const char* v = std::getenv("SF_SETTLE_LEAVES");
+        return v && *v ? size_t(std::max(1, std::atoi(v))) : size_t(0);
+    }();
+    startSettleBatch(!drainQueue_.empty() ? SIZE_MAX : fixedLeaves ? fixedLeaves : std::max<size_t>(settleLeaves_, 1));
 }
 
 void App::finishSettle() {

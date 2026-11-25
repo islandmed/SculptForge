@@ -533,6 +533,7 @@ private:
     void finishSculpting();            // the stroke in progress ends (endStroke) and the last one's normals settle
     void settleForPress();             // a press: the settle batch in flight is committed (the rest is the new stroke's)
     bool strokeTakeOver_ = false;
+    bool strokeTookOver_ = false;      // (UI tests: taken_over; stays until the next stroke begins)
     double strokeFirstCommitAt_ = 0.0; // this stroke's first dabs on the GPU (steady_clock seconds; the bench's restroke_ms)      // this stroke took the last one's pending normals over: its first batch does them
     double settleStartAt_ = 0.0, settledAt_ = 0.0; // (steady_clock seconds: the bench's settled_ms)
     size_t settleLeaves_ = 0;          // leaves per settle batch (toward kSettleBatchSeconds of work)

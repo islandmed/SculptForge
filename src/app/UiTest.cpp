@@ -297,6 +297,8 @@
 //                            cells, and the Preferences > Interface values. With GOLDEN (relative to the script) the dump must equal
 //                            that file: a Classic default that moved fails; SF_UI_GOLDEN_UPDATE=1 rewrites it (on purpose, reviewed)
 //   action ID                run a registry action as its key, shelf tile or the command palette would
+//   action_interactive ID    the same as a person's click or shortcut (App::runInteractive): during a stroke's end or the
+//                            normals' settle it waits in the queue (drainQueue_) instead of finishing them first
 //   dialog_answer PATH|cancel   what the next file or folder dialog answers (none ever opens from a script:
 //                            NativeDialog.h; PATH relative to the script); values dialogs_requested (dialogs and URLs
 //                            asked for so far), dialog_kind (the last: 0 none, 1 open file, 2 save file, 3 open
@@ -2000,6 +2002,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "pen_y") return penAt_.y;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
     if (name == "normals_settling") return app_.doc_.sculptor.settling() ? 1.0 : 0.0; // (App::deferNormals)
+    if (name == "taken_over") return app_.strokeTookOver_ ? 1.0 : 0.0; // the last stroke began mid-settle and took it over
     if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
     if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
     if (name == "size_ring_value") return std::round(double(app_.sizeRingPreviewValue_) * 100.0) / 100.0;
@@ -2177,7 +2180,7 @@ void Demo::testKey(int line, const std::string& combo, int phase) {
 enum class StepVerb { None,
     SafeArea, AndroidBack, TouchDragAt, TouchTap,
     Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
-    AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
+    AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, ActionInteractive, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
     Orbit, Camera, Zoom, HideUi, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
@@ -2214,7 +2217,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"click_part", StepVerb::ClickPart},
         {"drag", StepVerb::Drag},
         {"button_drag", StepVerb::ButtonDrag},
-        {"action", StepVerb::Action},
+        {"action", StepVerb::Action}, {"action_interactive", StepVerb::ActionInteractive},
         {"set_shortcut", StepVerb::SetShortcut},
         {"expect_shortcut", StepVerb::ExpectShortcut},
         {"expect_popup_keys", StepVerb::ExpectPopupKeys},
@@ -2928,6 +2931,16 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             const Action* a = app_.actions_.find(id);
             if (!a || !a->run) fail(line, "no action " + id);
             else a->run();
+        });
+        wait(0.2f);
+        break;
+    }
+    case StepVerb::ActionInteractive: { // action_interactive ID: as a person runs it (runInteractive: queued while a stroke ends)
+        if (!need(1)) return false;
+        run([this, line, id = w[1]] {
+            const Action* a = app_.actions_.find(id);
+            if (!a || !a->run) fail(line, "no action " + id);
+            else app_.runInteractive(a->run);
         });
         wait(0.2f);
         break;

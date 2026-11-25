@@ -2213,13 +2213,17 @@ BrushType App::activeBrush() const {
 }
 
 void App::onMouseDown(float x, float y, Uint8 button) {
-    if (holdingPointer_ || strokeDraining() || !drainQueue_.empty()) { // the last stroke's dabs still being placed (or what waited for them): this press waits
+    // The last stroke's dabs still being placed (or what waited for them), or a settle batch of its normals running (the
+    // press goes once that one batch is in: a stroke then takes the rest over; waiting for it here froze the frame): this
+    // press waits.
+    const bool settleBatch = doc_.sculptor.settling() && solverBusy();
+    if (holdingPointer_ || strokeDraining() || settleBatch || !drainQueue_.empty()) {
         if (!holdingPointer_) drainQueue_.emplace_back(kHeldPress, Args{});
         holdingPointer_ = true;
         heldPointer_.push_back({HeldPointer::Down, x, y, 0.0f, 0.0f, button, false, pointerEventNs_ ? pointerEventNs_ : SDL_GetTicksNS()});
         mouseX_ = x;
         mouseY_ = y;
-        status_ = drainStatus();
+        if (!settleBatch) status_ = drainStatus(); // (a batch is a frame or two: no status for it)
         return;
     }
     if (strokeFinishing_) endStroke(); // (a stroke ending on this thread)
@@ -2953,6 +2957,7 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     // (Not Kelvinlet, Cloth or fused batches: their dabs reach past the ball Sculptor::flushInheritedAround works out.)
     strokeTakeOver_ = doc_.sculptor.settling() && asyncStrokeAllowed() && solver_ && !solver_->busy() && !kelvinStrokeBrush() &&
                       strokeBrush_ != BrushType::Cloth && !fastBigBrushes();
+    strokeTookOver_ = strokeTakeOver_;
     if (!strokeTakeOver_) settleNow();
     doc_.sculptor.takeOverSettle = strokeTakeOver_;
     if (!doc_.sculptor.beginStroke(doc_.mesh,
