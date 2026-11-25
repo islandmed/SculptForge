@@ -944,7 +944,8 @@ void registerPartCommands(CommandRegistry& reg) {
                  return {true, out};
              }});
 
-    reg.add({"part_duplicate", "Copy a Part (with its layers and attributes) and make the copy active.",
+    reg.add({"part_duplicate", "Copy a Part (with its layers and attributes) and make the copy active; the copy is "
+                               "numbered (Head -> Head.01, Head.02, ...).",
              {indexParam, nameParam},
              [](Document& doc, const Args& a) -> CommandResult {
                  const int i = targetPart(doc, a);
@@ -955,7 +956,7 @@ void registerPartCommands(CommandRegistry& reg) {
                  const uint32_t folder = doc.parts[size_t(i)].folder;
                  const glm::mat4 place = doc.parts[size_t(i)].transform;
                  const AiProvenance ai = doc.parts[size_t(i)].ai;
-                 const int added = doc.addPart(std::move(copy), doc.parts[size_t(i)].name + " copy", true, i + 1);
+                 const int added = doc.addPart(std::move(copy), doc.duplicatePartName(doc.parts[size_t(i)].name), true, i + 1);
                  doc.parts[size_t(added)].shading = shading;
                  doc.parts[size_t(added)].boolean = boolean; // (a copy of a cutter cuts too)
                  doc.parts[size_t(added)].folder = folder; // (right below it: the folder stays together)

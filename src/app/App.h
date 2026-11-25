@@ -244,6 +244,11 @@ private:
     std::optional<glm::vec3> lastStrokePoint() const;        // where a stroke last landed, in the scene, while it is still on a Part
     void noteStrokePoint(const glm::vec3& local);            // (the active Part's space)
     void frameLastStroke();                                  // the view.frame_last_stroke action
+    // Centre the view on the point under (x, y) keeping the zoom (Discord ask #209): the point (on any visible Part,
+    // else on the view plane through the orbit target) is panned to where the orbit target lands on screen; the eye
+    // moves across the view only, and the orbit target takes the point's depth. Alt+middle click (centreClick_), or
+    // the view.centre_pointer action at the pointer.
+    void centreViewOnPointer(float x, float y);
     float rollSweep(float x, float y, float dx, float dy) const; // radians the cursor turns around the canvas centre
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
     void onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat = false);
@@ -303,7 +308,8 @@ private:
     void openFileDialog();
     void saveFileDialog(FileAction action);
     AABB sceneBounds() const; // mesh plus the main body of any splats
-    // Floor grid (#115): keeps RenderSettings::floorHeight at the lowest point of the visible Parts. Measured again
+    // Floor grid (#115): keeps RenderSettings::floorHeight at the lowest point of the visible Parts (or at 0 with
+    // Floor grid at Y=0, UiPrefs::floorGridFixed). Measured again
     // only when the history, the Parts or their visibility changed and no stroke or drag is running (so the floor
     // doesn't follow each dab); App.cpp.
     void updateFloorHeight();
@@ -3516,6 +3522,13 @@ private:
         std::vector<size_t> found;
         int exportMenu = -1;     // the menu the export dialog was opened for
     } radialEdit_;
+    struct CentreClick { // Alt+middle press that hasn't moved past kRightClickSlop: a click centres the view on release
+        bool pending = false; // (the drag itself goes on as usual from the press: a pan or, with Blender keys, an orbit)
+        bool release = false; // the release being handled is the middle button's own (not another button's, a pen's or a touch's)
+        float x = 0.0f, y = 0.0f;
+        float dx = 0.0f, dy = 0.0f; // the motion since the press
+        float upX = 0.0f, upY = 0.0f; // where the middle button was let go (the release event's own position)
+    } centreClick_;
     struct RightClick {
         bool pending = false; // a right press that hasn't moved past the slop: navigation waits
         bool down = false;    // the right button is held (a second press for it is the driver's echo, not a click)

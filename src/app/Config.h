@@ -134,6 +134,9 @@ struct UiPrefs {
     bool backfaceCulling = false;
     // View > Display > Floor grid (#115): the grid on the ground plane (RenderSettings::floorGrid). Off by default.
     bool floorGrid = false;
+    // View > Display > Floor grid at Y=0 (Discord ask): the grid stays at world height zero instead of following the
+    // lowest point of the visible Parts. Off by default (the grid follows the model, as before).
+    bool floorGridFixed = false;
     // UV Editor > Pack > Columns x Rows (#135): the UDIM grid the last pack filled, the default for new projects.
     int uvPackColumns = 1, uvPackRows = 1;
     // Preferences > Interface > Mask darkness (and Tool > Masking): how strongly masked areas show, 0-1

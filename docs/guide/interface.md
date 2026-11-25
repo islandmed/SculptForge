@@ -214,7 +214,7 @@ turn on **Edit > Preferences > Interface > Palettes strictly A-Z (strict order)*
 | **Generate** | Mesh > Generate 3D (Mesh > From Image while Edit > Preferences > AI is off) | Generate 3D (image or text to 3D), Relief, Inflate and Stamp from an image, and the AI brush provider settings; with AI off only Relief, Inflate and Stamp |
 | **Material** | Render > Materials | The Lit Sphere materials (Soft Clay, the default, first), your own (**Load Lit Sphere...**) and Studio, Base colour, Smooth / Flat shading for the scene and the active Part |
 | **Preferences** | Edit > Preferences | Config, Interface, Input, Hotkeys, Display, Library, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
-| **Render** | View | Wireframe, Show Mesh, Show Vertex Paint, Show Mask, Show Face Groups, Floor grid, Show Splats, Background, Frame, Fullscreen |
+| **Render** | View | Wireframe, Show Mesh, Show Vertex Paint, Show Mask, Show Face Groups, Floor grid, Floor grid at Y=0, Show Splats, Background, Frame, Fullscreen |
 | **Script** | File > Script | Console, Run script file, Copy session as script, Clear console |
 | **Splats** | Render > Gaussian Splats | Gaussian splat tools: show, flip, turn, fit, clean floaters, Make sculptable, sculpt to splats, save, clear |
 | **Stroke** | Sculpt > Stroke | The stroke types (Dots, Drag Stamp, Spray, Lazy Stroke) and their settings |
@@ -665,7 +665,7 @@ layout saves itself.
 | **One sub-palette open** | On | Opening a sub-palette closes the others in that palette |
 | **Auto collapse left tray** / **right tray** | On / Off | Collapse other palettes in the tray when one wouldn't fit |
 | **Palettes strictly A-Z (strict order)** | Off | Classic layout: strict alphabetical palette bar instead of File and Edit first, Help last |
-| **Show newer menu rows** | Off in Classic, on in SculptForge | File > Render with..., Edit > Preferences > Scripts, Edit > Preferences > Render bridge and Tool > Scatter (added after 0.13.0); a feature you have set up keeps its row either way |
+| **Show newer menu rows** | Off in Classic, on in SculptForge | File > Render with..., Edit > Preferences > Scripts, Edit > Preferences > Render bridge, Tool > Scatter and View > Floor grid at Y=0 (added after 0.13.0); a feature you have set up keeps its row either way |
 | **Left-handed layout** | Off | Mirrors the shelves and trays: tools on the right, navigation on the left |
 | **UI scale** | Automatic | Size of text and controls, a slider from 70% to 300%, applied when you let it go; Automatic follows the monitor; remembered per monitor (see below) |
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |

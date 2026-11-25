@@ -1,0 +1,144 @@
+# Centre view on the pointer (#209): Alt+middle click on the canvas (press and let go without dragging) slides the point under
+# the pointer to the middle of the view, keeping the zoom (the eye keeps its depth: the model stays the same size) and the
+# angle; the orbit target takes that point's depth. Every key style: an Alt+middle drag still pans (Blender keys: orbits).
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=4
+key f
+wait 0.3
+expect_value camera_yaw == 0
+expect_value camera_target_x == 0
+remember camera_eye_z z0
+remember camera_distance d0
+shot before
+
+# A click on the sphere's right side: the target moves to +X, the eye slides across (its depth stays), the view does not turn.
+hold alt
+button_drag middle 0.48 0.5 0.48 0.5 0.05
+hold none
+expect_status Centred the view on the pointer
+expect_value camera_target_x > 0.2
+expect_value camera_eye_z == $z0
+expect_value camera_yaw == 0
+expect_value camera_pitch == 0
+# The orbit target took the surface's depth: nearer than the sphere's middle was.
+expect_value camera_distance < $d0
+remember camera_target_x tx1
+shot centred-on-model
+
+# A click beside the model centres on that spot of the background: a pan, the distance exactly as it was.
+key f
+wait 0.2
+remember camera_distance d1
+hold alt
+button_drag middle 0.2 0.5 0.2 0.5 0.05
+hold none
+expect_value camera_target_x < -0.5
+expect_value camera_distance == $d1
+expect_value camera_eye_z == $z0
+shot centred-on-background
+
+# An Alt+middle DRAG is still a pan (SculptForge and Classic keys), never a centring.
+key f
+wait 0.2
+remember camera_target_x tx0
+hold alt
+button_drag middle 0.4 0.5 0.6 0.5
+hold none
+expect_value camera_target_x != $tx0
+expect_value camera_yaw == 0
+input_style classic
+key f
+wait 0.2
+hold alt
+button_drag middle 0.4 0.5 0.6 0.5
+hold none
+expect_value camera_target_x != $tx0
+expect_value camera_yaw == 0
+hold alt
+button_drag middle 0.48 0.5 0.48 0.5 0.05
+hold none
+expect_status Centred the view on the pointer
+
+# Blender keys: Alt+middle drag orbits as before; the click centres.
+input_style blender
+key home
+wait 0.2
+hold alt
+button_drag middle 0.4 0.5 0.6 0.5
+hold none
+expect_value camera_yaw != 0
+key home
+wait 0.2
+remember camera_distance dbl
+hold alt
+button_drag middle 0.48 0.5 0.48 0.5 0.05
+hold none
+expect_status Centred the view on the pointer
+expect_value camera_distance < $dbl
+
+# Maya keys: Alt+middle drag pans; the click centres.
+input_style maya
+key f
+wait 0.2
+remember camera_target_x tm0
+hold alt
+button_drag middle 0.4 0.5 0.6 0.5
+hold none
+expect_value camera_target_x != $tm0
+key f
+wait 0.2
+hold alt
+button_drag middle 0.48 0.5 0.48 0.5 0.05
+hold none
+expect_status Centred the view on the pointer
+input_style sculptforge
+
+# Shift or Ctrl with it is not the gesture (Ctrl+middle zooms, as before).
+key f
+wait 0.2
+remember camera_distance d2
+remember camera_target_x tc0
+hold ctrl
+button_drag middle 0.48 0.5 0.48 0.5 0.05
+hold none
+expect_value camera_distance == $d2
+expect_value camera_target_x == $tc0
+
+# A pen in range with a button mapped to Middle (its press and release arrive as mouse events; artist-qa 11-24): a tap
+# centres; a drag never ends in a centring, whichever device carried its moves (a mouse's moves are strays while the pen
+# is in range, so here the view simply stays).
+key f
+wait 0.2
+remember camera_distance dp0
+remember camera_target_x tp0
+pen_hover 0.4 0.5 0.1
+hold alt
+button_drag middle 0.4 0.5 0.6 0.5
+hold none
+pen_out
+wait 0.2
+expect_value camera_distance == $dp0
+expect_value camera_target_x == $tp0
+pen_hover 0.48 0.5 0.1
+hold alt
+button_drag middle 0.48 0.5 0.48 0.5 0.05
+hold none
+pen_out
+wait 0.2
+expect_value camera_distance < $dp0
+
+# The action with a key of its own works at the pointer; from the palette (pointer off the canvas) it only says how.
+set_shortcut view.centre_pointer Ctrl+Alt+Shift+Y
+key f
+wait 0.2
+remember camera_distance dk
+remember camera_target_x tk
+mouse_move 0.48 0.5
+key ctrl+alt+shift+y
+expect_status Centred the view on the pointer
+expect_value camera_target_x != $tk
+expect_value camera_distance < $dk
+key f3
+type "##Command palette" "centre view on the pointer"
+key enter
+expect_status Centre view on the pointer: Alt+middle click

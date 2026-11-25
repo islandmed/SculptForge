@@ -214,9 +214,40 @@ TEST(part_merge_split_commands) {
     // Duplicate sits right below the original and is independent.
     CHECK(reg.execute(doc, "part_select", {{"index", 0.0}}).ok);
     CHECK(reg.execute(doc, "part_duplicate").ok);
-    CHECK(doc.activePart == 1 && doc.parts[1].name.find("copy") != std::string::npos);
+    CHECK(doc.activePart == 1 && doc.parts[1].name == doc.parts[0].name + ".01");
     CHECK(reg.execute(doc, "mask_all").ok);
     CHECK(!doc.partMesh(0).hasMask());
+}
+
+TEST(part_duplicate_numbered) { // Discord ask: "Head.01, Head.02", never "copy copy"
+    Document doc;
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "new_sphere", {{"subdivisions", 2.0}}).ok);
+    CHECK(reg.execute(doc, "part_rename", {{"to", std::string("Head")}}).ok);
+    CHECK(reg.execute(doc, "part_duplicate").ok);
+    CHECK(doc.parts[1].name == "Head.01");
+    // The copy's copy counts from the base, not "Head.01.01".
+    CHECK(reg.execute(doc, "part_duplicate").ok);
+    CHECK(doc.activePart == 2 && doc.parts[2].name == "Head.02");
+    // The original again: the next free number, right under it.
+    CHECK(reg.execute(doc, "part_duplicate", {{"index", 0.0}}).ok);
+    CHECK(doc.activePart == 1 && doc.parts[1].name == "Head.03");
+    // A number freed by a delete is used again before a new one.
+    CHECK(reg.execute(doc, "part_delete", {{"name", std::string("Head.02")}}).ok);
+    CHECK(reg.execute(doc, "part_duplicate", {{"name", std::string("Head")}}).ok);
+    CHECK(doc.parts[1].name == "Head.02");
+    CHECK(doc.duplicatePartName("Head.99") == "Head.04"); // (a numbered source counts from its base)
+    CHECK(doc.duplicatePartName("v1.2") == "v1.2.01");   // one digit after the dot is part of the name
+    CHECK(doc.duplicatePartName("Mk.II") == "Mk.II.01");
+    CHECK(doc.duplicatePartName(".01") == "Part.01");
+    // A wider number (a Blender-style "Cube.001") keeps its width.
+    doc.addPart(Mesh(), "Cube.001", false);
+    CHECK(doc.duplicatePartName("Cube.001") == "Cube.002");
+    // Past 99 the number just grows.
+    Document many;
+    CHECK(many.duplicatePartName("Eye") == "Eye.01");
+    for (int n = 1; n <= 99; ++n) many.addPart(Mesh(), "Eye." + std::string(n < 10 ? "0" : "") + std::to_string(n), false);
+    CHECK(many.duplicatePartName("Eye") == "Eye.100");
 }
 
 TEST(part_append_file) {

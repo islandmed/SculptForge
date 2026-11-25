@@ -394,6 +394,11 @@ void App::registerViewActions() {
         "Maya keys: Alt+F).", [this] { frameActivePart(); });
     add("view.frame_last_stroke", "Frame last stroke", "", "Move in on where you last sculpted (no key by default: bind one "
         "in Preferences > Hotkeys). The view keeps its angle; Frame fits the whole model.", [this] { frameLastStroke(); });
+    add("view.centre_pointer", "Centre view on the pointer", "",
+        "Slide the view so the point under the pointer is in the middle, keeping the zoom and the angle; the view then "
+        "turns about that point. Alt+middle click on the canvas does it in every key style (a drag still pans); this "
+        "action does the same at the pointer when you press its key (no key by default: bind one in Preferences > Hotkeys).",
+        [this] { centreViewOnPointer(mouseX_, mouseY_); });
     add("view.reset", "Reset view", "", "Back to the view a new model opens with: from the front, in perspective, "
         "the whole model in view (Maya keys: Alt+H).", [this] { resetView(); });
     // Saved views (from a review: "custom cam views, like Blender"): named cameras, kept with the project.
@@ -664,6 +669,36 @@ void App::notePressOnAnotherPart(float x, float y) {
     pressHintKey_ = key;
     pressHintNs_ = now;
     status_ = doc_.parts[size_t(other)].name + " is in front: Alt+Q selects it";
+}
+
+void App::centreViewOnPointer(float x, float y) {
+    // Run from a menu or the command palette, or with the pointer over a panel that floats on the canvas: not on the view.
+    if (ImGui::GetIO().WantCaptureMouse || !canvasRect().contains(x, y)) { // (as the canvas presses in App.cpp)
+        status_ = "Centre view on the pointer: Alt+middle click the canvas, or press its key with the pointer over the view";
+        return;
+    }
+    doc_.syncBvh();
+    RayHit hit;
+    glm::vec3 point;
+    if (pickPart(x, y, &hit) >= 0) point = hit.position; // any visible Part, where the pointer is
+    else { // the background: the point on the view plane through the orbit target (a pan to it, nothing else)
+        glm::vec3 origin, dir;
+        canvasRay(x, y, origin, dir);
+        const glm::vec3 f = camera_.forward();
+        const float along = glm::dot(dir, f);
+        if (!(std::abs(along) > 1e-6f)) return;
+        const float t = glm::dot(camera_.target - origin, f) / along;
+        if (!std::isfinite(t)) return;
+        point = origin + dir * t;
+    }
+    // Across the view only: the eye keeps its depth (the model stays the same size on screen), the point lands where
+    // the target does (the view's middle, or its free area's with a lens shift); then the orbit target takes its depth.
+    const glm::vec3 f = camera_.forward(), rel = point - camera_.position();
+    const glm::vec3 across = rel - f * glm::dot(rel, f);
+    if (!std::isfinite(across.x) || !std::isfinite(across.y) || !std::isfinite(across.z)) return;
+    camera_.target += across;
+    camera_.targetDepthOf(point);
+    status_ = "Centred the view on the pointer";
 }
 
 // Close in on the last stroke's place (the view's angle stays): a box round it a tenth the size of its Part.
