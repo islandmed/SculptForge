@@ -1,5 +1,5 @@
 ---
-fixed: **Android, Mali graphics chips**: a sphere past about 65k triangles no longer draws with a graphics-driver error, so the model stays visible after New Texture and the paint shows.
+fixed: **Android**: on graphics chips with a small buffer limit (some Mali tablets), a model with more than about 65,000 triangles no longer disappears, with or without a texture.
 testers:
   - Android with a Mali GPU (Mali-G72 first): Sphere at 5-6 subdivisions, Texture Image > Auto UV > New Texture, paint a stroke; the sphere stays visible and the paint shows.
     Confirmed on a Mali-G72 phone by a member (11-24, test build of this fix).
