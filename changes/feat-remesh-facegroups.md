@@ -4,8 +4,8 @@ whats_new: **Keep Face Groups** (Tool > Remesh, under Voxel Remesh): the new sur
   at the Part's detail, no dialog, one undo step (on the background <kbd>N</kbd> still remeshes the whole Part). Requested by members.
 highlight: Face groups survive Voxel Remesh; N-drag refreshes stretched topology
 added: **Keep Face Groups** (Tool > Remesh, beside Keep Masked; off by default): Voxel Remesh carries the Part's face groups
-  onto the new surface. Each new polygon takes the group of the original surface nearest its centre, stray polygons along a
-  border take their neighbours' group, so borders stay hard lines (stepped at the voxel size). Quick Remesh and Remesh after
+  onto the new surface. Each new polygon takes the group of the original surface nearest its centre, the border is relaxed at
+  the scale of the original triangles and stray polygons along it take their neighbours' group, so borders stay hard, clean lines. Quick Remesh and Remesh after
   each stroke follow the checkbox; command `remesh keep_groups=true`. Requested by a Founding Member.
 added: **Refresh the topology under the brush**: with Quick Remesh on, hold <kbd>N</kbd> (the Quick Remesh drag key) and
   drag on the model to remesh only the stretched triangles under the brush at the Part's detail (dynamic topology's edge

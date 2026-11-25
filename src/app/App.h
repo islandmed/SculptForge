@@ -887,7 +887,8 @@ private:
     bool voxelKeepGroups_ = false; // Voxel Remesh's Keep Face Groups (core/Voxel.h transferFaceGroups)
     static constexpr const char* kKeepGroupsHelp =
         "The new surface keeps the Part's face groups: each new polygon takes the group of the original surface "
-        "nearest its centre, so the borders stay hard lines (stepped at the voxel size). Off: one face group, as before. "
+        "nearest its centre, and the borders are relaxed at the scale of the original triangles, so they stay hard, clean lines. "
+        "Off: one face group, as before. "
         "Quad Remesh's Follow Face Groups does the same for quads.";
     static constexpr const char* kKeepMaskedHelp =
         "Masked areas keep their triangles exactly as they are (their detail too); only the rest is rebuilt, and "

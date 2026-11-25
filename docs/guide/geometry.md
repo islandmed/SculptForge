@@ -115,8 +115,9 @@ What happens to your data:
 - Mask and vertex paint are transferred from the nearest original vertex.
 - Hidden faces and UVs are reset (everything becomes visible). Hidden parts are remeshed too.
 - Face groups are reset to one group unless **Keep Face Groups** (under the button, off by default) is on: then each
-  new polygon takes the group of the original surface nearest its centre, so the groups come through with hard borders
-  (stepped at the voxel size, as the surface itself is) and no stray polygons along them. Quad Remesh's **Follow Face
+  new polygon takes the group of the original surface nearest its centre and the border is relaxed at the scale of
+  the original triangles, so the groups come through with hard, clean borders (a mask's edge drawn along coarse
+  triangles doesn't come through as their saw teeth) and no stray polygons along them. Quad Remesh's **Follow Face
   Groups** does the same for quads. Command: `remesh keep_groups=true`.
 - A painted texture is kept with **Keep Texture** (on by default, shown next to the button when the Part has a
   texture): the result gets Auto UVs and the texture is projected onto it, every layer included, in the same undo

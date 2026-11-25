@@ -18,6 +18,7 @@
 #include "core/CloseHoles.h"
 #include "core/HardwareProfile.h"
 #include "core/MemoryGuard.h"
+#include "core/QuickRemesh.h"
 #include "core/SurfaceQuery.h"
 #include "core/ThreadPool.h"
 #include "core/VoxelSparse.h"
@@ -1136,7 +1137,7 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
 }
 } // namespace
 
-void transferFaceGroups(const Mesh& source, Mesh& dst) {
+void transferFaceGroups(const Mesh& source, Mesh& dst, bool relaxBorders) {
     if (!source.hasFaceGroups() || source.facegroups.size() != source.triangleCount() || dst.triangleCount() == 0 ||
         source.triangleCount() == 0)
         return;
@@ -1210,6 +1211,86 @@ void transferFaceGroups(const Mesh& source, Mesh& dst) {
         i = j;
     }
     std::vector<EdgeRef>().swap(edges);
+    auto isBorder = [&](uint32_t t) {
+        for (uint8_t k = 0; k < nbCount[t]; ++k)
+            if (groups[nb[t][k]] != groups[t]) return true;
+        return false;
+    };
+    if (relaxBorders) {
+        // The border, relaxed at the scale of the source's triangles: a border drawn along coarse triangles (a mask's
+        // edge on a 5k-triangle sphere) comes through as their saw teeth, several polygons deep at a fine resolution.
+        // Each border polygon takes the group that weighs most among the polygons within one source edge of it
+        // (Gaussian weights, over the polygon graph), which is the mid-line of the teeth; borders between big regions
+        // stay where they are. A group that would lose half its polygons (a stripe thinner than the source's
+        // triangles) keeps its polygons as the nearest transfer gave them.
+        // (Teeth are up to half a source edge deep: the kernel's sigma is a source edge and it reaches two, so a polygon
+        // inside a tooth sees mostly the other side; everything within reach of the border is re-decided, not just the
+        // border ring, or a tooth's inside would be left as an island.)
+        const float sourceEdge = std::max(typicalEdgeLength(source), 2.0f * typicalEdgeLength(dst));
+        const float reachR = 2.0f * sourceEdge;
+        const float polyEdge = std::max(typicalEdgeLength(dst), 1e-12f);
+        const int depth = int(std::ceil(reachR / polyEdge)) + 1;
+        const float sigma2 = 2.0f * sourceEdge * sourceEdge;
+        std::vector<glm::vec3> centres(nt);
+        for (uint32_t t : polys) centres[t] = centre(t);
+        std::vector<uint32_t> border; // the band: every polygon within `depth` rings of a border polygon
+        {
+            std::vector<uint8_t> inBand(nt, 0);
+            std::vector<uint32_t> frontier;
+            for (uint32_t t : polys)
+                if (isBorder(t)) inBand[t] = 1, frontier.push_back(t);
+            for (int d = 0; d < depth && !frontier.empty(); ++d) {
+                std::vector<uint32_t> next;
+                for (uint32_t t : frontier)
+                    for (uint8_t k = 0; k < nbCount[t]; ++k)
+                        if (!inBand[nb[t][k]]) inBand[nb[t][k]] = 1, next.push_back(nb[t][k]);
+                frontier.swap(next);
+            }
+            for (uint32_t t : polys)
+                if (inBand[t]) border.push_back(t);
+        }
+        std::vector<uint32_t> relaxed(border.size());
+        poolFor(border.size(), [&](size_t b, size_t e) {
+            std::vector<std::pair<uint32_t, int>> queue;
+            std::unordered_map<uint32_t, uint8_t> seen;
+            std::vector<std::pair<uint32_t, float>> weight; // group, weight
+            for (size_t i = b; i < e; ++i) {
+                const uint32_t p = border[i];
+                queue.clear(), seen.clear(), weight.clear();
+                queue.emplace_back(p, 0);
+                seen.emplace(p, 1);
+                for (size_t q = 0; q < queue.size(); ++q) {
+                    const auto [t, d] = queue[q];
+                    const glm::vec3 dv = centres[t] - centres[p];
+                    const float dist2 = glm::dot(dv, dv);
+                    if (dist2 > reachR * reachR) continue;
+                    const float w = std::exp(-dist2 / sigma2);
+                    bool found = false;
+                    for (auto& [g, sum] : weight)
+                        if (g == groups[t]) sum += w, found = true;
+                    if (!found) weight.emplace_back(groups[t], w);
+                    if (d >= depth) continue;
+                    for (uint8_t k = 0; k < nbCount[t]; ++k)
+                        if (seen.emplace(nb[t][k], 1).second) queue.emplace_back(nb[t][k], d + 1);
+                }
+                uint32_t best = groups[p];
+                float bestW = -1.0f;
+                for (const auto& [g, sum] : weight)
+                    if (sum > bestW || (sum == bestW && g == groups[p])) bestW = sum, best = g;
+                relaxed[i] = best;
+            }
+        });
+        std::unordered_map<uint32_t, int64_t> count, delta; // per group: polygons now, and the relax's change
+        for (uint32_t t : polys) ++count[groups[t]];
+        for (size_t i = 0; i < border.size(); ++i)
+            if (relaxed[i] != groups[border[i]]) --delta[groups[border[i]]], ++delta[relaxed[i]];
+        std::unordered_map<uint32_t, bool> keep; // groups the relax would halve keep their polygons
+        for (const auto& [g, n] : count) keep[g] = delta[g] < 0 && n + delta[g] < n / 2;
+        for (size_t i = 0; i < border.size(); ++i) {
+            const uint32_t from = groups[border[i]], to = relaxed[i];
+            if (to != from && !keep[from]) groups[border[i]] = to;
+        }
+    }
     // Cleanup: a polygon whose group differs from every neighbour's, with the neighbours agreeing, takes theirs. Two
     // passes catch a 2-polygon speck; a real sliver of a group (a ring one polygon wide) has neighbours of its own group.
     for (int pass = 0; pass < 2; ++pass) {

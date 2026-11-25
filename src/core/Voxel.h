@@ -95,10 +95,12 @@ Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error = nullptr,
                  const std::function<bool(float)>& progress = {}, bool allowSwap = false, bool keepGroups = false);
 
 // Face groups of `source` carried onto a rebuilt surface `dst` (Keep Face Groups): each polygon of `dst` (a quad pair
-// from Mesh::quadPartners, else a triangle) takes the group of the source triangle nearest its centre, then isolated
-// polygons whose edge neighbours all agree on another group take that one (no salt and pepper along a border; a border
-// stays a hard line, one group per polygon). Nothing happens when `source` has no face groups. Safe to call from a
-// worker thread (read-only on `source`).
-void transferFaceGroups(const Mesh& source, Mesh& dst);
+// from Mesh::quadPartners, else a triangle) takes the group of the source triangle nearest its centre; with `relaxBorders`
+// the border is then relaxed at the scale of the source's triangles (each border polygon takes the group that weighs
+// most among the polygons within one source edge of it, so the saw teeth of a border drawn along coarse triangles
+// read as a clean line; a group that would lose half its polygons keeps them); finally isolated polygons whose edge
+// neighbours all agree on another group take that one. A border stays a hard line, one group per polygon. Nothing
+// happens when `source` has no face groups. Safe to call from a worker thread (read-only on `source`).
+void transferFaceGroups(const Mesh& source, Mesh& dst, bool relaxBorders = true);
 
 } // namespace sf

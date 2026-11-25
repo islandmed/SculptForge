@@ -158,6 +158,47 @@ TEST(voxel_remesh_keep_face_groups_invariant_hard_borders) {
     CHECK(maskedUp > 0 && maskedDown < maskedUp / 20 + 8);
 }
 
+// The border of the kept groups, relaxed at the scale of the source triangles: a mask's edge drawn along a coarse
+// sphere's triangles comes through as a clean line, not their saw teeth; a stripe thinner than those triangles survives.
+TEST(voxel_remesh_keep_face_groups_invariant_border_relax) {
+    Mesh m = makeIcosphere(4, 1.0f);
+    groupBy(m, [](const glm::vec3& c) { return c.y > 0.0f ? 7u : 3u; });
+    std::string err;
+    Mesh raw = voxelRemesh(m, 160, &err); // (voxels 8x smaller than the source triangles: the teeth are 3-4 voxels deep)
+    CHECK(raw.triangleCount() > 0);
+    Mesh relaxed = raw;
+    transferFaceGroups(m, raw, false);
+    transferFaceGroups(m, relaxed, true);
+    // Polygons on the wrong side of y = 0 by more than `cells` voxels: the raw transfer follows the source triangles'
+    // saw teeth (half a source edge deep); the relaxed border sits within a voxel or two of the mid-line.
+    const float cell = 2.0f / 160.0f;
+    auto wrongBeyond = [&](const Mesh& out, float cells) {
+        size_t n = 0;
+        for (uint32_t t = 0; t < out.triangleCount(); ++t) {
+            const float y = centroid(out, t).y;
+            n += (out.facegroups[t] == 7u) != (y > 0.0f) && std::abs(y) > cells * cell;
+        }
+        return n;
+    };
+    std::printf("  border relax: wrong side beyond 1 / 2 cells: raw %zu / %zu, relaxed %zu / %zu (cell %.4f, source edge %.4f)\n",
+                wrongBeyond(raw, 1.0f), wrongBeyond(raw, 2.0f), wrongBeyond(relaxed, 1.0f), wrongBeyond(relaxed, 2.0f), cell,
+                typicalEdgeLength(m));
+    CHECK(groupsOf(relaxed) == (std::set<uint32_t>{3u, 7u}));
+    CHECK(specks(relaxed) == 0);
+    CHECK(wrongBeyond(raw, 2.0f) > 100);          // the teeth are there to remove
+    CHECK(wrongBeyond(relaxed, 2.0f) == 0);
+    CHECK(wrongBeyond(relaxed, 1.0f) < relaxed.triangleCount() / 200); // (the voxel staircase itself: within two voxels)
+    // A stripe of its own group, thinner than the source's triangles: it keeps its polygons (never relaxed away).
+    Mesh striped = makeIcosphere(4, 1.0f);
+    groupBy(striped, [](const glm::vec3& c) { return std::abs(c.y) < 0.05f ? 5u : c.y > 0.0f ? 7u : 3u; });
+    const Mesh out = voxelRemesh(striped, 96, &err, {}, false, true);
+    CHECK(groupsOf(out) == (std::set<uint32_t>{3u, 5u, 7u}));
+    size_t stripe = 0;
+    for (uint32_t g : out.facegroups) stripe += g == 5u;
+    std::printf("  stripe group: %zu of %zu triangles\n", stripe, out.triangleCount());
+    CHECK(stripe > out.triangleCount() / 40);
+}
+
 TEST(voxel_remesh_keep_face_groups_sparse_and_open) {
     // The brick grid (above 512 in the app; forced low here) and an open mesh (capped first) keep the groups the same way.
     Mesh m = makeIcosphere(4, 1.0f);
