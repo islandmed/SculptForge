@@ -1692,7 +1692,7 @@ private:
         std::shared_ptr<std::atomic<float>> progress;
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<Mesh> result;
-        std::shared_ptr<std::string> error, note;
+        std::shared_ptr<std::string> error, note, lead; // (lead: before the message, e.g. Voxel Remesh's Resolution hint)
         uint32_t part = 0;
         size_t triangles = 0;
         int resolution = 200;

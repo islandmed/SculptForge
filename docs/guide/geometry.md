@@ -87,6 +87,11 @@ Two thirds of the slider covers 32 to 512, the everyday range; the last third go
 (Ctrl+click it to type a number). The line under it estimates the result, *About 1.6M triangles*, from the Part's
 surface area (fine detail smaller than a voxel counts there, so a dense scan comes out somewhat lower).
 
+Creases and hard edges a little wider than the voxels (wrinkles, eyelid and lip lines) keep a clean, even line. A
+crease narrower than about two voxels can't be held at that Resolution: when a remesh loses a good share of such
+creases, the status line starts *Resolution 384 keeps fine creases (about 1.1M triangles)*. Undo, set that
+Resolution and remesh again to keep them. The hint only appears when that Resolution fits in the free memory.
+
 512 is safe on an 8 GB computer: a 28M-triangle scan remeshes at 512 in about 8 s (14 s on 4 cores) into about
 760,000 triangles; a round 2M-triangle sculpt, which fills its box, in about 3 s (5 s on 4 cores) into about 2.5
 million triangles, with about 2 GB of memory at its peak.

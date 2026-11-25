@@ -77,6 +77,8 @@ VoxelRemeshEstimate estimateVoxelRemesh(const Mesh& mesh, int resolution, double
 
 // Tests: above this resolution voxelRemesh uses the brick grid (default kVoxelDenseMax).
 void setVoxelSparseAbove(int resolution);
+// Tests: whether voxelRemesh sharpens creases finer than its voxels (default on; Voxel.cpp snapCreases, gh#240).
+void setVoxelCreaseSnap(bool on);
 
 // Rebuilds the mesh as an even, watertight surface (`resolution` cells across
 // its longest side). Overlapping parts are merged. Sculpt layers are baked. Open borders (a neck, a cut) are capped
@@ -89,7 +91,17 @@ void setVoxelSparseAbove(int resolution);
 // and which Resolution would fit. `allowSwap`: the person agreed to one that is past the free memory but within RAM +
 // swap (core/MemoryGuard.h, MemoryTier::NeedsSwap); past that it still refuses. Running out of memory midway
 // (bad_alloc) is caught: an empty result, `error` says so, the source is never touched.
+// `notes` (optional): what the remesh noticed. creaseResolution > 0 when a good share of the creases are finer than
+// two voxels (the crease pass couldn't follow them): the Resolution that makes them two voxels wide, when it fits the
+// free memory (0 otherwise, also when the result is fine), with about how many triangles it makes.
+struct VoxelRemeshNotes {
+    int creaseResolution = 0;
+    size_t creaseTriangles = 0;
+};
 Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error = nullptr,
-                 const std::function<bool(float)>& progress = {}, bool allowSwap = false);
+                 const std::function<bool(float)>& progress = {}, bool allowSwap = false, VoxelRemeshNotes* notes = nullptr);
+// The start of the status line for `notes` ("Resolution 512 keeps fine creases (about 1.2M triangles). ", then
+// "Remeshed to ..."), or "": first, so the number shows when a long message is cut short.
+std::string voxelRemeshNote(const VoxelRemeshNotes& notes);
 
 } // namespace sf

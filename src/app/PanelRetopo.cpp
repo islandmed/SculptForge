@@ -461,6 +461,7 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     job->result = std::make_shared<Mesh>();
     job->error = std::make_shared<std::string>();
     job->note = std::make_shared<std::string>();
+    job->lead = std::make_shared<std::string>();
     job->part = doc_.activePartInfo().id;
     job->triangles = doc_.mesh.triangleCount();
     job->resolution = voxelResolution_;
@@ -486,15 +487,17 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     }
     std::thread([promise = std::move(promise), source = std::move(source), res = job->resolution, allowSwap,
                  progress = job->progress, cancel = job->cancel, result = job->result, error = job->error,
-                 note = job->note, keep = std::move(keep), texture, keepTexture = keepTexture_]() mutable {
+                 note = job->note, lead = job->lead, keep = std::move(keep), texture, keepTexture = keepTexture_]() mutable {
         bool ok = false;
         try {
             progress->store(0.02f);
             const float remeshShare = texture ? 0.13f : 0.9f; // the rest: Keep Masked, then the texture's Auto UV
+            VoxelRemeshNotes notes;
             *result = voxelRemesh(*source, res, error.get(), [&](float f) {
                 progress->store(0.02f + remeshShare * f);
                 return !cancel->load();
-            }, allowSwap);
+            }, allowSwap, &notes);
+            *lead = voxelRemeshNote(notes); // (first on the status line: a long one is cut short)
             ok = result->triangleCount() > 0;
             if (ok && !keep.empty()) { // Keep Masked: the masked part goes back in, joined to the new surface
                 Mesh stitched;
@@ -578,9 +581,10 @@ void App::pollVoxelRemesh() {
         lastCommandOk_ = false;
         return;
     }
-    CommandResult r{true, std::string(job->trigger == RemeshTrigger::Quick         ? "Quick Remesh: remeshed"
-                                      : job->trigger == RemeshTrigger::AfterStroke ? "Remeshed after the stroke"
-                                                                                   : "Remeshed") +
+    CommandResult r{true, *job->lead +
+                              std::string(job->trigger == RemeshTrigger::Quick         ? "Quick Remesh: remeshed"
+                                          : job->trigger == RemeshTrigger::AfterStroke ? "Remeshed after the stroke"
+                                                                                       : "Remeshed") +
                               " to " + std::to_string(doc_.mesh.triangleCount()) + " triangles" + *job->note};
     if (job->trigger != RemeshTrigger::Button) r.message += " (resolution " + std::to_string(job->resolution) + "; " +
                                                           actions_.shortcutText("edit.undo") + " undoes it)";

@@ -2116,7 +2116,11 @@ void App::drawStatusBar(const ShellGeometry& g) {
         if (!msg.empty() && avail > 60.0f * s) {
             const bool error = !layout_.customize && !lastCommandOk_ && ImGui::GetTime() - statusSince_ < 6.0;
             const std::string text = (style == Status::Terminal ? "> " : "") + msg;
-            textAt(monoSmall, menusEnd, error ? theme::danger : theme::textDim, elide(monoSmall, text, avail));
+            const std::string shown = elide(monoSmall, text, avail);
+            textAt(monoSmall, menusEnd, error ? theme::danger : theme::textDim, shown);
+            // Cut short: the whole message on hover (as the status bar's), e.g. a remesh's notes at the end.
+            if (shown != text && ImGui::IsMouseHoveringRect(ImVec2(menusEnd, o.y), ImVec2(menusEnd + avail, o.y + h)))
+                ImGui::SetTooltip("%s", msg.c_str());
         }
     }
 

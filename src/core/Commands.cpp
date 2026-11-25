@@ -303,11 +303,12 @@ CommandRegistry::CommandRegistry() {
              const bool keeping = std::find(keep.begin(), keep.end(), 1) != keep.end();
              if (keeping && std::find(keep.begin(), keep.end(), 0) == keep.end())
                  return {false, "Remesh: everything is masked, so nothing would change"};
+             VoxelRemeshNotes notes;
              Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), kVoxelResolutionMin, kVoxelResolutionMax), &err,
                                   [](float f) { // (progress and cancel for an MCP call, core/OpControl.h)
                                       opProgress(0.9f * f, "Remeshing");
                                       return !opCancelled();
-                                  });
+                                  }, false, &notes);
              if (m.triangleCount() == 0) return {false, err};
              if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
              std::string keepNote;
@@ -320,7 +321,7 @@ CommandRegistry::CommandRegistry() {
              if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
              const std::string texture = carryTextureNote(doc.mesh, m, argBool(a, "keep_texture", true));
              doc.replaceMeshUndoable(std::move(m), "Remesh", true);
-             return {true, "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture +
+             return {true, voxelRemeshNote(notes) + "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture +
                            (keepNote.empty() ? "" : "; Keep masked: " + keepNote)};
          }});
 
