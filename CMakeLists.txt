@@ -1234,6 +1234,14 @@ if(SCULPTFORGE_BUILD_TESTS)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
       set_tests_properties(release_script_beta PROPERTIES TIMEOUT 300)
     endif()
+    # release.sh's guide check before the bump (a colon in the What's New tagline stops the stage at once, not an hour in), and T0's
+    # gallery gate (a branch changing tools/brush-gallery/repo must match the public gallery repo first).
+    if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+      add_test(NAME release_guide_check COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_guide_check_test.sh)
+      set_tests_properties(release_guide_check PROPERTIES TIMEOUT 120)
+      add_test(NAME gallery_gate COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/gallery_gate_test.sh)
+      set_tests_properties(gallery_gate PROPERTIES TIMEOUT 60)
+    endif()
     # release.sh's one rerun of a CI run red in a test step: flaky.md row when it passes, red and named when it fails again.
     if(UNIX AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
       add_test(NAME release_rerun COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_rerun_test.sh)
