@@ -478,11 +478,6 @@ CoarseShape coarseShape(const CoarseLevels& L, int level, Use use) {
     return r;
 }
 
-std::vector<ClusterBounds> allBounds(const Mesh& m, const UploadOrder& order) {
-    std::vector<ClusterBounds> b(order.clusters().size());
-    for (uint32_t c = 0; c < b.size(); ++c) b[c] = clusterBounds(m, order, c);
-    return b;
-}
 
 } // namespace
 
@@ -589,7 +584,7 @@ TEST(coarse_levels_stale_clusters_draw_in_full) {
         for (size_t v = 0; v < small.vertexCount(); ++v) small.positions[v] += small.normals[v] * (L.cell * 1.5f);
         CoarseLevels S = buildCoarseLevels(m, order);
         updateCoarseLevels(S, small, order, dirty);
-        CHECK(refreshCoarseUnsafe(S, allBounds(small, order)) == 0);
+        CHECK(refreshCoarseUnsafe(S) == 0);
     }
     for (int s = 0; s < 3; ++s) {
         const glm::vec3 centre = glm::normalize(glm::vec3(std::sin(float(s) * 1.3f), 0.6f - 0.2f * float(s), std::cos(float(s) * 1.7f))) * R;
@@ -603,7 +598,7 @@ TEST(coarse_levels_stale_clusters_draw_in_full) {
         m.recomputeAllNormals();
     }
     updateCoarseLevels(L, m, order, dirty);
-    const size_t unsafe = refreshCoarseUnsafe(L, allBounds(m, order));
+    const size_t unsafe = refreshCoarseUnsafe(L);
     const CoarseLevels F = buildCoarseLevels(m, order);
     std::printf("  stale: %zu of %zu clusters in full\n", unsafe, L.clusters.size());
     CHECK(unsafe > 0);

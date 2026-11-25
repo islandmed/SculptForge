@@ -101,13 +101,16 @@ struct CoarseLevels {
     std::vector<float> mask;
     std::vector<uint32_t> indices;             // into positions (the renderer frees them once on the GPU)
     std::vector<Lod> clusters;
-    // Stale cells (gh: holes in a posed dense Part while orbiting): the build's cell membership is kept through edits, so a push
-    // that carries vertices more than `staleCells` cells from where they were built stretches their cells and folds the coarse
-    // triangles over them (a folded triangle faces away: culled, a hole). `stale[c]`: a vertex of cluster c is that far from its
-    // build cell (set by updateCoarseLevels for the clusters it is given); `unsafe[c]`: c is stale, or within a cell or two of a
-    // stale cluster (it shares cells with it): both draw in full (refreshCoarseUnsafe).
-    int staleCells = 3; // (measured, test coarse_levels_stale_clusters_draw_in_full: no fold or stretched triangle is left in clusters under it)
-    std::vector<uint8_t> stale, unsafe;
+    // Pushed vertices (holes in a posed dense Part while orbiting): the build's cell membership is kept through edits, so a vertex
+    // carried more than `staleCells` cells from its build cell drags the point of every cell it is in (and the cells above), and
+    // the coarse triangles round that point stretch and fold (a fold faces away: culled, a hole; the stretched ones show as
+    // dark patches). `vertexFar` says which vertices are that far (set by updateCoarseLevels for the clusters it is given),
+    // `cellFar` counts them per cell up the levels, `clusterCells` lists each cluster's cells at all its levels: a cluster
+    // that uses a cell with a far vertex is `unsafe` and draws in full (refreshCoarseUnsafe).
+    int staleCells = 3; // (measured, test coarse_levels_stale_clusters_draw_in_full: no fold or stretched triangle is left in the others)
+    std::vector<uint8_t> vertexFar, unsafe;
+    std::vector<uint32_t> cellFar;
+    std::vector<uint32_t> clusterCellsFirst, clusterCells; // CSR, sorted and unique per cluster
     // Membership is the build's: an edit moves the cells' points (the means of their vertices where they are now),
     // never which cell a vertex is in, so the triangles stay as built and the surface stays closed.
     std::vector<uint32_t> vertexCell;              // per mesh vertex: its level-0 cell (into positions)
@@ -123,9 +126,8 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order);
 // vertices where they are now, and of their cells up the levels. Returns the cells changed.
 std::vector<uint32_t> updateCoarseLevels(CoarseLevels& levels, const Mesh& mesh, const UploadOrder& order,
                                          const std::vector<uint32_t>& dirty);
-// Which clusters can't draw coarse (CoarseLevels::unsafe): the stale ones and those whose bounds come within two level-0 cells of one.
-// `bounds` are the renderer's culling bounds (one per cluster; radius < 0: none). Returns how many are unsafe.
-size_t refreshCoarseUnsafe(CoarseLevels& levels, const std::vector<ClusterBounds>& bounds);
+// Which clusters can't draw coarse (CoarseLevels::unsafe): those that use a cell with a pushed vertex in it. Returns how many.
+size_t refreshCoarseUnsafe(CoarseLevels& levels);
 // The cells' colours and mask from the mesh's: of the level-0 cells `cells0` (cell ids into positions; empty: all)
 // and their cells up the levels. Where the mesh gained or lost colours or a mask since, every cell's.
 void coarseAttributes(CoarseLevels& levels, const Mesh& mesh, std::vector<uint32_t> cells0 = {});

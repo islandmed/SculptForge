@@ -4389,7 +4389,7 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
     const std::vector<uint32_t> changed = updateCoarseLevels(*s.coarse, mesh, s.order, s.coarsePending);
     // (clusters pushed far from where the levels were built draw in full; SF_COARSE_NO_STALE=1: as before, to compare)
     static const bool noStale = std::getenv("SF_COARSE_NO_STALE") != nullptr;
-    const size_t unsafe = noStale ? 0 : refreshCoarseUnsafe(*s.coarse, s.bounds);
+    const size_t unsafe = noStale ? 0 : refreshCoarseUnsafe(*s.coarse);
     gl::BindVertexArray(s.coarseVao);
     if (!changed.empty()) uploadCoarsePoints(s), uploadCoarseAttributes(s);
     gl::BindVertexArray(0);

@@ -12,7 +12,6 @@
 #include <cstring>
 #include <map>
 #include <tuple>
-#include <unordered_map>
 #include <vector>
 
 namespace sf {
@@ -379,7 +378,6 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
     const size_t nv = mesh.vertexCount(), nt = mesh.triangleCount();
     const uint32_t nc = uint32_t(order.clusters().size());
     L.clusters.resize(nc);
-    L.stale.assign(nc, 0);
     L.unsafe.assign(nc, 0);
     if (nv == 0 || nt == 0 || nc == 0) return L;
     AABB box;
@@ -486,7 +484,7 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
     }
     coarseAttributes(L, mesh);
     // Per cluster, its levels while they pay.
-    std::vector<std::vector<uint32_t>> lists(nc);
+    std::vector<std::vector<uint32_t>> lists(nc), cellLists(nc);
     poolFor(nc, [&](size_t c0, size_t c1) {
         std::vector<std::array<uint32_t, 3>> tris;
         for (size_t c = c0; c < c1; ++c) {
@@ -503,11 +501,24 @@ CoarseLevels buildCoarseLevels(const Mesh& mesh, const UploadOrder& order) {
                 lod.error[lod.levels] = std::max(error, lod.levels > 0 ? lod.error[lod.levels - 1] : 0.0f);
                 ++lod.levels;
                 for (const auto& m : tris) lists[c].insert(lists[c].end(), m.begin(), m.end());
+                for (const auto& m : tris) cellLists[c].insert(cellLists[c].end(), m.begin(), m.end());
                 previous = tris.size();
             }
             lists[c].shrink_to_fit();
+            std::sort(cellLists[c].begin(), cellLists[c].end());
+            cellLists[c].erase(std::unique(cellLists[c].begin(), cellLists[c].end()), cellLists[c].end());
+            cellLists[c].shrink_to_fit();
         }
     }, 16, 1);
+    L.clusterCellsFirst.assign(size_t(nc) + 1, 0);
+    for (uint32_t c = 0; c < nc; ++c) L.clusterCellsFirst[c + 1] = L.clusterCellsFirst[c] + uint32_t(cellLists[c].size());
+    L.clusterCells.reserve(L.clusterCellsFirst[nc]);
+    for (uint32_t c = 0; c < nc; ++c) {
+        L.clusterCells.insert(L.clusterCells.end(), cellLists[c].begin(), cellLists[c].end());
+        std::vector<uint32_t>().swap(cellLists[c]);
+    }
+    L.vertexFar.assign(nv, 0);
+    L.cellFar.assign(L.positions.size(), 0);
     size_t total = 0;
     for (const auto& l : lists) total += l.size();
     L.indices.reserve(total);
@@ -537,25 +548,37 @@ std::vector<uint32_t> updateCoarseLevels(CoarseLevels& L, const Mesh& mesh, cons
     // The level-0 cells of the dirty clusters' vertices (the build's cells: membership doesn't change).
     const size_t cells0 = L.levels[0].keys.size();
     std::vector<uint8_t> flagged(cells0, 0);
-    if (L.stale.size() != L.clusters.size()) L.stale.assign(L.clusters.size(), 0), L.unsafe.assign(L.clusters.size(), 0);
-    poolFor(dirty.size(), [&](size_t d0, size_t d1) {
-        for (size_t d = d0; d < d1; ++d) {
-            const auto& cl = order.clusters()[dirty[d]];
-            bool far = false;
-            for (uint32_t l = 0; l < cl.vertexCount; ++l)
-                if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv) {
-                    AtomicRef<uint8_t>(flagged[L.vertexCell[v] - base0]).store(1, std::memory_order_relaxed);
-                    if (!far) { // (bounded by the cluster: no pass over the mesh)
+    if (L.vertexFar.size() != nv) L.vertexFar.assign(nv, 0), L.cellFar.assign(L.positions.size(), 0);
+    // Which vertices of the dirty clusters are carried far from their build cell (bounded by those clusters: no pass over the
+    // mesh); the cells' counts follow serially below.
+    {
+        std::vector<std::vector<std::pair<uint32_t, uint8_t>>> found(dirty.size());
+        poolFor(dirty.size(), [&](size_t d0, size_t d1) {
+            for (size_t d = d0; d < d1; ++d) {
+                const auto& cl = order.clusters()[dirty[d]];
+                for (uint32_t l = 0; l < cl.vertexCount; ++l)
+                    if (const uint32_t v = fromGpu[cl.firstVertex + l]; v < nv) {
+                        AtomicRef<uint8_t>(flagged[L.vertexCell[v] - base0]).store(1, std::memory_order_relaxed);
                         const uint64_t was = L.levels[0].keys[L.vertexCell[v] - base0], now = cellKey(L, mesh.positions[v], 0);
+                        bool far = false;
                         for (int axis = 0; axis < 3 && !far; ++axis) {
                             const int a = int((was >> (21 * axis)) & 0x1FFFFF), b = int((now >> (21 * axis)) & 0x1FFFFF);
                             far = std::abs(a - b) > L.staleCells;
                         }
+                        if ((L.vertexFar[v] != 0) != far) found[d].emplace_back(v, uint8_t(far));
+                    }
+            }
+        }, 16);
+        for (const auto& f : found)
+            for (const auto& [v, far] : f)
+                if ((L.vertexFar[v] != 0) != (far != 0)) { // (a copy of the vertex in another cluster says it too)
+                    L.vertexFar[v] = far;
+                    for (uint32_t k = L.vertexCell[v]; k != ~0u; k = L.parent[k]) {
+                        if (far) ++L.cellFar[k];
+                        else if (L.cellFar[k]) --L.cellFar[k];
                     }
                 }
-            if (dirty[d] < L.stale.size()) L.stale[dirty[d]] = far ? 1 : 0;
-        }
-    }, 16);
+    }
     std::vector<uint32_t> cells;
     for (size_t k = 0; k < cells0; ++k)
         if (flagged[k]) cells.push_back(base0 + uint32_t(k));
@@ -606,44 +629,14 @@ std::vector<uint32_t> updateCoarseLevels(CoarseLevels& L, const Mesh& mesh, cons
     return changed;
 }
 
-size_t refreshCoarseUnsafe(CoarseLevels& L, const std::vector<ClusterBounds>& bounds) {
+size_t refreshCoarseUnsafe(CoarseLevels& L) {
     const size_t nc = L.clusters.size();
     L.unsafe.assign(nc, 0);
-    if (L.stale.size() != nc) L.stale.assign(nc, 0);
-    std::vector<uint32_t> staleList;
-    float biggest = 0.0f;
-    for (uint32_t c = 0; c < nc; ++c) {
-        if (L.stale[c]) staleList.push_back(c);
-        if (c < bounds.size()) biggest = std::max(biggest, bounds[c].radius);
-    }
-    if (staleList.empty()) return 0;
-    // A grid of the stale clusters' bounds, one cell wide enough that every cluster within reach is in the 27 around its own.
-    const float margin = L.cell * 2.0f, step = std::max(2.0f * biggest + margin, 1e-6f);
-    const auto key = [&](const glm::vec3& p) {
-        const glm::ivec3 q = glm::ivec3(glm::floor(p / step));
-        return uint64_t(uint32_t(q.x)) * 73856093u ^ uint64_t(uint32_t(q.y)) * 19349663u ^ uint64_t(uint32_t(q.z)) * 83492791u;
-    };
-    std::unordered_map<uint64_t, std::vector<uint32_t>> grid;
-    for (uint32_t c : staleList)
-        if (c < bounds.size() && bounds[c].radius >= 0.0f) grid[key(bounds[c].center)].push_back(c);
+    if (L.clusterCellsFirst.size() != nc + 1) return 0;
     size_t count = 0;
     for (uint32_t c = 0; c < nc; ++c) {
-        bool bad = L.stale[c] != 0;
-        if (!bad && c < bounds.size() && bounds[c].radius >= 0.0f) {
-            const glm::ivec3 q = glm::ivec3(glm::floor(bounds[c].center / step));
-            for (int dx = -1; dx <= 1 && !bad; ++dx)
-                for (int dy = -1; dy <= 1 && !bad; ++dy)
-                    for (int dz = -1; dz <= 1 && !bad; ++dz) {
-                        const glm::vec3 probe = (glm::vec3(q + glm::ivec3(dx, dy, dz)) + 0.5f) * step;
-                        const auto it = grid.find(key(probe));
-                        if (it == grid.end()) continue;
-                        for (uint32_t s : it->second)
-                            if (glm::distance(bounds[c].center, bounds[s].center) < bounds[c].radius + bounds[s].radius + margin) {
-                                bad = true;
-                                break;
-                            }
-                    }
-        }
+        bool bad = false;
+        for (uint32_t i = L.clusterCellsFirst[c]; i < L.clusterCellsFirst[c + 1] && !bad; ++i) bad = L.cellFar[L.clusterCells[i]] != 0;
         L.unsafe[c] = bad ? 1 : 0;
         count += bad;
     }
