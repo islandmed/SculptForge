@@ -3462,6 +3462,7 @@ private:
         bool release = false; // the release being handled is the middle button's own (not another button's, a pen's or a touch's)
         float x = 0.0f, y = 0.0f;
         float dx = 0.0f, dy = 0.0f; // the motion since the press
+        float upX = 0.0f, upY = 0.0f; // where the middle button was let go (the release event's own position)
     } centreClick_;
     struct RightClick {
         bool pending = false; // a right press that hasn't moved past the slop: navigation waits

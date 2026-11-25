@@ -104,6 +104,29 @@ hold none
 expect_value camera_distance == $d2
 expect_value camera_target_x == $tc0
 
+# A pen in range with a button mapped to Middle (its press and release arrive as mouse events; artist-qa 11-24): a tap
+# centres; a drag never ends in a centring, whichever device carried its moves (a mouse's moves are strays while the pen
+# is in range, so here the view simply stays).
+key f
+wait 0.2
+remember camera_distance dp0
+remember camera_target_x tp0
+pen_hover 0.4 0.5 0.1
+hold alt
+button_drag middle 0.4 0.5 0.6 0.5
+hold none
+pen_out
+wait 0.2
+expect_value camera_distance == $dp0
+expect_value camera_target_x == $tp0
+pen_hover 0.48 0.5 0.1
+hold alt
+button_drag middle 0.48 0.5 0.48 0.5 0.05
+hold none
+pen_out
+wait 0.2
+expect_value camera_distance < $dp0
+
 # The action with a key of its own works at the pointer; from the palette (pointer off the canvas) it only says how.
 set_shortcut view.centre_pointer Ctrl+Alt+Shift+Y
 key f

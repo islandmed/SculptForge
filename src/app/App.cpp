@@ -1914,6 +1914,16 @@ void App::dispatchEvent(const SDL_Event& event) {
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) androidBack();
         return;
     }
+    // An Alt+middle click (centreViewOnPointer) is over once anything moves the pointer past the slop: here, before a
+    // pen in range makes the mouse's moves strays (strayMouseMotion) or a pointer drag drops the pen's samples
+    // (onMouseMove), so whichever device carries the drag, a drag never ends in a centring (artist-qa 11-24).
+    if (centreClick_.pending) {
+        float px = 0.0f, py = 0.0f;
+        bool moved = false;
+        if (event.type == SDL_EVENT_MOUSE_MOTION) { px = event.motion.x; py = event.motion.y; moved = true; }
+        else if (event.type == SDL_EVENT_PEN_MOTION) { px = event.pmotion.x; py = event.pmotion.y; moved = true; }
+        if (moved && std::hypot(px - centreClick_.x, py - centreClick_.y) > kRightClickSlop) centreClick_.pending = false;
+    }
     if (strayMouseMotion(event)) { // neither the canvas nor the UI follows a driver's stray mouse events
         ++penDiag_.strayMouse;
         return;
@@ -2047,6 +2057,8 @@ void App::dispatchEvent(const SDL_Event& event) {
         // button opens it only when set to Right click, in penButton.)
         if (e.button.button == SDL_BUTTON_RIGHT && e.button.which != SDL_PEN_MOUSEID) rightClickRelease();
         centreClick_.release = e.button.button == SDL_BUTTON_MIDDLE; // (only its own release centres the view)
+        centreClick_.upX = e.button.x; // (the event's own place: mouseX_ may be stale when a pen in range made the mouse's moves strays)
+        centreClick_.upY = e.button.y;
         onMouseUp();
         centreClick_.release = false;
         break;
@@ -2734,7 +2746,7 @@ void App::onMouseUp() {
     if (centreClick_.pending) { // Alt+middle click: pressed and let go without moving
         const bool fire = centreClick_.release; // another button's, a pen's or a touch's release only drops it
         centreClick_.pending = false;
-        if (fire) centreViewOnPointer(mouseX_, mouseY_);
+        if (fire) centreViewOnPointer(centreClick_.upX, centreClick_.upY);
     }
     zsMenu_.armed = false;
     orbitStarted_ = false;
