@@ -733,7 +733,6 @@ constexpr Entry kTraditionalChinese[] = {
     {"which comes first and wins", "（排在前面，先生效）"},
     {"Orbit", "環繞"},
     {"Pan", "平移"},
-    {"Left", "左鍵"},
     {"Middle", "中鍵"},
     {"Right", "右鍵"},
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---

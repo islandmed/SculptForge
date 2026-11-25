@@ -733,7 +733,6 @@ constexpr Entry kSimplifiedChinese[] = {
     {"which comes first and wins", "（排在前面，先生效）"},
     {"Orbit", "环绕"},
     {"Pan", "平移"},
-    {"Left", "左键"},
     {"Middle", "中键"},
     {"Right", "右键"},
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---

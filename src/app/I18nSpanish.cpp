@@ -892,7 +892,6 @@ constexpr Entry kSpanish[] = {
     {"which comes first and wins", "que va primero y gana"},
     {"Orbit", "Orbitar"},
     {"Pan", "Desplazar"},
-    {"Left", "Izquierdo"},
     {"Middle", "Central"},
     {"Right", "Derecho"},
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---

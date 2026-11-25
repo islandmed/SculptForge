@@ -6863,7 +6863,6 @@ constexpr Entry kJapanese[] = {
     {"which comes first and wins", "（先に並ぶ方が優先）"},
     {"Orbit", "回転"},
     {"Pan", "パン"},
-    {"Left", "左"},
     {"Middle", "中"},
     {"Right", "右"},
 };
