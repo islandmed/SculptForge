@@ -820,6 +820,36 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
         const float tiny = 2e-3f * r * r; // twice an area (as cross products come): a sliver 0.1 r long and 0.02 r wide
         std::vector<uint32_t> slot(nv, ~0u);
         for (size_t i = 0; i < todo.size(); ++i) slot[todo[i]] = uint32_t(i);
+        // What each band triangle must keep facing: its own start facing, or, when that was too small to mean anything,
+        // the sum of its edge neighbours' (as the cut left them: a fixed reference, so a pinned vertex cannot make its
+        // neighbours fail in turn).
+        std::vector<vec3> reference(m.triangleCount(), vec3(0.0f));
+        {
+            std::unordered_map<uint64_t, std::array<uint32_t, 2>> edgeTris;
+            for (size_t t = 0; t < m.triangleCount(); ++t) {
+                const glm::uvec3 tri = m.triangles[t];
+                if (slot[tri.x] == ~0u && slot[tri.y] == ~0u && slot[tri.z] == ~0u) continue;
+                reference[t] = facing[t];
+                for (int i = 0; i < 3; ++i) {
+                    auto [it, fresh] = edgeTris.emplace(edgeKey(tri[i], tri[(i + 1) % 3]), std::array<uint32_t, 2>{uint32_t(t), ~0u});
+                    if (!fresh) it->second[1] = uint32_t(t);
+                }
+            }
+            for (size_t t = 0; t < m.triangleCount(); ++t) {
+                if (glm::length(facing[t]) >= tiny) continue;
+                const glm::uvec3 tri = m.triangles[t];
+                if (slot[tri.x] == ~0u && slot[tri.y] == ~0u && slot[tri.z] == ~0u) continue;
+                vec3 sum(0.0f);
+                for (int i = 0; i < 3; ++i) {
+                    const auto it = edgeTris.find(edgeKey(tri[i], tri[(i + 1) % 3]));
+                    if (it == edgeTris.end()) continue;
+                    const uint32_t o = it->second[0] == t ? it->second[1] : it->second[0];
+                    if (o != ~0u && glm::length(facing[o]) >= tiny) sum += facing[o];
+                }
+                reference[t] = sum; // (all neighbours tiny too: a zero reference, and the triangle is never a fold)
+            }
+        }
+        std::vector<uint8_t> pinned(todo.size(), 0);
         std::vector<uint8_t> again(m.triangleCount(), 0); // (folded in the round before: then all its vertices)
         // The last rounds pin every vertex of a folded triangle where it started and look again, until none is left:
         // each such round pins vertices that were not pinned, so this ends, and a triangle with all its vertices at
@@ -832,8 +862,12 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
                 const glm::uvec3 tri = m.triangles[t];
                 if (slot[tri.x] == ~0u && slot[tri.y] == ~0u && slot[tri.z] == ~0u) continue;
                 const vec3 n = faceNormal(tri);
-                if (glm::dot(n, facing[t]) >= 0.0f) continue;
-                if (glm::length(n) < tiny || glm::length(facing[t]) < tiny) continue; // (noise before, or nothing to see after)
+                if (glm::length(n) < tiny) continue; // (nothing to see)
+                // (a triangle too small at the start to have a facing of its own, a sliver of the cut, is held against
+                // its neighbours' start facing: one that grew while it turned over would otherwise pass; the runner
+                // folded four such at a band's edge that the laptop did not, float ties falling differently)
+                const bool turned = glm::dot(n, reference[t]) < 0.0f;
+                if (!turned) continue;
                 ++folded;
                 now[t] = 1;
                 // (first the vertex that moved farthest: pulling all three left the other two folded against their
@@ -878,15 +912,21 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
             // (halfway back, then onto the fillet again from there: the fold came from a slide, and the projection
             // alone makes none; the last round leaves the vertex where it started, the one place sure to be folded
             // against nothing)
+            size_t fresh = 0;
+            for (size_t i = 0; i < todo.size(); ++i)
+                if (pull[i] && round >= 7 && !pinned[i]) {
+                    pinned[i] = 1;
+                    ++fresh;
+                }
             poolFor(todo.size(), [&](size_t b0, size_t e0) {
-                SurfaceHit hit;
+                SurfaceHit h;
                 for (size_t i = b0; i < e0; ++i) {
                     if (!pull[i]) continue;
-                    if (round < 7) m.positions[todo[i]] = project(start[i] + (m.positions[todo[i]] - start[i]) * 0.5f, start[i], kOf[i], hit);
+                    if (round < 7) m.positions[todo[i]] = project(start[i] + (m.positions[todo[i]] - start[i]) * 0.5f, start[i], kOf[i], h);
                     else m.positions[todo[i]] = start[i];
                 }
             }, 256);
-            if (round >= 7 && std::none_of(pull.begin(), pull.end(), [](uint8_t p) { return p != 0; })) break; // (folded, but nothing of ours to pin)
+            if (round >= 7 && fresh == 0) break; // (every vertex of what is left is pinned already: nothing more to do)
         }
     }
     std::vector<float> moved(todo.size(), 0.0f);
