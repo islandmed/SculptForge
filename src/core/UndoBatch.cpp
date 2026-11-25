@@ -3,6 +3,10 @@
 #include "core/UndoBatch.h"
 
 #include "core/FigurePose.h"
+#include "core/PaintLayer.h"
+#include "core/Reference.h"
+#include "core/SelectionSets.h"
+#include "core/Splats.h"
 
 #include <algorithm>
 #include <cstring>
@@ -52,11 +56,9 @@ void followBatch(Document& doc, uint64_t batch, bool isUndo) {
     }
 }
 
-uint64_t topSeq(const UndoStack& s) { return s.canUndo() ? s.undoStep(0)->seq : 0; }
-
 std::map<uint32_t, uint64_t> topsOf(const Document& doc) {
     std::map<uint32_t, uint64_t> tops;
-    for (int i : historyParts(doc)) tops[doc.meshKey(i)] = topSeq(doc.partUndo(i));
+    for (int i : historyParts(doc)) tops[doc.meshKey(i)] = doc.partUndo(i).topSeq();
     return tops;
 }
 
@@ -92,7 +94,27 @@ struct Hasher {
         plain ? word(0xA77) : vec(v);
     }
     void str(const std::string& s) { bytes(s.data(), s.size()); }
+    template <class T> void pod(const T& v) { bytes(&v, sizeof v); }
 };
+
+void hashSelectionSets(Hasher& h, const SelectionSetList* list) {
+    if (!list) return h.word(0x5E7);
+    h.word(list->sets.size());
+    h.str(list->morphTarget);
+    for (const auto& s : list->sets) {
+        h.str(s->name);
+        h.word(uint64_t(s->channels) | uint64_t(uint32_t(s->level)) << 32);
+        h.word(uint64_t(s->vertexCount) | uint64_t(s->triangleCount) << 32);
+        h.vec(s->maskRuns);
+        h.vec(s->maskValues);
+        h.vec(s->groupRuns);
+        h.vec(s->paintRuns);
+        h.vec(s->paintValues);
+        h.vec(s->hiddenRuns);
+        h.vec(s->uvs);
+        h.vec(s->positions);
+    }
+}
 
 } // namespace
 
@@ -149,15 +171,61 @@ uint64_t sceneHash(const Document& doc) {
         h.attribute(m.hidden, uint8_t(0));
         h.attribute(m.uvs, glm::vec2(0.0f));
         h.attribute(m.creases, 0.0f);
+        h.vec(m.uvFlags);
+        h.vec(m.quadPartners);
         h.vec(m.base);
         h.vec(m.paintBase);
+        h.word(uint64_t(uint32_t(m.activePaintLayer)));
+        h.word(m.paintLayers.size());
+        for (const PaintLayer& l : m.paintLayers) {
+            h.str(l.name);
+            h.vec(l.color);
+            h.vec(l.alpha);
+            h.word(uint64_t(l.blend) | uint64_t(l.visible) << 8 | uint64_t(l.locked) << 16);
+            h.pod(l.opacity);
+        }
+        hashSelectionSets(h, m.selectionSets.get());
         for (const SculptLayer& l : m.layers) {
             h.str(l.name);
             h.bytes(&l.weight, sizeof l.weight);
             h.vec(l.delta);
         }
     }
-    h.word(doc.splats.size());
+    h.word(doc.partFolders.size());
+    for (const PartFolder& f : doc.partFolders) {
+        h.word(uint64_t(f.id) | uint64_t(f.collapsed) << 32);
+        h.str(f.name);
+    }
+    h.word(doc.references.size());
+    for (const ReferenceImage& r : doc.references) {
+        h.str(r.name);
+        h.str(r.path);
+        h.word(uint64_t(r.mode) | uint64_t(r.plane) << 8 | uint64_t(r.flipX) << 16 | uint64_t(r.flipY) << 17 |
+               uint64_t(r.locked) << 18 | uint64_t(r.visible) << 19 | uint64_t(r.inRenders) << 20 | uint64_t(r.embed) << 21);
+        h.pod(r.center);
+        h.pod(r.origin);
+        h.pod(r.height);
+        h.pod(r.sceneHeight);
+        h.pod(r.stretch);
+        h.pod(r.opacity);
+        if (r.image) {
+            h.word(uint64_t(uint32_t(r.image->width)) | uint64_t(uint32_t(r.image->height)) << 32);
+            h.vec(r.image->rgba);
+        } else {
+            h.word(0);
+        }
+    }
+    // Splats are not in the undo history at all: any change to them is a change outside it.
+    const SplatCloud& sp = doc.splats;
+    h.word(doc.splatsVersion);
+    h.word(uint64_t(uint32_t(sp.shDegree)));
+    h.vec(sp.positions);
+    h.vec(sp.rotations);
+    h.vec(sp.scales);
+    h.vec(sp.opacities);
+    h.vec(sp.sh);
+    h.pod(sp.transform);
+    h.str(sp.name);
     return h.h;
 }
 
@@ -219,7 +287,7 @@ std::string markUnreachable(const Document& doc, const HistoryMark& mark) {
     if (mark.epoch != undoClearEpoch()) return "the history was cleared since (a new scene, an open or a step that can't be undone)";
     for (int i : historyParts(doc)) {
         const uint64_t target = targetOf(mark, doc.meshKey(i));
-        if (target && !doc.partUndo(i).hasStep(target))
+        if (!doc.partUndo(i).reaches(target))
             return "its steps were replaced by newer edits or dropped by the undo memory budget";
     }
     return {};
@@ -240,6 +308,7 @@ HistoryRestore restoreToMark(Document& doc, const HistoryMark& mark, uint64_t gr
     out.exact = out.exact && sceneHash(doc) == mark.hash;
     if (out.exact) return out;
 
+    out.offHistory = out.problem.empty();
     // Not there (steps the budget dropped, a Part a command that can't be undone made or removed, a scene changed outside
     // the history): go back to where we started, and stamp the steps with their own batch ids again.
     std::string problem = out.problem.empty() ? "the scene differs from the checkpoint (something in it was changed outside "

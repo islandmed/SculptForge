@@ -220,7 +220,9 @@ HistoryToolReply restoreCheckpoint(Document& doc, const Json& arguments) {
                                           : "Restored checkpoint '" + name + "': " + plural(size_t(w.undone), "step", "steps") +
                                                 " undone, " + std::to_string(w.redone) + " redone. undo takes it back";
     } else {
-        r.text = "Could not restore checkpoint '" + name + "': checkpoint no longer in undo history (" + w.problem + "). " +
+        r.text = std::string("Could not restore checkpoint '") + name + "': " +
+                 (w.offHistory ? "the scene could not be restored exactly" : "checkpoint no longer in undo history") + " (" +
+                 w.problem + "). " +
                  (w.untouched ? "The scene was not changed." : "THE SCENE MAY HAVE CHANGED: check with mesh_info / viewport_image.");
         r.structured.set("problem", w.problem);
         r.structured.set("scene_unchanged", w.untouched);

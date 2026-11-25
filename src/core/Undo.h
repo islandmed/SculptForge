@@ -293,6 +293,14 @@ public:
         const auto is = [&](const UndoRecord& r) { return r.seq == seq; };
         return std::any_of(undo_.begin(), undo_.end(), is) || std::any_of(redo_.begin(), redo_.end(), is);
     }
+    // The `seq` of the last step the byte budget dropped from the bottom (0 = none has been): with every undo step
+    // undone, the Part is exactly as that step left it. A history position is "after step N" (0 = the very start).
+    uint64_t retainedBase() const { return retainedBase_; }
+    // The position this history is at now: the top applied step, or the retained base when none is left.
+    uint64_t topSeq() const { return undo_.empty() ? retainedBase_ : undo_.back().seq; }
+    // Whether undoing / redoing can bring this history to "after step `seq`": it holds that step, or the steps below
+    // it were dropped (it IS the base). Position 0 is reachable only while nothing has been dropped.
+    bool reaches(uint64_t seq) const { return seq == retainedBase_ || hasStep(seq); }
 
     // Both rebuild/refit the BVH as needed.
     bool undo(Mesh& mesh, BVH& bvh);
@@ -327,7 +335,7 @@ private:
     void enforceBudget();
 
     std::deque<UndoRecord> undo_, redo_;
-    uint64_t revision_ = 0, microRevisions_ = 0;
+    uint64_t revision_ = 0, microRevisions_ = 0, retainedBase_ = 0;
     size_t droppedPending_ = 0, droppedTotal_ = 0;
     bool lastStepOver_ = false, overPending_ = false;
 };
