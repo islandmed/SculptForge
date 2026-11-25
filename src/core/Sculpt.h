@@ -160,8 +160,11 @@ struct ConnectedScratch {
 // reaches through edges between vertices of `verts`; the order stays. `surface` (Contact facing): also each kept
 // vertex's distance from `seed` along the surface (the flood's edge paths, each vertex relaxed from the neighbours
 // reached before it: an upper bound within a few percent of the geodesic on an even mesh), in the kept order.
+// `facingHint` (Contact facing): the flood starts from the nearest vertex whose normal is within 60 degrees of it (else
+// the nearest), so a cursor that is nearer a vertex of the far wall of a narrow gap (the surface lowered under it by the
+// stroke's own cut) still floods from the wall it is on.
 void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch,
-                   std::vector<float>* surface = nullptr);
+                   std::vector<float>* surface = nullptr, const glm::vec3* facingHint = nullptr);
 // Contact facing, right after keepConnected over `all` (its list before the call): stamps the vertices of `all` the
 // flood didn't reach that lie on a piece closed within `all` (none of its vertices has an edge leaving it: an eyeball
 // modelled on its own, inside the flood's sphere) with the returned value, which differs from `reached` (the flood's
