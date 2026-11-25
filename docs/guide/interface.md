@@ -264,17 +264,20 @@ When you open a Gaussian splat capture, **Render > Gaussian Splats** moves into 
 (**Edit > My Panel...**; the Classic layout's palette bar shows it once it holds something or sits in a tray), and it
 works like any other palette: put it in a tray, or open it in a window of its own for a second monitor.
 
-- **Add a button or a whole section**: hold <kbd>Alt</kbd> and drag it from any palette (or a shelf) into My Panel.
-  A section keeps all its controls, live, so **Masking** or **Geometry** can sit next to the three buttons you press
-  all day. A line shows where it will land.
+- **Add a button, a control or a whole section**: hold <kbd>Alt</kbd> and drag it from any palette (or a shelf) into
+  My Panel. A section keeps all its controls, live, so **Masking** or **Geometry** can sit next to the three buttons
+  you press all day. A line shows where it will land.
+- **One control on its own**: any slider, checkbox, choice or readout comes by itself the same way: hold <kbd>Alt</kbd>
+  and drag **Backface culling** (Tool > Viewport Look), the brush **Size** slider (Draw), the triangle count at the top of
+  the Tool palette, or **Orbit around the pointer** (Edit > Preferences > Input). It stays the palette's own control, live: a
+  change in My Panel is a change everywhere. While <kbd>Alt</kbd> is held a slider is picked up, not changed. A control
+  its palette shows only sometimes (the Levels line of a Part without levels) shows as its dim name until it is back.
 - **Reorder**: hold <kbd>Alt</kbd> and drag an entry to a new place in My Panel.
 - **Take one out**: drag it out of My Panel (still holding <kbd>Alt</kbd>) and let go anywhere else, or right-click it
   and choose **Remove from My Panel**.
 - **Fold a section** in My Panel by clicking its title. This does not change the same section in its own palette.
 - **Open it where you are working**: press <kbd>F4</kbd> (change the key in **Edit > Preferences > Hotkeys**, the action is
   **My Panel**). My Panel appears at the cursor; press the key again or <kbd>Esc</kbd> to close it.
-
-Buttons and sections can be dragged in. Sliders and checkboxes on their own cannot; drag the section that holds them.
 
 However My Panel is open (its key, the Edit menu, a tray, or a window of its own), hold <kbd>Alt</kbd> and drag an
 entry onto it. In a window of its own the entry lands at the end of the panel; drag within that window to reorder.

@@ -143,8 +143,34 @@ struct MyPanelPayload {
 inline constexpr const char* kMyPanelPayload = "SF_MYPANEL";
 // Makes the last item a drag source for My Panel while Alt (without Ctrl) is held. `section`: a header, else an action.
 bool MyPanelDragSource(const char* id, bool section, const char* label, bool fromPanel = false);
+// The same for any entry as My Panel stores it ("control:tool.display/Backface culling").
+bool MyPanelDragEntry(const std::string& entry, const char* label, bool fromPanel);
 // Alt-dragged a button or header more than a click's travel: its release was the end of a drag, not a click.
 bool MyPanelDragged();
+
+// One control as a My Panel entry ("control:<scope>/<key>", UiLayout.h; PanelMyPanel.cpp draws it). HelpText and
+// HelpAction mark the control drawn just before them: while Alt (without Ctrl) is held it is a drag source for My Panel,
+// keyed by the help title (or the action id) inside the scope being drawn; while My Panel draws one control
+// (BeginPinnedControl) the one whose key matches is measured and made movable. A key repeated in a scope gets "#2", "#3".
+void PinPalette(const char* paletteId); // the palette whose body is being drawn ("" when done); resets the key counts
+void PinSection(const char* sectionId); // the open section being drawn ("" at its end)
+struct PinnedControl {
+    std::string scope, key; // what My Panel wants
+    bool measuring = false;  // the first pass only measures: no drag source, no menu
+    bool found = false;
+    ImVec2 min, max;         // the control's rect this frame
+    float lineX = 0.0f;      // where its line starts (a control mid-row is drawn from there in My Panel)
+    bool remove = false;     // its right-click menu asked for removal
+};
+void BeginPinnedControl(const std::string& scope, const std::string& key, bool measuring);
+PinnedControl EndPinnedControl();
+// Palette bodies while Alt (without Ctrl) is held: sliders and fields are read-only, so an Alt-drag that starts on one
+// picks it up for My Panel without changing it. Returns what EndPaletteItems needs.
+bool BeginPaletteItems();
+void EndPaletteItems(bool readOnly);
+// A readout ("12,480 tris", "Level 2 of 4"): dim text that is an item with an id, so it can be hovered for help, found
+// by UI tests and dragged into My Panel like a control (ImGui::Text has no id).
+void Readout(const char* id, const char* text);
 
 // Keyboard keycaps for a chord ("Ctrl+Shift+I", "F3 / Ctrl+Shift+P"), drawn inline as an item.
 void Keycaps(const std::string& chord);
