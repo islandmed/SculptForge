@@ -1304,6 +1304,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         const bool useAlpha = p.alpha && !p.alpha->empty(); // (the reach dabSingle gives the brush)
         const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock ? 1.3f : 1.0f;
         const float scale = type == BrushType::Smooth ? dyntopoSmoothScale(dyntopo) : 1.0f;
+        dynTopo_.dissolveNeedles = type == BrushType::Smooth;
         if (scale > 0.0f) remeshDab(mesh, bvh, p, sym, scale, reach);
         else lastRemesh_ = false; // (Smooth only: no repair pass either)
     }

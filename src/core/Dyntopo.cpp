@@ -922,7 +922,9 @@ bool DynamicTopology::collapseTarget(uint32_t a, uint32_t b, uint32_t& keep, uin
     return false;
 }
 
-bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3& p) const {
+// The topology half of canCollapse: the edge is a manifold one, and merging its ends neither pinches the surface nor
+// leaves a vertex with fewer than three neighbours. (Leaves the ends' rings in ringA_ and ringB_.)
+bool DynamicTopology::collapseKeepsTopology(uint32_t keep, uint32_t drop) const {
     const Mesh& m = *mesh_;
     uint32_t tris[4];
     const int n = edgeTriangles(keep, drop, tris);
@@ -956,6 +958,16 @@ bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3&
         if (ro.size() <= 3) return false;
     }
     if (n == 1 && (rk.size() < 3 || rd.size() < 3)) return false;
+    return true;
+}
+
+bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3& p) const {
+    if (!collapseKeepsTopology(keep, drop)) return false;
+    const Mesh& m = *mesh_;
+    uint32_t tris[4];
+    const int n = edgeTriangles(keep, drop, tris);
+    const std::vector<uint32_t>& rk = ringA_; // (the rings collapseKeepsTopology just listed)
+    const std::vector<uint32_t>& rd = ringB_;
     // No long edge, no triangle turned over or made degenerate or much worse.
     const auto& pos = m.positions;
     // (Only what the collapse makes worse counts: merging two vertices at one point moves nothing.)
@@ -1084,6 +1096,80 @@ void DynamicTopology::collapsePass() {
             if (i > 0 && !canCollapse(pl.keep, pl.drop, pl.p)) continue; // (the first changed its surroundings)
             collapse(pl.keep, pl.drop, pl.p);
             pushEdgesAround(pl.keep, false);
+        }
+    }
+}
+
+// A needle: a triangle whose height over its longest edge is under kNeedleWidth of the target edge length (a hair-thin
+// strip: its two long edges run side by side). Even triangles are around 0.8 of the target, a sliver a repair pass
+// still has to look at is above this.
+bool DynamicTopology::needleTriangle(uint32_t t) const {
+    const auto& p = mesh_->positions;
+    const glm::uvec3& tri = mesh_->triangles[t];
+    const glm::vec3 e0 = p[tri.y] - p[tri.x], e1 = p[tri.z] - p[tri.y], e2 = p[tri.x] - p[tri.z];
+    const float longest2 = std::max({glm::dot(e0, e0), glm::dot(e1, e1), glm::dot(e2, e2)});
+    const float area2 = glm::length(glm::cross(e0, -e2));
+    // (height = area2 / longest edge)
+    const float w = kNeedleWidth * target_;
+    return area2 * area2 < w * w * longest2;
+}
+
+// Smooth with Dynamic on: a hair-thin strand (a Tendril pulled long and thin, then smoothed) has edges far longer than the
+// collapse length, so the collapse pass never takes them, and smoothing a straight line of vertices moves nothing. A vertex
+// whose every triangle is a needle is merged onto a neighbour (the one with the most ordinary triangles: the strand's base,
+// which does not move), from the strand's end inwards, until it is gone. Anything with a solid triangle around it is left.
+void DynamicTopology::dissolvePass() {
+    std::vector<uint32_t> work;
+    for (uint32_t t : regionTris_) {
+        if (t >= mesh_->triangleCount() || deadT_[t] || !needleTriangle(t)) continue;
+        const glm::uvec3 tri = mesh_->triangles[t];
+        for (int c = 0; c < 3; ++c)
+            if (inside(tri[c], tri[c])) work.push_back(tri[c]);
+    }
+    if (work.empty()) return;
+    std::sort(work.begin(), work.end());
+    work.erase(std::unique(work.begin(), work.end()), work.end());
+    auto allNeedles = [&](uint32_t v) {
+        for (uint32_t t : mesh_->vertexTriangles(v))
+            if (!needleTriangle(t)) return false;
+        return true;
+    };
+    std::vector<uint32_t> neighbours;
+    std::vector<std::pair<uint32_t, uint32_t>> edges;
+    size_t tries = 0;
+    for (size_t i = 0; i < work.size() && ops_ < maxOps_ && tries < maxOps_ * kTriesPerOp; ++i) {
+        const uint32_t v = work[i];
+        if (deadV_[v] || locked(v) || !allNeedles(v)) continue;
+        uint32_t other[2];
+        if (featureEdges(v, other) != 0) continue;
+        ++tries;
+        ring(v, neighbours);
+        // The neighbour with the most ordinary triangles first (ties: the lowest index, so the result is the same on any thread count).
+        std::vector<std::pair<int, uint32_t>> order;
+        for (uint32_t u : neighbours) {
+            int solid = 0;
+            for (uint32_t t : mesh_->vertexTriangles(u)) solid += needleTriangle(t) ? 0 : 1;
+            order.emplace_back(-solid, u);
+        }
+        std::sort(order.begin(), order.end());
+        for (const auto& [solid, u] : order) {
+            if (locked(u) || !collapseKeepsTopology(u, v)) continue;
+            orbit(v, u, edges);
+            if (edges.size() > 1 && orbitSharesTriangle(edges)) break; // at the symmetry plane: leave it
+            bool ok = true;
+            for (const auto& [x, y] : edges)
+                ok = ok && !deadV_[x] && !deadV_[y] && !locked(x) && !locked(y) && allNeedles(x) && collapseKeepsTopology(y, x);
+            if (!ok) continue;
+            if (orbitIncomplete_ && !mirrorMaps_.empty()) ++stats.unpaired;
+            for (size_t k = 0; k < edges.size(); ++k) {
+                const auto [x, y] = edges[k];
+                if (deadV_[x] || deadV_[y] || (k > 0 && !collapseKeepsTopology(y, x))) continue; // (the first changed its surroundings)
+                collapse(y, x, mesh_->positions[y]);
+                ++stats.dissolved;
+                ring(y, neighbours); // (what the strand's next vertex sees now)
+                work.insert(work.end(), neighbours.begin(), neighbours.end());
+            }
+            break;
         }
     }
 }
@@ -1434,6 +1520,7 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
     queryRegion();
     phase(stats.gatherMs);
     collapsePass();
+    if (dissolveNeedles) dissolvePass();
     phase(stats.collapseMs);
     flipPass();
     phase(stats.flipMs);
