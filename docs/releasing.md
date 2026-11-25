@@ -67,6 +67,11 @@ the run. `scripts/release.sh X.Y.Z` then only promotes: step `bump` checks main 
 waits for staging's Packages run and checks it, step `tag` tags **exactly that commit** (main must be it). The Release
 workflow takes that run's packages unchanged, verifies them, smoke-tests them, signs and publishes.
 
+**Main is held from the stage to the end of the promote.** `--stage` writes `~/Work/.sf/hold-main` (who, why, since) at its
+start, the file `sitepush.sh` and `queue-merge.sh` check, and keeps it after the stage (main is the staged commit until
+the tag); `--yes`, run to its last step, lifts it. A stage that stops leaves it and prints `rm ~/Work/.sf/hold-main` for
+giving up on the version. A hold set by hand is never replaced or lifted by the script.
+
 **The next batch stages while this one promotes.** A promote holds a lock (`sf-promoting` in the git common dir,
 with its pid) from start to end. `scripts/release.sh X.Y+1 --stage` may run at the same time: staging, its CI, its
 packages and T1 go ahead, and only main's fast-forward waits for the lock (`SF_PROMOTE_WAIT_MIN`, default 180).

@@ -77,11 +77,40 @@ wait_ci() { # wait_ci <branch>: dispatches the full CI on the branch, waits, ret
     done
     [ -n "$id" ] || die "no CI run started for $branch"
     echo "   CI: https://github.com/$REPO/actions/runs/$id" >&2
-    gh run watch "$id" -R "$REPO" --exit-status --interval 30 >/dev/null 2>&1 && { echo success; return; }
+    ci_finished "$id" || { echo unknown; return; }
+    [ "$CI_CONCLUSION" = success ] && { echo success; return; }
     # scripts/release.sh --stage exports infra_retry: a setup-step or test-step failure gets one rerun of its failed jobs (logged;
     # a test that passes on it goes to flaky.md). Otherwise, or red again: failure.
-    if declare -F infra_retry >/dev/null && infra_retry "$id" &&
-        [ "$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null)" = success ]; then echo success; else echo failure; fi
+    if declare -F infra_retry >/dev/null && infra_retry "$id"; then
+        ci_finished "$id" || { echo unknown; return; }
+        [ "$CI_CONCLUSION" = success ] && { echo success; return; }
+    fi
+    echo failure
+}
+
+# ci_finished <run>: waits until the run has FINISHED and sets CI_CONCLUSION from `gh run view --json status,conclusion`. A watch
+# that errors (HTTP 502, a dropped connection) says nothing about the run, so it is retried: only a finished run's conclusion is
+# judged (0.14.1: a `gh run watch` error read as red while the run was still building, and every job later passed). Returns 1, with
+# nothing judged, when the run's state can't be read SF_CI_ERR_MAX (default 120) polls in a row (about an hour).
+ci_finished() {
+    local id=$1 st errs=0 waiter=${SF_GH_WAIT:-$HOME/Work/.sf/gh-wait.sh}
+    CI_CONCLUSION=""
+    while :; do
+        # gh-wait.sh reads the shared cache (the API budget); without it, gh run watch. Neither's exit status is used.
+        if [ -x "$waiter" ]; then "$waiter" "$id" "$REPO" >/dev/null 2>&1 || true
+        else gh run watch "$id" -R "$REPO" --interval 30 >/dev/null 2>&1 || true; fi
+        st=$(gh run view "$id" -R "$REPO" --json status,conclusion -q '"\(.status) \(.conclusion // "")"' 2>/dev/null) || st=""
+        case "$st" in
+            "completed "?*) CI_CONCLUSION=${st#completed }; return 0 ;;
+            "completed"*|"") errs=$((errs + 1)) ;; # unreadable, or finished without a conclusion yet
+            *) errs=0 ;;                           # queued / in_progress: still going
+        esac
+        if [ "$errs" -ge "${SF_CI_ERR_MAX:-120}" ]; then
+            echo "   CI run $id: its state could not be read $errs times in a row (gh errors); not judged red. Check https://github.com/$REPO/actions/runs/$id" >&2
+            return 1
+        fi
+        sleep "${SF_CI_POLL_SLEEP:-30}"
+    done
 }
 
 run_serial() {
@@ -109,7 +138,7 @@ run_serial() {
 }
 
 run_batch() {
-    local prs=() merged=() pr head base branch
+    local prs=() merged=() pr head base branch ci
     mapfile -t prs < <(queued)
     [ ${#prs[@]} -gt 0 ] || { echo "queue is empty"; return 0; }
     git fetch -q origin main
@@ -145,7 +174,9 @@ run_batch() {
     fi
     git -C "$wt" push -q origin "HEAD:refs/heads/$branch"
     git worktree remove --force "$wt"
-    if [ "$(wait_ci "$branch")" != success ]; then
+    ci=$(wait_ci "$branch")
+    [ "$ci" != unknown ] || die "CI on $branch: the run's state could not be read (gh errors, above); it is not red. The branch stays: look at the run, then run again"
+    if [ "$ci" != success ]; then
         git push -q origin --delete "$branch"
         say "batch red: landing one at a time to find the PR that broke it"
         run_serial
@@ -193,6 +224,7 @@ land_staging() { # land_staging [--with CMD] [REF]
     # full CI passed (tools/release/paperwork_only.py): the same answer, not another 20 minutes of it.
     if [ -n "${SF_STAGE_CI_REUSED:-}" ]; then ci=success; echo "   CI: reused from ${SF_STAGE_CI_REUSED%% *} (run ${SF_STAGE_CI_REUSED##* }; paperwork only)"; else ci=$(wait_ci staging); fi
     if [ -n "$pid" ]; then wait "$pid" || local_rc=$?; tail -5 "/tmp/merge-queue-with-${sha:0:8}.log" | sed 's/^/   /'; fi
+    [ "$ci" != unknown ] || die "CI on staging: the run's state could not be read (gh errors, above); it is not red. Look at the run, then run again"
     echo "   CI on staging: $ci; local: $([ $local_rc = 0 ] && echo ok || echo "failed ($local_rc)"); $(( $(date +%s) - t0 )) s"
     [ "$ci" = success ] && [ $local_rc = 0 ] || die "staging is red: main stays at $(git rev-parse --short origin/main); fix the batch and run again"
     # A release being promoted on this machine (scripts/release.sh X.Y.Z --yes) holds main until it is done: wait

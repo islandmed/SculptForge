@@ -131,6 +131,7 @@ python3 -c 'import json, sys; sys.path.insert(0, sys.argv[1]); import check_publ
 if [ -f "$HOME/Work/.sf/pre-push-guard.py" ]; then
     mkdir -p "$S/home/Work/.sf" && ln -s "$HOME/Work/.sf/pre-push-guard.py" "$S/home/Work/.sf/pre-push-guard.py"
 fi
+REAL_HOME=$HOME
 export PATH="$S/bin:$PATH" HOME="$S/home" BUILD_DIR="$S/build" YES=1 SF_GALLERY_PUBLIC="$S/gallery.json"
 unset HIGHLIGHTS
 
@@ -239,6 +240,7 @@ git add changes docs/guide/whats-new.md && git commit -q -m "9.0.1 notes" && git
 cat > "$S/bin/mq" <<EOF
 #!/usr/bin/env bash
 echo "\$*" > "$S/mq.args"
+cp "$S/home/Work/.sf/hold-main" "$S/hold-during-stage" # the stage holds main before it moves it
 git push -q origin "\${@: -1}:refs/heads/staging" "\${@: -1}:refs/heads/main"
 EOF
 chmod +x "$S/bin/mq"
@@ -248,6 +250,35 @@ staged=$(git rev-parse HEAD)
 [ "$(git -C "$S/origin.git" rev-parse staging)" = "$staged" ] || fail "--stage didn't put the bump on staging"
 grep -q "^staging $staged\$" "$S/mq.args" || fail "--stage ran the merge queue as: $(cat "$S/mq.args")"
 grep -q '^## \[9.0.1\]' CHANGELOG.md || fail "--stage: no CHANGELOG [9.0.1] in the staged commit"
+# hold-main: set at the stage's start (who/why/since), still set after it (main stays the staged commit until the promote)
+grep -q '^who: release.sh --stage 9.0.1 ' "$S/hold-during-stage" || fail "--stage set no hold-main before moving main: $(cat "$S/hold-during-stage" 2>&1)"
+grep -q '^why: ' "$S/hold-during-stage" && grep -q '^since: ' "$S/hold-during-stage" || fail "hold-main lacks why/since"
+HOLD=$S/home/Work/.sf/hold-main
+[ -f "$HOLD" ] || fail "hold-main was lifted at the end of the stage"
+# sitepush.sh (outside the repo: only where it exists) refuses while main is held, before it touches anything
+if [ -x "$REAL_HOME/Work/.sf/sitepush.sh" ]; then
+    SF_SITEPUSH_DRY=1 "$REAL_HOME/Work/.sf/sitepush.sh" "$PWD" >"$S/out.log" 2>&1 && fail "sitepush ran during a stage"
+    grep -q 'main is held' "$S/out.log" || fail "sitepush: $(cat "$S/out.log")"
+fi
+# a stage that stops (merge queue red) leaves hold-main and says how to lift it
+printf '#!/bin/sh\nexit 1\n' > "$S/bin/mq-red"; chmod +x "$S/bin/mq-red"
+MERGE_QUEUE=$S/bin/mq-red STAGE_WITH= scripts/release.sh 9.0.1 --stage >"$S/out.log" 2>&1 && fail "a red staging passed"
+[ -f "$HOLD" ] || fail "an aborted stage lifted hold-main"
+grep -q "hold-main stays set.*rm $HOLD" "$S/out.log" || fail "no lift message after an aborted stage: $(tail -5 "$S/out.log")"
+# the hold functions: a hand-set hold is never replaced or lifted; another version's promote leaves ours; ours is lifted by its promote
+holdfn() { # holdfn VERSION CALLS...
+    local v=$1; shift
+    V=$v SF_HOLD_MAIN=$HOLD bash -c "ok() { :; }; $(sed -n '/^HOLD_MAIN=/,/^# The stage.s EXIT trap/p' scripts/release.sh | sed '$d'); $*" 2>/dev/null
+}
+hold_save=$(cat "$HOLD")
+printf 'who: the owner by hand\n' > "$HOLD"
+holdfn 9.0.1 hold_main_set; holdfn 9.0.1 hold_main_lift
+grep -q 'by hand' "$HOLD" || fail "a hand-set hold-main was replaced or lifted"
+printf '%s\n' "$hold_save" > "$HOLD"
+holdfn 9.0.2 hold_main_lift
+[ -f "$HOLD" ] || fail "another version's promote lifted the 9.0.1 hold"
+holdfn 9.0.1 hold_main_lift
+[ ! -f "$HOLD" ] || fail "the 9.0.1 promote did not lift its hold"
 git switch -q main && git merge -q --ff-only origin/main
 quiet scripts/release.sh 9.0.1 --only bump # promoting: main already carries it
 grep -q 'already carries 9.0.1' "$S/out.log" || fail "promote bump: $(cat "$S/out.log")"
