@@ -8,6 +8,7 @@ click "Tool##palette.tool"
 click "Tool/##detach"
 wait 0.2
 expect_value detached_panels == 1
+click "Parts##tool.part"                        # (Parts opens by default and fills the window: fold it, so Viewport Look's rows fit below)
 expect "Viewport Look##tool.display"
 click "Viewport Look##tool.display"
 click "Backface culling##display"

@@ -470,7 +470,10 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
                 }
             }
             if (shorts.empty()) break;
-            std::sort(shorts.begin(), shorts.end(), [](const Short& x, const Short& y) { return x.length < y.length; });
+            // (ties by vertex id: a grid's seam edges are all one length, and float noise differs between machines)
+            std::sort(shorts.begin(), shorts.end(), [](const Short& x, const Short& y) {
+                return x.length != y.length ? x.length < y.length : x.v != y.v ? x.v < y.v : x.u < y.u;
+            });
             std::vector<uint8_t> touched(m.vertexCount(), 0);
             std::vector<uint32_t> tu, tv;
             size_t before = collapsed;
@@ -810,15 +813,18 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
     // 5. No folds: a sliver of the cut whose vertex moved more than the sliver is high turns over, and a relaxation
     // slide can cross an edge of an uneven star. Any triangle facing against the way it faced before the projection
     // has a vertex pulled: four rounds towards its neighbours' mean, then halfway back to where it started and onto
-    // the fillet again, and at the last back to where it started, until none is left (at the start it faced as it
-    // did, so this ends). Triangles too small to see at the fillet's scale are
+    // the fillet again, and from the eighth round all its vertices back to where they started, until none is left
+    // (at the start it faced as it did, so this ends). Triangles too small to see at the fillet's scale are
     // left alone: their facing is noise, and pinning a seam vertex for one would crease the fillet.
     if (o.relax) { // (not on an unwelded seam: it could pull one copy of a seam vertex back and not its twin, and open a crack)
         const float tiny = 2e-3f * r * r; // twice an area (as cross products come): a sliver 0.1 r long and 0.02 r wide
         std::vector<uint32_t> slot(nv, ~0u);
         for (size_t i = 0; i < todo.size(); ++i) slot[todo[i]] = uint32_t(i);
         std::vector<uint8_t> again(m.triangleCount(), 0); // (folded in the round before: then all its vertices)
-        for (int round = 0; round < 8; ++round) {
+        // The last rounds pin every vertex of a folded triangle where it started and look again, until none is left:
+        // each such round pins vertices that were not pinned, so this ends, and a triangle with all its vertices at
+        // their start faces as it did (a round that ends early never leaves a neighbour's fold behind).
+        for (int round = 0; round < 64; ++round) {
             std::vector<uint8_t> pull(todo.size(), 0);
             std::vector<uint8_t> now(m.triangleCount(), 0);
             size_t folded = 0;
@@ -833,7 +839,7 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
                 // (first the vertex that moved farthest: pulling all three left the other two folded against their
                 // own neighbours, and the pulls then ran along the seam, one vertex per round: a torn edge; all three
                 // once that alone did not mend it, as at the band's edge, where the one that slid across moved least)
-                if (again[t]) {
+                if (again[t] || round >= 7) {
                     for (uint32_t v : {tri.x, tri.y, tri.z})
                         if (slot[v] != ~0u) pull[slot[v]] = 1;
                     continue;
@@ -880,6 +886,7 @@ void blendBooleanSeam(Mesh& m, std::vector<uint8_t>& side, const std::vector<uin
                     else m.positions[todo[i]] = start[i];
                 }
             }, 256);
+            if (round >= 7 && std::none_of(pull.begin(), pull.end(), [](uint8_t p) { return p != 0; })) break; // (folded, but nothing of ours to pin)
         }
     }
     std::vector<float> moved(todo.size(), 0.0f);
