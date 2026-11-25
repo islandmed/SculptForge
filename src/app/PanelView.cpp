@@ -551,9 +551,8 @@ void App::drawAddedLightControls() {
                      "The view's cast shadows come from this light (Shadows & AO on). One light at most casts them: ticking it "
                      "here takes them over; with none ticked they come from the material's light or the environment, as before.",
                      kPath);
-        const float bw = ImGui::GetFrameHeight();
-        ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - bw));
-        if (ImGui::Button(ICON_LC_X "##remove", ImVec2(bw, 0))) removeAt = int(i);
+        ImGui::SameLine();
+        if (ui::GlyphButton("##remove", ICON_LC_X, ImVec2(ImGui::GetFrameHeight(), 0))) removeAt = int(i);
         ui::HelpText("Remove", nullptr, "Take this light away.", kPath);
         ImGui::SetNextItemWidth(-1);
         ui::SliderInside("##intensity", &l.intensity, 0.0f, 3.0f, tr("Intensity %.2f"));
