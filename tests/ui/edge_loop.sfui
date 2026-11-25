@@ -1,0 +1,46 @@
+# edge_loop and edge_select op=ring (core/EdgeLoopInsert.h): from Edges mode, the ring through a clicked edge, then a loop
+# inserted across it as one undo step with the new loop selected; three loops slid to one side; undo takes each back.
+# (The Polygon mode panel's Edge loop entry drives the same op; this covers the command and the Document wiring.)
+run new_sphere subdivisions=1
+run part_append type=cube name=Box
+run part_delete index=0
+orbit 120 -60
+key f
+zoom 0.7
+click "Geometry##tool.geometry"
+click "Geometry/Edges mode"
+expect_value edges_mode == 1
+expect_value edges_selected == 0
+remember triangles tris0
+remember vertices verts0
+
+# One clicked edge; its ring goes round the cube.
+click_part Box 0.5 0.5 1
+expect_value edges_selected == 1
+run edge_select op=ring edge=0
+expect_status "Edge ring of"
+expect_value edges_selected > 1
+remember edges_selected ring
+shot edge-loop-ring
+
+# One new loop with as many edges as the ring (the ring closes round the cube), selected afterwards; the cube gains
+# one vertex per ring edge.
+run edge_loop
+expect_status "Edge loop: 1 loop of"
+expect_value edges_selected == $ring
+expect_value vertices > $verts0
+expect_value triangles > $tris0
+shot edge-loop-inserted
+
+# One undo step takes it back.
+key ctrl+z
+expect_value vertices == $verts0
+expect_value triangles == $tris0
+
+# Three loops, slid towards one side, through a given edge.
+run edge_loop count=3 slide=0.5 edge=0
+expect_status "Edge loop: 3 loops of"
+expect_value edges_selected > $ring
+shot edge-loop-three
+key ctrl+z
+expect_value vertices == $verts0

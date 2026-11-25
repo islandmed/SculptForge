@@ -150,7 +150,7 @@ void registerAgentTools(CommandRegistry& reg) {
 
     reg.add({"scene_overview",
              "What's in the scene: every Part (index, name, triangles, subdivision levels, size, centre, active / "
-             "hidden), the active brush and the size of the whole scene. Use it before and after big steps.",
+             "hidden, AI provenance: model, host, date and pass for Parts Generate 3D made), the active brush and the size of the whole scene. Use it before and after big steps.",
              {},
              [](Document& doc, const Args&) -> CommandResult {
                  std::string out = std::to_string(doc.partCount()) + " Part" + (doc.partCount() == 1 ? "" : "s") + ":";
@@ -164,6 +164,7 @@ void registerAgentTools(CommandRegistry& reg) {
                      if (m.triangleCount()) out += ", " + partLine(doc, i);
                      if (i == doc.activePart) out += ", active";
                      if (!p.visible) out += ", hidden";
+                     if (!p.ai.empty()) out += ", AI: " + p.ai.line();
                  }
                  const AABB scene = doc.visibleBounds();
                  if (scene.valid()) out += "\nScene (visible): size " + vecText(scene.max - scene.min) + ", centre " +

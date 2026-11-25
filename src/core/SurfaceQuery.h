@@ -10,6 +10,7 @@
 #include "core/Mesh.h"
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace sf {
@@ -29,7 +30,9 @@ public:
         uint32_t first = 0; // leaf: first index into order(); inner: left child (right = first + 1)
         uint32_t count = 0; // > 0 for leaves
     };
-    void build(const std::vector<AABB>& boxes);
+    // `stop` (optional) is asked between the tree's top levels and the subtree rounds; false leaves the tree empty and
+    // returns false (Cancel during a remesh of a dense sculpt: the build is half a second at 5M triangles).
+    bool build(const std::vector<AABB>& boxes, const std::function<bool()>& stop = {});
     const std::vector<Node>& nodes() const { return nodes_; }
     const std::vector<uint32_t>& order() const { return order_; }
     bool empty() const { return nodes_.empty(); }
@@ -42,7 +45,7 @@ private:
 class TriangleBVH {
 public:
     // Takes the triangles to query (hidden ones should be left out by the caller).
-    void build(std::vector<glm::vec3> positions, std::vector<glm::uvec3> triangles);
+    bool build(std::vector<glm::vec3> positions, std::vector<glm::uvec3> triangles, const std::function<bool()>& stop = {});
     void build(const Mesh& mesh) { build(mesh.positions, mesh.triangles); }
     bool empty() const { return bvh_.empty(); }
 

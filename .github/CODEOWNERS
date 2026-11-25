@@ -1,0 +1,53 @@
+# Changes here need a maintainer's security review before merge (build, CI, dependencies, parsers of
+# untrusted files, network, plugins, scripting, AI/MCP and app links). Everything else: normal review.
+# Last match wins; keep this list in step with CONTRIBUTING.md "Areas that get a security review".
+
+# Repository plumbing
+/.github/                     @islandmed
+/scripts/                     @islandmed
+/tools/release/               @islandmed
+/tools/ci/                    @islandmed
+
+# Build and dependencies
+/CMakeLists.txt               @islandmed
+**/CMakeLists.txt             @islandmed
+/cmake/                       @islandmed
+/third_party/                 @islandmed
+/packaging/                   @islandmed
+/pyproject.toml               @islandmed
+/android/**/*.gradle*        @islandmed
+/android/gradle.properties    @islandmed
+
+# Parsers of files people open or download
+/src/io/                      @islandmed
+/src/core/Project.*           @islandmed
+/src/core/Pack.*              @islandmed
+/src/core/BrushPacks.*        @islandmed
+/src/core/BenchPack.*         @islandmed
+/src/core/GarmentFiles.*      @islandmed
+/src/core/Image.*             @islandmed
+/src/core/CommandParse.*      @islandmed
+/src/core/FileReplace.*       @islandmed
+
+# Network, updates, plugins, scripting, AI, MCP, app links (IPC)
+/src/core/NetworkPolicy.*     @islandmed
+/src/core/SelfUpdate.*        @islandmed
+/src/core/UpdateCheck.*       @islandmed
+/src/core/Plugin.*            @islandmed
+/src/core/Script.*            @islandmed
+/src/core/ScriptPath.*        @islandmed
+/src/ai/                      @islandmed
+/src/cli/Mcp*                 @islandmed
+/src/link/                    @islandmed
+/src/python/                  @islandmed
+/src/app/PanelPlugins.cpp     @islandmed
+/src/app/PanelUpdate.cpp      @islandmed
+/sdk/plugin/                  @islandmed
+/services/                    @islandmed
+/integrations/                @islandmed
+/addons/                      @islandmed
+/python/                      @islandmed
+
+# The website deploys straight from main (scripts run in visitors' browsers)
+/website/**/*.js              @islandmed
+/website/**/*.html            @islandmed

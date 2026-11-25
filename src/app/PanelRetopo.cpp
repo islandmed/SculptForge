@@ -454,6 +454,7 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
     }
     auto job = std::make_unique<VoxelRemeshJob>();
     job->trigger = trigger;
+    job->restarts = std::exchange(voxelRemeshRestarts_, 0);
     job->revision = doc_.undo.revision();
     job->progress = std::make_shared<std::atomic<float>>(0.0f);
     job->cancel = std::make_shared<std::atomic<bool>>(false);
@@ -551,7 +552,14 @@ void App::pollVoxelRemesh() {
     }
     if (job->trigger != RemeshTrigger::Button && doc_.undo.revision() != job->revision) {
         // Sculpted (or undone) while it ran: landing would throw that work away, so it remeshes the Part as it is now.
+        // Twice at most in a row (Quick Remesh is on by default since 0.14.0): a key pressed by mistake mid-stroke must
+        // not keep the computer remeshing for as long as the sculpting goes on.
+        if (job->restarts >= 2) {
+            status_ = std::string(name) + "the Part kept changing while it was remeshed; nothing landed. Remesh again when you pause";
+            return;
+        }
         status_ = std::string(name) + "the Part changed while it was remeshed, remeshing again...";
+        voxelRemeshRestarts_ = job->restarts + 1;
         startVoxelRemesh(job->trigger);
         return;
     }
@@ -634,7 +642,7 @@ std::string App::remeshSkippedNote(int reason) {
         tr("Remesh after each stroke: skipped, this Part has subdivision levels (a remesh would remove them). %s"),
         tr("Remesh after each stroke: skipped, this Part has sculpt layers (a remesh would remove them). %s"),
         tr("Remesh after each stroke: skipped, this Part has a painted texture (carrying it over takes a while). %s")};
-    const std::string key = uiPrefs_.quickRemesh ? actions_.shortcutText("geometry.quick_remesh") : std::string();
+    const std::string key = quickRemeshOn() ? actions_.shortcutText("geometry.quick_remesh") : std::string();
     char way[160], line[512];
     if (key.empty()) std::snprintf(way, sizeof way, "%s", tr("Tool > Remesh > Remesh remeshes it anyway."));
     else std::snprintf(way, sizeof way, tr("%s remeshes it anyway."), key.c_str());
@@ -648,14 +656,14 @@ void App::quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down) {
         return;
     }
     const Action* a = actions_.actionForChord(chordFromEvent(key, mods));
-    if (a && a->id == "geometry.quick_remesh_drag" && uiPrefs_.quickRemesh) quickRemeshDragKey_ = key;
+    if (a && a->id == "geometry.quick_remesh_drag" && quickRemeshOn()) quickRemeshDragKey_ = key;
 }
 
 // With the drag key held (N by default, Preferences > Hotkeys), a press on the background (no surface under it)
 // remeshes when it's let go. On the model the press stays a stroke. The key is unbound in every input style, so
 // no empty-canvas drag of any style (turn, pan, zoom, mask and hide shapes) changes.
 bool App::quickRemeshDragDown(float x, float y) {
-    if (quickRemeshDragKey_ == SDLK_UNKNOWN || !uiPrefs_.quickRemesh) return false;
+    if (quickRemeshDragKey_ == SDLK_UNKNOWN || !quickRemeshOn()) return false;
     RayHit hit;
     if (previewLod_ < 0 && pick(x, y, hit)) return false;
     drag_ = Drag::QuickRemesh;
@@ -665,8 +673,8 @@ bool App::quickRemeshDragDown(float x, float y) {
 
 void App::drawQuickRemeshContents() {
     tray::GroupLabel(*this, "Quick Remesh");
-    bool quick = uiPrefs_.quickRemesh;
-    if (ImGui::Checkbox(tr("Quick Remesh##remesh.quick"), &quick)) uiPrefs_.quickRemesh = quick;
+    bool quick = quickRemeshOn();
+    if (ImGui::Checkbox(tr("Quick Remesh##remesh.quick"), &quick)) uiPrefs_.quickRemesh = quick ? 1 : 0;
     const std::string key = actions_.shortcutText("geometry.quick_remesh");
     const std::string drag = actions_.shortcutText("geometry.quick_remesh_drag");
     const std::string help =

@@ -160,6 +160,11 @@ struct SceneMesh {
 struct RenderViewport {
     int x = 0, y = 0, w = 0, h = 0;
     glm::vec3 surround{0.118f, 0.118f, 0.125f};
+    // Several views in one frame (App's Split view): multi = a scaled draw goes into the frame-size target and only this
+    // rect is copied to the window, so the panes share one target (no reallocation between them); keep = the target
+    // outside this rect is left as it is (the pane before drew there; the first pane clears it); secondary = no
+    // screen-stroke pass (the pending dabs' preview belongs to the view the stroke is in).
+    bool multi = false, keep = false, secondary = false;
 };
 
 // Display colour of a face group id (linear RGB): a stable hash spread over

@@ -501,6 +501,7 @@ void App::registerShellActions() {
             paintMode_ = false;
             const std::string guides = leaveGuides(); // leaves the QRemesh Guides brush
             edgesMode_ = false;  // and Edges mode
+            if (polyMode_) setPolyMode(false); // and Polygon mode (PanelPolygon.cpp)
             maskBrush_.on = false;
             // and Draw Tube / Append > Insert, the same brush picked again too; the status says what was left
             if (leaveDrawModesStatus().empty() && !guides.empty()) status_ = "Left " + guides + ": brushes sculpt again";
@@ -769,20 +770,20 @@ void App::registerShellActions() {
     // Quick Remesh (#121): Shift+R, and N held while clicking or dragging on the background (quickRemeshDragDown).
     // Neither key is taken in any input style (Input.cpp applyInputStyle).
     add({"geometry.quick_remesh", "Quick Remesh", nullptr,
-         "With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background.",
+         "Remesh the active Part at the Voxel Remesh resolution, in the background (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
          "Tool > Remesh", "Shift+R", "",
          [this] {
-             if (uiPrefs_.quickRemesh) quickRemesh(RemeshTrigger::Quick);
+             if (quickRemeshOn()) quickRemesh(RemeshTrigger::Quick);
              else status_ = "Quick Remesh is off: turn it on in Tool > Remesh";
          },
          nullptr, nullptr});
     add({"geometry.quick_remesh_drag", "Quick Remesh (hold and drag)", nullptr,
-         "With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to "
-         "remesh the active Part.",
+         "Hold this key and click or drag on the background (not on the model) to remesh the active Part (on by default in the "
+         "SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
          "Tool > Remesh", "N", "",
          [this] {
              const std::string key = actions_.shortcutText("geometry.quick_remesh_drag");
-             status_ = !uiPrefs_.quickRemesh ? "Quick Remesh is off: turn it on in Tool > Remesh"
+             status_ = !quickRemeshOn() ? "Quick Remesh is off: turn it on in Tool > Remesh"
                        : key.empty()         ? "Quick Remesh: give this a key in Preferences > Hotkeys, then hold it and drag on the background"
                                              : "Quick Remesh: hold " + key + " and click or drag on the background";
          },
@@ -1031,7 +1032,9 @@ ShellGeometry App::shellGeometry() const {
     return computeShell(layout_, float(w), float(h), uiScale_, topInset(), shellMetrics());
 }
 
-CanvasRect App::canvasRect() const {
+CanvasRect App::canvasRect() const { return uiPrefs_.splitView ? splitPaneRect(splitActive_) : wholeCanvasRect(); }
+
+CanvasRect App::wholeCanvasRect() const {
     int w = 0, h = 0;
     SDL_GetWindowSize(window_, &w, &h);
     if (hideUi_) return {0.0f, 0.0f, float(std::max(w, 1)), float(std::max(h, 1))};
@@ -1052,10 +1055,11 @@ glm::vec4 App::freeCanvasArea() const {
     const CanvasRect c = canvasRect();
     if (hideUi_ || c.w < 1.0f || c.h < 1.0f) return glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
     float top = c.y, bottom = c.y + c.h;
-    if (libraryBrowser_.open()) { // as drawTimeline places the strip beside it
-        const float lib = std::min(LibraryBrowser::height(layout_, uiScale_), c.h);
-        if (layout_.libraryBottom) bottom -= lib;
-        else top += lib;
+    if (libraryBrowser_.open()) { // as drawTimeline places the strip beside it (along the whole canvas's edge: with the
+        const CanvasRect whole = wholeCanvasRect(); // view split, it covers only the pane on that edge)
+        const float lib = std::min(LibraryBrowser::height(layout_, uiScale_), whole.h);
+        if (layout_.libraryBottom) bottom = std::min(bottom, whole.y + whole.h - lib);
+        else top = std::max(top, whole.y + lib);
     }
     if (timelineStripY_ >= 0.0f) { // the strip (or its tab) as last drawn
         if (uiPrefs_.timelineTop) top = std::max(top, timelineStripY_ + timelineStripH_);
@@ -1082,13 +1086,14 @@ void App::partRay(float x, float y, glm::vec3& origin, glm::vec3& dir) const {
     partCamera().screenRay(x - c.x, y - c.y, c.w, c.h, origin, dir);
 }
 
-Renderer::Viewport App::canvasViewport(int fbWidth, int fbHeight) const {
-    if (hideUi_) return {};
+Renderer::Viewport App::canvasViewport(int fbWidth, int fbHeight) const { return canvasViewportOf(canvasRect(), fbWidth, fbHeight); }
+
+Renderer::Viewport App::canvasViewportOf(const CanvasRect& c, int fbWidth, int fbHeight) const {
+    if (hideUi_ && !uiPrefs_.splitView) return {}; // (the whole window; split panes are inset even then)
     int w = 0, h = 0;
     SDL_GetWindowSize(window_, &w, &h);
     if (w <= 0 || h <= 0) return {};
     const float sx = float(fbWidth) / float(w), sy = float(fbHeight) / float(h);
-    const CanvasRect c = canvasRect();
     Renderer::Viewport v;
     v.x = int(std::lround(c.x * sx));
     v.w = std::max(1, int(std::lround((c.x + c.w) * sx)) - v.x);
@@ -1102,6 +1107,10 @@ Renderer::Viewport App::canvasViewport(int fbWidth, int fbHeight) const {
 void App::updateCameraAspect() {
     const CanvasRect c = canvasRect();
     camera_.aspect = c.w / std::max(c.h, 1.0f);
+    if (uiPrefs_.splitView) {
+        const CanvasRect o = splitPaneRect(1 - splitActive_);
+        otherCamera_.aspect = o.w / std::max(o.h, 1.0f);
+    }
 }
 
 // The one-time "Layout changes save themselves - ..." hint comes from watchLayoutChanges (Config.cpp),

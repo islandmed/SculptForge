@@ -215,6 +215,49 @@ HistoryWalk walkToMark(Document& doc, const HistoryMark& mark, uint64_t groupId)
     return w;
 }
 
+std::string markUnreachable(const Document& doc, const HistoryMark& mark) {
+    if (mark.epoch != undoClearEpoch()) return "the history was cleared since (a new scene, an open or a step that can't be undone)";
+    for (int i : historyParts(doc)) {
+        const uint64_t target = targetOf(mark, doc.meshKey(i));
+        if (target && !doc.partUndo(i).hasStep(target))
+            return "its steps were replaced by newer edits or dropped by the undo memory budget";
+    }
+    return {};
+}
+
+HistoryRestore restoreToMark(Document& doc, const HistoryMark& mark, uint64_t groupId) {
+    HistoryRestore out;
+    if (std::string why = markUnreachable(doc, mark); !why.empty()) {
+        out.problem = std::move(why);
+        out.untouched = true;
+        return out;
+    }
+    const HistoryMark before = markHistory(doc);
+    std::map<uint64_t, uint64_t> batchOf; // step seq -> batch id, as the walk restamps the steps it moves
+    for (int i : historyParts(doc)) doc.partUndo(i).forEachStep([&](UndoRecord& r) { batchOf[r.seq] = r.batch; });
+
+    static_cast<HistoryWalk&>(out) = walkToMark(doc, mark, groupId);
+    out.exact = out.exact && sceneHash(doc) == mark.hash;
+    if (out.exact) return out;
+
+    // Not there (steps the budget dropped, a Part a command that can't be undone made or removed, a scene changed outside
+    // the history): go back to where we started, and stamp the steps with their own batch ids again.
+    std::string problem = out.problem.empty() ? "the scene differs from the checkpoint (something in it was changed outside "
+                                                "the undo history)"
+                                              : out.problem;
+    const HistoryWalk back = walkToMark(doc, before);
+    for (int i : historyParts(doc))
+        doc.partUndo(i).forEachStep([&](UndoRecord& r) {
+            if (const auto it = batchOf.find(r.seq); it != batchOf.end()) r.batch = it->second;
+        });
+    out.untouched = back.exact && sceneHash(doc) == before.hash;
+    if (!out.untouched) problem += "; going back to where it was did not work out exactly (" + back.problem + ")";
+    out.problem = std::move(problem);
+    out.exact = false;
+    out.undone = out.redone = 0;
+    return out;
+}
+
 HistoryDistance distanceToMark(const Document& doc, const HistoryMark& mark) {
     HistoryDistance d;
     if (mark.epoch != undoClearEpoch()) return {-1, -1, false};

@@ -427,13 +427,14 @@ bool partMovesWhole(const Document& doc, int index, bool useMask) {
 }
 
 size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useMask, float falloff, Symmetry mirror,
-                        const std::string& label) {
+                        const std::string& label, const std::vector<float>* weights) {
     if (index < 0 || index >= doc.partCount()) return 0;
     Mesh& mesh = doc.partMesh(index);
     const Part& part = doc.parts[size_t(index)];
+    if (weights && weights->empty()) return 0;
     // A linked copy (or one moved as a whole before) moves as a whole: its transform, one undo step in its
     // group's history. With a mask, what moves is the shared mesh, in the Part's own space.
-    if (partMovesWhole(doc, index, useMask)) {
+    if (!weights && partMovesWhole(doc, index, useMask)) {
         if (!part.visible || mesh.vertexCount() == 0) return 0;
         doc.setPartTransform(index, t.evenScale().matrix() * part.transform, label);
         return mesh.vertexCount();
@@ -443,7 +444,7 @@ size_t transformPart(Document& doc, int index, const MeshTransform& t, bool useM
     UndoStack& undo = doc.partUndo(index);
     TransformSession s;
     const int layer = part.data == doc.activePartInfo().data ? doc.activeLayer : -1; // (the checked-out mesh)
-    if (!s.begin(mesh, transformWeights(mesh, useMask, falloff), mirror, local.pivot, layer)) return 0;
+    if (!s.begin(mesh, weights ? *weights : transformWeights(mesh, useMask, falloff), mirror, local.pivot, layer)) return 0;
     if (index == doc.activePart && figurePoseEditing(doc)) s.keepOp(); // a Pose Mesh move (core/FigurePose.h)
     const size_t n = s.movingVertices();
     s.apply(mesh, local);

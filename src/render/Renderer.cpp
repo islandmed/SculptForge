@@ -3489,7 +3489,42 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     if (directView_) samples = 1;
     // Resolution scale (#80): the view drawn into a smaller target and scaled up into the window.
     const float scale = std::clamp(settings.resolutionScale, 0.25f, 1.0f);
-    if (scale < 0.999f && !directView_ && !scaleFailed_) {
+    const bool pane = viewport.multi && viewport.w > 0 && viewport.h > 0; // one pane of a split view (RenderViewport)
+    if (scale < 0.999f && !directView_ && !scaleFailed_ && pane) {
+        // Split view: the pane drawn smaller in its own corner of the frame-size target (the same target every pane
+        // uses: a target per size would be remade twice a frame), then stretched into its place in the window.
+        Viewport small = viewport;
+        small.w = std::max(1, int(std::lround(viewport.w * scale)));
+        small.h = std::max(1, int(std::lround(viewport.h * scale)));
+        int s = samples;
+        while (s > 1 && !viewTarget(width, height, s)) s /= 2;
+        if (s > 1 || viewTarget(width, height, 1)) {
+            gl::BindFramebuffer(GL_FRAMEBUFFER, viewFbo_);
+            draw(camera, width, height, settings, small);
+            logViewFrame("scaled pane", small.w, small.h, s, scale, lastDrawn_, true);
+            gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_);
+            gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
+            gl::BlitFramebuffer(small.x, small.y, small.x + small.w, small.y + small.h, small.x, small.y, small.x + small.w,
+                                small.y + small.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            applyOcclusion(viewFbo_, viewResolveFbo_, width, height);
+            gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+            gl::Disable(GL_SCISSOR_TEST);
+            gl::Viewport(0, 0, width, height);
+            if (!viewport.keep) { // the window around the panes, once a frame (as draw() leaves it)
+                gl::ClearColor(viewport.surround.x, viewport.surround.y, viewport.surround.z, 1.0f);
+                gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            }
+            gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_);
+            gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            gl::BlitFramebuffer(small.x, small.y, small.x + small.w, small.y + small.h, viewport.x, viewport.y,
+                                viewport.x + viewport.w, viewport.y + viewport.h, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+            const GLenum blitError = gl::GetError();
+            gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
+            if (blitError == GL_NO_ERROR) return s;
+            scaleFailed_ = true;
+            SDL_Log("Scaled pane copy to the window failed (GL error 0x%04x); drawing at full resolution", unsigned(blitError));
+        }
+    } else if (scale < 0.999f && !directView_ && !scaleFailed_) {
         const int sw = std::max(1, int(std::lround(width * scale))), sh = std::max(1, int(std::lround(height * scale)));
         const bool inset = viewport.w > 0 && viewport.h > 0;
         Viewport small = viewport;
@@ -3532,7 +3567,7 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     while (samples > 1 && !viewTarget(width, height, samples)) samples /= 2;
     screenStrokeDrawn_ = false;
     // A screen stroke needs the view in a target it can read back: through the single-sample one when no AA.
-    const bool screen = !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr() && !settings.unlit;
+    const bool screen = !viewport.secondary && !screenStroke_.dabs.empty() && settings.litsphere >= 0 && !settings.pbr() && !settings.unlit;
     // ... and so do the view's shadows and AO (they read its depth).
     const bool occlusion = occlusionWanted(settings);
     if (samples <= 1 && !((screen || occlusion) && viewTarget(width, height, 1))) {
@@ -3546,7 +3581,12 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
     logViewFrame("view target", width, height, samples, 1.0f, lastDrawn_, true);
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewFbo_); // resolve: same format and size on both sides
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, viewResolveFbo_);
-    gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    // A later pane of a split view copies only its own rect: the rest of the target is the panes before it (or stale).
+    const bool keepPane = pane && viewport.keep;
+    if (keepPane)
+        gl::BlitFramebuffer(viewport.x, viewport.y, viewport.x + viewport.w, viewport.y + viewport.h, viewport.x, viewport.y,
+                            viewport.x + viewport.w, viewport.y + viewport.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    else gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     if (occlusion) applyOcclusion(viewFbo_, viewResolveFbo_, width, height);
     if (screen)
         screenStrokeDrawn_ = screenPass_.apply(screenStroke_, viewFbo_, viewResolveFbo_, width, height, frameView_, frameProj_,
@@ -3554,7 +3594,10 @@ int Renderer::drawView(const Camera& camera, int width, int height, const Render
                                                lightRotation(settings.lightYaw, settings.lightPitch));
     gl::BindFramebuffer(GL_READ_FRAMEBUFFER, viewResolveFbo_); // single-sample blit: may convert to the window's format
     gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    if (keepPane)
+        gl::BlitFramebuffer(viewport.x, viewport.y, viewport.x + viewport.w, viewport.y + viewport.h, viewport.x, viewport.y,
+                            viewport.x + viewport.w, viewport.y + viewport.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    else gl::BlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     const GLenum blitError = gl::GetError();
     gl::BindFramebuffer(GL_FRAMEBUFFER, 0);
     if (blitError != GL_NO_ERROR) { // the view never reached the window: draw this frame and later ones directly
@@ -3740,8 +3783,10 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     gl::Viewport(0, 0, targetWidth, targetHeight);
     const bool inset = viewport.w > 0 && viewport.h > 0;
     if (inset) {
-        gl::ClearColor(viewport.surround.x, viewport.surround.y, viewport.surround.z, 1.0f);
-        gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        if (!viewport.keep) { // (a second pane of a split view keeps what the first drew around it)
+            gl::ClearColor(viewport.surround.x, viewport.surround.y, viewport.surround.z, 1.0f);
+            gl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
         gl::Viewport(viewport.x, viewport.y, viewport.w, viewport.h);
         gl::Scissor(viewport.x, viewport.y, viewport.w, viewport.h);
         gl::Enable(GL_SCISSOR_TEST);

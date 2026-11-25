@@ -13,8 +13,8 @@
   the test's ENVIRONMENT and the SF_/SCULPTFORGE_/SDL_/GL driver variables of this run. Tests that read the whole tree
   (marks, the guide, release notes...) hash every tracked file. A test that passed with the same fingerprint on this
   machine is skipped and reported as cached; a pass on the first try is recorded. Never on CI (nothing persists).
-* Flakes: failed tests run once more (ctest --rerun-failed). A pass on the rerun is a flake: logged (`flaky: name`
-  lines, appended to --flaky-log), not cached, and does not fail the run. A test in tests/quarantine.txt (owner, date)
+* Flakes: failed tests run once more, by name (ctest --rerun-failed's test numbers can shift). A pass on the rerun is a
+  flake: logged (`flaky: name` lines, appended to --flaky-log), not cached, and does not fail the run. A test in tests/quarantine.txt (owner, date)
   doesn't block until its date, then blocks again until it is fixed or deleted. A test labelled `flaky` that fails twice is
   reported but never fails the run either (it never blocks a release; fix it or delete it).
 * Budget: a non-nightly test that took longer than --budget seconds (default $SF_TEST_BUDGET or 20; 0 = off) fails
@@ -232,6 +232,13 @@ def parallel_jobs(args):
     return 1
 
 
+def names_args(names, args):
+    """Run exactly these tests again, by NAME. (ctest --rerun-failed goes by test number, and the numbers can shift between
+    the two runs: 11-24 a T0's rerun of #523 ran ui_generate_candidates_2880 instead of ui_async_stroke_undo_view_1440, so
+    that flake never got its rerun and turned 11 runs red.) Fixtures (the warm UI servers) come along as with any -R."""
+    return ["-R", "^(" + "|".join(re.escape(n) for n in names) + ")$", *rerun_args(args)]
+
+
 def rerun_args(args):
     """The options a rerun keeps: the configuration (-C X: a multi-config build runs nothing without it) and -j."""
     keep, i = [], 0
@@ -431,7 +438,7 @@ def run_tests(argv=None):
             flaky = []
             if failed:
                 print(f"\nrerunning {len(failed)} failed test(s) once: {' '.join(failed)}", flush=True)
-                ctest(build, ["--rerun-failed", *rerun_args(args)], os.path.join(tmp, "b.xml"))
+                ctest(build, names_args(failed, args), os.path.join(tmp, "b.xml"))
                 again = results(os.path.join(tmp, "b.xml"))
                 said = outputs(os.path.join(tmp, "b.xml"))
                 gpu_lost = [n for n in failed if again.get(n, ("fail",))[0] != "pass" and GPU_LOST.search(said.get(n, ""))]
@@ -606,6 +613,7 @@ def self_test():
     assert rerun_args(["-j10", "-CRelease", "-R", "x"]) == ["-j10", "-CRelease"] and rerun_args(["-j"]) == ["-j"]
     assert alone_args("ci_x", ["-C", "Release", "-j4", "-L", "ui"]) == ["-R", "^ci_x$", "-C", "Release", "-j4"]
     assert alone_args("a.b", []) == ["-R", "^a\\.b$"]
+    assert names_args(["ui_a_1440", "t.b"], ["-j", "4", "-L", "ui"]) == ["-R", "^(ui_a_1440|t\\.b)$", "-j", "4"]
     print("run.py self-test passed")
     return 0
 

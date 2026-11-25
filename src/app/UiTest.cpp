@@ -64,6 +64,7 @@
 //   brush_size PX            set Size (the brush radius, screen pixels)
 //   reset_sliders            Size, Intensity, Colour intensity and Falloff back to their defaults
 //   zoom FACTOR / look X Y Z  move the camera FACTOR times closer / turn it about (and look at) the point X Y Z
+//   hide_ui 0|1              hide (1) or show (0) every panel and bar: the viewport alone, for clips and beauty shots
 //   camera_distance D        put the camera D model units from the point it looks at (extreme zoom)
 //   run COMMANDS             sculptforge-cli commands, e.g. run new_sphere subdivisions=4 ($SCRIPT_DIR: the script's folder)
 //   drop FILE                as if FILE were dropped onto the window (relative to the script's folder)
@@ -126,7 +127,8 @@
 //                            "SculptForge has a new look" card),
 //                            generate_candidates (Generate 3D's, waiting for a pick), generated_part (the pick's Part
 //                            index, -1 none), high_detail_part (its hidden copy's index, -1 none, -2 shown),
-//                            subdiv_levels (the active Part's, 0 none),
+//                            subdiv_levels (the active Part's, 0 none), ai_provenance (the active Part's AI tag: 0 none,
+//                            1 generated, 2 sculpting base, 3 reference),
 //                            brush_looks (different alpha + stroke looks the brush thumbnails were asked for, #208),
 //                            thumbnails_regenerated (brush thumbnails remade by right-click > Regenerate thumbnail),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
@@ -137,6 +139,10 @@
 //                            extract_preview (1 while an Extract preview waits for Accept), open_edges (edges of
 //                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
 //                            volume with its open borders capped),
+//                            poly_mode (Tool > Polygon on), poly_element (0 Points, 1 Edges, 2 Faces), poly_selected / poly_total
+//                            (of that kind), poly_shown (drawn facing the camera), poly_hovered (the element under the cursor, -1 none),
+//                            poly_ops (operations in the registry), poly_preview (1 while an op's live preview is drawn),
+//                            poly_selected_min_edge (the shortest edge of the selected faces, scene units: a sliver check after Inset),
 //                            edited_parts (Parts with undo history), user_brushes (brushes in the
 //                            user library), library_files (.sfbrush files in it; UI tests get an empty
 //                            one in --ui-out/brush-library), ui_config (1 once ui.json is written: the preferences save themselves, or Save Layout),
@@ -246,7 +252,10 @@
 //                            their own curve), dab_error_px (the last stroke's dab furthest from its cursor
 //                            position, projected back), dab_jitter / dab_jitter_raw (its depth wobble with / without
 //                            the pick filter, x1000 radii), dabs, pixel_density (2 on a HiDPI screen), input_style (0 classic, 1 SculptForge, 2 Blender), turntable, orbit_lock (0 free, 1 Y, 2 X, 3 Z),
-//                            camera_ortho, checked@ACTION (1 when the toggle shows on), size_slider_ring (a Size slider's ring: 1 while it drags, then fading),
+//                            camera_ortho, split_view (0 off, 1 beside, 2 below) / split_active (the pointer's pane, 0 left or top) /
+//                            split_lens_first / split_lens_second (0 free, 1 front, 2 right, 3 top) / split_ratio /
+//                            split_first_u, split_first_v, split_second_u, split_second_v (a pane's middle, window fractions),
+//                            checked@ACTION (1 when the toggle shows on), size_slider_ring (a Size slider's ring: 1 while it drags, then fading),
 //                            right_column_clipped (right shelf items past its bottom), right_shelf_changes (frames that folded,
 //                            unfolded or resized it; steady = no change), right_shelf_folded, mask_brush (Blender's Mask brush on), shortcut_conflicts (keys two actions
 //                            claim), brush_type (BrushType
@@ -438,6 +447,7 @@
 #include "core/ListSort.h"
 #include "core/Micro.h"
 #include "core/LitSphere.h"
+#include "core/PolyOps.h"
 #include "core/Multires.h"
 #include "core/MicroTiles.h"
 #include "core/PerfTrace.h"
@@ -454,6 +464,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <limits>
 #include <cstring>
 #include <utility>
 #include <thread>
@@ -817,7 +828,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "voxel_highres_confirm") return app_.voxelHighResConfirm_.open && !app_.voxelHighResConfirm_.swap ? 1.0 : 0.0;
     if (name == "voxel_swap_confirm") return app_.voxelHighResConfirm_.open && app_.voxelHighResConfirm_.swap ? 1.0 : 0.0;
     if (name == "autosave_written") return app_.autosaveWritten_ ? 1.0 : 0.0;
-    if (name == "quick_remesh") return app_.uiPrefs_.quickRemesh ? 1.0 : 0.0;
+    if (name == "quick_remesh") return app_.quickRemeshOn() ? 1.0 : 0.0;
     if (name == "remesh_after_stroke") return app_.uiPrefs_.remeshAfterStroke ? 1.0 : 0.0;
     if (name == "stroke_stretched") return double(app_.lastStrokeStretched_);
     if (name == "remesh_skip_notes") return double(app_.remeshSkipNoted_.size()); // Remesh after each stroke told why (once per Part and reason)
@@ -841,6 +852,32 @@ double Demo::query(const std::string& name, bool& known) const {
         for (uint8_t v : app_.edgeOverlay_.visible) n += v;
         return double(n);
     }
+    // Polygon mode (Tool > Polygon, PanelPolygon.cpp, core/PolyMode.h)
+    if (name == "poly_mode") return app_.polyMode_ ? 1.0 : 0.0;
+    if (name == "poly_element") return double(int(app_.doc_.polySelection.element)); // 0 Points, 1 Edges, 2 Faces
+    if (name == "poly_selected") return double(app_.doc_.polySelection.count());
+    if (name == "poly_total") return app_.doc_.polySelection.topo ? double(app_.doc_.polySelection.total(m)) : 0.0;
+    if (name == "poly_shown") {
+        size_t n = 0;
+        for (uint8_t v : app_.polyOverlay_.visible) n += v;
+        return double(n);
+    }
+    if (name == "poly_hovered") return app_.polyOverlay_.hovered == ~0u ? -1.0 : double(app_.polyOverlay_.hovered);
+    if (name == "poly_ops") return double(PolyOpRegistry::instance().all().size());
+    if (name == "poly_preview") return app_.polyOverlay_.previewOk ? 1.0 : 0.0;
+    if (name == "poly_selected_min_edge") { // the shortest polygon edge of the selected faces (quad diagonals skipped), scene units; 0 with none
+        const std::vector<uint8_t>& faces = app_.doc_.polySelection.faces;
+        double best = std::numeric_limits<double>::infinity();
+        for (uint32_t t = 0; t < m.triangleCount() && t < faces.size(); ++t) {
+            if (!faces[t]) continue;
+            const glm::uvec3& tri = m.triangles[t];
+            const uint32_t u = m.quadPartnerAt(t);
+            const int diag = u != Mesh::kNoQuad && u < m.triangleCount() ? m.quadDiagonal(t, u) : -1;
+            for (int k = 0; k < 3; ++k)
+                if (k != diag) best = std::min(best, double(glm::length(m.positions[tri[k]] - m.positions[tri[(k + 1) % 3]])));
+        }
+        return std::isfinite(best) ? best : 0.0;
+    }
     if (name == "forgespheres") return double(m.forgespheres.size());
     if (name == "forgesphere_preview") return m.forgespherePreview ? 1.0 : 0.0;
     if (name == "tube_points") return double(m.tube.points.size()); // the active Tube Part's (Tube, PanelTube.cpp)
@@ -851,6 +888,10 @@ double Demo::query(const std::string& name, bool& known) const {
         return m.tube.empty() ? -1.0 : 1000.0 * (name[5] == 'f' ? m.tube.points.front() : m.tube.points.back()).radius;
     if (name == "tube_profile") return double(int(m.tube.profile)); // 0 round, 1 square, 2 triangle, 3 ribbon, 4 rope, 5 braid, 6 sleeve
     if (name == "tube_curve") return m.tube.curve ? 1.0 : 0.0; // the active Part is a Curve Part
+    if (name == "tube_straight") return m.tube.straight ? 1.0 : 0.0; // ... a polyline (straight spans)
+    if (name == "tube_selected_count") return double(app_.tubeSelectedPoints().size()); // points selected (Shift+click)
+    if (name == "tube_points_style") return app_.tubePoints_ ? 1.0 : 0.0; // Draw > Points (click to place points)
+    if (name == "tube_line_open") return app_.tubePolyPart_ != 0 ? 1.0 : 0.0; // a polyline being built by clicks
     if (name == "tube_twist") return double(m.tube.twist);
     if (name == "tube_strands") return double(m.tube.strands);
     if (name == "tube_roll") return double(m.tube.roll);
@@ -1108,6 +1149,19 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "turntable") return app_.uiPrefs_.orbitLock == 1 ? 1.0 : 0.0;
     if (name == "orbit_lock") return double(app_.uiPrefs_.orbitLock);
     if (name == "camera_ortho") return app_.camera_.ortho ? 1.0 : 0.0;
+    // Split view (SplitView.cpp): the mode, the pointer's pane, each pane's lens, the divider's share, and where the
+    // second pane's middle is in window fractions (to hover or stroke there).
+    if (name == "split_view") return double(app_.uiPrefs_.splitView);
+    if (name == "split_active") return double(app_.splitActive_);
+    if (name == "split_lens_first") return double(app_.uiPrefs_.splitLens[0]);
+    if (name == "split_lens_second") return double(app_.uiPrefs_.splitLens[1]);
+    if (name == "split_ratio") return double(app_.uiPrefs_.splitRatio);
+    if (name == "split_second_u" || name == "split_second_v" || name == "split_first_u" || name == "split_first_v") {
+        const CanvasRect r = app_.splitPaneRect(name.find("second") != std::string::npos ? 1 : 0);
+        int ww = 0, wh = 0;
+        SDL_GetWindowSize(app_.window_, &ww, &wh);
+        return name.back() == 'u' ? double((r.x + r.w * 0.5f) / float(std::max(ww, 1))) : double((r.y + r.h * 0.5f) / float(std::max(wh, 1)));
+    }
     if (name == "mask_brush") return app_.maskBrushActive() ? 1.0 : 0.0;
     if (name == "brush_sets") return double(app_.brushSets().size()); // brush sets in the library (#143)
     if (name == "brush_set_active") return double(app_.matchingBrushSet()); // the set the bottom shelf is, -1 none
@@ -1397,6 +1451,10 @@ double Demo::query(const std::string& name, bool& known) const {
         return i < 0 ? -1.0 : app_.doc_.parts[size_t(i)].visible ? -2.0 : double(i);
     }
     if (name == "subdiv_levels") return double(subdivLevelCount(app_.doc_.mesh)); // the active Part's (0: none)
+    if (name == "ai_provenance") { // the active Part's AI provenance tag: 0 none, 1 generated, 2 sculpting base, 3 reference
+        const AiProvenance& ai = app_.doc_.activePartInfo().ai;
+        return ai.empty() ? 0.0 : ai.role == AiProvenance::kSculptingBase ? 2.0 : ai.role == AiProvenance::kReference ? 3.0 : 1.0;
+    }
     if (name == "language_bar_open") return app_.languageBar_ ? 1.0 : 0.0; // the first start's "SculptForge is in..." note
     if (name == "welcome_open") return app_.showWelcome_ ? 1.0 : 0.0;
     if (name == "welcome_close_hidden_px" || name == "welcome_x_hidden_px" || name == "welcome_scroll_px" || name == "welcome_scrolled_px") {
@@ -1596,6 +1654,15 @@ double Demo::query(const std::string& name, bool& known) const {
     // Draw > Camera > Gizmo size and View Figure: the axes' length in unscaled px (34 at Medium), the figure shown.
     if (name == "axis_gizmo_length") return double(34.0f * app_.axisGizmoUnit() / std::max(app_.uiScale_, 0.01f));
     if (name == "view_figure") return app_.uiPrefs_.showViewFigure ? 1.0 : 0.0;
+    // Draw > Camera > Corner gizmo (CornerGizmo.cpp): the widget shows (the preference, else by layout); what the corner
+    // shows (0 hidden, 1 the axes, 2 the orientation widget); which corner and where the disc is; the dot under the
+    // pointer; an eased camera turn running.
+    if (name == "orientation_widget") return app_.uiPrefs_.showAxes && app_.orientationWidgetOn() ? 1.0 : 0.0;
+    if (name == "corner_gizmo") return !app_.uiPrefs_.showAxes ? 0.0 : app_.orientationWidgetOn() ? 2.0 : 1.0;
+    if (name == "corner_position") return double(app_.uiPrefs_.cornerPosition);
+    if (name == "axis_gizmo_x") return double(app_.axisGizmoCentre().x);
+    if (name == "nav_hover_end") return double(app_.orientationWidgetHover(mouse_.x, mouse_.y)); // the dot under the pointer, -1 none
+    if (name == "camera_moving") return app_.cameraMoving() ? 1.0 : 0.0;
     // The side view the axis gizmo names under it (0-5: +X +Y +Z -X -Y -Z, as axis_click), -1 between views.
     if (name == "axis_view") return double(axisGizmoAligned(app_.axisGizmoLayout()));
     // The model's projected bounding box against the free area framing fits it into (App::freeCanvasArea: the canvas
@@ -2106,7 +2173,7 @@ enum class StepVerb { None,
     Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
     AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
-    Orbit, Camera, Zoom, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
+    Orbit, Camera, Zoom, HideUi, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
     GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
@@ -2157,7 +2224,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"release", StepVerb::Release},
         {"orbit", StepVerb::Orbit},
         {"camera", StepVerb::Camera},
-        {"zoom", StepVerb::Zoom},
+        {"zoom", StepVerb::Zoom}, {"hide_ui", StepVerb::HideUi},
         {"camera_distance", StepVerb::CameraDistance},
         {"brush_size", StepVerb::BrushSize},
         {"reset_sliders", StepVerb::ResetSliders},
@@ -2507,7 +2574,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         if (!need(1)) return false;
         auto text = std::make_shared<std::string>(restOf(lineText_, 1));
         steps_.push_back([this, text](float) {
-            testKeyNow(SDLK_A, SDL_KMOD_LCTRL);
+            // Select what is there first, except in a slider's typed field, which opens with its number selected
+            // (and where the app, not the field, would take Ctrl+A: Mask All).
+            if (GImGui->TempInputId == 0 || GImGui->TempInputId != GImGui->ActiveId) testKeyNow(SDLK_A, SDL_KMOD_LCTRL);
             SDL_Event e{};
             e.type = SDL_EVENT_TEXT_INPUT;
             e.text.windowID = SDL_GetWindowID(app_.window_);
@@ -2600,7 +2669,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         break;
     }
     case StepVerb::AxisClick: {
-        // axis_click +x|-x|+y|-y|+z|-z: click that end of the axis gizmo (Draw > Camera > Axes, #43)
+        // axis_click +x|-x|+y|-y|+z|-z [double] [nowait]: click that end of the axis gizmo (Draw > Camera > Axes, #43), or
+        // of the orientation widget; "double": a double-click (the second press as SDL counts it). The widget turns with
+        // a 0.35 s eased move: the step settles until it ends (so the next line sees the view), "nowait" leaves it running.
         if (!need(1)) return false;
         static const char* const names[6] = {"+x", "+y", "+z", "-x", "-y", "-z"};
         const auto found = std::find_if(std::begin(names), std::end(names), [&](const char* n) { return w[1] == n; });
@@ -2615,7 +2686,26 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             *at = ImVec2(e.at.x, e.at.y);
         });
         stroke([at](float) { return *at; }, 0.2f);
+        const bool twice = std::find(w.begin() + 2, w.end(), "double") != w.end();
+        const bool nowait = std::find(w.begin() + 2, w.end(), "nowait") != w.end();
+        if (twice)
+            steps_.push_back([this](float) {
+                SDL_Event e{};
+                e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+                e.button.windowID = SDL_GetWindowID(app_.window_);
+                e.button.button = SDL_BUTTON_LEFT;
+                e.button.down = true;
+                e.button.clicks = 2;
+                e.button.x = mouse_.x;
+                e.button.y = mouse_.y;
+                app_.handleEvent(e);
+                e.type = SDL_EVENT_MOUSE_BUTTON_UP;
+                e.button.down = false;
+                app_.handleEvent(e);
+                return true;
+            });
         run([this] { SDL_SetModState(held_); });
+        if (!nowait) steps_.push_back([this](float t) { return !app_.cameraMoving() || t > 2.0f; }); // (the eased turn settles)
         wait(0.1f);
         break;
     }
@@ -3093,12 +3183,32 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         const float dx = num(2, 0), dy = num(3, 0), seconds = w.size() > 4 && w[4] != "keep" ? num(4, 0.4f) : 0.4f;
         auto from = std::make_shared<ImVec2>();
         steps_.push_back([this, line, label, from](float t) {
-            if (findItem(label, *from)) {
-                mouseMotion(from->x, from->y);
-                return true;
+            // Find the item; scrolled out of its panel, wheel the panel towards it first, as click does (a slider
+            // below the fold of a long section: Tool > Polygon with every op's settings).
+            bool visible = false;
+            if (!findItem(label, *from, &visible)) {
+                if (t > 3.0f) fail(line, notFound(label));
+                return t > 3.0f;
             }
-            if (t > 3.0f) fail(line, notFound(label));
-            return t > 3.0f;
+            if (!visible) {
+                ImVec4 clip;
+                findItem(label, *from, &visible, &clip);
+                if (clip.z > clip.x && clip.w > clip.y && t <= 2.0f) {
+                    mouseMotion((clip.x + clip.z) * 0.5f, (clip.y + clip.w) * 0.5f);
+                    SDL_Event e{};
+                    e.type = SDL_EVENT_MOUSE_WHEEL;
+                    e.wheel.windowID = SDL_GetWindowID(app_.window_);
+                    e.wheel.y = from->y > clip.w ? -1.0f : 1.0f;
+                    e.wheel.mouse_x = mouse_.x;
+                    e.wheel.mouse_y = mouse_.y;
+                    app_.handleEvent(e);
+                    return false;
+                }
+                if (t > 1.0f) fail(line, "\"" + label + "\" is not visible (off screen or scrolled out of view)");
+                return t > 1.0f;
+            }
+            mouseMotion(from->x, from->y);
+            return true;
         });
         steps_.push_back([this, from, dx, dy, seconds, keep](float t) {
             if (t == 0.0f) return false; // a frame of hover first
@@ -3309,6 +3419,12 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     case StepVerb::Zoom: { // zoom FACTOR: the camera's distance divided by FACTOR
         if (!need(1)) return false;
         run([this, f = num(1, 1)] { app_.camera_.distance /= std::max(float(f), 1e-3f); });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::HideUi: { // hide_ui 0|1: the viewport alone (clips, beauty shots)
+        if (!need(1)) return false;
+        run([this, on = num(1, 1) != 0.0] { app_.hideUi_ = on; });
         wait(0.1f);
         break;
     }
