@@ -10,7 +10,7 @@
 // --noise A: every vertex moved along its normal by up to A x the bounding-box diagonal (scan or pore-like grain);
 // --holes N: N round holes punched through the surface (open boundaries, as a sculpt with deleted faces).
 // --detail KIND: a whole-surface detail_pass (pores, skin, wrinkles, scales, scars), as a finished sculpt has.
-// --no-crease-snap: Voxel Remesh without its crease pass (A/B).
+// --no-crease-snap: Voxel Remesh without its crease pass (A/B). --keep-groups: with Keep Face Groups.
 // --shape creased: a sphere with V-creases under two voxels wide at Resolution 200 (tests/CreaseProbe.h, gh#240; --tris
 // is ignored); each voxel row is followed by a CREASE line: serration and distances along the creases.
 // --cancel-after MS: Cancel each run MS ms after it starts (from another thread, as the app's button does) and print
@@ -225,7 +225,7 @@ int main(int argc, char** argv) {
     float noise = 0.0f, adaptive = -1.0f; // (adaptive < 0: the option's default)
     std::string detail;
     int symmetry = -1;
-    bool bumpy = false;
+    bool bumpy = false, keepGroups = false;
     std::vector<long> sizes = {1000, 10000, 100000, 1000000};
     std::string paths = "qr2,legacy,voxel", shape = "sphere";
     for (int i = 1; i < argc; ++i) {
@@ -238,6 +238,7 @@ int main(int argc, char** argv) {
         else if (a == "--voxel-res" && more) voxelRes = std::atoi(argv[++i]);
         else if (a == "--bumpy") bumpy = true;
         else if (a == "--no-crease-snap") setVoxelCreaseSnap(false);
+        else if (a == "--keep-groups") keepGroups = true;
         else if (a == "--shape" && more) shape = argv[++i];
         else if (a == "--cancel-after" && more) cancelAfter = std::atoi(argv[++i]);
         else if (a == "--noise" && more) noise = float(std::atof(argv[++i]));
@@ -318,7 +319,7 @@ int main(int argc, char** argv) {
                 QuadQuality q;
                 bool ok;
                 if (std::string(path) == "voxel") {
-                    out = voxelRemesh(src, voxelRes, &error, mark);
+                    out = voxelRemesh(src, voxelRes, &error, mark, false, keepGroups);
                     ok = out.triangleCount() > 0;
                 } else {
                     QRemeshOptions o; // the UI defaults (App::startQRemesh with retopo_ untouched)

@@ -8,7 +8,8 @@ fixed: **Voxel Remesh: creases came out stair-stepped** (#240). A crease about 1
   the original; a cube's edges come out sharper. Smooth surfaces and fine bumps come out exactly as before, there are no
   new self-intersections, and the remesh takes about 1% longer. Creases finer than that can't be held by a remesh at
   that Resolution: when a remesh loses a good share of them, the status line says which Resolution keeps them and
-  about how many triangles it makes, first on the line (only when it fits the free memory); in the title bar, a status
+  about how many triangles it makes, first on the line (only when it fits the free memory, once per Part and
+  Resolution in a session, and not once you have raised the Resolution above the default); in the title bar, a status
   message too long to show whole now shows it all on hover. Creases no remesh at that Resolution can hold (a closed
   slit such as the lips, or a crease under a voxel wide) are left as before. Reported by @nino3thd.
 testers:

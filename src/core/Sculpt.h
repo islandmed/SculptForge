@@ -160,8 +160,11 @@ struct ConnectedScratch {
 // reaches through edges between vertices of `verts`; the order stays. `surface` (Contact facing): also each kept
 // vertex's distance from `seed` along the surface (the flood's edge paths, each vertex relaxed from the neighbours
 // reached before it: an upper bound within a few percent of the geodesic on an even mesh), in the kept order.
+// `facingHint` (Contact facing): the flood starts from the nearest vertex whose normal is within 60 degrees of it (else
+// the nearest), so a cursor that is nearer a vertex of the far wall of a narrow gap (the surface lowered under it by the
+// stroke's own cut) still floods from the wall it is on.
 void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& scratch,
-                   std::vector<float>* surface = nullptr);
+                   std::vector<float>* surface = nullptr, const glm::vec3* facingHint = nullptr);
 // Contact facing, right after keepConnected over `all` (its list before the call): stamps the vertices of `all` the
 // flood didn't reach that lie on a piece closed within `all` (none of its vertices has an edge leaving it: an eyeball
 // modelled on its own, inside the flood's sphere) with the returned value, which differs from `reached` (the flood's
@@ -327,6 +330,9 @@ public:
     void moveVertices(Mesh& mesh, BVH& bvh, std::span<const uint32_t> verts, std::span<const glm::vec3> d);
 
     SculptTimings timings;
+    // Clay and Clay Block weigh a vertex by where the stroke first found it (Sculpt.cpp, dabSingle); off = by where it is now (the test compares).
+    bool clayStartWeights = true;
+    uint32_t clayStartBudget = 1u << 18; // (test hook: the vertices a stroke keeps start positions for, at most; 262144 = 8 MB with their hash)
     // The brush's frame on the surface at the last dab's first (unmirrored) pass: the dab centre, the area normal
     // and the area centre its kernel used (the predictive stroke preview estimates the next dabs from it).
     struct DabFrame {
@@ -342,6 +348,17 @@ public:
     // No remeshing for the rest of this stroke: strokes that undo and re-stamp while dragging (DragRect,
     // DragDot; restoreStroke) put positions back, not topology. restoreStroke holds it too.
     void holdTopology() { topologyHeld_ = true; }
+    // The topology refresh gesture (Tool > Remesh: the Quick Remesh drag key held while dragging on the model): remeshes
+    // the stretched triangles within `radius` of `center` towards `edgeLength` without moving the surface (dynamic
+    // topology's remesher, refine only: no collapses, see DynamicTopology::refineOnly), whether or not dynamic topology
+    // is on. Inside a stroke (beginStroke ... endStroke, which returns the one undo step); the mask, hidden faces, face
+    // group borders and symmetry are respected as in dynamic topology. Returns false when nothing changed.
+    bool refreshTopologyDab(Mesh& mesh, BVH& bvh, const glm::vec3& center, float radius, float edgeLength, Symmetry sym);
+    // The edge length refreshTopologyDab aims for: dynamic topology's when it is on (as the brush would make), else the
+    // smaller of the typical edge around the brush (within three radii of `center`) and the Part's (core/QuickRemesh.h
+    // typicalEdgeLength): a dense face on a coarse body refreshes to the face's detail, a long tendril (everything near
+    // it stretched) to the Part's.
+    float refreshEdgeLength(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius) const;
 
     // Kelvinlet brushes (core/Kelvinlet.h, defined in Kelvinlet.cpp): one step of KelvinGrab / KelvinSnake
     // (step.delta), KelvinTwist (step.angle) or KelvinScale (step.logScale), mirrored by `sym`. dab() turns a plain
@@ -401,6 +418,7 @@ public:
     bool dragSlide = dragSlideDefault();
     // Dabs whose drag moved the vertices with the clay after all (slideBack could not put them all back; the tests count them).
     size_t dragSlideFallbacks = 0;
+    static constexpr float kStartDeep = 0.6f; // (Clay's start-position weights: the height below the plane, in radii, where they begin)
     static constexpr size_t kAdaptiveMinVertices = 150'000;
     static constexpr size_t kAreaSamples = 65'536;
     // Whether adaptive dabs moved leaves whose exact normals are still to come, and catching up with up to
@@ -492,6 +510,44 @@ private:
     // stroke's laps over one line don't keep squeezing the walls: the sideways pull is bounded against that start (Sculpt.cpp, kPinchReach).
     std::vector<uint32_t> pinchStamp_;
     std::vector<glm::vec3> pinchStart_;
+    // A Clay stroke's start positions (see kStartDeep): kept only for the vertices a dab found far below its plane, in a hash
+    // (16 bytes a slot, at most half of kMaxSlots: 8 MB) with a bit a vertex in front of it, so a stroke on a rough mesh holds a few MB, never
+    // 16 bytes for the whole mesh. A vertex is in it from the dab that first found it deep; the others weigh by where they are.
+    struct StartStore {
+        static constexpr uint32_t kMaxSlots = 1u << 19;
+        std::vector<uint64_t> bits;      // (one per vertex: is it in the hash)
+        std::vector<uint32_t> keys;      // (vertex + 1; 0 = empty slot)
+        std::vector<glm::vec3> starts;
+        uint32_t count = 0;
+        bool find(uint32_t v, glm::vec3& out) const {
+            if (!(bits[v >> 6] >> (v & 63) & 1u)) return false;
+            const uint32_t mask = uint32_t(keys.size()) - 1;
+            for (uint32_t i = (v * 2654435761u) & mask;; i = (i + 1) & mask)
+                if (keys[i] == v + 1) return out = starts[i], true;
+        }
+        void insert(uint32_t v, const glm::vec3& at) {
+            if (keys.empty()) keys.assign(1u << 12, 0), starts.resize(1u << 12);
+            if (count * 2 >= keys.size()) { // (grow: half full)
+                std::vector<uint32_t> oldKeys;
+                std::vector<glm::vec3> oldStarts;
+                oldKeys.swap(keys), oldStarts.swap(starts);
+                keys.assign(oldKeys.size() * 2, 0), starts.resize(oldKeys.size() * 2);
+                for (size_t j = 0; j < oldKeys.size(); ++j)
+                    if (oldKeys[j]) place(oldKeys[j] - 1, oldStarts[j]);
+            }
+            place(v, at);
+            ++count;
+        }
+        void place(uint32_t v, const glm::vec3& at) {
+            const uint32_t mask = uint32_t(keys.size()) - 1;
+            uint32_t i = (v * 2654435761u) & mask;
+            while (keys[i]) i = (i + 1) & mask;
+            keys[i] = v + 1, starts[i] = at;
+            bits[v >> 6] |= uint64_t(1) << (v & 63);
+        }
+        size_t bytes() const { return bits.capacity() * 8 + keys.capacity() * 4 + starts.capacity() * sizeof(glm::vec3); }
+    };
+    StartStore clayStart_;
     std::vector<uint32_t> pinchDabStamp_; // (the dab that worked out pinchTaper_: every copy of a symmetry's dab shares it)
     std::vector<float> pinchTaper_;
     uint32_t pinchDab_ = 0;
@@ -499,7 +555,7 @@ public:
     // The bytes a pinching recipe's stroke holds (0 between strokes: endStroke frees them).
     size_t pinchStateBytes() const {
         return pinchStamp_.capacity() * sizeof(uint32_t) + pinchStart_.capacity() * sizeof(glm::vec3) + pinchDabStamp_.capacity() * sizeof(uint32_t) +
-               pinchTaper_.capacity() * sizeof(float);
+               pinchTaper_.capacity() * sizeof(float) + clayStart_.bytes();
     }
 
 private:

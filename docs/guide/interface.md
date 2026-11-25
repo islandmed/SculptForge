@@ -214,7 +214,7 @@ turn on **Edit > Preferences > Interface > Palettes strictly A-Z (strict order)*
 | **Generate** | Mesh > Generate 3D (Mesh > From Image while Edit > Preferences > AI is off) | Generate 3D (image or text to 3D), Relief, Inflate and Stamp from an image, and the AI brush provider settings; with AI off only Relief, Inflate and Stamp |
 | **Material** | Render > Materials | The Lit Sphere materials (Soft Clay, the default, first), your own (**Load Lit Sphere...**) and Studio, Base colour, Smooth / Flat shading for the scene and the active Part |
 | **Preferences** | Edit > Preferences | Config, Interface, Input, Hotkeys, Display, Library, Tablet, Performance, Updates and Autosave sub-palettes (see [Customizing the interface](#customizing-the-interface)) |
-| **Render** | View | Wireframe, Show Mesh, Show Vertex Paint, Show Mask, Show Face Groups, Floor grid, Show Splats, Background, Frame, Fullscreen |
+| **Render** | View | Wireframe, Show Mesh, Show Vertex Paint, Show Mask, Show Face Groups, Floor grid, Floor grid at Y=0, Show Splats, Background, Frame, Fullscreen |
 | **Script** | File > Script | Console, Run script file, Copy session as script, Clear console |
 | **Splats** | Render > Gaussian Splats | Gaussian splat tools: show, flip, turn, fit, clean floaters, Make sculptable, sculpt to splats, save, clear |
 | **Stroke** | Sculpt > Stroke | The stroke types (Dots, Drag Stamp, Spray, Lazy Stroke) and their settings |
@@ -264,17 +264,20 @@ When you open a Gaussian splat capture, **Render > Gaussian Splats** moves into 
 (**Edit > My Panel...**; the Classic layout's palette bar shows it once it holds something or sits in a tray), and it
 works like any other palette: put it in a tray, or open it in a window of its own for a second monitor.
 
-- **Add a button or a whole section**: hold <kbd>Alt</kbd> and drag it from any palette (or a shelf) into My Panel.
-  A section keeps all its controls, live, so **Masking** or **Geometry** can sit next to the three buttons you press
-  all day. A line shows where it will land.
+- **Add a button, a control or a whole section**: hold <kbd>Alt</kbd> and drag it from any palette (or a shelf) into
+  My Panel. The same drag onto a shelf puts the button or control there instead (see [The shelves](#the-shelves)). A section keeps all its controls, live, so **Masking** or **Geometry** can sit next to the three buttons
+  you press all day. A line shows where it will land.
+- **One control on its own**: any slider, checkbox, choice or readout comes by itself the same way: hold <kbd>Alt</kbd>
+  and drag **Backface culling** (Tool > Viewport Look), the brush **Size** slider (Draw), the triangle count at the top of
+  the Tool palette, or **Orbit around the pointer** (Edit > Preferences > Input). It stays the palette's own control, live: a
+  change in My Panel is a change everywhere. While <kbd>Alt</kbd> is held a slider is picked up, not changed. A control
+  its palette shows only sometimes (the Levels line of a Part without levels) shows as its dim name until it is back.
 - **Reorder**: hold <kbd>Alt</kbd> and drag an entry to a new place in My Panel.
 - **Take one out**: drag it out of My Panel (still holding <kbd>Alt</kbd>) and let go anywhere else, or right-click it
   and choose **Remove from My Panel**.
 - **Fold a section** in My Panel by clicking its title. This does not change the same section in its own palette.
 - **Open it where you are working**: press <kbd>F4</kbd> (change the key in **Edit > Preferences > Hotkeys**, the action is
   **My Panel**). My Panel appears at the cursor; press the key again or <kbd>Esc</kbd> to close it.
-
-Buttons and sections can be dragged in. Sliders and checkboxes on their own cannot; drag the section that holds them.
 
 However My Panel is open (its key, the Edit menu, a tray, or a window of its own), hold <kbd>Alt</kbd> and drag an
 entry onto it. In a window of its own the entry lands at the end of the panel; drag within that window to reorder.
@@ -283,8 +286,11 @@ What is in My Panel is saved with your layout (**Edit > Preferences > Saving & L
 ## The shelves
 
 Shelves surround the canvas and hold the controls you use all the time. Point at anything with <kbd>Ctrl</kbd>
-held to see what it does. Right-click an item for **Remove from shelf**; see [Customizing the
-interface](#customizing-the-interface) to add items.
+held to see what it does. **Any control from any palette can go on a shelf**: hold <kbd>Alt</kbd> and drag a checkbox,
+slider, choice, readout or button (**Backface culling**, the brush **Size**, **Orbit around the pointer** from
+Edit > Preferences > Input, **Subdivide**) onto the shelf you want; an orange line shows where it lands. It stays the
+palette's own control, live. Right-click an item for **Remove from shelf**; see [Customizing the
+interface](#customizing-the-interface) to move items around.
 
 ### Top shelf
 
@@ -594,7 +600,14 @@ you quit); **Save Layout** marks the layout **Revert to Saved Layout** returns t
    - off the shelves (onto the canvas, for example) to **remove** it.
 3. Turn **Customize Shelves** off when you're done, and click **Save Layout** (same palette) to keep the result.
 
-Right-clicking a shelf item and choosing **Remove from shelf** works without Customize mode.
+Right-clicking a shelf item and choosing **Remove from shelf** works without Customize mode. So does **adding any control**:
+hold <kbd>Alt</kbd> (without <kbd>Ctrl</kbd>) and drag any checkbox, slider, choice, readout or button from any palette
+onto a shelf, Customize on or off. It is the palette's own control, live both ways; while <kbd>Alt</kbd> is held a slider
+is picked up, not changed. On the top or bottom shelf it is as wide as it is in its palette; on a side shelf it takes the
+column's width (a long label is cut short there and ends in "...": drag the left shelf's inner edge to widen the column, or
+point at it with <kbd>Ctrl</kbd> for its name). A control its palette shows only sometimes (the Levels line of a Part without levels) is hidden on the
+shelf until it is back; Customize Shelves shows it dim so you can move or remove it. The same drag puts a control into
+[My Panel](#my-panel), and an entry dragged out of My Panel onto a shelf moves there.
 
 A shelf you empty is hidden when Customize Shelves is off, and the canvas takes its room. Turn Customize Shelves
 back on and the empty shelf returns, outlined, so you can drag buttons onto it again.
@@ -665,9 +678,9 @@ layout saves itself.
 | **One sub-palette open** | On | Opening a sub-palette closes the others in that palette |
 | **Auto collapse left tray** / **right tray** | On / Off | Collapse other palettes in the tray when one wouldn't fit |
 | **Palettes strictly A-Z (strict order)** | Off | Classic layout: strict alphabetical palette bar instead of File and Edit first, Help last |
-| **Show newer menu rows** | Off in Classic, on in SculptForge | File > Render with..., Edit > Preferences > Scripts, Edit > Preferences > Render bridge and Tool > Scatter (added after 0.13.0); a feature you have set up keeps its row either way |
+| **Show newer menu rows** | Off in Classic, on in SculptForge | File > Render with..., Edit > Preferences > Scripts, Edit > Preferences > Render bridge, Tool > Scatter, Tool > Cloth, Tool > Parts > Primitive, Tool > Parts > Extract > Solidify and View > Floor grid at Y=0 (added after 0.13.0); a feature you have set up keeps its row either way |
 | **Left-handed layout** | Off | Mirrors the shelves and trays: tools on the right, navigation on the left |
-| **UI scale** | Automatic | Size of text and controls (100% to 200%), applied at once; Automatic follows the monitor (see below) |
+| **UI scale** | Automatic | Size of text and controls, a slider from 70% to 300%, applied when you let it go; Automatic follows the monitor; remembered per monitor (see below) |
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |
 
 **Language** changes the interface at once, without a restart; saved automatically for the next start. In **Español**
@@ -693,12 +706,20 @@ Any other computer language (Portuguese, French...) starts in English, and the *
 welcome shows the five names, each in its own script: one click switches the whole interface. **Help > Welcome** shows
 the row again. Nothing is ever sent anywhere, and the choice is asked once.
 
-**UI scale** also applies at once: text, buttons, shelves and trays resize on the next frame; saved automatically.
-**Automatic** uses the scale of the monitor the window is on (Windows: **Settings > Display > Scale**; macOS and
-Wayland: the display's scaling; X11: the desktop's font DPI).
+**UI scale** is a slider from **70%** to **300%** in steps of 5% (double-click it to type a value). The size applies
+the moment you let the slider go, no restart: text, buttons, shelves and trays resize together, and the text and icons
+are built again at the new size, so they stay sharp at every setting (nothing is a stretched or shrunk bitmap). The
+sample line under the slider shows the size while you drag. Below 100%, for a 4K or 5K screen whose system scaling makes
+the interface too large, buttons and sliders keep a little more room around their text than the text itself loses, so
+they stay easy to hit with a mouse or a pen. Saved automatically.
 
-Drag the window to a monitor at another scale, or change the system setting, and the interface follows. A chosen size
-(100% to 200%) stays the same on every monitor.
+**Automatic** (the tick beside the slider) uses the scale of the monitor the window is on (Windows: **Settings >
+Display > Scale**; macOS and Wayland: the display's scaling; X11: the desktop's font DPI). Drag the window to a monitor
+at another scale, or change the system setting, and the interface follows.
+
+A chosen size is remembered **per monitor**: set 80% on a 4K monitor and leave the laptop's own screen on Automatic,
+and each keeps its setting as the window moves between them (monitors are told apart by their name and pixel size, so
+two identical monitors share one setting). A monitor the window has never been on uses the last size you chose.
 
 **Edit > Preferences > Cursor**:
 

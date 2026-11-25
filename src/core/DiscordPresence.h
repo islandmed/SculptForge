@@ -7,11 +7,13 @@
 // no network socket, nothing listens. Outbound only: HANDSHAKE, then SET_ACTIVITY (an empty one clears it on
 // disable and quit). Whatever Discord sends back is read only to drain the connection, never interpreted: frames
 // are bounds-checked (8-byte header, 64 KiB cap) and anything malformed closes it. It runs on its own thread
-// (5 s connect timeout, a back-off from 2 s to 60 s after a failure, one activity every 4 s at most) and starts no
-// thread or connection until it's switched on. Scripted and agent runs never start it (agentRun).
+// (5 s connect timeout; after a failure the next attempt waits 30 s, then 60 s while Discord stays away; one
+// activity every 4 s at most), starts no thread or connection until it's switched on, and its thread ends when
+// it's switched off. Scripted and agent runs never start it (agentRun).
 //
-// Sent: the icon, the name SculptForge (the application's name; details stay empty), the elapsed time, and
-// optionally "Monthly challenge: <theme>" and the file name (never a path). Every string is sanitised first.
+// Sent: the icon, the name SculptForge (the application's name; details stay empty), the elapsed time and one of
+// three fixed words for what the user is doing: Sculpting, Painting or Idle. Nothing from the scene or the
+// computer: no file name, path, Part name or user name (the owner's conditions, 11-23).
 #pragma once
 
 #include <atomic>
@@ -43,23 +45,18 @@ bool agentRun(const std::function<const char*(const char*)>& getenv, const char*
 // A real application ID: 1-20 digits, not "0".
 bool appIdConfigured(std::string_view id);
 
-// Valid UTF-8 only (bad sequences dropped), no control or bidirectional-override characters, whitespace runs
-// collapsed and trimmed, at most maxCodepoints code points.
-std::string sanitize(std::string_view in, size_t maxCodepoints);
-
-inline constexpr size_t kChallengeMax = 64;  // the theme the user types
-inline constexpr size_t kFileNameMax = 64;
-inline constexpr size_t kStateMax = 128;     // Discord's limit for the state line
+// What the user is doing, in one of three fixed words. Nothing else ever goes into the state line.
+enum class Mode { Idle, Sculpting, Painting };
+const char* modeName(Mode m); // "Idle", "Sculpting", "Painting"
 
 struct Activity {
-    bool show = false;          // false: nothing shown (cleared)
-    std::string challenge;      // the monthly challenge's theme ("" = not shown)
-    std::string fileName;       // the file's name ("" = not shown); a path is cut to its last part
-    int64_t start = 0;          // seconds since 1970 for the elapsed time (0 = none)
+    bool show = false;        // false: nothing shown (cleared)
+    Mode mode = Mode::Idle;
+    int64_t start = 0;        // seconds since 1970 for the elapsed time (0 = none)
     bool operator==(const Activity&) const = default;
 };
 
-// The state line: "Monthly challenge: <theme>", the file name, or both joined by " · "; "" for none.
+// The state line: the mode's word; "" when nothing is shown.
 std::string activityState(const Activity& a);
 
 // Frames: little-endian opcode and length, then the JSON.
@@ -97,6 +94,12 @@ bool socketOwnedBy(const std::string& path, unsigned uid);
 // Every connection attempt this process made (tests: off means zero).
 uint64_t connectAttempts();
 
+// After `failures` attempts in a row (a refused connection, a lost one), the wait before the next: never under
+// kRetryMinMs, twice that from the second failure on, and at most maxMs (the tests pass a short cap).
+inline constexpr int kRetryMinMs = 30000;
+inline constexpr int kDefaultBackoffMs = 60000;
+int retryDelayMs(int failures, int maxMs);
+
 class Client {
 public:
     explicit Client(std::string appId);
@@ -104,10 +107,12 @@ public:
     Client(const Client&) = delete;
     Client& operator=(const Client&) = delete;
 
-    // What to show. Cheap; the worker thread starts on the first call that shows something with a real app ID.
+    // What to show. Cheap; the worker thread starts on the first call that shows something with a real app ID
+    // and ends once a call that shows nothing has cleared the status (a later call that shows starts a new one).
     void set(const Activity& a);
     bool connected() const { return connected_.load(); }
     uint64_t activitiesSent() const { return sent_.load(); }
+    bool threadRunning() const { return running_.load(); } // tests: off leaves no thread behind
 
     // Tests: the longest back-off after a failure, the connect timeout and the gap between two activities
     // (milliseconds).
@@ -122,12 +127,14 @@ private:
     Activity desired_;
     bool dirty_ = false, stop_ = false;
     std::thread thread_;
-    std::atomic<bool> abort_{false};
+    std::atomic<bool> abortConnect_{false}; // switched off or destroyed: a connect in progress gives up
+    std::atomic<bool> running_{false};
     std::atomic<bool> connected_{false};
     std::atomic<uint64_t> sent_{0};
-    // Back-off: 2 s after a connection is lost (Discord restarting), doubling to 60 s while it stays away. Discord
-    // takes at most 5 activities in 20 s and drops the rest: one every 4 s at most, always the latest.
-    int backoffMs_ = 60000, connectTimeoutMs_ = 5000, minGapMs_ = 4000;
+    // Back-off: 30 s after a connection fails or is lost (Discord restarting), 60 s while it stays away
+    // (retryDelayMs). Discord takes at most 5 activities in 20 s and drops the rest: one every 4 s at most,
+    // always the latest.
+    int backoffMs_ = kDefaultBackoffMs, connectTimeoutMs_ = 5000, minGapMs_ = 4000;
 };
 
 } // namespace sf::discord

@@ -27,6 +27,32 @@ namespace sf {
 
 class MicroRenderer;
 
+// An added view light (RenderSettings::lights).
+struct ViewLight {
+    enum class Role : uint8_t { Key = 0, Fill = 1, Rim = 2 };
+    Role role = Role::Key;
+    float yaw = 0.0f, pitch = 0.0f; // degrees, as RenderSettings::lightYaw / lightPitch (view space)
+    glm::vec3 color{1.0f};         // linear RGB
+    float intensity = 1.0f;        // 0..3
+    bool shadows = false;          // the view's cast shadows come from this light (one light at most; a Key starts so)
+};
+constexpr int kMaxViewLights = 4;
+// What a light of that role starts as: the key from the upper left front, a cool fill from the right, a rim from
+// behind and above. The names are what the interface shows.
+ViewLight viewLightPreset(ViewLight::Role role);
+const char* viewLightRoleName(ViewLight::Role role);    // "Key", "Fill", "Rim"
+bool parseViewLightRole(const std::string& text, ViewLight::Role& out); // either name, any case
+// The direction towards the light in view space (yaw / pitch as lightRotation turns it from straight ahead).
+glm::vec3 viewLightDirection(float yawDegrees, float pitchDegrees);
+// Balance of the added lights: the factor every light's colour is scaled by so that together they add one light's worth
+// of exposure (their luminance-weighted intensities sum to at most the strongest light's own intensity, or 1 if that is
+// less). 1 with no light or one light: a single light is exactly what its slider says; four at their presets share it
+// instead of washing the model out.
+float viewLightsBalance(const std::vector<ViewLight>& lights);
+// The share of the light a cast shadow takes away: the light's own share `base` times RenderSettings::shadowStrength,
+// at most 1 (black).
+float shadowDarknessFor(float base, float strength);
+
 struct RenderSettings {
     bool wireframe = false;
     glm::vec3 baseColor{0.62f, 0.58f, 0.53f}; // Studio's colour: a warm clay grey, like the default Soft Clay
@@ -100,7 +126,16 @@ struct RenderSettings {
     float aoSoftness = 0.4f;  // 0..1: the blur's width
     bool shadows = false;     // the key light's cast shadows (PBR: the environment's brightest direction)
     float shadowSoftness = 0.35f;
+    // Shadow strength (a member's request): a multiplier on how dark the cast shadows get. 1 = the darkness Shadows & AO
+    // shipped with (the light's own share, Occlusion.h shadowDarkness), 2 = black shadows, 0 = none (shadowDarknessFor).
+    float shadowStrength = 1.0f;
     bool occlusionInLitSphere = false;
+    // Added lights (Material > Light > Lights): up to kMaxViewLights directional lights on top of the material's
+    // own light (Lit Sphere / studio) or the environment (PBR), each a role it started as (Key, Fill, Rim), a
+    // direction in view space (yaw / pitch as the light above: they turn with the camera), a linear colour and an
+    // intensity. None by default: the view draws exactly as it did. The one with `shadows` on (a Key starts with
+    // it) is the light the cast shadows come from (Shadows & AO). Saved in the project.
+    std::vector<ViewLight> lights;
     // Lit Sphere and studio lighting (#80): the light turned from where the material has it, in degrees about the
     // view's up axis (yaw, + to the right) and its side axis (pitch, + up), its intensity (a multiplier) and an
     // ambient term that lifts the shadows (a share of the colour). The defaults leave the material as it is.
@@ -241,6 +276,7 @@ public:
     bool textureNotShown(uint32_t id) const;
     // The GPU rejected drawing the texture (a GL error at its first textured draw, logged): the Part draws plain, with a status.
     bool textureRejected(uint32_t id) const;
+    uint32_t emptyBufferSamplers() const { return emptyBufferSamplers_; } // (tests: gl_limits)
     // How Part `id`'s UVs reach the shader, for tests: 0 a texture buffer, N rows of N texels in a 2D texture.
     int textureUvWidth(uint32_t id) const;
 
@@ -445,6 +481,11 @@ private:
     // The textured program's two UV samplers (a buffer and a 2D texture) always have a complete texture of their own type
     // bound, the unused one a single texel: a driver that checks every sampler (Mali) never meets an empty unit in the geometry shader.
     GLuint dummyUvBufferData_ = 0, dummyUvBufferTexture_ = 0, dummyUv2D_ = 0;
+    // The same for the face group sampler (an unsigned one: the mesh program declares it in every variant): a Part without
+    // per-triangle ids (a mesh past a small GPU's buffer limit, or none set) binds this, never an empty unit (Mali-G72, 0.13.14:
+    // a 69632-triangle sphere drew with GL error 0x0501 "glTexBuffer ... beyond the allocated buffer" against a 65536-texel limit).
+    GLuint dummyUintBufferData_ = 0, dummyUintBufferTexture_ = 0;
+    uint32_t emptyBufferSamplers_ = 0; // tests only (gl_limits): draws that met a buffer sampler unit with no texture on it
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)
     std::vector<ReferenceImage> references_; // setReferences
     struct ReferenceTexture {
@@ -690,7 +731,8 @@ private:
         GLint view = -1, proj = -1, gridOrigin = -1, gridStep = -1, viewport = -1, projScale = -1, baseColor = -1, paint = -1,
               showMask = -1, maskDarkness = -1, maskColor = -1, groups = -1, litsphere = -1, litsphereCavity = -1, dim = -1, primBase = -1,
               hasPaint = -1, unlit = -1, normalFlipY = -1, twoSided = -1, checker = -1, checkerScale = -1, tintShift = -1, lightRot = -1,
-              lightLevels = -1, alpha = -1, microWire = -1, occAlpha = -1, occLight = -1;
+              lightLevels = -1, alpha = -1, microWire = -1, occAlpha = -1, occLight = -1, lightCount = -1, lightDirs = -1,
+              lightCols = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
               pbrCavity = -1, viewToEnv = -1, sh = -1;
         // The units the environment and BRDF table are bound to (meshProgram: a micro level's own buffers hold 8-15).

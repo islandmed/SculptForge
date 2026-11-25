@@ -21,6 +21,7 @@
 #include <fstream>
 #include <mutex>
 #include <thread>
+#include <vector>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -93,6 +94,37 @@ bool accentButton(const char* label) {
 
 bool releaseKey(uint8_t key[32]) { return update::parseHexKey(update::kUpdatePublicKeyHex, key); }
 
+// Whether this app carries a developer's team identifier (a Developer ID build). Today's Mac builds are ad-hoc signed:
+// false, and the banner's help never claims "the same developer" (cto 11-24: honest wording). Read once.
+bool runningAppHasTeam() {
+#if defined(__APPLE__)
+    static const bool has = [] {
+        std::string id, team;
+        return update::runningCodeIdentity(id, team) && !team.empty();
+    }();
+    return has;
+#else
+    return false;
+#endif
+}
+
+// SF_UPDATE_DRY_RUN=1 (testers): the update downloads, checks and unpacks, then removes what it unpacked instead of
+// replacing anything; the status line says what would have happened.
+bool updateDryRun() {
+    const char* v = std::getenv("SF_UPDATE_DRY_RUN");
+    return v && *v && std::string(v) != "0";
+}
+
+// Runs a system tool for the macOS install (update::MacTools::run): by its absolute path, no shell, stdin closed,
+// output discarded; its exit code, -1 when it couldn't start.
+int runTool(const std::vector<std::string>& argv) {
+    if (argv.empty()) return -1;
+    ai::ChildProcess tool;
+    std::string error;
+    if (!tool.start(argv[0], std::vector<std::string>(argv.begin() + 1, argv.end()), "", {}, error)) return -1;
+    return tool.wait();
+}
+
 constexpr double kConfirmAfterSeconds = 5.0; // a new version that has run this long counts as started
 constexpr double kRestartWaitSeconds = 90.0; // how long the old version waits for the new one to say so
 
@@ -128,6 +160,11 @@ const update::Install& App::updateInstall() {
             t.kind = update::InstallKind::PackageManager;
             t.manager = "pacman";
             t.command = "yay -Syu sculptforge";
+        } else if (std::string(kind) == "macapp") {
+            t.kind = update::InstallKind::MacApp;
+            t.target = "/Applications/SculptForge.app";
+            t.asset = "SculptForge-macos.dmg";
+            t.stagingDir = "/nonexistent/Library/Caches/SculptForge/updates";
         }
         updateInstall_ = t;
     }
@@ -137,7 +174,9 @@ const update::Install& App::updateInstall() {
 bool App::selfUpdateOffered(const UpdateInfo& u) {
     uint8_t key[32];
     const bool keyed = releaseKey(key) || !options_.uiTest.empty(); // no key compiled in yet: Download only
-    return keyed && update::selfUpdates(updateInstall().kind) && update::safeVersion(u.version);
+    // A Mac bundle only while the feed says so (UpdateInfo::macSelfUpdate; missing = no): the hold the site lane lifts.
+    const bool held = updateInstall().kind == update::InstallKind::MacApp && !u.macSelfUpdate;
+    return keyed && !held && update::selfUpdates(updateInstall().kind) && update::safeVersion(u.version);
 }
 
 void App::initSelfUpdate() {
@@ -156,7 +195,7 @@ void App::initSelfUpdate() {
                 p.from.c_str());
         ai::ChildProcess child;
         std::string err;
-        if (child.start(p.target, {}, "", {}, err)) child.detach();
+        if (child.start(update::appExecutable(p.target), {}, "", {}, err)) child.detach();
         running_ = false;
         break;
     }
@@ -242,7 +281,7 @@ void App::tickSelfUpdate() {
 }
 
 void App::startSelfUpdate(const UpdateInfo& u) {
-    if (selfUpdateStage_ == SelfUpdateStage::Downloading) return;
+    if (selfUpdateStage_ == SelfUpdateStage::Downloading || !selfUpdateOffered(u)) return; // (the feed's hold, among the rest)
     selfUpdateVersion_ = u.version;
     selfUpdateError_.clear();
     installAtQuit_ = false;
@@ -283,12 +322,44 @@ bool App::installSelfUpdate(bool relaunch, std::string& error) {
         return false;
     }
     const update::Install& install = updateInstall();
-    if (install.kind == update::InstallKind::AppImage) {
-        if (!update::installAppImage(install, *selfUpdate_, selfUpdateVersion_, appFullVersion(), updateNotePath(), error))
+    const bool dryRun = updateDryRun();
+    if (install.kind == update::InstallKind::AppImage || install.kind == update::InstallKind::MacApp) {
+        if (install.kind == update::InstallKind::AppImage) {
+            if (dryRun) { // (the download goes too: a dry run leaves nothing behind)
+                std::error_code ec;
+                fs::remove(fsPath(selfUpdate_->staged), ec);
+                status_ = "Dry run: SculptForge " + selfUpdateVersion_ + " would replace " + install.target + "; nothing was changed.";
+                return true;
+            }
+            if (!update::installAppImage(install, *selfUpdate_, selfUpdateVersion_, appFullVersion(), updateNotePath(), error))
+                return false;
+        } else {
+#if defined(__APPLE__)
+            update::MacTools tools;
+            tools.run = runTool;
+            tools.signature = update::macBundleSignature;
+            if (!update::runningCodeIdentity(tools.runningIdentifier, tools.runningTeamId)) { // compared below, never shown or kept
+                std::error_code ec;
+                fs::remove(fsPath(selfUpdate_->staged), ec);
+                error = "can't read this app's own code signature, so the new one can't be compared with it";
+                return false;
+            }
+            if (!update::installMacApp(install, *selfUpdate_, selfUpdateVersion_, appFullVersion(), updateNotePath(), tools, dryRun,
+                                       error))
+                return false;
+            if (dryRun) {
+                status_ = "Dry run: SculptForge " + selfUpdateVersion_ + " was downloaded, checked and unpacked beside " +
+                          install.target + ", then removed; nothing was changed.";
+                return true;
+            }
+#else
+            error = "this install can't update itself";
             return false;
+#endif
+        }
         if (!relaunch) return true;
         auto child = std::make_shared<ai::ChildProcess>();
-        if (!child->start(install.target, {}, "", {}, error)) {
+        if (!child->start(update::appExecutable(install.target), {}, "", {}, error)) {
             update::Pending p;
             std::string ignored;
             if (update::readPending(updateNotePath(), p)) update::rollback(p, updateNotePath(), ignored);
@@ -300,6 +371,12 @@ bool App::installSelfUpdate(bool relaunch, std::string& error) {
     }
 #if defined(_WIN32)
     if (install.kind == update::InstallKind::WindowsInstaller || install.kind == update::InstallKind::WindowsPortable) {
+        if (dryRun) {
+            std::error_code ec;
+            fs::remove(fsPath(selfUpdate_->staged), ec);
+            status_ = "Dry run: SculptForge " + selfUpdateVersion_ + " would replace " + install.target + "; nothing was changed.";
+            return true;
+        }
         // A helper finishes the job once this process has ended (Windows can't replace a running program).
         if (install.kind == update::InstallKind::WindowsPortable &&
             !update::writePending(updateNotePath(), {selfUpdateVersion_, appFullVersion(), install.target, install.target + ".old", 0})) {
@@ -340,6 +417,12 @@ void App::restartIntoUpdate() {
             selfUpdate_.reset();
             return;
         }
+        if (updateDryRun()) { // checked and removed again: back to the banner's Update button
+            SDL_Log("update: %s", status_.c_str());
+            selfUpdateStage_ = SelfUpdateStage::Idle;
+            selfUpdate_.reset();
+            return;
+        }
         selfUpdateStage_ = SelfUpdateStage::Restarting;
         if (restartChild_ && window_) SDL_HideWindow(window_); // (shown again if the new version doesn't start)
         if (restartChild_) { // hidden: the new version shows itself on Discord (if it's on), never both
@@ -373,7 +456,13 @@ bool App::drawSelfUpdate(const UpdateInfo& u, bool& close) {
         return true;
     }
     if (thisVersion && selfUpdateStage_ == SelfUpdateStage::Ready) {
-        ImGui::Text(tr("SculptForge %s is downloaded and checked."), u.version.c_str());
+        // What the user confirms: the version, its size, where it came from, what it replaces. "Checked" is the
+        // release's signed checksum list and (macOS) the bundle's code signature once it is unpacked; the honest words.
+        const double mb = selfUpdate_ ? double(selfUpdate_->received.load()) / 1e6 : 0.0;
+        ImGui::Text(tr("SculptForge %s (%.0f MB) is downloaded from github.com/islandmed/SculptForge releases and checked."),
+                    u.version.c_str(), mb);
+        if (install.kind == update::InstallKind::MacApp)
+            ImGui::TextDisabled(tr("Restart now replaces %s after its code signature is checked too."), install.target.c_str());
         if (installAtQuit_) {
             ImGui::TextDisabled("%s", tr("It installs when you quit."));
             if (ImGui::Button(tr("Restart now##update.restart"))) restartIntoUpdate();
@@ -415,10 +504,28 @@ bool App::drawSelfUpdate(const UpdateInfo& u, bool& close) {
         if (accentButton((std::string(tr(selfUpdateStage_ == SelfUpdateStage::Failed && thisVersion ? "Try again" : "Update")) +
                           "##update.update").c_str()))
             startSelfUpdate(u);
-        ui::HelpText("Update", nullptr,
-                     "Download the new version from SculptForge's GitHub releases, check its signature and checksum, "
-                     "and install it. The current version is kept until the new one has started.",
-                     "Update banner");
+        // What the checks prove, no more: the download arrived intact (the release's checksum list; its key lives with
+        // the project's releases, so it is no proof against someone who controls those) and, on a Mac, the bundle's
+        // own code signature; "the same developer" only once this app is a developer-signed build.
+        if (install.kind == update::InstallKind::MacApp && runningAppHasTeam())
+            ui::HelpText("Update", nullptr,
+                         "Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge "
+                         "checks the download arrived intact (its checksum must match the release's checksum list) and that "
+                         "the app inside passes macOS's code signature check and comes from the same developer as this one. "
+                         "You confirm before anything is replaced; the current version is kept until the new one has started.",
+                         "Update banner");
+        else if (install.kind == update::InstallKind::MacApp)
+            ui::HelpText("Update", nullptr,
+                         "Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge "
+                         "checks the download arrived intact (its checksum must match the release's checksum list) and that "
+                         "the app inside passes macOS's code signature check. You confirm before anything is replaced; the "
+                         "current version is kept until the new one has started.",
+                         "Update banner");
+        else
+            ui::HelpText("Update", nullptr,
+                         "Download the new version from SculptForge's GitHub releases, check the download arrived intact, "
+                         "and install it. The current version is kept until the new one has started.",
+                         "Update banner");
         ImGui::SameLine();
     }
     return false;

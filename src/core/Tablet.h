@@ -44,6 +44,7 @@ enum class PenAction {
     Smooth,     // like holding Shift: the Smooth brush
     RotateView, // hold the button and move the pen to orbit
     PanView,    // hold the button and move the pen to pan
+    ZoomView,   // hold the button and move the pen to zoom (Preferences > Navigation)
     RightClick, // a right mouse button: drag to orbit on the canvas, context menus in the UI
     EraseMask,  // eraser only: the eraser removes mask (like Ctrl+Alt)
 };

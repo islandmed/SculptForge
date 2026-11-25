@@ -4,8 +4,8 @@
 // Stencil (#155, docs/design/stencil.md): a reference image laid over the view that the brushes work through. It sits
 // in screen space (the model turns under it); each dab weighs every vertex by the stencil at the point where the
 // vertex shows on screen, times the brush's own falloff. Sculpt brushes take its brightness as their alpha, Vertex
-// Paint its colours (or its brightness masking the paint colour). Outside the image (unless tiled) brushes do
-// nothing. The image comes from the same loader as alphas (core/Image.h); the placement is kept relative to the
+// Paint its colours (or its brightness masking the paint colour). Outside the image (unless tiled) a stroke works as
+// if there were no Stencil (`outsideSculpts`; off, it does nothing). The image comes from the same loader as alphas (core/Image.h); the placement is kept relative to the
 // canvas, so it stays put when the window changes size.
 #pragma once
 
@@ -22,6 +22,10 @@ namespace sf {
 
 class CommandRegistry;
 
+// Outside an untiled image (Outside the image: Sculpt) a stroke's weight fades from the image's edge value to "no Stencil" over
+// this distance past the edge, in canvas heights, so a dark border never meets full effect in a wall.
+inline constexpr float kStencilEdgeFeather = 0.04f;
+
 struct Stencil {
     std::shared_ptr<const Image> image; // null = no stencil (straight from the file; inverted on sampling)
     // The image halved (box filtered) while it stays 512 px or more: where a dab's vertices are many pixels apart it
@@ -37,6 +41,7 @@ struct Stencil {
     float opacity = 0.5f; // how strongly the overlay shows (the brushes always take the whole image)
     bool invert = false;  // the image's negative: black works, white leaves the surface alone
     bool tile = false;    // the image repeats across the whole view
+    bool outsideSculpts = true; // outside an untiled image a stroke works as if there were no Stencil (off: it does nothing)
     bool visible = true;  // hidden: drawn nowhere and the brushes ignore it
     bool colors = true;   // Vertex Paint lays the image's colours; off, its brightness masks the paint colour
 
@@ -83,7 +88,8 @@ struct StencilView {
     bool active() const { return stencil && stencil->active(); }
     // The canvas point (fractions) a world point shows at; false behind the camera.
     bool canvasAt(const glm::vec3& world, glm::vec2& canvas) const;
-    // 0..1: how much a sculpt dab moves the vertex at `world` (0 off the image or behind the camera).
+    // 0..1: how much a sculpt dab moves the vertex at `world` (off the image or behind the camera: 1, or 0 when
+    // the Stencil blocks outside its image).
     float weight(const glm::vec3& world) const;
     // The colour (linear) and how much of it a paint dab lays at `world`: the image's own (colors) or the paint
     // colour masked by its brightness.

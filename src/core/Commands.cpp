@@ -19,6 +19,8 @@
 #include "core/Dyntopo.h"
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
+#include "core/PrimitiveKit.h"
+#include "core/Solidify.h"
 #include "core/Face.h"
 #include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
@@ -296,7 +298,9 @@ CommandRegistry::CommandRegistry() {
           {"keep_texture", T::Bool, "Keep a painted texture: Auto UV the result and project the texture onto it. "
                                     "Default true.", false},
           {"keep_masked", T::Bool, "Keep masked: masked areas keep their triangles exactly; the rest is remeshed and "
-                                   "joined to them watertight. Default false.", false}},
+                                   "joined to them watertight. Default false.", false},
+          {"keep_groups", T::Bool, "Keep Face Groups: each new polygon takes the face group of the original surface nearest "
+                                   "its centre (hard borders). Default false: one face group.", false}},
          [](Document& doc, const Args& a) -> CommandResult {
              std::string err;
              const std::vector<uint8_t> keep = argBool(a, "keep_masked", false) ? keepMaskedTriangles(doc.mesh) : std::vector<uint8_t>();
@@ -304,11 +308,11 @@ CommandRegistry::CommandRegistry() {
              if (keeping && std::find(keep.begin(), keep.end(), 0) == keep.end())
                  return {false, "Remesh: everything is masked, so nothing would change"};
              VoxelRemeshNotes notes;
-             Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", 200)), kVoxelResolutionMin, kVoxelResolutionMax), &err,
+             Mesh m = voxelRemesh(doc.mesh, std::clamp(int(argNumber(a, "resolution", kVoxelResolutionDefault)), kVoxelResolutionMin, kVoxelResolutionMax), &err,
                                   [](float f) { // (progress and cancel for an MCP call, core/OpControl.h)
                                       opProgress(0.9f * f, "Remeshing");
                                       return !opCancelled();
-                                  }, false, &notes);
+                                  }, false, argBool(a, "keep_groups", false), &notes);
              if (m.triangleCount() == 0) return {false, err};
              if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
              std::string keepNote;
@@ -962,6 +966,8 @@ CommandRegistry::CommandRegistry() {
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
     registerFigurePoseCommands(*this); // figure_pose_* (core/FigurePose.h)
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
+    registerSolidifyCommands(*this); // solidify (core/Solidify.h)
+    registerPrimitiveCommands(*this); // part_primitive (core/PrimitiveKit.h)
     registerMeshCheckCommands(*this);     // weld_points, mesh_check, mesh_fix (core/MeshCheck.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
     registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)

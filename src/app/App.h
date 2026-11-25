@@ -89,6 +89,7 @@
 #include <cstdint>
 #include <functional>
 #include <future>
+#include <initializer_list>
 #include <memory>
 #include <mutex>
 #include <map>
@@ -108,6 +109,7 @@ namespace sf::ai {
 class ChildProcess; // ai/Process.h (the updater's restart)
 }
 
+struct ImRect; // imgui_internal.h
 namespace sf {
 
 struct AppOptions {
@@ -211,6 +213,12 @@ public:
     static void glWindowAttributes(); // OpenGL 3.3 core, before a window is made
     void setInterfaceLanguage(Language lang); // live and remembered in ui.json (Preferences > Interface, the welcome, the bar)
     void requestUiScale(); // Preferences > Interface > UI scale changed: rebuilt live before the next frame (#87)
+    // Preferences > Interface > UI scale, for the monitor the window is on: 0 = Automatic, else 0.7-3.0 (UiScale.h). The
+    // setter remembers it for this monitor (uiScaleByDisplay) and as the general choice, and rebuilds the UI live.
+    float uiScalePreference() const;
+    void setUiScalePreference(float scale);
+    float uiScale() const { return uiScale_; } // the scale the UI is built at now (0.7-3.0)
+    std::string displayScaleKey() const; // the window's display (name + pixel size), "" without a window
 
     enum class FileAction { OpenObj, SaveObj, ExportGlb, ExportLods, SaveBrush, LoadBrush, OpenImage, ExportUsd, SaveSplats, ExportUnreal, SaveProject, SaveVisibleParts, AppendPart, ComfyWorkflow, LoadLitSphere, InsertMesh, InsertSet, Count };
     struct DialogRequest {
@@ -222,7 +230,7 @@ public:
 
 private:
     enum class Drag { None, Stroke, Orbit, Pan, Zoom, Roll, MaskCanvas, PartClick, Select, Gizmo, Guide, Sculptable, ForgeSphere, Insert, Capture,
-                      AirStroke, UvTool, SizeScrub, QuickRemesh, Gradient, Stencil, Tube, Reference,
+                      AirStroke, UvTool, SizeScrub, QuickRemesh, RefreshTopology, Gradient, Stencil, Tube, Reference,
                       NavWidget }; // AirStroke: a stroke begun off the model, waiting to reach it (#62); NavWidget: a press on the orientation widget, a click until it moves
 
     void handleEvent(const SDL_Event& e); // the pen's mouse events first (penMouseEvents), then dispatchEvent
@@ -238,6 +246,11 @@ private:
     std::optional<glm::vec3> lastStrokePoint() const;        // where a stroke last landed, in the scene, while it is still on a Part
     void noteStrokePoint(const glm::vec3& local);            // (the active Part's space)
     void frameLastStroke();                                  // the view.frame_last_stroke action
+    // Centre the view on the point under (x, y) keeping the zoom (Discord ask #209): the point (on any visible Part,
+    // else on the view plane through the orbit target) is panned to where the orbit target lands on screen; the eye
+    // moves across the view only, and the orbit target takes the point's depth. Alt+middle click (centreClick_), or
+    // the view.centre_pointer action at the pointer.
+    void centreViewOnPointer(float x, float y);
     float rollSweep(float x, float y, float dx, float dy) const; // radians the cursor turns around the canvas centre
     void rollBy(float x, float y, float dx, float dy); // Shift+click, release Shift, drag: turn about the view axis
     void onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat = false);
@@ -297,7 +310,8 @@ private:
     void openFileDialog();
     void saveFileDialog(FileAction action);
     AABB sceneBounds() const; // mesh plus the main body of any splats
-    // Floor grid (#115): keeps RenderSettings::floorHeight at the lowest point of the visible Parts. Measured again
+    // Floor grid (#115): keeps RenderSettings::floorHeight at the lowest point of the visible Parts (or at 0 with
+    // Floor grid at Y=0, UiPrefs::floorGridFixed). Measured again
     // only when the history, the Parts or their visibility changed and no stroke or drag is running (so the floor
     // doesn't follow each dab); App.cpp.
     void updateFloorHeight();
@@ -705,17 +719,20 @@ private:
     std::string challengeTitle_;                // the monthly challenge whose results came (latest.json)
     // Show SculptForge on Discord (PanelIntegrations.cpp, core/DiscordPresence.h): off by default, project.json.
     struct DiscordPresencePrefs {
-        bool enabled = false, showChallenge = false, showFileName = false;
-        std::string challenge; // the theme the user typed (sanitised when sent)
+        bool enabled = false;
+        // Up to 0.14.0 the status could carry the file name or a typed challenge theme; both options are gone (only the
+        // app, Sculpting / Painting / Idle and the time leave the app). Someone who had one on sees a note once.
+        bool optionsNote = false;
     };
     struct DiscordClientDelete { void operator()(discord::Client* c) const; };
     DiscordPresencePrefs discordPrefs_;
     std::unique_ptr<discord::Client, DiscordClientDelete> discordClient_; // made on the first switch-on
     bool discordClosed_ = false;                 // quitting: cleared and closed, never made again (shutdown)
     int64_t discordStart_ = 0;                   // seconds since 1970 when this session started (the elapsed time)
-    char discordChallengeBuf_[64 * 4 + 1] = {};  // the theme field (64 code points of UTF-8)
+    double discordStrokeAt_ = -1e9;              // SDL seconds of the last stroke's start (with lastInputAt_: Idle 5 min after)
     bool discordPresenceAvailable() const;       // an application ID is compiled in
-    void updateDiscordPresence();                // every frame: sends only when what's shown changes
+    discord::Mode discordMode() const;           // Sculpting, Painting or Idle: the one word about the work that is sent
+    void updateDiscordPresence();                // every frame (tickProject): sends only when what's shown changes
     bool discordAgentRun() const;                // agent or offscreen run: never (discord::agentRun)
     void drawIntegrationsPrefs();                // Preferences > Integrations
     bool supportCardQueued_ = false;            // the first start's full card waits for the welcome and the tier card
@@ -866,8 +883,16 @@ private:
     bool comfyPickingText_ = false;
     std::string comfyWorkflowError_;
     int generatedRemesh_ = int(GeneratedRemesh::Quad); // Generate 3D's sculpting base: Quad (Voxel, then Quad Remesh) or Voxel
-    int voxelResolution_ = 200;
+    int voxelResolution_ = kVoxelResolutionDefault;
+    // Voxel Remesh's fine-crease hint, once per Part (id) and Resolution a session: a remesh at the default every
+    // starter head triggers would otherwise repeat it every time (cto 11-25).
+    std::set<std::pair<uint32_t, int>> creaseHintShown_;
     bool voxelKeepMasked_ = false; // Voxel Remesh's Keep Masked (#43)
+    bool voxelKeepGroups_ = false; // Voxel Remesh's Keep Face Groups (core/Voxel.h transferFaceGroups)
+    static constexpr const char* kKeepGroupsHelp =
+        "The new surface keeps the Part's face groups: each new polygon takes the group of the original surface "
+        "nearest its centre, so the borders stay hard lines (stepped at the voxel size). Off: one face group, as before. "
+        "Quad Remesh's Follow Face Groups does the same for quads.";
     static constexpr const char* kKeepMaskedHelp =
         "Masked areas keep their triangles exactly as they are (their detail too); only the rest is rebuilt, and "
         "it's joined to them along the mask's edge so the model stays closed. Mask what to keep first (Ctrl). "
@@ -1172,6 +1197,10 @@ private:
     // Cloth brush and Drape (PanelCloth.cpp, core/Cloth.h): Brush > Cloth, and the other visible Parts as the
     // surfaces the cloth collides with (built once, rebuilt when one of them changes).
     void drawClothSection();
+    void drawClothPanel();                          // Tool > Cloth: the brush settings and Drape together
+    void showClothPanel();                          // open it (the "Cloth settings..." links)
+    void drawClothSettingsLink(const char* id);
+    bool inClothPanel_ = false;
     void prepareClothColliders();
     bool clothUiValue(const std::string& name, double& out) const; // UI test values (UiTest.cpp)
     std::unique_ptr<ClothColliders> clothColliders_;
@@ -1679,9 +1708,30 @@ private:
     void drawQuickRemeshContents();          // their checkboxes under Tool > Remesh (PanelRetopo.cpp)
     std::string remeshSkippedNote(int reason);           // why Remesh after each stroke passed over this Part (0 levels, 1 layers, 2 texture)
     void strokeEndedForRemesh(const UndoRecord& stroke); // Remesh after each stroke: did it stretch the surface?
-    bool quickRemeshDragDown(float x, float y);          // a press on the background with the drag key held
+    bool quickRemeshDragDown(float x, float y);          // a press with the drag key held: background = whole Part, model = refresh
     void quickRemeshKey(SDL_Keycode key, SDL_Keymod mods, bool down); // tracks the held drag key
     SDL_Keycode quickRemeshDragKey_ = SDLK_UNKNOWN; // the "hold and drag" key while it is down
+    // The topology refresh gesture (PanelRetopo.cpp): the drag key held and a drag on the model refreshes the stretched
+    // triangles under the brush (Sculptor::refreshTopologyDab), one undo step per drag, no dialog.
+    void refreshTopologyDown(float x, float y, const RayHit& hit);
+    void refreshTopologyTo(float x, float y);
+    void refreshTopologyRelease();
+    float refreshEdge_ = 0.0f;              // the edge length this gesture refreshes towards
+    glm::vec3 refreshLast_{0.0f};           // the last dab's centre (dabs are spaced along the surface)
+    bool refreshHaveLast_ = false, refreshChanged_ = false;
+    size_t refreshTrianglesBefore_ = 0;
+    uint32_t refreshPart_ = 0;                 // the Part the gesture began on
+    int refreshDabs_ = 0, lastRefreshDabs_ = 0; // dabs this gesture / the last finished one (UI tests: refresh_dabs)
+    // Hold-to-navigate keys (Preferences > Navigation, NavBindings.h): the key down now that is bound to Hold to orbit /
+    // pan / zoom, and which move (0 orbit, 1 pan, 2 zoom; -1 none). Any press on the canvas while it is held is that
+    // camera drag (navMoveForPress); the drag goes on to the button's release, as Hold Space does.
+    void navHoldKey(SDL_Keycode key, SDL_Keymod mods, bool down); // tracks it (dispatchEvent, as quickRemeshKey)
+    int navMoveForPress(Uint8 button) const; // the move a press starts: a held key's, or a custom drag gesture's; -1 none
+    std::vector<std::string> navWarningLines() const; // Preferences > Navigation's warnings, one line per problem
+    int navConflictCount() const { return int(navWarningLines().size()); } // (UI tests: nav_conflicts)
+    void resetNavigationBindings();          // Preferences > Navigation > Navigation defaults
+    SDL_Keycode navHoldKey_ = SDLK_UNKNOWN;
+    int navHoldMove_ = -1;
     bool autoRemeshDue_ = false;                    // a stroke stretched the surface: remesh once nothing waits
     size_t lastStrokeStretched_ = 0;                // the last stroke's stretched edges (UI tests: stroke_stretched)
     std::set<std::pair<uint32_t, int>> remeshSkipNoted_; // (Part id, reason) already told why a remesh was skipped
@@ -1696,7 +1746,7 @@ private:
         uint32_t part = 0;
         size_t triangles = 0;
         int resolution = 200;
-        bool keepMasked = false, keepTexture = true;
+        bool keepMasked = false, keepTexture = true, keepGroups = false;
         bool allowSwap = false; // the person agreed to a remesh past the free memory (MemoryTier::NeedsSwap)
         int restarts = 0;       // quick ones: how often this job started again because the Part changed meanwhile
     };
@@ -2339,6 +2389,11 @@ private:
     uint64_t splitGroupsKey_ = ~uint64_t(0);
     bool splitGroupsPossible_ = false;
     bool splitKeepOriginal_ = false; // Split Hidden / Masked / Unmasked copy instead of move (keep=true)
+    // Primitive settings (core/PrimitiveKit.h): the sliders edit this copy of the active primitive's spec, taken again
+    // whenever the Part or its settings change (the key), and applied with part_primitive when a slider is let go.
+    PrimitiveSpec primEdit_;
+    uint64_t primEditKey_ = ~uint64_t(0);
+    void drawPrimitiveSection();
     // Community brushes window (PanelBrushGallery.cpp): browse, search and install shared brushes.
     void drawBrushGallery(); // also finishes background downloads while the window is closed
     void refreshBrushGallery();
@@ -2419,6 +2474,7 @@ private:
     // The SculptForge layout (Preferences > Interface > Look): the status bar with the task menus, and a task menu's
     // drop-down (its palettes as sections). Old palette ids keep working: a palette opens in its menu.
     void drawStatusBar(const ShellGeometry& g);
+    std::string navHoldLabel() const; // "HOLD TO PAN" while a navigation hold key is down, else empty (status bars)
     void drawTaskMenu();
     void drawLookChrome();    // a look's gaps, tile borders and effects (Shell.cpp)
     ShellMetrics shellMetrics() const;
@@ -2433,7 +2489,7 @@ private:
     std::map<std::string, std::string> menuSection_; // each task menu's last section (palette id)
     void drawShelf(int shelf, const CanvasRect& rect);
     void drawShelfItem(int shelf, int index, const std::string& item, bool vertical);
-    bool shelfItemShown(const std::string& item) const;
+    bool shelfItemShown(int shelf, const std::string& item) const;
     void drawTray(bool right, const CanvasRect& rect);
     void drawDivider(bool right, const CanvasRect& rect);
     void drawPaletteDropdown();
@@ -2488,7 +2544,17 @@ private:
     void fillPanelHost(ImGuiWindowFlags& flags);
     void registerPanelActions();
     void finishShelfDrag();
-    std::string myPanelSection_;      // while drawMyPanelSection runs: the section whose body subpalette() lets through
+    std::string myPanelSection_;      // while drawMyPanelScope runs: the section whose body subpalette() lets through
+    bool myPanelPaletteLevel_ = false; // ... or (myPanelSection_ = a palette id) the palette's own controls, no section
+    struct PinnedControlPlace {       // where one control sits in its scope's body, measured (PanelMyPanel.cpp drawPinnedControl)
+        bool known = false;
+        bool missing = false;             // measured, not there: its palette hides it in this state (a shelf then hides it too)
+        double measured = 0.0;            // when (ImGui time): a shelf looks for a missing control again now and then
+        float x = 0, y = 0, w = 0, h = 0; // from the body's origin, logical px as laid out at the host's width
+        float lineX = 0;                  // where its line starts: a control mid-row is drawn from there, not mid-panel
+    };
+    std::unordered_map<std::string, PinnedControlPlace> pinnedControls_; // by host and entry (pinnedPlaceKey)
+    static std::string pinnedPlaceKey(int host, const std::string& entry) { return std::to_string(host) + '|' + entry; }
     bool myPanelFloating_ = false;    // the floating My Panel is open (ui.my_panel)
     bool myPanelPlace_ = false;       // ... and wants placing at the cursor this frame
     std::vector<std::string> myPanelFolded_; // sections folded in My Panel (session only)
@@ -2544,6 +2610,17 @@ private:
     // like the others, or floating at the cursor on a key (ui.my_panel).
     void drawPalette_MyPanel();
     void drawMyPanelSection(const std::string& sectionId); // one palette section's body, without its header
+    void drawMyPanelScope(const std::string& scope);       // ... or (a palette id) the palette's controls outside sections
+    // One control entry, live, in My Panel (host ui::HostMyPanel) or on a shelf (host = the shelf, 0-3): its scope's body cropped
+    // to that control. layoutWidth: the width the body is laid out at; fit: the item is only as wide as the control (a horizontal
+    // shelf), else layoutWidth wide; rowH: the item's least height (the control is centred in it). false when it is not an
+    // entry this build knows. A control its palette hides now: in My Panel (and in Customize Shelves) its dim name, on a shelf
+    // otherwise nothing (shelfItemShown then skips it).
+    bool drawPinnedControl(const std::string& entry, const MyPanelEntry& e, int host, float layoutWidth, bool fit, float rowH, ImRect& rect,
+                           bool& remove);
+    // The shelf item for an Alt-dragged My Panel entry ("action:<id>": the id, a shelf button; "control:...": as it is), or
+    // empty when this build has no such action or palette (a section is My Panel's alone).
+    std::string shelfItemForEntry(const std::string& entry) const;
     void drawMyPanelFloating();
     void registerMyPanelActions();
     void finishMyPanelDrag();
@@ -2619,6 +2696,8 @@ private:
     bool extractDouble_ = false;           // Both Sides
     bool extractTriCorners_ = false;        // Corners: triangles in the rim's sharp corners
     bool extractTriBorder_ = false;         // Border: the whole rim triangles
+    float solidifyThick_ = 0.03f;           // Solidify: thickness as a fraction of the Part's size (core/Solidify.h)
+    bool solidifyBoth_ = false;             // Solidify: Centred
     bool mirrorWeldAxes_[3] = {true, false, false}; // Make Symmetric's X Y Z
     bool mirrorAxes_[3] = {true, false, false};     // Symmetry > Mirror's X Y Z
     // Reshape > Stack (docs/design/deform-panel.md): the steps, the one being edited and the preview, which is
@@ -2739,6 +2818,7 @@ private:
     // View controls (PanelView.cpp): X-Ray, the view's resolution, the light, Save Render's options.
     void registerViewUiCommands();
     void drawLightControls();
+    void drawAddedLightControls(); // Material > Light > Lights (PanelView.cpp)
     void drawSaveRenderControls();
     LibraryRoots library_;
     FolderScanner libraryScanner_;
@@ -2811,6 +2891,8 @@ private:
     friend class PythonScripting;
     friend class CommandPalette;
     friend void config::drawHotkeysSection(App&);
+    friend void config::drawNavigationSection(App&);
+    friend void config::drawShortcutCell(App&, const Action&, float, const char*);
     friend void config::drawLibraryBrowserSection(App&);
     void initUiConfig(bool deterministic); // reads ui.json before fonts are built (UI scale)
     void initActions();                    // the default actions and shortcuts, then every command as cmd.*
@@ -3510,6 +3592,13 @@ private:
         std::vector<size_t> found;
         int exportMenu = -1;     // the menu the export dialog was opened for
     } radialEdit_;
+    struct CentreClick { // Alt+middle press that hasn't moved past kRightClickSlop: a click centres the view on release
+        bool pending = false; // (the drag itself goes on as usual from the press: a pan or, with Blender keys, an orbit)
+        bool release = false; // the release being handled is the middle button's own (not another button's, a pen's or a touch's)
+        float x = 0.0f, y = 0.0f;
+        float dx = 0.0f, dy = 0.0f; // the motion since the press
+        float upX = 0.0f, upY = 0.0f; // where the middle button was let go (the release event's own position)
+    } centreClick_;
     struct RightClick {
         bool pending = false; // a right press that hasn't moved past the slop: navigation waits
         bool down = false;    // the right button is held (a second press for it is the driver's echo, not a click)
@@ -3588,6 +3677,10 @@ private:
     PenAction eraserAction() const { return uiPrefs_.tablet.eraser; }
     void firstDab(float x, float y); // the stroke's first dab, once the pen reports a real pressure
     void drawTabletSection();         // Preferences > Tablet
+    // One pen mapping row (the eraser or a side button), shared by Preferences > Tablet and > Navigation (Tablet.cpp).
+    void drawPenActionRow(const char* label, PenAction& value, std::initializer_list<PenAction> choices, const char* help,
+                          const char* path, float width);
+    void drawPenButtonRow(int button, const char* path, float width); // side button 0 lower, 1 upper, 2 third
     void detectPenName();
     void tabletDeviceEvent(const SDL_Event& e); // a tablet plugged in or out while running (TabletHotplug)
     void tabletNote(TabletHotplug::Note note, const std::string& name);

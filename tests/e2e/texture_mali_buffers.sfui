@@ -1,0 +1,34 @@
+# Member bug (Android, Mali-G72, 0.13.14, GL_MAX_TEXTURE_BUFFER_SIZE 65536 texels): a new sphere drew "GL driver message: glTexBuffer
+# ... extends beyond the allocated buffer" and GL error 0x0501 before any texture existed, and the sphere vanished when a texture was
+# made. Every buffer texture must hold at most the driver's limit, in the whole sequence the member ran, with the model visible
+# at each step (render_cell) and the paint showing. gl::TexBuffer counts the ones past the limit (texbuffer_over_limit), and each draw
+# counts a buffer sampler unit left empty (empty_buffer_samplers; the Mali rejects those: the face group unit of a mesh past the limit).
+run ui_look look=classic layout=classic
+gl_limits texels=65536
+run new_sphere subdivisions=6
+wait 0.5
+expect_value texbuffer_over_limit == 0
+expect_value empty_buffer_samplers == 0
+render_cell "new sphere x 65536-texel buffer limit (no texture yet)" mode=lit
+run uv_auto resolution=2048
+run texture_create size=2048
+wait 0.5
+expect_value texbuffer_over_limit == 0
+expect_value empty_buffer_samplers == 0
+expect_value texture_not_shown == 0
+render_cell "textured sphere x 65536-texel buffer limit" mode=lit
+run paint_layer_add name=Second
+run viewport_shading mode=pbr environment=photo_studio
+run texture_channels enable=roughness,metallic
+wait 0.5
+render_cell "PBR textured sphere with layers x 65536-texel buffer limit" mode=pbr
+action draw.paint
+run set_color color=00ff00
+stroke 0.2 0.5 0.8 0.5
+wait 0.5
+expect_value texture_painted > 3000
+expect_value texbuffer_over_limit == 0
+expect_value empty_buffer_samplers == 0
+render_cell "painted sphere x 65536-texel buffer limit" mode=lit
+shot texture_mali_buffers
+gl_limits texels=0

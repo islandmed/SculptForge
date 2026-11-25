@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <bit>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <thread>
@@ -479,6 +480,9 @@ uniform vec2 uLightLevels;    // light intensity, ambient
 uniform float uAlpha;         // X-Ray: the see-through Parts' opacity (1 = opaque)
 uniform int uOccAlpha;        // 1: alpha carries the shading normal's facing to the shadow light (render/Occlusion.h)
 uniform vec3 uOccLight;       // that light, view space
+uniform int uLightCount;      // added lights (RenderSettings::lights; 0 = none, the view as it always drew)
+uniform vec3 uLightDir[4];    // towards each one, view space
+uniform vec3 uLightCol[4];    // its linear colour times its intensity
 vec3 gShadeN = vec3(0.0, 0.0, 1.0); // (main sets it: the normal the pixel is shaded with)
 uniform int uTwoSided;        // 1: back faces shade with the normal turned towards the viewer; 0: the motion proxy,
                               // whose folds face backwards on the outside of the surface
@@ -516,6 +520,20 @@ vec3 groupColor(uint id) {
 }
 vec3 faceColor(uint c) {
     return pow(vec3(float(c & 255u), float((c >> 8) & 255u), float((c >> 16) & 255u)) / 255.0, vec3(2.2));
+}
+// The added lights on the Lit Sphere and studio shading: Lambert diffuse in the surface's colour and a small
+// Blinn highlight per light, in the material's own units (no tone map here, so a light at 1 adds about half
+// the surface colour on a facing surface, like the studio key does).
+vec3 addedLights(vec3 n, vec3 v, vec3 albedo, float shine) {
+    vec3 sum = vec3(0.0);
+    for (int i = 0; i < uLightCount; ++i) {
+        vec3 L = uLightDir[i];
+        float ndl = max(dot(n, L), 0.0);
+        // (the highlight fades out as the surface turns away from the light: no glint from a light behind it)
+        float sp = pow(max(dot(n, normalize(L + v)), 0.0), shine) * 0.18 * smoothstep(0.0, 0.08, dot(n, L));
+        sum += uLightCol[i] * (albedo * ndl * 0.55 + sp);
+    }
+    return sum;
 }
 // The UV checker: light and dark squares, the whole tile tinted by its UDIM number so tiles tell apart.
 vec3 checkerColor(vec2 uv) {
@@ -578,6 +596,26 @@ vec3 toneMapped(vec3 c) {
     }
     return clamp(c, 0.0, 1.0);
 }
+// The added lights in the PBR view: GGX (Smith height-correlated visibility, Schlick Fresnel) plus Lambert, each
+// light's colour as its radiance over pi, so a light at 1 on a facing white surface adds its colour once.
+vec3 directLights(vec3 albedo, vec3 n, vec3 v, float rough, float metal, vec3 F0, float NdotV) {
+    vec3 sum = vec3(0.0);
+    float a = max(rough * rough, 0.002), a2 = a * a;
+    for (int i = 0; i < uLightCount; ++i) {
+        vec3 L = uLightDir[i];
+        float NdotL = dot(n, L);
+        if (NdotL <= 0.0) continue;
+        vec3 H = normalize(L + v);
+        float NdotH = max(dot(n, H), 0.0), VdotH = max(dot(v, H), 0.0);
+        float d = NdotH * NdotH * (a2 - 1.0) + 1.0;
+        float D = a2 / (3.14159265 * d * d);
+        float Vis = 0.5 / (NdotL * sqrt(NdotV * NdotV * (1.0 - a2) + a2) + NdotV * sqrt(NdotL * NdotL * (1.0 - a2) + a2) + 1e-5);
+        vec3 F = F0 + (1.0 - F0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
+        vec3 kd = (1.0 - F) * (1.0 - metal);
+        sum += (kd * albedo + D * Vis * F * 3.14159265) * uLightCol[i] * NdotL;
+    }
+    return sum;
+}
 vec3 pbrShade(vec3 albedo, vec3 n, vec3 v, float rough, float metal, float ao, float curvature, vec3 emissive) {
     rough = clamp(rough, 0.03, 1.0);
     metal = clamp(metal, 0.0, 1.0);
@@ -593,7 +631,8 @@ vec3 pbrShade(vec3 albedo, vec3 n, vec3 v, float rough, float metal, float ao, f
     vec3 diffuse = (1.0 - F) * (1.0 - metal) * albedo * irr;
     float specOcc = clamp(pow(NdotV + ao, exp2(-16.0 * rough - 1.0)) - 1.0 + ao, 0.0, 1.0); // Lagarde & de Rousiers
     float cavity = 1.0 - uPbrCavity * 0.6 * smoothstep(0.0, 0.16, curvature);
-    return ((diffuse * ao + spec * specOcc) * cavity + emissive) * exp2(uExposure);
+    vec3 direct = uLightCount > 0 ? directLights(albedo, n, v, rough, metal, F0, NdotV) : vec3(0.0);
+    return ((diffuse * ao + spec * specOcc + direct) * cavity + emissive) * exp2(uExposure);
 }
 #endif
 void main() {
@@ -684,6 +723,7 @@ void main() {
         float mcrease = smoothstep(0.03, 0.18, curvature);
         float mridge = smoothstep(0.03, 0.2, -curvature);
         vec3 c = mc * tint * (1.0 - uLitSphereCavity.x * mcrease) * (1.0 + uLitSphereCavity.y * mridge);
+        if (uLightCount > 0) c += addedLights(n, v, tint, 40.0) * (1.0 - uLitSphereCavity.x * mcrease);
         if (uShowMask == 1) c = maskTint(c, V_MASK);
         fragColor = finish(c);
         return;
@@ -706,6 +746,7 @@ void main() {
     c += albedo * ridge * 0.3 * diff;                           // ridges catch the key light
     c += vec3(spec) * (1.0 - crease) + rim * vec3(0.8, 0.85, 1.0);
     c = c * uLightLevels.x + albedo * uLightLevels.y * 0.6;
+    if (uLightCount > 0) c += addedLights(n, v, albedo, 40.0) * cavity;
     if (uShowMask == 1) c = maskTint(c, V_MASK);
     fragColor = finish(c);
 }
@@ -1208,6 +1249,15 @@ bool Renderer::init(std::string& error) {
         gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, dummyUvBufferData_);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
         gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+        const uint32_t zeroUint = 0;
+        gl::GenBuffers(1, &dummyUintBufferData_);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, dummyUintBufferData_);
+        gl::BufferData(GL_TEXTURE_BUFFER, sizeof zeroUint, &zeroUint, GL_STATIC_DRAW);
+        gl::GenTextures(1, &dummyUintBufferTexture_);
+        gl::BindTexture(GL_TEXTURE_BUFFER, dummyUintBufferTexture_);
+        gl::TexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, dummyUintBufferData_);
+        gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
         gl::GenTextures(1, &dummyUv2D_);
         gl::BindTexture(GL_TEXTURE_2D, dummyUv2D_);
         gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -1299,6 +1349,11 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.alpha = at("uAlpha");
     p.occAlpha = at("uOccAlpha");
     p.occLight = at("uOccLight");
+    p.lightCount = at("uLightCount");
+    p.lightDirs = at("uLightDir[0]"); // (an array's location: by its first element; some drivers want the bare name)
+    if (p.lightDirs < 0) p.lightDirs = at("uLightDir");
+    p.lightCols = at("uLightCol[0]");
+    if (p.lightCols < 0) p.lightCols = at("uLightCol");
     p.microWire = at("uMicroWire");
     p.primBase = at("uPrimBase");
     p.hasPaint = at("uHasPaint");
@@ -1608,6 +1663,8 @@ void Renderer::shutdown() {
     gl::DeleteVertexArrays(1, &emptyVao_);
     gl::DeleteBuffers(1, &dummyUvBufferData_);
     gl::DeleteTextures(1, &dummyUvBufferTexture_);
+    gl::DeleteBuffers(1, &dummyUintBufferData_);
+    gl::DeleteTextures(1, &dummyUintBufferTexture_);
     gl::DeleteTextures(1, &dummyUv2D_);
     for (MeshProgram& p : programs_) {
         deleteProgram(p.id);
@@ -3424,10 +3481,20 @@ void Renderer::prepareOcclusion(const RenderSettings& settings, bool pbr, const 
         const float l0 = 0.282095f * glm::dot(envSh_.c[0], lum), l1 = 0.488603f * glm::length(dirEnv);
         o.light = l1 > 1e-6f ? glm::transpose(frameViewToEnv_) * (dirEnv / glm::length(dirEnv)) : glm::vec3(0.0f, 1.0f, 0.0f);
         o.shadowDarkness = std::clamp(l1 / std::max(l0 + l1, 1e-6f), 0.3f, 0.55f);
-        } else {
+    } else {
         o.light = lightRotation(settings.lightYaw, settings.lightPitch) * glm::normalize(glm::vec3(0.45f, 0.65f, 0.6f));
         o.shadowDarkness = 0.6f; // (the studio key's share of the light)
     }
+    // An added light with Shadows on is where the shadows come from: its share of the light grows with its
+    // intensity against the rest (the environment's even part, or the studio's fill and ambient).
+    for (const ViewLight& l : settings.lights)
+        if (l.shadows) {
+            const float k = std::max(l.intensity, 0.0f) * glm::dot(glm::max(l.color, glm::vec3(0.0f)), glm::vec3(0.2126f, 0.7152f, 0.0722f));
+            o.light = viewLightDirection(l.yaw, l.pitch);
+            o.shadowDarkness = std::clamp(k / (k + 0.5f), 0.3f, 0.75f);
+            break;
+        }
+    o.shadowDarkness = shadowDarknessFor(o.shadowDarkness, settings.shadowStrength);
     frameOcclusionWanted_ = true;
 }
 
@@ -4379,6 +4446,77 @@ void Renderer::setLightUniforms(const MeshProgram& p, const RenderSettings& sett
     const bool occ = frameOcclusionWanted_ && frameOcclusion_.shadows;
     gl::Uniform1i(p.occAlpha, occ ? 1 : 0);
     if (occ) gl::Uniform3fv(p.occLight, 1, glm::value_ptr(glm::normalize(frameOcclusion_.light)));
+    // The added lights: direction towards each (view space) and colour times intensity; none = the shader's old path.
+    const int count = std::min(int(settings.lights.size()), kMaxViewLights);
+    gl::Uniform1i(p.lightCount, count);
+    if (count > 0) {
+        glm::vec3 dirs[kMaxViewLights], cols[kMaxViewLights];
+        const float balance = viewLightsBalance(settings.lights);
+        for (int i = 0; i < count; ++i) {
+            const ViewLight& l = settings.lights[size_t(i)];
+            dirs[i] = viewLightDirection(l.yaw, l.pitch);
+            cols[i] = glm::max(l.color, glm::vec3(0.0f)) * (std::max(l.intensity, 0.0f) * balance);
+        }
+        gl::Uniform3fv(p.lightDirs, count, glm::value_ptr(dirs[0]));
+        gl::Uniform3fv(p.lightCols, count, glm::value_ptr(cols[0]));
+    }
+}
+
+glm::vec3 viewLightDirection(float yawDegrees, float pitchDegrees) {
+    return lightRotation(yawDegrees, pitchDegrees) * glm::vec3(0.0f, 0.0f, 1.0f);
+}
+
+float viewLightsBalance(const std::vector<ViewLight>& lights) {
+    const glm::vec3 lum(0.2126f, 0.7152f, 0.0722f);
+    float total = 0.0f, strongest = 0.0f;
+    int n = 0;
+    for (const ViewLight& l : lights) {
+        if (++n > kMaxViewLights) break;
+        const float k = std::max(l.intensity, 0.0f) * glm::dot(glm::clamp(l.color, 0.0f, 1.0f), lum);
+        total += k;
+        strongest = std::max(strongest, k);
+    }
+    const float cap = std::max(strongest, 1.0f);
+    return total > cap ? cap / total : 1.0f;
+}
+
+float shadowDarknessFor(float base, float strength) {
+    return std::clamp(std::clamp(base, 0.0f, 1.0f) * std::clamp(strength, 0.0f, 2.0f), 0.0f, 1.0f);
+}
+
+ViewLight viewLightPreset(ViewLight::Role role) {
+    ViewLight l;
+    l.role = role;
+    switch (role) {
+    case ViewLight::Role::Key: // warm, from the upper left in front; it casts the shadows
+        l.yaw = -35.0f, l.pitch = 30.0f, l.color = glm::vec3(1.0f, 0.95f, 0.88f), l.intensity = 1.0f, l.shadows = true;
+        break;
+    case ViewLight::Role::Fill: // cool and soft, from the right, a little low
+        l.yaw = 55.0f, l.pitch = -5.0f, l.color = glm::vec3(0.78f, 0.86f, 1.0f), l.intensity = 0.4f;
+        break;
+    case ViewLight::Role::Rim: // from behind and above: it catches the silhouette
+        l.yaw = 145.0f, l.pitch = 35.0f, l.color = glm::vec3(1.0f), l.intensity = 0.9f;
+        break;
+    }
+    return l;
+}
+
+const char* viewLightRoleName(ViewLight::Role role) {
+    switch (role) {
+    case ViewLight::Role::Fill: return "Fill";
+    case ViewLight::Role::Rim: return "Rim";
+    default: return "Key";
+    }
+}
+
+bool parseViewLightRole(const std::string& text, ViewLight::Role& out) {
+    std::string s;
+    for (char c : text) s += char(std::tolower(static_cast<unsigned char>(c)));
+    if (s == "key") out = ViewLight::Role::Key;
+    else if (s == "fill") out = ViewLight::Role::Fill;
+    else if (s == "rim") out = ViewLight::Role::Rim;
+    else return false;
+    return true;
 }
 
 void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
@@ -4444,7 +4582,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::ActiveTexture(kTexture7);
     gl::BindTexture(GL_TEXTURE_BUFFER, s.primTexture);
     gl::ActiveTexture(GL_TEXTURE1);
-    gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.groupTexture : 0);
+    gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.groupTexture : dummyUintBufferTexture_);
     gl::ActiveTexture(GL_TEXTURE0);
     gl::Uniform1i(p->paint, settings.showVertexPaint && s.hasColors ? 1 : 0);
     gl::Uniform1i(p->showMask, active && settings.showMask && s.hasMask ? 1 : 0);
@@ -4456,6 +4594,15 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform1i(p->twoSided, 1);
     gl::Uniform1i(p->checker, checker ? 1 : 0);
     gl::Uniform1f(p->checkerScale, checker ? s.overlay->checkerScale : 8.0f);
+    if (gl::testTexelLimitSet()) { // (a UI test: a driver that checks every sampler, Mali, rejects the draw when one buffer unit is empty)
+        for (const GLenum unit : {kTexture7, GL_TEXTURE1, textured || normalMapped ? GL_TEXTURE3 : kTexture7, normalMapped ? kTexture6 : kTexture7}) {
+            GLint bound = 0;
+            gl::ActiveTexture(unit);
+            gl::GetIntegerv(0x8C2C /* GL_TEXTURE_BINDING_BUFFER */, &bound);
+            if (!bound) ++emptyBufferSamplers_;
+        }
+        gl::ActiveTexture(GL_TEXTURE0);
+    }
     };
     bind(p);
     gl::BindVertexArray(s.vao);
@@ -4596,7 +4743,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         if (!s.patchMaskOn) gl::VertexAttrib1f(3, 0.0f);
         if (perTriangle) {
             gl::ActiveTexture(GL_TEXTURE1);
-            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : 0);
+            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : dummyUintBufferTexture_);
             gl::ActiveTexture(GL_TEXTURE0);
         }
         drawPatches(s, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);

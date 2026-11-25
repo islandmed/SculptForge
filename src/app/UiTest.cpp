@@ -78,6 +78,7 @@
 //                            N (A first) gets the Nth shape (cycling): sphere cube torus capsule cone, or fail, textoff, nomodel (the free Spaces' real refusal / empty answers); off = the services
 //   key_nav_speed X          the pan and zoom key speed (Preferences > Input), 0.1 to 5
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
+//   set_nav_drag MOVE GESTURE  Preferences > Navigation's drag gesture for orbit, pan or zoom, e.g. set_nav_drag zoom Shift+Middle (none clears)
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
 //                            $LIBRARY in DST (and in env values) is the test's Library library folder; a
@@ -132,6 +133,7 @@
 //                            brush_looks (different alpha + stroke looks the brush thumbnails were asked for, #208),
 //                            thumbnails_regenerated (brush thumbnails remade by right-click > Regenerate thumbnail),
 //                            parts (count), part_thumbnails (Part panel thumbnails rendered), active_part (index, 0 = top), visible_parts,
+//                            primitive_fresh (1 while the active Part is still the primitive Append made: its settings show), primitive_segments, open_edges (boundary edges; 0 = closed),
 //                            linked_parts (Parts sharing the active one's mesh, #94; 1 = none), part_moved, part_x (its
 //                            centre's x in the scene),
 //                            boolean_preview (triangles of the Boolean result the view shows in place of its Parts, 0
@@ -151,6 +153,7 @@
 //                            the tray, -1 when closed); OP is == != < <= > >=; N may be $NAME, $NAME*K,
 //                            $NAME+K or $NAME-K (see remember)
 //                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
+//                            view_vs_mark (mean pixel difference to mark_view's view), view_nearer_mark (that, less the same to mark_view other's),
 //                            micro_pending_coarse (Focus Detail: tiles whose coarse shading still waits for a frame),
 //                            micro_pending_shading (a micro level without Focus Detail: patches whose shading still waits),
 //                            micro_widen_deferrals (live strokes' range widens shown a frame late, MicroRenderer::sync),
@@ -182,7 +185,7 @@
 //                            smooth_group_borders (Brush > Smooth face group borders only, #81),
 //                            moved_out (summed movement along the snapshot's normals: > 0 out, < 0 in),
 //                            moved_off_stencil (moved vertices that showed off the Stencil's image), stencil_active,
-//                            stencil_adjust, stencil_tile, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
+//                            stencil_adjust, stencil_tile, stencil_outside_sculpts, stencil_x / stencil_y / stencil_size (x1000), stencil_angle (degrees),
 //                            reference_count, reference_selected, reference_adjust, reference_gpu_kb, reference_x /
 //                            reference_y / reference_height / reference_stretch / reference_origin_x..z (x1000, the
 //                            selected one), reference_scene, reference_has_image, reference_facing (x1000),
@@ -223,6 +226,7 @@
 //                            longest_frame_ms (the longest real time between two frames since the last read; resets),
 //                            time_limit_scale (timeLimit()'s factor: 4 on CI or in a parallel ctest, else 1),
 //                            voxel_remesh_running, quick_remesh / remesh_after_stroke (Tool > Remesh, #121), stroke_stretched, remesh_skip_notes,
+//                            voxel_keep_groups (Keep Face Groups), refresh_dabs (dabs of the last topology refresh drag), refresh_active,
 //                            guide_strength (Guide Strength), retopo_target (Target Quads), guide_strength_on_shelves / target_quads_on_shelves / level_on_shelves, voxel_resolution, voxel_resolution_on_shelves (shelf slots holding its slider), voxel_triangle_estimate (the line under it), voxel_highres_confirm (1 while
 //                            the above-512 confirmation is open),
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
@@ -451,6 +455,8 @@
 #include "core/Multires.h"
 #include "core/MicroTiles.h"
 #include "core/PerfTrace.h"
+#include "core/ExtractMirror.h"
+#include "core/PrimitiveKit.h"
 #include "core/Primitives.h"
 #include "core/Script.h"
 #include "core/SelectionSets.h"
@@ -489,8 +495,8 @@
 namespace sf {
 
 namespace {
-// mark_view / view_vs_mark: the 3D view as the GPU holds it now (no sync: what the user would see this frame), 480 x 270.
-std::vector<uint8_t> gViewMark;
+// mark_view / view_vs_mark / view_nearer_mark: the 3D view as the GPU holds it now (no sync: what the user would see this frame), 480 x 270.
+std::vector<uint8_t> gViewMark, gViewMarkOther; // (mark_view, mark_view other)
 bool renderLiveView(App& app, std::vector<uint8_t>& out, const Camera& camera, const RenderSettings& settings, Renderer& renderer) {
     (void)app;
     Camera cam = camera;
@@ -820,6 +826,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (const double v = app_.sculptableTestValue(name); !std::isnan(v)) return v;
     if (name == "qremesh_running") return app_.qremesh_ ? 1.0 : 0.0;
     if (name == "voxel_remesh_running") return app_.voxelRemesh_ ? 1.0 : 0.0;
+    if (name == "voxel_keep_groups") return app_.voxelKeepGroups_ ? 1.0 : 0.0;
+    if (name == "refresh_dabs") return double(app_.lastRefreshDabs_); // the last topology refresh gesture's dabs
+    if (name == "refresh_active") return app_.drag_ == App::Drag::RefreshTopology ? 1.0 : 0.0;
     if (name == "voxel_resolution") return double(app_.voxelResolution_);
     if (name == "retopo_target") return double(app_.retopo_.target);
     if (name == "guide_strength") return double(app_.curvesStrength_);
@@ -1066,6 +1075,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "emulate_3_button") return app_.uiPrefs_.emulate3Button ? 1.0 : 0.0; // Blender style (#77)
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
+    if (name == "nav_hold") return double(app_.navHoldMove_ + 1);        // a Hold to orbit / pan / zoom key down: 1 / 2 / 3, 0 none
+    if (name == "nav_conflicts") return double(app_.navConflictCount()); // Preferences > Navigation's warnings
+    for (int i = 0; i < kNavMoves; ++i)                                  // nav_drag_orbit / pan / zoom: the gesture's button (0 none)
+        if (name == std::string("nav_drag_") + kNavMoveIds[i]) return double(app_.uiPrefs_.nav.drag[i].button);
     if (name == "radial_open") return app_.radial_.menu >= 0 ? 1.0 : 0.0;
     if (name == "stroke_popup_open") return app_.strokePopup_.open ? 1.0 : 0.0;
     if (name == "stroke_popup_held") return app_.strokePopup_.open && app_.strokePopup_.held ? 1.0 : 0.0;
@@ -1443,6 +1456,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "connect_ai_open") return app_.showConnectAi_ ? 1.0 : 0.0; // Help > Connect an AI tool (PanelConnectAi.cpp)
     if (name == "discord_connects") return double(discord::connectAttempts()); // Show SculptForge on Discord: never in tests
     if (name == "discord_presence") return app_.discordPrefs_.enabled ? 1.0 : 0.0;
+    if (name == "discord_mode") return double(int(app_.discordMode())); // what would be sent: 0 Idle, 1 Sculpting, 2 Painting
+    if (name == "discord_options_note") return app_.discordPrefs_.optionsNote ? 1.0 : 0.0;
     if (name == "http_requests") return double(ai::httpRequestCount()); // every request this process started
     if (name == "generate_candidates") return double(app_.candidates_.size()); // Generate 3D's, waiting for a pick
     if (name == "generated_part") return double(app_.doc_.partIndex(app_.generatedPart_)); // the pick's Part (-1 none)
@@ -1562,6 +1577,14 @@ double Demo::query(const std::string& name, bool& known) const {
     }
     if (name == "linked_parts") return double(app_.doc_.linkCount(app_.doc_.activePart)); // (#94: 1 = not linked)
     if (name == "part_moved") return app_.doc_.activePartInfo().moved() ? 1.0 : 0.0;
+    // Primitive settings (core/PrimitiveKit.h): 1 while the active Part is still exactly the primitive Append made.
+    if (name == "primitive_fresh") return primitiveFresh(app_.doc_, app_.doc_.activePart) ? 1.0 : 0.0;
+    if (name == "primitive_segments") { // (the check first: after undo it finds the settings the mesh matches)
+        primitiveFresh(app_.doc_, app_.doc_.activePart);
+        const PrimitiveState& st = app_.doc_.activePartInfo().data->primitive;
+        return st.any() ? double(st.spec().segments) : -1.0;
+    }
+    if (name == "open_edges") return double(boundaryEdges(app_.doc_.mesh.triangles).size()); // 0 = closed (Solidify)
     if (name == "part_x") return double(app_.doc_.partBounds(app_.doc_.activePart).center().x);
     if (name == "visible_parts")
         return double(std::count_if(doc.parts.begin(), doc.parts.end(), [](const Part& s) { return s.visible; }));
@@ -1842,6 +1865,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "detached_panels") return double(app_.panelWindows_.size()); // in windows of their own (PanelWindows.cpp)
     if (name == "floor_grid") return app_.renderSettings_.floorGrid ? 1.0 : 0.0;
     if (name == "floor_height") return double(app_.renderSettings_.floorHeight); // (the visible Parts' lowest point)
+    if (name == "floor_grid_fixed") return app_.uiPrefs_.floorGridFixed ? 1.0 : 0.0; // View > Display > Floor grid at Y=0
     if (name == "floor_grid_drawn") { // the 3D view drawn once more now: 1 if it drew the floor grid
         app_.benchmarkDrawMs(0);
         return app_.renderer_.floorGridDrawn() ? 1.0 : 0.0;
@@ -1855,11 +1879,68 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "light_pitch") return double(app_.renderSettings_.lightPitch);
     if (name == "light_intensity") return double(app_.renderSettings_.lightIntensity);
     if (name == "light_ambient") return double(app_.renderSettings_.lightAmbient);
+    if (name == "light_count") return double(app_.renderSettings_.lights.size()); // added lights (Material > Light > Lights)
+    if (name == "added_light_yaw") return app_.renderSettings_.lights.empty() ? 0.0 : double(app_.renderSettings_.lights.back().yaw);
+    if (name == "added_light_intensity") return app_.renderSettings_.lights.empty() ? 0.0 : double(app_.renderSettings_.lights.back().intensity);
+    if (name == "shadow_strength") return double(app_.renderSettings_.shadowStrength);
+    if (name == "lights_balance") return double(viewLightsBalance(app_.renderSettings_.lights)); // 1 = each light as its slider says
+    if (name == "shadow_light_count") { // added lights that cast the shadows (0 or 1)
+        int n = 0;
+        for (const ViewLight& l : app_.renderSettings_.lights) n += l.shadows ? 1 : 0;
+        return double(n);
+    }
     if (name == "render_aspect") return double(app_.renderAspect_);
     if (name == "draw_ms") return app_.benchmarkDrawMs(30); // the 3D view drawn 30 times: ms per frame
     if (name == "drawn_triangles") { // the 3D view drawn once more now: the triangles it drew
         app_.benchmarkDrawMs(0);
         return double(app_.renderer_.lastDrawnTriangles());
+    }
+    if (name == "view_mean_luma" || name == "view_max_luma" || name == "view_clipped_share") {
+        // The model's exposure in the view as drawn now (render/Occlusion.h pass included): over the pixels of the scene's
+        // projected box in a 480x270 render with a black flat background, the mean luminance (0-255), the 99.5th
+        // percentile (the highlights, one stray pixel apart) and the share of pixels at 250 or more (clipped), in percent.
+        // The lights' balance test keeps a three-light setup within the one-light look's range (render_lights_balance.sfui).
+        const int w = 480, h = 270;
+        Camera cam = app_.camera_;
+        cam.aspect = float(w) / float(h);
+        RenderSettings rs = app_.renderSettings_;
+        rs.gradientBackground = false;
+        rs.backgroundColor = glm::vec3(0.0f);
+        rs.environmentBackground = false;
+        const AABB b = app_.sceneBounds();
+        if (!b.valid()) return -1.0;
+        const glm::mat4 vp = cam.projection() * cam.view();
+        int x0 = w, x1 = -1, y0 = h, y1 = -1;
+        for (int k = 0; k < 8; ++k) {
+            const glm::vec3 q((k & 1) ? b.max.x : b.min.x, (k & 2) ? b.max.y : b.min.y, (k & 4) ? b.max.z : b.min.z);
+            const glm::vec4 hc = vp * glm::vec4(q, 1.0f);
+            if (hc.w <= 0.0f) return -1.0;
+            const int px = int((hc.x / hc.w * 0.5f + 0.5f) * float(w)), py = int((0.5f - hc.y / hc.w * 0.5f) * float(h)); // (rows top-down)
+            x0 = std::min(x0, px), x1 = std::max(x1, px), y0 = std::min(y0, py), y1 = std::max(y1, py);
+        }
+        x0 = std::clamp(x0, 0, w - 1), x1 = std::clamp(x1, 0, w - 1), y0 = std::clamp(y0, 0, h - 1), y1 = std::clamp(y1, 0, h - 1);
+        if (x1 < x0 || y1 < y0) return -1.0;
+        std::vector<uint8_t> rgba;
+        std::string error;
+        app_.syncScene();
+        if (!app_.renderer_.renderToImage(cam, w, h, rs, rgba, error) || rgba.size() != size_t(w) * size_t(h) * 4) return -1.0;
+        std::vector<float> luma;
+        luma.reserve(size_t(x1 - x0 + 1) * size_t(y1 - y0 + 1));
+        double sum = 0.0;
+        size_t clipped = 0;
+        for (int y = y0; y <= y1; ++y)
+            for (int x = x0; x <= x1; ++x) {
+                const uint8_t* px = &rgba[(size_t(y) * size_t(w) + size_t(x)) * 4];
+                const float l = 0.2126f * px[0] + 0.7152f * px[1] + 0.0722f * px[2];
+                luma.push_back(l);
+                sum += l;
+                if (l >= 250.0f) ++clipped;
+            }
+        if (luma.empty()) return -1.0;
+        if (name == "view_mean_luma") return sum / double(luma.size());
+        if (name == "view_clipped_share") return 100.0 * double(clipped) / double(luma.size());
+        std::sort(luma.begin(), luma.end());
+        return double(luma[std::min(luma.size() - 1, size_t(double(luma.size()) * 0.995))]);
     }
     if (name == "view_stale") {
         // gh#184: the view as the GPU holds it after the edits so far, against the same mesh sent up whole again: the
@@ -1878,13 +1959,21 @@ double Demo::query(const std::string& name, bool& known) const {
         for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(whole[i])));
         return double(sum) / double(std::max<size_t>(1, now.size()));
     }
-    if (name == "view_vs_mark") { // the view as the GPU holds it now (not synced first) against mark_view's: mean pixel difference 0-255
+    if (name == "view_vs_mark" || name == "view_nearer_mark") {
+        // view_vs_mark: the view as the GPU holds it now (not synced first) against mark_view's: mean pixel difference 0-255.
+        // view_nearer_mark: how much nearer that is than to `mark_view other`'s (negative: the view is nearer the other). A stroke
+        // running changes the whole shading a little, so the distance to one mark alone can't tell "undone" from "still shown".
         std::vector<uint8_t> now;
         if (gViewMark.empty() || !renderLiveView(app_, now, app_.camera_, app_.renderSettings_, app_.renderer_) || now.size() != gViewMark.size())
             return -1.0;
-        uint64_t sum = 0;
-        for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(gViewMark[i])));
-        return double(sum) / double(std::max<size_t>(1, now.size()));
+        const auto distance = [&now](const std::vector<uint8_t>& mark) {
+            uint64_t sum = 0;
+            for (size_t i = 0; i < now.size(); ++i) sum += uint64_t(std::abs(int(now[i]) - int(mark[i])));
+            return double(sum) / double(std::max<size_t>(1, now.size()));
+        };
+        if (name == "view_vs_mark") return distance(gViewMark);
+        if (gViewMarkOther.size() != now.size()) return -1.0;
+        return distance(gViewMarkOther) - distance(gViewMark);
     }
     // Strokes on the stroke thread (interactive_strokes on; AsyncStroke.cpp): the stroke now running places its dabs there,
     // and the last one is still being placed (draining) or the thread is busy.
@@ -2004,6 +2093,12 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
     if (name == "cursor_follows_surface") return app_.uiPrefs_.cursorFollowsSurface ? 1.0 : 0.0;
     if (name == "camera_yaw") return glm::degrees(app_.camera_.yaw);
+    if (name == "camera_target_x") return app_.camera_.target.x; // the orbit target (centre view on the pointer)
+    if (name == "camera_target_y") return app_.camera_.target.y;
+    if (name == "camera_target_z") return app_.camera_.target.z;
+    if (name == "camera_eye_x") return app_.camera_.position().x; // where the eye is
+    if (name == "camera_eye_y") return app_.camera_.position().y;
+    if (name == "camera_eye_z") return app_.camera_.position().z;
     if (name == "camera_pitch") return glm::degrees(app_.camera_.pitch);
     if (name == "camera_roll") return glm::degrees(app_.camera_.roll);
     if (name == "camera_up") return (app_.camera_.orientation() * glm::vec3(0, 1, 0)).y;
@@ -2057,7 +2152,9 @@ double Demo::rememberedNumber(int line, const std::string& text, bool* found) {
 void Demo::testClick(int line, const std::string& label, int button, bool doubleClick) {
     // Find the item (give the UI a moment to appear), glide there, press and release.
     const auto clipAt = std::make_shared<ImVec4>(); // the item's panel when the mouse glided there
-    steps_.push_back([this, line, label, clipAt](float t) {
+    const auto last = std::make_shared<ImVec2>(-1.0f, -1.0f); // where the item was a frame ago (-1: not seen yet)
+    const auto moved = std::make_shared<bool>(false);          // logged once: it moved after it was first seen
+    steps_.push_back([this, line, label, clipAt, last, moved](float t) {
         ImVec2 to;
         bool visible = false;
         if (!findItem(label, to, &visible)) {
@@ -2082,6 +2179,22 @@ void Demo::testClick(int line, const std::string& label, int button, bool double
             // Off the screen, or the panel won't scroll: a person couldn't click it either.
             if (t > 1.0f) fail(line, "\"" + label + "\" is not visible (off screen or scrolled out of view)");
             return t > 1.0f;
+        }
+        // The step before (a run, a click that opened something) may still be moving the layout: a group that appears
+        // in the next frame pushes everything under it down, and a press at the old spot would land on another item
+        // (or off the panel, where the re-follow at press time can't see it). Take the item only once it has stayed
+        // put for a frame; a jump is logged (a real one-frame layout jump a fast click would mis-hit), a layout that
+        // never settles fails. A slow drift (a palette easing open, a hover lift: a pixel or two a frame) is no jump:
+        // the press step follows that, as it always has.
+        if (std::abs(to.x - last->x) > 3.0f || std::abs(to.y - last->y) > 3.0f) {
+            if (last->x >= 0.0f && !*moved) {
+                *moved = true;
+                std::printf("  click \"%s\": the item moved %.0f px (y, down is positive) between frames (layout settling after the step before)\n",
+                            label.c_str(), double(to.y - last->y));
+            }
+            *last = to;
+            if (t > 3.0f) fail(line, "\"" + label + "\" kept moving (the layout never settled)");
+            return t > 3.0f;
         }
         findItem(label, to, &visible, clipAt.get());
         mouseMotion(to.x, to.y);
@@ -2175,7 +2288,7 @@ enum class StepVerb { None,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
     Orbit, Camera, Zoom, HideUi, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
     AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
-    PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, Restart,
+    PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, SetNavDrag, Restart,
     GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
     Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, DumpUi, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
@@ -2249,6 +2362,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"mouse_orbit_speed", StepVerb::MouseOrbitSpeed},
         {"two_key_window", StepVerb::TwoKeyWindow},
         {"input_style", StepVerb::InputStyle},
+        {"set_nav_drag", StepVerb::SetNavDrag},
         {"restart", StepVerb::Restart},
         {"generator_stub", StepVerb::GeneratorStub},
         {"env", StepVerb::Env},
@@ -3742,8 +3856,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     case StepVerb::UiScale: { // ui_scale 175 | auto: as Preferences > Interface > UI scale picks it (#87)
         if (!need(1)) return false;
         const float v = w[1] == "auto" ? 0.0f : num(1, 100) / 100.0f;
-        run([this, v] {
-            app_.uiPrefs_.uiScale = v;
+        run([this, v] { // the general choice only (the per-monitor entry comes from the Preferences slider: ui_scale_prefs.sfui;
+            app_.uiPrefs_.uiScale = v; // a test's ui.json stays as the Classic golden has it: classic_defaults.sfui)
             app_.requestUiScale();
         });
         wait(0.2f);
@@ -3836,6 +3950,21 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return false;
         }
         run([this, style] { app_.setInputStyle(style); });
+        break;
+    }
+    case StepVerb::SetNavDrag: {
+        // set_nav_drag orbit|pan|zoom GESTURE: Preferences > Navigation's drag gesture, e.g. set_nav_drag zoom Shift+Middle (none clears)
+        if (!need(2)) return false;
+        const std::string n = w[1], text = restOf(lineText_, 2);
+        int move = -1;
+        for (int i = 0; i < kNavMoves; ++i)
+            if (n == kNavMoveIds[i]) move = i;
+        NavDrag d;
+        if (move < 0 || !parseNavDrag(text, d)) {
+            fail(line, "set_nav_drag takes orbit, pan or zoom and a gesture like Ctrl+Middle, Shift+Left, Right or none");
+            return false;
+        }
+        run([this, move, d] { app_.uiPrefs_.nav.drag[move] = d; });
         break;
     }
     case StepVerb::Restart: {
@@ -4478,9 +4607,11 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         run([this, on] { app_.interactiveStrokes_ = on; });
         break;
     }
-    case StepVerb::MarkView: { // mark_view: remember the view as the GPU holds it now, for view_vs_mark
-        run([this] {
-            if (!renderLiveView(app_, gViewMark, app_.camera_, app_.renderSettings_, app_.renderer_)) gViewMark.clear();
+    case StepVerb::MarkView: { // mark_view [other]: remember the view as the GPU holds it now, for view_vs_mark (other: view_nearer_mark)
+        const bool other = w.size() > 1 && w[1] == "other";
+        run([this, other] {
+            std::vector<uint8_t>& mark = other ? gViewMarkOther : gViewMark;
+            if (!renderLiveView(app_, mark, app_.camera_, app_.renderSettings_, app_.renderer_)) mark.clear();
         });
         break;
     }
@@ -5504,7 +5635,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
                 "drag_item", "drag_to", "drag_item_to", "drag_shelf_items", "drag_path", "release", "orbit", "camera", "zoom", "camera_distance", "brush_size", "reset_sliders", "look",
                 "run", "key_nav_speed", "mouse_orbit_speed", "wait", "wait_real", "wait_idle", "wait_for", "wait_value", "pen_stroke", "pen_drag_item", "pen_button", "pen_hover", "pen_move",
                 "pen_enter", "pen_drag", "pen_pressure", "pen_new", "pen_out", "pen_rest", "pen_tap", "wheel", "mouse_move", "mouse_by", "click_here",
-                "touch_stroke", "touch_pinch", "touch_tap", "touch_tap_at", "touch_drag_at", "touch_tap_welcome_x", "android_back", "safe_area", "palm_guard", "classic_keys", "input_style"};
+                "touch_stroke", "touch_pinch", "touch_tap", "touch_tap_at", "touch_drag_at", "touch_tap_welcome_x", "android_back", "safe_area", "palm_guard", "classic_keys", "input_style", "set_nav_drag"};
             if (!allowed.count(verb)) {
                 error = scriptName_ + ":" + std::to_string(n) + ": '" + verb +
                         "' can't be used in a benchmark take (only input, the camera and waits play in real time)";

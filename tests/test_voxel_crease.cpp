@@ -114,15 +114,15 @@ TEST(voxel_crease_invariant_smooth_surface_untouched) {
 TEST(voxel_crease_resolution_hint) {
     VoxelRemeshNotes notes;
     std::string error;
-    voxelRemesh(fixture().mesh, 200, &error, {}, false, &notes);
+    voxelRemesh(fixture().mesh, 200, &error, {}, false, false, &notes);
     std::printf("    hint at 200: %d (%zu triangles) %s\n", notes.creaseResolution, notes.creaseTriangles, voxelRemeshNote(notes).c_str());
     CHECK(notes.creaseResolution == 256);
     CHECK(notes.creaseTriangles > 0);
     CHECK(voxelRemeshNote(notes).rfind("Resolution 256 keeps fine creases", 0) == 0);
-    voxelRemesh(fixture().mesh, 320, &error, {}, false, &notes);
+    voxelRemesh(fixture().mesh, 320, &error, {}, false, false, &notes);
     CHECK(notes.creaseResolution == 0);
     CHECK(voxelRemeshNote(notes).empty());
-    voxelRemesh(makeQuadSphere(120, 1.0f), 200, &error, {}, false, &notes);
+    voxelRemesh(makeQuadSphere(120, 1.0f), 200, &error, {}, false, false, &notes);
     CHECK(notes.creaseResolution == 0);
 }
 

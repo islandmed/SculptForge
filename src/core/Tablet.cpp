@@ -22,6 +22,7 @@ constexpr ActionName kActions[] = {
     {PenAction::Smooth, "smooth", "Smooth (Shift)"},
     {PenAction::RotateView, "rotate", "Rotate view"},
     {PenAction::PanView, "pan", "Pan view"},
+    {PenAction::ZoomView, "zoom", "Zoom view"},
     {PenAction::RightClick, "right_click", "Right-click"},
     {PenAction::EraseMask, "erase_mask", "Erase mask"},
 };

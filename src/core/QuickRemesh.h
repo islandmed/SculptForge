@@ -27,4 +27,12 @@ inline constexpr size_t kStretchedEdges = 6;   // this many stretched edges reme
 StrokeStretch strokeStretch(const Mesh& mesh, std::span<const uint32_t> moved, std::span<const glm::vec3> before);
 inline bool stretchWantsRemesh(const StrokeStretch& s) { return s.stretched >= kStretchedEdges; }
 
+// The Part's own detail: the median edge length of its triangles (every edge on a mesh up to ~100k triangles, else an
+// even sample of them). 0 for a mesh without edges. The topology refresh gesture (Sculptor::refreshTopologyDab) remeshes
+// stretched triangles back towards it when dynamic topology is off, so the refreshed area matches the rest of the Part.
+float typicalEdgeLength(const Mesh& mesh);
+// The same over `triangles` only (the surface around a brush: BVH::queryTriangles), so a dense face and a coarse body
+// each refresh to their own detail. Empty or too few triangles (under 64): falls back to the whole mesh.
+float typicalEdgeLength(const Mesh& mesh, std::span<const uint32_t> triangles);
+
 } // namespace sf

@@ -57,6 +57,7 @@ void rasterizeMeshShell(const Mesh& mesh, VoxelGrid& grid);
 // Voxel Remesh resolutions (voxels across the longest side). Up to kVoxelDenseMax the grid is dense; above it only
 // bricks near the surface are stored (VoxelSparse.cpp), so memory goes with the surface area, not the volume.
 constexpr int kVoxelResolutionMin = 32, kVoxelDenseMax = 512, kVoxelResolutionMax = 4096;
+constexpr int kVoxelResolutionDefault = 200; // (the panel's and the remesh command's)
 // A remeshed surface in the app, per triangle (as MemoryGuard counts a mesh: arrays, adjacency, BVH, GPU, undo).
 constexpr double kVoxelResultBytesPerTriangle = 150.0;
 
@@ -86,6 +87,8 @@ void setVoxelCreaseSnap(bool on);
 // Mask and colours transfer from the nearest original vertex; face groups,
 // hidden flags and UVs reset (all visible, group 0, no UVs); the original's
 // quads are dropped and the result is all quads of its own. `progress` (0..1) returning false cancels (empty result).
+// `keepGroups` (Keep Face Groups): each new quad takes the face group of the original surface nearest its centre
+// (transferFaceGroups below), so the groups come through with crisp borders.
 // Parallel and narrow-band throughout: well under a second at the default resolution; run it off the UI thread.
 // Resolutions 32-4096; a remesh that won't fit in the free memory gives an empty result and `error` says what it needs
 // and which Resolution would fit. `allowSwap`: the person agreed to one that is past the free memory but within RAM +
@@ -99,9 +102,17 @@ struct VoxelRemeshNotes {
     size_t creaseTriangles = 0;
 };
 Mesh voxelRemesh(const Mesh& mesh, int resolution, std::string* error = nullptr,
-                 const std::function<bool(float)>& progress = {}, bool allowSwap = false, VoxelRemeshNotes* notes = nullptr);
+                 const std::function<bool(float)>& progress = {}, bool allowSwap = false, bool keepGroups = false,
+                 VoxelRemeshNotes* notes = nullptr);
 // The start of the status line for `notes` ("Resolution 512 keeps fine creases (about 1.2M triangles). ", then
 // "Remeshed to ..."), or "": first, so the number shows when a long message is cut short.
 std::string voxelRemeshNote(const VoxelRemeshNotes& notes);
+
+// Face groups of `source` carried onto a rebuilt surface `dst` (Keep Face Groups): each polygon of `dst` (a quad pair
+// from Mesh::quadPartners, else a triangle) takes the group of the source triangle nearest its centre, then isolated
+// polygons whose edge neighbours all agree on another group take that one (no salt and pepper along a border; a border
+// stays a hard line, one group per polygon). Nothing happens when `source` has no face groups. Safe to call from a
+// worker thread (read-only on `source`).
+void transferFaceGroups(const Mesh& source, Mesh& dst);
 
 } // namespace sf

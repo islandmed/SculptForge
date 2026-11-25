@@ -26,7 +26,8 @@ float largestSide(const Mesh& mesh) {
     return s > 0.0f ? s : 1.0f;
 }
 
-// The directed edges (a, b) of `tris` that no other triangle shares: the open boundary, wound as in the triangles.
+} // namespace
+
 std::vector<std::pair<uint32_t, uint32_t>> boundaryEdges(const std::vector<glm::uvec3>& tris) {
     std::vector<std::pair<uint64_t, uint32_t>> edges; // undirected key, directed edge index (3 * t + k)
     edges.reserve(tris.size() * 3);
@@ -48,6 +49,8 @@ std::vector<std::pair<uint32_t, uint32_t>> boundaryEdges(const std::vector<glm::
     }
     return out;
 }
+
+namespace {
 
 // Edge Smooth: the staircase the mask's triangles leave along the patch's edge, smoothed (Taubin along the edge loops, so
 // they don't shrink). The edge vertices alone moving would fold the triangles beside them over (a tip of one triangle

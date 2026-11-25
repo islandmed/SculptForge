@@ -332,6 +332,7 @@ void UndoStack::clear() {
     ++gClearEpoch;
     undo_.clear();
     redo_.clear();
+    retainedBase_ = 0;
     if (listener) listener->undoCleared();
 }
 
@@ -357,6 +358,7 @@ void UndoStack::enforceBudget() {
     const size_t before = droppedPending_;
     while (undo_.size() > 1 && total > limit) {
         total -= undo_.front().budgetBytes();
+        retainedBase_ = undo_.front().seq;
         undo_.pop_front();
         ++droppedPending_;
         ++droppedTotal_;

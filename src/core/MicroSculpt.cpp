@@ -547,12 +547,12 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
         flood.stamp.swap(floodStamp_), flood.queue.swap(floodQueue_), flood.dist.swap(floodDist_), flood.epoch = floodEpoch_;
         brushVertices(m, bvh, center, r * reach + pad, floodVerts_);
         const size_t within = floodVerts_.size();
-        keepConnected(m, center, floodVerts_, flood, &floodSurface_);
+        keepConnected(m, center, floodVerts_, flood, &floodSurface_, &contact);
         PieceStamps st{flood.epoch, 0};
         if (floodVerts_.size() != within) {
             brushVertices(m, bvh, center, r * reach * kDetourFlood + pad, floodWide_);
             floodVerts_ = floodWide_;
-            keepConnected(m, center, floodVerts_, flood, &floodSurface_);
+            keepConnected(m, center, floodVerts_, flood, &floodSurface_, &contact);
             st = markClosedPieces(m, floodWide_, flood);
         }
         flood.stamp.swap(floodStamp_), flood.queue.swap(floodQueue_), flood.dist.swap(floodDist_), floodEpoch_ = flood.epoch;
