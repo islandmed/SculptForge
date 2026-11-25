@@ -7,6 +7,7 @@
 #include "TestHarness.h"
 
 #include "app/I18n.h"
+#include "app/NavBindings.h"
 #include "core/Parts.h"
 
 #include <cstdint>
@@ -348,4 +349,32 @@ TEST(i18n_builtin_insert_sets_translated) {
                 CHECK(sf::i18n::lookup(l, n) != nullptr);
             }
     }
+}
+
+TEST(i18n_nav_gesture_names_are_translated) {
+    // Preferences > Navigation's warning names what a gesture already does (navStyleGesture, NavBindings.h) and the panel
+    // runs it through tr(): those texts are not literals at the call, so tools/i18n/coverage.py cannot see them. Every one
+    // the four key styles can return needs an entry in every language, keeping the chord (Ctrl / Shift / Alt) as written.
+    std::set<std::string> texts;
+    for (int style = 0; style < 4; ++style)
+        for (int button = 1; button <= 3; ++button)
+            for (int mods = 0; mods < 8; ++mods) {
+                NavDrag d;
+                d.button = button, d.ctrl = mods & 1, d.shift = mods & 2, d.alt = mods & 4;
+                if (const char* t = navStyleGesture(style, d); t[0]) texts.insert(t);
+            }
+    CHECK(texts.size() >= 20);
+    for (const Language language : {Language::Spanish, Language::TraditionalChinese, Language::SimplifiedChinese, Language::Japanese})
+        for (const std::string& t : texts) {
+            const char* tr = i18n::lookup(language, t);
+            if (!tr) std::printf("  %s has no translation of \"%s\"\n", languageCode(language), t.c_str());
+            CHECK(tr != nullptr);
+            if (!tr) continue;
+            const size_t open = t.find('(');
+            if (open == std::string::npos) continue;
+            const std::string chord = t.substr(open + 1, t.find_first_of(";,)", open) - open - 1); // "Ctrl+Shift+right-drag"
+            const std::string keys = chord.substr(0, chord.find_first_of("-"));
+            for (const char* key : {"Ctrl", "Shift", "Alt"})
+                CHECK((keys.find(key) != std::string::npos) == (std::string(tr).find(key) != std::string::npos));
+        }
 }

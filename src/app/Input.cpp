@@ -398,24 +398,30 @@ void App::registerViewActions() {
     // the key held turns any press on the canvas (any button, the pen's tip) into that camera drag, in every key style:
     // left-handed and tablet users navigate from the hand on the keyboard. navHoldKey tracks the key, navMoveForPress
     // starts the drag (App.cpp onMouseDown), which goes on to the button's release as Hold Space does.
-    auto holdHint = [this](const char* id, const char* label, const char* verb) { // the key pressed alone: a hint in the status bar
+    // (the status line is translated here, with the key spelled in: tr(status_) would not find a composed text)
+    auto holdHint = [this](const char* id, const char* label, const char* noKey, const char* withKey) {
         const std::string key = actions_.shortcutText(id);
-        status_ = key.empty() ? std::string(label) + ": give it a key in Preferences > Navigation, then hold it and drag"
-                              : std::string("Hold ") + key + " and drag anywhere to " + verb;
+        char line[256];
+        if (key.empty()) std::snprintf(line, sizeof line, noKey, label);
+        else std::snprintf(line, sizeof line, withKey, key.c_str());
+        status_ = line;
     };
     add("view.hold_orbit", "Hold to orbit", "",
         "No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, "
         "to turn the view: it never sculpts while the key is down. Preferences > Navigation sets it beside the other camera keys.",
-        [holdHint] { holdHint("view.hold_orbit", "Hold to orbit", "turn the view"); });
+        [holdHint] { holdHint("view.hold_orbit", tr("Hold to orbit"), tr("%s: give it a key in Preferences > Navigation, then hold it and drag"),
+                          tr("Hold %s and drag anywhere to turn the view")); });
     add("view.hold_pan", "Hold to pan", "",
         "No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, "
         "to pan the view: it never sculpts while the key is down. Preferences > Navigation sets it beside the other camera keys.",
-        [holdHint] { holdHint("view.hold_pan", "Hold to pan", "pan the view"); });
+        [holdHint] { holdHint("view.hold_pan", tr("Hold to pan"), tr("%s: give it a key in Preferences > Navigation, then hold it and drag"),
+                          tr("Hold %s and drag anywhere to pan the view")); });
     add("view.hold_zoom", "Hold to zoom", "",
         "No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, "
         "to zoom: drag up to come closer, down to back away (the Classic sculpting keys the other way round). Preferences > "
         "Navigation sets it beside the other camera keys.",
-        [holdHint] { holdHint("view.hold_zoom", "Hold to zoom", "zoom"); });
+        [holdHint] { holdHint("view.hold_zoom", tr("Hold to zoom"), tr("%s: give it a key in Preferences > Navigation, then hold it and drag"),
+                          tr("Hold %s and drag anywhere to zoom")); });
     add("view.centre_pointer", "Centre view on the pointer", "",
         "Slide the view so the point under the pointer is in the middle, keeping the zoom and the angle; the view then "
         "turns about that point. Alt+middle click on the canvas does it in every key style (a drag still pans); this "
@@ -908,7 +914,7 @@ void App::resetNavigationBindings() {
     uiPrefs_.tablet.buttons = TabletSettings().buttons;
     navHoldKey_ = SDLK_UNKNOWN;
     navHoldMove_ = -1;
-    status_ = "Navigation bindings back to their defaults";
+    status_ = tr("Navigation bindings back to their defaults");
 }
 
 void App::drawInputStyleRow(float width) {
