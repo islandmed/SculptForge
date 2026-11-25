@@ -5,6 +5,44 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.14.1
+
+```features
+date: 2026-11-25
+tagline: Up to four lights of your own with a shadow strength, any control on any shelf, and one place for the camera's navigation bindings.
+highlight: Up to four lights of your own, balanced to one light's exposure, and a Shadow strength slider
+highlight: Any control on any shelf: hold Alt and drag a checkbox, slider or readout where you want it
+highlight: Navigation bindings: hold a key and drag to orbit, pan or zoom, set up in one place
+highlight: Primitive settings for appended Parts, and Solidify gives a flat Part thickness
+highlight: Keep Face Groups through Voxel Remesh, and N-drag refreshes stretched topology under the brush
+highlight: UI scale from 70% to 300%, remembered per monitor
+title: Lights of your own
+line: Material > Light > Lights adds up to four lights on top of the material's own; together they keep one light's exposure, and Shadow strength sets how dark the cast shadows are.
+action: guide:pbr-painting.md
+title: Any control on any shelf
+line: Hold Alt and drag a checkbox, slider, choice or readout from a palette onto a shelf or My Panel; it works there just as it does in its palette.
+action: guide:interface.md
+title: Navigation bindings
+line: Edit > Preferences > Navigation: hold a key and drag to orbit, pan or zoom, set drag gestures and the pen's Zoom view, with a warning for every clash.
+action: guide:navigation.md
+```
+
+- **Lights** (**Material > Light > Lights**): up to four directional lights on top of the material's light, balanced so
+  together they add one light's worth of exposure; **Shadow strength** sets how dark cast shadows are.
+- **Shelves and My Panel**: any single control can go on any shelf or on My Panel; a floating My Panel keeps its size.
+- **Navigation bindings** (**Edit > Preferences > Navigation**): hold-to-orbit, pan and zoom keys, drag gestures and the
+  pen's Zoom view in one place; the status bar shows the held key.
+- **Parts**: **Primitive settings** for a Part from Append, and **Solidify** (**Tool > Parts > Extract**) gives a flat,
+  single-sided Part thickness. **Tool > Cloth** gathers the Cloth brush and Drape settings in one section.
+- **Remesh**: **Keep Face Groups** carries face groups through Voxel Remesh; with Quick Remesh on, hold <kbd>N</kbd> and
+  drag to refresh stretched topology under the brush. Narrow creases come out cleaner (#240).
+- **View**: **UI scale** from 70% to 300%, a **Floor grid at Y=0**, <kbd>Alt</kbd>+middle click centres the view on the
+  pointer, and Duplicate numbers the copies.
+- **Fixes**: Android on some Mali phones and tablets draws large models and Micro levels; Dynamic + Smooth no longer
+  leaves a hair-thin strand (#238); Clay keeps a slot's lip clean; Stencil strokes outside the image work; Trim
+  Intensity scales all the way down; typing 1 in the Intensity pop-up means 1%, and a decimal comma works; layered
+  Parts no longer flicker against the body.
+
 ## Version 0.14.0
 
 ```features
