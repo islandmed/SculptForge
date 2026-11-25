@@ -1076,6 +1076,21 @@ void Sculptor::flushLazy(Mesh& mesh, const BVH& bvh, std::span<const uint32_t> l
     dabLeaves_ = keep;
 }
 
+void Sculptor::flushPendingAround(Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius) {
+    if (lazyCount_ == 0 || &mesh != lazyMesh_) return;
+    std::vector<uint32_t> near, leaves;
+    bvh.leavesInSphere(center, radius, near);
+    for (uint32_t l : near)
+        if (l < lazyFlag_.size() && lazyFlag_[l] != 0) {
+            if (lazyFlag_[l] == 3) --inherited_;
+            lazyFlag_[l] = 0; // (its list entry stays: takeLazy skips it)
+            leaves.push_back(l);
+        }
+    if (leaves.empty()) return;
+    lazyCount_ -= leaves.size();
+    flushLazy(mesh, bvh, leaves);
+}
+
 void Sculptor::flushInheritedAround(Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, Symmetry sym) {
     if (inherited_ == 0 || &mesh != lazyMesh_) return;
     std::vector<uint32_t> near, leaves;

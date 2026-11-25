@@ -151,6 +151,11 @@ void App::StrokeSolver::loop() {
         if (((finalize && !deferEnd) || settled) && uploadReady) app.renderer_.refineStrokeBoundsInto(uploadId, app.doc_.mesh, upload);
         prepSeconds = finalize || settle ? 0.0 : std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
         if (settle) catchUpSeconds = spent + std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
+        static const int settleDelayMs = [] { // (tests: SF_SETTLE_DELAY_MS holds each settle batch, so input lands inside it)
+            const char* v = std::getenv("SF_SETTLE_DELAY_MS");
+            return v && *v ? std::max(0, std::atoi(v)) : 0;
+        }();
+        if (settle && settleDelayMs > 0) std::this_thread::sleep_for(std::chrono::milliseconds(settleDelayMs));
         static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
         if (log) {
             const SculptTimings& t = app.doc_.sculptor.timings;
@@ -279,20 +284,32 @@ void App::pumpSettle() {
             settleLeaves_ = size_t(std::clamp(double(s.catchUpLeaves) * kSettleBatchSeconds / s.catchUpSeconds, 4096.0, 4194304.0));
         commitSolverBatch();
         if (last) {
-            s.settle = s.settled = false;
-            doc_.sculptor.endSettle();
-            renderer_.refineStrokeBounds(doc_.meshKey(doc_.activePart), displayedMesh()); // (when the batch couldn't pack)
-            settledAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
-            static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
-            if (log) SDL_Log("settled: at %.3f s, %.1f ms after the stroke end", double(SDL_GetTicksNS()) * 1e-9, (settledAt_ - settleStartAt_) * 1000.0);
+            finishSettle();
             return;
         }
     }
+    // A shortcut waiting for the settle (queued, as for a stroke's end): the rest in one batch, then it runs.
+    startSettleBatch(drainQueue_.empty() ? std::max<size_t>(settleLeaves_, 1) : SIZE_MAX);
+}
+
+void App::finishSettle() {
+    StrokeSolver* s = solver_.get();
+    if (s) s->settle = s->settled = false;
+    doc_.sculptor.endSettle();
+    renderer_.refineStrokeBounds(doc_.meshKey(doc_.activePart), displayedMesh()); // (when the batch couldn't pack)
+    settledAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    drainNextFrame_ = drainNextFrame_ || !drainQueue_.empty(); // what waited for it, next frame
+    static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
+    if (log) SDL_Log("settled: at %.3f s, %.1f ms after the stroke end", double(SDL_GetTicksNS()) * 1e-9, (settledAt_ - settleStartAt_) * 1000.0);
+}
+
+void App::startSettleBatch(size_t leaves) {
+    StrokeSolver& s = *solver_;
     s.batch.clear();
     s.finalize = s.deferEnd = false;
     s.catchUp = true;
     s.settle = true;
-    s.catchUpLeaves = std::max<size_t>(settleLeaves_, 1);
+    s.catchUpLeaves = leaves;
     s.view.camera = partCamera();
     s.view.canvas = canvasRect();
     s.view.probe = nullptr;
@@ -308,13 +325,18 @@ void App::pumpSettle() {
 void App::settleNow() {
     if (!doc_.sculptor.settling()) return;
     if (solver_) {
+        // The batch in flight, then the rest in one more on the solver thread, packed as the stroke's batches are (worked
+        // out here, the regular sync would pack them on this thread with every cavity term walked again: 0.9 s at 28M).
         solver_->wait();
         if (solver_->done) commitSolverBatch();
-        solver_->settle = solver_->settled = false;
+        if (doc_.sculptor.settling()) {
+            startSettleBatch(SIZE_MAX);
+            solver_->wait();
+            if (solver_->done) commitSolverBatch();
+        }
     }
-    doc_.sculptor.settleNormals(); // the rest here (marked dirty: the next sync sends them)
-    renderer_.refineStrokeBounds(doc_.meshKey(doc_.activePart), displayedMesh());
-    settledAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    doc_.sculptor.settleNormals(); // (anything left: none, unless the batch couldn't run)
+    finishSettle();
 }
 
 void App::settleForPress() {

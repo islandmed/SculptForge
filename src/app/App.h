@@ -523,7 +523,13 @@ private:
     // frame (pumpSettle), while the stroke still counts as draining (a press or a shortcut waits as it did for the end).
     bool deferNormals() const;
     void pumpSettle();                 // per frame while the last stroke's normals settle
-    void settleNow();                  // the rest at once, here (what reads or edits the document calls it first)
+    void settleNow();                  // the rest at once (what reads or edits the document calls it first)
+    void startSettleBatch(size_t leaves); // a settle batch of up to `leaves` pending leaves on the solver thread
+    void finishSettle();               // the last settle batch is on the GPU: the exact bounds, what waited for it
+    // The surface cursor while a settle batch has the solver: the last one drawn (picking then would race it).
+    bool cursorCached_ = false;
+    glm::vec3 cursorAt_{0.0f}, cursorNormal_{0.0f};
+    float cursorRadius_ = 0.0f, cursorX_ = 0.0f, cursorY_ = 0.0f;
     void finishSculpting();            // the stroke in progress ends (endStroke) and the last one's normals settle
     void settleForPress();             // a press: the settle batch in flight is committed (the rest is the new stroke's)
     bool strokeTakeOver_ = false;

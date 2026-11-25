@@ -1268,6 +1268,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "newer_menu_rows") return app_.newerMenuRows() ? 1.0 : 0.0; // File > Render with... and the two Preferences rows shown
     if (name == "level_switches") return double(app_.sdivSwitches_); // subdiv_level runs from the Level slider
     if (name == "undo_steps") return double(app_.doc_.undo.undoCount());
+    // The active mesh's positions and normals, hashed (52 bits; -1 while a stroke or its normals are still going).
+    if (name == "mesh_state_hash")
+        return app_.solverBusy() || app_.doc_.sculptor.strokeActive() || app_.doc_.sculptor.settling()
+                   ? -1.0
+                   : double(App::meshStateHash(app_.doc_.mesh) & ((uint64_t(1) << 52) - 1));
     if (name == "can_undo") return app_.doc_.undo.canUndo() ? 1.0 : 0.0;
     if (name == "can_redo") return app_.doc_.undo.canRedo() ? 1.0 : 0.0;
     if (name == "typing") return GImGui->TempInputId != 0 && GImGui->TempInputId == GImGui->ActiveId ? 1.0 : 0.0; // a slider's number is being typed
@@ -1994,6 +1999,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "pen_x") return penAt_.x; // where the pen last was (window px): the brush ring is there (#216)
     if (name == "pen_y") return penAt_.y;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
+    if (name == "normals_settling") return app_.doc_.sculptor.settling() ? 1.0 : 0.0; // (App::deferNormals)
     if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
     if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);
     if (name == "size_ring_value") return std::round(double(app_.sizeRingPreviewValue_) * 100.0) / 100.0;

@@ -3450,7 +3450,8 @@ void App::endStroke() {
 // ---------------------------------------------------------------------------
 
 void App::runCommand(const std::string& name, const Args& args) {
-    if (interactiveCommand_ > 0 && macros_.runDepth == 0 && commandSource_.empty() && (strokeDraining() || !drainQueue_.empty())) {
+    if (interactiveCommand_ > 0 && macros_.runDepth == 0 && commandSource_.empty() &&
+        (strokeDraining() || doc_.sculptor.settling() || !drainQueue_.empty())) { // (settling: a frame or two, no frozen one)
         drainQueue_.emplace_back(name, args);
         status_ = drainStatus();
         lastCommandOk_ = true;
@@ -5183,18 +5184,47 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, fl
     // Only what brushes work on: the active, visible Part with an up-to-date BVH (a stale one, after a
     // whole-mesh change, is rebuilt at the next press; until then the flat ring shows), not an LOD preview.
     if (previewLod_ >= 0 || doc_.bvhDirty) return false;
-    // Not while the solver thread is moving this mesh (predictive strokes): reading it then races the dabs.
-    if (solverBusy() || (asyncStroke_ && drag_ == Drag::Stroke)) return false;
+    // Not while the solver thread is moving this mesh (predictive strokes): reading it then races the dabs. While it only
+    // settles the last stroke's normals (positions and the BVH stay as they are), the ring follows the pointer with the
+    // last orientation worked out (it flipped to the flat ring each frame), and turns again at the next quiet frame.
     RayHit hit;
-    if (!pick(x, y, hit)) return false; // one ray, as a press would cast
-    // The world radius a dab here gets (App::firstDab / the brushes: Size times world size of a pixel).
-    const float radius = radiusPx * partCamera().worldPerPixel(hit.position, canvasHeight());
-    if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
-    // A steady normal over the brush's area (32 rays), then the ring and the Falloff ring as true circles in
-    // that plane (#88): no per-point pressing, so bumps can't bend or break the ring. Never a pass over the mesh.
-    const glm::vec3 n = surfaceCursorNormal(doc_.mesh, doc_.bvh, hit, radius);
-    surfaceCursorCircle(hit.position, n, radius, 64, cursorRing_);
-    surfaceCursorCircle(hit.position, n, radius * focalRingFraction(focal), 48, cursorInner_);
+    glm::vec3 n;
+    float radius = 0.0f;
+    if (solverBusy() || (asyncStroke_ && drag_ == Drag::Stroke)) {
+        if (!(doc_.sculptor.settling() && !asyncStroke_)) return false;
+        if (cursorCached_ && std::abs(x - cursorX_) < 0.5f && std::abs(y - cursorY_) < 0.5f) {
+            hit.position = cursorAt_, n = cursorNormal_, radius = cursorRadius_;
+        } else {
+            if (!pick(x, y, hit)) return false; // (positions only: the face's own normal)
+            radius = radiusPx * partCamera().worldPerPixel(hit.position, canvasHeight());
+            if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
+            // (no orientation yet: the face's; as surfaceCursorNormal's flip guard)
+            n = !cursorCached_ || glm::dot(cursorNormal_, hit.normal) < -0.2f ? hit.normal : cursorNormal_;
+            cursorCached_ = true, cursorNormal_ = n;
+            surfaceCursorCircle(hit.position, n, radius, 64, cursorRing_);
+            surfaceCursorCircle(hit.position, n, radius * focalRingFraction(focal), 48, cursorInner_);
+            cursorAt_ = hit.position, cursorRadius_ = radius, cursorX_ = x, cursorY_ = y;
+        }
+    } else {
+        cursorCached_ = false;
+        if (!pick(x, y, hit)) return false; // one ray, as a press would cast
+        // The world radius a dab here gets (App::firstDab / the brushes: Size times world size of a pixel).
+        radius = radiusPx * partCamera().worldPerPixel(hit.position, canvasHeight());
+        if (!(radius > 0.0f) || !std::isfinite(radius)) return false;
+        // The last stroke's normals still settling: those at the hit first (the normal below starts from them).
+        if (doc_.sculptor.settling() && hit.triangle < doc_.mesh.triangles.size()) {
+            const glm::uvec3 t = doc_.mesh.triangles[hit.triangle];
+            const auto& P = doc_.mesh.positions;
+            const float edge = std::max({glm::distance(P[t.x], P[t.y]), glm::distance(P[t.y], P[t.z]), glm::distance(P[t.z], P[t.x])});
+            doc_.sculptor.flushPendingAround(doc_.mesh, doc_.bvh, hit.position, edge * 2.0f);
+        }
+        // A steady normal over the brush's area (32 rays), then the ring and the Falloff ring as true circles in
+        // that plane (#88): no per-point pressing, so bumps can't bend or break the ring. Never a pass over the mesh.
+        n = surfaceCursorNormal(doc_.mesh, doc_.bvh, hit, radius);
+        surfaceCursorCircle(hit.position, n, radius, 64, cursorRing_);
+        surfaceCursorCircle(hit.position, n, radius * focalRingFraction(focal), 48, cursorInner_);
+        cursorCached_ = true, cursorAt_ = hit.position, cursorNormal_ = n, cursorRadius_ = radius, cursorX_ = x, cursorY_ = y;
+    }
 
     const glm::vec3 eye = partCamera().position(), forward = partCamera().forward();
     const bool ortho = partCamera().ortho;

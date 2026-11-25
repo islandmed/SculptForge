@@ -1376,6 +1376,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(NOT WIN32) # (any widen splits over two frames here, whatever this computer's speed; tests/ui/micro_widen_live_stroke.sfui)
       set_tests_properties(ui_micro_widen_live_stroke PROPERTIES ENVIRONMENT "SF_WIDEN_SPLIT_MS=0")
     endif()
+    set_tests_properties(ui_async_stroke_settle PROPERTIES
+                         ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_SETTLE_DELAY_MS=1500")
     set_tests_properties(ui_async_stroke_press_waits PROPERTIES
                          ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=40")
     set_tests_properties(ui_async_stroke_undo PROPERTIES

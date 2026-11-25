@@ -677,6 +677,11 @@ private:
     // A dab, before any of its mirror copies moves a vertex: the taken-over leaves (lazyFlag_ 3) whose boxes touch any
     // copy's ball (radius x the widest reach any brush's region takes), so every normal it reads is as after a settle.
     void flushInheritedAround(Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius, Symmetry sym);
+public:
+    // While settling: the pending leaves whose boxes touch the ball, worked out now (the surface cursor's hit, whose
+    // normals it reads; marked dirty as any).
+    void flushPendingAround(Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius);
+private:
     size_t inherited_ = 0;                            // taken-over leaves still pending
     Mesh* lazyMesh_ = nullptr;
     const BVH* lazyBvh_ = nullptr;
