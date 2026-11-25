@@ -102,6 +102,31 @@ TEST(stencil_outside_is_no_effect_unless_tiled) {
     CHECK(view.weight(glm::vec3(0.0f, 0.0f, 0.05f)) < 0.01f);  // its bottom half
     CHECK(view.weight(glm::vec3(0.8f, 0.0f, 0.8f)) == 1.0f);   // off the image: as if there were no Stencil
     CHECK(view.weight(glm::vec3(0.0f, 0.0f, 0.05f)) < 0.01f);   // (inside it the image still weighs)
+    // The edge: the image's dark border meets "no Stencil" through the feather, not a wall (artist-qa 11-24). The image is 0.2
+    // canvas heights = 0.4 world units (the canvas is 2 high), centred: its bottom (black) edge is at z = 0.2. Walk from the
+    // image across the edge: no step between neighbours larger than the feather's own slope allows, and it ends at 1.
+    {
+        const float worldFeather = kStencilEdgeFeather * 2.0f, dz = 0.005f;
+        float prev = view.weight(glm::vec3(0.0f, 0.0f, 0.2f - dz)), worst = 0.0f;
+        CHECK(prev < 0.01f); // (inside, the border's own black)
+        for (float z = 0.2f; z < 0.2f + 1.5f * worldFeather; z += dz) {
+            const float w = view.weight(glm::vec3(0.0f, 0.0f, z));
+            worst = std::max(worst, std::fabs(w - prev));
+            prev = w;
+        }
+        CHECK(prev == 1.0f);
+        CHECK(worst < 1.6f * dz / worldFeather); // (a smoothstep's steepest slope is 1.5 / width: a wall would be 1.0)
+        CHECK(view.weight(glm::vec3(0.0f, 0.0f, 0.2f + 0.5f * worldFeather)) > 0.4f);
+        CHECK(view.weight(glm::vec3(0.0f, 0.0f, 0.2f + 2.0f * worldFeather)) == 1.0f); // far past it: as if there were no Stencil
+    }
+    // A light border (white edge texel): outside it fades from 1 to 1, never dipping.
+    {
+        Stencil lit;
+        lit.set(blackImage(1, 1, {{0, 0}}), "white", "");
+        lit.size = 0.2f;
+        const StencilView lv{&lit, topView(), 1.0f};
+        for (float z = 0.2f - 0.01f; z < 0.5f; z += 0.01f) CHECK(lv.weight(glm::vec3(0.0f, 0.0f, z)) > 0.999f);
+    }
     st.outsideSculpts = false; // Block: the old behaviour, off the image nothing
     CHECK(view.weight(glm::vec3(0.8f, 0.0f, 0.8f)) == 0.0f);
     CHECK(view.paint(glm::vec3(0.8f, 0.0f, 0.8f), glm::vec3(1, 0, 0)).w == 0.0f);

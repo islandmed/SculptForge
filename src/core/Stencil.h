@@ -22,6 +22,10 @@ namespace sf {
 
 class CommandRegistry;
 
+// Outside an untiled image (Outside the image: Sculpt) a stroke's weight fades from the image's edge value to "no Stencil" over
+// this distance past the edge, in canvas heights, so a dark border never meets full effect in a wall.
+inline constexpr float kStencilEdgeFeather = 0.04f;
+
 struct Stencil {
     std::shared_ptr<const Image> image; // null = no stencil (straight from the file; inverted on sampling)
     // The image halved (box filtered) while it stays 512 px or more: where a dab's vertices are many pixels apart it

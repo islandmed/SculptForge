@@ -652,7 +652,7 @@ stroke over it, turn the model or move the stencil, and stroke again.
 | **Show** | Hidden, the stencil is off and brushes work as if it weren't there. |
 | **Invert** | Uses the image's negative: black works, white leaves the surface alone. |
 | **Tile** | Repeats the image across the whole view, for skin, fabric and other patterns. |
-| **Outside the image** | **Sculpt** (the default): a stroke past the image's edge works as if there were no Stencil. **Block**: it does nothing there, so the image's edge is a wall. A tiled image covers the whole view. |
+| **Outside the image** | **Sculpt** (the default): a stroke past the image's edge works as if there were no Stencil (fading in over a short distance, so the edge leaves no wall). **Block**: it does nothing there, so the image's edge is a wall. A tiled image covers the whole view. |
 | **Paint its colours** | Vertex Paint lays the image's own colours; off, its brightness masks the paint colour. |
 | **Hide while navigating** | Fades the stencil while the view turns, moves or zooms, so you see the model under it. |
 | **Opacity** | How strongly the overlay shows. The brushes always take the whole image (use Intensity to go lighter). |
