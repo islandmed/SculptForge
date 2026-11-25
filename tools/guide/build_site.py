@@ -1115,8 +1115,11 @@ def check(index: Page, chapters) -> list:
     wn = pages.get(WHATS_NEW)
     if isinstance(wn, WhatsNewPage):
         problems += wn.problems
-        if wn.versions and re.search(r"\w: ", wn.versions[0]["tagline"]):
-            problems.append(f"{WHATS_NEW}: Version {wn.versions[0]['version']}: the tagline is the headline and up to 2 short "
+        # The newest section in the file, also one not released yet: release.sh runs this check before the bump, when
+        # the version being staged is still newer than CMakeLists.txt's and so not in wn.versions.
+        newest = re.search(r"^## Version (\S+)\n.*?^tagline: ([^\n]+)", wn.chars, re.M | re.S)
+        if newest and re.search(r"\w: ", newest.group(2)):
+            problems.append(f"{WHATS_NEW}: Version {newest.group(1)}: the tagline is the headline and up to 2 short "
                             "items, sentence case, no 'X: verb' colon chains (the site bar, README and feed show it)")
         for v in wn.versions:
             if not v["date"]:
