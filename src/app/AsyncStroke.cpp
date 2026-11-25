@@ -22,6 +22,9 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#if defined(__linux__)
+#include <sched.h>
+#endif
 
 namespace sf {
 
@@ -49,6 +52,16 @@ App::StrokeSolver::~StrokeSolver() {
     wake_.notify_all();
     if (thread_.joinable()) thread_.join();
 }
+
+namespace {
+int currentCpu() { // (SF_STROKE_LOG: a hybrid CPU's efficiency cores take the same work about twice as long)
+#if defined(__linux__)
+    return sched_getcpu();
+#else
+    return -1;
+#endif
+}
+} // namespace
 
 void App::StrokeSolver::start() {
     {
@@ -129,9 +142,10 @@ void App::StrokeSolver::loop() {
         static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
         if (log) {
             const SculptTimings& t = app.doc_.sculptor.timings;
-            SDL_Log("solver: %zu dabs %.1f ms (kernel %.1f, normals %.1f, BVH %.1f), upload packed in %.1f ms (vertices %.1f, "
+            SDL_Log("solver: at %.3f s%s on cpu %d, %zu dabs %.1f ms (kernel %.1f, normals %.1f, BVH %.1f), upload packed in %.1f ms (vertices %.1f, "
                     "bounds %.1f), %.1f MB",
-                    batch.size(), spent * 1000.0, t.kernelMs - before.kernelMs, t.normalsMs - before.normalsMs,
+                    double(SDL_GetTicksNS()) * 1e-9, finalize ? " (finalize)" : catchUp ? " (catch-up)" : "", currentCpu(), batch.size(),
+                    spent * 1000.0, t.kernelMs - before.kernelMs, t.normalsMs - before.normalsMs,
                     t.bvhMs - before.bvhMs,
                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - prepStart).count(),
                     upload.packMs, upload.boundsMs, double(upload.bytes()) / 1e6);
@@ -294,7 +308,7 @@ void App::commitSolverBatch() {
         renderer_.commitStrokeUpload(s.upload);
         s.uploadReady = false;
         static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
-        if (log) SDL_Log("commit: %.1f ms", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+        if (log) SDL_Log("commit: at %.3f s, %.1f ms", double(SDL_GetTicksNS()) * 1e-9, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
     } else {
         syncScene(); // (the regular sync: a new grid, or a mesh the two-part upload doesn't handle)
     }
@@ -377,7 +391,7 @@ void App::pumpStroke() {
             const auto t0 = std::chrono::steady_clock::now();
             finishStrokeNow(); // released, and every dab is on the GPU
             drainNextFrame_ = !drainQueue_.empty(); // then what a shortcut asked for meanwhile, in order, next frame
-            if (log) SDL_Log("stroke end: %.1f ms", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+            if (log) SDL_Log("stroke end: at %.3f s, %.1f ms", double(SDL_GetTicksNS()) * 1e-9, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
             return;
         }
         // The pen rests (no dabs for a tenth of a second): the exact normals behind the brush (Fast Big Brushes)

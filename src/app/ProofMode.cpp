@@ -58,6 +58,7 @@
 #include <sys/utsname.h>
 #include <mach/mach.h>
 #else
+#include <sched.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 #endif
@@ -385,6 +386,7 @@ struct PhaseResult {
     int gizmo = 0; // a Gizmo drag (PhaseSpec::gizmo)
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
+    std::vector<double> releaseFrames[7]; // the frames from pen-up to then: frame ms, then by part as split
     float pathRadiusPx = 0; // the stroke path's size (strokePoint's R, fitted to the model)
     double pathLaps = 1.0;  // ... how often round it relative to the full-size path (ProofState::laps)
     bool pathUpright = false;
@@ -1118,6 +1120,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         const PhaseSpec& spec = p.phases[p.phaseIndex];
         PhaseResult& ph = p.results.back().phases.back();
         if (p.releasing) { // (frames while the last dabs land aren't the stroke's)
+            if (ph.releaseFrames[0].size() < 10000) { // (but where they went is the release's: release_frames)
+                ph.releaseFrames[0].push_back(frameMs);
+                for (int k = 0; k < 6; ++k) ph.releaseFrames[k + 1].push_back(frameSplitMs_[k]);
+            }
             if (doc_.sculptor.strokeActive()) break;
             p.releasing = false;
             ph.releaseDoneMs = (nowSeconds() - p.releaseAt) * 1000.0;
@@ -1231,6 +1237,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             pointerEventNs_ = 0;
             if (u >= 1.0) {
                 const double up = nowSeconds();
+#if defined(__linux__)
+                if (std::getenv("SF_STROKE_LOG")) SDL_Log("bench: pen up at %.3f s (%s), main thread on cpu %d", double(SDL_GetTicksNS()) * 1e-9, spec.name, sched_getcpu());
+#endif
                 onMouseUp(); // places the dabs still waiting, ends the stroke (undo step, timeline)
                 ph.releaseMs = (nowSeconds() - up) * 1000.0;
                 p.pressed = false;
@@ -1384,6 +1393,18 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     const char* names[6] = {"events", "sculpt", "ui", "upload", "draw", "swap_wait"};
                     for (int k = 0; k < 6; ++k) split.set(names[k], percentilesJson(percentiles(ph.split[k])));
                     j.set("frame_split_ms", split);
+                    if (!ph.releaseFrames[0].empty()) { // pen-up to release done: each frame's ms, and the parts' sums
+                        Json rf = Json::object(), each = Json::array();
+                        for (double ms : ph.releaseFrames[0]) each.push(std::round(ms * 10) / 10);
+                        rf.set("frames", double(ph.releaseFrames[0].size()));
+                        rf.set("frame_ms", each);
+                        for (int k = 0; k < 6; ++k) {
+                            double sum = 0;
+                            for (double ms : ph.releaseFrames[k + 1]) sum += ms;
+                            rf.set(std::string(names[k]) + "_sum_ms", std::round(sum * 10) / 10);
+                        }
+                        j.set("release_frames", rf);
+                    }
                     if (!ph.focusSplit[0].empty()) { // (Focus Detail: where "upload" went)
                         Json fs = Json::object();
                         const char* fnames[7] = {"promote", "coarse", "records", "shade_coarse", "pages", "shade_pages", "sync_all"};
