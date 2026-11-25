@@ -322,19 +322,21 @@ void App::drawStencilSection() {
     ui::SameLineAt(column2);
     ui::Checkbox(tr("Tile##stencil.tile"), &st.tile);
     ui::HelpText("Tile", nullptr, "Repeat the image across the whole view, for skin, fabric and other patterns.", where);
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(tr("Outside the image"));
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(-1);
-    {
-        const char* modes[] = {tr("Sculpt"), tr("Block")};
-        int mode = st.outsideSculpts ? 0 : 1;
-        if (ImGui::Combo("##stencil.outside", &mode, modes, 2)) st.outsideSculpts = mode == 0;
+    if (newerMenuRows() || !st.outsideSculpts) { // (a row after 0.13.0: Classic keeps its old rows, unless Block is set and needs its way back)
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr("Outside the image"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1);
+        {
+            const char* modes[] = {tr("Sculpt"), tr("Block")};
+            int mode = st.outsideSculpts ? 0 : 1;
+            if (ImGui::Combo("##stencil.outside", &mode, modes, 2)) st.outsideSculpts = mode == 0;
+        }
+        ui::HelpText("Outside the image", nullptr,
+                     "What a stroke does where the Stencil's image isn't. Sculpt: it works as if there were no Stencil. Block: "
+                     "it does nothing (the image's edge is a wall). A tiled image covers the whole view.",
+                     where);
     }
-    ui::HelpText("Outside the image", nullptr,
-                 "What a stroke does where the Stencil's image isn't. Sculpt: it works as if there were no Stencil. Block: "
-                 "it does nothing (the image's edge is a wall). A tiled image covers the whole view.",
-                 where);
     ui::Checkbox(tr("Paint its colours##stencil.colors"), &st.colors);
     ui::HelpText("Paint its colours", nullptr,
                  "Vertex Paint lays the image's own colours. Off, its brightness masks the paint colour instead.", where);

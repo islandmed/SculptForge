@@ -3346,7 +3346,7 @@ void App::dabAt(float x, float y, float pressure, bool stamp) {
         if (!haveLastDab_ && p.stencil.weight(p.center) < 0.05f) { // (a stroke that starts where the image is dark or off it)
             glm::vec2 at, uv;
             const bool off = !p.stencil.canvasAt(p.center, at) || !st.stencil.imageCoord(at, p.stencil.canvasAspect, uv);
-            status_ = off ? "Stencil on: strokes outside its image do nothing (Outside the image: Sculpt, or X removes it)"
+            status_ = off ? "Stencil blocks outside: set to Sculpt"
                           : "Stencil on: only its light parts (X removes it)";
         }
     }

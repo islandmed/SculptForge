@@ -63,11 +63,12 @@ snapshot
 stroke 0.3 0.5 0.7 0.5
 expect_value moved > 0
 expect_status_not Stencil on:
+expect_status_not blocks outside
 key ctrl+z
 run stencil_set outside=block
 snapshot
 stroke 0.3 0.5 0.7 0.5
 expect_value moved == 0
-expect_status Stencil on: strokes outside its image do nothing (Outside the image: Sculpt, or X removes it)
+expect_status Stencil blocks outside: set to Sculpt
 run stencil_set visible=false
 expect_sculpts

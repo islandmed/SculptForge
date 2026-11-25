@@ -1,6 +1,6 @@
 # The Stencil's "Outside the image" option: a stroke past the image's edge sculpts as if there were no Stencil (Sculpt, the
 # default, in Classic too); Block keeps the old behaviour (nothing off the image). Tiled images cover the view either way.
-run ui_look look=classic layout=classic
+run ui_look look=classic layout=classic newer_rows=true   # (the row is a newer one: Classic shows it with Show newer menu rows, or when Block is set)
 run new_sphere subdivisions=5
 key f
 click "Standard##brush.standard"

@@ -17,6 +17,12 @@ wait 0.3
 expect "Adjust##stencil.adjust"
 expect "Tile##stencil.tile"
 expect "Invert##stencil.invert"
+expect_not "##stencil.outside"      # (a row after 0.13.0: Classic keeps its old rows)
+click "Alpha##palette.alpha"
+# With Block set Classic shows the row too, so there is a way back to Sculpt.
+run stencil_set outside=block
+click "Alpha##palette.alpha"
+wait 0.3
 expect "##stencil.outside"
 expect_value past_right:Alpha == 0
 remember_items classic Alpha
