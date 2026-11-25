@@ -1435,7 +1435,11 @@ void App::drawTitleStrip(const ShellGeometry& g) {
         ImGui::TextDisabled("%s", fps);
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::SetCursorPosX(slotX + fpsSlot);
-        const std::string msg = layout_.customize ? std::string(tr("Customize: Ctrl+Alt+drag to move or remove items")) : tr(status_);
+        // A navigation hold key down (Preferences > Navigation): its move, in the accent colour, until it is let go.
+        const std::string hold = navHoldLabel();
+        const std::string msg = layout_.customize ? std::string(tr("Customize: Ctrl+Alt+drag to move or remove items"))
+                                : !hold.empty()   ? hold
+                                                  : std::string(tr(status_));
         if (!msg.empty() && avail - infoW > 60.0f * s) {
             // The status message is what just happened, so it stands out from the readout: the regular font, in
             // the bright text colour (still elided to the space the small-font readout leaves).
@@ -1443,7 +1447,7 @@ void App::drawTitleStrip(const ShellGeometry& g) {
             if (infoFont) ImGui::PopFont();
             ImGui::SetCursorPosY(std::floor((h - ImGui::GetTextLineHeight()) * 0.5f));
             const bool error = !layout_.customize && !lastCommandOk_ && ImGui::GetTime() - statusSince_ < 6.0;
-            ImGui::PushStyleColor(ImGuiCol_Text, layout_.customize ? theme::accent : error ? theme::danger : theme::textBright);
+            ImGui::PushStyleColor(ImGuiCol_Text, layout_.customize || !hold.empty() ? theme::accent : error ? theme::danger : theme::textBright);
             ImGui::TextUnformatted(elide(ImGui::GetFont(), msg, avail - infoW - 20.0f * s).c_str());
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered() && msg.size() > 40) ImGui::SetTooltip("%s", msg.c_str());
@@ -1771,6 +1775,15 @@ struct StatusModule {
 
 } // namespace
 
+std::string App::navHoldLabel() const {
+    switch (navHoldMove_) {
+    case 0: return upper(tr("Hold to orbit"));
+    case 1: return upper(tr("Hold to pan"));
+    case 2: return upper(tr("Hold to zoom"));
+    default: return {};
+    }
+}
+
 void App::drawStatusBar(const ShellGeometry& g) {
     const float s = uiScale_;
     if (!beginShellWindow("##TitleStrip", g.title, theme::shellBg, ImVec2(0.0f, 0.0f))) {
@@ -1992,6 +2005,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
 
     // Modules: mode, brush, document, triangles, frame rate.
     std::vector<StatusModule> mods;
+    int lockMod = -1, holdMod = -1; // Camera locked / a navigation hold key's move, when shown
     {
         const char* mode = paintMode_ ? "Paint" : "Sculpt";
         for (const char* t : {"tool.move", "tool.scale", "tool.rotate", "tool.gizmo_all"})
@@ -2017,7 +2031,15 @@ void App::drawStatusBar(const ShellGeometry& g) {
         std::snprintf(fps, sizeof fps, "%3.0f", fpsShown_);
         mods.push_back({ICON_LC_ACTIVITY, "fps", fps});
         // View > Lock camera (#62, Shift+L): left-drags on the background start strokes instead of turning the view.
-        if (uiPrefs_.airStrokes) mods.push_back({ICON_LC_LOCK, "camera", upper(tr("Camera locked")), true});
+        if (uiPrefs_.airStrokes) {
+            lockMod = int(mods.size());
+            mods.push_back({ICON_LC_LOCK, "camera", upper(tr("Camera locked")), true});
+        }
+        // A Hold to orbit / pan / zoom key is down (Preferences > Navigation): the move it starts, the same label as above.
+        if (!navHoldLabel().empty()) {
+            holdMod = int(mods.size());
+            mods.push_back({ICON_LC_MOVE_3D, "hold", navHoldLabel(), true});
+        }
     }
     // Memory beside them (sfmonitor, Oslen on Discord): this app's RAM and the system's free RAM, then the graphics
     // card's memory in use where its driver says. Once a second; the tooltip has the detail.
@@ -2047,7 +2069,8 @@ void App::drawStatusBar(const ShellGeometry& g) {
     const float sepW = style == Status::Terminal ? textW(monoSmall, " | ") : style == Status::TitleBlock ? 0.0f : 16.0f * s;
     // Drop the least important modules (from the file name inwards) until they fit beside the menus.
     std::vector<int> shown = {0, 1, 2, 3, 4};
-    if (uiPrefs_.airStrokes) shown.insert(shown.begin() + 1, 5); // Camera locked, beside the mode (never dropped)
+    for (int m : {holdMod, lockMod}) // Camera locked, then the held move, beside the mode (never dropped but in the narrowest bar)
+        if (m >= 0) shown.insert(shown.begin() + 1, m);
     for (int m : {ramMod, gpuMod}) // after the triangles, before the frame rate
         if (m >= 0) shown.insert(std::find(shown.begin(), shown.end(), 4), m);
     auto total = [&] {
@@ -2060,7 +2083,7 @@ void App::drawStatusBar(const ShellGeometry& g) {
         if (total() > right - menusEnd - 120.0f * s) shown.erase(std::remove(shown.begin(), shown.end(), drop), shown.end());
     }
     // A narrow window (#105: 800 logical px at Windows' 200 %): never over the menus; the triangles go, then the mode.
-    for (int drop : {gpuMod, ramMod, 3, 5, 0})
+    for (int drop : {gpuMod, ramMod, 3, lockMod, holdMod, 0})
         if (total() > right - menusEnd) shown.erase(std::remove(shown.begin(), shown.end(), drop), shown.end());
     float mx = right - total();
     const float modulesX = mx;

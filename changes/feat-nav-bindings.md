@@ -12,11 +12,12 @@ added: **Navigation bindings** (Edit > Preferences > Navigation): one place for 
   Reset view, the orbit, pan and zoom step keys) and the pen's side buttons, where **Zoom view** joins Rotate view and Pan
   view (Preferences > Tablet has it too). A hold key another action also has, two moves with the same gesture, or a
   gesture the key style already uses show a warning naming the other meaning; **Navigation defaults** puts all of it
-  back. Everything saves itself; every key style's defaults are unchanged. Requested by Fenix and other members on
+  back. While a hold key is down a label (HOLD TO ORBIT, PAN or ZOOM) shows in the status bar where Camera locked does,
+  and the warning lines and gesture names are translated. Everything saves itself; every key style's defaults are unchanged. Requested by Fenix and other members on
   Discord.
 testers:
   - Any OS: Edit > Preferences > Navigation; click the key button beside Pan, press J. Hold J and drag on the model with
-    the left button: the view pans, nothing is sculpted; let go of J mid-drag: the pan continues to the release. Do the
+    the left button: the view pans, nothing is sculpted, and HOLD TO PAN shows in the status bar until you let go of J; let go of J mid-drag: the pan continues to the release. Do the
     same with the right and middle buttons and with a pen's tip.
   - Windows or Linux with a tablet: set the pen's third side button (or the upper one) to Zoom view; hold it and move
     the pen: the view zooms.

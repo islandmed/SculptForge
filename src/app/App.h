@@ -2471,6 +2471,7 @@ private:
     // The SculptForge layout (Preferences > Interface > Look): the status bar with the task menus, and a task menu's
     // drop-down (its palettes as sections). Old palette ids keep working: a palette opens in its menu.
     void drawStatusBar(const ShellGeometry& g);
+    std::string navHoldLabel() const; // "HOLD TO PAN" while a navigation hold key is down, else empty (status bars)
     void drawTaskMenu();
     void drawLookChrome();    // a look's gaps, tile borders and effects (Shell.cpp)
     ShellMetrics shellMetrics() const;

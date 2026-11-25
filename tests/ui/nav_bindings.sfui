@@ -53,6 +53,8 @@ camera 0 0
 remember camera_pan pan0
 key_down j
 expect_value nav_hold == 2
+wait 2
+expect_text "HOLD TO PAN"
 view_drag 0.45 0.5 0.45 0.65
 expect_value camera_pan != $pan0
 expect_value can_undo == 0
@@ -65,18 +67,24 @@ button_drag middle 0.45 0.5 0.6 0.5
 expect_value camera_pan != $pan2
 key_up j
 expect_value nav_hold == 0
+wait 2
+expect_no_text "HOLD TO PAN"
 
 # K held: a drag zooms; H held: a drag turns the view.
 key f
 remember camera_distance d0
 key_down k
 expect_value nav_hold == 3
+wait 2
+expect_text "HOLD TO ZOOM"
 view_drag 0.45 0.6 0.45 0.4
 expect_value camera_distance != $d0
 key_up k
 remember camera_yaw yaw0
 key_down h
 expect_value nav_hold == 1
+wait 2
+expect_text "HOLD TO ORBIT"
 view_drag 0.45 0.5 0.6 0.5
 expect_value camera_yaw != $yaw0
 key_up h
@@ -209,3 +217,13 @@ expect "-##hk.view.hold_pan"
 expect "##navdrag.pan"
 shot nav_panel_streamlined
 key escape
+
+# The hold key's label shows in this layout's status bar too, in the place Camera locked takes, and goes when it is let go.
+set_shortcut view.hold_zoom K
+key_down k
+wait 2
+expect_text "HOLD TO ZOOM"
+shot nav_hold_label
+key_up k
+wait 2
+expect_no_text "HOLD TO ZOOM"
