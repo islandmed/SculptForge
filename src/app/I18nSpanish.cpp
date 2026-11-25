@@ -2496,16 +2496,23 @@ constexpr Entry kSpanish[] = {
      "esculpen en tiempo real. Move cambia la forma del nivel inferior y el detalle va con él."},
     // --- PanelIntegrations.cpp (tools/i18n/coverage.py) ---
     {"Show SculptForge on Discord", "Mostrar SculptForge en Discord"},
-    {"Your Discord profile shows SculptForge, its icon and how long you've been sculpting. Sent only to the Discord "
-     "app on this computer, which shows it to your friends. Off by default.",
-     "Tu perfil de Discord muestra SculptForge, su icono y cuánto llevas esculpiendo. Se envía solo a la app de "
-     "Discord de este equipo, que lo muestra a tus amigos. Desactivado por defecto."},
-    {"Show the monthly challenge", "Mostrar el reto mensual"},
-    {"Adds \"Monthly challenge: <theme>\", with the theme you type below.",
-     "Añade \"Monthly challenge: <theme>\", con el tema que escribas abajo."},
-    {"Show the file name", "Mostrar el nombre del archivo"},
-    {"Adds the name of the file you're working on (never its folder). Off by default.",
-     "Añade el nombre del archivo en el que trabajas (nunca su carpeta). Desactivado por defecto."},
+    {"Your Discord profile shows SculptForge, its icon, the time since you started it and one word for what you're "
+     "doing: Sculpting, Painting or Idle. Sent only to the Discord app on this computer, which shows it to your "
+     "friends. Needs the Discord app running. Off by default.",
+     "Tu perfil de Discord muestra SculptForge, su icono, el tiempo desde que lo iniciaste y una palabra para lo "
+     "que estás haciendo: Sculpting, Painting o Idle. Se envía solo a la aplicación de Discord de este equipo, que "
+     "lo muestra a tus amigos. Necesita la aplicación de Discord abierta. Desactivado por defecto."},
+    {"Shown on your Discord profile: SculptForge, its icon, the time since you started it, and Sculpting, Painting "
+     "or Idle (nothing done for five minutes). Sent only to the Discord app on this computer. Nothing else: no "
+     "file names, folders, Part names, user name or model details.",
+     "Se muestra en tu perfil de Discord: SculptForge, su icono, el tiempo desde que lo iniciaste y Sculpting, "
+     "Painting o Idle (sin actividad durante cinco minutos). Se envía solo a la aplicación de Discord de este "
+     "equipo. Nada más: ni nombres de archivo, ni carpetas, ni nombres de piezas, ni nombre de usuario, ni "
+     "detalles del modelo."},
+    {"Discord now shows only SculptForge and what you're doing, never the file name or a challenge theme. Those "
+     "two options are gone.",
+     "Discord ahora solo muestra SculptForge y lo que estás haciendo, nunca el nombre del archivo ni el tema de un "
+     "reto. Esas dos opciones han desaparecido."},
     // --- PanelKelvinlet.cpp (tools/i18n/coverage.py) ---
     {"How the Kelvinlet brushes' material keeps its volume (Poisson's ratio): 0 is rubbery (it stretches without "
      "bulging), 100 is incompressible clay (pressing in bulges the surface up around the thumb, pulling out draws "
@@ -4819,8 +4826,6 @@ constexpr Entry kSpanish[] = {
     {"Terms & refunds", "Términos y reembolsos"},
     {"Nothing about memberships for a week.",
      "Nada sobre membresías durante una semana."},
-    {"Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running.",
-     "No se envía nada más: ni carpetas, ni nombre de usuario, ni detalles del modelo. Necesita la aplicación de Discord abierta."},
     {"Off (raw mesh)",
      "Desactivado (malla original)"},
     {"Off in this run: tests, renders and recordings use fixed settings.",
@@ -5073,8 +5078,6 @@ constexpr Entry kSpanish[] = {
      "¿El teléfono no puede abrir la página?"},
     {"The phone link couldn't start.",
      "No se pudo iniciar el enlace con el teléfono."},
-    {"Theme (64 characters at most)",
-     "Tema (64 caracteres como máximo)"},
     {"There is no ready-made %s for this computer. %s",
      "No hay un %s listo para este ordenador. %s"},
     {"Thickness",

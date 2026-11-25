@@ -2191,16 +2191,19 @@ constexpr Entry kSimplifiedChinese[] = {
      "占 0.4 GB，并可实时雕刻。Move 会改变下层形状，细节随之移动。"},
     // --- PanelIntegrations.cpp (tools/i18n/coverage.py) ---
     {"Show SculptForge on Discord", "在 Discord 上显示 SculptForge"},
-    {"Your Discord profile shows SculptForge, its icon and how long you've been sculpting. Sent only to the Discord "
-     "app on this computer, which shows it to your friends. Off by default.",
-     "你的 Discord 个人数据会显示 SculptForge、其图标与你已雕刻多久。只发送给这台电脑上的 Discord 应用程序，由它显示"
-     "给你的朋友。默认关闭。"},
-    {"Show the monthly challenge", "显示每月挑战"},
-    {"Adds \"Monthly challenge: <theme>\", with the theme you type below.",
-     "加入“Monthly challenge: <theme>”，主题为你在下方输入的内容。"},
-    {"Show the file name", "显示文件名称"},
-    {"Adds the name of the file you're working on (never its folder). Off by default.",
-     "加入你正在处理的文件名称（绝不含文件夹）。默认关闭。"},
+    {"Your Discord profile shows SculptForge, its icon, the time since you started it and one word for what you're "
+     "doing: Sculpting, Painting or Idle. Sent only to the Discord app on this computer, which shows it to your "
+     "friends. Needs the Discord app running. Off by default.",
+     "您的 Discord 个人资料会显示 SculptForge、其图标、启动后的经过时间，以及代表当前操作的一个词: Sculpting、Painting 或 Idle。仅发送至此计算机上的 Discord "
+     "应用并向好友展示。需要 Discord 应用保持运行。默认关闭。"},
+    {"Shown on your Discord profile: SculptForge, its icon, the time since you started it, and Sculpting, Painting "
+     "or Idle (nothing done for five minutes). Sent only to the Discord app on this computer. Nothing else: no "
+     "file names, folders, Part names, user name or model details.",
+     "在您的 Discord 个人资料中显示: SculptForge、其图标、启动后的经过时间，以及 Sculpting、Painting 或 Idle(五分钟内无任何操作)。仅发送至此计算机上的 Discord "
+     "应用。无其他任何内容: 不包含文件名、文件夹、部件名称、用户名或模型详情。"},
+    {"Discord now shows only SculptForge and what you're doing, never the file name or a challenge theme. Those "
+     "two options are gone.",
+     "Discord 现在仅显示 SculptForge 以及您正在进行的操作，绝不会显示文件名或挑战主题。这两个选项已移除。"},
     // --- PanelKelvinlet.cpp (tools/i18n/coverage.py) ---
     {"How the Kelvinlet brushes' material keeps its volume (Poisson's ratio): 0 is rubbery (it stretches without "
      "bulging), 100 is incompressible clay (pressing in bulges the surface up around the thumb, pulling out draws "
@@ -4376,8 +4379,6 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Terms & refunds", "条款与退款"},
     {"Nothing about memberships for a week.",
      "一周内不再显示会员方案。"},
-    {"Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running.",
-     "不会发送其他数据：没有文件夹、用户名或模型细节。需要 Discord 应用正在运行。"},
     {"Off (raw mesh)",
      "关闭（原始网格）"},
     {"Off in this run: tests, renders and recordings use fixed settings.",
@@ -4630,8 +4631,6 @@ constexpr Entry kSimplifiedChinese[] = {
      "手机打不开页面？"},
     {"The phone link couldn't start.",
      "无法启动手机连接。"},
-    {"Theme (64 characters at most)",
-     "主题（最多 64 个字符）"},
     {"There is no ready-made %s for this computer. %s",
      "没有适用于这台电脑的现成 %s。%s"},
     {"Thickness",
