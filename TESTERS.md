@@ -1,3 +1,13 @@
+# Testers: the end of a big stroke on a dense Part (Windows first)
+A big stroke now ends right after its last dab; that dab's shading catches up over the next few frames. Needs a real window.
+- Open a dense Part (a few million triangles or more: Lucy, a scan, or a sphere divided until the status bar shows 10M+).
+- **Clay** and **Standard** at about 240 px: a stroke with varied pressure, release, and watch where it ended (close up, light from the
+  side, Cavity on). Good: the surface lands and stays put; no flicker, pop or blotch as the shading settles.
+- Release and start the next stroke at once, over the end of the first. Good: it starts without a hitch; no seam where they meet.
+- Right after a release, move the pointer: the brush ring stays on the surface and moves with your hand (it must not flip flat or lag).
+- Press **Ctrl+Z** right after a release: the stroke is undone, no frozen frame.
+- Tell us the GPU and how many triangles the Part has.
+
 # Testers: Android, New Texture on a Mali tablet or phone
 The model vanished (or showed only its wireframe) after Texture Image > New Texture on a Mali-G72 tablet. Any Android device helps; Mali first.
 - **Sphere**, 5-6 subdivisions (60k+ triangles); **Texture Image > Auto UV**; **New Texture** (2K); paint one stroke. Good: the sphere stays visible and the stroke shows.
