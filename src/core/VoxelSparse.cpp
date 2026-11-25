@@ -432,13 +432,18 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
         const int64_t i = g.find(p.x, p.y, p.z);
         return i < 0 ? !g.out[g.brickOf(p.x, p.y, p.z)] : (flags[size_t(i)] & kSolid) != 0;
     };
+    // (a crease sealed by the wall closing: see the sign pass in Voxel.cpp)
+    constexpr float kSealed = 2.5f, kHug = 2.0f;
+    std::atomic<size_t> opened{0};
     poolFor(stored, [&](size_t b, size_t e) {
+        size_t openedHere = 0;
         for (size_t i = b; i < e; ++i) {
             const glm::ivec3 s = g.sample(i);
             if (!g.inGrid(s)) continue;
             bool inside;
+            const bool sealed = (flags[i] & kSolid) && !(flags[i] & kNearOutside) && nearest[i] >= 0 && dist2[i] <= kSealed * kSealed;
             if (!(flags[i] & kSolid)) inside = false;
-            else if (!(flags[i] & kNearOutside) || nearest[i] < 0) inside = true;
+            else if (!((flags[i] & kNearOutside) || sealed) || nearest[i] < 0) inside = true;
             else {
                 const glm::uvec3 tri = mesh.triangles[size_t(nearest[i])];
                 const glm::vec3 nrm = glm::cross(P[tri.y] - P[tri.x], P[tri.z] - P[tri.x]);
@@ -446,13 +451,22 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
                 const glm::vec3 onSurface = closestOnTriangle(p, P[tri.x], P[tri.y], P[tri.z]);
                 const float len = glm::length(nrm);
                 const glm::ivec3 probe(glm::round((onSurface + nrm * (2.5f * cell / std::max(len, 1e-20f)) - origin) / cell));
-                const bool buried = len > 0.0f && g.inGrid(probe) && solidAt(probe);
+                bool buried = len > 0.0f && g.inGrid(probe) && solidAt(probe);
+                if (buried) { // (a gap's far wall is within kHug of the probe and has the sample on its outer side too)
+                    const int64_t k = g.find(probe.x, probe.y, probe.z);
+                    if (k >= 0 && nearest[size_t(k)] >= 0 && dist2[size_t(k)] < kHug * kHug &&
+                        sideOfTriangle(mesh, uint32_t(nearest[size_t(k)]), p) > 0.0f)
+                        buried = false;
+                }
                 inside = buried || glm::dot(p - onSurface, nrm) < 0.0f;
+                openedHere += sealed && !inside;
             }
             if (inside) flags[i] |= kInside;
             if (!(flags[i] & kSolid)) flags[i] |= kReached;
         }
+        opened.fetch_add(openedHere, std::memory_order_relaxed);
     }, 1 << 14);
+    if (creases) creases->sealedOpened = opened.load();
     {
         auto storageAt = [&](const glm::ivec3& p) { return g.inGrid(p) ? g.find(p.x, p.y, p.z) : int64_t(-1); };
         const glm::ivec3 dirs[6] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};

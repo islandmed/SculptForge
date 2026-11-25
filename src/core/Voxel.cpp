@@ -239,7 +239,7 @@ Mesh meshFromFieldPolled(const VoxelGrid& grid, const std::vector<float>& f, flo
 // `nearestOut`: each sample's nearest triangle (-1: none measured), for snapCreases.
 std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& grid, const std::vector<uint8_t>& solid,
                                              float band, const StagePoll& poll, bool& stopped,
-                                             std::vector<int32_t>* nearestOut = nullptr);
+                                             std::vector<int32_t>* nearestOut = nullptr, size_t* sealedOpened = nullptr);
 
 glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c);
 
@@ -733,6 +733,13 @@ glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::v
     return a + ab * (vb * denom) + ac * (vc * denom);
 }
 
+float sideOfTriangle(const Mesh& mesh, uint32_t t, const glm::vec3& p) {
+    const auto& P = mesh.positions;
+    const glm::uvec3 tri = mesh.triangles[t];
+    const glm::vec3 nrm = glm::cross(P[tri.y] - P[tri.x], P[tri.z] - P[tri.x]);
+    return glm::dot(p - closestOnTriangle(p, P[tri.x], P[tri.y], P[tri.z]), nrm);
+}
+
 bool makeVoxelGrid(const AABB& box, int resolution, int padding, VoxelGrid& grid, size_t maxCells) {
     if (!box.valid()) return false;
     resolution = std::max(resolution, 4);
@@ -1001,7 +1008,8 @@ std::vector<float> insideDistanceField(const Mesh& mesh, const VoxelGrid& grid, 
 }
 
 std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& grid, const std::vector<uint8_t>& solid,
-                                             float band, const StagePoll& poll, bool& stopped, std::vector<int32_t>* nearestOut) {
+                                             float band, const StagePoll& poll, bool& stopped, std::vector<int32_t>* nearestOut,
+                                             size_t* sealedOpened) {
     stopped = false;
     auto stop = [&] { return stopped = true, std::vector<float>{}; };
     static const bool timing = std::getenv("SF_VOXEL_TIMING") != nullptr;
@@ -1350,14 +1358,27 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
     // Sign: the flood fill is certain about the outside and about the deep inside; next to the surface (nearOutside:
     // within 2 samples, any axis, of an outside sample) the nearest triangle's side decides, which keeps sub-voxel
     // detail instead of voxel stair-steps.
+    // A crease narrower than about 4 samples is sealed by the wall closing (the walls are thickened by a sample each and
+    // the flood never gets in): its air counts as solid, and the sign of the nearest triangle only reached 2 samples down
+    // from its mouth, so the rest filled up and the surface between the two came out as speckled sheets (gh#240). The
+    // nearest triangle decides for every solid sample within kSealed of the surface too. A surface buried inside another
+    // part must still count as buried there: its front side is solid, as a sealed gap is; the difference is that a gap's
+    // far wall is within kHug of the probe and has the sample on its outer side as well.
+    constexpr float kSealed = 2.5f, kHug = 2.0f;
+    auto outsideFarWall = [&](size_t probeIndex, const glm::vec3& p) {
+        return nearest[probeIndex] >= 0 && dist2[probeIndex] < kHug * kHug && sideOfTriangle(mesh, uint32_t(nearest[probeIndex]), p) > 0.0f;
+    };
     std::vector<uint8_t> inside(n);
+    std::atomic<size_t> opened{0};
     poolFor(size_t(dims.z), [&](size_t zb, size_t ze) {
+        size_t openedHere = 0;
         for (int z = int(zb); z < int(ze); ++z)
             for (int y = 0; y < dims.y; ++y)
                 for (int x = 0; x < dims.x; ++x) {
                     const size_t i = grid.index(x, y, z);
+                    const bool sealed = solid[i] && !nearOutside[i] && nearest[i] >= 0 && dist2[i] <= kSealed * kSealed;
                     if (!solid[i]) inside[i] = 0;
-                    else if (!nearOutside[i] || nearest[i] < 0) inside[i] = 1;
+                    else if (!(nearOutside[i] || sealed) || nearest[i] < 0) inside[i] = 1;
                     else {
                         const glm::uvec3 tri = mesh.triangles[size_t(nearest[i])];
                         const glm::vec3 nrm = glm::cross(P[tri.y] - P[tri.x], P[tri.z] - P[tri.x]);
@@ -1368,11 +1389,15 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
                         const glm::ivec3 probe(glm::round((onSurface + nrm * (2.5f * grid.cell / std::max(len, 1e-20f)) -
                                                            grid.origin) / grid.cell));
                         const bool buried = len > 0.0f && glm::all(glm::greaterThanEqual(probe, glm::ivec3(0))) &&
-                                            glm::all(glm::lessThan(probe, dims)) && solid[grid.index(probe.x, probe.y, probe.z)];
+                                            glm::all(glm::lessThan(probe, dims)) && solid[grid.index(probe.x, probe.y, probe.z)] &&
+                                            !outsideFarWall(grid.index(probe.x, probe.y, probe.z), p);
                         inside[i] = buried || glm::dot(p - onSurface, nrm) < 0.0f;
+                        openedHere += sealed && !inside[i];
                     }
                 }
+        opened.fetch_add(openedHere, std::memory_order_relaxed);
     }, 1);
+    if (sealedOpened) *sealedOpened = opened.load();
     std::vector<uint8_t>().swap(nearOutside);
     // The late gather: a solid sample 3 from the outside next to one the sign test turned may be half of a straddling
     // pair, so it needs its value too (the small triangles' part; the big ones splatted it already). Rare.
@@ -1578,7 +1603,7 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
             else if (error && error->empty()) *error = "Remesh produced no surface";
             return {};
         }
-        if (open) dropSpecks(out, 64);
+        if (open || creases.sealedOpened > 0) dropSpecks(out, 64);
         noteFineCreases(mesh, resolution, creases, notes);
         if (!step(0.9f)) return {};
         transferVertexAttributes(source, out);
@@ -1617,8 +1642,9 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
     // Mesh the signed distance to the original surface (positive inside), not the blocky occupancy: the result
     // lands on the original surface with no voxel terracing.
     std::vector<int32_t> nearest;
-    const std::vector<float> field =
-        insideDistanceFieldPolled(mesh, grid, solid, 3.0f, {&stepFn, 0.25f, 0.6f}, stopped, g_creaseSnap ? &nearest : nullptr);
+    size_t sealedOpened = 0;
+    const std::vector<float> field = insideDistanceFieldPolled(mesh, grid, solid, 3.0f, {&stepFn, 0.25f, 0.6f}, stopped,
+                                                               g_creaseSnap ? &nearest : nullptr, &sealedOpened);
     if (stopped) return {};
     std::vector<uint8_t>().swap(solid);
     if (!step(0.6f)) return {};
@@ -1630,7 +1656,9 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
         out.recomputeAllNormals();
         noteFineCreases(mesh, resolution, creases, notes);
     }
-    if (open) dropSpecks(out, 64); // (a few voxels: never detail at a remesh resolution)
+    // (a few voxels: never detail at a remesh resolution. Where the sign test opened a sealed crease, the tip of a groove
+    // under a voxel wide can leave one-voxel pieces of its own.)
+    if (open || sealedOpened > 0) dropSpecks(out, 64);
     if (out.triangleCount() == 0 && error) *error = "Remesh produced no surface";
     if (!step(0.9f)) return {};
     // Mask and vertex paint follow the nearest original vertex; hidden flags and UVs don't survive a rebuild (everything
