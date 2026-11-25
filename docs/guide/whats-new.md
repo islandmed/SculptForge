@@ -9,7 +9,7 @@ three versions in full, then the older ones in groups. Every detail is in the
 
 ```features
 date: 2026-11-24
-tagline: Polygon mode: pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span; plus Split view, standalone curves and an orientation widget.
+tagline: Polygon mode lets you pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span, and Split view shows a second live view of your scene.
 highlight: Polygon mode: pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span
 highlight: Split view shows a second live view of your scene, each with its own camera
 highlight: Place curves point by point, straight or smooth, and edit their points with the Gizmo

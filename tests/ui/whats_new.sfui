@@ -56,7 +56,7 @@ expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
 expect_text "Version 0.14.0"
-expect_text "Polygon mode: pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span; plus Split view, standalone curves and an orientation widget."
+expect_text "Polygon mode lets you pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span, and Split view shows a second live view of your scene."
 expect_text "Version 0.13.14"
 expect_text "Scatter covers a Part with copies and Keep apart stops them overlapping, Trim keeps the far wall of thin Parts, and Make Shell rims come out smooth."
 expect_text "Version 0.13.13"
