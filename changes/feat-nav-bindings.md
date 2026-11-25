@@ -12,7 +12,7 @@ added: **Navigation bindings** (Edit > Preferences > Navigation): one place for 
   Reset view, the orbit, pan and zoom step keys) and the pen's side buttons, where **Zoom view** joins Rotate view and Pan
   view (Preferences > Tablet has it too). A hold key another action also has, two moves with the same gesture, or a
   gesture the key style already uses show a warning naming the other meaning; **Navigation defaults** puts all of it
-  back. While a hold key is down a label (HOLD TO ORBIT, PAN or ZOOM) shows in the status bar where Camera locked does (its place is kept free while a hold key is bound, so the bar never shifts),
+  back. While a hold key is down a label (HOLD TO ORBIT, PAN or ZOOM) shows in the status bar where Camera locked does (its place is kept free while a hold key is bound when the bar is wide enough; in a narrower one it replaces the status text meanwhile; no item ever moves or drops),
   and the warning lines and gesture names are translated. Everything saves itself; every key style's defaults are unchanged. Requested by Fenix and other members on
   Discord.
 testers:

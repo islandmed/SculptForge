@@ -218,23 +218,39 @@ expect "##navdrag.pan"
 shot nav_panel_streamlined
 key escape
 
-# The hold key's label shows in this layout's status bar too, in the place Camera locked takes, and goes when it is let go.
+# The hold key's label shows in this layout's status bar too and goes when it is let go, and it never moves or drops a chip:
+# where the bar fits it, it has a place of its own (kept free while a hold key is bound); where it does not (a laptop's
+# 1440), it takes the status text's place while the key is down. Either way the chips (memory and frame rate among them)
+# are the same unbound, bound, held and let go.
+wait 2
+remember status_chips chipsN
+remember status_mem_chips memN
+expect_value status_mem_chips >= 1
 set_shortcut view.hold_zoom K
 set_shortcut view.hold_orbit H
 wait 2
+expect_value status_chips == $chipsN
+expect_value status_mem_chips == $memN
 remember status_modules_x chips0
+shot nav_hold_idle
 key_down k
 wait 2
 expect_text "HOLD TO ZOOM"
+expect_value status_chips == $chipsN
+expect_value status_mem_chips == $memN
 expect_value status_modules_x == $chips0
 shot nav_hold_label
 key_up k
 wait 2
 expect_no_text "HOLD TO ZOOM"
+expect_value status_chips == $chipsN
+expect_value status_mem_chips == $memN
 expect_value status_modules_x == $chips0
-# (a longer label does not move them either: the slot is as wide as the longest)
+# (a longer label does not move them either)
 key_down h
 wait 2
 expect_text "HOLD TO ORBIT"
+expect_value status_chips == $chipsN
+expect_value status_mem_chips == $memN
 expect_value status_modules_x == $chips0
 key_up h
