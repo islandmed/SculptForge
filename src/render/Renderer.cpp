@@ -1292,9 +1292,9 @@ bool Renderer::init(std::string& error) {
 }
 
 const Renderer::MeshProgram* Renderer::meshProgram(int features) {
-    if (features & (kTextured | kNormalMap)) features |= kTextured | kPrim;
+    if (!(features & kMicro) && (features & (kTextured | kNormalMap))) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
-    if (features & kMicro) features &= kMicro | kFlat | kPbr | ((features & kFocus) ? kFocus : kTiles);
+    if (features & kMicro) features &= kMicro | kFlat | kPbr | kWide | ((features & kFocus) ? kFocus : kTiles);
     MeshProgram& p = programs_[features & 255];
     if (p.id) return &p;
     const auto simpler = [&]() -> const MeshProgram* {
@@ -1305,12 +1305,13 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     std::string prefix = "#version 330 core\n";
     if (features & kMicro)
         prefix += (features & kFocus) ? "#define MICRO\n#define FOCUS\n" : (features & kTiles) ? "#define MICRO\n#define TILES\n" : "#define MICRO\n";
+    if ((features & kMicro) && (features & kWide)) prefix += "#define WIDE\n";
     else if (features & kPaint) prefix += "#define PAINT\n";
     if ((features & kPrim) && !(features & kMicro)) prefix += "#define PRIM\n";
     if (features & kTextured) prefix += "#define TEXTURED\n";
     if (features & kNormalMap) prefix += "#define NORMALMAP\n";
     if (features & kFlat) prefix += "#define FLAT\n";
-    if (features & kGhost) prefix += "#define GHOST\n";
+    if ((features & kGhost) && !(features & kMicro)) prefix += "#define GHOST\n";
     if (features & kPbr) prefix += "#define PBR\n";
     const std::string vs = prefix + ((features & kMicro) ? microVertexShaderSource() : kMeshVS), fs = prefix + kMeshFS,
                       gs = prefix + kMeshGS;
@@ -3321,6 +3322,12 @@ bool Renderer::textureRejected(uint32_t id) const {
     return false;
 }
 
+bool Renderer::microWide(uint32_t id) const {
+    for (const auto& s : slots_)
+        if (s.id == id) return s.micro && s.micro->wide();
+    return false;
+}
+
 bool Renderer::textureNotShown(uint32_t id) const {
     for (const auto& s : slots_)
         if (s.id == id) return s.uvsLost;
@@ -4394,7 +4401,7 @@ void Renderer::updateCoarse(MeshSlot& s, const Mesh& mesh) {
 
 void Renderer::drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings) {
     const MeshProgram* p = meshProgram(kMicro | (flat ? kFlat : 0) | (settings.pbr() && envTexture_ ? kPbr : 0) |
-                                       (s.micro && s.micro->focus() ? kFocus : 0) | (s.micro && s.micro->tilePagesOn() ? kTiles : 0));
+                                       (s.micro && s.micro->focus() ? kFocus : 0) | (s.micro && s.micro->tilePagesOn() ? kTiles : 0) | (s.micro && s.micro->wide() ? kWide : 0));
     if (!p) return;
     gl::UseProgram(p->id);
     setPbrUniforms(*p, settings, false, s);

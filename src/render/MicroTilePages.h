@@ -24,6 +24,7 @@
 
 #include "core/Micro.h"
 #include "render/GL.h"
+#include "render/TexelStore.h"
 
 #include <cstdint>
 #include <vector>
@@ -37,7 +38,7 @@ public:
     ~MicroTilePages();
     void release();
     // A new layout: `slots` base triangles, pages at `pageLevel` (no pages kept).
-    void setup(uint32_t slots, int pageLevel);
+    void setup(uint32_t slots, int pageLevel, bool wide); // wide: the page table is a 2D texture (render/TexelStore.h)
     int pageLevel() const { return level_; }
     // A sync: `dirty` base triangles whose heights changed (`all`: every page is out of date). Refills their pages,
     // frees those with no tiles left, gives pages to the tiled slots the last draw drew.
@@ -67,7 +68,8 @@ private:
 
     int level_ = -1;
     uint32_t m_ = 1, samples_ = 3, slots_ = 0;
-    GLuint pool_ = 0, poolTex_ = 0, slope_ = 0, slopeTex_ = 0, table_ = 0, tableTex_ = 0;
+    GLuint pool_ = 0, poolTex_ = 0, slope_ = 0, slopeTex_ = 0;
+    TexelStore table_;
     uint32_t capacity_ = 0;
     std::vector<uint32_t> page_;    // per slot: 0 = none, else page + 1
     std::vector<uint32_t> owner_;   // per page: its slot (~0 = free)
