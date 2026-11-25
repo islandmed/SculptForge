@@ -3742,8 +3742,8 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
     case StepVerb::UiScale: { // ui_scale 175 | auto: as Preferences > Interface > UI scale picks it (#87)
         if (!need(1)) return false;
         const float v = w[1] == "auto" ? 0.0f : num(1, 100) / 100.0f;
-        run([this, v] {
-            app_.uiPrefs_.uiScale = v;
+        run([this, v] { // the general choice only (the per-monitor entry comes from the Preferences slider: ui_scale_prefs.sfui;
+            app_.uiPrefs_.uiScale = v; // a test's ui.json stays as the Classic golden has it: classic_defaults.sfui)
             app_.requestUiScale();
         });
         wait(0.2f);

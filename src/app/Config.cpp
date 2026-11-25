@@ -108,6 +108,11 @@ Json toJson(const UiPrefs& p) {
     j.set("autoCollapseLeft", p.autoCollapseLeft);
     j.set("autoCollapseRight", p.autoCollapseRight);
     j.set("uiScale", double(p.uiScale));
+    if (!p.uiScaleByDisplay.empty()) { // per monitor (UiScale.h): {"DELL U2720Q 3840x2160": 0.8, ...}
+        Json byDisplay = Json::object();
+        for (const auto& [key, scale] : p.uiScaleByDisplay) byDisplay.set(key, double(scale));
+        j.set("uiScaleByDisplay", byDisplay);
+    }
     j.set("libraryAtStartup", p.libraryAtStartup);
     j.set("startupSplash", p.startupSplash);
     j.set("libraryFolder", p.libraryFolder);
@@ -227,7 +232,16 @@ void fromJson(const Json& j, UiPrefs& p) {
     p.oneSubpalette = j["oneSubpalette"].asBool(p.oneSubpalette);
     p.autoCollapseLeft = j["autoCollapseLeft"].asBool(p.autoCollapseLeft);
     p.autoCollapseRight = j["autoCollapseRight"].asBool(p.autoCollapseRight);
-    p.uiScale = std::clamp(float(j["uiScale"].asNumber(p.uiScale)), 0.0f, 3.0f);
+    p.uiScale = std::clamp(float(j["uiScale"].asNumber(p.uiScale)), 0.0f, kMaxUiScale);
+    if (p.uiScale > 0.0f) p.uiScale = std::max(p.uiScale, kMinUiScale);
+    if (j["uiScaleByDisplay"].isObject()) {
+        p.uiScaleByDisplay.clear();
+        for (const auto& [key, value] : j["uiScaleByDisplay"].members()) {
+            float scale = std::clamp(float(value.asNumber(0.0)), 0.0f, kMaxUiScale);
+            if (scale > 0.0f) scale = std::max(scale, kMinUiScale);
+            setDisplayScale(p.uiScaleByDisplay, key, scale);
+        }
+    }
     p.libraryAtStartup = j["libraryAtStartup"].asBool(p.libraryAtStartup);
     p.startupSplash = j["startupSplash"].asBool(p.startupSplash);
     if (j["libraryFolder"].isString()) p.libraryFolder = j["libraryFolder"].asString();
@@ -2197,28 +2211,66 @@ void drawInterfaceSection(App& app) {
         if (ui::Checkbox("Compact timeline##view.timeline_compact", &compact)) a->run();
         ui::HelpAction(app, "view.timeline_compact");
     }
-    // Finer steps near 100 % (125 % was too big a first step) and up to 300 % for a 5K or 5K2K monitor at its native
-    // resolution, no system scaling (fenix 11-08).
-    static const char* kScales[] = {"Automatic", "100%", "110%", "115%", "125%", "135%", "150%",
-                                    "175%",      "200%", "250%", "300%"};
-    static const float kScaleValues[] = {0.0f, 1.0f, 1.1f, 1.15f, 1.25f, 1.35f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f};
-    constexpr int kScaleCount = int(sizeof kScaleValues / sizeof kScaleValues[0]);
-    int current = 0;
-    for (int i = 0; i < kScaleCount; ++i)
-        if (std::abs(kScaleValues[i] - p.uiScale) < 0.01f) current = i;
-    ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::BeginCombo("##ui_scale", (std::string(tr("UI scale:")) + " " + tr(kScales[current])).c_str())) {
-        for (int i = 0; i < kScaleCount; ++i)
-            if (ImGui::Selectable(tr(kScales[i]), i == current)) {
-                p.uiScale = kScaleValues[i];
-                app.requestUiScale(); // live, from the next frame (#87)
+    // 70 % (a 4K or 5K monitor at its native size, the system scaling the UI too large: Fenix 11-22) to 300 % (a 5K2K
+    // monitor: fenix 11-08), a slider in 5 % steps, applied when it is let go or a typed value is entered: rebuilding the
+    // fonts while it is dragged would move the slider under the pointer (the tray scales with the UI). The sample line
+    // below shows the size while it is dragged. Automatic follows the monitor the window is on; a chosen size is
+    // remembered for that monitor (App::setUiScalePreference, uiScaleByDisplay).
+    {
+        const float pref = app.uiScalePreference();
+        const bool automatic = pref <= 0.0f;
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr("UI scale:"));
+        ImGui::SameLine();
+        bool autoTick = automatic;
+        if (ImGui::Checkbox((std::string(tr("Automatic")) + "##ui_scale_auto").c_str(), &autoTick))
+            app.setUiScalePreference(autoTick ? 0.0f : snapUiScale(app.uiScale()));
+        ui::HelpText("Automatic", nullptr,
+                     "Follow the display the window is on (Windows: Settings > Display > Scale, per monitor; macOS and Wayland: "
+                     "the display's scaling; X11: the desktop's font DPI). Untick, or move the slider, to choose a size.",
+                     "Preferences > Interface");
+        // The value while the slider is held or typed into (pending), and the one let go of, applied a third of a second
+        // later unless a second click follows: the first click of a double-click (which opens the typed field) must not
+        // rebuild the UI under the second. A typed value applies the moment it is entered.
+        static int pending = -1, letGo = -1;
+        static double applyAt = 0.0;
+        static bool wasTyping = false;
+        const int currentPct = int(std::lround((automatic ? app.uiScale() : pref) * 100.0f));
+        int pct = pending >= 0 ? pending : letGo >= 0 ? letGo : currentPct;
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        const bool edited = ImGui::SliderInt("##ui_scale", &pct, int(std::lround(kMinUiScale * 100.0f)),
+                                             int(std::lround(kMaxUiScale * 100.0f)), "%d%%", ImGuiSliderFlags_AlwaysClamp);
+        const bool typing = ImGui::TempInputIsActive(ImGui::GetItemID());
+        if (ImGui::IsItemActive()) {
+            if (edited && !typing) pct = int(std::lround(snapUiScale(float(pct) / 100.0f) * 100.0f)); // dragged or arrow keys: 5 % steps
+            pending = pct;
+            letGo = -1; // (a second click: the first one's value is not applied)
+        } else {
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                letGo = pct;
+                applyAt = wasTyping ? 0.0 : ImGui::GetTime() + 0.35;
+                app.redrawIn(0.35);
             }
-        ImGui::EndCombo();
+            pending = -1;
+            if (letGo >= 0 && ImGui::GetTime() >= applyAt) {
+                app.setUiScalePreference(float(letGo) / 100.0f);
+                letGo = -1;
+            }
+        }
+        wasTyping = typing;
+        ui::HelpText("UI scale", nullptr,
+                     "Size of text and controls, 70% to 300%, applied when you let the slider go (double-click it to type a "
+                     "value). Below 100% the buttons keep a little more room around their text, so they stay easy to hit. "
+                     "The size is remembered for the monitor the window is on, so a laptop screen and a 4K monitor can each "
+                     "have their own.",
+                     "Preferences > Interface");
+        // The sample: the interface font and icons at the slider's size (stretched from the current atlas while it is
+        // dragged; built crisp at that size the moment it is let go).
+        const float sample = std::clamp(float(pct) / 100.0f / std::max(app.uiScale(), 0.01f), 0.2f, 5.0f);
+        ImGui::SetWindowFontScale(sample);
+        ImGui::TextUnformatted((std::string(ICON_LC_SEARCH "  ") + tr("Aa Bb 123") + "  " ICON_LC_BRUSH "  " ICON_LC_BOX).c_str());
+        ImGui::SetWindowFontScale(1.0f);
     }
-    ui::HelpText("UI scale", nullptr,
-                 "Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: "
-                 "Settings > Display > Scale, per monitor).",
-                 "Preferences > Interface");
     static const char* kRotation[] = {"Free", "Turntable", "X axis", "Z axis"}; // UiPrefs::orbitLock
     p.orbitLock = std::clamp(p.orbitLock, 0, 3);
     ImGui::SetNextItemWidth(-FLT_MIN);

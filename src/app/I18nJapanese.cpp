@@ -2368,8 +2368,16 @@ constexpr Entry kJapanese[] = {
      "ホバーおよびフォーカスのハイライトは色のみ変更します：イージングはなく、タイルが浮き上がったり拡大したりしません。"},
     {"Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
      "オフ：パレットバーで「ファイル」と「編集」が先頭、「ヘルプ」が最後になり、その他はAからZの順になります。オン：すべてのパレットがAからZの順になります。"},
-    {"Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: Settings > Display > Scale, per monitor).",
-     "テキストとコントロールのサイズです。即座に適用されます。「自動」はウィンドウが表示されているディスプレイに従います（Windows：設定 > ディスプレイ > スケール、モニターごと）。"},
+    {"Follow the display the window is on (Windows: Settings > Display > Scale, per monitor; macOS and Wayland: the "
+     "display's scaling; X11: the desktop's font DPI). Untick, or move the slider, to choose a size.",
+     "ウィンドウが表示されているディスプレイに従います（Windows：設定 > ディスプレイ > スケール、モニターごと。macOS と Wayland：ディスプレイのスケーリング。X11：デスクトップのフォント "
+     "DPI）。チェックを外すか、スライダーを動かすとサイズを選べます。"},
+    {"Size of text and controls, 70% to 300%, applied when you let the slider go (double-click it to type a value). "
+     "Below 100% the buttons keep a little more room around their text, so they stay easy to hit. The size is "
+     "remembered for the monitor the window is on, so a laptop screen and a 4K monitor can each have their own.",
+     "テキストとコントロールのサイズです（70% から 300%）。スライダーを離したときに適用されます（ダブルクリックで値を入力できます）。100% "
+     "未満ではボタンのテキストの周りに少し余白を残し、押しやすさを保ちます。サイズはウィンドウが表示されているモニターごとに記憶されるため、ノート PC の画面と 4K モニターでそれぞれ別のサイズにできます。"},
+    {"Aa Bb 123", "Aa 文字 123"},
     {"Free: dragging turns the model about the screen's axes and can roll it over the top; press Shift while rotating to snap to the nearest front, side, top or bottom view. Turntable: the model stays upright and turns about its vertical axis, as in Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",
      "フリー：ドラッグすると画面の軸を中心にモデルが回転し、天地を反転させることもできます。回転中にShiftを押すと、最も近い正面、側面、上面、底面ビューにスナップします。ターンテーブル：BlenderやMayaのように、モデルは垂直を維持したまま縦軸を中心に回転します。X軸、Z軸：そのワールド軸を中心にのみ回転します（ビュー > オービットロック）。"},
     {"Keeps the interface below the camera notch of MacBooks (and other laptops) when SculptForge fills the screen. Automatic asks the system (macOS) or recognises a notched MacBook display (Linux).",

@@ -209,8 +209,9 @@ window.
 
 ### Text and buttons are too small or too large
 
-**Edit > Preferences > Interface > UI scale** sets the size (Automatic, 100% to 200%) and applies it at once and
-keeps it for the next start. **Automatic** uses
+**Edit > Preferences > Interface > UI scale** sets the size (a slider from 70% to 300%, or **Automatic**), applies it
+when you let the slider go and keeps it for the next start, per monitor. On a 4K or 5K screen where the system's own
+scaling makes everything too large, go below 100%: the text is built sharp at the small size. **Automatic** uses
 the scale of the monitor the window is on: on Windows that is **Settings > Display > Scale**, per monitor, and the
 interface follows when you drag the window to another monitor. On Linux under X11 it comes from the desktop's
 font DPI (Xft.dpi); if Automatic looks wrong there, pick a size.

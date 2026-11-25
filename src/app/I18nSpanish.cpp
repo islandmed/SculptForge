@@ -1653,10 +1653,19 @@ constexpr Entry kSpanish[] = {
     {"Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
      "Desactivado: Archivo y Editar van primero en la barra de paletas y Ayuda al final, el resto de la A a la Z. "
      "Activado: todas las paletas de la A a la Z."},
-    {"Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: Settings > "
-     "Display > Scale, per monitor).",
-     "Tamaño del texto y los controles, aplicado al instante. Automático sigue a la pantalla en la que está la "
-     "ventana (Windows: Configuración > Pantalla > Escala, por monitor)."},
+    {"Follow the display the window is on (Windows: Settings > Display > Scale, per monitor; macOS and Wayland: the "
+     "display's scaling; X11: the desktop's font DPI). Untick, or move the slider, to choose a size.",
+     "Seguir la pantalla en la que está la ventana (Windows: Configuración > Pantalla > Escala, por monitor; macOS y "
+     "Wayland: el escalado de la pantalla; X11: el DPI de fuente del escritorio). Desmarque, o mueva el control "
+     "deslizante, para elegir un tamaño."},
+    {"Size of text and controls, 70% to 300%, applied when you let the slider go (double-click it to type a value). "
+     "Below 100% the buttons keep a little more room around their text, so they stay easy to hit. The size is "
+     "remembered for the monitor the window is on, so a laptop screen and a 4K monitor can each have their own.",
+     "Tamaño del texto y los controles, del 70% al 300%, aplicado al soltar el control deslizante (haga doble clic "
+     "para escribir un valor). Por debajo del 100%, los botones conservan un poco más de espacio alrededor de su "
+     "texto, para que sigan siendo fáciles de pulsar. El tamaño se recuerda para el monitor en el que está la "
+     "ventana, así que la pantalla de un portátil y un monitor 4K pueden tener cada uno el suyo."},
+    {"Aa Bb 123", "Aa Bb 123"},
     {"Free: dragging turns the model about the screen's axes and can roll it over the top; press Shift while rotating "
      "to snap to the nearest front, side, top or bottom view. Turntable: the model stays upright and turns about its "
      "vertical axis, as in Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",

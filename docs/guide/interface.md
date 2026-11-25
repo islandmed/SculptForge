@@ -667,7 +667,7 @@ layout saves itself.
 | **Palettes strictly A-Z (strict order)** | Off | Classic layout: strict alphabetical palette bar instead of File and Edit first, Help last |
 | **Show newer menu rows** | Off in Classic, on in SculptForge | File > Render with..., Edit > Preferences > Scripts, Edit > Preferences > Render bridge and Tool > Scatter (added after 0.13.0); a feature you have set up keeps its row either way |
 | **Left-handed layout** | Off | Mirrors the shelves and trays: tools on the right, navigation on the left |
-| **UI scale** | Automatic | Size of text and controls (100% to 200%), applied at once; Automatic follows the monitor (see below) |
+| **UI scale** | Automatic | Size of text and controls, a slider from 70% to 300%, applied when you let it go; Automatic follows the monitor; remembered per monitor (see below) |
 | **Camera notch** | Automatic | Keeps the interface below a laptop's camera notch in fullscreen (see below) |
 
 **Language** changes the interface at once, without a restart; saved automatically for the next start. In **Español**
@@ -693,12 +693,20 @@ Any other computer language (Portuguese, French...) starts in English, and the *
 welcome shows the five names, each in its own script: one click switches the whole interface. **Help > Welcome** shows
 the row again. Nothing is ever sent anywhere, and the choice is asked once.
 
-**UI scale** also applies at once: text, buttons, shelves and trays resize on the next frame; saved automatically.
-**Automatic** uses the scale of the monitor the window is on (Windows: **Settings > Display > Scale**; macOS and
-Wayland: the display's scaling; X11: the desktop's font DPI).
+**UI scale** is a slider from **70%** to **300%** in steps of 5% (double-click it to type a value). The size applies
+the moment you let the slider go, no restart: text, buttons, shelves and trays resize together, and the text and icons
+are built again at the new size, so they stay sharp at every setting (nothing is a stretched or shrunk bitmap). The
+sample line under the slider shows the size while you drag. Below 100%, for a 4K or 5K screen whose system scaling makes
+the interface too large, buttons and sliders keep a little more room around their text than the text itself loses, so
+they stay easy to hit with a mouse or a pen. Saved automatically.
 
-Drag the window to a monitor at another scale, or change the system setting, and the interface follows. A chosen size
-(100% to 200%) stays the same on every monitor.
+**Automatic** (the tick beside the slider) uses the scale of the monitor the window is on (Windows: **Settings >
+Display > Scale**; macOS and Wayland: the display's scaling; X11: the desktop's font DPI). Drag the window to a monitor
+at another scale, or change the system setting, and the interface follows.
+
+A chosen size is remembered **per monitor**: set 80% on a 4K monitor and leave the laptop's own screen on Automatic,
+and each keeps its setting as the window moves between them (monitors are told apart by their name and pixel size, so
+two identical monitors share one setting). A monitor the window has never been on uses the last size you chose.
 
 **Edit > Preferences > Cursor**:
 
