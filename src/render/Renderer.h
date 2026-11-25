@@ -236,6 +236,7 @@ public:
     bool textureNotShown(uint32_t id) const;
     // The GPU rejected drawing the texture (a GL error at its first textured draw, logged): the Part draws plain, with a status.
     bool textureRejected(uint32_t id) const;
+    uint32_t emptyBufferSamplers() const { return emptyBufferSamplers_; } // (tests: gl_limits)
     // How Part `id`'s UVs reach the shader, for tests: 0 a texture buffer, N rows of N texels in a 2D texture.
     int textureUvWidth(uint32_t id) const;
 
@@ -440,6 +441,11 @@ private:
     // The textured program's two UV samplers (a buffer and a 2D texture) always have a complete texture of their own type
     // bound, the unused one a single texel: a driver that checks every sampler (Mali) never meets an empty unit in the geometry shader.
     GLuint dummyUvBufferData_ = 0, dummyUvBufferTexture_ = 0, dummyUv2D_ = 0;
+    // The same for the face group sampler (an unsigned one: the mesh program declares it in every variant): a Part without
+    // per-triangle ids (a mesh past a small GPU's buffer limit, or none set) binds this, never an empty unit (Mali-G72, 0.13.14:
+    // a 69632-triangle sphere drew with GL error 0x0501 "glTexBuffer ... beyond the allocated buffer" against a 65536-texel limit).
+    GLuint dummyUintBufferData_ = 0, dummyUintBufferTexture_ = 0;
+    uint32_t emptyBufferSamplers_ = 0; // tests only (gl_limits): draws that met a buffer sampler unit with no texture on it
     bool thumbnailPass_ = false; // draw(): transparent background, no gradient (renderMeshThumbnail)
     std::vector<ReferenceImage> references_; // setReferences
     struct ReferenceTexture {

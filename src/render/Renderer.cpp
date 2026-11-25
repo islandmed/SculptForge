@@ -1208,6 +1208,15 @@ bool Renderer::init(std::string& error) {
         gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, dummyUvBufferData_);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
         gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
+        const uint32_t zeroUint = 0;
+        gl::GenBuffers(1, &dummyUintBufferData_);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, dummyUintBufferData_);
+        gl::BufferData(GL_TEXTURE_BUFFER, sizeof zeroUint, &zeroUint, GL_STATIC_DRAW);
+        gl::GenTextures(1, &dummyUintBufferTexture_);
+        gl::BindTexture(GL_TEXTURE_BUFFER, dummyUintBufferTexture_);
+        gl::TexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, dummyUintBufferData_);
+        gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
         gl::GenTextures(1, &dummyUv2D_);
         gl::BindTexture(GL_TEXTURE_2D, dummyUv2D_);
         gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -1608,6 +1617,8 @@ void Renderer::shutdown() {
     gl::DeleteVertexArrays(1, &emptyVao_);
     gl::DeleteBuffers(1, &dummyUvBufferData_);
     gl::DeleteTextures(1, &dummyUvBufferTexture_);
+    gl::DeleteBuffers(1, &dummyUintBufferData_);
+    gl::DeleteTextures(1, &dummyUintBufferTexture_);
     gl::DeleteTextures(1, &dummyUv2D_);
     for (MeshProgram& p : programs_) {
         deleteProgram(p.id);
@@ -4399,7 +4410,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::ActiveTexture(kTexture7);
     gl::BindTexture(GL_TEXTURE_BUFFER, s.primTexture);
     gl::ActiveTexture(GL_TEXTURE1);
-    gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.groupTexture : 0);
+    gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.groupTexture : dummyUintBufferTexture_);
     gl::ActiveTexture(GL_TEXTURE0);
     gl::Uniform1i(p->paint, settings.showVertexPaint && s.hasColors ? 1 : 0);
     gl::Uniform1i(p->showMask, active && settings.showMask && s.hasMask ? 1 : 0);
@@ -4411,6 +4422,15 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform1i(p->twoSided, 1);
     gl::Uniform1i(p->checker, checker ? 1 : 0);
     gl::Uniform1f(p->checkerScale, checker ? s.overlay->checkerScale : 8.0f);
+    if (gl::testTexelLimitSet()) { // (a UI test: a driver that checks every sampler, Mali, rejects the draw when one buffer unit is empty)
+        for (const GLenum unit : {kTexture7, GL_TEXTURE1, textured || normalMapped ? GL_TEXTURE3 : kTexture7, normalMapped ? kTexture6 : kTexture7}) {
+            GLint bound = 0;
+            gl::ActiveTexture(unit);
+            gl::GetIntegerv(0x8C2C /* GL_TEXTURE_BINDING_BUFFER */, &bound);
+            if (!bound) ++emptyBufferSamplers_;
+        }
+        gl::ActiveTexture(GL_TEXTURE0);
+    }
     };
     bind(p);
     gl::BindVertexArray(s.vao);
@@ -4551,7 +4571,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         if (!s.patchMaskOn) gl::VertexAttrib1f(3, 0.0f);
         if (perTriangle) {
             gl::ActiveTexture(GL_TEXTURE1);
-            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : 0);
+            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : dummyUintBufferTexture_);
             gl::ActiveTexture(GL_TEXTURE0);
         }
         drawPatches(s, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);
