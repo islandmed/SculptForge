@@ -2,7 +2,7 @@
 # Brush > Cloth opens it. The controls are the same state as Tool > Drape and Brush > Cloth (a wind set there shows
 # here, a mode set there shows here). The wind is set in Tool > Drape while it is the only section in the tray
 # (the long tray with the Brush palette scrolls the sliders out of reach).
-run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run ui_look look=classic layout=classic newer_rows=true   # Classic with Show newer menu rows: Tool > Cloth is a row added after 0.13.0
 run new_sphere subdivisions=4
 wait_idle 30
 click "Tool##palette.tool"

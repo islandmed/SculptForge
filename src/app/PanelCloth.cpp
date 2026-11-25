@@ -95,7 +95,8 @@ void App::showClothPanel() {
 }
 
 void App::drawClothSettingsLink(const char* id) {
-    if (inClothPanel_) return; // (already there)
+    if (inClothPanel_) return;   // (already there)
+    if (!newerMenuRows()) return; // (Classic without Show newer menu rows has no Tool > Cloth row to open)
     if (ImGui::SmallButton((std::string(tr("Cloth settings...")) + "##" + id).c_str())) showClothPanel();
     ui::HelpText("Cloth settings...", nullptr,
                  "Opens Tool > Cloth: the Cloth brush settings and Drape together in one place.", "Tool > Cloth");

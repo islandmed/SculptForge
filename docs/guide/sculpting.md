@@ -864,7 +864,8 @@ Everything cloth in one place: **Tool > Cloth** shows the [Cloth brush](#cloth-b
 gravity, reach, steps, soft body, collisions) and [Drape](#drape) (fabric, wind, units per metre, pins, Simulate)
 one under the other, with a line on what each part does. They are the same controls as in **Sculpt > Brush > Cloth**
 and **Tool > Drape**, not copies: a fabric picked here is the fabric there. **Cloth settings...** under the Cloth
-brush's settings and under Drape opens it.
+brush's settings and under Drape opens it. In the Classic layout it is a row added after 0.13.0: turn on
+**Edit > Preferences > Interface > Show newer menu rows** to see it (the SculptForge layout shows it always).
 
 ## Capture an alpha or a VDM from the model
 
