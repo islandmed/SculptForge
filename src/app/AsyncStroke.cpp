@@ -324,6 +324,7 @@ void App::startSettleBatch(size_t leaves) {
 
 void App::settleNow() {
     if (!doc_.sculptor.settling()) return;
+    const auto t0 = std::chrono::steady_clock::now();
     if (solver_) {
         // The batch in flight, then the rest in one more on the solver thread, packed as the stroke's batches are (worked
         // out here, the regular sync would pack them on this thread with every cavity term walked again: 0.9 s at 28M).
@@ -337,15 +338,20 @@ void App::settleNow() {
     }
     doc_.sculptor.settleNormals(); // (anything left: none, unless the batch couldn't run)
     finishSettle();
+    static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
+    if (log) SDL_Log("settle now: %.1f ms on the main thread", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
 }
 
 void App::settleForPress() {
     // A press while the last stroke settles: the batch in flight first (at most one, ~kSettleBatchSeconds), so the
     // pick and the stroke's start see the mesh; a sculpt stroke then takes the rest over (beginStroke).
     if (!doc_.sculptor.settling() || !solver_) return;
+    const auto t0 = std::chrono::steady_clock::now();
     solver_->wait();
     if (solver_->done) commitSolverBatch();
     solver_->settle = solver_->settled = false;
+    static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
+    if (log) SDL_Log("settle: a press waited %.1f ms", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
 }
 
 void App::finishSculpting() {
