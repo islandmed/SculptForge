@@ -1226,11 +1226,14 @@ void transferFaceGroups(const Mesh& source, Mesh& dst, bool relaxBorders) {
         // (Teeth are up to half a source edge deep: the kernel's sigma is a source edge and it reaches two, so a polygon
         // inside a tooth sees mostly the other side; everything within reach of the border is re-decided, not just the
         // border ring, or a tooth's inside would be left as an island.)
-        const float sourceEdge = std::max(typicalEdgeLength(source), 2.0f * typicalEdgeLength(dst));
-        const float reachR = 2.0f * sourceEdge;
+        // The reach is capped at 12 polygons (diff review 11-24: a coarse source under a 4096 remesh would otherwise make
+        // every border polygon walk thousands of neighbours): the deepest teeth of such a pairing lose their worst half.
         const float polyEdge = std::max(typicalEdgeLength(dst), 1e-12f);
-        const int depth = int(std::ceil(reachR / polyEdge)) + 1;
-        const float sigma2 = 2.0f * sourceEdge * sourceEdge;
+        const float sourceEdge = std::max(typicalEdgeLength(source), 2.0f * polyEdge);
+        constexpr int kMaxDepth = 12;
+        const float reachR = std::min(2.0f * sourceEdge, float(kMaxDepth) * polyEdge);
+        const int depth = std::min(kMaxDepth, int(std::ceil(reachR / polyEdge))) + 1;
+        const float sigma2 = 2.0f * (0.5f * reachR) * (0.5f * reachR);
         std::vector<glm::vec3> centres(nt);
         for (uint32_t t : polys) centres[t] = centre(t);
         std::vector<uint32_t> border; // the band: every polygon within `depth` rings of a border polygon
@@ -1253,6 +1256,7 @@ void transferFaceGroups(const Mesh& source, Mesh& dst, bool relaxBorders) {
         poolFor(border.size(), [&](size_t b, size_t e) {
             std::vector<std::pair<uint32_t, int>> queue;
             std::unordered_map<uint32_t, uint8_t> seen;
+            seen.reserve(size_t(2 * (depth + 1) * (depth + 1)));
             std::vector<std::pair<uint32_t, float>> weight; // group, weight
             for (size_t i = b; i < e; ++i) {
                 const uint32_t p = border[i];
@@ -1284,8 +1288,8 @@ void transferFaceGroups(const Mesh& source, Mesh& dst, bool relaxBorders) {
         for (uint32_t t : polys) ++count[groups[t]];
         for (size_t i = 0; i < border.size(); ++i)
             if (relaxed[i] != groups[border[i]]) --delta[groups[border[i]]], ++delta[relaxed[i]];
-        std::unordered_map<uint32_t, bool> keep; // groups the relax would halve keep their polygons
-        for (const auto& [g, n] : count) keep[g] = delta[g] < 0 && n + delta[g] < n / 2;
+        std::unordered_map<uint32_t, bool> keep; // groups the relax would halve (or empty) keep their polygons
+        for (const auto& [g, n] : count) keep[g] = delta[g] < 0 && 2 * (n + delta[g]) <= n;
         for (size_t i = 0; i < border.size(); ++i) {
             const uint32_t from = groups[border[i]], to = relaxed[i];
             if (to != from && !keep[from]) groups[border[i]] = to;

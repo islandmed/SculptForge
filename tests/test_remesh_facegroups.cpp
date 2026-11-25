@@ -188,15 +188,27 @@ TEST(voxel_remesh_keep_face_groups_invariant_border_relax) {
     CHECK(wrongBeyond(raw, 2.0f) > 100);          // the teeth are there to remove
     CHECK(wrongBeyond(relaxed, 2.0f) == 0);
     CHECK(wrongBeyond(relaxed, 1.0f) < relaxed.triangleCount() / 200); // (the voxel staircase itself: within two voxels)
-    // A stripe of its own group, thinner than the source's triangles: it keeps its polygons (never relaxed away).
+    // A stripe of its own group, thinner than the source's triangles, and a spot of a few source triangles: each keeps
+    // its polygons (never relaxed away; at least as many as the raw transfer gave it, less a few on the rim).
     Mesh striped = makeIcosphere(4, 1.0f);
-    groupBy(striped, [](const glm::vec3& c) { return std::abs(c.y) < 0.05f ? 5u : c.y > 0.0f ? 7u : 3u; });
-    const Mesh out = voxelRemesh(striped, 96, &err, {}, false, true);
-    CHECK(groupsOf(out) == (std::set<uint32_t>{3u, 5u, 7u}));
-    size_t stripe = 0;
-    for (uint32_t g : out.facegroups) stripe += g == 5u;
-    std::printf("  stripe group: %zu of %zu triangles\n", stripe, out.triangleCount());
+    groupBy(striped, [](const glm::vec3& c) {
+        return glm::distance(c, glm::vec3(1.0f, 0.0f, 0.0f)) < 0.09f ? 6u : std::abs(c.y) < 0.05f ? 5u : c.y > 0.0f ? 7u : 3u;
+    });
+    size_t spotSource = 0;
+    for (uint32_t g : striped.facegroups) spotSource += g == 6u;
+    Mesh rawStriped = voxelRemesh(striped, 96, &err);
+    Mesh out = rawStriped;
+    transferFaceGroups(striped, rawStriped, false);
+    transferFaceGroups(striped, out, true);
+    CHECK(groupsOf(out) == (std::set<uint32_t>{3u, 5u, 6u, 7u}));
+    size_t stripe = 0, spot = 0, spotRaw = 0;
+    for (uint32_t g : out.facegroups) stripe += g == 5u, spot += g == 6u;
+    for (uint32_t g : rawStriped.facegroups) spotRaw += g == 6u;
+    std::printf("  stripe group: %zu of %zu triangles; spot group: %zu source triangles -> raw %zu, relaxed %zu\n", stripe,
+                out.triangleCount(), spotSource, spotRaw, spot);
     CHECK(stripe > out.triangleCount() / 40);
+    CHECK(spotSource >= 2 && spotSource <= 12);
+    CHECK(spot * 2 > spotRaw);
 }
 
 TEST(voxel_remesh_keep_face_groups_sparse_and_open) {
