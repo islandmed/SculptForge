@@ -8,6 +8,7 @@
 #include "TestHarness.h"
 
 #include "cli/McpAttach.h"
+#include "cli/McpServer.h"
 #include "core/Commands.h"
 #include "core/Json.h"
 #include "link/AiLink.h"
@@ -104,6 +105,39 @@ TEST(ai_link_wrong_code_refused) {
     const std::string a = makePairingCode(), b = makePairingCode();
     CHECK(a.size() == 6 && a.find_first_not_of("0123456789") == std::string::npos);
     CHECK(a != b || makePairingCode() != a); // (one in a million twice in a row)
+}
+
+TEST(ai_link_catalog_keeps_history_tools_headless) {
+    CommandRegistry registry;
+    const std::string list = R"({"jsonrpc":"2.0","id":1,"method":"tools/list"})";
+    auto toolNames = [](const std::string& response) {
+        Json reply;
+        std::string err;
+        CHECK(Json::parse(response, reply, err));
+        std::set<std::string> names;
+        for (const Json& tool : reply["result"]["tools"].items())
+            names.insert(tool["name"].asString());
+        return names;
+    };
+
+    std::istringstream in(list);
+    std::ostringstream out;
+    runMcpAttach(in, out, {}, &registry);
+    const auto beforePairing = toolNames(out.str());
+
+    const auto step = paired().handle(list, 0.0);
+    CHECK(step.kind == Kind::ListTools);
+    const auto afterPairing = toolNames(AiLinkSession::listReply(step.call.id, mcpAppToolList(registry)));
+
+    Document doc;
+    const auto headless = toolNames(handleMcpMessage(registry, doc, list));
+    CHECK(beforePairing.contains("part_list"));
+    CHECK(afterPairing.contains("part_list"));
+    for (const char* name : {"batch", "checkpoint_save", "checkpoint_list", "checkpoint_restore"}) {
+        CHECK(!beforePairing.contains(name));
+        CHECK(!afterPairing.contains(name));
+        CHECK(headless.contains(name));
+    }
 }
 
 TEST(ai_link_paired_requests_and_rate_limit) {
