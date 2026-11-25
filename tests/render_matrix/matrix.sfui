@@ -8,7 +8,8 @@
 # data a plain mesh sends is left out.
 #
 # RULE (qa-plan.md): a new render path, shading mode or GPU limit adds its cells here in the same branch. A mode that is a
-# setting of the view (AO, shadows) goes in render_cell's list of modes (src/app/UiTestRender.cpp) and as a line per path below.
+# setting of the view (AO, shadows) goes in render_cell's list of modes (src/app/UiTestRender.cpp) and as a line per path below;
+# lights=1 draws the cell with four added lights (Material > Light > Lights), the shader's other path.
 # cold: the matrix sets a GL limit and an environment variable; a warm server keeps neither between scripts.
 run new_sphere subdivisions=2
 # the PBR view builds its environment once, in the background: wait for it, then the cells ask for what they want
@@ -21,6 +22,8 @@ run new_sphere subdivisions=4
 wait 0.3
 render_cell "Lit Sphere x small" mode=lit
 render_cell "PBR x small" mode=pbr
+render_cell "Lit Sphere x small, four lights" mode=lit lights=1
+render_cell "PBR x small, four lights" mode=pbr lights=1
 render_cell "flat x small" mode=flat
 render_cell "wire x small" mode=wire
 # (face groups: a second group in front, Show Face Groups on)
@@ -36,6 +39,8 @@ run texture_create size=1024
 wait 0.3
 render_cell "Lit Sphere x textured" mode=lit
 render_cell "PBR x textured" mode=pbr
+render_cell "Lit Sphere x textured, four lights" mode=lit lights=1
+render_cell "PBR x textured, four lights" mode=pbr lights=1
 gl_limits texels=1024
 run new_sphere subdivisions=4
 run uv_auto resolution=1024
@@ -44,6 +49,8 @@ wait 0.3
 expect_value texture_uv_width > 0
 render_cell "Lit Sphere x textured, UVs past the buffer limit" mode=lit
 render_cell "PBR x textured, UVs past the buffer limit" mode=pbr
+render_cell "Lit Sphere x textured, UVs past the buffer limit, four lights" mode=lit lights=1
+render_cell "PBR x textured, UVs past the buffer limit, four lights" mode=pbr lights=1
 gl_limits texels=0
 run viewport_shading mode=lit
 run new_sphere subdivisions=4
@@ -67,6 +74,8 @@ run micro_divide level=3
 wait 0.3
 render_cell "Lit Sphere x dense Micro" mode=lit
 render_cell "PBR x dense Micro" mode=pbr
+render_cell "Lit Sphere x dense Micro, four lights" mode=lit lights=1
+render_cell "PBR x dense Micro, four lights" mode=pbr lights=1
 render_cell "flat x dense Micro" mode=flat
 render_cell "wire x dense Micro" mode=wire
 run mask_by_facing x=0 y=0 z=1 angle=50
@@ -86,6 +95,8 @@ env SF_FOCUS_DETAIL 0
 wait 0.3
 render_cell "Lit Sphere x Focus Detail" mode=lit
 render_cell "PBR x Focus Detail" mode=pbr
+render_cell "Lit Sphere x Focus Detail, four lights" mode=lit lights=1
+render_cell "PBR x Focus Detail, four lights" mode=pbr lights=1
 render_cell "flat x Focus Detail" mode=flat
 render_cell "wire x Focus Detail" mode=wire
 render_cell "Lit Sphere x Focus Detail, above the stored level" mode=lit target=0,0,1 distance=0.03
@@ -96,6 +107,8 @@ run new_sphere subdivisions=5
 wait 0.3
 render_cell "Lit Sphere x small, over the buffer limit" mode=lit
 render_cell "PBR x small, over the buffer limit" mode=pbr
+render_cell "Lit Sphere x small, over the buffer limit, four lights" mode=lit lights=1
+render_cell "PBR x small, over the buffer limit, four lights" mode=pbr lights=1
 render_cell "flat x small, over the buffer limit" mode=flat
 render_cell "wire x small, over the buffer limit" mode=wire
 gl_limits texels=0
@@ -107,6 +120,8 @@ run micro_divide level=3
 wait 0.3
 render_cell "Lit Sphere x dense Micro, over the buffer limit" mode=lit
 render_cell "PBR x dense Micro, over the buffer limit" mode=pbr
+render_cell "Lit Sphere x dense Micro, over the buffer limit, four lights" mode=lit lights=1
+render_cell "PBR x dense Micro, over the buffer limit, four lights" mode=pbr lights=1
 render_cell "flat x dense Micro, over the buffer limit" mode=flat
 render_cell "wire x dense Micro, over the buffer limit" mode=wire
 gl_limits texels=0
@@ -120,6 +135,8 @@ env SF_FOCUS_DETAIL 0
 wait 0.3
 render_cell "Lit Sphere x Focus Detail, over the buffer limit" mode=lit
 render_cell "PBR x Focus Detail, over the buffer limit" mode=pbr
+render_cell "Lit Sphere x Focus Detail, over the buffer limit, four lights" mode=lit lights=1
+render_cell "PBR x Focus Detail, over the buffer limit, four lights" mode=pbr lights=1
 render_cell "flat x Focus Detail, over the buffer limit" mode=flat
 render_cell "wire x Focus Detail, over the buffer limit" mode=wire
 gl_limits texels=0

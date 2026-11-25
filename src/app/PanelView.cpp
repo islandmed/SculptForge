@@ -8,7 +8,9 @@
 #include "app/App.h"
 #include "app/I18n.h"
 #include "app/Ui.h"
+#include "core/Mesh.h"
 #include "core/TierConfig.h"
+#include "core/VertexPaint.h"
 
 #include <IconsLucide.h>
 
@@ -17,6 +19,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iterator>
+#include <string>
 
 namespace sf {
 
@@ -54,6 +57,7 @@ void App::registerViewUiCommands() {
                     {"ao_strength", T::Number, "How dark the occlusion gets, 0 to 1 (default 0.8).", false},
                     {"ao_softness", T::Number, "How soft it is, 0 to 1 (default 0.4).", false},
                     {"shadow_softness", T::Number, "How soft the shadows' edges are, 0 to 1 (default 0.35).", false},
+                    {"shadow_strength", T::Number, "How dark the shadows get, 0 to 2: 1 (the default) is the light's own share, 2 is black.", false},
                     {"lit_sphere", T::Bool, "Also with Lit Sphere shading (default off).", false}},
                    [this](Document&, const Args& a) -> CommandResult {
                        auto parseMode = [&](const char* key, int& out) {
@@ -70,6 +74,7 @@ void App::registerViewUiCommands() {
                        p.aoStrength = std::clamp(float(argNumber(a, "ao_strength", p.aoStrength)), 0.0f, 1.0f);
                        p.aoSoftness = std::clamp(float(argNumber(a, "ao_softness", p.aoSoftness)), 0.0f, 1.0f);
                        p.shadowSoftness = std::clamp(float(argNumber(a, "shadow_softness", p.shadowSoftness)), 0.0f, 1.0f);
+                       p.shadowStrength = std::clamp(float(argNumber(a, "shadow_strength", p.shadowStrength)), 0.0f, 2.0f);
                        p.viewOcclusionLitSphere = argBool(a, "lit_sphere", p.viewOcclusionLitSphere);
                        applyViewEffects();
                        const RenderSettings& v = renderSettings_;
@@ -107,6 +112,74 @@ void App::registerViewUiCommands() {
                        std::snprintf(buf, sizeof buf, "Light: %.0f deg right, %.0f deg up, intensity %.2f, ambient %.2f",
                                      double(v.lightYaw), double(v.lightPitch), double(v.lightIntensity), double(v.lightAmbient));
                        return {true, buf};
+                   }});
+    commands_.add({"lights",
+                   "Added lights (Material > Light > Lights): up to four directional lights on top of the material's light "
+                   "or the PBR environment, each a Key, Fill or Rim to start with, then its own direction (as `light`: "
+                   "it turns with the view), colour and intensity. The one with `shadows` on (a Key starts so) casts the "
+                   "view's shadows (Shadows & AO). With no light named, the settings go to the last one. Saved in the project.",
+                   {{"add", T::String, "key, fill or rim: add a light with that role's starting direction, colour and intensity.", false},
+                    {"remove", T::String, "The light to remove, 1 to 4 (as listed), or all.", false},
+                    {"light", T::Number, "Which light the other arguments set, 1 to 4 (default: the last one).", false},
+                    {"yaw", T::Number, "Degrees about the view's up axis, + to the right (-180 to 180).", false},
+                    {"pitch", T::Number, "Degrees up (+) or down (-) (-90 to 90).", false},
+                    {"color", T::String, "Its colour: a name, #rrggbb or r,g,b (0 to 1).", false},
+                    {"intensity", T::Number, "Brightness, 0 to 3.", false},
+                    {"shadows", T::Bool, "This light casts the view's shadows (it takes them over from the others).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       std::vector<ViewLight>& lights = renderSettings_.lights;
+                       if (a.contains("remove")) {
+                           std::string which = argString(a, "remove"); // ("4" typed in a script arrives as a number)
+                           if (which.empty() && argNumber(a, "remove", 0.0) > 0.0) which = std::to_string(int(std::lround(argNumber(a, "remove", 0.0))));
+                           if (which == "all") lights.clear();
+                           else {
+                               char* end = nullptr;
+                               const long n = std::strtol(which.c_str(), &end, 10);
+                               if (end == which.c_str() || *end || n < 1 || size_t(n) > lights.size())
+                                   return {false, lights.empty() ? "lights: no light to remove" : "lights: remove is 1 to " + std::to_string(lights.size()) + " or all"};
+                               lights.erase(lights.begin() + (n - 1));
+                           }
+                       }
+                       if (a.contains("add")) {
+                           ViewLight::Role role;
+                           if (!parseViewLightRole(argString(a, "add"), role)) return {false, "lights: add is key, fill or rim"};
+                           if (int(lights.size()) >= kMaxViewLights) return {false, "lights: four lights at most (remove one first)"};
+                           ViewLight l = viewLightPreset(role);
+                           for (const ViewLight& other : lights)
+                               if (other.shadows) l.shadows = false; // (the light already casting them keeps them)
+                           lights.push_back(l);
+                       }
+                       const bool sets = a.contains("yaw") || a.contains("pitch") || a.contains("color") || a.contains("intensity") ||
+                                         a.contains("shadows");
+                       if (sets || a.contains("light")) {
+                           if (lights.empty()) return {false, "lights: no light yet (add=key, fill or rim)"};
+                           const int n = int(std::lround(argNumber(a, "light", double(lights.size()))));
+                           if (n < 1 || size_t(n) > lights.size()) return {false, "lights: light is 1 to " + std::to_string(lights.size())};
+                           ViewLight& l = lights[size_t(n - 1)];
+                           double yaw = std::fmod(argNumber(a, "yaw", l.yaw), 360.0);
+                           if (yaw > 180.0) yaw -= 360.0;
+                           if (yaw < -180.0) yaw += 360.0;
+                           l.yaw = float(yaw);
+                           l.pitch = std::clamp(float(argNumber(a, "pitch", l.pitch)), -90.0f, 90.0f);
+                           l.intensity = std::clamp(float(argNumber(a, "intensity", l.intensity)), 0.0f, 3.0f);
+                           if (a.contains("color") && !parseColor(argString(a, "color"), l.color))
+                               return {false, "lights: unknown colour '" + argString(a, "color") + "' (a name, #rrggbb or r,g,b)"};
+                           if (a.contains("shadows")) {
+                               l.shadows = argBool(a, "shadows", l.shadows);
+                               if (l.shadows)
+                                   for (ViewLight& other : lights) other.shadows = &other == &l;
+                           }
+                       }
+                       if (lights.empty()) return {true, "Lights: none added"};
+                       std::string said = "Lights:";
+                       for (size_t i = 0; i < lights.size(); ++i) {
+                           const ViewLight& l = lights[i];
+                           char buf[96];
+                           std::snprintf(buf, sizeof buf, "%s %zu %s (%.0f, %.0f) x%.2f%s", i ? "," : "", i + 1, viewLightRoleName(l.role),
+                                         double(l.yaw), double(l.pitch), double(l.intensity), l.shadows ? " shadows" : "");
+                           said += buf;
+                       }
+                       return {true, said};
                    }});
     commands_.add({"xray",
                    "X-Ray (#80, #91): draw the other visible Parts see-through so the active Part shows through them "
@@ -248,6 +321,7 @@ void App::applyViewEffects() {
     v.aoStrength = uiPrefs_.aoStrength;
     v.aoSoftness = uiPrefs_.aoSoftness;
     v.shadowSoftness = uiPrefs_.shadowSoftness;
+    v.shadowStrength = uiPrefs_.shadowStrength;
     v.occlusionInLitSphere = uiPrefs_.viewOcclusionLitSphere;
     // While the view moves or a stroke runs: off where they would cost the frame, back when it is still.
     const bool busy = perf_.movingNow || doc_.sculptor.strokeActive() || strokeFinishing_;
@@ -282,9 +356,9 @@ void App::drawViewEffectsControls(const char* idSuffix) {
         }
         ui::HelpText(label, nullptr, help, path);
     };
-    auto slider = [&](const char* label, const char* key, float* value, const char* fmt, const char* help) {
+    auto slider = [&](const char* label, const char* key, float* value, const char* fmt, const char* help, float hi = 1.0f) {
         ImGui::SetNextItemWidth(-1);
-        ImGui::SliderFloat((std::string("##") + key + idSuffix).c_str(), value, 0.0f, 1.0f, tr(fmt));
+        ImGui::SliderFloat((std::string("##") + key + idSuffix).c_str(), value, 0.0f, hi, tr(fmt));
         if (ImGui::IsItemDeactivatedAfterEdit()) runCommand("view_shadows", {{key, double(*value)}});
         else if (ImGui::IsItemActive()) applyViewEffects(); // (live while dragging)
         ui::HelpText(label, nullptr, help, path);
@@ -293,8 +367,11 @@ void App::drawViewEffectsControls(const char* idSuffix) {
     mode("Shadows", "shadows", p.viewShadows,
          "Shadows cast by the key light: the nose on the cheek, the brow over the eyes. Auto: on when the graphics card "
          "has room for them (Standard tier and up). They step aside while you orbit or sculpt if the frame needs it.");
-    if (renderSettings_.shadows || p.viewShadows == 1)
+    if (renderSettings_.shadows || p.viewShadows == 1) {
+        slider("Shadow strength", "shadow_strength", &p.shadowStrength, "Shadow strength %.2f",
+               "How dark the shadows get: 1 is the light's own share, towards 2 they deepen to black.", 2.0f);
         slider("Shadow softness", "shadow_softness", &p.shadowSoftness, "Shadow softness %.2f", "How soft the shadows' edges are.");
+    }
     mode("Ambient occlusion", "ao", p.viewAo,
          "Creases and hollows darken where the light around the model can't reach. Auto: on when the graphics card has "
          "room for it (Standard tier and up).");
@@ -327,7 +404,63 @@ void App::drawSaveRenderControls() {
     ui::Segmented(*this, {"render.aspect_9x16", "render.aspect_4x3", "render.format_png", "render.format_jpg"});
 }
 
-// Material > Light: a pad to drag the light around the model, its intensity and ambient light.
+namespace {
+
+// The light pad: a ball lit from the light's direction, the light as a dot on it; dragging on it turns the light.
+// `enabled` false draws it only. Returns true on the frame the drag ends (the caller runs its command then);
+// `reset` is set on a double-click.
+bool lightPad(const char* id, float side, float scale, bool enabled, float& yaw, float& pitch, bool& reset) {
+    const ImVec2 p0 = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton(id, ImVec2(side, side));
+    const bool held = ImGui::IsItemActive() && enabled;
+    const ImVec2 c(p0.x + side * 0.5f, p0.y + side * 0.5f);
+    const float r = side * 0.5f - 2.0f * scale;
+    if (held) {
+        const ImVec2 m = ImGui::GetIO().MousePos;
+        float x = (m.x - c.x) / r, y = (c.y - m.y) / r;
+        const float len = std::sqrt(x * x + y * y);
+        float z = 1.0f;
+        if (len <= 1.0f) { // on the ball: the front half
+            z = std::sqrt(std::max(0.0f, 1.0f - x * x - y * y));
+        } else { // past the edge: round the back (a rim light), back towards the far pole as the pointer goes on
+            const float t = std::clamp(2.0f - len, 0.0f, 1.0f) / len;
+            x *= t;
+            y *= t;
+            z = -std::sqrt(std::max(0.0f, 1.0f - x * x - y * y));
+        }
+        yaw = glm::degrees(std::atan2(x, z));
+        pitch = glm::degrees(std::asin(std::clamp(y, -1.0f, 1.0f)));
+    }
+    const bool done = ImGui::IsItemDeactivated() && enabled;
+    reset = enabled && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+    // The ball lit from the light's direction (a few soft discs towards the light), and the light's dot.
+    const glm::vec3 dir = viewLightDirection(yaw, pitch);
+    const ImVec2 dot(c.x + dir.x * r, c.y - dir.y * r);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->AddCircleFilled(c, r, IM_COL32(38, 38, 42, 255), 48);
+    constexpr int kSteps = 10;
+    for (int i = 1; i <= kSteps; ++i) {
+        const float t = float(i) / float(kSteps);
+        const float lift = dir.z < 0.0f ? 0.4f : 1.0f; // a light behind the model leaves it mostly dark
+        const ImVec2 ci(c.x + (dot.x - c.x) * t * 0.7f, c.y + (dot.y - c.y) * t * 0.7f);
+        const int g = int(44.0f + (205.0f - 44.0f) * t * t * lift);
+        dl->AddCircleFilled(ci, r * (1.0f - 0.9f * t), IM_COL32(g, g, g + 4, 255), 40);
+    }
+    dl->AddCircle(c, r, IM_COL32(90, 90, 96, 255), 48, 1.0f * scale);
+    const ImU32 sun = held || ImGui::IsItemHovered() ? ui::color::accentHover : ui::color::accent;
+    if (dir.z < 0.0f) { // behind the model: a ring, not a disc
+        dl->AddCircle(dot, 4.0f * scale, sun, 16, 1.5f * scale);
+    } else {
+        dl->AddCircleFilled(dot, 4.0f * scale, sun, 16);
+        dl->AddCircle(dot, 4.0f * scale, IM_COL32(20, 20, 20, 255), 16, 1.0f * scale);
+    }
+    return done;
+}
+
+} // namespace
+
+// Material > Light: a pad to drag the light around the model, its intensity and ambient light; under it the added
+// lights (up to four: Key, Fill, Rim), each with its own pad, colour and intensity, in every shading.
 void App::drawLightControls() {
     RenderSettings& v = renderSettings_;
     ImGui::Spacing();
@@ -336,51 +469,15 @@ void App::drawLightControls() {
     const float s = uiScale_;
     const float side = std::floor(std::min(ImGui::GetFrameHeightWithSpacing() * 3.0f - ImGui::GetStyle().ItemSpacing.y,
                                            ImGui::GetContentRegionAvail().x * 0.4f));
-    const ImVec2 p0 = ImGui::GetCursorScreenPos();
-    ImGui::InvisibleButton("##lightpad", ImVec2(side, side));
-    const bool held = ImGui::IsItemActive() && !v.pbr();
-    const ImVec2 c(p0.x + side * 0.5f, p0.y + side * 0.5f);
-    const float r = side * 0.5f - 2.0f * s;
-    if (held) {
-        const ImVec2 m = ImGui::GetIO().MousePos;
-        float x = (m.x - c.x) / r, y = (c.y - m.y) / r;
-        const float len = std::sqrt(x * x + y * y);
-        if (len > 1.0f) {
-            x /= len;
-            y /= len;
-        }
-        const float z = std::sqrt(std::max(0.0f, 1.0f - x * x - y * y));
-        v.lightYaw = glm::degrees(std::atan2(x, z));
-        v.lightPitch = glm::degrees(std::asin(std::clamp(y, -1.0f, 1.0f)));
-    }
-    if (ImGui::IsItemDeactivated() && !v.pbr())
+    bool reset = false;
+    if (lightPad("##lightpad", side, s, !v.pbr(), v.lightYaw, v.lightPitch, reset))
         runCommand("light", {{"yaw", double(v.lightYaw)}, {"pitch", double(v.lightPitch)}});
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-        runCommand("light", {{"yaw", 0.0}, {"pitch", 0.0}});
+    if (reset) runCommand("light", {{"yaw", 0.0}, {"pitch", 0.0}});
     ui::HelpText("Light direction", nullptr,
-                 "Drag on the ball to move the light around the model (the dot is the light); double-click puts it "
-                 "back where the material has it. Lit Sphere and studio shading.",
+                 "Drag on the ball to move the light around the model (the dot is the light; past the edge it goes round "
+                 "the back and shows as a ring); double-click puts it back where the material has it. Lit Sphere and "
+                 "studio shading.",
                  kLightPath);
-    // The pad: a ball lit from the light's direction (a few soft discs towards the light), and the light's dot.
-    {
-        const glm::mat3 rot = lightRotation(v.lightYaw, v.lightPitch);
-        const glm::vec3 dir = rot * glm::vec3(0.0f, 0.0f, 1.0f);
-        const ImVec2 dot(c.x + dir.x * r, c.y - dir.y * r);
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        dl->AddCircleFilled(c, r, IM_COL32(38, 38, 42, 255), 48);
-        constexpr int kSteps = 10;
-        for (int i = 1; i <= kSteps; ++i) {
-            const float t = float(i) / float(kSteps);
-            const float lift = dir.z < 0.0f ? 0.4f : 1.0f; // a light behind the model leaves it mostly dark
-            const ImVec2 ci(c.x + (dot.x - c.x) * t * 0.7f, c.y + (dot.y - c.y) * t * 0.7f);
-            const int g = int(44.0f + (205.0f - 44.0f) * t * t * lift);
-            dl->AddCircleFilled(ci, r * (1.0f - 0.9f * t), IM_COL32(g, g, g + 4, 255), 40);
-        }
-        dl->AddCircle(c, r, IM_COL32(90, 90, 96, 255), 48, 1.0f * s);
-        const ImU32 sun = held || ImGui::IsItemHovered() ? ui::color::accentHover : ui::color::accent;
-        dl->AddCircleFilled(dot, 4.0f * s, sun, 16);
-        dl->AddCircle(dot, 4.0f * s, IM_COL32(20, 20, 20, 255), 16, 1.0f * s);
-    }
     ImGui::SameLine();
     ImGui::BeginGroup();
     auto slider = [&](const char* id, const char* key, float* value, float lo, float hi, const char* fmt, const char* title,
@@ -399,6 +496,91 @@ void App::drawLightControls() {
     ImGui::EndGroup();
     ImGui::EndDisabled();
     if (v.pbr()) ImGui::TextDisabled("%s", tr("PBR: Viewport Shading's rotation and exposure"));
+    drawAddedLightControls();
+}
+
+// Material > Light > Lights: the added lights. Each row: its pad, its role, colour and intensity, and a remove
+// button; under them Add Key / Fill / Rim (gone at four). Every change runs `lights`.
+void App::drawAddedLightControls() {
+    constexpr const char* kPath = "Material > Light > Lights";
+    std::vector<ViewLight>& lights = renderSettings_.lights;
+    const float s = uiScale_;
+    const float side = std::floor(std::min(ImGui::GetFrameHeightWithSpacing() * 2.0f - ImGui::GetStyle().ItemSpacing.y,
+                                           ImGui::GetContentRegionAvail().x * 0.3f));
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", tr("Lights"));
+    ui::HelpText("Lights", nullptr,
+                 "Up to four lights of your own on top of the material's light or the PBR environment: a Key (the main "
+                 "light; it starts with the view's shadows), a Fill (soft, from the other side) and a Rim (from behind, "
+                 "along the edges). Each has a direction pad, a colour, an intensity and a Shadows tick (one light casts "
+                 "them). Together they add one light's worth of exposure: a second light shares it with the first instead "
+                 "of piling on, up to the strongest light's own intensity. Saved in the project.",
+                 kPath);
+    int removeAt = -1;
+    for (size_t i = 0; i < lights.size(); ++i) {
+        ViewLight& l = lights[i];
+        ImGui::PushID(int(i));
+        bool reset = false;
+        if (lightPad("##pad", side, s, true, l.yaw, l.pitch, reset))
+            runCommand("lights", {{"light", double(i + 1)}, {"yaw", double(l.yaw)}, {"pitch", double(l.pitch)}});
+        if (reset) {
+            const ViewLight preset = viewLightPreset(l.role);
+            runCommand("lights", {{"light", double(i + 1)}, {"yaw", double(preset.yaw)}, {"pitch", double(preset.pitch)}});
+        }
+        ui::HelpText("Light direction", nullptr,
+                     "Drag on the ball to move this light around the model (the dot is the light; past the edge it goes round "
+                     "the back and shows as a ring); double-click puts it back where its role starts.",
+                     kPath);
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        glm::vec3 srgb = linearToSrgb(l.color);
+        if (ImGui::ColorEdit3("##colour", &srgb.x, ImGuiColorEditFlags_NoInputs)) l.color = srgbToLinear(glm::clamp(srgb, 0.0f, 1.0f));
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+            char buf[48];
+            std::snprintf(buf, sizeof buf, "%.4f,%.4f,%.4f", double(srgb.x), double(srgb.y), double(srgb.z));
+            runCommand("lights", {{"light", double(i + 1)}, {"color", std::string(buf)}});
+        }
+        ui::HelpText("Colour", nullptr, "The light's colour: warm for a key, cool for a fill, white for a rim.", kPath);
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr(l.role == ViewLight::Role::Fill ? "Fill light" : l.role == ViewLight::Role::Rim ? "Rim light" : "Key light"));
+        ImGui::SameLine();
+        bool shadows = l.shadows;
+        if (ui::Checkbox((std::string(tr("Shadows")) + "##castshadows").c_str(), &shadows))
+            runCommand("lights", {{"light", double(i + 1)}, {"shadows", shadows}});
+        ui::HelpText("Shadows", nullptr,
+                     "The view's cast shadows come from this light (Shadows & AO on). One light at most casts them: ticking it "
+                     "here takes them over; with none ticked they come from the material's light or the environment, as before.",
+                     kPath);
+        ImGui::SameLine();
+        if (ui::GlyphButton("##remove", ICON_LC_X, ImVec2(ImGui::GetFrameHeight(), 0))) removeAt = int(i);
+        ui::HelpText("Remove", nullptr, "Take this light away.", kPath);
+        ImGui::SetNextItemWidth(-1);
+        ui::SliderInside("##intensity", &l.intensity, 0.0f, 3.0f, tr("Intensity %.2f"));
+        if (ImGui::IsItemDeactivatedAfterEdit()) runCommand("lights", {{"light", double(i + 1)}, {"intensity", double(l.intensity)}});
+        ui::HelpText("Intensity", nullptr,
+                     "How bright this light is. With several lights, the brightest one's intensity is the total they share.", kPath);
+        ImGui::EndGroup();
+        ImGui::PopID();
+    }
+    if (removeAt >= 0) runCommand("lights", {{"remove", std::to_string(removeAt + 1)}});
+    const bool full = int(lights.size()) >= kMaxViewLights;
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(tr("Add"));
+    ImGui::SameLine();
+    const float w = (ImGui::GetContentRegionAvail().x - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
+    struct Add { const char* label; const char* title; const char* role; const char* help; };
+    static constexpr Add kAdds[] = {
+        {"Key light##lights.add_key", "Key light", "key", "Add a key light: warm, from the upper left in front; it casts the view's shadows."},
+        {"Fill light##lights.add_fill", "Fill light", "fill", "Add a fill light: cool and soft, from the right, to lift the dark side."},
+        {"Rim light##lights.add_rim", "Rim light", "rim", "Add a rim light: from behind and above, along the silhouette."}};
+    ImGui::BeginDisabled(full);
+    for (int k = 0; k < 3; ++k) {
+        if (k) ImGui::SameLine();
+        if (ImGui::Button(tr(kAdds[k].label), ImVec2(w, 0))) runCommand("lights", {{"add", std::string(kAdds[k].role)}});
+        ui::HelpText(kAdds[k].title, nullptr, full ? "Four lights at most: remove one to add another." : kAdds[k].help, kPath);
+    }
+    ImGui::EndDisabled();
 }
 
 } // namespace sf

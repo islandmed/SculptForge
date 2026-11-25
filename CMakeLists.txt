@@ -1405,6 +1405,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(keep_strokes_editable_checkbox_tablet keep_strokes_editable_checkbox --size 1024x768)
     sculptforge_ui_test(primitives_kit_1440 primitives_kit --size 1440x900) # Parts > Append primitive settings, Solidify
     sculptforge_ui_test(primitives_kit_2880 primitives_kit --size 2880x1800)
+    sculptforge_ui_test(render_lights_1440 render_lights --size 1440x900) # Material > Light > Lights, Shadow strength
+    sculptforge_ui_test(render_lights_2880 render_lights --size 2880x1800)
+    sculptforge_ui_test(render_lights_balance_1440 render_lights_balance --size 1440x900) # several lights share one light's exposure
+    sculptforge_ui_test(render_lights_balance_2880 render_lights_balance --size 2880x1800)
     sculptforge_ui_test(render_bridge_1440 render_bridge --size 1440x900) # File > Render with... (the Render window)
     sculptforge_ui_test(render_bridge_2880 render_bridge --size 2880x1620)
     # Heavy-mesh and benchmark scripts (tests/perf/*.sfui, e.g. 33M-triangle precision): nightly only (T3).

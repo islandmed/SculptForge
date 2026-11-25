@@ -2803,6 +2803,7 @@ private:
     // View controls (PanelView.cpp): X-Ray, the view's resolution, the light, Save Render's options.
     void registerViewUiCommands();
     void drawLightControls();
+    void drawAddedLightControls(); // Material > Light > Lights (PanelView.cpp)
     void drawSaveRenderControls();
     LibraryRoots library_;
     FolderScanner libraryScanner_;

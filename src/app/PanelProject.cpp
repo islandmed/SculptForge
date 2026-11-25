@@ -510,6 +510,20 @@ void App::storeProjectSettings() {
         light.set("ambient", double(renderSettings_.lightAmbient));
         render.set("light", light);
     }
+    if (!renderSettings_.lights.empty()) { // the added lights (Material > Light > Lights)
+        Json lights = Json::array();
+        for (const ViewLight& l : renderSettings_.lights) {
+            Json o = Json::object();
+            o.set("role", std::string(viewLightRoleName(l.role)));
+            o.set("yaw", double(l.yaw));
+            o.set("pitch", double(l.pitch));
+            o.set("color", vec3Json(l.color));
+            o.set("intensity", double(l.intensity));
+            o.set("shadows", l.shadows);
+            lights.push(o);
+        }
+        render.set("lights", lights);
+    }
     render.set("litsphere", renderSettings_.litsphere < 0 ? std::string() : std::string(litsphereName(renderSettings_.litsphere)));
     // Viewport shading (Material > Viewport Shading): Lit Sphere or PBR with its environment.
     {
@@ -678,6 +692,28 @@ void App::applyProjectSettings() {
             v.lightPitch = num("pitch", defaults.lightPitch, -90.0f, 90.0f);
             v.lightIntensity = num("intensity", defaults.lightIntensity, 0.0f, 3.0f);
             v.lightAmbient = num("ambient", defaults.lightAmbient, 0.0f, 1.0f);
+        }
+        // The added lights; projects from before them (or without any): none.
+        {
+            std::vector<ViewLight>& lights = renderSettings_.lights;
+            lights.clear();
+            const Json& list = r["lights"];
+            for (size_t i = 0; list.isArray() && i < list.size() && int(lights.size()) < kMaxViewLights; ++i) {
+                const Json& o = list[i];
+                if (!o.isObject()) continue;
+                ViewLight::Role role = ViewLight::Role::Key;
+                if (o["role"].isString()) parseViewLightRole(o["role"].asString(), role);
+                ViewLight l = viewLightPreset(role);
+                l.yaw = std::clamp(float(o["yaw"].asNumber(l.yaw)), -180.0f, 180.0f);
+                l.pitch = std::clamp(float(o["pitch"].asNumber(l.pitch)), -90.0f, 90.0f);
+                readVec3(o["color"], l.color);
+                l.color = glm::clamp(l.color, 0.0f, 1.0f);
+                l.intensity = std::clamp(float(o["intensity"].asNumber(l.intensity)), 0.0f, 3.0f);
+                l.shadows = o["shadows"].asBool(l.shadows);
+                for (const ViewLight& other : lights)
+                    if (other.shadows) l.shadows = false; // (one light casts the shadows)
+                lights.push_back(l);
+            }
         }
         // The background (#21); projects from before it: the preferred one.
         renderSettings_.gradientBackground =
