@@ -387,6 +387,10 @@ struct PhaseResult {
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
     std::vector<double> releaseFrames[7]; // the frames from pen-up to then: frame ms, then by part as split
+    // releaseDoneMs in two: the stroke catching up with the pen (the dabs still to place: how long depends on where the
+    // stroke ends, a big brush's dabs costing 40-370 ms each on Lucy 28M, which made the 240 px release 0.55 or 0.95 s)
+    // and its end work (the last batch with the normals and bounds, the undo step): the part to compare between builds.
+    double releaseCatchUpMs = -1, releaseEndMs = -1;
     float pathRadiusPx = 0; // the stroke path's size (strokePoint's R, fitted to the model)
     double pathLaps = 1.0;  // ... how often round it relative to the full-size path (ProofState::laps)
     bool pathUpright = false;
@@ -1127,6 +1131,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             if (doc_.sculptor.strokeActive()) break;
             p.releasing = false;
             ph.releaseDoneMs = (nowSeconds() - p.releaseAt) * 1000.0;
+            if (strokeFinalizeAt_ >= p.releaseAt) {
+                ph.releaseCatchUpMs = (strokeFinalizeAt_ - p.releaseAt) * 1000.0;
+                ph.releaseEndMs = ph.releaseDoneMs - ph.releaseCatchUpMs;
+            }
             ph.stroke = perf_.lastStroke;
             ph.strokeSyncMs = perf_.lastStrokeSyncMs;
             ph.strokeFrames = perf_.lastStrokeFrames;
@@ -1449,6 +1457,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     j.set("path_px", std::round(ph.pathPx));
                     j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
                     j.set("release_done_ms", std::round(ph.releaseDoneMs * 10) / 10);
+                    if (ph.releaseEndMs >= 0) {
+                        j.set("release_catchup_ms", std::round(ph.releaseCatchUpMs * 10) / 10);
+                        j.set("release_end_ms", std::round(ph.releaseEndMs * 10) / 10);
+                    }
                     if (ph.stroke.dabs > 0) { // where the stroke's time went, beside frame_split_ms (which is the main thread's)
                         Json t = Json::object();
                         t.set("kernel", std::round(ph.stroke.kernelMs * 10) / 10);
@@ -1467,6 +1479,10 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     j.set("pointer_samples", double(ph.samples));
                     j.set("release_ms", std::round(ph.releaseMs * 10) / 10);
                     j.set("release_done_ms", std::round(ph.releaseDoneMs * 10) / 10);
+                    if (ph.releaseEndMs >= 0) {
+                        j.set("release_catchup_ms", std::round(ph.releaseCatchUpMs * 10) / 10);
+                        j.set("release_end_ms", std::round(ph.releaseEndMs * 10) / 10);
+                    }
                 }
                 phases.push(j);
             }

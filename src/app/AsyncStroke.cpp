@@ -371,6 +371,7 @@ void App::pumpStroke() {
         StrokeSolver& s = *solver_;
         s.batch.clear();
         s.finalize = true;
+        strokeFinalizeAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
         s.catchUp = false;
         s.view.camera = partCamera();
         s.view.canvas = canvasRect();
@@ -429,6 +430,7 @@ void App::pumpStroke() {
     s.batch.clear();
     while (!dabQueue_.empty() && s.batch.size() < n) s.batch.push_back(dabQueue_.pop());
     s.finalize = strokeFinishing_ && dabQueue_.empty();
+    if (s.finalize) strokeFinalizeAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     s.catchUp = false; // (dabs are coming: the exact normals wait for a pause or the release)
     lastDabsQueued_ = double(SDL_GetTicksNS()) * 1e-9;
     s.view.camera = partCamera();
