@@ -19,6 +19,8 @@
 #include "core/Dyntopo.h"
 #include "core/EnginePresets.h"
 #include "core/ExtractMirror.h"
+#include "core/PrimitiveKit.h"
+#include "core/Solidify.h"
 #include "core/Face.h"
 #include "core/HardwareProfile.h"
 #include "core/ImageTo3D.h"
@@ -961,6 +963,8 @@ CommandRegistry::CommandRegistry() {
     registerTransformCommands(*this); // transform (core/MeshTransform.h)
     registerFigurePoseCommands(*this); // figure_pose_* (core/FigurePose.h)
     registerExtractMirrorCommands(*this); // extract, mirror_and_weld, mirror (core/ExtractMirror.h)
+    registerSolidifyCommands(*this); // solidify (core/Solidify.h)
+    registerPrimitiveCommands(*this); // part_primitive (core/PrimitiveKit.h)
     registerMeshCheckCommands(*this);     // weld_points, mesh_check, mesh_fix (core/MeshCheck.h)
     registerPerformanceCommands(*this); // perf_info, set_multithreading (core/Benchmark.cpp)
     registerHardwareProfileCommands(*this); // performance_profile, calibrate, set_performance_override (core/HardwareProfile.cpp)

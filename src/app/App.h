@@ -2351,6 +2351,11 @@ private:
     uint64_t splitGroupsKey_ = ~uint64_t(0);
     bool splitGroupsPossible_ = false;
     bool splitKeepOriginal_ = false; // Split Hidden / Masked / Unmasked copy instead of move (keep=true)
+    // Primitive settings (core/PrimitiveKit.h): the sliders edit this copy of the active primitive's spec, taken again
+    // whenever the Part or its settings change (the key), and applied with part_primitive when a slider is let go.
+    PrimitiveSpec primEdit_;
+    uint64_t primEditKey_ = ~uint64_t(0);
+    void drawPrimitiveSection();
     // Community brushes window (PanelBrushGallery.cpp): browse, search and install shared brushes.
     void drawBrushGallery(); // also finishes background downloads while the window is closed
     void refreshBrushGallery();
@@ -2631,6 +2636,8 @@ private:
     bool extractDouble_ = false;           // Both Sides
     bool extractTriCorners_ = false;        // Corners: triangles in the rim's sharp corners
     bool extractTriBorder_ = false;         // Border: the whole rim triangles
+    float solidifyThick_ = 0.03f;           // Solidify: thickness as a fraction of the Part's size (core/Solidify.h)
+    bool solidifyBoth_ = false;             // Solidify: Centred
     bool mirrorWeldAxes_[3] = {true, false, false}; // Make Symmetric's X Y Z
     bool mirrorAxes_[3] = {true, false, false};     // Symmetry > Mirror's X Y Z
     // Reshape > Stack (docs/design/deform-panel.md): the steps, the one being edited and the preview, which is

@@ -1,0 +1,84 @@
+# Parametric primitives (core/PrimitiveKit.h) and Solidify (core/Solidify.h), in the Parts panel and Tool > Parts > Extract.
+# Append's Low-poly switch gives a 12-segment cylinder whose settings show below the list; a slider rebuilds it; a stroke
+# turns it into an ordinary mesh (the settings go) and undo brings them back. Solidify closes a flat plane.
+run new_sphere subdivisions=3
+click "Parts/Append"
+click "Low-poly (Polygon mode)"
+key escape
+click "Parts/Append"
+click "Cylinder"
+expect_value parts == 2
+expect_value active_part == 1
+expect_value primitive_fresh == 1
+expect_value primitive_segments == 12
+expect_value quads == 30
+expect_value triangles == 60
+expect "Parts/##prim_segments"
+expect "Parts/##prim_rings"
+expect "Parts/##prim_caps"
+run part_solo
+key f
+shot cylinder-lowpoly
+
+# Typing a value into the Segments slider rebuilds the Part (one undo step).
+double_click "Parts/##prim_segments"
+expect_value typing == 1
+type_here 8
+key enter
+expect_value typing == 0
+expect_value primitive_segments == 8
+expect_value quads == 16
+expect_value triangles == 32
+expect_value primitive_fresh == 1
+shot cylinder-8
+
+# Quad caps off: fans with a pole (8 side quads, 16 triangles in the caps); the Z axis turns it.
+click "Parts/Quad caps"
+expect_value primitive_fresh == 1
+expect_value quads == 8
+expect_value triangles == 32
+click "Parts/Z##prim_axis"
+expect_value primitive_fresh == 1
+shot cylinder-fancaps-z
+
+# A stroke makes it an ordinary mesh: the settings go; undo brings them back. (The cap faces the camera now, its
+# pole vertex at the centre of the view: the stroke reaches it. On the side, this cage has vertices only at the rims.)
+stroke 0.45 0.45 0.55 0.55
+expect_value primitive_fresh == 0
+expect_not "Parts/##prim_segments"
+run undo
+expect_value primitive_fresh == 1
+expect "Parts/##prim_segments"
+
+# Dense preset: the sculpting mesh Append makes without the switch.
+click "Parts/Dense"
+expect_value primitive_segments == 48
+expect_value primitive_fresh == 1
+run undo
+expect_value primitive_segments == 8
+
+# Solidify: a low-poly plane (open) gets a back and a rim and is closed.
+click "Parts/Append"
+click "Plane"
+expect_value parts == 3
+expect_value open_edges == 16
+expect "Extract/Solidify"
+click "Extract/Solidify"
+expect_value open_edges == 0
+expect_value primitive_fresh == 0
+expect_status "Solidified"
+camera 30 -35
+key f
+shot plane-solidified
+run undo
+expect_value open_edges == 16
+expect_value primitive_fresh == 1
+
+# The switch is a saved preference; off again, Append gives the dense cylinder.
+click "Parts/Append"
+click "Low-poly (Polygon mode)"
+key escape
+click "Parts/Append"
+click "Cylinder"
+expect_value primitive_segments == 48
+expect_value primitive_fresh == 1

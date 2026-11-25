@@ -161,6 +161,7 @@ Json toJson(const UiPrefs& p) {
     if (p.cornerWidget >= 0) j.set("cornerGizmo", std::string(p.cornerWidget == 1 ? "orientation" : "axes"));
     if (p.cornerPosition == 1) j.set("cornerGizmoPosition", std::string("top-right"));
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
+    j.set("appendLowPoly", p.appendLowPoly);
     if (p.newerMenuRows >= 0) j.set("newerMenuRows", p.newerMenuRows != 0); // (unset = by layout)
     lookToJson(p, j);
     j.set("language", p.language);
@@ -300,6 +301,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     if (j["cornerGizmo"].isString()) p.cornerWidget = j["cornerGizmo"].asString() == "orientation" ? 1 : 0;
     if (j["cornerGizmoPosition"].isString()) p.cornerPosition = j["cornerGizmoPosition"].asString() == "top-right" ? 1 : 0;
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
+    p.appendLowPoly = j["appendLowPoly"].asBool(p.appendLowPoly);
     if (j["newerMenuRows"].isBool()) p.newerMenuRows = j["newerMenuRows"].asBool() ? 1 : 0;
     // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the Classic layout,
     // and keeps them (the new-look card offers the new default once, PanelSupport.cpp).
@@ -650,6 +652,15 @@ void App::initActions() {
     add("part.figure_pose_cancel", "Cancel Pose", "Tool > Parts", nullptr, [this] { runCommand("figure_pose_cancel"); },
         nullptr, "figure_pose_cancel", nullptr, [this] { return figurePoseActive(doc_); },
         "Remove the Pose Mesh and show the Parts again; nothing changes.");
+    // Solidify (core/Solidify.h, PanelExtract.cpp): thickness for a flat, single-sided Part, in place.
+    add("part.solidify", "Solidify", "Tool > Parts", nullptr,
+        [this] { runCommand("solidify", {{"thickness", double(solidifyThick_)}, {"both", solidifyBoth_}}); }, nullptr, "solidify",
+        nullptr, [this] { return doc_.mesh.triangleCount() > 0; },
+        "Give a flat, single-sided Part thickness in place: a back pushed along the normals by Thickness, joined by a rim of "
+        "quads along every open edge, one closed mesh. For a Plane, or an Extract made with Thickness 0.");
+    add("part.solidify_both", "Centred", "Tool > Parts", nullptr, [this] { solidifyBoth_ = !solidifyBoth_; }, nullptr, nullptr,
+        [this] { return solidifyBoth_; }, nullptr,
+        "Solidify centres the thickness on the surface, half in front and half behind, instead of all behind it.");
     add("part.extract_double", "Both Sides", "Tool > Parts", nullptr,
         [this] {
             extractDouble_ = !extractDouble_;

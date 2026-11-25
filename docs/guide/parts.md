@@ -61,8 +61,13 @@ you start off the model.
 
 Click **Append** and choose:
 
-- **Sphere**, **Cube** or **Plane**: a new primitive placed beside the visible model (to the right, on +X), sized
-  to about a third of the largest visible Part.
+- **Sphere**, **Cube**, **Plane**, **Cylinder**, **Cone**, **Torus**, **Capsule**, **Pipe** (a hollow cylinder with a
+  wall), **Icosphere** or **Quad Sphere**: a new primitive placed beside the visible model (to the right, on +X), sized
+  to about a third of the largest visible Part. Its settings stay editable for a while: see
+  [Primitive settings](#primitive-settings) below.
+- **Low-poly (Polygon mode)**, the switch at the top of the menu: on, new primitives come as low-poly cages (a
+  12-segment, 1-ring cylinder, a 1-cell cube, a 4-cell plane), the clean quads polygon modelling starts from. Off (the
+  default), they are the dense meshes for sculpting, as always. A saved preference; the settings below switch either way.
 - **Insert on the model**: choose a shape, then drag on the active Part's surface to add it there as a new
   face group (the drag sets its size and turns it). With **Symmetry** X, Y or Z on, a mirrored copy goes on the other
   side too, in the same undo step; a shape inserted right on a mirror plane isn't doubled.
@@ -81,6 +86,32 @@ Click **Append** and choose:
   a project (`.sfproj`). A file with several objects adds one Part per object.
 
 The new Part becomes the active one.
+
+### Primitive settings
+
+A Part made by **Append** keeps the settings it was built from, shown as a **Primitive** group under the Parts buttons
+for as long as the Part is still exactly that mesh (in the Classic layout the group is a newer row: turn on
+**Edit > Preferences > Interface > Show newer menu rows** to see it):
+
+| Setting | What it does |
+|---|---|
+| **Segments** | Around the axis. For a cube, plane or quad sphere, **Cells** per side; for a sphere or icosphere, **Subdivisions** |
+| **Rings** | Along the side of a cylinder, cone, capsule or pipe; around the tube of a torus |
+| **Cap rings** | The ends of a cylinder or cone: 0 leaves them open, 1 is a fan of triangles, more gives rings of quads around a fan |
+| **Quad caps** | The caps as an all-quad grid with no centre pole (segments become a multiple of 4), for subdividing and polygon modelling |
+| **Radius** | As a share of the Part's size |
+| **Top radius** / **Tube radius** / **Inner radius** | A cone's top (0 is a point, more a truncated cone); a torus's tube; a pipe's inside |
+| **Height** | As a share of the Part's size |
+| **Axis** | The shape's axis: Y (up, the default), X or Z (a wheel, an eye) |
+| **Low-poly** / **Dense** | Every setting at once: the Polygon-mode cage (quad caps, so edge loops run across the ends), or the dense sculpting mesh |
+
+Each change rebuilds the Part as one undo step, where it is. Moving the whole Part with the [Gizmo](gizmo.md) keeps
+the settings. Sculpting, remeshing or editing its faces turns it into an ordinary mesh and the group disappears; undo
+the edit and it is back. The settings are saved in the project.
+
+Every primitive is a clean quad mesh (triangles only in the fan of a cap or at a pole), closed, with one face group
+per part: bottom cap, side, top cap. From a script: `part_append type=cylinder low_poly=true segments=12 rings=2
+caps=1 axis=z`, then `part_primitive segments=16 quad_caps=true`; `part_primitive info=true` reports the settings.
 
 ### Creature bones
 
@@ -297,6 +328,23 @@ Accept is one undo step: <kbd>Ctrl</kbd>+<kbd>Z</kbd> on the source Part takes t
 brings it back. A preview you don't accept goes away as soon as you change the source Part or pick another one, and it
 is never saved.
 
+## Solidify
+
+**Solidify**, under Make Shell in **Tool > Parts > Extract**, gives a flat, single-sided Part real thickness, in place:
+a copy of the surface pushed along the normals becomes the back, and a rim of quads joins the two along every open
+edge, so the result is one closed mesh. Use it on a **Plane**, or on a shell made with **Make Shell** at **Thickness** 0:
+extract the flat surface first and fit it, then give it its thickness. In the Classic layout the Solidify rows show with
+**Edit > Preferences > Interface > Show newer menu rows**.
+
+| Setting | What it does |
+|---|---|
+| **Thickness** | As a share of the Part's size (0.03 is 3%). Positive grows the back behind the surface; negative grows it in front |
+| **Centred** | Half the thickness in front and half behind, so the original surface sits in the middle |
+
+Face groups, UVs and vertex paint stay on both sides; the rim gets a new face group of its own, so you can mask or hide
+it. On a Part that is closed already, Solidify says so and changes nothing. One undo step. From a script:
+`solidify thickness=0.03 both=false`.
+
 ## Delete a Part
 
 Click **Delete...** (or right-click a row > **Delete...**) and confirm. The last Part can't be deleted, and a
@@ -327,7 +375,8 @@ used.
 |---|---|
 | `part_list` | List the Parts |
 | `part_select index=1` | Make a Part active |
-| `part_append type=cube` | Add a primitive (`sphere`, `cube`, `plane`); `path=` adds a file; `size=` (0.05-2, default 0.35) |
+| `part_append type=cube` | Add a primitive (`sphere`, `cube`, `plane`, `cylinder`, `cone`, `torus`, `capsule`, `pipe`, `icosphere`, `quadsphere`); `path=` adds a file; `size=` (0.05-2, default 0.35); `low_poly=true` for the Polygon-mode cage; `segments=`, `rings=`, `caps=`, `quad_caps=`, `radius=`, `radius2=`, `height=` |
+| `part_primitive segments=16` | Change a fresh primitive's settings and rebuild it (`rings=`, `caps=`, `quad_caps=`, `radius=`, `radius2=`, `height=`, `axis=x|y|z`, `preset=lowpoly` or `dense`; `info=true` reports them) |
 | `part_duplicate` | Copy a Part |
 | `part_duplicate_linked` / `part_make_unique` | A [linked copy](linked-duplicates.md) sharing the mesh / break the link |
 | `part_delete name=Helmet` | Delete a Part |
@@ -349,6 +398,7 @@ used.
 | `boolean_parts op=subtract a=Body b=Bolt` | The Boolean of two Parts into a new Part, whatever their marks (`union`, `subtract`, `intersect`; `a` and `b` are names or list indices); the same options |
 | `extract thickness=0.02 smooth=5 double=false` | Preview an Extract shell from the mask; `triangle_corners` / `triangle_border` for a triangle rim; `accept=true` keeps it at once |
 | `extract_accept` / `extract_cancel` | Keep or remove the Extract preview |
+| `solidify thickness=0.03 both=false` | Give a flat Part thickness in place (a back and a rim of quads; `both=true` centres it) |
 
 ```text
 part_append type=sphere name=EyeL size=0.12; part_duplicate; part_rename to=EyeR

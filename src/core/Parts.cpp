@@ -9,6 +9,7 @@
 #include "core/Multires.h"
 #include "core/PathStroke.h"
 #include "core/FaceGroups.h"
+#include "core/PrimitiveKit.h"
 #include "core/Primitives.h"
 #include "core/Sculpt.h"
 #include "core/Texture.h"
@@ -18,6 +19,8 @@
 #include "io/ObjIO.h"
 #include "io/PlyIO.h"
 #include "core/Utf8Path.h"
+
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <stb_image.h>
 
@@ -33,6 +36,7 @@
 #include <memory>
 #include <mutex>
 #include <numeric>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -790,14 +794,24 @@ void registerPartCommands(CommandRegistry& reg) {
     reg.add({"part_append",
              "Add a new Part: a primitive (sphere, cube, plane) placed beside the visible model, or a model file. "
              "It becomes the active Part.",
-             {{"type", T::String, "'sphere' (default), 'cube', 'plane', 'cylinder', 'cone', 'torus', 'capsule', 'icosphere' or 'quadsphere'.", false},
+             {{"type", T::String, "'sphere' (default), 'cube', 'plane', 'cylinder', 'cone', 'torus', 'capsule', 'pipe', 'icosphere' or 'quadsphere'.", false},
               {"path", T::String, "Model file to append instead of a primitive (.obj, .glb, .fbx, .ply, .stl, .usd...).", false},
               {"unit", T::String, "Unit of the numbers in an STL, OBJ or PLY file (mm, cm, m, in), as open's.", false},
               {"name", T::String, "Name for the new Part.", false},
-              {"size", T::Number, "Primitive size relative to the largest visible Part (0.05-2). Default 0.35.", false}},
+              {"size", T::Number, "Primitive size relative to the largest visible Part (0.05-2). Default 0.35.", false},
+              {"low_poly", T::Bool, "The low-poly cage for Polygon mode (12 segments, 1 ring, fan caps; a 1-cell cube) instead of the dense sculpting mesh. Default false.", false},
+              {"segments", T::Number, "Primitive settings (part_primitive has them all): around the axis; cube, plane, quad sphere: cells per side; spheres: subdivisions.", false},
+              {"rings", T::Number, "Along the side; torus: around the tube.", false},
+              {"caps", T::Number, "Cylinder, cone: 0 open, 1 a fan, 2-8 rings of quads.", false},
+              {"quad_caps", T::Bool, "Caps as an all-quad grid (segments become a multiple of 4).", false},
+              {"radius", T::Number, "As a fraction of half the size (0.02-1).", false},
+              {"radius2", T::Number, "Cone: top radius; torus: tube radius; pipe: inner radius.", false},
+              {"height", T::Number, "As a fraction of the size (0.02-1).", false},
+              {"axis", T::String, "The shape's axis: y (up, the default), x or z.", false}},
              [](Document& doc, const Args& a) -> CommandResult {
                  Mesh m;
                  std::string name;
+                 std::optional<PrimitiveSpec> spec; // a primitive: its settings stay editable (core/PrimitiveKit.h)
                  if (a.contains("path")) {
                      // Load through `open` into a scratch document, so every format and its attributes work;
                      // each object in the file becomes its own Part.
@@ -824,6 +838,9 @@ void registerPartCommands(CommandRegistry& reg) {
                      }
                  } else {
                      const std::string type = argString(a, "type", "sphere");
+                     if (!isPrimitiveType(type))
+                         return {false, "Unknown primitive '" + type +
+                                            "' (sphere, cube, plane, cylinder, cone, torus, capsule, pipe, icosphere, quadsphere)"};
                      // Sized from the largest visible Part (so repeated appends neither grow nor shrink),
                      // placed beside everything shown.
                      const AABB scene = doc.visibleBounds();
@@ -836,23 +853,29 @@ void registerPartCommands(CommandRegistry& reg) {
                      }
                      if (extent <= 0.0f) extent = 2.0f;
                      const float size = extent * float(std::clamp(argNumber(a, "size", 0.35), 0.05, 2.0));
-                     if (type == "sphere") m = makeIcosphere(5, size * 0.5f);
-                     else if (type == "cube") m = makeCube(48, size);
-                     else if (type == "plane") m = makePlane(128, size);
-                     else if (type == "cylinder") m = makeCylinder(48, size);
-                     else if (type == "cone") m = makeCone(48, size);
-                     else if (type == "torus") m = makeTorus(64, size);
-                     else if (type == "capsule") m = makeCapsule(48, size);
-                     else if (type == "icosphere") m = makeIcosphere(3, size * 0.5f);
-                     else if (type == "quadsphere") m = makeQuadSphere(32, size);
-                     else
-                         return {false, "Unknown primitive '" + type +
-                                            "' (sphere, cube, plane, cylinder, cone, torus, capsule, icosphere, quadsphere)"};
+                     // The dense sculpting mesh Append has always made, or the low-poly cage; the settings given here
+                     // (and later, part_primitive) override either.
+                     PrimitiveSpec s = primitiveDefaults(type, argBool(a, "low_poly", false));
+                     s.size = size;
+                     if (a.contains("segments")) s.segments = int(std::lround(argNumber(a, "segments", s.segments)));
+                     if (a.contains("rings")) s.rings = int(std::lround(argNumber(a, "rings", s.rings)));
+                     if (a.contains("caps")) s.caps = int(std::lround(argNumber(a, "caps", s.caps)));
+                     if (a.contains("quad_caps")) s.quadCaps = argBool(a, "quad_caps", s.quadCaps);
+                     if (a.contains("radius")) s.radius = float(argNumber(a, "radius", s.radius));
+                     if (a.contains("radius2")) s.radius2 = float(argNumber(a, "radius2", s.radius2));
+                     if (a.contains("height")) s.height = float(argNumber(a, "height", s.height));
+                     if (a.contains("axis")) {
+                         const std::string ax = argString(a, "axis", "y");
+                         if (ax != "x" && ax != "y" && ax != "z") return {false, "axis must be x, y or z"};
+                         s.axis = ax == "x" ? 0 : ax == "y" ? 1 : 2;
+                     }
                      // Beside the model on +X, at its middle height.
                      const glm::vec3 at = scene.valid() ? glm::vec3(scene.max.x + size * 0.6f, scene.center().y, scene.center().z)
                                                         : glm::vec3(0.0f);
-                     for (auto& p : m.positions) p += at;
-                     m.recomputeAllNormals();
+                     s.placement = glm::translate(glm::mat4(1.0f), at);
+                     clampPrimitiveSpec(s);
+                     m = makePrimitive(s);
+                     spec = s;
                      name = type;
                      if (!name.empty()) name[0] = char(std::toupper(static_cast<unsigned char>(name[0])));
                      if (type == "quadsphere") name = "QuadSphere";
@@ -860,6 +883,7 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (a.contains("name")) name = argString(a, "name");
                  const size_t tris = m.triangleCount();
                  const int i = doc.addPart(std::move(m), name);
+                 if (spec) setPrimitiveSpec(*doc.parts[size_t(i)].data, *spec, doc.partUndo(i).revision());
                  return {true, "Appended Part " + doc.parts[size_t(i)].name + " (" + countText(tris) + ")"};
              }});
 
@@ -869,7 +893,7 @@ void registerPartCommands(CommandRegistry& reg) {
         {"size", T::Number, "size in scene units (default 0.2)", false},
         {"twist", T::Number, "turn about the normal in degrees (default 0)", false},
         {"symmetry", T::String, "mirror axes, e.g. \"x\" or \"xz\": a mirrored copy across each plane (#43; default none)", false}};
-    std::vector<ParamSpec> primitiveParams{{"type", T::String, "sphere, cube, cylinder, cone, torus, capsule or quadsphere", false}};
+    std::vector<ParamSpec> primitiveParams{{"type", T::String, "sphere, cube, cylinder, cone, torus, capsule, pipe or quadsphere", false}};
     primitiveParams.insert(primitiveParams.end(), placeParams.begin(), placeParams.end());
     reg.add({"insert_primitive",
              "Insert a primitive into the active Part where the surface is (#34): its axis along the surface "
@@ -888,7 +912,13 @@ void registerPartCommands(CommandRegistry& reg) {
                  else if (type == "torus") prim = makeTorus(32, size);
                  else if (type == "capsule") prim = makeCapsule(24, size);
                  else if (type == "quadsphere") prim = makeQuadSphere(8, size);
-                 else return {false, "Unknown primitive '" + type + "'"};
+                 else if (type == "pipe") {
+                     PrimitiveSpec s = primitiveDefaults("pipe", false);
+                     s.size = size;
+                     s.segments = 24;
+                     s.rings = 12;
+                     prim = makePrimitive(s);
+                 } else return {false, "Unknown primitive '" + type + "'"};
                  return insertPiece(doc, std::move(prim), a, type);
              }});
 

@@ -103,6 +103,8 @@ add_library(sculptforge_core STATIC
   src/core/GarmentPrint.cpp
   src/core/GarmentTemplates.cpp
   src/core/ExtractMirror.cpp
+  src/core/Solidify.cpp
+  src/core/PrimitiveKit.cpp
   src/core/MeshTransform.cpp
   src/core/FigurePose.cpp
   src/core/Deform.cpp
@@ -1392,6 +1394,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(ui_async_stroke_undo PROPERTIES
                          ENVIRONMENT "SF_TRIANGLE_BUDGET=40000;SF_STILL_FRAME_MS=0.001;SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=40")
     sculptforge_ui_test(keep_strokes_editable_checkbox_tablet keep_strokes_editable_checkbox --size 1024x768)
+    sculptforge_ui_test(primitives_kit_1440 primitives_kit --size 1440x900) # Parts > Append primitive settings, Solidify
+    sculptforge_ui_test(primitives_kit_2880 primitives_kit --size 2880x1800)
     sculptforge_ui_test(render_bridge_1440 render_bridge --size 1440x900) # File > Render with... (the Render window)
     sculptforge_ui_test(render_bridge_2880 render_bridge --size 2880x1620)
     # Heavy-mesh and benchmark scripts (tests/perf/*.sfui, e.g. 33M-triangle precision): nightly only (T3).

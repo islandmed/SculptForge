@@ -1,0 +1,28 @@
+# The Primitive group (Tool > Parts) and Solidify (Tool > Parts > Extract) are rows added after 0.13.0: the Classic layout
+# keeps its old rows, so they show only with Preferences > Interface > Show newer menu rows (ui_look newer_rows); the
+# SculptForge layout always has them (primitives_kit.sfui). A fresh low-poly cylinder is the case where the group would show.
+run ui_look look=classic layout=classic newer_rows=0
+wait 0.3
+run new_sphere subdivisions=3
+click "Parts/Append"
+click "Low-poly (Polygon mode)"
+key escape
+click "Parts/Append"
+click "Cylinder"
+expect_value parts == 2
+expect_value primitive_fresh == 1
+expect_value newer_menu_rows == 0
+expect_no_text "Quad caps"
+expect_no_text "Solidify"
+shot classic-newer-off
+run ui_look look=classic layout=classic newer_rows=1
+wait 0.3
+expect_value newer_menu_rows == 1
+expect_value primitive_fresh == 1
+click "Quad caps"
+click "Quad caps"
+expect_value primitive_fresh == 1
+click "Centred"
+click "Centred"
+expect_text "Solidify"
+shot classic-newer-on

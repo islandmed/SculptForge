@@ -237,6 +237,7 @@
     "axisGizmoSize": "medium",
     "showViewFigure": false,
     "alphabeticalPalettes": false,
+    "appendLowPoly": false,
     "look": {
       "name": "classic",
       "scheme": "neutral",
