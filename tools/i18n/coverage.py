@@ -58,6 +58,18 @@ DYNAMIC = {
     "PanelUvEditor.cpp mode, colour and image labels": ["Vertex", "Edge", "Face", "Island", "Islands", "Stretch",
                                                          "Density", "Plain", "No Image", "Checker", "Texture"],
     "PanelUvEditor.cpp sections": ["Unwrap", "Pack", "Texel Density", "Trim Sheet", "Edit", "Display"],
+    # Polygon mode ops (core/PolyOps.h): PanelPolygon.cpp shows each op's label, description and parameter labels / help
+    # through tr(); the ops are registered in src/core (registerPolyExtrudeOp...), where the search doesn't look.
+    "core/PolyExtrude.cpp op labels and help": [
+        "Extrude", "Distance", "Inset", "Individual", "Even thickness", "Keep shape", "Edges along normals",
+        "Push the selected faces out along their normals (in, with a negative distance) with new side walls, as one "
+        "region or face by face; selected open border edges extrude into a strip along the surface.",
+        "How far out, as a fraction of the Part's size (negative: in).",
+        "Narrow the cap first by this much (a fraction of the Part's size), so the walls slant in.",
+        "Each face on its own, with a groove between neighbours, instead of the connected region.",
+        "Where the selection bends, every face still moves the full distance along its own normal.",
+        "Move the whole region along one direction (its average normal) so it keeps its shape.",
+        "Edges: the strip stands on the surface instead of extending it."],
     "Pickers.cpp sections and core/ListSort.h listSortLabel": ["Built-in", "Custom", "Recent", "Pack"],
     "link/AiLinkSession.cpp and PanelAiLink.cpp confirm reasons (AiDecision::format, shown through tr())": [
         "Connects to the network", "Runs a macro or script", "Runs outside programs (splat training)",

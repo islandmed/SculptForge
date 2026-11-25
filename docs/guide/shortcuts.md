@@ -190,8 +190,9 @@ generated from SculptForge's action registry, the same source as the Controls wi
 | Lower Level | <kbd>Shift</kbd>+<kbd>D</kbd> | Step one subdivision level down (fewer polygons, for big forms). The detail of the higher levels is kept. |
 | Mask All | <kbd>Ctrl</kbd>+<kbd>A</kbd> | Mask the whole visible Part. |
 | Preview | <kbd>A</kbd> | Show the skin Make Mesh would build instead of the spheres. Turn it off to edit the spheres again. |
-| Quick Remesh | <kbd>Shift</kbd>+<kbd>R</kbd> | With Tool > Remesh > Quick Remesh on: remesh the active Part at the Voxel Remesh resolution, in the background. |
-| Quick Remesh (hold and drag) | <kbd>N</kbd> | With Tool > Remesh > Quick Remesh on: hold this key and click or drag on the background (not on the model) to remesh the active Part. |
+| Quick Remesh | <kbd>Shift</kbd>+<kbd>R</kbd> | Remesh the active Part at the Voxel Remesh resolution, in the background (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it). |
+| Quick Remesh (hold and drag) | <kbd>N</kbd> | Hold this key and click or drag on the background (not on the model) to remesh the active Part (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it). |
+| Remove Hidden | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> | Permanently delete the hidden part of the mesh (one undo step). What stays keeps its mask, paint, face groups, UVs and sculpt layers. |
 | Sculpt the Part under the cursor | <kbd>Alt</kbd>+<kbd>Q</kbd> | Make the Part under the pointer the one you sculpt, without moving the view (each Part keeps its mask). The same key as Blender's; Preferences > Hotkeys changes it. |
 
 ### Transform
@@ -239,6 +240,7 @@ generated from SculptForge's action registry, the same source as the Controls wi
 |---|---|---|
 | Free | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> | Rotation drags turn the view about the screen's axes and can roll it over the top (the default). Saved with the preferences. |
 | Lock camera | <kbd>Shift</kbd>+<kbd>L</kbd> | Lock the camera for left-drags: a drag that starts on the background sculpts once it reaches the model instead of turning the view (Preferences > Input > Start strokes off the model, #62). The status bar shows CAMERA LOCKED while it is on. Right-drag or Alt+drag still move the view. Shift+L turns it on and off. |
+| Split view | <kbd>Shift</kbd>+<kbd>V</kbd> | A second live view of the scene beside this one (View > Split view: beside or below, and each view's direction). The view under the pointer is the one you sculpt and turn in; the other follows every stroke. Again: one view. |
 | Turbo | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> | Everything this computer can safely give to sculpting speed, in one click: antialiasing off and a lighter view while you sculpt and orbit (full quality the moment you stop), and the top budgets of the tier this machine carries. It never goes past what the memory holds. Off puts everything back as you set it. Remembered on this computer. |
 | X | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> | Rotation drags turn the view about the world X axis only (red): from the front, an up or down drag tips the model towards you or away. Shift still snaps to a side view; the axis gizmo shows the lock. Saved with the preferences. |
 | Y (turntable) | <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Y</kbd> | Rotation drags turn the view like a turntable: the model stays upright and turns about its vertical (Y) axis. Saved with the preferences. |

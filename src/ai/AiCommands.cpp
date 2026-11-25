@@ -47,7 +47,7 @@ bool remeshArg(const Args& a, GeneratedRemesh& mode, std::string& error) {
 
 // Opens the generated file into the document and makes it sculptable; the message ends "- ready to sculpt".
 CommandResult importGenerated(Document& doc, const Args& a, const GeneratorResult& r, GeneratedRemesh mode,
-                              const std::string& what) {
+                              const std::string& what, const AiProvenance& provenance) {
     CommandResult opened = CommandRegistry().execute(doc, "open", {{"path", r.outputPath}});
     std::error_code ec;
     std::filesystem::remove(std::filesystem::path(std::u8string(r.outputPath.begin(), r.outputPath.end())), ec);
@@ -66,6 +66,10 @@ CommandResult importGenerated(Document& doc, const Args& a, const GeneratorResul
         doc.setMesh(std::move(m));
     } else {
         st.rawTriangles = doc.mesh.triangleCount();
+    }
+    if (!provenance.empty()) { // the tag (core/AiProvenance.h): the pass it is, as the app's Generate 3D sets it
+        doc.activePartInfo().ai = provenance;
+        doc.activePartInfo().ai.role = mode == GeneratedRemesh::Off ? AiProvenance::kGenerated : AiProvenance::kSculptingBase;
     }
     const std::string note = generatedRemeshNote(st, mode);
     return {true, "Generated a 3D model" + what + " (" + std::to_string(st.rawTriangles) + " triangles" +
@@ -117,9 +121,9 @@ bool prepareGenerateJob(const std::string& name, const Args& a, const AiSettings
                         : comfy::run(s, argString(a, "workflow"), input, {}, out, progress, comfySeed(a));
         return text ? generate3DFromText(s, input, out, progress) : generate3D(s, input, out, progress);
     };
-    job.finish = [a, mode, text](Document& doc, GeneratorResult& r) -> CommandResult {
+    job.finish = [a, mode, text, provenance = generateProvenance(s, text)](Document& doc, GeneratorResult& r) -> CommandResult {
         if (!r.ok) return {false, r.error + (r.note.empty() ? std::string() : " " + r.note)};
-        return importGenerated(doc, a, r, mode, text ? " from text" : "");
+        return importGenerated(doc, a, r, mode, text ? " from text" : "", provenance);
     };
     return true;
 }

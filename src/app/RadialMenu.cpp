@@ -189,7 +189,7 @@ void App::openRadialMenu(int menu, RadialHold hold, int code) {
     closeStrokePopup();
     const float s = uiScale_;
     // Keep the whole pie on the canvas; the flick is measured from wherever its centre ends up.
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     const float mx = (kRadialRadius + 70.0f) * s, my = (kRadialRadius + 24.0f) * s;
     ImVec2 at(mouseX_, mouseY_);
     if (c.w > 2.0f * mx) at.x = std::clamp(at.x, c.x + mx, c.x + c.w - mx);

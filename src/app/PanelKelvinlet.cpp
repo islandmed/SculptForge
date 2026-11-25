@@ -417,7 +417,7 @@ void App::drawCaptureOverlay() {
 void App::drawCaptureWindow() {
     const float s = uiScale_;
     ImGui::SetNextWindowSize(ImVec2(340.0f * s, 0.0f), ImGuiCond_Appearing);
-    const CanvasRect cr = canvasRect();
+    const CanvasRect cr = wholeCanvasRect();
     ImGui::SetNextWindowPos(ImVec2(cr.x + cr.w - 360.0f * s, cr.y + 60.0f * s), ImGuiCond_Appearing);
     if (!ImGui::Begin(tr("Capture from view##capture"), &capture_.open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::End();

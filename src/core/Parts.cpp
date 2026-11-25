@@ -277,6 +277,7 @@ std::vector<MeshObjectRef> visiblePartObjects(const Document& doc, bool instance
     auto add = [&](int i, const std::string& name) {
         const Part& p = doc.parts[size_t(i)];
         MeshObjectRef o{name, &doc.partMesh(i)};
+        o.ai = p.ai; // (exporters with a place for it keep the AI provenance tag)
         if (instances) {
             o.transform = p.transform;
             const auto first = std::find(data.begin(), data.end(), p.data.get());
@@ -425,6 +426,7 @@ CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, co
     const uint32_t folder = from.folder;
     const Shading shading = from.shading;
     const int litsphere = from.litsphere;
+    const AiProvenance ai = from.ai; // (a piece of an AI-made model is still one)
     const glm::mat4 place = from.transform; // (a moved linked copy, #94: the piece stays where it was seen)
     const int at = doc.addPart(std::move(piece), doc.uniquePartName(source + " " + suffix), false, doc.activePart + 1);
     Part& added = doc.parts[size_t(at)];
@@ -432,6 +434,7 @@ CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, co
     added.folder = folder;
     added.shading = shading;
     added.litsphere = litsphere;
+    added.ai = ai;
     added.transform = place;
     const uint32_t id = added.id;
     const std::string name = added.name;
@@ -717,6 +720,7 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
         const uint32_t folder = from.folder;
         const Shading shading = from.shading;
         const int litsphere = from.litsphere;
+        const AiProvenance ai = from.ai;
         const glm::mat4 place = from.transform; // (a moved linked copy: the piece stays where it was placed)
         const int index = doc.addPart(std::move(piece), doc.uniquePartName(label), false, doc.activePart + 1);
         Part& added = doc.parts[size_t(index)];
@@ -724,6 +728,7 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
         added.folder = folder;
         added.shading = shading;
         added.litsphere = litsphere;
+        added.ai = ai;
         added.transform = place;
         const std::string name = added.name;
         auto step = std::make_shared<PartStep>();
@@ -954,12 +959,14 @@ void registerPartCommands(CommandRegistry& reg) {
                  const PartBoolean boolean = doc.parts[size_t(i)].boolean;
                  const uint32_t folder = doc.parts[size_t(i)].folder;
                  const glm::mat4 place = doc.parts[size_t(i)].transform;
+                 const AiProvenance ai = doc.parts[size_t(i)].ai;
                  const int added = doc.addPart(std::move(copy), doc.parts[size_t(i)].name + " copy", true, i + 1);
                  doc.parts[size_t(added)].shading = shading;
                  doc.parts[size_t(added)].litsphere = litsphere;
                  doc.parts[size_t(added)].boolean = boolean; // (a copy of a cutter cuts too)
                  doc.parts[size_t(added)].folder = folder; // (right below it: the folder stays together)
                  doc.parts[size_t(added)].transform = place;
+                 doc.parts[size_t(added)].ai = ai; // (a copy of an AI-made model is still one)
                  return {true, "Duplicated as " + doc.parts[size_t(added)].name};
              }});
 

@@ -199,13 +199,15 @@ void App::startGenerator() {
     candidatesDone_ = std::make_shared<std::atomic<int>>(0);
     auto promise = std::make_shared<std::promise<std::vector<GeneratedCandidate>>>();
     pendingGenerator_ = promise->get_future();
+    const AiProvenance provenance = ai::generateProvenance(settings, textMode_); // (the same for every candidate of this run)
     std::thread([promise, settings, in = refImagePath_, text = textMode_ ? std::string(textPrompt_) : std::string(), stem,
-                 progress = candidateProgress_, done = candidatesDone_, dropBackdrop = removeBackground_] {
+                 progress = candidateProgress_, done = candidatesDone_, dropBackdrop = removeBackground_, provenance] {
         const int n = int(progress.size());
         std::vector<GeneratedCandidate> out(static_cast<size_t>(n));
         // One candidate: generated, opened into one piece, its flat background dropped, pictured.
         auto make = [&](int i) {
             GeneratedCandidate& c = out[size_t(i)];
+            c.ai = provenance;
             ai::GenerationProgress* p = progress[size_t(i)].get();
             const std::string s = n == 1 ? stem : stem + "_" + letter(i);
             c.result = text.empty() ? ai::generate3D(settings, in, s, p) : ai::generate3DFromText(settings, text, s, p);
@@ -385,6 +387,9 @@ void App::pickCandidate(int index) {
     } else {
         doc_.addPart(placed(*c.mesh), "Generated");
     }
+    const bool reference = generatedResult_ == int(GeneratedResult::Reference);
+    doc_.activePartInfo().ai = c.ai; // the provenance tag (core/AiProvenance.h); the role follows the Result choice
+    doc_.activePartInfo().ai.role = reference ? AiProvenance::kReference : AiProvenance::kGenerated;
     generatedPart_ = doc_.activePartInfo().id;
     highDetailPart_ = 0;
     scrollGenerateTo_ = 2;
@@ -395,6 +400,7 @@ void App::pickCandidate(int index) {
             if (i == index || !candidates_[size_t(i)].mesh) continue;
             const int at = doc_.addPart(placed(*candidates_[size_t(i)].mesh), "Option " + letter(i), false);
             doc_.parts[size_t(at)].visible = false;
+            doc_.parts[size_t(at)].ai = candidates_[size_t(i)].ai;
             ++kept;
         }
     const bool several = candidates_.size() > 1;
@@ -404,9 +410,16 @@ void App::pickCandidate(int index) {
     frameView(sceneBounds());
     status_ = (several ? "Picked " + letter(index) + ": " : std::string("Generated model: ")) + "Part " + name + " (" +
               std::to_string(tris) + " tris, as generated)" + backdrop +
-              (kept ? ", the others kept as hidden Parts" : std::string()) +
-              ". Next: Use as sculpting base (Generate 3D) for a clean, even mesh";
+              (kept ? ", the others kept as hidden Parts" : std::string());
     updateTitle();
+    // The one choice (Result): a sculpting base is made at once, one click from form to topology; a reference stays as it is.
+    if (reference) {
+        status_ += ". Kept at full fidelity as a reference: sculpt on a base of your own and Project Detail from it";
+        return;
+    }
+    const std::string picked = status_;
+    useAsSculptingBase();
+    status_ = picked + ". " + (pendingBase_.valid() ? generatorProgress_->status() : status_);
 }
 
 void App::useAsSculptingBase() {
@@ -463,10 +476,13 @@ void App::pollSculptingBase() {
         const std::string name = doc_.uniquePartName("Reference"); // short: the Parts list shows about 9 letters
         const int at = doc_.addPart(Mesh(*source), name, false, index + 1);
         doc_.parts[size_t(at)].visible = false;
+        doc_.parts[size_t(at)].ai = doc_.parts[size_t(index)].ai;
+        if (!doc_.parts[size_t(at)].ai.empty()) doc_.parts[size_t(at)].ai.role = AiProvenance::kReference;
         highDetailPart_ = doc_.parts[size_t(at)].id;
         kept = ". The model as generated is kept hidden as \"" + name + "\" for Project Detail";
     }
     doc_.replaceMeshUndoable(std::move(*b.result), "Sculpting base");
+    if (Part& base = doc_.parts[size_t(index)]; !base.ai.empty()) base.ai.role = AiProvenance::kSculptingBase; // (the tag's pass)
     const std::string notice = doc_.takeNotice();
     status_ = "Sculpting base ready: " + generatedRemeshNote(b.stats, mode) + kept + (notice.empty() ? "" : ". " + notice);
     lastCommandOk_ = true;
@@ -544,36 +560,74 @@ void App::drawSculptingBase() {
         ImGui::TextWrapped("%s", text);
         ImGui::PopStyleColor();
     };
-    ImGui::SeparatorText(tr("Sculpting base"));
-    if (scrollGenerateTo_ == 2) { // picked: the next step is here
+    ImGui::SeparatorText(tr("Result"));
+    if (scrollGenerateTo_ == 2) { // picked: what happens next is here
         ImGui::SetScrollHereY(0.0f);
         scrollGenerateTo_ = 0;
     }
-    hint(tr("The AI gives the form; SculptForge gives the topology. Use as sculpting base rebuilds the picked model as a "
-            "clean, even mesh to sculpt on."));
-    bool quads = generatedRemesh_ != int(GeneratedRemesh::Voxel);
-    if (ImGui::Checkbox(tr("Then Quad Remesh"), &quads)) generatedRemesh_ = int(quads ? GeneratedRemesh::Quad : GeneratedRemesh::Voxel);
+    hint(tr("The AI gives the form; SculptForge gives the topology. Choose what the model you pick becomes:"));
+    // The one choice (areas/ai.md #2): a sculpting base of moderate density in clean quads, or the model at full fidelity.
+    const bool quads = generatedRemesh_ != int(GeneratedRemesh::Voxel);
+    auto subline = [&hint](const char* text) { // the qualifier under a radio, indented to its label
+        ImGui::Indent(ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x);
+        hint(text);
+        ImGui::Unindent(ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x);
+    };
+    ImGui::RadioButton(tr("Sculpting base##result"), &generatedResult_, int(GeneratedResult::SculptingBase));
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+        char tip[320];
+        std::snprintf(tip, sizeof tip,
+                      tr(quads ? "Voxel Remesh, then Quad Remesh: about %d quads with one subdivision level, ready to divide "
+                                 "and sculpt. The model as generated stays hidden as a Reference for Project Detail."
+                               : "Voxel Remesh: one even, watertight surface of about %d triangles. The model as generated "
+                                 "stays hidden as a Reference for Project Detail."),
+                      quads ? generatedQuadTarget(remeshResolution_) : 2 * generatedQuadTarget(remeshResolution_));
+        ImGui::SetTooltip("%s", tip);
+    }
+    subline(tr("Moderate density, clean quads"));
+    ImGui::RadioButton(tr("Reference##result"), &generatedResult_, int(GeneratedResult::Reference));
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip("%s", tr("Voxel Remesh first makes one even, watertight surface. Quad Remesh then turns it into "
-                                   "clean quads with one subdivision level holding the detail, ready to divide and "
-                                   "sculpt. Off: the even triangle surface."));
-    ImGui::SetNextItemWidth(-ImGui::CalcTextSize(tr("Resolution")).x - ImGui::GetStyle().ItemInnerSpacing.x);
-    ImGui::SliderInt(tr("Resolution"), &remeshResolution_, 96, 400);
-    if (quads) {
+        ImGui::SetTooltip("%s", tr("The model exactly as the service made it, every triangle. Sculpt on a base of your "
+                                   "own and Project Detail from it, or export it as it is."));
+    subline(tr("High fidelity, exactly as generated"));
+    const bool base = generatedResult_ == int(GeneratedResult::SculptingBase);
+    if (base && quads) {
         char text[160];
         std::snprintf(text, sizeof text, tr("About %d quads, then 1 subdivision level"), generatedQuadTarget(remeshResolution_));
         hint(text);
     }
-    ImGui::Checkbox(tr("Keep a high-detail copy (hidden)"), &keepHighDetail_);
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-        ImGui::SetTooltip("%s", tr("For experts: the model as generated stays as a hidden Part right below the sculpting "
-                                   "base. Divide the base, then Project Detail from it to bring fine detail back."));
+    if (base && ImGui::TreeNodeEx(tr("Advanced##sculpting_base"), 0)) { // (closed: the defaults are the promise above)
+        bool q = quads;
+        if (ImGui::Checkbox(tr("Then Quad Remesh"), &q)) generatedRemesh_ = int(q ? GeneratedRemesh::Quad : GeneratedRemesh::Voxel);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Voxel Remesh first makes one even, watertight surface. Quad Remesh then turns it into "
+                                       "clean quads with one subdivision level holding the detail, ready to divide and "
+                                       "sculpt. Off: the even triangle surface."));
+        ImGui::SetNextItemWidth(-ImGui::CalcTextSize(tr("Resolution")).x - ImGui::GetStyle().ItemInnerSpacing.x);
+        ImGui::SliderInt(tr("Resolution"), &remeshResolution_, 96, 400);
+        ImGui::Checkbox(tr("Keep a high-detail copy (hidden)"), &keepHighDetail_);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("For experts: the model as generated stays as a hidden Part right below the sculpting "
+                                       "base. Divide the base, then Project Detail from it to bring fine detail back."));
+        ImGui::TreePop();
+    }
     const int part = doc_.partIndex(generatedPart_);
-    ImGui::BeginDisabled(part < 0 || pendingBase_.valid() || pendingGenerator_.valid());
-    if (ImGui::Button(tr("Use as sculpting base"), ImVec2(-1, 0))) useAsSculptingBase();
-    ImGui::EndDisabled();
-    if (part < 0 && !pendingGenerator_.valid())
-        hint(tr("Generate a model and pick one first."));
+    if (base) { // the pick is remeshed at once; the button does it again (after Undo, or a pick made as a reference)
+        ImGui::BeginDisabled(part < 0 || pendingBase_.valid() || pendingGenerator_.valid());
+        if (ImGui::Button(tr("Use as sculpting base"), ImVec2(-1, 0))) useAsSculptingBase();
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("%s", tr("Rebuilds the picked model as a sculpting base. A pick does this on its own; the button "
+                                       "does it again, after Undo or for a model picked as a reference."));
+        if (part < 0 && !pendingGenerator_.valid()) hint(tr("Generate a model and pick one first."));
+    } else if (part < 0 && !pendingGenerator_.valid()) {
+        hint(tr("Generate a model and pick one: it stays exactly as generated."));
+    }
+    if (part >= 0 && !doc_.parts[size_t(part)].ai.empty()) { // the tag the Part carries (Parts list tooltip, project, exports)
+        char line[256];
+        std::snprintf(line, sizeof line, tr("AI: %s"), ui::AiProvenanceText(doc_.parts[size_t(part)].ai).c_str());
+        hint(line);
+    }
     if (const int ref = doc_.partIndex(highDetailPart_); ref >= 0 && part >= 0 && !pendingBase_.valid()) {
         if (ImGui::Button(tr("Project Detail from the high-detail copy"), ImVec2(-1, 0))) {
             if (part != doc_.activePart) doc_.selectPart(part);

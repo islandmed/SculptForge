@@ -28,6 +28,7 @@ case "$1 $2" in
 esac
 SH
 chmod +x "$S/bin/gh"
+printf '#!/bin/sh\nexit 0\n' > "$S/bin/herdr"; chmod +x "$S/bin/herdr" # a stable release prompts sfmonitor: never the real one
 export PATH=$S/bin:$PATH GH_LOG=$S/gh.log GH_UPLOADS=$S/uploads GH_ASSETS=$ROOT/tests/data/beta_release_assets.txt
 export SF_LAUNCH_DIR=$S/launch
 REPO=pub/app INSIDERS_REPO=pri/insiders

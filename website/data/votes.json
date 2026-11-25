@@ -139,16 +139,6 @@
    "slug": "topology",
    "ideas": [
     {
-     "slug": "polygon-modelling-mode",
-     "anchor": "vote-polygon-modelling-mode",
-     "title": "Polygon modelling mode",
-     "line": "Beginner-friendly Points, Edges and Polygons panels: extrude, smart bevel, bridge, circle from edges, for hard-surface work next to sculpting.",
-     "where": "a new Model mode with its own panels",
-     "votes": 4,
-     "status": "open",
-     "shipped": ""
-    },
-    {
      "slug": "edit-base-mesh-keep-detail",
      "anchor": "vote-edit-base-mesh-keep-detail",
      "title": "Edit base mesh, keep detail",
@@ -267,6 +257,16 @@
      "votes": 0,
      "status": "open",
      "shipped": ""
+    },
+    {
+     "slug": "polygon-modelling-mode",
+     "anchor": "vote-polygon-modelling-mode",
+     "title": "Polygon modelling mode",
+     "line": "Beginner-friendly Points, Edges and Polygons panels: extrude, smart bevel, bridge, circle from edges, for hard-surface work next to sculpting.",
+     "where": "a new Model mode with its own panels",
+     "votes": 4,
+     "status": "shipped",
+     "shipped": "0.14.0"
     },
     {
      "slug": "confirm-before-destructive-remesh",
@@ -511,26 +511,6 @@
    "slug": "view-camera",
    "ideas": [
     {
-     "slug": "clickable-orientation-widget",
-     "anchor": "vote-clickable-orientation-widget",
-     "title": "Clickable orientation widget",
-     "line": "Click a 3D widget at the top right to jump to front, side or top.",
-     "where": "Top right of the canvas",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
-     "slug": "split-view",
-     "anchor": "vote-split-view",
-     "title": "Split view",
-     "line": "A second live view, for example side view while you sculpt the front.",
-     "where": "View menu",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
-    {
      "slug": "frozen-multi-angle-view",
      "anchor": "vote-frozen-multi-angle-view",
      "title": "Frozen multi-angle view",
@@ -579,6 +559,26 @@
      "votes": 0,
      "status": "in progress",
      "shipped": ""
+    },
+    {
+     "slug": "clickable-orientation-widget",
+     "anchor": "vote-clickable-orientation-widget",
+     "title": "Clickable orientation widget",
+     "line": "Click a 3D widget at the top right to jump to front, side or top.",
+     "where": "Top right of the canvas",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.14.0"
+    },
+    {
+     "slug": "split-view",
+     "anchor": "vote-split-view",
+     "title": "Split view",
+     "line": "A second live view, for example side view while you sculpt the front.",
+     "where": "View menu",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.14.0"
     },
     {
      "slug": "reference-image-board",
@@ -874,5 +874,5 @@
    ]
   }
  ],
- "updated": "2026-11-22T19:08:18Z"
+ "updated": "2026-11-25T03:52:47Z"
 }

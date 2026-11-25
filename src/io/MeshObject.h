@@ -6,6 +6,7 @@
 // becomes one Part on import, and each visible Part one object on export.
 #pragma once
 
+#include "core/AiProvenance.h"
 #include "core/Mesh.h"
 
 #include <memory>
@@ -30,6 +31,7 @@ struct MeshObjectRef {
     glm::mat4 transform{1.0f};
     int instanceOf = -1;
     std::shared_ptr<const Mesh> owned{};
+    AiProvenance ai{}; // the Part's AI provenance tag, if any: glTF extras, USD customData, OBJ comments keep it
 };
 
 } // namespace sf

@@ -94,11 +94,17 @@ void buildNode(std::vector<FlatBVH::Node>& nodes, std::vector<uint32_t>& order, 
 
 } // namespace
 
-void FlatBVH::build(const std::vector<AABB>& boxes) {
+bool FlatBVH::build(const std::vector<AABB>& boxes, const std::function<bool()>& stop) {
     nodes_.clear();
     order_.resize(boxes.size());
     for (uint32_t i = 0; i < order_.size(); ++i) order_[i] = i;
-    if (boxes.empty()) return;
+    if (boxes.empty()) return true;
+    auto stopped = [&] {
+        if (!stop || stop()) return false;
+        nodes_.clear();
+        order_.clear();
+        return true;
+    };
     std::vector<glm::vec3> centers(boxes.size());
     poolFor(boxes.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) centers[i] = boxes[i].center();
@@ -123,21 +129,28 @@ void FlatBVH::build(const std::vector<AABB>& boxes) {
             buildNode(nodes_, order_, boxes, centers, t, true, [&](const BuildTask& c) { next.push_back(c); });
         }
         top.swap(next);
+        if (stopped()) return false;
     }
+    // The subtrees in rounds of a few per thread, Cancel asked between rounds (on this thread).
     std::vector<std::vector<Node>> local(subtrees.size());
-    poolFor(subtrees.size(), [&](size_t b, size_t e) {
-        for (size_t k = b; k < e; ++k) {
-            std::vector<Node>& nodes = local[k];
-            nodes.reserve(2 * size_t(subtrees[k].end - subtrees[k].begin) / kLeafSize + 2);
-            nodes.push_back({});
-            std::vector<BuildTask> stack{{0, subtrees[k].begin, subtrees[k].end}};
-            while (!stack.empty()) {
-                const BuildTask t = stack.back();
-                stack.pop_back();
-                buildNode(nodes, order_, boxes, centers, t, false, [&](const BuildTask& c) { stack.push_back(c); });
+    const size_t perRound = stop ? std::max<size_t>(2, size_t(std::max(1, ThreadPool::shared().threads())) * 2) : subtrees.size();
+    for (size_t first = 0; first < subtrees.size(); first += perRound) {
+        const size_t last = std::min(subtrees.size(), first + perRound);
+        poolFor(last - first, [&](size_t b, size_t e) {
+            for (size_t k = first + b; k < first + e; ++k) {
+                std::vector<Node>& nodes = local[k];
+                nodes.reserve(2 * size_t(subtrees[k].end - subtrees[k].begin) / kLeafSize + 2);
+                nodes.push_back({});
+                std::vector<BuildTask> stack{{0, subtrees[k].begin, subtrees[k].end}};
+                while (!stack.empty()) {
+                    const BuildTask t = stack.back();
+                    stack.pop_back();
+                    buildNode(nodes, order_, boxes, centers, t, false, [&](const BuildTask& c) { stack.push_back(c); });
+                }
             }
-        }
-    }, 1, 2);
+        }, 1, 2);
+        if (stopped()) return false;
+    }
     // Stitch: a subtree's root goes in its placeholder, the rest after the nodes so far (inner nodes' children
     // shifted to match; leaves index order_, which every subtree filled in place).
     for (size_t k = 0; k < subtrees.size(); ++k) {
@@ -150,6 +163,7 @@ void FlatBVH::build(const std::vector<AABB>& boxes) {
         nodes_[subtrees[k].node] = moved(nodes[0]);
         for (size_t i = 1; i < nodes.size(); ++i) nodes_.push_back(moved(nodes[i]));
     }
+    return true;
 }
 
 glm::vec3 closestPointOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,
@@ -211,7 +225,7 @@ glm::vec3 closestPointOnTriangle(const glm::vec3& p, const glm::vec3& a, const g
     return a + ab * v + ac * w;
 }
 
-void TriangleBVH::build(std::vector<glm::vec3> positions, std::vector<glm::uvec3> triangles) {
+bool TriangleBVH::build(std::vector<glm::vec3> positions, std::vector<glm::uvec3> triangles, const std::function<bool()>& stop) {
     positions_ = std::move(positions);
     triangles_ = std::move(triangles);
     std::vector<AABB> boxes(triangles_.size());
@@ -222,7 +236,9 @@ void TriangleBVH::build(std::vector<glm::vec3> positions, std::vector<glm::uvec3
             boxes[t] = box;
         }
     });
-    bvh_.build(boxes);
+    if (bvh_.build(boxes, stop)) return true;
+    positions_.clear(), triangles_.clear(); // (stopped: empty, as never built)
+    return false;
 }
 
 glm::vec3 TriangleBVH::faceNormal(uint32_t t) const {

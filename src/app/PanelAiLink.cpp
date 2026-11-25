@@ -726,7 +726,7 @@ void App::drawAiLink() {
     if (s.session->state() != link::AiLinkSession::State::Paired) return;
 
     // The badge: bottom right of the canvas (clear of the history strip on top), while connected.
-    const CanvasRect c = canvasRect();
+    const CanvasRect c = wholeCanvasRect();
     ImGui::SetNextWindowPos(ImVec2(c.x + c.w - 12 * sc, c.y + c.h - 12 * sc), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
     ImGui::SetNextWindowBgAlpha(0.92f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8 * sc);
