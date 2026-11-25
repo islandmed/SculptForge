@@ -991,13 +991,12 @@ void App::drawPalette_Tool() {
         } else {
             ImGui::Checkbox(tr("Keep Masked##remesh"), &voxelKeepMasked_);
             ui::HelpText("Keep Masked", nullptr, kKeepMaskedHelp, "Tool > Remesh");
-            ImGui::SameLine();
-            ImGui::Checkbox(tr("Keep Face Groups##remesh"), &voxelKeepGroups_);
-            ui::HelpText("Keep Face Groups", nullptr, kKeepGroupsHelp, "Tool > Remesh");
             if (hasTexture(doc_.mesh)) {
                 ImGui::SameLine();
                 drawKeepTextureCheckbox("Keep Texture##remesh", "Tool > Remesh"); // only for a painted Part
             }
+            ImGui::Checkbox(tr("Keep Face Groups##remesh"), &voxelKeepGroups_); // (its own row: three boxes don't fit a tray)
+            ui::HelpText("Keep Face Groups", nullptr, kKeepGroupsHelp, "Tool > Remesh");
         }
         drawQuickRemeshContents(); // Quick Remesh, Remesh after each stroke (#121, PanelRetopo.cpp)
     }

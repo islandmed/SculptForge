@@ -711,6 +711,7 @@ void App::refreshTopologyDown(float x, float y, const RayHit& hit) {
     refreshChanged_ = false;
     refreshDabs_ = 0;
     refreshTrianglesBefore_ = doc_.mesh.triangleCount();
+    refreshPart_ = doc_.activePartInfo().id;
     drag_ = Drag::RefreshTopology;
     status_ = "Refresh topology: drag over stretched triangles to even them out at the Part's detail; let go to finish";
     refreshTopologyTo(x, y);
@@ -718,6 +719,7 @@ void App::refreshTopologyDown(float x, float y, const RayHit& hit) {
 
 void App::refreshTopologyTo(float x, float y) {
     if (drag_ != Drag::RefreshTopology || !doc_.sculptor.strokeActive()) return;
+    if (doc_.activePartInfo().id != refreshPart_) return; // (another Part picked mid-drag: the release ends the gesture)
     RayHit hit;
     if (!pick(x, y, hit)) return;
     const Camera cam = partCamera();
@@ -733,6 +735,11 @@ void App::refreshTopologyTo(float x, float y) {
 
 void App::refreshTopologyRelease() {
     if (!doc_.sculptor.strokeActive()) return;
+    if (doc_.activePartInfo().id != refreshPart_) { // (the Part changed under the gesture: nothing lands; the stroke's mesh is gone)
+        endStroke();
+        status_ = "Refresh topology: the Part changed during the drag; nothing changed";
+        return;
+    }
     UndoRecord r = doc_.sculptor.endStroke();
     lastRefreshDabs_ = refreshDabs_;
     const size_t before = refreshTrianglesBefore_, after = doc_.mesh.triangleCount();

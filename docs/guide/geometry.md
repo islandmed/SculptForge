@@ -156,15 +156,16 @@ drag on the background: without it, a drag there turns, pans or zooms the view, 
 exactly as your key style says. With Quick Remesh off, the keys only tell you where to turn it on. The right-click
 [Quick Menu](sculpting.md#the-quick-menu) has a **Quick Remesh** button too, beside **Quad Remesh** and **Remove Hidden**.
 
-#### Refresh the topology under the brush
+### Refresh the topology under the brush
 
 The same key, on the model: hold <kbd>N</kbd> and drag over the stretched part of the surface (the long triangles a
 Move or Tendril pull leaves) and only that part is remeshed, as you drag, with no dialog and no remesh of the whole
 Part. Edges longer than one and a half times the surface's own edge length (the detail around the brush, or the
 Part's where everything near is stretched) are split, the new points following the surface's curve as dynamic topology
 splits do; the points that were there don't move and nothing finer is coarsened, so detail next to the stretched area
-stays as it is. With [dynamic topology](sculpting.md#dynamic-topology) on, the refresh aims for its edge length instead
-(what the brush would make). Masked and hidden parts, face group borders, open borders and symmetry are respected exactly as dynamic
+stays as it is. The refresh follows wherever the pull stretched: a big Move brush stretches a wide area, so a drag some
+way from the tendril itself can still split a few triangles there. With [dynamic topology](performance.md#dynamic-topology)
+on, the refresh aims for its edge length instead (what the brush would make). Masked and hidden parts, face group borders, open borders and symmetry are respected exactly as dynamic
 topology respects them. Each drag is one undo step; the status bar says how many triangles the Part has now. A Part
 with subdivision levels can't be refreshed (the status bar says so; <kbd>N</kbd> on the background remeshes it whole).
 

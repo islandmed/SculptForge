@@ -1696,6 +1696,7 @@ private:
     glm::vec3 refreshLast_{0.0f};           // the last dab's centre (dabs are spaced along the surface)
     bool refreshHaveLast_ = false, refreshChanged_ = false;
     size_t refreshTrianglesBefore_ = 0;
+    uint32_t refreshPart_ = 0;                 // the Part the gesture began on
     int refreshDabs_ = 0, lastRefreshDabs_ = 0; // dabs this gesture / the last finished one (UI tests: refresh_dabs)
     bool autoRemeshDue_ = false;                    // a stroke stretched the surface: remesh once nothing waits
     size_t lastStrokeStretched_ = 0;                // the last stroke's stretched edges (UI tests: stroke_stretched)

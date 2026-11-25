@@ -767,9 +767,12 @@ bool Sculptor::refreshTopologyDab(Mesh& mesh, BVH& bvh, const glm::vec3& center,
     if (!active_ || !(edgeLength > 0.0f) || !(radius > 0.0f) || !dyntopoBlocker(mesh).empty()) return false;
     auto clock = std::chrono::steady_clock::now();
     const std::vector<SymCopy> ms = copies(sym);
-    dynTopo_.refineOnly = true;
+    struct RefineOnly { // (set for this dab only, whatever happens inside)
+        DynamicTopology& d;
+        explicit RefineOnly(DynamicTopology& t) : d(t) { d.refineOnly = true; }
+        ~RefineOnly() { d.refineOnly = false; }
+    } refine(dynTopo_);
     const bool changed = dynTopo_.remesh(mesh, bvh, center, radius, edgeLength, ms);
-    dynTopo_.refineOnly = false;
     lastRemesh_ = true;
     lastCenter_ = center;
     lastRadius_ = radius;
