@@ -1775,14 +1775,18 @@ struct StatusModule {
 
 } // namespace
 
-std::string App::navHoldLabel() const {
-    switch (navHoldMove_) {
+namespace {
+std::string navHoldLabelText(int move) {
+    switch (move) {
     case 0: return upper(tr("Hold to orbit"));
     case 1: return upper(tr("Hold to pan"));
     case 2: return upper(tr("Hold to zoom"));
     default: return {};
     }
 }
+} // namespace
+
+std::string App::navHoldLabel() const { return navHoldLabelText(navHoldMove_); }
 
 void App::drawStatusBar(const ShellGeometry& g) {
     const float s = uiScale_;
@@ -2035,11 +2039,6 @@ void App::drawStatusBar(const ShellGeometry& g) {
             lockMod = int(mods.size());
             mods.push_back({ICON_LC_LOCK, "camera", upper(tr("Camera locked")), true});
         }
-        // A Hold to orbit / pan / zoom key is down (Preferences > Navigation): the move it starts, the same label as above.
-        if (!navHoldLabel().empty()) {
-            holdMod = int(mods.size());
-            mods.push_back({ICON_LC_MOVE_3D, "hold", navHoldLabel(), true});
-        }
     }
     // Memory beside them (sfmonitor, Oslen on Discord): this app's RAM and the system's free RAM, then the graphics
     // card's memory in use where its driver says. Once a second; the tooltip has the detail.
@@ -2055,8 +2054,30 @@ void App::drawStatusBar(const ShellGeometry& g) {
         mods.push_back({ICON_LC_GPU, "gpu", mem.gpuTotalMB > mem.gpuFreeMB ? compactBytes(size_t(mem.gpuTotalMB - mem.gpuFreeMB) << 20)
                                                                           : compactBytes(size_t(mem.gpuFreeMB) << 20) + " " + tr("free")});
     }
+    // A Hold to orbit / pan / zoom key is down (Preferences > Navigation): the move it starts, the same label as above.
+    // With a hold key bound the block keeps its place (the widest label's width, empty while no key is down), so the chips
+    // beside it never shift when a key goes down or up. Only when the bar fits it with every chip shown: otherwise it has no
+    // place at all (no chip moves or drops for it) and the label takes the status text's place while the key is down.
+    bool holdBound = false;
+    for (const char* id : kNavHoldActions) holdBound = holdBound || !actions_.shortcutText(id).empty();
+    if (holdBound) {
+        holdMod = int(mods.size());
+        mods.push_back({ICON_LC_MOVE_3D, "hold", navHoldLabel(), true});
+    }
     ImFont* labelFont = theme::look.id != 0 && fontMonoTiny_ ? fontMonoTiny_ : fontTiny_ ? fontTiny_ : monoSmall;
-    auto moduleW = [&](const StatusModule& m) {
+    auto moduleW = [&](const StatusModule& m) -> float {
+        if (m.label == "hold") { // the reserved slot: as wide as the longest label, whichever is shown
+            float w = 0.0f;
+            for (int i = 0; i < kNavMoves; ++i) {
+                const std::string v = navHoldLabelText(i);
+                switch (style) {
+                case Status::Terminal: w = std::max(w, textW(monoSmall, "[" + v + "]") + 10.0f * s); break;
+                case Status::TitleBlock: w = std::max(w, textW(labelFont, upper(m.label)) + 6.0f * s + textW(monoSmall, v) + 20.0f * s); break;
+                default: w = std::max(w, textW(monoSmall, v) + 20.0f * s); break;
+                }
+            }
+            return w;
+        }
         switch (style) {
         case Status::Terminal:
             return m.mode ? textW(monoSmall, "[" + m.value + "]") + 10.0f * s : textW(monoSmall, m.label + ":" + m.value);
@@ -2078,6 +2099,10 @@ void App::drawStatusBar(const ShellGeometry& g) {
         for (size_t k = 0; k < shown.size(); ++k) w += moduleW(mods[size_t(shown[k])]) + (k ? sepW : 0.0f);
         return w;
     };
+    if (holdMod >= 0 && total() > right - menusEnd - 120.0f * s) { // no room for the slot beside every chip
+        shown.erase(std::remove(shown.begin(), shown.end(), holdMod), shown.end());
+        holdMod = -1;
+    }
     for (int drop : {gpuMod, 2, ramMod, 4, 1}) { // (RAM outlasts the file name, and shrinks to the app's own before it goes)
         if (drop >= 0 && drop == ramMod && total() > right - menusEnd - 120.0f * s) mods[size_t(ramMod)].value = compactBytes(mem.appBytes);
         if (total() > right - menusEnd - 120.0f * s) shown.erase(std::remove(shown.begin(), shown.end(), drop), shown.end());
@@ -2087,12 +2112,25 @@ void App::drawStatusBar(const ShellGeometry& g) {
         if (total() > right - menusEnd) shown.erase(std::remove(shown.begin(), shown.end(), drop), shown.end());
     float mx = right - total();
     const float modulesX = mx;
+    // (UI tests: where the chips start, not counting the memory chips, whose text changes width with the readings)
+    statusModulesX_ = modulesX;
+    statusChips_ = int(shown.size()) - (holdMod >= 0 ? 1 : 0); // (the hold block's slot is not a chip: it is only room)
+    statusMemChips_ = 0;
+    for (size_t k = 0; k < shown.size(); ++k)
+        if (shown[k] == ramMod || shown[k] == gpuMod) {
+            statusModulesX_ += moduleW(mods[size_t(shown[k])]) + sepW;
+            ++statusMemChips_;
+        }
     std::vector<std::tuple<int, float, float>> memSpans; // (module, x0, x1): the memory modules' tooltip
 
     for (size_t k = 0; k < shown.size(); ++k) {
         const StatusModule& m = mods[size_t(shown[k])];
         const float w = moduleW(m);
-        ImGui::LogText("%s", m.value.c_str()); // (UI tests read the bar)
+        if (!m.value.empty()) ImGui::LogText("%s", m.value.c_str()); // (UI tests read the bar)
+        if (shown[k] == holdMod && m.value.empty()) { // the reserved slot, no key down: nothing drawn, the space kept
+            mx += w + (k ? sepW : 0.0f);
+            continue;
+        }
         if (k) {
             if (style == Status::Terminal) textAt(monoSmall, mx, theme::textDim, " | ");
             mx += sepW;
@@ -2152,13 +2190,18 @@ void App::drawStatusBar(const ShellGeometry& g) {
 
     // The status message between the menus and the modules: what just happened.
     {
-        const std::string msg = layout_.customize ? std::string(tr("Customize: Ctrl+Alt+drag to move or remove items")) : tr(status_);
+        // (a hold key down with no slot in this bar: its move stands in for the text until it is let go)
+        const std::string hold = holdMod < 0 && holdBound ? navHoldLabel() : std::string();
+        const std::string msg = layout_.customize ? std::string(tr("Customize: Ctrl+Alt+drag to move or remove items"))
+                                : !hold.empty()   ? hold
+                                                  : std::string(tr(status_));
         const float avail = modulesX - menusEnd - 16.0f * s;
         if (!msg.empty() && avail > 60.0f * s) {
             const bool error = !layout_.customize && !lastCommandOk_ && ImGui::GetTime() - statusSince_ < 6.0;
             const std::string text = (style == Status::Terminal ? "> " : "") + msg;
             const std::string shown = elide(monoSmall, text, avail);
-            textAt(monoSmall, menusEnd, error ? theme::danger : theme::textDim, shown);
+            if (!hold.empty()) ImGui::LogText("%s", hold.c_str()); // (UI tests read the bar)
+            textAt(monoSmall, menusEnd, !hold.empty() ? theme::accent : error ? theme::danger : theme::textDim, shown);
             // Cut short: the whole message on hover (as the status bar's), e.g. a remesh's notes at the end.
             if (shown != text && ImGui::IsMouseHoveringRect(ImVec2(menusEnd, o.y), ImVec2(menusEnd + avail, o.y + h)))
                 ImGui::SetTooltip("%s", msg.c_str());

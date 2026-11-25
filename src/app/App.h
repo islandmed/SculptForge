@@ -2329,6 +2329,8 @@ private:
     uint64_t autosaveRevision_ = ~uint64_t(0);
     bool autosaveWritten_ = false;
     std::string windowTitle_;
+    int statusChips_ = 0, statusMemChips_ = 0; // chips drawn in the status bar / the memory ones among them (UI tests: status_chips, status_mem_chips)
+    float statusModulesX_ = 0.0f; // where the status bar's chips start, as drawn, plus the memory chips' width (UI tests: status_modules_x)
     float infoFontPx_ = 0.0f; // the title strip's info readout font size as drawn (UI tests: info_font_px)
     std::vector<std::pair<float, float>> barSpans_; // the top bar's widgets, x from-to, last frame (UI tests: no overlaps)
     std::vector<std::pair<float, float>> timelineSpans_; // the timeline header's pieces, x from-to (UI tests: no overlaps)
