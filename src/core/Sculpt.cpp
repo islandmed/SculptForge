@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <iterator>
 #include <limits>
+#include <mutex>
 #include <queue>
 #include <unordered_map>
 
@@ -1172,6 +1173,7 @@ UndoRecord Sculptor::endStroke() {
     // A pinching recipe's per-stroke state (24 bytes a vertex: 120 MB on a 5M mesh) goes with the stroke, not with the mesh.
     std::vector<uint32_t>().swap(pinchStamp_), std::vector<glm::vec3>().swap(pinchStart_);
     std::vector<uint32_t>().swap(pinchDabStamp_), std::vector<float>().swap(pinchTaper_);
+    clayStart_ = StartStore();
     clearRecorded();
     active_ = false;
     grabVerts_.clear();
@@ -1534,6 +1536,14 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const bool analyticEarly = earlyNormals_ && !adaptiveDab_ && isPlaneKernelBrush(type) && !trimSheet && !p.viewFalloff && !useAlpha && !useStencil && !facing &&
                                !dynTopo_.active() && !draft_ && mesh.normals.size() == mesh.vertexCount() &&
                                mesh.mask.size() != mesh.vertexCount() && !mesh.hasHidden();
+    // Clay weighs a vertex that lies far below its plane (more than 0.6 of the radius: the foot of a wall, at the edge of the reach) by
+    // where it stood when the stroke first reached it (pinchStart_): each dab pulls a vertex along the area normal to the plane, and
+    // where a wall leans away from that normal (the lip of a squeezed band) the pull moved it toward the dab, its falloff rose, and
+    // the next dab pulled it further, a runaway x1.5 a dab at the edge of the reach that left ribs along it. On a surface that bends
+    // away gently (a head under a big brush: up to half the radius at the edge) the weights are what they were. (The exact path
+    // only: the adaptive and the early-normals paths weigh by where a vertex is.)
+    const bool startWanted = !analyticEarly && clayStartWeights && type == BrushType::Clay && !adaptiveDab_ &&
+                             !useAlpha && !useStencil && !p.viewFalloff && !dynTopo_.active() && !draft_;
     earlyNormals_ = false;
     const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
 
@@ -1608,6 +1618,44 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     plane.invert = p.invert;
     plane.viewFalloff = p.viewFalloff;
 
+    // The stroke's start positions (16 bytes a vertex) are kept from the first dab that reaches a vertex far below its plane: an
+    // ordinary stroke never allocates them.
+    bool startWeights = startWanted;
+    if (startWeights) {
+        float kk;
+        const glm::vec3 planeAt = plane.clayPlane(kk);
+        const float deepAt = kStartDeep * p.radius;
+        // The deep vertices of the dab (those the stroke has kept not counted when `all` is off), gathered in parallel.
+        const auto gather = [&](bool all) {
+            std::vector<uint32_t> found;
+            std::mutex foundLock;
+            poolFor(verts_.size(), [&](size_t b, size_t e) {
+                std::vector<uint32_t> mine;
+                for (size_t i = b; i < e; ++i) {
+                    const uint32_t v = verts_[i];
+                    if (std::abs(glm::dot(pos[v] - planeAt, areaNormal)) > deepAt && (all || !(clayStart_.bits[v >> 6] >> (v & 63) & 1u))) mine.push_back(v);
+                }
+                if (!mine.empty()) {
+                    std::lock_guard<std::mutex> lk(foundLock);
+                    found.insert(found.end(), mine.begin(), mine.end());
+                }
+            }, 65536);
+            return found;
+        };
+        const size_t kBudget = clayStartBudget;
+        std::vector<uint32_t> found = gather(clayStart_.bits.empty());
+        if (clayStart_.count + found.size() > kBudget) { // (the budget is spent: start afresh with this dab's own, or none if they alone are over it, so
+            clayStart_ = StartStore();                   // that every deep vertex of a dab is weighed alike, never a mix of kept and not)
+            found = gather(true);
+            if (found.size() > kBudget) found.clear();
+        }
+        if (!found.empty()) {
+            if (clayStart_.bits.empty()) clayStart_.bits.assign((mesh.vertexCount() + 63) / 64, 0);
+            for (const uint32_t v : found) clayStart_.insert(v, pos[v]);
+        }
+        startWeights = clayStart_.count > 0;
+    }
+
     // Inflate swells along each vertex's own normal, unless the dab reaches a groove or a packed grid (see inflateAlongNormals).
     bool inflateAlongNormals = true;
     if (type == BrushType::Inflate) {
@@ -1659,9 +1707,17 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                         viewDepthFade(x, p.center, p.viewDir, r);
             if (reachFade <= 0.0f) return glm::vec3(0.0f);
         }
-        const glm::vec3 o = x - p.center;
+        glm::vec3 xw = x; // (where the falloff weighs it)
+        glm::vec3 st;
+        if (startWeights && clayStart_.find(v, st)) {
+            float kk;
+            const float deep = std::abs(glm::dot(st - plane.clayPlane(kk), areaNormal)) / r;
+            const float t = std::clamp((deep - kStartDeep) * 4.0f, 0.0f, 1.0f);
+            if (t > 0.0f) xw = x + (st - x) * (t * t * (3.0f - 2.0f * t));
+        }
+        const glm::vec3 o = xw - p.center;
         float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
-                           : brushFalloff(brushDistance(p, x), r, p.focal);
+                           : brushFalloff(brushDistance(p, xw), r, p.focal);
         if (useStencil && f > 0.0f) f *= stencil.weight(x);
         glm::vec3 d(0.0f);
 
