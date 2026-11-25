@@ -27,6 +27,9 @@ set(SCULPTFORGE_PACKAGE_SUFFIX "" CACHE STRING "Extra tag in package file names,
 option(SCULPTFORGE_BUILD_TESTS "Build unit tests" ON)
 option(SCULPTFORGE_USE_SYSTEM_SDL "Use an installed SDL3 if one is found" ON)
 option(SCULPTFORGE_UPDATE_CHECK "The app checks the website for a newer version once a day (OFF for package managers)" ON)
+# The macOS one-click update (core/SelfUpdate.h installMacApp). OFF: the banner's Download link on a Mac, as before 0.14.1
+# (a release cut before a real-Mac tester has run its checklist ships OFF; release manager's call).
+option(SCULPTFORGE_MAC_SELF_UPDATE "The update banner's Update button replaces the macOS app bundle itself" ON)
 # Android (android/README.md): the app is libmain.so inside an APK, drawing with OpenGL ES 3.2. SCULPTFORGE_GLES=ON on a
 # desktop builds that same ES path against the desktop's GLES driver (Mesa), to test it without a device.
 option(SCULPTFORGE_GLES "Draw with OpenGL ES 3.2 instead of desktop OpenGL 3.3 (ON for Android)" ${ANDROID})
@@ -321,7 +324,8 @@ if(SF_ZSTD_FOUND)
   target_link_libraries(sculptforge_core PRIVATE PkgConfig::SF_ZSTD)
   target_compile_definitions(sculptforge_core PRIVATE SF_HAVE_ZSTD)
 endif()
-target_compile_definitions(sculptforge_core PUBLIC GLM_FORCE_XYZW_ONLY)
+target_compile_definitions(sculptforge_core PUBLIC GLM_FORCE_XYZW_ONLY
+                                                   SF_MAC_SELF_UPDATE=$<BOOL:${SCULPTFORGE_MAC_SELF_UPDATE}>) # core/SelfUpdate.h, app and tests alike
 target_compile_definitions(sculptforge_core PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}") # written into projects
 if(MSVC)
   target_compile_options(sculptforge_core PRIVATE /W4 /utf-8 /permissive-)
@@ -1314,6 +1318,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     file(GLOB SCULPTFORGE_UI_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/*.sfui)
     list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/mode_matrix\\.sfui$") # (four shards, below)
     list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/hardware_tier_panel\\.sfui$") # (only at 1440 and 2880, below)
+    if(NOT SCULPTFORGE_MAC_SELF_UPDATE) # (the banner shows Download on a Mac: nothing of that script to drive)
+      list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/self_update_mac\\.sfui$")
+    endif()
     if(NOT TARGET sculptforge_pyhost) # (a build without Python in the app: its console says so, nothing to drive)
       list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/python_[a-z_]+\\.sfui$")
     endif()

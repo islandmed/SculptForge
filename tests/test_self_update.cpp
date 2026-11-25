@@ -362,7 +362,7 @@ TEST(self_update_detects_installs) {
     p.os = "macos", p.exePath = "/Applications/SculptForge.app/Contents/MacOS/sculptforge", p.home = "/Users/u";
     present.clear();
     in = detectInstall(p);
-    CHECK(in.kind == InstallKind::MacApp && in.target == "/Applications/SculptForge.app" && selfUpdates(in.kind));
+    CHECK(in.kind == InstallKind::MacApp && in.target == "/Applications/SculptForge.app" && selfUpdates(in.kind, true));
     CHECK(in.asset == "SculptForge-macos.dmg");
 #if !defined(_WIN32) // (the paths are joined with the host's separator; a Windows build never runs the Mac install)
     CHECK(in.stagingDir == "/Users/u/Library/Caches/SculptForge/updates");
@@ -728,6 +728,25 @@ FakeReleases macRelease(std::string& sumsOut) {
 
 } // namespace
 
+// The build switch (CMake SCULPTFORGE_MAC_SELF_UPDATE): OFF leaves a Mac with the Download link, every other install as it was.
+TEST(self_update_mac_build_switch) {
+    CHECK(selfUpdates(InstallKind::MacApp, true) && !selfUpdates(InstallKind::MacApp, false));
+    CHECK(selfUpdates(InstallKind::AppImage, false) && selfUpdates(InstallKind::WindowsInstaller, false) &&
+          selfUpdates(InstallKind::WindowsPortable, false));
+    CHECK(!selfUpdates(InstallKind::PackageManager, true) && !selfUpdates(InstallKind::None, true));
+    CHECK(selfUpdates(InstallKind::MacApp) == kMacSelfUpdate); // the default is what the build says
+    if (kMacSelfUpdate) return;
+    // Built OFF: the download step refuses a Mac bundle before asking for anything.
+    MacSandbox s("sf_self_update_mac_off");
+    std::string sums;
+    FakeReleases f = macRelease(sums);
+    uint8_t k[32];
+    CHECK(parseHexKey(kMacTestKey, k));
+    Download d;
+    downloadUpdate("99.0.0", s.install, k, f.fetch(), d);
+    CHECK(d.done && !d.ok && d.error == "this install can't update itself" && f.asked.empty() && s.cached() == 0);
+}
+
 TEST(self_update_mac_team_policy) {
     std::string why;
     CHECK(teamIdsAcceptable("ABCDE12345", "ABCDE12345", why) && why.empty());
@@ -772,6 +791,7 @@ TEST(self_update_mac_bundle_in_image_and_swap) {
 }
 
 TEST(self_update_mac_downloads_and_installs) {
+    if (!kMacSelfUpdate) return; // (built out: self_update_mac_build_switch covers the refusal)
     MacSandbox s("sf_self_update_mac_ok");
     std::string sums;
     FakeReleases f = macRelease(sums);
@@ -835,6 +855,7 @@ TEST(self_update_mac_downloads_and_installs) {
 }
 
 TEST(self_update_mac_refuses) {
+    if (!kMacSelfUpdate) return;
     uint8_t k[32];
     CHECK(parseHexKey(kMacTestKey, k));
     // Before the install: the download's own checks, as on every platform.

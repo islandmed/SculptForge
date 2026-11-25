@@ -85,6 +85,9 @@ releases (the checksum-list key is an Actions secret there); a developer-signed 
 - **Dry run**: `SF_UPDATE_DRY_RUN=1` does everything up to and including the signature checks, then removes the copy
   and the download; the status line says what would have happened. Linux/Windows: the same variable skips the install
   and removes the download.
+- **Build switch**: CMake `SCULPTFORGE_MAC_SELF_UPDATE` (default ON; `SF_MAC_SELF_UPDATE` in core/SelfUpdate.h). OFF
+  builds the leg out: a Mac gets the banner's Download link as before and `downloadUpdate` refuses a bundle install; the
+  release manager ships OFF when no real-Mac tester has run the checklist by the cut. Nothing else changes.
 - **Quarantine**: the app's own HTTP client sets no `com.apple.quarantine` attribute (as `curl -O` doesn't), so the
   copied bundle opens without Gatekeeper's first-launch prompt; what it opens is exactly the bytes the signed list names.
 

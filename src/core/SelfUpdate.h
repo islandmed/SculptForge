@@ -96,9 +96,15 @@ struct InstallProbe {
 };
 InstallProbe currentInstallProbe(); // this process
 Install detectInstall(const InstallProbe& probe);
-inline bool selfUpdates(InstallKind k) {
+// The macOS leg can be built out (CMake SCULPTFORGE_MAC_SELF_UPDATE=OFF, SF_MAC_SELF_UPDATE=0): a Mac then gets the
+// banner's Download link as before, and downloadUpdate refuses a MacApp install. Everything else is unchanged.
+#if !defined(SF_MAC_SELF_UPDATE)
+#define SF_MAC_SELF_UPDATE 1
+#endif
+inline constexpr bool kMacSelfUpdate = SF_MAC_SELF_UPDATE != 0;
+inline bool selfUpdates(InstallKind k, bool macSelfUpdate = kMacSelfUpdate) {
     return k == InstallKind::AppImage || k == InstallKind::WindowsInstaller || k == InstallKind::WindowsPortable ||
-           k == InstallKind::MacApp;
+           (k == InstallKind::MacApp && macSelfUpdate);
 }
 // What to start for an install's target: the AppImage file itself, a bundle's Contents/MacOS/sculptforge.
 std::string appExecutable(const std::string& target);
