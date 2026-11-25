@@ -187,7 +187,9 @@ private:
     void setCornerUv(uint32_t t, uint32_t v, const glm::vec2& uv); // (t is recorded already)
     bool seamVertex(uint32_t v) const;                              // its corners don't all have one UV
     bool seamEdge(uint32_t a, uint32_t b) const;                    // the triangles on it differ at an end
-    void slideUvs(uint32_t v, const glm::vec3& to);                 // before v moves to `to` along the surface
+    bool slideUvs(uint32_t v, const glm::vec3& to);                 // before v moves to `to` along the surface (false: a triangle's UVs would turn over)
+    void prepareUvMask();                                           // at a stroke's start: the charts' footprint, kept while only Dynamic changes the UVs
+    bool uvInChart(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c) const; // a triangle with these UVs samples only the texels the charts cover
     // The UV keep's corner takes in each triangle around `drop` (the edge's own n <= 2 triangles aside) when drop
     // merges into it: the one keep has in the edge triangle on the same side of the seam (the same UV at drop).
     // Where keep has no UV for a triangle of drop's (a chart it has no corner in) the plan is false: moving drop's corner
@@ -273,6 +275,12 @@ private:
     size_t ops_ = 0, maxOps_ = 0;
     mutable std::vector<uint32_t> scratch_, scratch2_, ringA_, ringB_, ringC_, lockScratch_;
     mutable std::vector<uint32_t> openScratch_;
+    // The cells of 1024 x 1024 the charts cover and one around them, from the UVs a Part had before Dynamic
+    // first changed them: a collapse may not put a triangle's samples outside. Kept from stroke to stroke while the UVs are the
+    // ones the last stroke left (rebuilt each stroke it would let each one's strays become the next one's charts), else built again.
+    std::vector<uint8_t> uvMask_;
+    const Mesh* uvMaskMesh_ = nullptr;
+    uint64_t uvMaskHash_ = 0;
     mutable std::vector<std::pair<uint32_t, glm::vec2>> uvPlan_; // collapseUvPlan's result (triangle, UV of the merged vertex)
 };
 

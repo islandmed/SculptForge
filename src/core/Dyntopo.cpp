@@ -7,6 +7,7 @@
 #include "core/ThreadPool.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -412,6 +413,95 @@ bool DynamicTopology::openVertex(uint32_t v) const {
     std::sort(around.begin(), around.end());
     const size_t distinct = size_t(std::unique(around.begin(), around.end()) - around.begin());
     return distinct != tris; // (a closed fan has as many neighbours as triangles; an open one, one more)
+}
+
+namespace {
+// Twice the signed area of a triangle in UV space.
+float uvArea(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c) {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+// A triangle whose corner UVs change keeps its orientation in UV space. When every triangle around a changed vertex does, the
+// triangles still cover exactly the UV region they covered; a collapse, flip or relax across a chart's notch turns one over.
+bool keepsUvTurn(const glm::vec2 old[3], const glm::vec2 now[3]) {
+    const float before = uvArea(old[0], old[1], old[2]), after = uvArea(now[0], now[1], now[2]);
+    if (std::abs(before) < 1e-12f) return true; // (flat in UV already: nothing to keep)
+    return before * after > 0.0f;
+}
+} // namespace
+
+namespace {
+constexpr int kUvMaskSize = 1024;
+uint64_t hashUvs(const std::vector<glm::vec2>& uvs) {
+    uint64_t h = 1469598103934665603ull;
+    const uint64_t* w = reinterpret_cast<const uint64_t*>(uvs.data());
+    for (size_t i = 0; i < uvs.size(); ++i) h = (h ^ w[i]) * 1099511628211ull; // (a vec2 is one 64-bit word)
+    return h;
+}
+} // namespace
+
+void DynamicTopology::prepareUvMask() {
+    const Mesh& m = *mesh_;
+    if (m.uvs.empty()) {
+        uvMask_.clear();
+        uvMaskMesh_ = nullptr;
+        return;
+    }
+    const uint64_t hash = hashUvs(m.uvs);
+    if (!uvMask_.empty() && uvMaskMesh_ == &m && uvMaskHash_ == hash) return; // (the UVs the last stroke left: the same charts)
+    uvMask_.clear();
+    uvMaskMesh_ = &m;
+    uvMaskHash_ = hash;
+    for (const glm::vec2& u : m.uvs)
+        if (!(u.x >= 0.0f && u.x <= 1.0f && u.y >= 0.0f && u.y <= 1.0f)) return; // (tiles outside 0..1: nothing to judge against)
+    std::vector<uint8_t> raw(size_t(kUvMaskSize) * kUvMaskSize, 0);
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::vec2 a = m.uvs[size_t(t) * 3], e1 = m.uvs[size_t(t) * 3 + 1] - a, e2 = m.uvs[size_t(t) * 3 + 2] - a;
+        const int steps = std::max(2, int(std::max(glm::length(e1), glm::length(e2)) * float(kUvMaskSize)) + 1); // (a sample a texel)
+        for (int i = 0; i <= steps; ++i)
+            for (int j = 0; i + j <= steps; ++j) {
+                const glm::vec2 q = a + e1 * (float(i) / float(steps)) + e2 * (float(j) / float(steps));
+                const int x = std::min(int(q.x * float(kUvMaskSize)), kUvMaskSize - 1), y = std::min(int(q.y * float(kUvMaskSize)), kUvMaskSize - 1);
+                raw[size_t(y) * kUvMaskSize + size_t(x)] = 1;
+            }
+    }
+    // One cell (two texels of 2048) around every chart, as two box passes.
+    std::vector<uint8_t> tmp(raw.size(), 0);
+    uvMask_.assign(raw.size(), 0);
+    for (int pass = 0; pass < 2; ++pass) {
+        const std::vector<uint8_t>& from = pass == 0 ? raw : tmp;
+        std::vector<uint8_t>& to = pass == 0 ? tmp : uvMask_;
+        for (int y = 0; y < kUvMaskSize; ++y)
+            for (int x = 0; x < kUvMaskSize; ++x) {
+                uint8_t any = 0;
+                for (int d = -1; d <= 1 && !any; ++d) {
+                    const int xx = pass == 0 ? x + d : x, yy = pass == 0 ? y : y + d;
+                    if (xx >= 0 && xx < kUvMaskSize && yy >= 0 && yy < kUvMaskSize) any = from[size_t(yy) * kUvMaskSize + size_t(xx)];
+                }
+                to[size_t(y) * kUvMaskSize + size_t(x)] = any;
+            }
+    }
+}
+
+bool DynamicTopology::uvInChart(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c) const {
+    if (uvMask_.empty()) return true; // (no UVs, or tiles outside 0..1)
+    const glm::vec2 centre = (a + b + c) / 3.0f;
+    auto covered = [&](const glm::vec2& p) {
+        const glm::vec2 q = centre + (p - centre) * 0.97f; // (a little inside the edge)
+        const int x = int(q.x * float(kUvMaskSize)), y = int(q.y * float(kUvMaskSize));
+        return q.x >= 0.0f && q.y >= 0.0f && x < kUvMaskSize && y < kUvMaskSize && uvMask_[size_t(y) * kUvMaskSize + size_t(x)];
+    };
+    // The corners and the centre first (nearly every refusal), then along the three edges a cell apart: a long triangle along a
+    // chart's bending edge or across its hollow has its corners and centre on the paint and an edge over unpainted texels. The cost
+    // follows the perimeter, not the area (the inside of a triangle with its edges on the paint is the paint's: charts have no islands).
+    if (!covered(a) || !covered(b) || !covered(c) || !covered(centre)) return false;
+    const glm::vec2 corner[3] = {a, b, c};
+    for (int e = 0; e < 3; ++e) {
+        const glm::vec2 p = corner[e], q = corner[(e + 1) % 3];
+        const int steps = std::clamp(int(glm::length(q - p) * float(kUvMaskSize)) + 1, 2, 48);
+        for (int i = 1; i < steps; ++i)
+            if (!covered(p + (q - p) * (float(i) / float(steps)))) return false;
+    }
+    return true;
 }
 
 bool DynamicTopology::outlineStaysInChart(uint32_t keep, uint32_t drop) const {
@@ -1108,10 +1198,30 @@ bool DynamicTopology::canCollapse(uint32_t keep, uint32_t drop, const glm::vec3&
     if (n < 1 || n > 2) return false;
     // (A seam vertex stays where it is, the other merges into it: only vertices with one UV each meet at the midpoint.)
     if (!m.uvs.empty() && p != m.positions[keep] && (seamVertex(keep) || seamVertex(drop))) return false;
-    // (Two vertices with one UV each, drop inside the mesh: nothing to judge. Most candidates are like that.)
-    if (!m.uvs.empty() && p == m.positions[keep] && (seamVertex(drop) || seamVertex(keep) || openVertex(drop)) &&
-        (!outlineStaysInChart(keep, drop) || !collapseUvPlan(keep, drop, tris, n, uvPlan_)))
-        return false;
+    // (Two vertices with one UV each, drop inside the mesh: no outline or plan to judge. Most candidates are like that.)
+    const bool judged = !m.uvs.empty() && p == m.positions[keep] && (seamVertex(drop) || seamVertex(keep) || openVertex(drop));
+    if (judged && (!outlineStaysInChart(keep, drop) || !collapseUvPlan(keep, drop, tris, n, uvPlan_))) return false;
+    if (!m.uvs.empty()) { // (no triangle turns over in UV: a big one across a chart's notch would sample unpainted texels)
+        const bool midpoint = p != m.positions[keep];
+        const glm::vec2 merged = midpoint ? (cornerUv(tris[0], keep) + cornerUv(tris[0], drop)) * 0.5f : cornerUv(tris[0], keep);
+        for (uint32_t v : {keep, drop}) {
+            if (v == keep && !midpoint) continue; // (keep's own triangles stay as they are)
+            for (uint32_t t : m.vertexTriangles(v)) {
+                if (t == tris[0] || (n == 2 && t == tris[1])) continue;
+                const glm::uvec3& tri = m.triangles[t];
+                glm::vec2 old[3], now[3];
+                for (int c = 0; c < 3; ++c) now[c] = old[c] = m.uvs[size_t(t) * 3 + size_t(c)];
+                for (int c = 0; c < 3; ++c)
+                    if (tri[c] == v) now[c] = merged;
+                if (judged && v == drop) // (a seam: each chart's corner goes to its own place)
+                    for (const auto& [pt, uv] : uvPlan_)
+                        if (pt == t)
+                            for (int c = 0; c < 3; ++c)
+                                if (tri[c] == drop) now[c] = uv;
+                if (!keepsUvTurn(old, now) || !uvInChart(now[0], now[1], now[2])) return false;
+            }
+        }
+    }
     uint32_t opposite[2] = {kNone, kNone};
     for (int i = 0; i < n; ++i) {
         const glm::uvec3& tri = m.triangles[tris[i]];
@@ -1273,7 +1383,11 @@ void DynamicTopology::collapsePass() {
         bool ok = true;
         for (const auto& [x, y] : edges) {
             Plan pl;
-            if (locked(x) || locked(y) || !collapseTarget(x, y, pl.keep, pl.drop, pl.p) || !canCollapse(pl.keep, pl.drop, pl.p)) {
+            if (locked(x) || locked(y) || !collapseTarget(x, y, pl.keep, pl.drop, pl.p)) {
+                ok = false;
+                break;
+            }
+            if (!canCollapse(pl.keep, pl.drop, pl.p)) {
                 ok = false;
                 break;
             }
@@ -1311,6 +1425,20 @@ bool DynamicTopology::flipGain(uint32_t a, uint32_t b, uint32_t& c, uint32_t& d)
     if (c == kNone || d == kNone || c == d) return false;
     uint32_t tmp[4];
     if (edgeTriangles(c, d, tmp) > 0) return false;
+    if (!m.uvs.empty()) { // (the new pair covers the old pair's UV quad only where that is convex: neither turns over)
+        const glm::vec2 ua = cornerUv(tris[0], a), ub = cornerUv(tris[0], b);
+        glm::vec2 uc(0.0f), ud(0.0f);
+        for (int i = 0; i < 2; ++i) {
+            const glm::uvec3& tri = m.triangles[tris[i]];
+            int k = 0;
+            while (tri[k] != a) ++k;
+            if (tri[(k + 1) % 3] == b) uc = cornerUv(tris[i], c);
+            else ud = cornerUv(tris[i], d);
+        }
+        const glm::vec2 was[3] = {ua, ub, uc}, wasToo[3] = {ub, ua, ud}; // (a, b, c and b, a, d)
+        const glm::vec2 first[3] = {uc, ua, ud}, second[3] = {ud, ub, uc};
+        if (!keepsUvTurn(was, first) || !keepsUvTurn(wasToo, second)) return false;
+    }
     const auto& p = m.positions;
     const glm::vec3 n1 = glm::cross(p[b] - p[a], p[c] - p[a]), n2 = glm::cross(p[a] - p[b], p[d] - p[b]);
     const float l1 = glm::length(n1), l2 = glm::length(n2);
@@ -1496,8 +1624,8 @@ void DynamicTopology::relaxPass() {
             }
         }
         if (!ok) continue;
+        if (!slideUvs(v, to)) continue; // (a triangle's UVs would turn over)
         recordVertex(v);
-        slideUvs(v, to);
         m.positions[v] = to;
         if (!m.base.empty()) m.base[v] += d;
     }
@@ -1507,11 +1635,11 @@ void DynamicTopology::relaxPass() {
 // ring: its UV goes the same fraction of the way to the middle of the ring's UVs (in its chart: a seam vertex isn't relaxed).
 // A convex combination of the corners around it stays inside its chart, however many times it is relaxed; the affine
 // extension of each triangle's own map did not (its errors added up, a few texels out, where the paint ends).
-void DynamicTopology::slideUvs(uint32_t v, const glm::vec3& to) {
+bool DynamicTopology::slideUvs(uint32_t v, const glm::vec3& to) {
     Mesh& m = *mesh_;
-    if (m.uvs.empty()) return;
+    if (m.uvs.empty()) return true;
     const IndexRing fan = m.vertexTriangles(v);
-    if (fan.begin() == fan.end()) return;
+    if (fan.begin() == fan.end()) return true;
     const glm::vec2 at = cornerUv(*fan.begin(), v);
     glm::vec3 mean3(0.0f);
     glm::vec2 mean2(0.0f);
@@ -1526,22 +1654,31 @@ void DynamicTopology::slideUvs(uint32_t v, const glm::vec3& to) {
             found = true;
             break;
         }
-        if (!found) return;
+        if (!found) return true;
         mean3 += m.positions[u];
         ++n;
     }
-    if (n == 0) return;
+    if (n == 0) return true;
     mean3 /= float(n);
     mean2 /= float(n);
     const float full = glm::length(mean3 - m.positions[v]);
-    if (!(full > 1e-12f)) return;
+    if (!(full > 1e-12f)) return true;
     const float f = std::min(1.0f, glm::length(to - m.positions[v]) / full);
     const glm::vec2 target = at + (mean2 - at) * f;
+    for (uint32_t t : fan) {
+        const glm::uvec3& tri = m.triangles[t];
+        glm::vec2 old[3], now[3];
+        for (int c = 0; c < 3; ++c) now[c] = old[c] = m.uvs[size_t(t) * 3 + size_t(c)];
+        for (int c = 0; c < 3; ++c)
+            if (tri[c] == v) now[c] = target;
+        if (!keepsUvTurn(old, now)) return false;
+    }
     for (uint32_t t : fan) {
         recordTriangle(t);
         m.uvs[size_t(t) * 3 + (m.triangles[t].x == v ? 0u : m.triangles[t].y == v ? 1u : 2u)] = target;
         markTriangle(t);
     }
+    return true;
 }
 
 void DynamicTopology::gatherRegion() {
@@ -1645,6 +1782,7 @@ bool DynamicTopology::remesh(Mesh& mesh, BVH& bvh, const glm::vec3& center, floa
         deadV_.assign(mesh.vertexCount(), 0);
         deadT_.assign(mesh.triangleCount(), 0);
         changedVFlag_.assign(mesh.vertexCount(), 0);
+        prepareUvMask();
     }
     center_ = center;
     radius_ = radius;
@@ -1738,6 +1876,7 @@ std::unique_ptr<TopologyUndo> DynamicTopology::finish(Mesh& mesh, BVH& bvh) {
     std::unique_ptr<TopologyUndo> undo = std::move(undo_);
     undo->vertexCount = startVertices_;
     undo->triangleCount = startTriangles_;
+    if (!uvMask_.empty()) uvMaskHash_ = hashUvs(mesh.uvs); // (these are the UVs this mask belongs to: the next stroke reuses it)
     mesh_ = nullptr;
     bvh_ = nullptr;
     std::vector<uint64_t>().swap(vertRec_);

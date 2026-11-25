@@ -748,8 +748,7 @@ void App::refreshTopologyRelease() {
         lastCommandOk_ = true;
         return;
     }
-    if (r.topology && !r.topology->uvs.empty()) status_ = "Refresh topology removed the UVs of the remeshed Part (Undo brings them back). ";
-    else status_.clear();
+    status_.clear(); // (Dynamic keeps a painted Part's UVs now: nothing to say about them)
     doc_.undo.push(std::move(r));
     doc_.modified = true;
     updateTitle();
