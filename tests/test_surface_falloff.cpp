@@ -441,3 +441,44 @@ TEST(surface_falloff_contact_facing_far_wall_after_a_cut) {
                     if (!(rim && t == BrushType::Trim && k == 0)) CHECK(a.share() < 0.05f);
                 }
 }
+
+// Trim with Contact facing on a dense curved sphere, with and without the option (overlapping strokes, varied pressure, X symmetry):
+// a cut only lowers (no vertex rises along its normal), the falloff edge has no spike or step the stroke without the option does
+// not have, the mirror halves stay mirrored, and a smooth form moves as without it (the flood's start, on the cursor's own wall
+// here as before, changes nothing where the nearest vertex already faces the contact).
+TEST(surface_falloff_contact_facing_trim_dense_sphere_invariants) {
+    const float edge = geom::meanEdge(geom::denseSphereFixture().mesh);
+    const std::vector<uint32_t> mirror = geom::mirrorMapX(geom::denseSphereFixture().mesh);
+    const Symmetry sym{true, false, false};
+    std::vector<glm::vec3> moved[2];
+    geom::EdgeReport rep[2];
+    float peak = 0.0f, rise[2] = {}, asym[2] = {};
+    for (int on = 0; on < 2; ++on) {
+        Document d = geom::denseSphere();
+        const std::vector<glm::vec3> before = d.mesh.positions, normals = d.mesh.normals;
+        const auto strokes = geom::overlapStrokes(glm::vec3(0.5f, 0.2f, 0.84f), 0.15f);
+        CHECK(d.sculptor.beginStroke(d.mesh, brushName(BrushType::Trim)));
+        for (const auto& s : strokes)
+            for (DabParams p : s) {
+                p.contactFacing = on == 1;
+                d.sculptor.dab(d.mesh, d.bvh, BrushType::Trim, p, sym);
+            }
+        d.undo.push(d.sculptor.endStroke());
+        moved[on] = d.mesh.positions;
+        rep[on] = geom::edgeOutliers(d.mesh, before, geom::centersOf(strokes), 0.15f, edge);
+        rise[on] = geom::maxRise(before, d.mesh, normals);
+        asym[on] = geom::symmetryError(d.mesh, mirror);
+        if (on == 0) peak = geom::maxMove(before, d.mesh);
+        CHECK(geom::nonFinite(d.mesh) == 0);
+    }
+    float diff = 0.0f;
+    for (size_t v = 0; v < moved[0].size(); ++v) diff = std::max(diff, glm::distance(moved[0][v], moved[1][v]));
+    std::printf("dense sphere Trim peak %.5f diff %.6f rise off %.2e on %.2e spikes off %d on %d worst off %.3f on %.3f asym off %.2e on %.2e\n",
+                peak, diff, rise[0], rise[1], rep[0].spikes, rep[1].spikes, rep[0].worst, rep[1].worst, asym[0], asym[1]);
+    CHECK(peak > 0.0f);
+    CHECK(rise[1] <= std::max(rise[0], 1e-6f)); // (cut only)
+    CHECK(rep[1].spikes <= rep[0].spikes);
+    CHECK(rep[1].worst <= std::max(1.2f * rep[0].worst, geom::kSpike));
+    CHECK(asym[1] <= std::max(asym[0], 1e-5f) + 1e-5f); // (symmetry holds)
+    CHECK(diff < 0.01f * peak);                         // (a smooth form moves as without the option)
+}
