@@ -7,26 +7,26 @@ run transform rotate=90,0,0                    # stood up: it faces the front vi
 run transform translate=-0.6,0,0               # room to stream to the right
 run mask_rect y0=0.85                          # its top strip, seen from the front: the pins
 run part_select name=Plane
-camera 20 -15
-zoom 1.3
+camera 25 -12
+zoom 1.25
 click "Tool##palette.tool"
 click "Drape##tool.drape"
 expect "##drapewind"
-drag_item "##drapewind" -80 0             # a breeze (the slider's middle is 10 m/s)
+drag_item "##drapewind" -75 0             # a breeze (the slider's middle is 10 m/s)
 wait_value drape_wind > 0 5
 click "From view##drapewind"
 wait_value drape_heading > 0 5
 drag_item "##drapeheading" -2000 0        # 0: toward -Z (into the screen from the front view)
 wait_value drape_heading == 0 5
-drag_item "##drapeheading" 60 0           # a heading to the right
+drag_item "##drapeheading" 62 0           # a heading away to the left of the view: it streams across the view
 wait_value drape_heading > 30 5
-drag_item "##drapegusts" 40 0
+drag_item "##drapegusts" 25 0
 wait_value drape_gusts > 0 5
 snapshot
 click "Simulate##drape"
 wait_value drape_running == 1 10
 wait_value drape_frame > 30 30
-drag_item "##drapewind" 20 0              # harder, while it runs
+drag_item "##drapewind" -60 0             # a little harder, while it runs (each drag starts at the slider's middle)
 wait_value drape_frame > 90 30
 expect "Keep##drape"
 click "Keep##drape"
