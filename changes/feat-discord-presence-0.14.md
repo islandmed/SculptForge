@@ -14,4 +14,4 @@ testers:
   - Uncheck it: the status clears at once. Quit Discord and start it again: SculptForge is back on your profile within about a minute.
   - Had "Show the file name" on in 0.14.0 or earlier: Preferences > Integrations shows a note once; Got it dismisses it for good.
 ---
-Narrows the shipped feature to the owner's 11-23 conditions (brief: feat/discord-presence). Security checklist in REPORT.md.
+Narrows the shipped feature to the owner's conditions: fixed strings only, a 30 s retry floor, no thread once off.
