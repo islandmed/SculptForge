@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <new>
 #include <numeric>
+#include <unordered_map>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -235,8 +236,481 @@ std::vector<uint8_t> solidifyShellPolled(const VoxelGrid& shell, float threshold
 bool rasterizeMeshShellPolled(const Mesh& mesh, VoxelGrid& grid, const StagePoll& poll);
 Mesh meshFromFieldPolled(const VoxelGrid& grid, const std::vector<float>& f, float iso, int smoothIterations, const StagePoll& poll,
                          bool& stopped);
+// `nearestOut`: each sample's nearest triangle (-1: none measured), for snapCreases.
 std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& grid, const std::vector<uint8_t>& solid,
-                                             float band, const StagePoll& poll, bool& stopped);
+                                             float band, const StagePoll& poll, bool& stopped,
+                                             std::vector<int32_t>* nearestOut = nullptr);
+
+glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c);
+
+namespace {
+bool g_creaseSnap = true; // (tests: setVoxelCreaseSnap)
+
+// Segment pq through the inside of triangle abc (Moller-Trumbore; touching an edge or a corner doesn't count).
+bool segmentCrossesTriangle(const glm::vec3& p, const glm::vec3& q, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
+    const glm::vec3 d = q - p, e1 = b - a, e2 = c - a, h = glm::cross(d, e2);
+    const float det = glm::dot(e1, h);
+    if (std::abs(det) < 1e-20f) return false;
+    const float f = 1.0f / det;
+    const glm::vec3 s = p - a;
+    const float u = f * glm::dot(s, h);
+    if (u <= 1e-6f || u >= 1.0f - 1e-6f) return false;
+    const glm::vec3 k = glm::cross(s, e1);
+    const float v = f * glm::dot(d, k);
+    if (v <= 1e-6f || u + v >= 1.0f - 1e-6f) return false;
+    const float t = f * glm::dot(e2, k);
+    return t > 1e-6f && t < 1.0f - 1e-6f;
+}
+} // namespace
+
+void setVoxelCreaseSnap(bool on) { g_creaseSnap = on; }
+
+// Creases under two voxels wide (gh#240: wrinkles on a decimated head came out stair-stepped). Surface nets puts each
+// vertex at the mean of its cell's edge crossings, interpolated linearly between samples a voxel apart, so a groove
+// narrower than two voxels is seen or missed depending on where the samples fall: along a crease that runs across the
+// grid it comes and goes (its depth swung +-45% at the default Resolution, its flanks tilted 44 degrees off).
+// The distance field already knows each sample's nearest source triangle (the Hermite data of dual contouring: Ju et
+// al. 2002; Kobbelt et al. 2001). After the smoothing, a vertex at a crease (its cell's nearest triangles turn more
+// than kFlat, and it sits more than kOffMin off the source) moves along its own normal to where the planes of the
+// nearest triangles of the 27 samples around it say the surface is (least squares, the nearer planes weighing more),
+// with a little smoothing between rounds so neighbours agree. Moving along the normal only, vertices don't slide past
+// each other. The move fades in up to kSharp and kOffFull and is at most a cell; one that doesn't end nearer the source
+// or would turn a face over goes back. Each touched quad's diagonal is then picked again, along the crease rather than
+// across it, and a move that makes two faces cross is halved until they don't. Everything else is not touched (smooth
+// surfaces and fine bumps come out byte-identical), the voxel topology and the quads stay, and it reads only what the
+// distance field kept: no search structure.
+// Returns whether a quad's diagonal changed (the caller rebuilds the topology).
+template <class NearestAt>
+bool snapCreases(Mesh& m, const Mesh& source, const VoxelGrid& grid, const NearestAt& nearestAt, CreaseReport* report = nullptr) {
+    const size_t nv = m.positions.size();
+    if (nv == 0 || m.normals.size() != nv) return false;
+    const float cell = grid.cell, inv = 1.0f / cell;
+    // A crease: its cell's nearest triangles turn more than 35 degrees (full move from 70); fine smooth bumps turn
+    // less within a cell (the bumpy bench spheres: none past 35).
+    const float kFlat = std::cos(glm::radians(35.0f)), kHalfFlat = std::cos(glm::radians(17.5f)), kSharp = std::cos(glm::radians(70.0f));
+    constexpr int kRounds = 5;
+    constexpr float kLambda = 0.3f, kReach = 1.0f; // (smoothing between rounds; planes within a cell count)
+    constexpr float kOffMin = 0.1f, kOffFull = 0.2f; // (cells off the source: untouched below, full move above) // (cells off the source: untouched below, full move above)
+    const auto& S = source.positions;
+    auto inGrid = [&](const glm::ivec3& s) {
+        return glm::all(glm::greaterThanEqual(s, glm::ivec3(0))) && glm::all(glm::lessThan(s, grid.dims));
+    };
+    static const bool timing = std::getenv("SF_VOXEL_TIMING") != nullptr;
+    auto clock0 = std::chrono::steady_clock::now();
+    auto lap = [&](const char* what) {
+        if (!timing) return;
+        const auto now = std::chrono::steady_clock::now();
+        std::fprintf(stderr, "    creases %-14s %6.1f ms\n", what, std::chrono::duration<double, std::milli>(now - clock0).count());
+        clock0 = now;
+    };
+    const std::vector<glm::vec3> original = m.positions;
+    // The vertices at a crease (the nearest triangles of their cell's corners turn), with how much they move (fade),
+    // found once; then the planes they move onto (the nearest triangles of the 27 samples around them).
+    constexpr int kMax = 27;
+    std::vector<float> fadeOf(nv, 0.0f);
+    poolFor(nv, [&](size_t b, size_t e) {
+        std::array<int32_t, 8> tris;
+        std::array<glm::vec3, 8> normals;
+        for (size_t v = b; v < e; ++v) {
+            const glm::ivec3 c(glm::floor((original[v] - grid.origin) * inv));
+            int count = 0;
+            bool spread = false; // (all within half of kFlat of the first: no pair can be past kFlat)
+            for (int k = 0; k < 8; ++k) {
+                const glm::ivec3 s = c + glm::ivec3(k & 1, (k >> 1) & 1, (k >> 2) & 1);
+                if (!inGrid(s)) continue;
+                const int32_t t = nearestAt(s);
+                if (t < 0 || std::find(tris.begin(), tris.begin() + count, t) != tris.begin() + count) continue;
+                const glm::uvec3 tri = source.triangles[size_t(t)];
+                const glm::vec3 n = glm::cross(S[tri.y] - S[tri.x], S[tri.z] - S[tri.x]);
+                const float l = glm::length(n);
+                if (!(l > 0.0f)) continue;
+                tris[size_t(count)] = t, normals[size_t(count)] = n / l;
+                spread |= glm::dot(normals[size_t(count)], normals[0]) < kHalfFlat;
+                ++count;
+            }
+            if (!spread) continue;
+            float minDot = 1.0f;
+            for (int i = 0; i < count; ++i)
+                for (int j = i + 1; j < count; ++j) minDot = std::min(minDot, glm::dot(normals[size_t(i)], normals[size_t(j)]));
+            if (minDot >= kFlat) continue;
+            // Smooth detail that only turns fast (fine bumps) the surface nets already follow: only a vertex that
+            // missed the source counts.
+            float off = 1e30f;
+            for (int i = 0; i < count; ++i) {
+                const glm::uvec3 tri = source.triangles[size_t(tris[size_t(i)])];
+                off = std::min(off, glm::length(closestOnTriangle(original[v], S[tri.x], S[tri.y], S[tri.z]) - original[v]));
+            }
+            fadeOf[v] = std::clamp((kFlat - minDot) / (kFlat - kSharp), 0.0f, 1.0f) *
+                        std::clamp((off * inv - kOffMin) / (kOffFull - kOffMin), 0.0f, 1.0f);
+        }
+    }, 1024);
+    std::vector<uint32_t> crease;
+    for (uint32_t v = 0; v < nv; ++v)
+        if (fadeOf[v] > 0.0f) crease.push_back(v);
+    std::vector<uint8_t> changed(nv, 0);
+    lap("find");
+    if (timing) std::fprintf(stderr, "    creases: %zu of %zu vertices\n", crease.size(), nv);
+    if (crease.empty()) return false;
+    for (uint32_t v : crease) changed[v] = 1;
+    std::vector<int32_t> trisOf(crease.size() * kMax, -1); // (each crease vertex's distinct nearest triangles)
+    poolFor(crease.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            int32_t* tris = &trisOf[i * kMax];
+            const glm::ivec3 c(glm::round((original[crease[i]] - grid.origin) * inv));
+            int count = 0;
+            for (int k = 0; k < kMax; ++k) {
+                const glm::ivec3 s = c + glm::ivec3(k % 3 - 1, (k / 3) % 3 - 1, k / 9 - 1);
+                if (!inGrid(s)) continue;
+                const int32_t t = nearestAt(s);
+                if (t >= 0 && std::find(tris, tris + count, t) == tris + count) tris[count++] = t;
+            }
+        }
+    }, 256);
+    // A crease's width at x (scene units; -1: can't tell) and how opposed its flanks are (`flanks`: the lowest dot of two
+    // of its triangles' normals), from crease vertex i's triangles: the flanks (the most opposed pair) and the surface
+    // around it (the triangle facing most like `around`) meet in the crease's bottom line, h below that surface, and open
+    // to h (cot a1 + cot a2) across it (a1, a2: each flank's tilt from the surface).
+    auto measureCrease = [&](size_t i, const glm::vec3& x, const glm::vec3& around, float& flanks) {
+        const int32_t* tris = &trisOf[i * kMax];
+        std::array<glm::vec3, kMax> q, n;
+        int count = 0;
+        for (int k = 0; k < kMax && tris[k] >= 0; ++k) {
+            const glm::uvec3 tri = source.triangles[size_t(tris[k])];
+            const glm::vec3 nt = glm::cross(S[tri.y] - S[tri.x], S[tri.z] - S[tri.x]);
+            if (!(glm::length(nt) > 0.0f)) continue;
+            q[size_t(count)] = closestOnTriangle(x, S[tri.x], S[tri.y], S[tri.z]), n[size_t(count)] = glm::normalize(nt);
+            ++count;
+        }
+        int f1 = -1, f2 = -1;
+        flanks = 1.0f;
+        for (int a = 0; a < count; ++a)
+            for (int c = a + 1; c < count; ++c)
+                if (const float d = glm::dot(n[size_t(a)], n[size_t(c)]); d < flanks) flanks = d, f1 = a, f2 = c;
+        if (f1 < 0 || flanks >= kFlat || !(glm::length(around) > 0.0f)) return -1.0f;
+        const glm::vec3 up = glm::normalize(around);
+        int top = -1;
+        float facing = -2.0f;
+        for (int k = 0; k < count; ++k)
+            if (k != f1 && k != f2 && glm::dot(n[size_t(k)], up) > facing) facing = glm::dot(n[size_t(k)], up), top = k;
+        if (top < 0 || facing < kFlat) return -1.0f;
+        const glm::vec3 n1 = n[size_t(f1)], n2 = n[size_t(f2)], n0 = n[size_t(top)];
+        const float b1 = glm::dot(n1, q[size_t(f1)] - x), b2 = glm::dot(n2, q[size_t(f2)] - x), c12 = glm::dot(n1, n2);
+        const float det = 1.0f - c12 * c12; // (the bottom line's point nearest x: x + l1 n1 + l2 n2 on both planes)
+        if (!(det > 1e-4f)) return -1.0f;
+        const float l1 = (b1 - c12 * b2) / det, l2 = (b2 - c12 * b1) / det;
+        const float h = std::abs(glm::dot(n0, x + l1 * n1 + l2 * n2 - q[size_t(top)]));
+        auto cot = [&](const glm::vec3& f) {
+            const float c = std::clamp(glm::dot(f, n0), -1.0f, 0.999f);
+            return std::max(c, 0.0f) / std::sqrt(1.0f - c * c);
+        };
+        const float w = h * (cot(n1) + cot(n2));
+        return w > 0.0f && w <= 4.0f * cell ? w : -1.0f;
+    };
+    // Creases no vertex can follow are left as the voxels made them: a slit (walls facing each other, more than 120
+    // degrees apart: closed lips, a fold) or a crease under a voxel wide. Snapping there pulls single vertices onto one
+    // wall or the other: shards and notches (artist-qa 11-25, a lip line).
+    poolFor(crease.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            float flanks = 1.0f;
+            const float w = measureCrease(i, original[crease[i]], m.normals[crease[i]], flanks);
+            if (flanks < -0.5f || (w >= 0.0f && w < cell)) changed[crease[i]] = 0, fadeOf[crease[i]] = 0.0f;
+        }
+    }, 256);
+    std::vector<glm::vec3> cur(original), moved(original), sum(nv);
+    std::vector<int> degree(nv, 0);
+    std::vector<uint32_t> around; // the faces at a crease vertex
+    for (uint32_t t = 0; t < m.triangles.size(); ++t)
+        if (changed[m.triangles[t].x] | changed[m.triangles[t].y] | changed[m.triangles[t].z]) around.push_back(t);
+    for (int round = 0; round < kRounds; ++round) {
+        if (round > 0) { // the crease vertices a little toward their neighbours, then onto the planes again
+            for (uint32_t v : crease) sum[v] = glm::vec3(0.0f), degree[v] = 0;
+            for (uint32_t f : around)
+                for (int k = 0; k < 3; ++k) {
+                    const glm::uvec3 t = m.triangles[f];
+                    const uint32_t i = t[k], j = t[(k + 1) % 3];
+                    if (changed[i]) sum[i] += moved[j], ++degree[i];
+                    if (changed[j]) sum[j] += moved[i], ++degree[j];
+                }
+            for (uint32_t v : crease)
+                cur[v] = degree[v] ? moved[v] + kLambda * (sum[v] / float(degree[v]) - moved[v]) : moved[v];
+        }
+        poolFor(crease.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const uint32_t v = crease[i];
+                if (!changed[v]) continue; // (left alone: a slit or too fine)
+                const glm::vec3 x = cur[v], axis = glm::normalize(m.normals[v]);
+                double num = 0.0, den = 0.0;
+                for (int k = 0; k < kMax && trisOf[i * kMax + size_t(k)] >= 0; ++k) {
+                    const glm::uvec3 tri = source.triangles[size_t(trisOf[i * kMax + size_t(k)])];
+                    const glm::vec3 nt = glm::cross(S[tri.y] - S[tri.x], S[tri.z] - S[tri.x]);
+                    const float l = glm::length(nt);
+                    if (!(l > 0.0f)) continue;
+                    const glm::vec3 n = nt / l, q = closestOnTriangle(x, S[tri.x], S[tri.y], S[tri.z]);
+                    const float dq = glm::length(q - x);
+                    if (dq > kReach * cell) continue;
+                    const double w = 1.0 / ((double(dq * inv) + 0.25) * (double(dq * inv) + 0.25)), a = glm::dot(n, axis);
+                    num += w * a * double(glm::dot(n, q - x)), den += w * a * a;
+                }
+                moved[v] = den > 1e-12 ? x + axis * (std::clamp(float(num / den), -cell, cell) * fadeOf[v]) : x;
+            }
+        }, 256);
+    }
+    // A move that doesn't bring the vertex nearer the source (a plane that only fits a curve nearby) goes back.
+    poolFor(crease.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            const uint32_t v = crease[i];
+            float before = 1e30f, after = 1e30f;
+            for (int k = 0; k < kMax && trisOf[i * kMax + size_t(k)] >= 0; ++k) {
+                const glm::uvec3 tri = source.triangles[size_t(trisOf[i * kMax + size_t(k)])];
+                before = std::min(before, glm::length(closestOnTriangle(original[v], S[tri.x], S[tri.y], S[tri.z]) - original[v]));
+                after = std::min(after, glm::length(closestOnTriangle(moved[v], S[tri.x], S[tri.y], S[tri.z]) - moved[v]));
+            }
+            if (!(after < before)) moved[v] = original[v], changed[v] = 0;
+        }
+    }, 256);
+    lap("snap");
+    // No face turned over and no new fold (two faces across an edge more than 120 degrees apart: a tooth on the
+    // crease's shoulder): the moves around one go halfway back, then all the way (a few rounds: undoing one can't
+    // make another).
+    auto faceNormal = [&](const std::vector<glm::vec3>& p, uint32_t t) {
+        const glm::uvec3 f = m.triangles[t];
+        return glm::cross(p[f.y] - p[f.x], p[f.z] - p[f.x]);
+    };
+    auto folded = [&](const glm::vec3& a, const glm::vec3& b) { return glm::dot(a, b) < -0.5f * glm::length(a) * glm::length(b); };
+    for (int round = 0; round < 6; ++round) {
+        std::vector<uint8_t> undo(nv, 0);
+        std::atomic<bool> any{false};
+        poolFor(crease.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const uint32_t v = crease[i];
+                if (!changed[v]) continue;
+                const IndexRing around = m.vertexTriangles(v);
+                bool bad = false;
+                for (auto it = around.begin(); it != around.end() && !bad; ++it) {
+                    const glm::vec3 n0 = faceNormal(original, *it), n1 = faceNormal(moved, *it);
+                    bad = glm::dot(n0, n1) <= 0.05f * glm::length(n0) * glm::length(n1);
+                    const glm::uvec3 f = m.triangles[*it];
+                    for (int k = 0; k < 3 && !bad; ++k) { // the face across each of its edges
+                        const uint32_t a = f[k], c = f[(k + 1) % 3];
+                        for (uint32_t u : m.vertexTriangles(a)) {
+                            const glm::uvec3 g = m.triangles[u];
+                            if (u == *it || (g.x != c && g.y != c && g.z != c)) continue;
+                            bad = folded(n1, faceNormal(moved, u)) && !folded(n0, faceNormal(original, u));
+                            break;
+                        }
+                    }
+                }
+                if (bad) undo[v] = 1, any.store(true, std::memory_order_relaxed);
+            }
+        }, 256);
+        if (!any) break;
+        for (uint32_t v : crease)
+            if (undo[v]) {
+                moved[v] = round < 3 ? 0.5f * (moved[v] + original[v]) : original[v];
+                if (round >= 3) changed[v] = 0;
+            }
+    }
+    m.positions = std::move(moved);
+    lap("flips");
+
+    // Each touched quad's diagonal again: the one whose middle lies nearer the source (along the crease, not across
+    // it), when neither half turns against the quad.
+    auto sourceDistance = [&](const glm::vec3& p) {
+        const glm::ivec3 c(glm::floor((p - grid.origin) * inv));
+        float best = 1e30f;
+        for (int k = 0; k < 8; ++k) {
+            const glm::ivec3 s = c + glm::ivec3(k & 1, (k >> 1) & 1, (k >> 2) & 1);
+            if (!inGrid(s)) continue;
+            const int32_t t = nearestAt(s);
+            if (t < 0) continue;
+            const glm::uvec3 tri = source.triangles[size_t(t)];
+            best = std::min(best, glm::length(closestOnTriangle(p, S[tri.x], S[tri.y], S[tri.z]) - p));
+        }
+        return best;
+    };
+    // (decided first, from the triangles as they are, then applied)
+    const auto& P = m.positions;
+    const size_t quads = m.triangles.size() / 2;
+    std::vector<uint8_t> flip(quads, 0);
+    auto across = [&](uint32_t x, uint32_t y, uint32_t skip) { // the face beyond edge xy, other than quad `skip`'s
+        for (uint32_t u : m.vertexTriangles(x)) {
+            const glm::uvec3 g = m.triangles[u];
+            if (u / 2 != skip && (g.x == y || g.y == y || g.z == y)) return int64_t(u);
+        }
+        return int64_t(-1);
+    };
+    poolFor(quads, [&](size_t b, size_t e) {
+        for (size_t q = b; q < e; ++q) {
+            const glm::uvec3 t1 = m.triangles[2 * q], t2 = m.triangles[2 * q + 1];
+            if (!(changed[t1.x] | changed[t1.y] | changed[t1.z] | changed[t2.x] | changed[t2.y] | changed[t2.z])) continue;
+            int o = -1; // t1's corner that t2 lacks, and t2's that t1 lacks: the quad is o1 s1 o2 s2, diagonal s1-s2
+            uint32_t o2 = ~0u;
+            for (int k = 0; k < 3; ++k) {
+                if (t1[k] != t2.x && t1[k] != t2.y && t1[k] != t2.z) o = k;
+                if (t2[k] != t1.x && t2[k] != t1.y && t2[k] != t1.z) o2 = t2[k];
+            }
+            if (o < 0 || o2 == ~0u) continue;
+            const uint32_t o1 = t1[o], s1 = t1[(o + 1) % 3], s2 = t1[(o + 2) % 3];
+            const glm::vec3 quadN = glm::cross(P[o2] - P[o1], P[s2] - P[s1]);
+            const glm::vec3 a = glm::cross(P[s1] - P[o1], P[o2] - P[o1]), c = glm::cross(P[o2] - P[o1], P[s2] - P[o1]);
+            if (glm::dot(a, quadN) <= 0.0f || glm::dot(c, quadN) <= 0.0f || folded(a, c)) continue;
+            if (sourceDistance(0.5f * (P[o1] + P[o2])) + 0.02f * cell >= sourceDistance(0.5f * (P[s1] + P[s2]))) continue;
+            // No new fold with the faces around the quad: each outer edge's new half against the face beyond it.
+            const glm::vec3 old1 = faceNormal(P, uint32_t(2 * q)), old2 = faceNormal(P, uint32_t(2 * q + 1));
+            bool ok = true;
+            const std::array<std::array<uint32_t, 2>, 4> edges = {{{o1, s1}, {s1, o2}, {o2, s2}, {s2, o1}}};
+            for (int k = 0; k < 4 && ok; ++k) {
+                const int64_t u = across(edges[size_t(k)][0], edges[size_t(k)][1], uint32_t(q));
+                if (u < 0) continue;
+                const glm::vec3 n = faceNormal(P, uint32_t(u)), now = k < 2 ? a : c, was = k == 0 || k == 3 ? old1 : old2;
+                ok = !folded(now, n) || folded(was, n);
+            }
+            flip[q] = ok;
+        }
+    }, 1024);
+    bool rediagonalised = false;
+    for (size_t q = 0; q < quads; ++q)
+        if (flip[q]) {
+            glm::uvec3& t1 = m.triangles[2 * q];
+            const glm::uvec3 t2 = m.triangles[2 * q + 1];
+            int o = 0;
+            uint32_t o2 = 0;
+            for (int k = 0; k < 3; ++k) {
+                if (t1[k] != t2.x && t1[k] != t2.y && t1[k] != t2.z) o = k;
+                if (t2[k] != t1.x && t2[k] != t1.y && t2[k] != t1.z) o2 = t2[k];
+            }
+            const uint32_t o1 = t1[o], s1 = t1[(o + 1) % 3], s2 = t1[(o + 2) % 3];
+            t1 = glm::uvec3(o1, s1, o2), m.triangles[2 * q + 1] = glm::uvec3(o1, o2, s2);
+            rediagonalised = true;
+        }
+    lap("diagonals");
+
+    // No new self-intersection: the faces within two rings of a moved vertex, bucketed by the cells their boxes touch
+    // (sorted), are tested in pairs that share no corner and include a moved one, each pair once (in the first cell of
+    // its boxes' overlap); crossings the surface already had are left alone. A crossing pair's moved corners go halfway
+    // back, then all the way, and the next round looks again around those only.
+    std::vector<uint8_t> seed(changed);
+    std::vector<std::pair<uint64_t, uint32_t>> buckets;
+    std::vector<glm::ivec3> lo(m.triangles.size()), hi(m.triangles.size());
+    auto cellKey = [](const glm::ivec3& c) {
+        return (uint64_t(uint32_t(c.x) & 0x1fffffu) << 42) | (uint64_t(uint32_t(c.y) & 0x1fffffu) << 21) | uint64_t(uint32_t(c.z) & 0x1fffffu);
+    };
+    for (int round = 0; round < 8; ++round) {
+        std::vector<uint8_t> ring(seed);
+        for (int r = 0; r < 2; ++r) {
+            std::vector<uint8_t> next(ring);
+            for (const glm::uvec3& t : m.triangles)
+                if (ring[t.x] | ring[t.y] | ring[t.z]) next[t.x] = next[t.y] = next[t.z] = 1;
+            ring.swap(next);
+        }
+        buckets.clear();
+        for (uint32_t t = 0; t < m.triangles.size(); ++t) {
+            const glm::uvec3 f = m.triangles[t];
+            if (!(ring[f.x] | ring[f.y] | ring[f.z])) continue;
+            const glm::vec3 a = P[f.x], b = P[f.y], c = P[f.z];
+            lo[t] = glm::ivec3(glm::floor((glm::min(a, glm::min(b, c)) - grid.origin) * inv));
+            hi[t] = glm::ivec3(glm::floor((glm::max(a, glm::max(b, c)) - grid.origin) * inv));
+            for (int z = lo[t].z; z <= hi[t].z; ++z)
+                for (int y = lo[t].y; y <= hi[t].y; ++y)
+                    for (int x = lo[t].x; x <= hi[t].x; ++x) buckets.push_back({cellKey({x, y, z}), t});
+        }
+        if (buckets.empty()) break;
+        std::sort(buckets.begin(), buckets.end());
+        std::vector<size_t> starts;
+        for (size_t i = 0; i < buckets.size(); ++i)
+            if (i == 0 || buckets[i].first != buckets[i - 1].first) starts.push_back(i);
+        starts.push_back(buckets.size());
+        std::vector<uint8_t> back(nv, 0);
+        std::atomic<bool> any{false};
+        poolFor(starts.size() - 1, [&](size_t sb, size_t se) {
+            for (size_t s0 = sb; s0 < se; ++s0)
+                for (size_t i = starts[s0]; i < starts[s0 + 1]; ++i)
+                    for (size_t j = i + 1; j < starts[s0 + 1]; ++j) {
+                        const uint32_t ti = buckets[i].second, tj = buckets[j].second;
+                        const glm::uvec3 f = m.triangles[ti], g = m.triangles[tj];
+                        if (!(changed[f.x] | changed[f.y] | changed[f.z] | changed[g.x] | changed[g.y] | changed[g.z])) continue;
+                        const glm::ivec3 olo = glm::max(lo[ti], lo[tj]), ohi = glm::min(hi[ti], hi[tj]);
+                        if (glm::any(glm::greaterThan(olo, ohi)) || cellKey(olo) != buckets[i].first) continue;
+                        bool shared = false;
+                        for (int u = 0; u < 3; ++u)
+                            for (int w = 0; w < 3; ++w) shared |= f[u] == g[w];
+                        if (shared) continue;
+                        bool hit = false;
+                        for (int u = 0; u < 3 && !hit; ++u)
+                            hit = segmentCrossesTriangle(P[f[u]], P[f[(u + 1) % 3]], P[g.x], P[g.y], P[g.z]) ||
+                                  segmentCrossesTriangle(P[g[u]], P[g[(u + 1) % 3]], P[f.x], P[f.y], P[f.z]);
+                        if (!hit) continue;
+                        for (uint32_t v : {f.x, f.y, f.z, g.x, g.y, g.z})
+                            if (changed[v]) AtomicRef<uint8_t>(back[v]).store(1, std::memory_order_relaxed);
+                        any.store(true, std::memory_order_relaxed);
+                    }
+        }, 64);
+        if (!any) break;
+        for (size_t v = 0; v < nv; ++v)
+            if (back[v]) {
+                m.positions[v] = round < 5 ? 0.5f * (m.positions[v] + original[v]) : original[v];
+                if (round >= 5) changed[v] = 0;
+            }
+        seed.swap(back);
+    }
+    lap("crossings");
+    if (report) {
+        // The crease vertices whose result still faces away from the source: a crease finer than the voxels, with no
+        // vertex inside it to bend the surface. Its width there: the gap between the closest points on its two most
+        // opposed flanks.
+        const float kLost = std::cos(glm::radians(30.0f));
+        std::vector<float> width(crease.size(), -1.0f);
+        poolFor(crease.size(), [&](size_t b, size_t e) {
+            for (size_t i = b; i < e; ++i) {
+                const glm::vec3 x = m.positions[crease[i]];
+                const int32_t* tris = &trisOf[i * kMax];
+                std::array<glm::vec3, kMax> q, n;
+                int count = 0;
+                for (int k = 0; k < kMax && tris[k] >= 0; ++k) {
+                    const glm::uvec3 tri = source.triangles[size_t(tris[k])];
+                    const glm::vec3 nt = glm::cross(S[tri.y] - S[tri.x], S[tri.z] - S[tri.x]);
+                    if (!(glm::length(nt) > 0.0f)) continue;
+                    q[size_t(count)] = closestOnTriangle(x, S[tri.x], S[tri.y], S[tri.z]), n[size_t(count)] = glm::normalize(nt);
+                    ++count;
+                }
+                // Lost: the result there faces more than 30 degrees away from the source triangle under it.
+                int under = -1;
+                float best = 1e30f;
+                for (int k = 0; k < count; ++k)
+                    if (const float d = glm::length(q[size_t(k)] - x); d < best) best = d, under = k;
+                glm::vec3 nr(0.0f);
+                for (uint32_t u : m.vertexTriangles(crease[i])) { // (the faces still at it: a diagonal may have moved)
+                    const glm::uvec3 f = m.triangles[u];
+                    if (f.x == crease[i] || f.y == crease[i] || f.z == crease[i]) nr += faceNormal(m.positions, u);
+                }
+                if (under < 0 || !(glm::length(nr) > 0.0f) || glm::dot(glm::normalize(nr), n[size_t(under)]) >= kLost) continue;
+                float flanks = 1.0f;
+                const float w = measureCrease(i, x, nr, flanks);
+                if (w < 0.0f) continue;
+                width[i] = w;
+            }
+        }, 256);
+        std::vector<float> fine;
+        for (float w : width)
+            if (w >= 0.0f) fine.push_back(w);
+        report->creases = crease.size(), report->fine = fine.size();
+        if (!fine.empty()) {
+            std::nth_element(fine.begin(), fine.begin() + ptrdiff_t(fine.size() / 2), fine.end());
+            report->fineWidth = fine[fine.size() / 2];
+        }
+        if (timing) std::fprintf(stderr, "    creases: %zu fine, width %.3f voxels\n", report->fine, report->fineWidth * inv);
+    }
+    return rediagonalised;
+}
+
+bool voxelCreaseSnap() { return g_creaseSnap; }
+
+bool snapVoxelCreases(Mesh& m, const Mesh& source, const glm::vec3& origin, float cell, const glm::ivec3& dims,
+                      const std::function<int32_t(const glm::ivec3&)>& nearestAt, CreaseReport* report) {
+    VoxelGrid grid; // (the layout only: no values)
+    grid.origin = origin, grid.cell = cell, grid.dims = dims;
+    return snapCreases(m, source, grid, nearestAt, report);
+}
 
 // Closest point to `p` on triangle abc (Ericson, Real-Time Collision Detection 5.1.5).
 glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
@@ -527,7 +1001,7 @@ std::vector<float> insideDistanceField(const Mesh& mesh, const VoxelGrid& grid, 
 }
 
 std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& grid, const std::vector<uint8_t>& solid,
-                                             float band, const StagePoll& poll, bool& stopped) {
+                                             float band, const StagePoll& poll, bool& stopped, std::vector<int32_t>* nearestOut) {
     stopped = false;
     auto stop = [&] { return stopped = true, std::vector<float>{}; };
     static const bool timing = std::getenv("SF_VOXEL_TIMING") != nullptr;
@@ -955,6 +1429,7 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
         }
     }, 1 << 16);
     lap("pockets + f");
+    if (nearestOut) *nearestOut = std::move(nearest);
     return f;
 }
 
@@ -1010,22 +1485,44 @@ VoxelRemeshEstimate estimateVoxelRemesh(const Mesh& mesh, int resolution, double
     const double cellsOfArea = area / (cell * cell);
     e.triangles = size_t(3.0 * cellsOfArea);
     // The grid: dense up to 512 (about 18 bytes a sample at its peak); above it the bricks near the surface (about 26
-    // samples deep per cell of area, 11 bytes each). Then the result in the app (as the other big commands count it).
+    // samples deep per cell of area, 15 bytes each with the nearest triangles the crease pass keeps). Then the result in
+    // the app (as the other big commands count it).
     double grid;
     if (resolution <= g_sparseAbove) {
         const glm::dvec3 dims = glm::ceil(glm::dvec3(ext) / cell) + 9.0;
         grid = dims.x * dims.y * dims.z * 18.0;
     } else {
         const glm::dvec3 bricks = glm::ceil((glm::ceil(glm::dvec3(ext) / cell) + 9.0) / 8.0);
-        grid = cellsOfArea * 26.0 * 11.0 + bricks.x * bricks.y * bricks.z * 6.0;
+        grid = cellsOfArea * 26.0 * 15.0 + bricks.x * bricks.y * bricks.z * 6.0;
     }
     e.bytes = size_t(grid + double(e.triangles) * kVoxelResultBytesPerTriangle);
     return e;
 }
 
 namespace {
+// The Resolution hint (gh#240): when the crease pass lost at least 64 crease vertices, and 1 in 20 of them (not one stray
+// crease: most of a head's are eyelids, lips and ears, which come through), the Resolution that makes those creases'
+// typical width two voxels, rounded up to the slider's step, if it fits the free memory; else none.
+// Only creases one to two voxels wide (median): thinner ones on a real sculpt are mostly the facets of a decimated
+// surface, which keep turning up finer at every Resolution, so no number would be honest for them.
+void noteFineCreases(const Mesh& mesh, int resolution, const CreaseReport& r, VoxelRemeshNotes* notes) {
+    if (!notes || r.fine < 64 || r.fine * 20 < r.creases || !(r.fineWidth > 0.0f)) return;
+    const glm::vec3 ext = mesh.bounds().extent();
+    const double longest = double(std::max({ext.x, ext.y, ext.z}));
+    const double voxels = double(r.fineWidth) * double(resolution) / longest;
+    if (voxels < 1.0 || voxels >= 2.0) return;
+    double want = std::ceil(2.0 * longest / double(r.fineWidth));
+    const int stepSize = want > 2048 ? 64 : want > 512 ? 16 : 8;
+    want = std::ceil(want / stepSize) * stepSize;
+    if (want <= double(resolution) || want > double(kVoxelResolutionMax)) return;
+    const VoxelRemeshEstimate e = estimateVoxelRemesh(mesh, int(want));
+    if (classifyMemory(e.bytes, memoryLimits()) != MemoryTier::Fits) return;
+    notes->creaseResolution = int(want);
+    notes->creaseTriangles = e.triangles;
+}
+
 Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, const std::function<bool(float)>& progress,
-                     bool allowSwap, bool keepGroups) {
+                     bool allowSwap, bool keepGroups, VoxelRemeshNotes* notes) {
     VoxelGrid grid;
     // An open Part (a starter head's neck, an extracted shell): the flood fill would pour in through the opening and
     // leave only a thin, holed shell. Its borders are capped first, on a copy of just the positions and triangles.
@@ -1066,12 +1563,13 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
             return {};
         }
     }
+    CreaseReport creases;
     if (resolution > g_sparseAbove && mesh.triangleCount() > 0) {
         // The brick grid (VoxelSparse.cpp): the same steps, memory going with the surface instead of the volume.
         std::string why;
         Mesh out;
         try {
-            out = sparseVoxelSurface(mesh, resolution, 4, 3.0f, open, &why, step, allowSwap);
+            out = sparseVoxelSurface(mesh, resolution, 4, 3.0f, open, &why, step, allowSwap, &creases);
         } catch (const std::bad_alloc&) {
             why = "Voxel Remesh at " + std::to_string(resolution) + " ran out of memory; the Part is unchanged. Lower the Resolution";
         }
@@ -1081,6 +1579,7 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
             return {};
         }
         if (open) dropSpecks(out, 64);
+        noteFineCreases(mesh, resolution, creases, notes);
         if (!step(0.9f)) return {};
         transferVertexAttributes(source, out);
         if (keepGroups) transferFaceGroups(source, out);
@@ -1117,12 +1616,20 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
     }
     // Mesh the signed distance to the original surface (positive inside), not the blocky occupancy: the result
     // lands on the original surface with no voxel terracing.
-    const std::vector<float> field = insideDistanceFieldPolled(mesh, grid, solid, 3.0f, {&stepFn, 0.25f, 0.6f}, stopped);
+    std::vector<int32_t> nearest;
+    const std::vector<float> field =
+        insideDistanceFieldPolled(mesh, grid, solid, 3.0f, {&stepFn, 0.25f, 0.6f}, stopped, g_creaseSnap ? &nearest : nullptr);
     if (stopped) return {};
     std::vector<uint8_t>().swap(solid);
     if (!step(0.6f)) return {};
-    Mesh out = meshFromFieldPolled(grid, field, 0.0f, 2, {&stepFn, 0.6f, 0.9f}, stopped);
+    Mesh out = meshFromFieldPolled(grid, field, 0.0f, 2, {&stepFn, 0.6f, 0.85f}, stopped);
     if (stopped) return {};
+    if (g_creaseSnap) {
+        if (snapCreases(out, mesh, grid, [&](const glm::ivec3& s) { return nearest[grid.index(s.x, s.y, s.z)]; }, &creases))
+            out.rebuildTopology();
+        out.recomputeAllNormals();
+        noteFineCreases(mesh, resolution, creases, notes);
+    }
     if (open) dropSpecks(out, 64); // (a few voxels: never detail at a remesh resolution)
     if (out.triangleCount() == 0 && error) *error = "Remesh produced no surface";
     if (!step(0.9f)) return {};
@@ -1230,13 +1737,24 @@ void transferFaceGroups(const Mesh& source, Mesh& dst) {
         if (lead[t] != t) groups[t] = groups[lead[t]];
 }
 
+std::string voxelRemeshNote(const VoxelRemeshNotes& notes) {
+    if (notes.creaseResolution <= 0) return {};
+    const double t = double(notes.creaseTriangles);
+    char tris[32];
+    if (t >= 1e6) std::snprintf(tris, sizeof tris, "%.1fM", t / 1e6);
+    else std::snprintf(tris, sizeof tris, "%.0fk", std::max(1.0, t / 1e3));
+    return "Resolution " + std::to_string(notes.creaseResolution) + " keeps fine creases (about " + tris + " triangles). ";
+}
+
 Mesh voxelRemesh(const Mesh& source, int resolution, std::string* error, const std::function<bool(float)>& progress,
-                 bool allowSwap, bool keepGroups) {
+                 bool allowSwap, bool keepGroups, VoxelRemeshNotes* notes) {
+    if (notes) *notes = {};
     try {
-        return voxelRemeshImpl(source, resolution, error, progress, allowSwap, keepGroups);
+        return voxelRemeshImpl(source, resolution, error, progress, allowSwap, keepGroups, notes);
     } catch (const std::bad_alloc&) { // (the grid, the bricks or the surface didn't fit after all: nothing half made)
     } catch (const std::length_error&) {
     }
+    if (notes) *notes = {};
     if (error) *error = "Voxel Remesh at " + std::to_string(resolution) + " ran out of memory; the Part is unchanged. Lower the Resolution or close other apps";
     return {};
 }
