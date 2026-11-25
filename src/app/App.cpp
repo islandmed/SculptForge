@@ -2740,6 +2740,7 @@ void App::onMouseUp() {
         // Predictive strokes: letting go doesn't wait for the dabs still to place; the solver carries on and
         // pumpStroke ends the stroke once they are on screen (anything that needs the document first ends it).
         strokeFinishing_ = true;
+        strokeEndWorkMs_ = 0.0;
         // (even with nothing left to place: the stroke's end work runs on the solver thread, pumpStroke)
     } else if (drag_ == Drag::Stroke) endStroke();
     if (drag_ == Drag::MaskCanvas) maskCanvasRelease();

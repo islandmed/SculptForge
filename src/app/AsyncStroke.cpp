@@ -103,10 +103,12 @@ void App::StrokeSolver::loop() {
         const SculptTimings before = app.doc_.sculptor.timings;
         view.lastHitSeen = false;
         app.dabView_ = &view;
+        endWorkSeconds = 0.0;
         if (finalize) { // a draft stroke's end: every normal and cavity term it touched
             const auto t0 = std::chrono::steady_clock::now();
             app.doc_.sculptor.flushDraft(app.doc_.mesh, app.doc_.bvh);
-            spent += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            endWorkSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            spent += endWorkSeconds;
         }
         app.doc_.sculptor.beginBatch(); // (a big brush's dabs go through the vertices together: core/SculptBatch.cpp)
         for (const PathDab& d : batch) {
@@ -139,6 +141,7 @@ void App::StrokeSolver::loop() {
         uploadReady = prepare && app.renderer_.prepareStrokeUpload(uploadId, app.doc_.mesh, upload, app.doc_.sculptor.strokeCurvature());
         if (finalize && uploadReady) app.renderer_.refineStrokeBoundsInto(uploadId, app.doc_.mesh, upload);
         prepSeconds = finalize ? 0.0 : std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
+        if (finalize) endWorkSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
         static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
         if (log) {
             const SculptTimings& t = app.doc_.sculptor.timings;
@@ -281,6 +284,7 @@ void App::solverWait() {
 void App::commitSolverBatch() {
     StrokeSolver& s = *solver_;
     s.done = false;
+    if (strokeFinishing_) strokeEndWorkMs_ += s.endWorkSeconds * 1000.0, s.endWorkSeconds = 0.0;
     ++commits_;
     // SF_MEASURE_POP: the view before the commit, with and without the batch's preview.
     std::vector<uint8_t> withPreview, withoutPreview, after;
@@ -371,7 +375,6 @@ void App::pumpStroke() {
         StrokeSolver& s = *solver_;
         s.batch.clear();
         s.finalize = true;
-        strokeFinalizeAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
         s.catchUp = false;
         s.view.camera = partCamera();
         s.view.canvas = canvasRect();
@@ -430,7 +433,6 @@ void App::pumpStroke() {
     s.batch.clear();
     while (!dabQueue_.empty() && s.batch.size() < n) s.batch.push_back(dabQueue_.pop());
     s.finalize = strokeFinishing_ && dabQueue_.empty();
-    if (s.finalize) strokeFinalizeAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     s.catchUp = false; // (dabs are coming: the exact normals wait for a pause or the release)
     lastDabsQueued_ = double(SDL_GetTicksNS()) * 1e-9;
     s.view.camera = partCamera();
@@ -485,6 +487,12 @@ void App::commitLiveMove() {
 }
 
 void App::finishStrokeNow() {
+    const auto endStart = std::chrono::steady_clock::now();
+    struct EndWork { // (the bench's release_end_ms: this too is the stroke's end work)
+        App& app;
+        std::chrono::steady_clock::time_point t0;
+        ~EndWork() { app.strokeEndWorkMs_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); }
+    } endWork{*this, endStart};
     commitLiveMove();
     if (solver_) solver_->finalize = false;
     doc_.sculptor.flushDraft(doc_.mesh, doc_.bvh); // (a draft stroke ended here rather than on the solver thread)

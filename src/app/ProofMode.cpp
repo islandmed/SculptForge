@@ -387,9 +387,10 @@ struct PhaseResult {
     double seconds = 0, pathPx = 0, releaseMs = 0; // releaseMs: lifting the pen (the dabs still queued, the undo step)
     double releaseDoneMs = 0; // until the stroke has ended (predictive strokes: the solver thread's last dabs on screen)
     std::vector<double> releaseFrames[7]; // the frames from pen-up to then: frame ms, then by part as split
-    // releaseDoneMs in two: the stroke catching up with the pen (the dabs still to place: how long depends on where the
-    // stroke ends, a big brush's dabs costing 40-370 ms each on Lucy 28M, which made the 240 px release 0.55 or 0.95 s)
-    // and its end work (the last batch with the normals and bounds, the undo step): the part to compare between builds.
+    // releaseDoneMs in two: its end work (the flush of the draft normals, the upload's packing, finishStrokeNow: work
+    // done, timed where it runs, not the dabs) and the rest, the stroke catching up with the pen (the dabs still to place:
+    // how long depends on where the stroke ends, a big brush's dabs costing 40-370 ms each on Lucy 28M, which made the
+    // 240 px release 0.55 or 0.95 s). The end work is the part to compare between builds.
     double releaseCatchUpMs = -1, releaseEndMs = -1;
     float pathRadiusPx = 0; // the stroke path's size (strokePoint's R, fitted to the model)
     double pathLaps = 1.0;  // ... how often round it relative to the full-size path (ProofState::laps)
@@ -1131,9 +1132,9 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             if (doc_.sculptor.strokeActive()) break;
             p.releasing = false;
             ph.releaseDoneMs = (nowSeconds() - p.releaseAt) * 1000.0;
-            if (strokeFinalizeAt_ >= p.releaseAt) {
-                ph.releaseCatchUpMs = (strokeFinalizeAt_ - p.releaseAt) * 1000.0;
-                ph.releaseEndMs = ph.releaseDoneMs - ph.releaseCatchUpMs;
+            if (strokeEndWorkMs_ > 0.0) {
+                ph.releaseEndMs = std::min(strokeEndWorkMs_, ph.releaseDoneMs);
+                ph.releaseCatchUpMs = ph.releaseDoneMs - ph.releaseEndMs;
             }
             ph.stroke = perf_.lastStroke;
             ph.strokeSyncMs = perf_.lastStrokeSyncMs;
