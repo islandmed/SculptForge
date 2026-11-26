@@ -601,6 +601,7 @@ private:
         GLuint patchVao = 0, patchLineVao = 0, patchVertices = 0, patchIndices = 0, patchLines = 0, patchColors = 0,
                patchMask = 0, patchGroupData = 0, patchGroupTexture = 0, patchUvData = 0, patchUvTexture = 0;
         size_t patchParts = 0; // parts the patch buffers have room for
+        bool patchUvAlloc = false; // the patches' UV buffer exists (a Part with UVs, within the driver's texture buffer limit)
         std::vector<glm::vec2> patchUvShadow; // the patches' UVs as the GPU holds them (3 per triangle, per part): sent in runs
         std::vector<uint32_t> patchUvParts;   // parts whose UVs changed in this sync
         bool patchColorsOn = false, patchMaskOn = false, patchLinesOn = false;

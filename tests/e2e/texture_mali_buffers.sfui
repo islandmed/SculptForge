@@ -31,4 +31,32 @@ expect_value texbuffer_over_limit == 0
 expect_value empty_buffer_samplers == 0
 render_cell "painted sphere x 65536-texel buffer limit" mode=lit
 shot texture_mali_buffers
+# Dynamic keeps a painted Part's texture and its patches carry the UVs (a texture buffer of 3 texels a triangle, per patch part): the
+# strokes below touch more clusters than 65536 texels hold parts of (5), and no buffer past the limit may ever be bound or drawn from;
+# the Part goes to a full upload instead, and the paint still shows.
+remember texture_painted painted
+click "Dynamic##draw.dynamic"
+click "Standard##brush.standard"
+drag_frames 0.15 0.35 0.85 0.4 6 dynamic
+drag_frames 0.15 0.5 0.85 0.55 6 dynamic
+drag_frames 0.15 0.65 0.85 0.7 6 dynamic
+camera 90 0
+drag_frames 0.15 0.35 0.85 0.4 6 dynamic
+drag_frames 0.15 0.6 0.85 0.65 6 dynamic
+camera 0 0
+wait 0.5
+expect_value uvs == 1
+expect_value texture_painted == $painted
+expect_value texbuffer_over_limit == 0
+expect_value empty_buffer_samplers == 0
+expect_value texture_not_shown == 0
+render_cell "Dynamic on the painted sphere x 65536-texel buffer limit (patches carry UVs, or a full upload)" mode=lit
+gl_limits texels=16384
+drag_frames 0.15 0.45 0.85 0.5 6 dynamic
+drag_frames 0.15 0.55 0.85 0.6 6 dynamic
+wait 0.5
+expect_value texbuffer_over_limit == 0
+expect_value empty_buffer_samplers == 0
+expect_value texture_painted == $painted
+render_cell "Dynamic on the painted sphere x 16384-texel buffer limit" mode=lit
 gl_limits texels=0

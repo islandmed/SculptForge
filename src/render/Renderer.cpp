@@ -1555,6 +1555,8 @@ void Renderer::freeSlot(MeshSlot& s) {
             gl::DeleteBuffers(1, b);
         gl::DeleteTextures(1, &s.patchGroupTexture);
         gl::DeleteTextures(1, &s.patchUvTexture);
+        s.patchUvAlloc = false;
+        s.patchParts = 0;
         gl::DeleteVertexArrays(1, &s.patchVao);
         gl::DeleteVertexArrays(1, &s.patchLineVao);
     }
@@ -2665,8 +2667,13 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
         }
         gl::BindVertexArray(0);
     }
-    if (s.patches.size() > s.patchParts) { // room for more parts: new buffers, everything sent again
+    // The patches' UVs are a texture buffer of 3 texels a triangle: a Part with UVs keeps its patches' parts under the driver's limit
+    // (sync() sends a Part that needs more to a full upload); a Part without UVs has no such buffer.
+    const bool meshUvs = !mesh.uvs.empty() && mesh.uvs.size() == mesh.triangleCount() * 3;
+    const size_t uvPartsMax = size_t(std::max(gl::maxTextureBufferTexels(), 0)) / (kPatchTriangles * 3);
+    if (s.patches.size() > s.patchParts || (meshUvs && !s.patchUvAlloc)) { // room for more parts: new buffers, everything sent again
         s.patchParts = std::max<size_t>({s.patches.size(), s.patchParts * 2, 8});
+        if (meshUvs) s.patchParts = std::max(s.patches.size(), std::min(s.patchParts, std::max<size_t>(uvPartsMax, 1)));
         const size_t parts = s.patchParts;
         auto alloc = [](GLenum target, GLuint buffer, size_t bytes) {
             gl::BindBuffer(target, buffer);
@@ -2676,19 +2683,22 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
         alloc(GL_ARRAY_BUFFER, s.patchColors, parts * kPatchVertices * sizeof(uint32_t));
         alloc(GL_ARRAY_BUFFER, s.patchMask, parts * kPatchVertices);
         alloc(GL_TEXTURE_BUFFER, s.patchGroupData, parts * kPatchTriangles * sizeof(uint32_t));
-        alloc(GL_TEXTURE_BUFFER, s.patchUvData, parts * kPatchTriangles * 3 * sizeof(glm::vec2));
+        s.patchUvAlloc = meshUvs && parts <= uvPartsMax;
+        if (s.patchUvAlloc) alloc(GL_TEXTURE_BUFFER, s.patchUvData, parts * kPatchTriangles * 3 * sizeof(glm::vec2));
         gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
         gl::BindTexture(GL_TEXTURE_BUFFER, s.patchGroupTexture);
         gl::TexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, s.patchGroupData);
-        gl::BindTexture(GL_TEXTURE_BUFFER, s.patchUvTexture);
-        gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, s.patchUvData);
+        if (s.patchUvAlloc) { // (never a buffer past the limit: the driver rejects the draw that samples it)
+            gl::BindTexture(GL_TEXTURE_BUFFER, s.patchUvTexture);
+            gl::TexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, s.patchUvData);
+        }
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
         gl::BindVertexArray(s.patchVao);
         gl::BufferData(GL_ELEMENT_ARRAY_BUFFER, GLsizeiptr(parts * kPatchTriangles * 3 * sizeof(uint16_t)), nullptr, GL_DYNAMIC_DRAW);
         gl::BindVertexArray(s.patchLineVao);
         gl::BufferData(GL_ELEMENT_ARRAY_BUFFER, GLsizeiptr(parts * kPatchLineIndices * sizeof(uint16_t)), nullptr, GL_DYNAMIC_DRAW);
         gl::BindVertexArray(0);
-        s.patchBytes = parts * (kPatchVertices * (sizeof(PackedVertex) + 5) + kPatchTriangles * (3 * 2 + 4 + 3 * sizeof(glm::vec2)) + kPatchLineIndices * 2);
+        s.patchBytes = parts * (kPatchVertices * (sizeof(PackedVertex) + 5) + kPatchTriangles * (3 * 2 + 4 + (s.patchUvAlloc ? 3 * sizeof(glm::vec2) : 0)) + kPatchLineIndices * 2);
         for (MeshSlot::Patch& p : s.patches) p.uploaded = false;
         all = true;
     }
@@ -2768,7 +2778,7 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
                                   GLsizeiptr(p.groups.size() * sizeof(uint32_t)), p.groups.data());
                 gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
             }
-            if (!p.uvs.empty()) { // (into the shadow; sent after the loop in runs of neighbouring parts: a call per patch is slow)
+            if (!p.uvs.empty() && s.patchUvAlloc) { // (into the shadow; sent after the loop in runs of neighbouring parts: a call per patch is slow)
                 if (s.patchUvShadow.size() < s.patchParts * kPatchTriangles * 3) s.patchUvShadow.resize(s.patchParts * kPatchTriangles * 3);
                 std::copy(p.uvs.begin(), p.uvs.end(), s.patchUvShadow.begin() + std::ptrdiff_t(p.part) * kPatchTriangles * 3);
                 s.patchUvParts.push_back(p.part);
@@ -2813,6 +2823,7 @@ void Renderer::uploadPatches(MeshSlot& s, const Mesh& mesh, bool wireframe) {
             gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(size_t(p.part) * kPatchVertices), GLsizeiptr(n), packedMask.data());
         }
     }
+    if (!s.patchUvParts.empty() && !s.patchUvAlloc) s.patchUvParts.clear();
     if (!s.patchUvParts.empty()) {
         std::sort(s.patchUvParts.begin(), s.patchUvParts.end());
         gl::BindBuffer(GL_TEXTURE_BUFFER, s.patchUvData);
@@ -2891,6 +2902,11 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
                           patchPartsWanted * kPatchTriangles * 3 <= size_t(std::max(gl::maxTextureBufferTexels(), 0));
     bool full = s.fresh || mesh.topologyDirty || (nv != s.vertexCapacity && !patched) || (patched && wantUvs && !patchUvs);
     if (!full && !mesh.changedTriangles.empty() && !notePatches(s, mesh)) full = true;
+    // A Part with UVs whose patches would need a UV buffer past the driver's texture buffer limit (65536 texels on a Mali-G72)
+    // takes the full upload, as it did before patches carried UVs: never a buffer past the limit.
+    if (!full && !s.patches.empty() && mesh.uvs.size() == mesh.triangleCount() * 3 && !mesh.uvs.empty() &&
+        s.patches.size() * kPatchTriangles * 3 > size_t(std::max(gl::maxTextureBufferTexels(), 0)))
+        full = true;
     if (!full && !s.patches.empty() && mesh.facesDirty)
         for (MeshSlot::Patch& p : s.patches) p.stale = true; // (groups or hidden triangles changed)
     if (!full && !s.patches.empty() && !preparePatches(s, mesh, wireframe)) full = true;
@@ -4789,7 +4805,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
             gl::ActiveTexture(GL_TEXTURE1);
             gl::BindTexture(GL_TEXTURE_BUFFER, s.hasGroups ? s.patchGroupTexture : dummyUintBufferTexture_);
             gl::ActiveTexture(GL_TEXTURE3); // (the patches' triangles have their UVs in their own buffer; a dummy where there are none)
-            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasUvs ? s.patchUvTexture : dummyUvBufferTexture_);
+            gl::BindTexture(GL_TEXTURE_BUFFER, s.hasUvs && s.patchUvAlloc ? s.patchUvTexture : dummyUvBufferTexture_);
             gl::ActiveTexture(GL_TEXTURE0);
         }
         drawPatches(s, GL_TRIANGLES, DrawPart::Triangles, perTriangle ? p->primBase : -1);
