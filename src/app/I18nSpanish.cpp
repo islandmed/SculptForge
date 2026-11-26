@@ -6470,6 +6470,7 @@ constexpr Entry kSpanish[] = {
     {"Hold %s and drag anywhere to pan the view", "Mantén %s y arrastra en cualquier parte para desplazar la vista"},
     {"Hold %s and drag anywhere to zoom", "Mantén %s y arrastra en cualquier parte para hacer zoom"},
     {"Navigation bindings back to their defaults", "Navegación restablecida a sus valores por defecto"},
+    {"%s on  \xc2\xb7  Esc turns it off", "%s activado  \xc2\xb7  Esc lo desactiva"},
 };
 
 } // namespace

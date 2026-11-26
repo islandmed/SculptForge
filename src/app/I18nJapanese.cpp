@@ -7191,6 +7191,7 @@ constexpr Entry kJapanese[] = {
     {"Hold %s and drag anywhere to pan the view", "%s を押しながらどこでもドラッグすると視点がパンします"},
     {"Hold %s and drag anywhere to zoom", "%s を押しながらどこでもドラッグするとズームします"},
     {"Navigation bindings back to their defaults", "ナビゲーションの設定を初期設定に戻しました"},
+    {"%s on  \xc2\xb7  Esc turns it off", "%s オン  \xc2\xb7  Esc で解除"},
 };
 
 } // namespace

@@ -2893,6 +2893,10 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
         closeStrokePopup();
         return;
     }
+    if (key == SDLK_ESCAPE && strokeLatch() != StrokeLatch::None && drag_ == Drag::None) { // a latched Smooth / Mask / Select / shape off
+        setStrokeLatch(StrokeLatch::None);
+        return;
+    }
     if (const int step = brushSizeStep(actions_.actionForKey(key, mod)); step && insertSetActive()) {
         // an insert set: the brush size keys ([ and ]) step through it (the drag sets the size, not the brush's)
         selectInsertSetItem(insertSet_.index + step);

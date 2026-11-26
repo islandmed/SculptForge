@@ -552,7 +552,14 @@ void App::registerShellActions() {
     auto shape = [this](std::string id, std::string label, std::string palette, SelectShape* target, SelectShape value,
                         std::string description) {
         actions_.add({std::move(id), std::move(label), nullptr, std::move(description), std::move(palette), "", "",
-                      [target, value] { *target = value; }, [target, value] { return *target == value; }, nullptr});
+                      [this, target, value] {
+                          // Its button again while the stroke popup latched this very shape: off (users press what they turned on)
+                          const StrokeLatch latch = strokeLatch();
+                          if (*target == value && latch == (target == &maskShape_ ? StrokeLatch::Mask : StrokeLatch::Select))
+                              setStrokeLatch(StrokeLatch::None);
+                          *target = value;
+                      },
+                      [target, value] { return *target == value; }, nullptr});
     };
     shape("mask.pen", "Mask Pen", "Tool > Masking", &maskShape_, SelectShape::Pen,
           "Ctrl+drag paints the mask with the brush; Ctrl+Alt+drag erases it. Ctrl+drag on the background clears it.");

@@ -5977,6 +5977,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Hold %s and drag anywhere to pan the view", "按住 %s 并在任意位置拖动即可平移视图"},
     {"Hold %s and drag anywhere to zoom", "按住 %s 并在任意位置拖动即可缩放"},
     {"Navigation bindings back to their defaults", "导航设置已恢复为默认值"},
+    {"%s on  \xc2\xb7  Esc turns it off", "%s 已开启  \xc2\xb7  按 Esc 关闭"},
 };
 
 } // namespace
