@@ -5,6 +5,26 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.14.2
+
+```features
+date: 2026-11-26
+tagline: Dynamic keeps your painted texture, pinching cuts hold smooth walls, and dense Micro levels shade closer behind the brush.
+highlight: Dynamic keeps a painted Part's texture: sculpt with Dynamic on and the paint stays
+highlight: Crease Line, Engrave and the other pinching cuts keep smooth walls over repeated passes
+highlight: Dense Micro levels shade the surface right behind the brush (#184)
+highlight: Add any control to a shelf or My Panel by touch: long-press it (requested by a member)
+title: Dynamic keeps your paint
+line: Turn Dynamic on over a painted Part and sculpt: the texture stays where you painted it, and Undo brings back every detail.
+action: guide:dynamic-topology.md
+title: Smooth walls on repeated cuts
+line: Crease Line, Engrave and the other pinching cuts stop deepening once the mesh can't hold the groove; untick Stop at mesh depth to cut on.
+action: guide:brush-lab.md
+title: Add to a shelf by touch
+line: On a tablet, long-press a control, a button or a section's title and pick Add to My Panel or a shelf; with a mouse, right-click it.
+action: guide:interface.md
+```
+
 ## Version 0.14.1
 
 ```features
