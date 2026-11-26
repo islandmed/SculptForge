@@ -58,7 +58,7 @@ float unsnorm(uint32_t q, int bits) {
 
 } // namespace
 
-bool packVertex(const PositionGrid& grid, const glm::vec3& p, const glm::vec3& n, float curvature, PackedVertex& out) {
+bool packPosition(const PositionGrid& grid, const glm::vec3& p, PackedVertex& out) {
     bool inside = true;
     const uint64_t x = quantize(p.x, grid.origin.x, grid.step, inside);
     const uint64_t y = quantize(p.y, grid.origin.y, grid.step, inside);
@@ -66,6 +66,16 @@ bool packVertex(const PositionGrid& grid, const glm::vec3& p, const glm::vec3& n
     const uint64_t bits = x | (y << 21) | (z << 42);
     out.pos[0] = uint32_t(bits);
     out.pos[1] = uint32_t(bits >> 32);
+    return inside;
+}
+
+bool packVertex(const PositionGrid& grid, const glm::vec3& p, const glm::vec3& n, float curvature, PackedVertex& out) {
+    const bool inside = packPosition(grid, p, out);
+    packNormal(n, curvature, out);
+    return inside;
+}
+
+void packNormal(const glm::vec3& n, float curvature, PackedVertex& out) {
     // Octahedral normal: project onto |x| + |y| + |z| = 1, fold the lower half over the diagonals.
     const float l1 = std::abs(n.x) + std::abs(n.y) + std::abs(n.z);
     glm::vec2 e(0.0f);
@@ -78,7 +88,6 @@ bool packVertex(const PositionGrid& grid, const glm::vec3& p, const glm::vec3& n
     const float c = std::isfinite(curvature) ? std::clamp(curvature / kCurvatureRange, -1.0f, 1.0f) : 0.0f;
     const float companded = c < 0.0f ? -std::sqrt(-c) : std::sqrt(c);
     out.normal = snorm(e.x, 11) | (snorm(e.y, 11) << 11) | (snorm(companded, 10) << 22);
-    return inside;
 }
 
 glm::vec3 unpackPosition(const PositionGrid& grid, const PackedVertex& v) {

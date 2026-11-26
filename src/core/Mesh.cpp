@@ -825,8 +825,15 @@ void Mesh::evaluateAll() {
 }
 
 AABB Mesh::bounds() const {
+    // In parallel: the Tool palette's Part size asks for it after every stroke (60 ms a frame at 28M triangles, one thread).
+    constexpr size_t kBlock = size_t(1) << 16;
+    std::vector<AABB> part((positions.size() + kBlock - 1) / kBlock);
+    poolFor(part.size(), [&](size_t b, size_t e) {
+        for (size_t k = b; k < e; ++k)
+            for (size_t i = k * kBlock, end = std::min(positions.size(), i + kBlock); i < end; ++i) part[k].expand(positions[i]);
+    }, 1);
     AABB b;
-    for (const auto& p : positions) b.expand(p);
+    for (const AABB& a : part) b.expand(a);
     return b;
 }
 

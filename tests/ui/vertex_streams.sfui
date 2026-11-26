@@ -1,0 +1,69 @@
+# cold
+# The mesh's two GPU vertex streams (positions, normal words: Renderer::StrokeUpload::Streams) hold what the mesh has after
+# every way vertices go up: a background stroke's batches (both streams), its deferred end (positions only), the settle
+# (nothing until its last batch, then the normal words left behind), a stroke that takes a settle over, a mask stroke
+# and undo (the regular sync), and a subdivision (the full upload). ctest sets SF_BACKGROUND_DABS, SF_SETTLE_DELAY_MS and
+# SF_SETTLE_LEAVES (a settle of several batches), and runs it again with SF_PERSISTENT_UPLOAD=1 (the staging buffer).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=6
+interactive_strokes on
+camera 0 0
+key f
+wait_idle 30
+brush_size 60
+snapshot
+wait_value gpu_vertex_mismatches > -1 20000
+expect_value gpu_vertex_mismatches == 0
+
+# A background stroke, its deferred end and the settle.
+stroke 0.30 0.40 0.60 0.45 0.5
+wait_value normals_settling == 1 60
+wait_value normals_settling == 0 20000
+wait_idle 30
+expect_value moved > 100
+wait_value gpu_vertex_mismatches > -1 20000
+expect_value gpu_vertex_mismatches == 0
+
+# A stroke that takes the settle over.
+stroke 0.30 0.60 0.60 0.65 0.5
+wait_value normals_settling == 1 60
+stroke 0.55 0.45 0.70 0.60 0.5
+wait_value taken_over == 1 20000
+wait_value normals_settling == 0 20000
+wait_idle 30
+wait_value gpu_vertex_mismatches > -1 20000
+expect_value gpu_vertex_mismatches == 0
+
+# Undo and redo (the regular sync).
+key ctrl+z
+wait_idle 30
+wait_value gpu_vertex_mismatches > -1 20000
+expect_value gpu_vertex_mismatches == 0
+key ctrl+shift+z
+wait_idle 30
+wait_value gpu_vertex_mismatches > -1 20000
+expect_value gpu_vertex_mismatches == 0
+
+# A mask stroke (the frame loop's own upload), then a sculpt stroke over it.
+hold ctrl
+stroke 0.35 0.35 0.65 0.65
+hold none
+wait_idle 30
+wait_value gpu_vertex_mismatches > -1 20000
+expect_value gpu_vertex_mismatches == 0
+stroke 0.30 0.50 0.70 0.50 0.5
+wait_value normals_settling == 0 20000
+wait_idle 30
+wait_value gpu_vertex_mismatches > -1 20000
+expect_value gpu_vertex_mismatches == 0
+
+# A subdivision (the full upload), then a stroke on the new level.
+run subdivide
+wait_idle 60
+wait_value gpu_vertex_mismatches > -1 20000
+expect_value gpu_vertex_mismatches == 0
+stroke 0.30 0.45 0.65 0.55 0.5
+wait_value normals_settling == 0 20000
+wait_idle 30
+wait_value gpu_vertex_mismatches > -1 20000
+expect_value gpu_vertex_mismatches == 0

@@ -1275,6 +1275,12 @@ double Demo::query(const std::string& name, bool& known) const {
         return app_.solverBusy() || app_.doc_.sculptor.strokeActive() || app_.doc_.sculptor.settling()
                    ? -1.0
                    : double(App::meshStateHash(app_.doc_.mesh) & ((uint64_t(1) << 52) - 1));
+    // GPU slots of the active Part whose vertex streams aren't the mesh's (Renderer::vertexStreamMismatches; -1 while a
+    // stroke or its normals are still going, or the Part is drawn another way).
+    if (name == "gpu_vertex_mismatches")
+        return app_.solverBusy() || app_.doc_.sculptor.strokeActive() || app_.doc_.sculptor.settling()
+                   ? -1.0
+                   : double(app_.renderer_.vertexStreamMismatches(app_.doc_.meshKey(app_.doc_.activePart), app_.displayedMesh()));
     if (name == "can_undo") return app_.doc_.undo.canUndo() ? 1.0 : 0.0;
     if (name == "can_redo") return app_.doc_.undo.canRedo() ? 1.0 : 0.0;
     if (name == "typing") return GImGui->TempInputId != 0 && GImGui->TempInputId == GImGui->ActiveId ? 1.0 : 0.0; // a slider's number is being typed

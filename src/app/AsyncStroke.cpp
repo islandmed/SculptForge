@@ -39,10 +39,12 @@ constexpr double kFusedBatchSeconds = 0.05;
 // Meshes from this many vertices place a stroke's dabs on the solver thread even without predictive strokes: one
 // 240 px dab there moves millions of vertices (100-300 ms at 33M triangles), more than a frame can hold.
 constexpr size_t kBackgroundDabVertices = 2'000'000;
-// A settle batch (the exact normals after a deferred stroke end) takes about this much work: one goes on while a
-// frame draws, so the surface sharpens over a few frames and a press or shortcut waiting for it waits about one.
-constexpr double kSettleBatchSeconds = 0.033;
-constexpr size_t kSettleFirstLeaves = 65536; // (about 600,000 vertices, ~15 ms on the floor tier)
+// The settle (the exact normals after a deferred stroke end) goes on the stroke thread while frames draw: in one batch
+// (about 230 ms for a 240 px dab at 28M triangles on the floor tier), as batches cost frame gaps and a pass each over
+// the dirty marks; a press during it waits for it, held (never a frame). Batches after the first (SF_SETTLE_LEAVES)
+// take about kSettleBatchSeconds of work; nothing is sent until the last, which packs every normal word once.
+constexpr double kSettleBatchSeconds = 0.1;
+constexpr size_t kSettleFirstLeaves = SIZE_MAX;
 
 } // namespace
 
@@ -145,9 +147,13 @@ void App::StrokeSolver::loop() {
         dabSeconds = batch.empty() ? 0.0 : spent / double(batch.size());
         const auto prepStart = std::chrono::steady_clock::now();
         if (finalize && deferEnd && !app.doc_.sculptor.normalsPending()) deferEnd = false; // (nothing to settle: as before)
+        settled = settle && !app.doc_.sculptor.normalsPending();
+        // A deferred end sends the positions only (its normals aren't worked out yet); the settle's batches pack nothing
+        // until the last, which sends every normal word they and the end left behind, once.
+        using Streams = Renderer::Streams;
+        upload.streams = finalize && deferEnd ? Streams::Positions : settle ? (settled ? Streams::Normals : Streams::None) : Streams::Both;
         uploadReady = prepare && app.renderer_.prepareStrokeUpload(uploadId, app.doc_.mesh, upload, app.doc_.sculptor.strokeCurvature());
         // The exact culling bounds: at the stroke's end, or (deferred) once the settle batches have caught up.
-        settled = settle && !app.doc_.sculptor.normalsPending();
         if (((finalize && !deferEnd) || settled) && uploadReady) app.renderer_.refineStrokeBoundsInto(uploadId, app.doc_.mesh, upload);
         prepSeconds = finalize || settle ? 0.0 : std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
         if (settle) catchUpSeconds = spent + std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
@@ -305,6 +311,7 @@ void App::finishSettle() {
     StrokeSolver* s = solver_.get();
     if (s) s->settle = s->settled = false;
     doc_.sculptor.endSettle();
+    renderer_.releaseStaleNormals(doc_.meshKey(doc_.activePart)); // (when the last batch couldn't send them: the next sync does)
     renderer_.refineStrokeBounds(doc_.meshKey(doc_.activePart), displayedMesh()); // (when the batch couldn't pack)
     settledAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     drainNextFrame_ = drainNextFrame_ || !drainQueue_.empty(); // what waited for it, next frame
@@ -352,7 +359,7 @@ void App::settleNow() {
 }
 
 void App::settleForPress() {
-    // A press while the last stroke settles: the batch in flight first (at most one, ~kSettleBatchSeconds), so the
+    // A press while the last stroke settles: the batch in flight first (at most one: the settle, kSettleFirstLeaves), so the
     // pick and the stroke's start see the mesh; a sculpt stroke then takes the rest over (beginStroke).
     if (!doc_.sculptor.settling() || !solver_) return;
     const auto t0 = std::chrono::steady_clock::now();
@@ -520,6 +527,8 @@ void App::pumpStroke() {
             finishStrokeNow(); // released, and every dab is on the GPU (deferred: its exact normals settle after)
             // Then what a shortcut asked for meanwhile, in order, next frame (deferred: once the normals have settled).
             drainNextFrame_ = !drainQueue_.empty();
+            // Deferred: the settle starts now, on the stroke thread, while this frame's UI draws (not a frame later).
+            if (doc_.sculptor.settling() && !drainNextFrame_) pumpSettle();
             if (log) SDL_Log("stroke end: at %.3f s, %.1f ms", double(SDL_GetTicksNS()) * 1e-9, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
             return;
         }

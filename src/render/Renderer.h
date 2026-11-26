@@ -266,35 +266,49 @@ public:
     // prepare clears the mesh's dirty state; it returns false, and leaves the mesh as it was, when the change
     // needs the regular syncScene instead (a new layout, attributes, dynamic topology, a vertex off the grid).
     // Only one prepare at a time, and no syncScene of that mesh until its commit.
+    // The vertices are two GPU streams (MeshSlot::vertexBuffer, normalBuffer), so a batch can send one of them:
+    // `streams` (set before prepare) Positions packs the positions only and leaves the mesh's dirty state for a
+    // later Normals or Both (a deferred stroke end: its normals aren't worked out yet); Normals packs the normal
+    // words only (the settle: the positions didn't move); None packs nothing and leaves the normal words it would have
+    // sent for the next Normals or Both (the settle's batches before its last: one pack at the end).
+    enum class Streams : uint8_t { Both, Positions, Normals, None };
     struct StrokeUpload {
         uint32_t id = 0;
         void* slot = nullptr; // bindStrokeUpload
         bool ready = false;
-        std::vector<PackedVertex> data;
+        Streams streams = Streams::Both;
+        std::vector<uint64_t> positions; // PackedVertex::pos, by slot
+        std::vector<uint32_t> normals;   // PackedVertex::normal
         struct Range {
             uint32_t begin, end; // GPU slots
-            size_t offset;       // into data
+            size_t offset;       // into positions / normals
         };
-        std::vector<Range> ranges;
+        std::vector<Range> ranges, normalRanges; // of positions, of normals
         std::vector<uint32_t> movedClusters;
         std::vector<ClusterBounds> bounds; // of movedClusters
-        std::vector<uint8_t> blockChanged, blockMoved; // scratch, per block
+        std::vector<uint8_t> blockChanged, blockMoved; // scratch, per block (normal words changed, positions moved)
         double packMs = 0.0, boundsMs = 0.0;           // where prepare's time went
         bool regrid = false;                           // every vertex, packed on a new grid
         PositionGrid grid;
         bool exact = false;                            // refineStrokeBoundsInto: exact bounds to set
         std::vector<uint32_t> exactClusters;
         std::vector<ClusterBounds> exactBounds;
-        size_t bytes() const { return packed * sizeof(PackedVertex); }
-        size_t packed = 0; // vertices packed (in data, or the staging buffer)
+        bool sendsPositions() const { return streams == Streams::Both || streams == Streams::Positions; }
+        bool sendsNormals() const { return streams == Streams::Both || streams == Streams::Normals; }
+        size_t bytes() const { return packed * ((sendsPositions() ? 8 : 0) + (sendsNormals() ? 4 : 0)); }
+        size_t packed = 0; // vertices packed (in positions / normals, or the staging buffer)
         // Persistent upload (SF_PERSISTENT_UPLOAD=1, a research prototype): bindStrokeUpload lends a persistently
-        // mapped staging buffer; prepare packs straight into it when the batch fits (`staged`), and commit has
-        // the GPU copy the ranges into the vertex buffer (no glBufferSubData of the packed data on the GL thread).
-        PackedVertex* stagingPtr = nullptr;
+        // mapped staging buffer (positions, then normal words); prepare packs straight into it when the batch fits
+        // (`staged`), and commit has the GPU copy the ranges into the vertex buffers (no glBufferSubData of the
+        // packed data on the GL thread).
+        void* stagingPtr = nullptr;
         size_t stagingCap = 0; // vertices
         int stagingIndex = -1;
         bool staged = false;
-        PackedVertex* dst() { return staged ? stagingPtr : data.data(); }
+        uint64_t* positionDst() { return staged ? static_cast<uint64_t*>(stagingPtr) : positions.data(); }
+        uint32_t* normalDst() {
+            return staged ? reinterpret_cast<uint32_t*>(static_cast<uint64_t*>(stagingPtr) + stagingCap) : normals.data();
+        }
     };
     // `curvature` (optional, by vertex): the cavity term of every vertex the mesh marked dirty, already worked
     // out (Sculptor::strokeCurvature).
@@ -314,6 +328,12 @@ public:
     // refineStrokeBounds on the solver thread at a stroke's end, after prepareStrokeUpload: the exact bounds go
     // into `up` and commitStrokeUpload sets them.
     void refineStrokeBoundsInto(uint32_t id, const Mesh& mesh, StrokeUpload& up);
+    // The normal words a positions-only stroke upload left behind go up with the next regular sync (GL thread, the
+    // mesh no longer changing; nothing to do when a stroke upload sent them).
+    void releaseStaleNormals(uint32_t id);
+    // (tests) GPU slots of Part `id` whose position or normal (the normal word's direction bits) isn't what packing
+    // `mesh` now gives; reads both vertex streams back. -1: no slot, or drawn another way.
+    long long vertexStreamMismatches(uint32_t id, const Mesh& mesh);
 
     // Bytes of GPU buffers and textures the mesh slots hold.
     size_t gpuBytes() const;
@@ -462,7 +482,12 @@ private:
         uint64_t vertexSyncs = 0; // (tests) syncs that found vertices to send (the mesh marked dirty)
         bool remeshing = false;   // a stroke that changes this mesh's topology runs (dynamic topology)
         GLuint vao = 0, lineVao = 0;
-        GLuint vertexBuffer = 0; // PackedVertex per GPU slot (render/Clusters.h)
+        GLuint vertexBuffer = 0; // PackedVertex::pos per GPU slot (render/Clusters.h), 8 bytes
+        GLuint normalBuffer = 0; // PackedVertex::normal per GPU slot, 4 bytes (a stream of its own: StrokeUpload::Streams)
+        // Slot runs whose normal words the GPU doesn't have yet (a positions-only stroke upload): the next upload that
+        // sends normals sends them too; the regular sync only once released (releaseStaleNormals: the settle is over).
+        std::vector<std::pair<uint32_t, uint32_t>> staleNormals;
+        bool staleHeld = false;
         GLuint indexBuffer = 0;  // 16-bit, relative to each cluster's first vertex; kClusterTriangles * 3 per cluster
         GLuint lineBuffer = 0;   // wireframe edges, 16-bit like the triangles, each edge once
         GLuint colorBuffer = 0, maskBuffer = 0; // RGBA8 (gamma encoded), R8

@@ -40,6 +40,10 @@ static_assert(sizeof(PackedVertex) == 12);
 // Packs a vertex; returns false (and clamps) when p is outside the grid.
 bool packVertex(const PositionGrid& grid, const glm::vec3& p, const glm::vec3& n, float curvature, PackedVertex& out);
 // What the shader decodes (tests).
+// The position only (out.normal as it was).
+bool packPosition(const PositionGrid& grid, const glm::vec3& p, PackedVertex& out);
+// The normal word only (out.pos as it was).
+void packNormal(const glm::vec3& n, float curvature, PackedVertex& out);
 glm::vec3 unpackPosition(const PositionGrid& grid, const PackedVertex& v);
 glm::vec3 unpackNormal(const PackedVertex& v);
 float unpackCurvature(const PackedVertex& v);

@@ -1432,6 +1432,7 @@ Renderer::MeshSlot& Renderer::slot(uint32_t id) {
     gl::GenVertexArrays(1, &s.vao);
     gl::GenVertexArrays(1, &s.lineVao);
     gl::GenBuffers(1, &s.vertexBuffer);
+    gl::GenBuffers(1, &s.normalBuffer);
     gl::GenBuffers(1, &s.indexBuffer);
     gl::GenBuffers(1, &s.lineBuffer);
     gl::GenBuffers(1, &s.colorBuffer);
@@ -1447,15 +1448,16 @@ Renderer::MeshSlot& Renderer::slot(uint32_t id) {
     gl::GenBuffers(1, &s.proxyBuffer);
     for (GLuint vao : {s.vao, s.lineVao, s.proxyVao}) {
         gl::BindVertexArray(vao);
-        gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer);
+        gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer); // (positions and normal words: two streams, StrokeUpload::Streams)
         gl::EnableVertexAttribArray(0);
-        gl::VertexAttribIPointer(0, 2, GL_UNSIGNED_INT, sizeof(PackedVertex), nullptr);
+        gl::VertexAttribIPointer(0, 2, GL_UNSIGNED_INT, sizeof(uint64_t), nullptr);
         if (vao == s.lineVao) {
             gl::BindBuffer(GL_ELEMENT_ARRAY_BUFFER, s.lineBuffer);
             continue;
         }
+        gl::BindBuffer(GL_ARRAY_BUFFER, s.normalBuffer);
         gl::EnableVertexAttribArray(1);
-        gl::VertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(PackedVertex), reinterpret_cast<const void*>(2 * sizeof(uint32_t)));
+        gl::VertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(uint32_t), nullptr);
         // Colour (2) and mask (3) arrays are only enabled while the mesh has them.
         gl::BindBuffer(GL_ARRAY_BUFFER, s.colorBuffer);
         gl::VertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, 4, nullptr);
@@ -1469,7 +1471,7 @@ Renderer::MeshSlot& Renderer::slot(uint32_t id) {
 }
 
 void Renderer::freeSlot(MeshSlot& s) {
-    for (GLuint* b : {&s.vertexBuffer, &s.indexBuffer, &s.lineBuffer, &s.proxyBuffer, &s.colorBuffer, &s.maskBuffer, &s.groupData,
+    for (GLuint* b : {&s.vertexBuffer, &s.normalBuffer, &s.indexBuffer, &s.lineBuffer, &s.proxyBuffer, &s.colorBuffer, &s.maskBuffer, &s.groupData,
                       &s.primData, &s.uvData})
         gl::DeleteBuffers(1, b);
     gl::DeleteTextures(1, &s.groupTexture);
@@ -1893,6 +1895,113 @@ void uploadGathered(std::vector<uint8_t>& staging, GLuint buffer, size_t element
     flush();
 }
 
+// a = a ∪ b (sorted runs of GPU slots, each list without overlaps).
+void mergeRuns(Runs& a, const Runs& b) {
+    if (b.empty()) return;
+    Runs all;
+    all.reserve(a.size() + b.size());
+    std::merge(a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(all));
+    a.clear();
+    for (const auto& r : all)
+        if (!a.empty() && r.first <= a.back().second) a.back().second = std::max(a.back().second, r.second);
+        else a.push_back(r);
+}
+
+// uploadGathered for a mesh's two vertex streams (MeshSlot::vertexBuffer, normalBuffer): fill(begin, end, positions,
+// normals) writes both; `moved` and `changed` (per block, set by fill) say which blocks send their positions and
+// which their normal words.
+template <class Fill>
+void uploadVertexStreams(std::vector<uint8_t>& staging, GLuint positions, GLuint normals, size_t count, bool allocate,
+                         const Runs& runs, const Fill& fill, const std::vector<uint8_t>& moved, const std::vector<uint8_t>& changed) {
+    constexpr uint32_t kPiece = 2048, kBatch = 1u << 18;
+    constexpr size_t kPos = sizeof(uint64_t), kNormal = sizeof(uint32_t);
+    if (allocate)
+        for (const auto& [buffer, size] : {std::pair{positions, kPos}, std::pair{normals, kNormal}}) {
+            gl::BindBuffer(GL_ARRAY_BUFFER, buffer);
+            gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(count * size), nullptr, GL_DYNAMIC_DRAW);
+        }
+    // A whole array: written straight into the mapped buffers, in parallel (no staging copy).
+    if (allocate && runs.size() == 1 && runs[0].first == 0 && runs[0].second == count && count > 0) {
+        gl::BindBuffer(GL_ARRAY_BUFFER, positions);
+        auto* p = static_cast<uint64_t*>(gl::MapBufferRange(GL_ARRAY_BUFFER, 0, GLsizeiptr(count * kPos), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
+        gl::BindBuffer(GL_ARRAY_BUFFER, normals);
+        auto* n = p ? static_cast<uint32_t*>(gl::MapBufferRange(GL_ARRAY_BUFFER, 0, GLsizeiptr(count * kNormal), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT))
+                    : nullptr;
+        if (n) poolFor(count, [&](size_t b, size_t e) { fill(uint32_t(b), uint32_t(e), p + b, n + b); }, kPiece);
+        const bool keptN = n && gl::UnmapBuffer(GL_ARRAY_BUFFER);
+        gl::BindBuffer(GL_ARRAY_BUFFER, positions);
+        const bool keptP = p && gl::UnmapBuffer(GL_ARRAY_BUFFER);
+        if (keptP && keptN) return;
+        // (The data was lost, which drivers may do on a mode switch, or a map failed: sent the usual way below.)
+    }
+    struct Piece {
+        uint32_t begin, end;
+        size_t offset; // in elements
+    };
+    std::vector<Piece> pieces;
+    size_t cap = 0;
+    uint64_t* pos = nullptr;
+    uint32_t* nrm = nullptr;
+    auto flush = [&]() {
+        if (pieces.empty()) return;
+        poolFor(pieces.size(), [&](size_t i0, size_t i1) {
+            for (size_t i = i0; i < i1; ++i) fill(pieces[i].begin, pieces[i].end, pos + pieces[i].offset, nrm + pieces[i].offset);
+        }, 1, 2);
+        // One upload per stretch of adjacent flagged blocks, per stream; adjacent pieces are adjacent in staging too.
+        for (int stream = 0; stream < 2; ++stream) {
+            const std::vector<uint8_t>& flag = stream ? changed : moved;
+            const size_t size = stream ? kNormal : kPos;
+            const uint8_t* base = stream ? reinterpret_cast<const uint8_t*>(nrm) : reinterpret_cast<const uint8_t*>(pos);
+            gl::BindBuffer(GL_ARRAY_BUFFER, stream ? normals : positions);
+            uint32_t from = 0, to = 0;
+            size_t fromOffset = 0;
+            auto send = [&]() {
+                if (to > from)
+                    gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(size_t(from) * size), GLsizeiptr(size_t(to - from) * size), base + fromOffset * size);
+                from = to = 0;
+            };
+            for (const Piece& p : pieces)
+                for (uint32_t b = p.begin; b < p.end; b = std::min(p.end, (b & ~(UploadOrder::kBlock - 1)) + UploadOrder::kBlock)) {
+                    const uint32_t e = std::min(p.end, (b & ~(UploadOrder::kBlock - 1)) + UploadOrder::kBlock);
+                    if (!flag[b >> UploadOrder::kBlockShift]) continue;
+                    if (b != to || to == from) {
+                        send();
+                        from = b;
+                        fromOffset = p.offset + size_t(b - p.begin);
+                    }
+                    to = e;
+                }
+            send();
+        }
+        pieces.clear();
+    };
+    const auto reserve = [&](size_t n) { // (positions, then normal words, in staging)
+        if (n <= cap) return;
+        cap = n;
+        staging.resize(cap * (kPos + kNormal));
+        pos = reinterpret_cast<uint64_t*>(staging.data());
+        nrm = reinterpret_cast<uint32_t*>(staging.data() + cap * kPos);
+    };
+    reserve(std::min<size_t>(kBatch, count));
+    size_t used = 0;
+    for (const auto& [b, e] : runs)
+        for (uint32_t c = b; c < e; c += kPiece) {
+            const uint32_t ce = std::min(e, c + kPiece);
+            if (used + (ce - c) > kBatch) {
+                flush();
+                used = 0;
+            }
+            if (used + (ce - c) > cap) { // (only before anything is filled: a run longer than kBatch never is)
+                flush();
+                used = 0;
+                reserve(ce - c);
+            }
+            pieces.push_back({c, ce, used});
+            used += ce - c;
+        }
+    flush();
+}
+
 // fill() for uploadGathered: fn(mesh vertex) for every slot.
 template <class T, class F>
 auto gatherWith(std::span<const uint32_t> order, F fn) {
@@ -2029,8 +2138,7 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
     blockChanged_.assign(nb, 0);
     blockMoved_.assign(nb, 0);
     bool everything = full;
-    auto fill = [&](uint32_t b, uint32_t e, void* dst) {
-        PackedVertex* out = static_cast<PackedVertex*>(dst);
+    auto fill = [&](uint32_t b, uint32_t e, uint64_t* outPos, uint32_t* outNormal) {
         bool inside = true;
         uint64_t hp = 0, hn = 0;
         AABB box;
@@ -2045,13 +2153,15 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
                 if (s.order.toGpu(v) == i) sent[v] = uint16_t(pv.normal >> 22);
                 box.expand(mesh.positions[v]);
             }
-            out[i - b] = pv;
-            hp = (hp ^ (uint64_t(pv.pos[0]) | uint64_t(pv.pos[1]) << 32)) * 0x100000001B3ull + i;
+            const uint64_t pw = uint64_t(pv.pos[0]) | uint64_t(pv.pos[1]) << 32;
+            outPos[i - b] = pw;
+            outNormal[i - b] = pv.normal;
+            hp = (hp ^ pw) * 0x100000001B3ull + i;
             hn = (hn ^ pv.normal) * 0x100000001B3ull + i;
             if ((i + 1) % UploadOrder::kBlock == 0 || i + 1 == e) {
                 const size_t g = i >> UploadOrder::kBlockShift;
                 blockMoved_[g] = everything || s.blockHash[g * 2] != hp;
-                blockChanged_[g] = blockMoved_[g] || s.blockHash[g * 2 + 1] != hn;
+                blockChanged_[g] = everything || s.blockHash[g * 2 + 1] != hn; // (the normal stream's own)
                 s.blockHash[g * 2] = hp;
                 s.blockHash[g * 2 + 1] = hn;
                 s.blockBox[g] = box;
@@ -2061,13 +2171,13 @@ void Renderer::uploadVertices(MeshSlot& s, const Mesh& mesh, bool full) {
         }
         if (!inside) outside.store(true, std::memory_order_relaxed);
     };
-    uploadGathered(staging_, s.vertexBuffer, sizeof(PackedVertex), ns, full, dirtyRuns_, fill, &blockChanged_);
+    uploadVertexStreams(staging_, s.vertexBuffer, s.normalBuffer, ns, full, dirtyRuns_, fill, blockMoved_, blockChanged_);
     if (outside.load()) {
         // A vertex left the grid: a new grid, and everything sent again.
         s.grid = PositionGrid::around(meshBounds(mesh));
         dirtyRuns_.assign(1, {0u, uint32_t(ns)});
         everything = true;
-        uploadGathered(staging_, s.vertexBuffer, sizeof(PackedVertex), ns, false, dirtyRuns_, fill, &blockChanged_);
+        uploadVertexStreams(staging_, s.vertexBuffer, s.normalBuffer, ns, false, dirtyRuns_, fill, blockMoved_, blockChanged_);
     }
     // The runs whose positions moved, for the culling bounds and motion proxies.
     movedRuns_.clear();
@@ -2843,12 +2953,18 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
         gl::BindVertexArray(0);
         s.grid = PositionGrid::around(meshBounds(mesh));
         dirtyRuns_.assign(1, {0u, uint32_t(s.order.size())});
+        s.staleNormals.clear(), s.staleHeld = false;
     } else if (s.regrid) { // a stroke's vertex left the grid (prepareStrokeUpload): a new one, everything sent
         s.grid = PositionGrid::around(meshBounds(mesh));
         dirtyRuns_.assign(1, {0u, uint32_t(s.order.size())});
         std::fill(s.blockHash.begin(), s.blockHash.end(), ~uint64_t(0) >> 1); // (no block keeps its hash)
+        s.staleNormals.clear(), s.staleHeld = false;
     } else {
         s.order.dirtyRuns(mesh, dirtyRuns_);
+        if (!s.staleHeld && !s.staleNormals.empty()) { // (a positions-only stroke upload's normal words, released)
+            mergeRuns(dirtyRuns_, s.staleNormals);
+            s.staleNormals.clear();
+        }
     }
     s.regrid = false;
     const size_t ns = s.order.size();
@@ -2890,8 +3006,10 @@ void Renderer::sync(MeshSlot& s, Mesh& mesh, const NormalMapView* normalMap, boo
             s.outOfMemory = s.outOfMemory || e == GL_OUT_OF_MEMORY;
         }
         if (s.outOfMemory) {
-            gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer);
-            gl::BufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+            for (GLuint b : {s.vertexBuffer, s.normalBuffer}) {
+                gl::BindBuffer(GL_ARRAY_BUFFER, b);
+                gl::BufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+            }
             gl::BindVertexArray(s.vao);
             gl::BufferData(GL_ELEMENT_ARRAY_BUFFER, 0, nullptr, GL_STATIC_DRAW);
             gl::BindVertexArray(0);
@@ -4521,15 +4639,16 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
         const auto warmStart = std::chrono::steady_clock::now();
         const std::vector<uint32_t> one{drawClusters_.front()};
         const auto range = s.order.clusters()[one[0]];
-        std::vector<PackedVertex> verts(range.vertexCount);
-        if (!verts.empty()) { // (BufferSubData of what is there: the stroke uploads' path, nothing changes)
-            const GLintptr at = GLintptr(size_t(range.firstVertex) * sizeof(PackedVertex));
-            const GLsizeiptr bytes = GLsizeiptr(verts.size() * sizeof(PackedVertex));
-            gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer);
-            gl::GetBufferSubData(GL_ARRAY_BUFFER, at, bytes, verts.data());
-            gl::BufferSubData(GL_ARRAY_BUFFER, at, bytes, verts.data());
-            gl::BindBuffer(GL_ARRAY_BUFFER, 0);
-        }
+        std::vector<uint64_t> verts(range.vertexCount);
+        if (!verts.empty()) // (BufferSubData of what is there: the stroke uploads' path, nothing changes)
+            for (const auto& [buffer, size] : {std::pair{s.vertexBuffer, sizeof(uint64_t)}, std::pair{s.normalBuffer, sizeof(uint32_t)}}) {
+                const GLintptr at = GLintptr(size_t(range.firstVertex) * size);
+                const GLsizeiptr bytes = GLsizeiptr(verts.size() * size);
+                gl::BindBuffer(GL_ARRAY_BUFFER, buffer);
+                gl::GetBufferSubData(GL_ARRAY_BUFFER, at, bytes, verts.data());
+                gl::BufferSubData(GL_ARRAY_BUFFER, at, bytes, verts.data());
+            }
+        gl::BindBuffer(GL_ARRAY_BUFFER, 0);
         const size_t drawn = lastDrawn_;
         for (int k = 1; k < 4; ++k) {
             if ((k & 2) && perTriangle) continue; // (draft strokes draw per-triangle data in full)
@@ -4690,10 +4809,12 @@ void Renderer::setGhostUniforms(const MeshProgram& p) {
 bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, const float* curvature) {
     out.id = id;
     out.ready = false;
-    out.data.clear();
+    out.positions.clear();
+    out.normals.clear();
     out.packed = 0;
     out.staged = false;
     out.ranges.clear();
+    out.normalRanges.clear();
     out.movedClusters.clear();
     out.bounds.clear();
     out.exactClusters.clear();
@@ -4712,7 +4833,18 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
         return false;
     std::vector<std::pair<uint32_t, uint32_t>> runs;
     s.order.dirtyRuns(mesh, runs);
+    // Normal words a positions-only upload left behind: with the next upload that sends normals; positions only, they
+    // wait (the mesh's dirty marks are cleared either way).
+    if (out.sendsNormals()) mergeRuns(runs, s.staleNormals);
+    if (out.streams == Streams::None) { // (positions unmoved: the normal words wait for the last batch)
+        mergeRuns(s.staleNormals, runs);
+        s.staleHeld = s.staleHeld || !runs.empty();
+        mesh.clearDirty();
+        out.ready = true;
+        return true;
+    }
     if (runs.empty()) {
+        if (out.sendsNormals()) s.staleNormals.clear(), s.staleHeld = false;
         out.ready = true;
         return true;
     }
@@ -4742,7 +4874,8 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
             }
         out.staged = out.stagingPtr && total <= out.stagingCap;
         out.packed = total;
-        out.data.resize(out.staged ? 0 : total);
+        out.positions.resize(out.staged || !out.sendsPositions() ? 0 : total);
+        out.normals.resize(out.staged || !out.sendsNormals() ? 0 : total);
     };
     cut();
     std::atomic<bool> outside{false};
@@ -4753,11 +4886,13 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
     bool everything = false;
     // The cavity bits each vertex last went up with: kKeepCurvature (a scale-adaptive dab) sends them again.
     uint16_t* sent = s.sentCurvature.size() == nv ? s.sentCurvature.data() : nullptr;
+    const bool withPositions = out.sendsPositions(), withNormals = out.sendsNormals();
     const auto pack = [&] {
     poolFor(pieces.size(), [&](size_t i0, size_t i1) {
         for (size_t pi = i0; pi < i1; ++pi) {
             const Piece& pc = pieces[pi];
-            PackedVertex* dst = out.dst() + pc.offset;
+            uint64_t* dstPos = withPositions ? out.positionDst() + pc.offset : nullptr;
+            uint32_t* dstNormal = withNormals ? out.normalDst() + pc.offset : nullptr;
             bool inside = true;
             uint64_t hp = 0, hn = 0;
             AABB box;
@@ -4765,25 +4900,35 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
                 const uint32_t v = order[i];
                 PackedVertex pv{};
                 if (v < nv) {
-                    float c = curvature ? curvature[v] : curvatureAt(mesh, v);
-                    const bool keep = std::isnan(c);
-                    if (keep && !sent) c = curvatureAt(mesh, v);
-                    inside &= packVertex(grid, mesh.positions[v], mesh.normals[v], keep && sent ? 0.0f : c, pv);
-                    if (sent) {
-                        if (keep) pv.normal = (pv.normal & 0x003FFFFFu) | uint32_t(sent[v]) << 22;
-                        else if (s.order.toGpu(v) == i) sent[v] = uint16_t(pv.normal >> 22); // (first slot only, as uploadVertices)
-                    }
-                    box.expand(mesh.positions[v]);
+                    if (withNormals) {
+                        float c = curvature ? curvature[v] : curvatureAt(mesh, v);
+                        const bool keep = std::isnan(c);
+                        if (keep && !sent) c = curvatureAt(mesh, v);
+                        if (withPositions) inside &= packPosition(grid, mesh.positions[v], pv);
+                        packNormal(mesh.normals[v], keep && sent ? 0.0f : c, pv);
+                        if (sent) {
+                            if (keep) pv.normal = (pv.normal & 0x003FFFFFu) | uint32_t(sent[v]) << 22;
+                            else if (s.order.toGpu(v) == i) sent[v] = uint16_t(pv.normal >> 22); // (first slot only, as uploadVertices)
+                        }
+                    } else inside &= packPosition(grid, mesh.positions[v], pv);
+                    if (withPositions) box.expand(mesh.positions[v]);
                 }
-                dst[i - pc.begin] = pv;
-                hp = (hp ^ (uint64_t(pv.pos[0]) | uint64_t(pv.pos[1]) << 32)) * 0x100000001B3ull + i;
-                hn = (hn ^ pv.normal) * 0x100000001B3ull + i;
+                const uint64_t pw = uint64_t(pv.pos[0]) | uint64_t(pv.pos[1]) << 32;
+                if (withPositions) {
+                    dstPos[i - pc.begin] = pw;
+                    hp = (hp ^ pw) * 0x100000001B3ull + i;
+                }
+                if (withNormals) {
+                    dstNormal[i - pc.begin] = pv.normal;
+                    hn = (hn ^ pv.normal) * 0x100000001B3ull + i;
+                }
                 if ((i + 1) % UploadOrder::kBlock == 0 || i + 1 == pc.end) {
+                    // (a stream not packed keeps its hash: what the GPU has)
                     const size_t g = i >> UploadOrder::kBlockShift;
-                    hashes[g * 2] = hp;
-                    hashes[g * 2 + 1] = hn;
-                    out.blockMoved[g] = everything || s.blockHash[g * 2] != hp;
-                    out.blockChanged[g] = out.blockMoved[g] || s.blockHash[g * 2 + 1] != hn;
+                    hashes[g * 2] = withPositions ? hp : s.blockHash[g * 2];
+                    hashes[g * 2 + 1] = withNormals ? hn : s.blockHash[g * 2 + 1];
+                    out.blockMoved[g] = withPositions && (everything || s.blockHash[g * 2] != hp);
+                    out.blockChanged[g] = withNormals && (everything || s.blockHash[g * 2 + 1] != hn);
                     boxes[g] = box;
                     hp = hn = 0;
                     box = AABB();
@@ -4793,6 +4938,7 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
         }
     }, 1, 2);
     };
+    const Runs marked = withNormals ? Runs() : runs; // (positions only: the normal words these leave behind)
     pack();
     if (outside.load()) {
         // A vertex left the position grid: a new one round the mesh, and every vertex packed again, here on this
@@ -4809,20 +4955,25 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
         out.grid = grid;
     }
     out.packMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count();
-    // The changed blocks' GPU ranges and where they are in `data`.
+    // The blocks each stream sends: their GPU ranges and where they are in `positions` / `normals`.
+    const auto addRange = [](std::vector<StrokeUpload::Range>& ranges, uint32_t b, uint32_t e, size_t offset) {
+        if (!ranges.empty() && ranges.back().end == b && ranges.back().offset + (ranges.back().end - ranges.back().begin) == offset)
+            ranges.back().end = e;
+        else ranges.push_back({b, e, offset});
+    };
     for (const Piece& pc : pieces)
         for (uint32_t b = pc.begin; b < pc.end;) {
             const uint32_t e = std::min(pc.end, (b & ~(UploadOrder::kBlock - 1)) + UploadOrder::kBlock);
             const size_t g = b >> UploadOrder::kBlockShift;
-            s.blockBox[g] = boxes[g];
-            if (out.blockChanged[g]) {
+            if (withPositions) s.blockBox[g] = boxes[g];
+            const size_t offset = pc.offset + (b - pc.begin);
+            if (out.blockMoved[g]) {
                 s.blockHash[g * 2] = hashes[g * 2];
+                addRange(out.ranges, b, e, offset);
+            }
+            if (out.blockChanged[g]) {
                 s.blockHash[g * 2 + 1] = hashes[g * 2 + 1];
-                const size_t offset = pc.offset + (b - pc.begin);
-                if (!out.ranges.empty() && out.ranges.back().end == b && out.ranges.back().offset +
-                                                                          (out.ranges.back().end - out.ranges.back().begin) == offset)
-                    out.ranges.back().end = e;
-                else out.ranges.push_back({b, e, offset});
+                addRange(out.normalRanges, b, e, offset);
             }
             b = e;
         }
@@ -4853,6 +5004,13 @@ bool Renderer::prepareStrokeUpload(uint32_t id, Mesh& mesh, StrokeUpload& out, c
         cb.coneAngle = -1.0f;
         cb.volume = c < s.bounds.size() ? s.bounds[c].volume : 0.0;
     }
+    if (out.sendsNormals()) {
+        s.staleNormals.clear();
+        s.staleHeld = false;
+    } else {
+        mergeRuns(s.staleNormals, marked);
+        s.staleHeld = true;
+    }
     mesh.clearDirty();
     out.boundsMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - clock).count() - out.packMs;
     out.ready = true;
@@ -4868,22 +5026,33 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
     if (!found) return;
     MeshSlot& s = *found;
     if (up.regrid) s.grid = up.grid; // (with every vertex, packed on it)
-    if (!up.ranges.empty() && up.staged && up.stagingIndex >= 0) { // (packed into a staging buffer: the GPU copies)
+    const struct {
+        const std::vector<StrokeUpload::Range>& ranges;
+        GLuint buffer;
+        size_t size, stagingAt; // bytes per slot; where the stream starts in the staging buffer, bytes
+        const void* data;
+    } streams[2] = {{up.ranges, s.vertexBuffer, sizeof(uint64_t), 0, up.positions.data()},
+                    {up.normalRanges, s.normalBuffer, sizeof(uint32_t), up.stagingCap * sizeof(uint64_t), up.normals.data()}};
+    if (up.staged && up.stagingIndex >= 0 && !(up.ranges.empty() && up.normalRanges.empty())) { // (packed into a staging buffer: the GPU copies)
         Staging& st = persist_[up.stagingIndex];
         gl::BindBuffer(GL_COPY_READ_BUFFER, st.buffer);
-        gl::BindBuffer(GL_COPY_WRITE_BUFFER, s.vertexBuffer);
-        for (const StrokeUpload::Range& r : up.ranges)
-            gl::CopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, GLintptr(r.offset * sizeof(PackedVertex)),
-                                  GLintptr(size_t(r.begin) * sizeof(PackedVertex)),
-                                  GLsizeiptr(size_t(r.end - r.begin) * sizeof(PackedVertex)));
+        for (const auto& stream : streams) {
+            gl::BindBuffer(GL_COPY_WRITE_BUFFER, stream.buffer);
+            for (const StrokeUpload::Range& r : stream.ranges)
+                gl::CopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, GLintptr(stream.stagingAt + r.offset * stream.size),
+                                      GLintptr(size_t(r.begin) * stream.size), GLsizeiptr(size_t(r.end - r.begin) * stream.size));
+        }
         gl::BindBuffer(GL_COPY_READ_BUFFER, 0);
         gl::BindBuffer(GL_COPY_WRITE_BUFFER, 0);
         st.fence = gl::FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0); // (bindStrokeUpload waits before it's reused)
-    } else if (!up.ranges.empty()) {
-        gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer);
-        for (const StrokeUpload::Range& r : up.ranges)
-            gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(size_t(r.begin) * sizeof(PackedVertex)),
-                              GLsizeiptr(size_t(r.end - r.begin) * sizeof(PackedVertex)), up.data.data() + r.offset);
+    } else if (!up.staged) {
+        for (const auto& stream : streams) {
+            if (stream.ranges.empty()) continue;
+            gl::BindBuffer(GL_ARRAY_BUFFER, stream.buffer);
+            for (const StrokeUpload::Range& r : stream.ranges)
+                gl::BufferSubData(GL_ARRAY_BUFFER, GLintptr(size_t(r.begin) * stream.size), GLsizeiptr(size_t(r.end - r.begin) * stream.size),
+                                  static_cast<const uint8_t*>(stream.data) + r.offset * stream.size);
+        }
         gl::BindBuffer(GL_ARRAY_BUFFER, 0);
     }
     if (!up.movedClusters.empty()) {
@@ -4918,6 +5087,41 @@ void Renderer::commitStrokeUpload(StrokeUpload& up) {
 }
 
 void Renderer::setDraftNormals(uint32_t id) { draftId_ = id; }
+
+long long Renderer::vertexStreamMismatches(uint32_t id, const Mesh& mesh) {
+    MeshSlot* found = nullptr;
+    for (MeshSlot& s : slots_)
+        if (s.id == id) found = &s;
+    if (!found || found->micro || found->fresh || !found->patches.empty() || mesh.normals.size() != mesh.vertexCount()) return -1;
+    MeshSlot& s = *found;
+    const size_t ns = s.order.size(), nv = mesh.vertexCount();
+    std::vector<uint64_t> pos(ns);
+    std::vector<uint32_t> normal(ns);
+    gl::BindBuffer(GL_ARRAY_BUFFER, s.vertexBuffer);
+    gl::GetBufferSubData(GL_ARRAY_BUFFER, 0, GLsizeiptr(ns * sizeof(uint64_t)), pos.data());
+    gl::BindBuffer(GL_ARRAY_BUFFER, s.normalBuffer);
+    gl::GetBufferSubData(GL_ARRAY_BUFFER, 0, GLsizeiptr(ns * sizeof(uint32_t)), normal.data());
+    gl::BindBuffer(GL_ARRAY_BUFFER, 0);
+    const std::span<const uint32_t> order = s.order.fromGpu();
+    long long bad = 0, moved = 0;
+    for (size_t i = 0; i < ns; ++i) {
+        const uint32_t v = order[i];
+        if (v >= nv) continue;
+        PackedVertex pv{};
+        packPosition(s.grid, mesh.positions[v], pv);
+        packNormal(mesh.normals[v], 0.0f, pv);
+        const bool p = pos[i] != (uint64_t(pv.pos[0]) | uint64_t(pv.pos[1]) << 32);
+        moved += p;
+        bad += p || (normal[i] & 0x003FFFFFu) != (pv.normal & 0x003FFFFFu);
+    }
+    if (bad) SDL_Log("vertex streams: %lld slots differ (%lld in position)", bad, moved);
+    return bad;
+}
+
+void Renderer::releaseStaleNormals(uint32_t id) {
+    for (MeshSlot& s : slots_)
+        if (s.id == id) s.staleHeld = false;
+}
 
 bool Renderer::persistentUpload() const {
     static const int env = [] {
@@ -4955,13 +5159,13 @@ void Renderer::bindStrokeUpload(uint32_t id, StrokeUpload& up) {
         gl::GenBuffers(1, &st.buffer);
         gl::BindBuffer(GL_COPY_READ_BUFFER, st.buffer);
         const GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-        gl::BufferStorage(GL_COPY_READ_BUFFER, GLsizeiptr(kCap * sizeof(PackedVertex)), nullptr, flags);
+        gl::BufferStorage(GL_COPY_READ_BUFFER, GLsizeiptr(kCap * sizeof(PackedVertex)), nullptr, flags); // (positions, then normal words)
         st.ptr = gl::MapBufferRange(GL_COPY_READ_BUFFER, 0, GLsizeiptr(kCap * sizeof(PackedVertex)), flags);
         gl::BindBuffer(GL_COPY_READ_BUFFER, 0);
         st.cap = st.ptr ? kCap : 0;
     }
     if (!st.ptr) return;
-    up.stagingPtr = static_cast<PackedVertex*>(st.ptr);
+    up.stagingPtr = st.ptr;
     up.stagingCap = st.cap;
     up.stagingIndex = k;
 }
