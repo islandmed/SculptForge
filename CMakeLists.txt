@@ -1638,6 +1638,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(modifier_brush_2880 modifier_brush --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
+    sculptforge_ui_test(facegroup_visible_fresh_id_1440 facegroup_visible_fresh_id --size 1440x900) # Ctrl+W on a partly hidden, ungrouped mesh
+    sculptforge_ui_test(facegroup_visible_fresh_id_2880 facegroup_visible_fresh_id --size 2880x1800)
     sculptforge_ui_test(popup_click_outside_1440 popup_click_outside --size 1440x900) # #210: context menus and combo lists close on a press outside
     sculptforge_ui_test(popup_click_outside_2880 popup_click_outside --size 2880x1800)
     # #182: the high-resolution and may-use-swap remesh dialogs at the review sizes (tests/ui/voxel_highres.sfui).

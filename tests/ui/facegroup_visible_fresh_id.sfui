@@ -14,7 +14,9 @@ hold ctrl+shift
 drag_path -0.2 -0.05 0.3 1.2
 hold none
 expect_value hidden > 100
+shot visible-part-hidden
 
 key ctrl+w
 expect_value groups > $g0
 expect_value show_facegroups == 1
+shot visible-part-own-group
