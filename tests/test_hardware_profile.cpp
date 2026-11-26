@@ -295,6 +295,35 @@ TEST(hw_profile_threads_override_past_16) {
     CHECK(ThreadPool::sharedSizeFor(32, 4, 96) == 32);
 }
 
+// #184: the thread count in the saved profile is not trusted: this machine's own count caps a Threads override.
+TEST(hw_profile_threads_cap_is_live) {
+    const HardwareInfo h = machine("NVIDIA Corporation", "NVIDIA GeForce RTX 4090/PCIe/SSE2", 24564, 65536, 16); // saved while limited to 16
+    ProfileOverrides o;
+    o.threads = 32;
+    const std::string path = tempPath("sf_hw_threads_live.json");
+    std::string error;
+    CHECK(saveHardwareProfile(path, mapProfile(h, measured(15000.0, 25.0, 0.2, 40.0), o), error));
+    HardwareProfile back;
+    CHECK(loadHardwareProfile(path, back));
+    CHECK(back.hardware.cpuThreads == detectLogicalThreads());
+    CHECK(back.settings.threads == std::min(32, detectLogicalThreads()));
+#if defined(_WIN32)
+    _putenv_s("SF_CPU_THREADS", "32");
+#else
+    setenv("SF_CPU_THREADS", "32", 1);
+#endif
+    CHECK(detectLogicalThreads() == 32);
+    CHECK(loadHardwareProfile(path, back) && back.hardware.cpuThreads == 32 && back.settings.threads == 32);
+#if defined(_WIN32)
+    _putenv_s("SF_CPU_THREADS", "");
+#else
+    unsetenv("SF_CPU_THREADS");
+#endif
+    CHECK(detectLogicalThreads() >= 1);
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}
+
 TEST(hw_profile_overrides) {
     const HardwareInfo h = machine("NVIDIA Corporation", "NVIDIA GeForce RTX 4090", 24564, 131072);
     ProfileOverrides o;
@@ -327,7 +356,7 @@ TEST(hw_profile_cache_invalidation) {
     HardwareProfile missing;
     CHECK(!loadHardwareProfile(path, missing));
 
-    const HardwareInfo h = machine("AMD", "AMD Radeon RX 7800 XT (radeonsi, navi32)", 16384, 32768);
+    const HardwareInfo h = machine("AMD", "AMD Radeon RX 7800 XT (radeonsi, navi32)", 16384, 32768, detectLogicalThreads()); // (a load reads the live count)
     ProfileOverrides o;
     o.maxTextureSize = 4096;
     o.governor = false;
