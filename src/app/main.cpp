@@ -463,7 +463,7 @@ static int runMain(int argc, char** argv) {
         sf::crashlog::stop();
         return 1;
     }
-    SDL_Log("Threads: pool of %d (hardware %u)", sf::ThreadPool::shared().threads(), std::thread::hardware_concurrency()); // (bug reports: #184)
+    SDL_Log("Threads: pool of %d (hardware %u)", sf::ThreadPool::shared().threads(), unsigned(sf::detectLogicalThreads())); // (bug reports: #184)
     const auto runStart = std::chrono::steady_clock::now();
     int code = app->run();
     const auto runEnd = std::chrono::steady_clock::now();
