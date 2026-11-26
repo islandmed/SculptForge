@@ -1,0 +1,86 @@
+# Add to a shelf or My Panel with no keyboard (Member Request, November 2026: a tablet can't Alt+drag). Hold a finger or the
+# pen still on a control, a button or a section's title for half a second: a ring shows it took and, as it lifts, a menu offers
+# Add to My Panel and the four shelves. The item lands at the end of the shelf, as an Alt-drop there would put it (a full
+# top shelf scrolls, so the left shelf is the one the test looks at), and the
+# press did nothing else: a box stays as it was, a slider keeps its value, a button is not pressed. A quick tap still acts, and
+# on a slider it still sets the value. A mouse gets the same menu from a right-click where the control has none of its own.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Parts##tool.part"
+click "Viewport Look##tool.display"
+expect "Tool/Backface culling##display"
+expect_value touch_pin_menu == 0
+expect_value "shelf_has_control:tool.display/Backface culling" == 0
+
+# A tap is a tap: the box ticks and unticks, no menu.
+touch_tap "Tool/Backface culling##display"
+expect_value backface_culling == 1
+touch_tap "Tool/Backface culling##display"
+expect_value backface_culling == 0
+expect_value touch_pin_menu == 0
+expect_value touch_pin_armed == 0
+
+# A long press on the box: the menu opens as the finger lifts, the box is as it was.
+touch_hold "Tool/Backface culling##display"
+expect_value touch_pin_armed == 1
+expect_value touch_pin_menu == 1
+expect_value backface_culling == 0
+expect "Add to My Panel"
+expect "Add to the top shelf"
+expect "Add to the bottom shelf"
+click "Add to the left shelf"
+expect_value touch_pin_menu == 0
+expect_value "shelf_has_control:tool.display/Backface culling" == 1
+expect_value backface_culling == 0
+expect "Left shelf/Backface culling##display"
+# (live: the shelf's copy works)
+click "Left shelf/Backface culling##display"
+expect_value backface_culling == 1
+click "Tool/Backface culling##display"
+expect_value backface_culling == 0
+
+# A button, held with the pen: not pressed, onto the right shelf.
+click "Viewport Look##tool.display"
+click "Geometry##tool.geometry"
+expect "Tool/Subdivide (removes levels)##geometry.subdivide"
+remember undo_steps steps0
+pen_hold "Tool/Subdivide (removes levels)##geometry.subdivide"
+expect_value touch_pin_menu == 1
+pen_tap "Add to the right shelf"
+pen_out
+expect_value shelf_has_geometry.subdivide == 1
+expect_value undo_steps == $steps0
+click "Geometry##tool.geometry"
+
+# A slider: the Draw palette's Size. The press does not move it; a quick tap does.
+click "Draw##palette.draw"
+click "Draw/##totray"
+brush_size 60
+expect "Draw/##drawsize"
+expect_value my_panel_entries == 0
+touch_hold "Draw/##drawsize"
+expect_value touch_pin_menu == 1
+expect_value draw_size == 60
+click "Add to My Panel"
+expect_value my_panel_entries == 1
+expect_value draw_size == 60
+touch_tap "Draw/##drawsize"
+expect_value draw_size != 60
+click "Draw/##totray"
+
+# A mouse: right-click the box.
+click "Parts##tool.part"
+click "Viewport Look##tool.display"
+right_click "Tool/Backface culling##display"
+expect_value touch_pin_menu == 1
+click "Add to the bottom shelf"
+expect_value "shelf_has_control:tool.display/Backface culling" == 2
+expect_value backface_culling == 0
+
+# A choice opens its list on the press: the long press closes it again and asks instead (Bake > Map size).
+click "Bake##tool.bake"
+expect "Tool/##bakesize"
+touch_hold "Tool/##bakesize"
+expect_value touch_pin_menu == 1
+click "Add to the bottom shelf"
+expect_value "shelf_has_control:tool.bake/Map size" == 1

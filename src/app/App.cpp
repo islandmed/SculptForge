@@ -1986,6 +1986,8 @@ void App::dispatchEvent(const SDL_Event& event) {
         closeTopPopupOnEscape())
         return; // Esc closes the top context menu or combo list and nothing else sees it (#210; the Library's Esc would close it)
     pressSpent_ = closePopupsOnPressOutside(e); // a press outside open menus and popups acts, not only closes them (Shell.cpp)
+    if (e.type == SDL_EVENT_MOUSE_MOTION) ui::NotePointerPen(e.motion.which == SDL_PEN_MOUSEID);
+    else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) ui::NotePointerPen(e.button.which == SDL_PEN_MOUSEID);
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
     if (touchMouseEvent(e)) return; // a finger's press waits for a second finger; a gesture's stay off (Touch.cpp)

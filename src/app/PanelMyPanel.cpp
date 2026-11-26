@@ -390,6 +390,22 @@ bool App::droppedOnMyPanelWindow() {
 // The end of a drag: an entry dragged out of My Panel and dropped anywhere but on a My Panel is removed (like a shelf
 // item). Called once a frame after every window, with the shelves' own finishShelfDrag.
 void App::finishMyPanelDrag() {
+    // A long press (or a right-click) menu pick (ui::TouchPin): lands where an Alt-drop at the end of the shelf or panel would.
+    std::string pinned;
+    int target = ui::HostMyPanel;
+    if (ui::TakeTouchPin(pinned, target)) {
+        if (target == ui::HostMyPanel) {
+            if (myPanelAdd(pinned, int(layout_.myPanel.size()))) status_ = "Added to My Panel";
+        } else if (const std::string item = shelfItemForEntry(pinned); !item.empty()) {
+            auto& list = target == ui::ShelfTop     ? layout_.topShelf
+                         : target == ui::ShelfLeft  ? layout_.leftShelf
+                         : target == ui::ShelfRight ? layout_.rightShelf
+                                                    : layout_.bottomShelf;
+            list.push_back(item);
+            status_ = "Added to the shelf";
+            noteLayoutChanged();
+        }
+    }
     const ImGuiPayload* payload = ImGui::GetDragDropPayload();
     if (payload && payload->IsDataType(ui::kMyPanelPayload)) {
         ui::MyPanelPayload item;
