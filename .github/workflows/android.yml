@@ -57,6 +57,13 @@ jobs:
           path: .ccache
           key: ccache-android-${{ matrix.abi }}.${{ github.sha }}
           restore-keys: ccache-android-${{ matrix.abi }}.
+      - name: Gradle dependencies
+        # (11-25/11-26: Maven Central answered the shared runner IPs with 429 / "not found" and the Gradle configure step failed
+        # on a release tag, twice. The build classpath comes from this cache; main's run saves it, tags and branches read it.)
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.gradle/caches/modules-2
+          key: gradle-android-${{ hashFiles('android/**/*.gradle', 'android/gradle.properties') }}
       - name: Build
         shell: bash # (-o pipefail: a failed build fails here, not behind tee)
         run: scripts/android-build.sh --abi ${{ matrix.abi }} --out build-android/${{ matrix.abi }} | tee apk-path.txt
@@ -66,6 +73,12 @@ jobs:
         with:
           path: .ccache
           key: ccache-android-${{ matrix.abi }}.${{ github.sha }}
+      - name: Gradle dependencies (save)
+        if: success() && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.gradle/caches/modules-2
+          key: gradle-android-${{ hashFiles('android/**/*.gradle', 'android/gradle.properties') }}
       - name: Check the APK
         run: |
           apk=$(tail -1 apk-path.txt)

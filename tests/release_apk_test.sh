@@ -4,7 +4,7 @@
 #
 # scripts/release.sh release_apk (ctest release_apk): a beta's Android APKs (arm64-v8a + x86_64 from the android.yml run of the
 # tagged commit) go onto the PRIVATE Insiders repository only: a beta's release, or a stable release's members-only one. Never a public repository; a missing or
-# failed run, a missing artifact or a failing upload is a warning and never fails the release; already uploaded: left alone.
+# failed run (after one rerun), a missing artifact or a failing upload is a loud warning plus a marker (release.sh exits 1 at its end) and never stops the train; already uploaded: left alone.
 # Stand-in gh and git repository in a sandbox.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -19,7 +19,7 @@ echo "$*" >> "$GH_LOG"
 case "$1 $2" in
   "run list") if [ -n "$GH_RUN" ]; then echo "$GH_RUN"; elif [ -e "$GH_DISPATCHED" ]; then echo "$GH_RUN_AFTER"; fi ;;
   "workflow run") [ -z "$GH_NODISPATCH" ] || exit 1; touch "$GH_DISPATCHED" ;;
-  "run view") case "$*" in *status*) echo completed ;; *) echo "$GH_CONC" ;; esac ;;
+  "run view") case "$*" in *status*) echo completed ;; *) if [ -e "$GH_RERUN" ]; then echo success; else echo "$GH_CONC"; fi ;; esac ;;
   "run download")
     [ -z "$GH_NODL" ] || exit 1
     while [ $# -gt 0 ]; do [ "$1" = -n ] && name=$2; [ "$1" = -D ] && dir=$2; shift; done
@@ -32,18 +32,19 @@ SH
 chmod +x "$S/bin/gh"
 printf '#!/bin/sh\necho "$*" >> "$HERDR_LOG"\n' > "$S/bin/herdr"; chmod +x "$S/bin/herdr" # never the real sfmonitor
 git init -q "$S/repo" && cd "$S/repo" && git -c user.name=t -c user.email=t@e commit -q --allow-empty -m beta && git tag v9.9.9-beta.3
-export PATH=$S/bin:$PATH GH_LOG=$S/gh.log GH_UPLOADS=$S/uploads GH_CREATED=$S/created HERDR_LOG=$S/herdr.log GH_DISPATCHED=$S/dispatched SF_APK_POLLS=2 SF_APK_POLL_S=0
+export PATH=$S/bin:$PATH GH_LOG=$S/gh.log GH_UPLOADS=$S/uploads GH_CREATED=$S/created HERDR_LOG=$S/herdr.log GH_DISPATCHED=$S/dispatched GH_RERUN=$S/rerun SF_APK_POLLS=2 SF_APK_POLL_S=0
 REPO=pub/app INSIDERS_REPO=pri/insiders
 V=9.9.9-beta.3 T=v9.9.9-beta.3 PRE=beta.3 RELEASE_REPO=pri/insiders
 work=$S/work
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 ok() { echo "ok: $*"; }
+red() { echo "$*" >&2; }
 resume() { echo "resume-$1"; }
 gh_watch() { return 0; }
 # shellcheck disable=SC1090
-eval "$(sed -n '/^release_apk()/,/^}/p' "$ROOT/scripts/release.sh")" # not source <(...): macOS bash 3.2 cannot
+eval "$(sed -n '/^apk_missing()/,/^}/p;/^release_apk()/,/^}/p' "$ROOT/scripts/release.sh")" # not source <(...): macOS bash 3.2 cannot
 reset() {
-    rm -rf "$work/apk" "$S/gh.log" "$S/uploads" "$S/created" "$S/herdr.log" "$S/dispatched"
+    rm -rf "$work/apk" "$work/apk-missing" "$S/rerun" "$S/rerun.log" "$S/gh.log" "$S/uploads" "$S/created" "$S/herdr.log" "$S/dispatched"
     : > "$S/gh.log"
     printf 'SHA256SUMS.txt\nSculptForge-9.9.9-linux.tar.gz\n' > "$work/assets"
     export GH_RUN=4242 GH_CONC=success GH_NODL= GH_UPFAIL= GH_IREL= GH_IASSETS= GH_CREATEFAIL= GH_RUN_AFTER= GH_NODISPATCH=
@@ -86,10 +87,23 @@ echo "$out" | grep -q WARNING || fail "no warning without a run: $out"
 reset; GH_RUN= GH_NODISPATCH=1; out=$(release_apk 2>&1) || fail "failed when the start failed"
 echo "$out" | grep -q WARNING && [ ! -e "$S/uploads" ] || fail "start failure: $out"
 
-# 4. the run failed: warning, no upload
+# 4. the run failed (no infra_retry here): a loud warning, the marker release.sh turns into an exit code, no upload
 reset; GH_CONC=failure; out=$(release_apk 2>&1) || fail "failed with a red run"
 echo "$out" | grep -q WARNING || fail "no warning for a red run"
+[ -s "$work/apk-missing" ] || fail "a red run left no apk-missing marker"
 [ ! -e "$S/uploads" ] || fail "uploaded from a red run"
+# 4b. a red run gets one rerun of its failed jobs (0.14.1, 0.14.2: Maven Central 429): when the rerun is green the APKs land, no marker
+infra_retry() { echo "$1" >> "$S/rerun.log"; [ -z "$RERUN_FIXES" ] || touch "$S/rerun"; }
+reset; GH_CONC=failure; RERUN_FIXES=1; out=$(release_apk 2>&1) || fail "failed with a red run that a rerun fixes: $out"
+[ "$(cat "$S/rerun.log")" = 4242 ] || fail "the red run was not rerun once: $(cat "$S/rerun.log" 2>/dev/null)"
+[ -s "$S/uploads" ] && [ ! -s "$work/apk-missing" ] || fail "rerun green: no upload or a marker: $out"
+# 4c. still red after the rerun: loud, marked, no upload (the train exits 1 at its end)
+reset; GH_CONC=failure; RERUN_FIXES=; out=$(release_apk 2>&1) || fail "failed with a red run after its rerun"
+echo "$out" | grep -q 'WARNING.*after its rerun' && [ -s "$work/apk-missing" ] && [ ! -e "$S/uploads" ] || fail "red after rerun: $out"
+# 4d. a cancelled run is never rerun
+reset; GH_CONC=cancelled; RERUN_FIXES=1; out=$(release_apk 2>&1) || fail "failed with a cancelled run"
+[ ! -e "$S/rerun.log" ] && [ -s "$work/apk-missing" ] || fail "cancelled run: $out"
+unset -f infra_retry
 
 # 5. artifacts expired: warning, no upload
 reset; GH_NODL=1; out=$(release_apk 2>&1) || fail "failed with expired artifacts"
