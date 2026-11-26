@@ -392,6 +392,7 @@ public:
     // (tests set it huge: every second point).
     float planeSamples = 7000.0f;
     bool adaptive = true;
+    bool fastWrite = true; // false: the callback loop writes the interpolated change (what the fast one is checked against)
     // Contact facing (DabParams::contactFacing) for the next dabs: the hint (the picked normal, unit length; zero = off). A dab
     // finds the contact normal from it on the micro surface under the cursor and weighs each point by its own micro
     // surface normal against that (facingWeight), and by the falloff along the base surface (a slot in the base: the
