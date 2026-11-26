@@ -7,5 +7,6 @@ testers:
   - Same tablet: long-press the brush Size slider (Draw palette) and pick Add to My Panel; the size does not change. Tap the slider quickly; it sets the size as before.
   - A pen: hold the tip still on a button (Subdivide) for half a second, lift, pick a shelf; the button was not pressed.
   - A mouse: right-click a checkbox; the same menu opens (brush tiles and layers keep their own right-click menus).
+  - Confirmed on a Samsung Galaxy Tab S6 Lite by a member.
 ---
 Reviewers: ui::TouchPin (Ui.cpp), SliderInside's hold, App::finishMyPanelDrag, tests/ui/touch_add_to_shelf.sfui.
