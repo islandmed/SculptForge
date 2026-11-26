@@ -1,7 +1,9 @@
 ---
-whats_new: **Stuck Shift, Ctrl or Alt**: if the system took a modifier key's release (a macOS menu, another app, the Windows key), SculptForge now notices and lets go of it. Strokes no longer smooth, mask or invert until you restart.
+whats_new: **Cmd+W and Cmd+H on macOS**: Cmd+W (Group from Mask) also asked to close the window (the save and quit prompt) and Cmd+H (View Mask) also hid the app; now only SculptForge's own action runs. **Stuck Shift, Ctrl or Alt**: if the system took a modifier key's release (a macOS menu, another app, the Windows key), SculptForge now notices and lets go of it. Strokes no longer smooth, mask or invert until you restart.
 fixed: **A modifier key stuck down** (macOS first, also Windows): Shift, Ctrl/Cmd or Alt that the system let go of without telling the app (a native menu or another window took the key-up) kept strokes smoothing, masking, selecting or inverting. The held keys are now compared with the system's own state every frame while one is down, when the window gains or loses focus, and when the stroke popup closes; a key the system says is up is released. Linux has no system query: the window system already tells SDL.
+fixed: **macOS: Cmd+W also asked to close the window, Cmd+H also hid the app.** SDL's menu bound Close (Cmd+W), Minimize (Cmd+M) and Hide (Cmd+H) and ran them after the app had used the key (Cmd is Ctrl here): Group from Mask also opened the save and quit prompt, View Mask also hid SculptForge. The menu items stay, without those keys.
 testers:
+  - macOS: Cmd+W (or Ctrl+W) turns the masked part into a face group and nothing else happens; Cmd+H toggles the view mask, the app stays.
   - macOS: hold Shift, open a menu in the menu bar (or Cmd+Tab away and back), let go of Shift, return to the window; a stroke sculpts normally (no smoothing), and Ctrl/Cmd mask and Alt invert only while held.
   - macOS, Windows: pick Select or Mask in the stroke popup (G), then pick it again, then another brush; strokes act as plain sculpting.
 ---
