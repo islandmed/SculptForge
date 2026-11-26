@@ -640,7 +640,8 @@ def cmd_selftest(args):
         failures.append("a stamp with hard edges passed")
     if args.cli:
         harsh = {"kind": "trims", "type": "brush", "tileable": False, "grid": None, "name": "Harsh", "params": {},
-                 "data": generate.brush_json("Harsh", "x", depth=-0.75, pinch=0.85, hardness=0.95, spacing=0.04)}
+                 "data": generate.brush_json("Harsh", "x", depth=-0.75, pinch=0.85, hardness=0.95, spacing=0.04,
+                                            stopAtMeshDepth=False)}  # (on, the cap keeps a pinching cut from tearing: this one cuts on)
         with tempfile.TemporaryDirectory() as t:
             g = gate(harsh, [], work=t, cli=args.cli)
         if g["ok"] or not any("tears" in r for r in g["reasons"]):

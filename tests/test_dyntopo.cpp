@@ -11,11 +11,13 @@
 #include "core/Multires.h"
 #include "core/PathStroke.h"
 #include "core/Primitives.h"
+#include "core/Texture.h"
 #include "core/ThreadPool.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <map>
@@ -413,7 +415,7 @@ TEST(dyntopo_symmetry_remeshes_both_sides_of_an_asymmetric_mesh) {
     CHECK(invalid(d.mesh, true).empty());
 }
 
-TEST(dyntopo_carries_attributes_and_drops_uvs) {
+TEST(dyntopo_carries_attributes_and_keeps_uvs) {
     Document d = sphereDoc(2);
     Mesh& m = d.mesh;
     m.ensureColors();
@@ -465,7 +467,7 @@ TEST(dyntopo_carries_attributes_and_drops_uvs) {
     for (int i = 0; i < 8; ++i) dabToward(d, glm::vec3(0.1f * float(i) - 0.4f, 0.05f, 3.0f), 0.35f, BrushType::Standard, Symmetry{});
     d.undo.push(d.sculptor.endStroke());
     CHECK(invalid(m, true).empty());
-    CHECK(m.uvs.empty());
+    CHECK(m.uvs.size() == m.triangleCount() * 3); // (kept: every corner of every triangle has its UV)
     CHECK(m.colors.size() == m.vertexCount());
     CHECK(m.facegroups.size() == m.triangleCount());
     CHECK(m.layers[0].delta.size() == m.vertexCount() && m.base.size() == m.vertexCount());
@@ -490,6 +492,7 @@ TEST(dyntopo_carries_attributes_and_drops_uvs) {
     CHECK(std::abs(groupArea(m, 3) - area3) < 0.05f * area3);
     d.undo.undo(m, d.bvh);
     CHECK(m.uvs.size() == m.triangleCount() * 3);
+    CHECK(m.uvs == std::vector<glm::vec2>(m.triangleCount() * 3, glm::vec2(0.5f)));
     CHECK(borderVerts(m).size() == borderBefore);
 }
 
@@ -809,4 +812,459 @@ TEST(dyntopo_failing_candidates_are_bounded_per_dab) {
     CHECK(dt.stats.collapses == 0); // (nothing can collapse: every edge is a feature)
     CHECK(invalid(d.mesh, true).empty());
     d.undo.push(d.sculptor.endStroke());
+}
+
+// ---------------------------------------------------------------------------
+// UVs and the painted texture (a Dynamic stroke used to drop the UVs, and with them the paint)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// A flat Part (y = 0, x and z in -1..1) with two UV islands that meet along the seam x = 0: left x < 0, right x > 0,
+// each mapped by its plane position (0.2 UV per unit) into its own half of the texture.
+glm::vec2 seamUv(const glm::vec3& p, bool right) { return glm::vec2(p.x * 0.2f + (right ? 0.75f : 0.25f), p.z * 0.2f + 0.5f); }
+
+bool rightIsland(const Mesh& m, uint32_t t) {
+    const glm::uvec3 tri = m.triangles[t];
+    return m.positions[tri.x].x + m.positions[tri.y].x + m.positions[tri.z].x > 0.0f;
+}
+
+// How far triangle t's UVs stray from the mapping of the island they follow (the better fit of the two): a seam end on the
+// boundary may slide a little, and its chart goes with it.
+float islandError(const Mesh& m, uint32_t t) {
+    float best = 1e9f;
+    for (bool right : {false, true}) {
+        float worst = 0.0f;
+        for (int c = 0; c < 3; ++c)
+            worst = std::max(worst, glm::distance(m.uvs[size_t(t) * 3 + size_t(c)], seamUv(m.positions[m.triangles[t][c]], right)));
+        best = std::min(best, worst);
+    }
+    return best;
+}
+
+// A triangle never takes UVs from both islands (it would stretch the texture across the gap between them): every triangle's UVs are
+// on one side. Away from the seam (past two edges of it) they are exactly its island's map; along the seam a triangle that
+// reaches over it takes its whole map from one island, and the triangles next to it follow the nearest of that.
+bool crossesSeam(const Mesh& m, uint32_t t) {
+    float lo = 1e9f, hi = -1e9f;
+    for (int c = 0; c < 3; ++c) {
+        lo = std::min(lo, m.positions[m.triangles[t][c]].x);
+        hi = std::max(hi, m.positions[m.triangles[t][c]].x);
+    }
+    return lo < -1e-5f && hi > 1e-5f;
+}
+
+bool nearSeam(const Mesh& m, uint32_t t) {
+    for (int c = 0; c < 3; ++c)
+        if (std::abs(m.positions[m.triangles[t][c]].x) < 0.3f) return true;
+    return false;
+}
+
+bool seamUvsOk(const Mesh& m, uint32_t t) {
+    bool left = false, right = false;
+    for (int c = 0; c < 3; ++c) (m.uvs[size_t(t) * 3 + size_t(c)].x < 0.5f ? left : right) = true;
+    if (left && right) return false;
+    return nearSeam(m, t) || islandError(m, t) < 2e-3f;
+}
+
+Document seamPlane(int resolution) {
+    Document d = makeDoc(makePlane(resolution, 2.0f));
+    d.sculptor.dyntopo.enabled = true;
+    d.sculptor.dyntopo.detail = 0.8f;
+    Mesh& m = d.mesh;
+    m.uvs.resize(m.triangleCount() * 3);
+    for (uint32_t t = 0; t < m.triangleCount(); ++t)
+        for (int c = 0; c < 3; ++c) m.uvs[size_t(t) * 3 + size_t(c)] = seamUv(m.positions[m.triangles[t][c]], rightIsland(m, t));
+    m.rebuildTopology();
+    d.bvh.build(m);
+    // A texture with a pattern in every texel, so any change is visible.
+    m.texture = makeTexture(128, 128);
+    PaintTexture& tex = *m.texture;
+    for (size_t i = 0; i < tex.texelCount(); ++i) {
+        tex.pixels[i * 4 + 0] = uint8_t(i * 37u);
+        tex.pixels[i * 4 + 1] = uint8_t((i / 128u) * 11u);
+        tex.pixels[i * 4 + 2] = uint8_t(i * 5u + 90u);
+        tex.pixels[i * 4 + 3] = 255;
+    }
+    return d;
+}
+
+// A straight-down dab at (x, z) on the flat Part (strength small: the Part stays flat, so the UVs can be checked
+// against the plane).
+void flatDab(Document& d, float x, float z, float radius) {
+    DabParams p;
+    p.center = glm::vec3(x, 0.0f, z);
+    p.viewDir = glm::vec3(0.0f, -1.0f, 0.0f);
+    p.radius = radius;
+    p.strength = 0.01f;
+    Symmetry none;
+    none.x = false;
+    d.sculptor.dab(d.mesh, d.bvh, BrushType::Standard, p, none);
+}
+
+} // namespace
+
+TEST(dyntopo_uv_invariants_paint_untouched_and_no_stretch_across_a_seam) {
+    Document d = seamPlane(16);
+    Mesh& m = d.mesh;
+    const Mesh before = m;
+    const std::vector<uint8_t> texels = m.texture->pixels;
+    const auto texture = m.texture;
+    // A stroke across the seam, small and large dabs (the Part gets finer and coarser under it).
+    CHECK(d.sculptor.beginStroke(m, "Standard"));
+    for (int i = 0; i < 10; ++i) flatDab(d, 0.12f * float(i) - 0.55f, 0.1f * float(i % 3) - 0.1f, i < 6 ? 0.25f : 0.5f);
+    d.undo.push(d.sculptor.endStroke());
+    CHECK(invalid(m, false, 1).empty());
+    CHECK(m.triangleCount() != before.triangleCount());
+    CHECK(m.uvs.size() == m.triangleCount() * 3);
+    // The paint is untouched: the same texture object, the same texels.
+    CHECK(m.texture == texture);
+    CHECK(m.texture->pixels == texels);
+    // Away from the seam every triangle has exactly its island's map (its UV area stays 0.04 of its area); near it, all its UVs from one island.
+    float lowRatio = 10.0f, highRatio = 0.0f;
+    size_t seamCorners = 0;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3 tri = m.triangles[t];
+        CHECK(seamUvsOk(m, t));
+        for (int c = 0; c < 3; ++c)
+            if (std::abs(m.positions[tri[c]].x) < 1e-5f) ++seamCorners;
+        if (nearSeam(m, t)) continue;
+        const glm::vec2 u1 = m.uvs[size_t(t) * 3 + 1] - m.uvs[size_t(t) * 3], u2 = m.uvs[size_t(t) * 3 + 2] - m.uvs[size_t(t) * 3];
+        const float uvArea = 0.5f * std::abs(u1.x * u2.y - u1.y * u2.x);
+        const float area = 0.5f * glm::length(glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]));
+        const float ratio = uvArea / area;
+        lowRatio = std::min(lowRatio, ratio);
+        highRatio = std::max(highRatio, ratio);
+    }
+    CHECK(lowRatio > 0.04f * 0.9f && highRatio < 0.04f * 1.1f);
+    CHECK(seamCorners > 0);
+    // The seam is intact: a texture lookup on each side of it still reads that side's texels.
+    CHECK(bvhMatches(m, d.bvh));
+    // Undo brings back the exact UVs, redo the new ones.
+    const Mesh after = m;
+    d.undo.undo(m, d.bvh);
+    CHECK(m.uvs == before.uvs);
+    CHECK(m.triangles == before.triangles);
+    CHECK(m.texture->pixels == texels);
+    d.undo.redo(m, d.bvh);
+    CHECK(m.uvs == after.uvs);
+    CHECK(m.triangles == after.triangles);
+    CHECK(m.texture->pixels == texels);
+}
+
+TEST(dyntopo_uv_invariants_coarse_dabs_never_make_a_triangle_span_a_seam) {
+    Document d = seamPlane(16);
+    d.sculptor.dyntopo.detail = 0.0f; // coarse: the brush wants to collapse what is under it
+    Mesh& m = d.mesh;
+    const Mesh plainTopology = m;
+    CHECK(d.sculptor.beginStroke(m, "Standard"));
+    for (int i = 0; i < 6; ++i) flatDab(d, 0.0f, 0.3f * float(i) - 0.75f, 0.9f);
+    d.undo.push(d.sculptor.endStroke());
+    CHECK(invalid(m, false, 1).empty());
+    CHECK(m.triangleCount() < size_t(2 * 16 * 16)); // (it did simplify)
+    size_t crossing = 0;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        CHECK(seamUvsOk(m, t));
+        crossing += crossesSeam(m, t) ? 1 : 0;
+    }
+    std::printf("  %zu of %zu triangles cross the seam\n", crossing, m.triangleCount());
+}
+
+TEST(dyntopo_uv_invariants_on_a_curved_part_with_symmetry_and_undo) {
+    Document d = sphereDoc(3);
+    Mesh& m = d.mesh;
+    // Two islands (upper and lower half, planar maps), so the equator is a seam all the way round.
+    m.uvs.resize(m.triangleCount() * 3);
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3 tri = m.triangles[t];
+        const bool upper = m.positions[tri.x].y + m.positions[tri.y].y + m.positions[tri.z].y > 0.0f;
+        for (int c = 0; c < 3; ++c)
+            m.uvs[size_t(t) * 3 + size_t(c)] = glm::vec2(m.positions[tri[c]].x, m.positions[tri[c]].z) * 0.25f + glm::vec2(upper ? 0.25f : 0.75f, 0.5f);
+    }
+    m.rebuildTopology();
+    d.bvh.build(m);
+    const Mesh before = m;
+    d.sculptor.dyntopo.detail = 0.8f;
+    Symmetry sym; // (X mirror on, as by default)
+    for (int s = 0; s < 3; ++s) {
+        CHECK(d.sculptor.beginStroke(m, "Standard"));
+        for (int i = 0; i < 8; ++i) dabToward(d, glm::vec3(0.12f * float(i) - 0.4f, 0.35f * float(s) - 0.3f, 3.0f), 0.3f, BrushType::Standard, sym);
+        d.undo.push(d.sculptor.endStroke());
+        CHECK(invalid(m, true).empty());
+        CHECK(m.uvs.size() == m.triangleCount() * 3);
+    }
+    CHECK(m.triangleCount() != before.triangleCount());
+    // Each island's UVs stay inside the range the planar map gave it (nothing flung out or extrapolated).
+    for (uint32_t t = 0; t < m.triangleCount(); ++t)
+        for (int c = 0; c < 3; ++c) {
+            const glm::vec2 uv = m.uvs[size_t(t) * 3 + size_t(c)];
+            const bool upper = uv.x < 0.5f;
+            CHECK(std::abs(uv.x - (upper ? 0.25f : 0.75f)) < 0.3f && std::abs(uv.y - 0.5f) < 0.3f);
+        }
+    CHECK(bvhMatches(m, d.bvh));
+    while (d.undo.canUndo()) d.undo.undo(m, d.bvh);
+    CHECK(m.uvs == before.uvs);
+    CHECK(m.triangles == before.triangles);
+}
+
+namespace {
+// Where a Part's charts are: every texel a UV triangle touches and `pad` of 1024 around it (two: the padding painting leaves around a chart),
+// and the triangles that sample outside that (a centre or a corner a little inside: a white speck on the paint).
+constexpr int kGrid = 1024;
+std::vector<uint8_t> chartFootprint(const Mesh& m, int pad = 2) {
+    std::vector<uint8_t> occupied(size_t(kGrid) * kGrid, 0);
+    for (uint32_t t = 0; t < m.triangleCount() && !m.uvs.empty(); ++t) {
+        const glm::vec2 a = m.uvs[size_t(t) * 3], e1 = m.uvs[size_t(t) * 3 + 1] - a, e2 = m.uvs[size_t(t) * 3 + 2] - a;
+        const int steps = std::max(8, int(std::max(glm::length(e1), glm::length(e2)) * float(kGrid)) + 1); // (a sample a pixel)
+        for (int i = 0; i <= steps; ++i)
+            for (int j = 0; i + j <= steps; ++j) {
+                const glm::vec2 q = a + e1 * (float(i) / float(steps)) + e2 * (float(j) / float(steps));
+                const int x = int(q.x * kGrid), y = int(q.y * kGrid);
+                for (int dy = -pad; dy <= pad; ++dy)
+                    for (int dx = -pad; dx <= pad; ++dx)
+                        if (x + dx >= 0 && x + dx < kGrid && y + dy >= 0 && y + dy < kGrid) occupied[size_t(y + dy) * kGrid + size_t(x + dx)] = 1;
+            }
+    }
+    return occupied;
+}
+size_t strayTriangles(const Mesh& m, const std::vector<uint8_t>& occupied) {
+    size_t stray = 0;
+    for (uint32_t t = 0; t < m.triangleCount() && !m.uvs.empty(); ++t) {
+        const glm::vec2 c = (m.uvs[size_t(t) * 3] + m.uvs[size_t(t) * 3 + 1] + m.uvs[size_t(t) * 3 + 2]) / 3.0f;
+        bool out = false;
+        for (int k = 0; k < 4 && !out; ++k) { // (the centre and each corner, a little inside)
+            const glm::vec2 q = k == 3 ? c : c + (m.uvs[size_t(t) * 3 + size_t(k)] - c) * 0.9f;
+            const int x = int(q.x * kGrid), y = int(q.y * kGrid);
+            out = x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)];
+        }
+        stray += out ? 1 : 0;
+    }
+    return stray;
+}
+// The same, for the whole triangle: any of a lattice of points over its area (a little inside its edge) outside the footprint. A long
+// triangle along a chart's bending edge or across its hollow has its centre and corners on the paint and white texels between them.
+size_t strictStrayTriangles(const Mesh& m, const std::vector<uint8_t>& occupied) {
+    size_t stray = 0;
+    const int n = 24;
+    for (uint32_t t = 0; t < m.triangleCount() && !m.uvs.empty(); ++t) {
+        const glm::vec2 a = m.uvs[size_t(t) * 3], b = m.uvs[size_t(t) * 3 + 1], c = m.uvs[size_t(t) * 3 + 2], centre = (a + b + c) / 3.0f;
+        bool out = false;
+        for (int i = 0; i <= n && !out; ++i)
+            for (int j = 0; i + j <= n && !out; ++j) {
+                const glm::vec2 p = a * (float(i) / float(n)) + b * (float(j) / float(n)) + c * (float(n - i - j) / float(n));
+                const glm::vec2 q = centre + (p - centre) * 0.97f;
+                const int x = int(q.x * kGrid), y = int(q.y * kGrid);
+                out = x < 0 || x >= kGrid || y < 0 || y >= kGrid || !occupied[size_t(y) * kGrid + size_t(x)];
+            }
+        stray += out ? 1 : 0;
+    }
+    return stray;
+}
+} // namespace
+
+// A strip whose chart is bent into an arc: a long triangle across the strip's middle crosses the hollow the arc encloses, where
+// there is no paint. Coarse dabs collapse the strip's triangles into longer ones; none may end up across the hollow or turned over.
+TEST(dyntopo_uv_invariants_a_bent_chart_is_not_bridged_by_big_triangles) {
+    Document d = makeDoc(makePlane(24, 2.0f));
+    d.sculptor.dyntopo.enabled = true;
+    d.sculptor.dyntopo.detail = 0.0f;
+    Mesh& m = d.mesh;
+    m.uvs.resize(m.triangleCount() * 3);
+    for (uint32_t t = 0; t < m.triangleCount(); ++t)
+        for (int c = 0; c < 3; ++c) {
+            const glm::vec3 p = m.positions[m.triangles[t][c]]; // (x along the arc, z across it)
+            const float angle = (0.15f + 1.7f * (p.x + 1.0f) * 0.5f) * 3.14159265f, radius = 0.30f + 0.10f * (p.z + 1.0f) * 0.5f;
+            m.uvs[size_t(t) * 3 + size_t(c)] = glm::vec2(0.5f + radius * std::cos(angle), 0.5f + radius * std::sin(angle));
+        }
+    m.rebuildTopology();
+    d.bvh.build(m);
+    const std::vector<uint8_t> footprint = chartFootprint(m), tight = chartFootprint(m, 1);
+    CHECK(strayTriangles(m, footprint) == 0);
+    auto turn = [&](uint32_t t) { // (the sign of the triangle's area in UV space)
+        const glm::vec2 e1 = m.uvs[size_t(t) * 3 + 1] - m.uvs[size_t(t) * 3], e2 = m.uvs[size_t(t) * 3 + 2] - m.uvs[size_t(t) * 3];
+        return e1.x * e2.y - e1.y * e2.x;
+    };
+    const float side = turn(0) > 0.0f ? 1.0f : -1.0f;
+    const size_t before = m.triangleCount();
+    for (int s = 0; s < 4; ++s) {
+        CHECK(d.sculptor.beginStroke(m, "Standard"));
+        for (int i = 0; i < 12; ++i) flatDab(d, 0.15f * float(i) - 0.85f + 0.04f * float(s), 0.2f * float(s) - 0.3f, 0.7f);
+        d.undo.push(d.sculptor.endStroke());
+    }
+    CHECK(invalid(m, false, 1).empty());
+    CHECK(m.triangleCount() < before * 3 / 4); // (it did simplify)
+    // The remesh is the plain one, so a coarse dab makes triangles that reach across the arc's hollow (a strip 100 texels wide): each is
+    // drawn in towards the chart, a few at the chart's thin ends keep a corner just past the padding.
+    CHECK(strayTriangles(m, footprint) <= 4);
+    size_t bentFan = 0;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v) bentFan = std::max(bentFan, m.vertexTriangles(v).size());
+    CHECK(bentFan < 64); // (a few of ~230 at the chart's thin ends; 115 of 161 before the fix)
+    CHECK(strictStrayTriangles(m, tight) <= 8);
+    size_t turned = 0;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) turned += turn(t) * side < 0.0f ? 1 : 0;
+    CHECK(turned == 0); // (a triangle across the bend takes the affine map of the chart's triangle at its middle, which never turns)
+}
+
+namespace {
+// Edges whose two triangles face away from each other (a fold-over).
+size_t foldedEdges(const Mesh& m) {
+    std::map<std::pair<uint32_t, uint32_t>, std::vector<glm::vec3>> e;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::uvec3 tri = m.triangles[t];
+        const glm::vec3 n = glm::normalize(glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]));
+        for (int c = 0; c < 3; ++c) e[{std::min(tri[c], tri[(c + 1) % 3]), std::max(tri[c], tri[(c + 1) % 3])}].push_back(n);
+    }
+    size_t folds = 0;
+    for (const auto& [k, v] : e)
+        if (v.size() == 2 && glm::dot(v[0], v[1]) < 0.0f) ++folds;
+    return folds;
+}
+} // namespace
+
+namespace {
+// Triangles whose texture area per area of surface is 50x under or over the median (a flat point of paint, or a stretch of the chart).
+size_t densitySpread(const Mesh& m) {
+    std::vector<float> ratios;
+    ratios.reserve(m.triangleCount());
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        const glm::vec2 e1 = m.uvs[size_t(t) * 3 + 1] - m.uvs[size_t(t) * 3], e2 = m.uvs[size_t(t) * 3 + 2] - m.uvs[size_t(t) * 3];
+        const glm::uvec3 tri = m.triangles[t];
+        const float area3 = 0.5f * glm::length(glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]));
+        ratios.push_back(area3 > 0.0f ? 0.5f * std::abs(e1.x * e2.y - e1.y * e2.x) / area3 : 0.0f);
+    }
+    std::vector<float> sorted = ratios;
+    std::nth_element(sorted.begin(), sorted.begin() + std::ptrdiff_t(sorted.size() / 2), sorted.end());
+    const float median = sorted[sorted.size() / 2];
+    size_t off = 0;
+    for (float r : ratios) off += r < median / 50.0f || r > median * 50.0f ? 1 : 0;
+    return off;
+}
+} // namespace
+
+// The Human head (one level, Auto UV: seams all round the eyes and the face), six strokes across the eyes with the
+// brushes an artist uses: Dynamic must leave it about as clean as on a head without UVs (a Part whose seam vertices
+// could not merge or relax tore open at the eyelids: 140 folded edges against 6), with sane UVs everywhere.
+TEST(nightly_dyntopo_uv_invariants_painted_head_stays_as_clean_as_an_unpainted_one) {
+    // Six stroke lines (the same strokes, the line moved over the head): a stroke's path is chaotic, and what a build makes of it
+    // (a libm, a compiler) is as good as another's, so the folded edges are judged on the medians; the strays on every line.
+    const float kShift[6] = {0.0f, 0.02f, 0.05f, 0.08f, -0.09f, 0.11f};
+    std::vector<size_t> plainFolds, paintedFolds;
+    double plainPerDab = 0.0; // (the plain run of a line comes first)
+    uint64_t plainHash[2] = {0, 0};
+    for (int line = 0; line < 6; ++line)
+    for (int painted = 0; painted < 2; ++painted) {
+        const float shift = kShift[line];
+        size_t folds[2] = {0, 0};
+        Document d;
+        CommandRegistry reg;
+        CHECK(reg.execute(d, "new_starter_mesh", {{"name", std::string("human-head")}}).ok);
+        CHECK(reg.execute(d, "subdiv_freeze", {}).ok);
+        CHECK(reg.execute(d, "dyntopo", {{"enabled", true}, {"detail", 50.0}}).ok);
+        if (painted) CHECK(reg.execute(d, "uv_auto", {{"resolution", 2048.0}}).ok);
+        Mesh& m = d.mesh;
+        if (painted) m.texture = makeTexture(2048, 2048); // (its size sets how far a UV may stray: the padding is 4 texels)
+        d.bvh.build(m);
+        const std::vector<uint8_t> tight = chartFootprint(m, 1); // (the painted area and one cell round it)
+        const AABB b = m.bounds();
+        const glm::vec3 lo = b.min, hi = b.max, ext = hi - lo;
+        const float diag = glm::length(ext);
+        const std::vector<uint8_t> occupied = chartFootprint(m); // (where the charts are: a triangle's UVs must stay in there)
+        auto countStray = [&]() { return strayTriangles(m, occupied); };
+        if (painted) CHECK(countStray() == 0);
+        const size_t spreadBefore = painted ? densitySpread(m) : 0;
+        double dabMs = 0.0;
+        int dabs = 0;
+        struct Stroke {
+            BrushType type;
+            float radius; // of the head's size
+        };
+        const Stroke strokes[] = {{BrushType::Standard, 0.08f}, {BrushType::Standard, 0.35f}, {BrushType::Clay, 0.25f},
+                                  {BrushType::Clay, 0.06f},     {BrushType::Smooth, 0.30f},   {BrushType::Tendril, 0.15f}}; // (as brush sizes on a head filling a quarter of the window)
+        for (const Stroke& s : strokes) {
+            CHECK(d.sculptor.beginStroke(m, "Standard"));
+            for (int i = 0; i < 100; ++i) { // a wavy line across the eyes, seen from the front
+                const float fx = 0.25f + 0.5f * float(i) / 99.0f + shift, fy = 0.62f + 0.04f * std::sin(float(i) * 0.17f) + 0.7f * shift;
+                RayHit hit;
+                if (!d.bvh.raycast(m, glm::vec3(lo.x + ext.x * fx, lo.y + ext.y * fy, hi.z + ext.z), glm::vec3(0, 0, -1), hit)) continue;
+                DabParams p;
+                p.center = hit.position;
+                p.viewDir = glm::vec3(0, 0, -1);
+                p.radius = s.radius * diag;
+                p.strength = 0.5f;
+                const auto t0 = std::chrono::steady_clock::now();
+                d.sculptor.dab(m, d.bvh, s.type, p, Symmetry{});
+                dabMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+                ++dabs;
+            }
+            d.undo.push(d.sculptor.endStroke());
+        }
+        for (const Stroke& s2 : strokes) { // and down the forehead (a vertical band, as an artist paints one)
+            CHECK(d.sculptor.beginStroke(m, "Standard"));
+            for (int i = 0; i < 100; ++i) {
+                const float fx = 0.5f + 0.03f * std::sin(float(i) * 0.2f) + shift, fy = 0.6f + 0.3f * float(i) / 99.0f - 0.5f * shift;
+                RayHit hit;
+                if (!d.bvh.raycast(m, glm::vec3(lo.x + ext.x * fx, lo.y + ext.y * fy, hi.z + ext.z), glm::vec3(0, 0, -1), hit)) continue;
+                DabParams p;
+                p.center = hit.position;
+                p.viewDir = glm::vec3(0, 0, -1);
+                p.radius = s2.radius * diag;
+                p.strength = 0.5f;
+                const auto t0 = std::chrono::steady_clock::now();
+                d.sculptor.dab(m, d.bvh, s2.type, p, Symmetry{});
+                dabMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+                ++dabs;
+            }
+            d.undo.push(d.sculptor.endStroke());
+        }
+        const std::string broken = invalid(m, false, 0);
+        if (!broken.empty()) std::printf("  mesh invalid: %s\n", broken.c_str());
+        CHECK(broken.empty());
+        const double perDab = dabMs / double(std::max(dabs, 1));
+        std::printf("  %s: %d dabs, %.2f ms per dab\n", painted ? "painted" : "plain", dabs, perDab);
+        if (!painted) plainPerDab = perDab;
+        else CHECK(perDab <= 10.0 * plainPerDab + 20.0); // (a painted Part keeps its UVs: 1-2x; a stalled one cost 1100 ms a dab on one build)
+        size_t maxFan = 0; // (no vertex grows into a hub: one took 3000 neighbours, every pass after walking its fan)
+        for (uint32_t v = 0; v < m.vertexCount(); ++v) maxFan = std::max(maxFan, m.vertexTriangles(v).size());
+        CHECK(maxFan < 64);
+        // The topology of a painted Part is exactly the plain Part's (the UVs are a transfer after each dab, never a rule).
+        uint64_t hash = 1469598103934665603ull;
+        auto mix = [&](const void* data, size_t n) {
+            const unsigned char* c = static_cast<const unsigned char*>(data);
+            for (size_t k = 0; k < n; ++k) hash = (hash ^ c[k]) * 1099511628211ull;
+        };
+        mix(m.positions.data(), m.positions.size() * sizeof(glm::vec3));
+        mix(m.triangles.data(), m.triangles.size() * sizeof(glm::uvec3));
+        plainHash[painted] = hash;
+        if (painted) std::printf("  line %d: mesh hash plain %016llx painted %016llx\n", line, (unsigned long long)plainHash[0], (unsigned long long)plainHash[1]);
+        if (painted) CHECK(plainHash[0] == plainHash[1]);
+        folds[painted] = foldedEdges(m);
+        (painted ? paintedFolds : plainFolds).push_back(folds[painted]);
+        if (!painted) continue;
+        CHECK(m.uvs.size() == m.triangleCount() * 3);
+        size_t outliers = 0;
+        for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+            const glm::vec2 u0 = m.uvs[size_t(t) * 3], u1 = m.uvs[size_t(t) * 3 + 1], u2 = m.uvs[size_t(t) * 3 + 2];
+            for (const glm::vec2& u : {u0, u1, u2})
+                if (u.x < -0.01f || u.x > 1.01f || u.y < -0.01f || u.y > 1.01f) ++outliers;
+        }
+        CHECK(outliers == 0);
+        // How much of the texture density the strokes leave uneven (a triangle across a seam takes one chart's map: squeezed paint at the seams; reported, not
+        // judged here: artist-qa looks at the paint).
+        const size_t spread = densitySpread(m);
+        std::printf("  %zu triangles off the median texture density by 50x (%zu before the strokes)\n", spread, spreadBefore);
+        const size_t stray = countStray();
+        std::printf("  %zu triangles, %zu with UVs outside every chart\n", m.triangleCount(), stray);
+        const size_t strict = strictStrayTriangles(m, tight);
+        std::printf("  %zu of them reach past one cell of padding (a triangle's whole UV area, not just its centre and corners)\n", strict);
+        CHECK(strict <= 100); // (the same promise as the centre-and-corners count; 545 on one build before the fix, 192 with the centre-and-corners check, 1-68 after)
+        CHECK(stray <= 100); // (of ~25000, simplified from 135000: a corner just past the padding of a chart is a white speck on the paint)
+    }
+    for (size_t i = 0; i < plainFolds.size() && i < paintedFolds.size(); ++i)
+        std::printf("  line %zu: folded edges %zu without UVs, %zu with\n", i, plainFolds[i], paintedFolds[i]);
+    auto median = [](std::vector<size_t> v) {
+        std::sort(v.begin(), v.end());
+        return v.empty() ? size_t(0) : (v[(v.size() - 1) / 2] + v[v.size() / 2]) / 2;
+    };
+    std::printf("  folded edges, medians: %zu without UVs, %zu with\n", median(plainFolds), median(paintedFolds));
+    CHECK(median(paintedFolds) <= 6 * median(plainFolds) + 40); // (heavy simplification under head-sized brushes: the seams keep some triangles)
 }

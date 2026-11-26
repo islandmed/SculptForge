@@ -138,10 +138,43 @@ if [ $MODE != stage ] && [ -z "$STAGED" ]; then
     trap 'rm -rf "$work"; [ "$(cut -d" " -f1 "$PROMOTE_LOCK" 2>/dev/null)" = $$ ] && rm -f "$PROMOTE_LOCK"' EXIT
 elif [ $MODE = stage ]; then
     echo "$$ $(cut -d' ' -f22 /proc/$$/stat 2>/dev/null || echo 0) $V" > "$STAGING_LOCK"
-    trap 'rm -rf "$work"; [ "$(cut -d" " -f1 "$STAGING_LOCK" 2>/dev/null)" = $$ ] && rm -f "$STAGING_LOCK"' EXIT
+    trap 'stage_exit $?' EXIT
 else
     trap 'rm -rf "$work"' EXIT
 fi
+
+# hold-main (~/Work/.sf/hold-main): the one file sitepush.sh and queue-merge.sh check before they move main. --stage sets it at
+# its start and keeps it past the stage (main is the staged commit until the promote tags it: a site push between the two
+# restarted the 0.14.1 stage 13:29 -> 14:16); the promote that finishes (--yes, run to its last step) lifts it. A hold someone else
+# set by hand (no "who: release.sh" line) is never replaced or lifted here. SF_HOLD_MAIN overrides the path (tests).
+HOLD_MAIN=${SF_HOLD_MAIN:-$HOME/Work/.sf/hold-main}
+hold_is_release() { grep -q '^who: release.sh' "$HOLD_MAIN" 2>/dev/null; }
+hold_main_set() {
+    if [ -e "$HOLD_MAIN" ] && ! hold_is_release; then
+        echo "   hold-main: already set by hand ($(head -1 "$HOLD_MAIN" 2>/dev/null)); left as it is, lift it yourself after the promote" >&2
+        return 0
+    fi
+    mkdir -p "$(dirname "$HOLD_MAIN")"
+    printf 'who: release.sh --stage %s (pid %s, %s@%s)\nwhy: SculptForge %s is staged or staging: main must not move until it is promoted and verified\nsince: %s\nlift: scripts/release.sh %s --yes lifts it when the promote is done; abandoned stage: rm %s\n' \
+        "$V" "$$" "$(id -un)" "$(hostname -s 2>/dev/null || echo host)" "$V" "$(date '+%F %H:%M')" "$V" "$HOLD_MAIN" > "$HOLD_MAIN.$$" &&
+        mv "$HOLD_MAIN.$$" "$HOLD_MAIN"
+}
+# Lifted only when it is this release's own hold (a stage of another version, or a hand-set hold, stays).
+hold_main_lift() {
+    hold_is_release && grep -q "^who: release.sh --stage $V " "$HOLD_MAIN" || return 0
+    rm -f "$HOLD_MAIN" && ok "hold-main lifted: main is free again (site pushes and the queue may move it)"
+}
+# The stage's EXIT trap: frees its lock; a stage that did not finish leaves hold-main in place and says how to lift it.
+stage_exit() {
+    local rc=$1
+    rm -rf "$work"
+    [ "$(cut -d" " -f1 "$STAGING_LOCK" 2>/dev/null)" = $$ ] && rm -f "$STAGING_LOCK"
+    if [ "$rc" != 0 ] && hold_is_release; then
+        printf '\033[1;31m%s\033[0m\n' "hold-main stays set (main must not move under an unfinished stage of $V): fix it and run the stage again; to give up on $V: rm $HOLD_MAIN" >&2
+    fi
+    return 0
+}
+[ $MODE != stage ] || hold_main_set
 
 # --- helpers that steps share -------------------------------------------------------------------------------------
 
@@ -813,6 +846,7 @@ step_stage() {
     ok "Packages run $id built every package for ${sha:0:8}"
     signing_state "$id" || die "the Windows packages of run $id carry SignPath's TEST certificate (never in a release)" "see the Windows job's summary (https://github.com/$REPO/actions/runs/$id); fix the signing setup, then $(resume stage)"
     echo "   next, on main: ${HIGHLIGHTS_GIVEN:+HIGHLIGHTS=$HIGHLIGHTS_GIVEN }scripts/release.sh $V --yes (promotes that run's packages)"
+    echo "   hold-main stays set until that promote has finished (site pushes and the queue wait)"
 }
 
 step_check() {
@@ -1522,3 +1556,5 @@ for s in "${STEPS[@]}"; do
 done
 [ -n "$started$ONLY" ] || { echo "unknown step $FROM; steps: ${STEPS[*]}"; exit 2; }
 say "SculptForge $V: done"
+# The promote ran through its last step (the release is published and checked): main is free again.
+[ -n "$ONLY" ] || [ $MODE = stage ] || [ -n "$STAGED" ] || [ -n "$PRE" ] || hold_main_lift

@@ -1918,9 +1918,9 @@ constexpr Entry kSpanish[] = {
     {"Mask what is unmasked and unmask what is masked (also: Ctrl+click the background).",
      "Enmascara lo que no tiene máscara y quita la máscara de lo que la tiene (también: Ctrl+clic en el fondo)."},
     {"Turn the masked part into a new face group and clear the mask. With nothing masked, everything visible becomes "
-     "one group.",
+     "one group (its own group when part of the mesh is hidden).",
      "Convierte lo enmascarado en un grupo de caras nuevo y borra la máscara. Sin nada enmascarado, todo lo visible "
-     "pasa a ser un grupo."},
+     "pasa a ser un grupo (con parte de la malla oculta, la parte visible forma su propio grupo)."},
     {"One face group per UV island: triangles that touch without a UV seam share a group. Only the visible part is "
      "regrouped. Needs UVs (Tool > Texture Image > Auto UV makes some).",
      "Un grupo de caras por isla UV: los triángulos que se tocan sin costura UV comparten grupo. Solo se reagrupa la "
@@ -2155,6 +2155,8 @@ constexpr Entry kSpanish[] = {
     {"Connected only", "Solo conectado"},
     {"Lock plane", "Fijar plano"},
     {"Crisp edge", "Borde nítido"},
+    {"Stop at mesh depth", "Parar a la profundidad de la malla"},
+    {"A pinching cut stops deepening and tightening once the mesh can't hold its groove (about a brush radius deep): repeated passes no longer saw the walls into teeth. Untick it, or turn on Dynamic, to cut on.", "Un corte con pellizco deja de profundizar y estrecharse cuando la malla ya no sostiene su surco (a un radio de pincel de profundidad): los pasos repetidos ya no serran las paredes en dientes. Desmárcalo, o activa Dynamic, para seguir cortando."},
     {"Keep the plane the stroke starts on for the whole stroke.", "Mantiene el plano donde empieza el trazo durante todo el trazo."},
     {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "Un borde de punta duro y limpio y un aplanado completo, para planos de superficie dura."},
     {"View falloff", "Ver atenuación"},
@@ -4001,12 +4003,12 @@ constexpr Entry kSpanish[] = {
      "Los pinceles restan a la superficie. Mantén Alt para sumar durante un trazo."},
     {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
      "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
-     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
-     "are dropped (Undo brings them back).",
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles; UVs and the "
+     "painted texture are kept.",
      "Topología dinámica: los pinceles añaden triángulos donde necesitan detalle y los quitan donde no, para sacar "
      "cuernos o dedos sin estirar. Detalle fija lo pequeños que son los triángulos; acerca la vista o reduce el "
      "pincel para hacerlos más finos. Necesita una malla sin niveles de subdivisión; los quads bajo el pincel pasan "
-     "a triángulos y las UV se descartan (Deshacer las recupera)."},
+     "a triángulos; las UV y la textura pintada se conservan."},
     {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
      "sculpting.",
      "Sombreado Lit Sphere (por defecto): la esfera de material elegida o las luces de estudio, pensado para leer "
@@ -6015,6 +6017,11 @@ constexpr Entry kSpanish[] = {
     {"Drop on My Panel or a shelf to move, elsewhere to remove", "Suelta en Mi panel o en un estante para mover, en otro sitio para quitar"},
     {"Hold Alt and drag a button, or a section's title, from any palette into this panel. Right-click an entry to remove it.", "Mantén Alt y arrastra un botón, o el título de una sección, desde cualquier paleta hasta este panel. Clic derecho en una entrada para quitarla."},
     {"My Panel", "Mi panel"},
+    {"Add to My Panel", "Añadir a Mi panel"},
+    {"Add to the top shelf", "Añadir al estante superior"},
+    {"Add to the left shelf", "Añadir al estante izquierdo"},
+    {"Add to the right shelf", "Añadir al estante derecho"},
+    {"Add to the bottom shelf", "Añadir al estante inferior"},
     {"Remove from My Panel", "Quitar de Mi panel"},
     {"Your own panel, floating at the cursor: the buttons, controls and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "Tu propio panel, flotando junto al cursor: los botones, controles y secciones que arrastraste a él (mantén Alt y arrastra desde cualquier paleta). Pulsa la tecla otra vez, o Esc, para cerrarlo. También es una paleta (Editar > Mi panel) para una bandeja, y puede pasar a una ventana propia."},
     {"Add images...",

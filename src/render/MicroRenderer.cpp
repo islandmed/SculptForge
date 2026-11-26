@@ -699,7 +699,7 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     // at all while a stroke runs (deferStale): its next dabs change most of them again, and what they'd change is
     // the brush's falloff tail at the patch border (usually nothing: a changed shared point changes both patches).
     // As many a frame as when each one also wrote its ring (~3 patches): shading as current as it was, for less.
-    const size_t limit = shadeBudget ? std::max<size_t>(1, shadeBudget / (S * 3)) : SIZE_MAX;
+    const size_t limit = shadeBudget ? std::max<size_t>({1, shadeBudget / (S * 3), keepPace ? scratch_.size() : 0}) : SIZE_MAX;
     std::vector<uint32_t>& seeds = scratch_;
     const bool full = seeds.size() >= limit; // (this sync's dirty ones fill it: sorted and unique already)
     if (full) seeds.resize(limit);
@@ -738,13 +738,35 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     // No whole-level staging kept, but held through a budgeted catch-up: freed once the backlog is empty or after an
     // unbudgeted sync (freed on every frame of a drain, it was allocated again by the next: drain frames 60-90 ms vs 45-70
     // in 0.13.12 on a 112M level, Windows' path).
-    if ((!shadeBudget || (!pendingCount_ && !staleCount_)) && staging_.capacity() > kShadeSlice * S * 4 * 2)
+    if ((!shadeBudget || (!pendingCount_ && !staleCount_ && sweepNext_ == sweepEnd_)) && staging_.capacity() > kShadeSlice * S * 4 * 2)
         std::vector<uint8_t>().swap(staging_);
     if (shaded) { // the cost per point, smoothed (a stroke's shading budget in time follows it)
         const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() /
                           double(shaded * S);
         shadeNsPerPoint_ = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ * 0.7 + ns * 0.3 : ns;
     }
+}
+
+// The sweep after a range widen: the next patches in order, as many as the rest budget holds (each with its ring's cost, as
+// shadePending), a tenth of the frame's shading time while the view moves.
+void MicroRenderer::sweepShading(const Mesh& mesh, bool viewMoving) {
+    const size_t S = mesh.micro->samples;
+    const size_t budget = microShadeBudget(currentTierConfig(), false, viewMoving, shadeNsPerPoint_, S * 3);
+    const size_t take = std::min<size_t>(sweepEnd_ - sweepNext_, budget ? std::max<size_t>(1, budget / (S * 3)) : sweepEnd_ - sweepNext_);
+    std::vector<uint32_t> seeds(take);
+    for (size_t i = 0; i < take; ++i) seeds[i] = sweepNext_ + uint32_t(i);
+    sweepNext_ += uint32_t(take);
+    if (sweepNext_ >= sweepEnd_) sweepNext_ = sweepEnd_ = 0;
+    const auto started = std::chrono::steady_clock::now();
+    constexpr size_t kShadeSlice = 16384; // (as shadePending)
+    size_t shaded = 0;
+    for (size_t at = 0; at < seeds.size(); at += kShadeSlice)
+        shaded += shadeSeeds(mesh, std::span<const uint32_t>(seeds).subspan(at, std::min(kShadeSlice, seeds.size() - at)), nullptr);
+    if (shaded) {
+        const double ns = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - started).count() / double(shaded * S);
+        shadeNsPerPoint_ = shadeNsPerPoint_ > 0.0 ? shadeNsPerPoint_ * 0.7 + ns * 0.3 : ns;
+    }
+    if (sweepNext_ == sweepEnd_ && staging_.capacity() > kShadeSlice * S * 4 * 2) std::vector<uint8_t>().swap(staging_); // (as shadePending)
 }
 
 // Shades `seeds` (sorted) alone and sends them; `outer` gets their neighbours to write later. Returns how many.
@@ -820,6 +842,7 @@ bool MicroRenderer::sync(Mesh& mesh) {
             uploadDispTiles(mesh, scratch_, true);
             if (tilePages_) tilePages_->sync(mesh, *this, scratch_, true);
             shadePending(mesh, true);
+            sweepNext_ = sweepEnd_ = 0;
         }
     } else {
         if (mesh.facesDirty) uploadTris(mesh); // (face groups: the group colours)
@@ -935,7 +958,9 @@ bool MicroRenderer::sync(Mesh& mesh) {
         if (focus_) {
         } else if (mm.allDirty) {
             shadePending(mesh, true);
+            sweepNext_ = sweepEnd_ = 0;
         } else {
+            if (mm.rescaled) sweepNext_ = 0, sweepEnd_ = baseTriangles_; // (from the start again: all of it is a step off)
             for (uint32_t t : scratch_) {
                 uint64_t& w = pending_[t >> 6];
                 const uint64_t bit = uint64_t(1) << (t & 63);
@@ -946,10 +971,12 @@ bool MicroRenderer::sync(Mesh& mesh) {
             // slower CPU doesn't spend the frame the dabs or the orbit need on shading; the rest follows.
             shadeBudget = microShadeBudget(currentTierConfig(), mm.stroking, viewMoving, shadeNsPerPoint_, size_t(mm.samples) * 3);
             deferStale = mm.stroking;
+            keepPace = mm.stroking && strokeShadeKeepsPace(currentTierConfig());
             // Undo, redo, a Move and a base moved by anything but a stroke show whole on this frame (#184; the same as
             // MicroFocus's shadeAll: a level without Focus Detail, Windows and macOS among them, caught up over frames).
             if (mm.shadeNow || mm.grabbing || (anyBase && !mm.stroking && !mm.strokeEnded)) shadeBudget = 0, deferStale = false;
             if (pendingCount_ || staleCount_) shadePending(mesh, false);
+            if (sweepNext_ < sweepEnd_ && !mm.stroking && !pendingCount_ && !staleCount_) sweepShading(mesh, viewMoving);
         }
     }
     step_ = mm.step;

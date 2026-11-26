@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.14.0 LANGUAGES C CXX)
+project(SculptForge VERSION 0.14.1 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -595,6 +595,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/BenchVideo.cpp
     src/app/BenchTake.cpp
     src/app/Tablet.cpp
+    src/app/OsModifiers.cpp
     src/app/Wintab.cpp
     src/app/SpaceMouse.cpp
     src/app/Touch.cpp
@@ -622,21 +623,25 @@ if(SCULPTFORGE_BUILD_APP)
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
-  # The commit a build came from, for proof mode's results and HUD (src/app/ProofMode.cpp, BenchTake.cpp); taken when CMake configures.
-  find_package(Git QUIET)
-  if(GIT_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
-    execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                    OUTPUT_VARIABLE SF_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-  endif()
-  if(SF_GIT_COMMIT)
-    set_source_files_properties(src/app/ProofMode.cpp src/app/BenchTake.cpp PROPERTIES COMPILE_DEFINITIONS "SF_GIT_COMMIT=\"${SF_GIT_COMMIT}\"")
-  endif()
-  # A developer's build says so beside the version (window title, top bar): "0.11.13 dev 1a2b3c4". AUTO = a git
-  # checkout built outside CI; release packages build in CI or from a tarball (AUR, brew, Flatpak skip .git).
+  # The commit a build came from (proof mode's results and HUD, src/app/ProofMode.cpp, BenchTake.cpp) and a developer's
+  # build says so beside the version (window title, top bar): "0.11.13 dev 1a2b3c4". Taken at BUILD time: a target that runs
+  # every build and rewrites BuildStamp.cpp only when the commit changes (cmake/BuildStamp.cmake), so an incremental build after
+  # a commit shows the new one. AUTO = a git checkout built outside CI; release packages build in CI or from a tarball
+  # (AUR, brew, Flatpak skip .git) and carry no dev stamp.
   set(SCULPTFORGE_DEV_BUILD AUTO CACHE STRING "Show 'dev <commit>' beside the version: AUTO, ON or OFF")
-  if(SF_GIT_COMMIT AND (SCULPTFORGE_DEV_BUILD STREQUAL "ON" OR (SCULPTFORGE_DEV_BUILD STREQUAL "AUTO" AND NOT DEFINED ENV{CI})))
-    set_property(SOURCE src/app/PanelProject.cpp APPEND PROPERTY COMPILE_DEFINITIONS "SF_DEV_COMMIT=\"${SF_GIT_COMMIT}\"")
+  if(SCULPTFORGE_DEV_BUILD STREQUAL "ON" OR (SCULPTFORGE_DEV_BUILD STREQUAL "AUTO" AND NOT DEFINED ENV{CI}))
+    set(SF_STAMP_DEV ON)
+  else()
+    set(SF_STAMP_DEV OFF)
   endif()
+  set(SF_BUILD_STAMP_CPP ${CMAKE_CURRENT_BINARY_DIR}/BuildStamp.cpp)
+  add_custom_target(sf_build_stamp
+    COMMAND ${CMAKE_COMMAND} -DSF_SRC=${CMAKE_CURRENT_SOURCE_DIR} -DSF_OUT=${SF_BUILD_STAMP_CPP} -DSF_DEV=${SF_STAMP_DEV}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildStamp.cmake
+    BYPRODUCTS ${SF_BUILD_STAMP_CPP} COMMENT "Build stamp" VERBATIM)
+  target_sources(sculptforge PRIVATE ${SF_BUILD_STAMP_CPP})
+  set_source_files_properties(${SF_BUILD_STAMP_CPP} PROPERTIES GENERATED TRUE SKIP_PRECOMPILE_HEADERS ON)
+  add_dependencies(sculptforge sf_build_stamp)
   if(MSVC)
     target_compile_options(sculptforge PRIVATE /W4 /utf-8 /permissive-)
   else()
@@ -986,6 +991,16 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES COST 1000 # the longest: start first
                          ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
   endforeach()
+  # The build stamp follows the commit at build time (cmake/BuildStamp.cmake), and a release build carries no dev stamp.
+  add_test(NAME build_stamp COMMAND ${CMAKE_COMMAND} -DSF_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildStamp.cmake
+           -DSF_WORK=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/build-stamp -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/build_stamp_test.cmake)
+  if(SCULPTFORGE_BUILD_APP) # the binary reports the version, plus "dev <commit>" only when this is a dev build
+    add_test(NAME build_stamp_version COMMAND sculptforge --version)
+    set_tests_properties(build_stamp_version PROPERTIES PASS_REGULAR_EXPRESSION "SculptForge ${PROJECT_VERSION}[^\n]*\n")
+    if(NOT SF_STAMP_DEV)
+      set_tests_properties(build_stamp_version PROPERTIES FAIL_REGULAR_EXPRESSION " dev ")
+    endif()
+  endif()
   if(SCULPTFORGE_BUILD_APP) # the start-up splash by each of its three ways onto the window (surface, renderer, software), on SDL's dummy driver
     add_test(NAME splash_paths COMMAND sculptforge --splash-selftest)
     set_tests_properties(splash_paths PROPERTIES ENVIRONMENT "SDL_VIDEO_DRIVER=dummy")
@@ -1005,6 +1020,10 @@ if(SCULPTFORGE_BUILD_TESTS)
   # The voxel and remesh real-model nightlies alone: T0 runs them when Voxel/Remesh/MemoryGuard change (tools/test/impacted.py).
   add_test(NAME sculptforge_tests_nightly_voxel COMMAND sculptforge_tests --nightly voxel remesh)
   set_tests_properties(sculptforge_tests_nightly_voxel PROPERTIES LABELS nightly_area TIMEOUT 900
+                       ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
+  # The Dynamic topology nightlies alone (a painted Part's UVs: its strays only show in the nightly, 0.13.14).
+  add_test(NAME sculptforge_tests_nightly_dyntopo COMMAND sculptforge_tests --nightly dyntopo)
+  set_tests_properties(sculptforge_tests_nightly_dyntopo PROPERTIES LABELS nightly_area TIMEOUT 1800
                        ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly)
   # Opt-in benches: own entry, labels bench + nightly (T0, CI and the shards never run them), hard timeout.
@@ -1254,6 +1273,11 @@ if(SCULPTFORGE_BUILD_TESTS)
       add_test(NAME release_rerun COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_rerun_test.sh)
       set_tests_properties(release_rerun PROPERTIES TIMEOUT 60)
     endif()
+    # scripts/merge-queue.sh wait_ci: a gh watch error while the run is still going is retried, never read as red.
+    if(UNIX AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+      add_test(NAME merge_queue_wait_ci COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/merge_queue_wait_ci_test.sh)
+      set_tests_properties(merge_queue_wait_ci PROPERTIES TIMEOUT 60)
+    endif()
     # packaging/linux/apt-retry.sh: apt-get through a mirror that fails DNS (stand-in apt-get, sandbox /etc/apt).
     if(UNIX AND NOT APPLE)
       add_test(NAME apt_retry COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/apt_retry_test.sh)
@@ -1371,6 +1395,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(floor_grid_fixed_2880 floor_grid_fixed --size 2880x1800)
     sculptforge_ui_test(parts_numbered_duplicates_1440 parts_numbered_duplicates --size 1440x900) # Head.01, Head.02 in the Parts list
     sculptforge_ui_test(parts_numbered_duplicates_2880 parts_numbered_duplicates --size 2880x1800)
+    sculptforge_ui_test(stop_at_mesh_depth_1440 stop_at_mesh_depth --size 1440x900) # Crease Line ten laps over one line: no sawtooth; Stop at mesh depth
+    sculptforge_ui_test(stop_at_mesh_depth_2880 stop_at_mesh_depth --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(orientation_widget_1440 orientation_widget --size 1440x900) # Draw > Camera > Corner gizmo > Orientation
@@ -1430,6 +1456,12 @@ if(SCULPTFORGE_BUILD_TESTS)
       endif()
       sculptforge_ui_test(e2e_${name} ../e2e/${name})
       set_tests_properties(ui_e2e_${name} PROPERTIES LABELS "ui;e2e")
+    endforeach()
+    # The Dynamic-on-a-painted-Part scenario at the shots bar's sizes too (the stills of the paint surviving the stroke).
+    foreach(size 1440x900 2880x1800)
+      string(REGEX REPLACE "x.*" "" w ${size})
+      sculptforge_ui_test(e2e_dynamic_keeps_texture_${w} ../e2e/dynamic_keeps_texture --size ${size})
+      set_tests_properties(ui_e2e_dynamic_keeps_texture_${w} PROPERTIES LABELS "ui;e2e")
     endforeach()
     if(NOT WIN32 AND Python3_Interpreter_FOUND AND TARGET sf_fake_splat_tools)
       # Quitting the app, every way, with a trainer child running: nothing outside it is signalled (#183).
@@ -1615,6 +1647,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(modifier_brush_2880 modifier_brush --size 2880x1800)
     sculptforge_ui_test(geometry_groups_1440 geometry_groups --size 1440x900)
     sculptforge_ui_test(geometry_groups_2880 geometry_groups --size 2880x1800) # its 200% shot: 1440 px of UI
+    sculptforge_ui_test(facegroup_visible_fresh_id_1440 facegroup_visible_fresh_id --size 1440x900) # Ctrl+W on a partly hidden, ungrouped mesh
+    sculptforge_ui_test(facegroup_visible_fresh_id_2880 facegroup_visible_fresh_id --size 2880x1800)
     sculptforge_ui_test(popup_click_outside_1440 popup_click_outside --size 1440x900) # #210: context menus and combo lists close on a press outside
     sculptforge_ui_test(popup_click_outside_2880 popup_click_outside --size 2880x1800)
     # #182: the high-resolution and may-use-swap remesh dialogs at the review sizes (tests/ui/voxel_highres.sfui).
@@ -1833,6 +1867,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(my_panel_controls_1440_200 sizes/my_panel_controls --size 2880x1800)
     sculptforge_ui_test(shelves_anything_1440 sizes/shelves_anything --size 1440x900)
     sculptforge_ui_test(shelves_anything_1440_200 sizes/shelves_anything --size 2880x1800)
+    sculptforge_ui_test(touch_add_to_shelf_1440 sizes/touch_add_to_shelf --size 1440x900)
+    sculptforge_ui_test(touch_add_to_shelf_1440_200 sizes/touch_add_to_shelf --size 2880x1800)
     sculptforge_ui_test(my_panel_paths_1440 sizes/my_panel_paths --size 1440x900)
     sculptforge_ui_test(my_panel_paths_1440_200 sizes/my_panel_paths --size 2880x1800)
     # A crash leaves a note in the log file (#16). Needs no window.

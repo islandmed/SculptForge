@@ -45,6 +45,10 @@ struct TierConfig {
     // ... and while a stroke runs or the view moves, at most this long a frame (ms; the points from the measured cost
     // per point, so a slower CPU shades fewer and the dabs and the orbit keep up; 0 = the points budget only).
     double strokeShadeMs = 10.0;
+    // ... but a level without Focus Detail shades every patch a stroke frame changed, whatever the budget (#184: the
+    // stroke showed only at its release). High and Extreme only: on the floor and standard tiers it cost a fifth to a third
+    // of the stroke's frame rate.
+    bool strokeShadeKeepPace = true;
     uint64_t outOfCorePoints = 0;
     // The hardware tier (core/HardwareTier.h): the one in effect (the detected or chosen one, minus the memory guard's
     // steps) and its budgets, which the advanced levels read (Focus Detail, coarse LOD, micro levels, dense strokes).
@@ -64,6 +68,8 @@ size_t strokeShadeBudget(size_t points, double ms, double nsPerPoint, size_t min
 // stroke runs or the view moves, also no more than strokeShadeMs of it (the catch-up after big strokes ran ~30 ms a
 // frame through the orbit on the floor tier); still frames get all of the points, as nothing waits for them.
 size_t microShadeBudget(const TierConfig& tier, bool stroking, bool viewMoving, double nsPerPoint, size_t minPoints);
+// strokeShadeKeepPace, or SF_STROKE_KEEP_PACE=0|1 (read each call: a UI script's env; anything else: the tier's).
+bool strokeShadeKeepsPace(const TierConfig& tier);
 
 // How many of `pending` tiles waiting for coarse shading to hand to one frame: all of them when `ms` is 0 (off), 64 while the
 // cost per tile (`nsPerTile`, measured, ring of neighbours included) is not known yet, else what fits in `ms`, at least 8

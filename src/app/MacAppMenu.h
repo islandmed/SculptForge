@@ -24,6 +24,7 @@ inline bool takePreferencesRequest() { return preferencesWanted.exchange(false);
 
 #if defined(__APPLE__)
 void install(); // after SDL_Init: gives SDL's Preferences... item its action
+int osModifierFlags(); // Shift 1, Ctrl 2, Alt 4, Cmd 8 held right now, per the system (OsModifiers.h)
 #else
 inline void install() {}
 #endif

@@ -722,6 +722,7 @@ int App::runUiTest(int w, int h, int fps) {
         updateCameraAspect();
         updateSpaceMouse(dt);
         updateKeyNav(dt);
+        if (osModsEachFrame_) syncModifiersFromOs();
         touchTick(); // a finger's press that waited for a second finger long enough goes through
         if (interactiveStrokes_) { // (`interactive_strokes on`: what run() does each frame for a stroke's queued dabs)
             flushGrab();
@@ -1540,6 +1541,7 @@ int App::run() {
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
         updateKeyNav(dt); // the held pan and zoom keys (runUiTest calls it too)
+        if (osModsEachFrame_) syncModifiersFromOs(); // a modifier's key-up the system took (OsModifiers.h)
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
@@ -1986,6 +1988,8 @@ void App::dispatchEvent(const SDL_Event& event) {
         closeTopPopupOnEscape())
         return; // Esc closes the top context menu or combo list and nothing else sees it (#210; the Library's Esc would close it)
     pressSpent_ = closePopupsOnPressOutside(e); // a press outside open menus and popups acts, not only closes them (Shell.cpp)
+    if (e.type == SDL_EVENT_MOUSE_MOTION) ui::NotePointerPen(e.motion.which == SDL_PEN_MOUSEID);
+    else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) ui::NotePointerPen(e.button.which == SDL_PEN_MOUSEID);
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
     if (touchMouseEvent(e)) return; // a finger's press waits for a second finger; a gesture's stay off (Touch.cpp)
@@ -2013,9 +2017,11 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
         windowFocused_ = true;
+        syncModifiersFromOs(); // (keys let go while another window had focus)
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
+        syncModifiersFromOs(); // (SDL lets go of every key itself when no window has focus; this covers a handover)
         // A pen button or the tip let go in another window never reaches us: its view drag, held buttons and stroke end
         // here, or the pen's next press only navigates (#216).
         if (penInProximity_ || penButtons_ || (dragFromPen_ && drag_ != Drag::None)) penLeft();
@@ -2850,6 +2856,8 @@ void App::onMouseUp() {
         // Predictive strokes: letting go doesn't wait for the dabs still to place; the solver carries on and
         // pumpStroke ends the stroke once they are on screen (anything that needs the document first ends it).
         strokeFinishing_ = true;
+        strokeEndWorkMs_ = 0.0;
+        strokeFinalizeCount_ = 0;
         // (even with nothing left to place: the stroke's end work runs on the solver thread, pumpStroke)
     } else if (drag_ == Drag::Stroke) endStroke();
     if (drag_ == Drag::MaskCanvas) maskCanvasRelease();
@@ -4420,6 +4428,11 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
             ImGui::Checkbox(tr("Crisp edge##recipe"), &recipe.crispEdge);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr("A hard, clean tip edge and a full plane pull, for hard-surface planes."));
+            if (recipe.pinch != 0.0f && recipe.depth < 0.0f && (newerMenuRows() || !recipe.stopAtMeshDepth)) { // (a row after 0.13.14: Classic keeps its old rows unless asked)
+                ImGui::Checkbox(tr("Stop at mesh depth##recipe"), &recipe.stopAtMeshDepth);
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                    ImGui::SetTooltip("%s", tr("A pinching cut stops deepening and tightening once the mesh can't hold its groove (about a brush radius deep): repeated passes no longer saw the walls into teeth. Untick it, or turn on Dynamic, to cut on."));
+            }
             continue; // (each has its own tooltip)
         case RecipeParam::Kind::Enum: {
             int idx = recipe.enumIndex(p.key);

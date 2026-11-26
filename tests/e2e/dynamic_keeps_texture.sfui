@@ -1,0 +1,49 @@
+# e2e: Dynamic topology on a painted Part (Discord, 0.13.11: "if I turn on Dynamic to edit a Part, all the paint (the whole
+# texture) is erased"). The first Dynamic dab dropped the Part's UVs, so the texture had nothing to sit on and the Part
+# showed white. Now the UVs stay: the paint is still there after the stroke, the texture is untouched (same painted texels),
+# Undo and Redo keep it. (Shots first, numbers after: on the unfixed build the stills show the white Part.)
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+key f
+camera 0 0
+click "Texture Image##tool.texture"
+click "Texture Image/Auto UV"
+wait_idle 120
+click "Texture Image/New Texture"
+run set_color color=c81e1e
+key p
+stroke 0.15 0.5 0.85 0.5
+run set_color color=2050d0
+stroke 0.5 0.15 0.5 0.85
+camera 90 0
+run set_color color=20a040
+stroke 0.15 0.35 0.85 0.65
+camera 0 0
+remember texture_painted painted
+remember triangles before
+shot painted
+click "Dynamic##draw.dynamic"
+click "Standard##brush.standard"
+drag_frames 0.3 0.45 0.7 0.55 6 dynamic
+shot after_dynamic
+camera 90 0
+shot after_dynamic_side
+camera 180 0
+shot after_dynamic_back
+camera 270 0
+shot after_dynamic_side2
+camera 0 0
+expect_value triangles > $before
+expect_value uvs == 1
+expect_value paint_texture == 1
+expect_value texture_painted == $painted
+key ctrl+z
+shot after_undo
+expect_value triangles == $before
+expect_value uvs == 1
+expect_value texture_painted == $painted
+key ctrl+shift+z
+expect_value triangles > $before
+expect_value uvs == 1
+expect_value texture_painted == $painted
+shot after_redo

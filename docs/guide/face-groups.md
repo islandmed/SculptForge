@@ -40,7 +40,7 @@ groups. So you can isolate one part and regroup just that part.
 | **By pieces** | One group per disconnected piece, such as separate eyes or buttons in one mesh. | `facegroup_by_connectivity` |
 | **From mask** | Masked triangles move into a new group. | `facegroup_from_mask` |
 | **Group by UVs** | One group per UV island: triangles that touch without a UV seam between them share a group. Needs UVs (**Tool > Texture Image > Auto UV** or an imported model's). | `facegroup_uv` |
-| **Merge visible** | Everything visible becomes one group. | `facegroup_merge_visible` |
+| **Merge visible** | Everything visible becomes one group. With part of the mesh hidden, the visible part gets a group of its own and the hidden faces keep theirs. | `facegroup_merge_visible` |
 | **Clear groups** | Remove all face groups; the whole Part becomes one group again. | `facegroup_clear` |
 
 Each button is one undo step.

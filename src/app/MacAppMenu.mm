@@ -28,10 +28,23 @@ void wakeMainLoop(); // App.h (not included: it pulls in the whole app)
 
 namespace sf::macmenu {
 
+// SDL's menu binds Cmd+W (Close), Cmd+M (Minimize) and Cmd+H (Hide) as key equivalents, and Cocoa runs them even though
+// SDL has already given the key to the app: Cmd is Ctrl here, so Group from Mask (Ctrl+W) also asked to close the
+// window (the quit / save prompt) and View Mask (Ctrl+H) hid the application. The items stay in the menus, without a key.
+static void dropClashingKeyEquivalents(NSMenu* menu) {
+    for (NSMenuItem* item in menu.itemArray) {
+        if (item.action == @selector(performClose:) || item.action == @selector(performMiniaturize:) ||
+            item.action == @selector(hide:) || item.action == @selector(hideOtherApplications:))
+            item.keyEquivalent = @"";
+        if (item.submenu) dropClashingKeyEquivalents(item.submenu);
+    }
+}
+
 void install() {
     static SFPreferencesTarget* target = [[SFPreferencesTarget alloc] init]; // (NSMenuItem keeps its target weakly)
     NSMenu* bar = [NSApp mainMenu];
     if (bar.numberOfItems == 0) return; // (no menu bar: nothing to fill)
+    dropClashingKeyEquivalents(bar);
     NSMenu* appMenu = [[bar itemAtIndex:0] submenu];
     for (NSMenuItem* item in appMenu.itemArray)
         if ([item.keyEquivalent isEqualToString:@","] && item.action == nil) { // SDL's "Preferences..." (Cmd+,)
@@ -39,6 +52,14 @@ void install() {
             item.action = @selector(openPreferences:);
             return;
         }
+}
+
+// The modifier keys the system says are down at this moment ([NSEvent modifierFlags]: one read of the hardware state, no
+// allocation). SDL tracks them from the events it sees; a key-up a native menu or another app took never reaches it.
+int osModifierFlags() {
+    const NSEventModifierFlags f = [NSEvent modifierFlags];
+    return ((f & NSEventModifierFlagShift) ? 1 : 0) | ((f & NSEventModifierFlagControl) ? 2 : 0) |
+           ((f & NSEventModifierFlagOption) ? 4 : 0) | ((f & NSEventModifierFlagCommand) ? 8 : 0);
 }
 
 } // namespace sf::macmenu

@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.14.0:</strong> Polygon mode lets you pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span, and Split view shows a second live view of your scene (<a href="https://sculptforge.app/guide/polygon-mode.md">how it works</a>)
+  <strong>New in 0.14.1:</strong> up to four lights of your own with a shadow strength, any control on any shelf, and one place for the camera&#x27;s navigation bindings (<a href="https://sculptforge.app/guide/pbr-painting.md">how it works</a>)
 </p>
 
 <p align="center">

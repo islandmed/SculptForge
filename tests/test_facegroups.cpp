@@ -164,6 +164,41 @@ TEST(facegroups_by_connectivity_and_merge) {
     CHECK(!d.mesh.hasFaceGroups());
 }
 
+TEST(facegroup_merge_visible_after_partial_hide) {
+    // Ungrouped mesh, half hidden: the visible half becomes its own group, the hidden half keeps id 0.
+    Document d = makeDoc(makeIcosphere(3));
+    CommandRegistry reg;
+    const uint32_t half = uint32_t(d.mesh.triangleCount() / 2);
+    d.mesh.hidden.assign(d.mesh.triangleCount(), 0);
+    for (uint32_t t = 0; t < half; ++t) d.mesh.hidden[t] = 1;
+    CHECK(!d.mesh.hasFaceGroups());
+    CHECK(reg.execute(d, "facegroup_merge_visible").ok);
+    CHECK(d.mesh.hasFaceGroups());
+    bool hiddenKept = true, visibleOwn = true;
+    for (uint32_t t = 0; t < d.mesh.triangleCount(); ++t) {
+        if (t < half) hiddenKept = hiddenKept && d.mesh.facegroupAt(t) == 0;
+        else visibleOwn = visibleOwn && d.mesh.facegroupAt(t) == 1;
+    }
+    CHECK(hiddenKept && visibleOwn);
+    CHECK(reg.execute(d, "show_all").ok);
+    CHECK(visibleFaceGroupCount(d.mesh) == 2);
+
+    // Fully visible: unchanged (one group, no ids stored).
+    Document all = makeDoc(makeIcosphere(3));
+    CHECK(reg.execute(all, "facegroup_merge_visible").ok);
+    CHECK(!all.mesh.hasFaceGroups() && visibleFaceGroupCount(all.mesh) == 1);
+
+    // Already grouped, hide one group: the visible groups merge into the lowest visible id, hidden group untouched.
+    Document g = makeDoc(makeTwoSpheres());
+    const uint32_t gHalf = uint32_t(g.mesh.triangleCount() / 2);
+    CHECK(reg.execute(g, "facegroup_by_connectivity").ok);
+    CHECK(reg.execute(g, "hide_facegroup", {{"group", 0.0}}).ok);
+    CHECK(reg.execute(g, "facegroup_merge_visible").ok);
+    bool same = true;
+    for (uint32_t t = 0; t < g.mesh.triangleCount(); ++t) same = same && g.mesh.facegroupAt(t) == (t < gHalf ? 0u : 1u);
+    CHECK(same);
+}
+
 TEST(facegroup_from_mask) {
     Document d = makeDoc(makeIcosphere(3));
     CommandRegistry reg;

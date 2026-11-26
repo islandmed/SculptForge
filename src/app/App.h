@@ -518,6 +518,8 @@ private:
     const DabView* dabView_ = nullptr; // set while the solver thread places dabs (dabAt reads it)
     bool asyncStroke_ = false;         // this stroke's dabs go to the solver thread
     bool strokeFinishing_ = false;     // released: the solver places the last dabs, the UI carries on
+    int strokeFinalizeCount_ = 0;      // finalize batches since the release (the bench's finalize_count: 1 expected)
+    double strokeEndWorkMs_ = 0.0;     // the released stroke's end work (flush, upload packing, finishStrokeNow), not its dabs: the bench's release split
     bool predictiveStrokes() const;    // the preference (and its environment override)
     bool previewStrokes() const;       // the stroke's dabs draw the predictive preview (predictive, or SF_BG_GHOST)
     bool fastBigBrushes() const;       // Preferences > Performance > Fast Big Brushes (SF_ADAPTIVE_DABS=0 / 1 overrides it)
@@ -2323,6 +2325,8 @@ private:
     uint64_t autosaveRevision_ = ~uint64_t(0);
     bool autosaveWritten_ = false;
     std::string windowTitle_;
+    int statusChips_ = 0, statusMemChips_ = 0; // chips drawn in the status bar / the memory ones among them (UI tests: status_chips, status_mem_chips)
+    float statusModulesX_ = 0.0f; // where the status bar's chips start, as drawn, plus the memory chips' width (UI tests: status_modules_x)
     float infoFontPx_ = 0.0f; // the title strip's info readout font size as drawn (UI tests: info_font_px)
     std::vector<std::pair<float, float>> barSpans_; // the top bar's widgets, x from-to, last frame (UI tests: no overlaps)
     std::vector<std::pair<float, float>> timelineSpans_; // the timeline header's pieces, x from-to (UI tests: no overlaps)
@@ -3551,7 +3555,10 @@ private:
     // picked again or another brush is picked.
     void registerStrokePopupActions();
     void openStrokePopup(bool held, int key);
-    void closeStrokePopup() { strokePopup_.open = false; }
+    void closeStrokePopup() {
+        strokePopup_.open = false;
+        syncModifiersFromOs(); // (a popup's key-up can be the one a native menu took)
+    }
     void pickStrokePopupItem(int item, bool close);
     bool strokePopupMouseEvent(const SDL_Event& e); // true: the popup used the event
     void strokePopupKeyUp(SDL_Keycode key);
@@ -3673,6 +3680,12 @@ private:
     // latch: a latched Mask still lets a drag beside the model turn the view.
     SDL_Keymod inputMods(bool latch = true) const;
     SDL_Keymod keyMods() const;   // the keyboard's alone (in the input style's terms)
+    // Clears the Shift / Ctrl / Alt / Cmd SDL thinks are held but the system says are up (a key-up that never reached us:
+    // OsModifiers.h). Once a frame, on focus changes and when the stroke popup closes. UI tests: `os_mods` fakes the system.
+    void syncModifiersFromOs();
+    int osModsOverride_ = -1;     // UI tests: the modifiers the "system" reports (kOsMod bits), -1 = ask the system
+                                  // (a test run never asks: its held keys are SDL_SetModState's, the real keyboard has none)
+    bool osModsEachFrame_ = true; // UI tests: false = only the event paths sync (focus, popup close)
     bool erasing() const;         // the pen's eraser end is drawing
     PenAction eraserAction() const { return uiPrefs_.tablet.eraser; }
     void firstDab(float x, float y); // the stroke's first dab, once the pen reports a real pressure

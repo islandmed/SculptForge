@@ -453,8 +453,8 @@
      "line": "One place for the Cloth brush settings and for running a simulation.",
      "where": "New Cloth panel",
      "votes": 0,
-     "status": "open",
-     "shipped": ""
+     "status": "shipped",
+     "shipped": "0.14.1"
     },
     {
      "slug": "wind-for-drape",
@@ -463,8 +463,8 @@
      "line": "Direction and turbulence so cloth can blow in the wind, still or live.",
      "where": "Drape tool settings",
      "votes": 0,
-     "status": "open",
-     "shipped": ""
+     "status": "shipped",
+     "shipped": "0.14.1"
     }
    ]
   },
@@ -473,16 +473,6 @@
    "emoji": "🎨",
    "slug": "paint-materials",
    "ideas": [
-    {
-     "slug": "more-lights-and-soft-shadows",
-     "anchor": "vote-more-lights-and-soft-shadows",
-     "title": "More lights and soft shadows",
-     "line": "More lights, ambient occlusion and soft shadows in the render.",
-     "where": "Render panel",
-     "votes": 0,
-     "status": "open",
-     "shipped": ""
-    },
     {
      "slug": "lit-sphere-material-per-part",
      "anchor": "vote-lit-sphere-material-per-part",
@@ -502,6 +492,16 @@
      "votes": 0,
      "status": "open",
      "shipped": ""
+    },
+    {
+     "slug": "more-lights-and-soft-shadows",
+     "anchor": "vote-more-lights-and-soft-shadows",
+     "title": "More lights and soft shadows",
+     "line": "More lights, ambient occlusion and soft shadows in the render.",
+     "where": "Render panel",
+     "votes": 0,
+     "status": "shipped",
+     "shipped": "0.14.1"
     }
    ]
   },
@@ -874,5 +874,5 @@
    ]
   }
  ],
- "updated": "2026-11-25T03:52:47Z"
+ "updated": "2026-11-25T22:40:25Z"
 }

@@ -1,7 +1,0 @@
----
-whats_new: **AI agents (MCP)**: a checkpoint restore now notices more cases where the checkpoint can't be reached exactly (the start of a history the undo budget has trimmed, selection sets, paint layers, UV seams, splat edits) and leaves your scene as it was.
-fixed: **MCP `checkpoint_restore`**: a checkpoint made at the very start of the history, after the undo memory budget had dropped the oldest steps, still reported success and left the scene on whatever the trimmed history started from. The history now remembers where it was trimmed, so such a checkpoint is refused up front, while a checkpoint exactly at the trimmed edge still restores. The scene check behind it now also covers selection sets, paint layers, UV seams and pins, quad pairs, Part folders, reference images and splats, so a restore that would end somewhere else says "could not be restored exactly" and changes nothing. Opening a saved history now gives its steps new numbers and counts as a new history, so checkpoints made before it are refused instead of pointing into it. Reported and reproduced by SurrealByDesign.
-testers:
-  - Any OS, with an AI agent connected: checkpoint_save "root" on a fresh scene, set the undo memory budget very low (Preferences > Performance), make two edits, then checkpoint_restore "root": the error says the checkpoint is no longer in the undo history and the scene stays as it was.
-  - Edit a splat capture's colours or positions after checkpoint_save, then checkpoint_restore: the error says it could not be restored exactly, and nothing changes.
----

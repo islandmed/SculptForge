@@ -1674,8 +1674,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "遮罩未遮罩的部分并取消已遮罩的部分（也可以：Ctrl+单击背景）。"},
     {"Group from Mask", "从遮罩创建组"},
     {"Turn the masked part into a new face group and clear the mask. With nothing masked, everything visible becomes "
-     "one group.",
-     "将遮罩部分转为新的面组并清除遮罩。若没有遮罩，所有可见部分会成为一个组。"},
+     "one group (its own group when part of the mesh is hidden).",
+     "将遮罩部分转为新的面组并清除遮罩。若没有遮罩，所有可见部分会成为一个组（部分网格被隐藏时，可见部分自成一组）。"},
     {"One face group per UV island: triangles that touch without a UV seam share a group. Only the visible part is "
      "regrouped. Needs UVs (Tool > Texture Image > Auto UV makes some).",
      "每个 UV 岛一个面组：相邻且无 UV 接缝的三角面属于同一组。只重新分组可见部分。需要 UV（工具 > 纹理图像 > 自动 UV "
@@ -1908,6 +1908,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Connected only", "仅限相连"},
     {"Lock plane", "锁定平面"},
     {"Crisp edge", "锐利边缘"},
+    {"Stop at mesh depth", "在网格深度停止"},
+    {"A pinching cut stops deepening and tightening once the mesh can't hold its groove (about a brush radius deep): repeated passes no longer saw the walls into teeth. Untick it, or turn on Dynamic, to cut on.", "收缩刻划在网格撑不住沟槽时（约一个笔刷半径深）就停止加深与收紧：重复描绘不再把沟壁锯成锯齿。取消勾选，或开启 Dynamic，即可继续刻深。"},
     {"Keep the plane the stroke starts on for the whole stroke.", "整个笔触都保持笔触起点的平面。"},
     {"A hard, clean tip edge and a full plane pull, for hard-surface planes.", "硬而干净的笔尖边缘并完全压平，用于硬表面平面。"},
     {"View falloff", "视图衰减"},
@@ -3553,11 +3555,10 @@ constexpr Entry kSimplifiedChinese[] = {
      "笔刷从表面减去。按住 Alt 可在单一笔触中增加。"},
     {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
      "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
-     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
-     "are dropped (Undo brings them back).",
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles; UVs and the "
+     "painted texture are kept.",
      "动态拓扑：笔刷在需要细节处加入三角面，不需要处则移除，让你拉出角或手指而不会拉伸。“细节”设置三角面的大小；拉"
-     "近视图或缩小笔刷可得到更细的三角面。需要没有细分层级的网格；笔刷下的四边面会变成三角面，UV 会被丢弃（可撤销恢复"
-     "）。"},
+     "近视图或缩小笔刷可得到更细的三角面。需要没有细分层级的网格；笔刷下的四边面会变成三角面，UV 与绘制的贴图会保留。"},
     {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
      "sculpting.",
      "Lit Sphere 着色（默认）：所选的材质球或摄影棚灯光，便于雕刻时判读形体。"},
@@ -5523,6 +5524,11 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Drop on My Panel or a shelf to move, elsewhere to remove", "拖放到“我的面板”或工具栏以移动，拖到其他位置则移除"},
     {"Hold Alt and drag a button, or a section's title, from any palette into this panel. Right-click an entry to remove it.", "按住 Alt，将任意面板中的按钮或分区标题拖到此面板。右键单击条目可将其移除。"},
     {"My Panel", "我的面板"},
+    {"Add to My Panel", "添加到“我的面板”"},
+    {"Add to the top shelf", "添加到顶部工具栏"},
+    {"Add to the left shelf", "添加到左侧工具栏"},
+    {"Add to the right shelf", "添加到右侧工具栏"},
+    {"Add to the bottom shelf", "添加到底部工具栏"},
     {"Remove from My Panel", "从“我的面板”移除"},
     {"Your own panel, floating at the cursor: the buttons, controls and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "属于你自己的面板，浮动在光标处：包含你拖入的按钮、控件和分区（按住 Alt 从任意面板拖动）。再按一次该快捷键或 Esc 即可关闭。它也是一个可放入侧栏的面板（编辑 > 我的面板），还可以移到独立窗口。"},
     {"Add images...",

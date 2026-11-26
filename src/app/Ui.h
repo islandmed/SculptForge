@@ -149,6 +149,19 @@ bool MyPanelDragEntry(const std::string& entry, const char* label, bool fromPane
 // Alt-dragged a button or header more than a click's travel: its release was the end of a drag, not a click.
 bool MyPanelDragged();
 
+// The same without a keyboard (a tablet): hold a finger or the pen still on a control, a button or a section's title for half a
+// second (a ring shows it took) and, as it lifts, a one-level menu offers "Add to My Panel" and the four shelves; a mouse's
+// right-click does the same where the control has no menu of its own. The entry goes where an Alt-drop at the end of the shelf
+// puts it. HelpText, HelpAction's buttons and the section titles call this themselves (`entry` as MyPanelDragEntry takes it); the
+// pick comes back once a frame, after every window (App::finishMyPanelDrag): the entry and where, HostMyPanel or a Shelf.
+void TouchPin(const std::string& entry, const char* label);
+bool TakeTouchPin(std::string& entry, int& target);
+// The source of the mouse event about to be handled: the pen's (SDL_PEN_MOUSEID) counts as a finger for a long press.
+void NotePointerPen(bool pen);
+// For UI tests: the menu is open for this entry ("" when it is not), and how many rings (a long press that took) were drawn.
+const std::string& TouchPinMenuEntry();
+int TouchPinArmed();
+
 // One control as a My Panel or shelf entry ("control:<scope>/<key>", UiLayout.h; PanelMyPanel.cpp drawPinnedControl draws
 // it in either). HelpText and HelpAction mark the control drawn just before them: while Alt (without Ctrl) is held it is a
 // drag source for My Panel and the shelves, keyed by the help title (or the action id) inside the scope being drawn; while a

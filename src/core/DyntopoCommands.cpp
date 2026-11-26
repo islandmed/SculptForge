@@ -24,8 +24,8 @@ void registerDyntopoCommands(CommandRegistry& registry) {
     registry.add({"dyntopo",
                   "Dynamic topology: while on, brush strokes add triangles where they need "
                   "detail and remove them where they don't, so shapes can be pulled out without stretching. Needs a "
-                  "mesh without subdivision levels; quads under the brush become triangles and UVs are dropped (undo "
-                  "brings them back). Without arguments, reports the settings.",
+                  "mesh without subdivision levels; quads under the brush become triangles; UVs and the painted "
+                  "texture are kept. Without arguments, reports the settings.",
                   {{"enabled", T::Bool, "true = on, false = off.", false},
                    {"freeze_levels", T::Bool,
                     "With enabled=true on a Part with subdivision levels: keep the level shown as a plain mesh "

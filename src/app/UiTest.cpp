@@ -374,6 +374,11 @@
 //                            beside the pen's, a press at each touch whose release never comes; right_after / right_first: the
 //                            driver also clicks the right mouse button for a pen side button, after / before the pen's own event
 //                            (right_late: with the pen's first motion after it)
+//   os_mods none|shift+ctrl+alt+cmd|off [events_only]   the modifiers the system reports are held (pair it with stuck_mods;
+//                            off asks the system again; events_only:
+//                            only a focus change or the stroke popup closing re-syncs, not each frame (OsModifiers.h)
+//   stuck_mods none|shift+ctrl+alt+cmd   SDL's held modifiers set once, with no key-up to come (unlike `hold`, the script's
+//                            held keys, which every step applies again)
 //   window_focus 1|0         the window gains or loses keyboard focus; mouse_leave: the pointer leaves the window
 //                            (another screen); values: focus_frames (1 while focus keeps it drawing), wants_frames (1
 //                            while anything keeps the idle loop drawing: input, a job, an animation),
@@ -394,6 +399,8 @@
 //   touch_tap "label"        one finger taps an item as it is on screen (no wheel, no scrolling: a finger can't scroll a
 //                            window that doesn't drag-scroll; fails when the item is not visible)
 //   touch_tap_at X Y         the same at window fractions (0..1): a tap outside a window, on the canvas
+//   touch_hold "label" [S [DX]]  one finger rests still on an item for S seconds (0.8), slides DX px sideways if given, and lifts: a long press (ui::TouchPin: the
+//                            menu to add it to My Panel or a shelf opens as it lifts). pen_hold is the same with the pen
 //   touch_drag_at X0 Y0 X1 Y1  one finger lands at window fractions and swipes to the others over 0.4 s (scrolls a window)
 //   touch_tap_welcome_x      a tap on the welcome window's title-bar X
 //   android_back             Android's Back button (SDLK_AC_BACK) down and up
@@ -432,6 +439,7 @@
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
 #include "app/Python.h"
+#include "app/OsModifiers.h"
 #include "ai/Http.h"
 #include "ai/GradioClient.h"
 #include "ai/ImageTo3DService.h"
@@ -1076,6 +1084,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "air_strokes") return app_.uiPrefs_.airStrokes ? 1.0 : 0.0;
     if (name == "emulate_3_button") return app_.uiPrefs_.emulate3Button ? 1.0 : 0.0; // Blender style (#77)
     if (name == "space_held") return app_.spaceHeld_ ? 1.0 : 0.0;
+    if (name == "status_modules_x") return double(app_.statusModulesX_);
+    if (name == "status_chips") return double(app_.statusChips_);
+    if (name == "status_mem_chips") return double(app_.statusMemChips_);
     if (name == "nav_hold") return double(app_.navHoldMove_ + 1);        // a Hold to orbit / pan / zoom key down: 1 / 2 / 3, 0 none
     if (name == "nav_conflicts") return double(app_.navConflictCount()); // Preferences > Navigation's warnings
     for (int i = 0; i < kNavMoves; ++i)                                  // nav_drag_orbit / pan / zoom: the gesture's button (0 none)
@@ -1368,6 +1379,9 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const std::string& p : py.pathScripts()) all = !py.setRunAtStartup(p, true) && !py.runsAtStartup(p) && all;
         return all ? 1.0 : 0.0;
     }
+    if (name == "touch_pin_menu") return ui::TouchPinMenuEntry().empty() ? 0.0 : 1.0; // the long-press menu is open
+    if (name == "touch_pin_armed") return double(ui::TouchPinArmed());               // long presses that took, so far
+    if (name == "my_panel_entries") return double(app_.layout_.myPanel.size());
     if (name.rfind("shelf_has_", 0) == 0) { // how many shelf slots hold the item (shelf_has_widget.color)
         const std::string id = name.substr(10);
         int n = 0;
@@ -2309,7 +2323,7 @@ void Demo::testKey(int line, const std::string& combo, int phase) {
 // Step verb -> its case in parseStep's switch. (A 147-link else-if chain reached MSVC's block-nesting limit, C1061;
 // a table + switch has no depth, and a new step is a name here, an enumerator and a case.)
 enum class StepVerb { None,
-    SafeArea, AndroidBack, TouchDragAt, TouchTap,
+    SafeArea, AndroidBack, TouchDragAt, TouchTap, TouchHold,
     Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
     AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
@@ -2320,7 +2334,7 @@ enum class StepVerb { None,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
     Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, DumpUi, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
-    PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
+    PenStream, MouseSteps, OsMods, StuckMods, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
     SpacemouseEcho, PenRest, ViewTrace, Shot,
 };
@@ -2330,6 +2344,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"android_back", StepVerb::AndroidBack},
         {"touch_drag_at", StepVerb::TouchDragAt},
         {"touch_tap", StepVerb::TouchTap}, {"touch_tap_at", StepVerb::TouchTap}, {"touch_tap_welcome_x", StepVerb::TouchTap},
+        {"touch_hold", StepVerb::TouchHold}, {"pen_hold", StepVerb::TouchHold},
         {"click", StepVerb::Click}, {"double_click", StepVerb::Click}, {"right_click", StepVerb::Click},
         {"jump_click", StepVerb::JumpClick},
         {"tier_card", StepVerb::TierCard},
@@ -2433,6 +2448,8 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"sdl_pen_mouse", StepVerb::SdlPenMouse},
         {"pen_lost", StepVerb::PenLost},
         {"pen_stream", StepVerb::PenStream}, {"mouse_steps", StepVerb::MouseSteps},
+        {"os_mods", StepVerb::OsMods},
+        {"stuck_mods", StepVerb::StuckMods},
         {"window_focus", StepVerb::WindowFocus},
         {"mouse_leave", StepVerb::MouseLeave},
         {"wheel", StepVerb::Wheel},
@@ -2545,6 +2562,74 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return true;
         });
         wait(0.2f);
+        return true;
+    }
+    case StepVerb::TouchHold: {
+        // A finger (SDL's mouse events for it, the finger event) or the pen rests on an item without moving, then lifts.
+        if (!need(1)) return false;
+        const std::string label = w[1];
+        const bool pen = verb == "pen_hold";
+        const SDL_MouseID which = pen ? SDL_PEN_MOUSEID : SDL_TOUCH_MOUSEID;
+        const float seconds = num(2, 0.8f), dx = num(3, 0.0f);
+        auto at = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, label, which, at, pen](float t) {
+            ImVec2 to;
+            bool visible = false;
+            if (!findItem(label, to, &visible)) {
+                if (t > 3.0f) fail(line, notFound(label));
+                return t > 3.0f;
+            }
+            if (!visible) {
+                if (t > 0.5f) fail(line, "\"" + label + "\" is not visible (off screen or scrolled out of view): a finger can't reach it");
+                return t > 0.5f;
+            }
+            *at = to;
+            if (pen) { // (the pen's own events, as pen_tap sends them)
+                if (!penIn_) penProximity(true);
+                penMove(to.x, to.y);
+                penTouch(true, false);
+                penPressure(0.3f);
+                return true;
+            }
+            mouseMotion(to.x, to.y, which);
+            mouseButton(true, SDL_BUTTON_LEFT, which);
+            return true;
+        });
+        auto finger = [this, at, pen](SDL_EventType type) {
+            if (pen) return;
+            int ww = 1, wh = 1;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            SDL_Event e{};
+            e.type = type;
+            e.tfinger.touchID = App::kUiTestTouchScreen;
+            e.tfinger.fingerID = 1;
+            e.tfinger.x = at->x / float(ww);
+            e.tfinger.y = at->y / float(wh);
+            e.tfinger.pressure = type == SDL_EVENT_FINGER_UP ? 0.0f : 1.0f;
+            e.tfinger.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        };
+        run([finger] { finger(SDL_EVENT_FINGER_DOWN); });
+        wait(seconds);
+        if (dx != 0.0f) { // ... then drags sideways by DX px over 0.3 s before it lifts (a rest, then a slide)
+            steps_.push_back([this, at, which, pen, dx](float t) {
+                const float k = std::min(t / 0.3f, 1.0f);
+                if (pen) penMove(at->x + dx * k, at->y);
+                else mouseMotion(at->x + dx * k, at->y, which);
+                return t >= 0.3f;
+            });
+        }
+        steps_.push_back([this, finger, which, pen](float) {
+            if (pen) {
+                penTouch(false, false);
+                penPressure(0.0f);
+                return true;
+            }
+            mouseButton(false, SDL_BUTTON_LEFT, which);
+            finger(SDL_EVENT_FINGER_UP);
+            return true;
+        });
+        wait(0.3f);
         return true;
     }
     case StepVerb::TouchTap: {
@@ -4859,6 +4944,23 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             kdeStall_ = kdeTick_ = 0;
             driverRight_ = mode == "right_after" ? 1 : mode == "right_first" ? 2 : mode == "right_late" ? 3 : 0;
         });
+        break;
+    }
+    case StepVerb::OsMods: { // os_mods none|shift+ctrl+alt+cmd|off [events_only]
+        if (!need(1)) return false;
+        const bool frames = !(w.size() > 2 && w[2] == "events_only");
+        run([this, text = w[1], frames] {
+            app_.osModsEachFrame_ = frames;
+            if (text == "off") return void(app_.osModsOverride_ = -1);
+            const SDL_Keymod m = text == "none" ? SDL_KMOD_NONE : parseMods(text);
+            app_.osModsOverride_ = ((m & SDL_KMOD_SHIFT) ? kOsModShift : 0) | ((m & SDL_KMOD_CTRL) ? kOsModCtrl : 0) |
+                                   ((m & SDL_KMOD_ALT) ? kOsModAlt : 0) | ((m & SDL_KMOD_GUI) ? kOsModCmd : 0);
+        });
+        break;
+    }
+    case StepVerb::StuckMods: { // stuck_mods none|shift+ctrl+alt+cmd: SDL's idea of the held modifiers, set once (a key-up never came)
+        if (!need(1)) return false;
+        run([mods = w[1] == "none" ? SDL_KMOD_NONE : parseMods(w[1])] { SDL_SetModState(mods); });
         break;
     }
     case StepVerb::WindowFocus: {

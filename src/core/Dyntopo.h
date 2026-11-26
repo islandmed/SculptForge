@@ -13,7 +13,11 @@
 // Masked and hidden parts are left alone. With symmetry on, every operation is done on its mirror images at the
 // same time, so mirrored dabs make mirrored topology.
 //
-// Quads under the brush become triangles; UVs are dropped (a remeshed surface has none) and come back on undo.
+// Quads under the brush become triangles. UVs (and so a painted texture) are kept by a transfer after the dab's
+// operations: the topology runs exactly as on a Part without UVs, then every triangle a dab changed takes its
+// corners' UVs from the closest points of the surface as it was before the dab (saveUv / transferUvs), one chart
+// for the whole triangle, so a triangle never spans a seam. Where the surface grew past its charts the paint
+// stretches (Auto UV again to give it room). Undo brings back the exact UVs.
 // Meshes with subdivision levels can't be remeshed (as , delete the levels first).
 //
 // The mesh stays valid after every dab (no dead entries): elements a dab removed are filled from the end of
@@ -78,6 +82,7 @@ struct TopologyTriangleValues {
     std::vector<glm::uvec3> triangles;
     std::vector<uint32_t> facegroups, quadPartners;
     std::vector<uint8_t> hidden;
+    std::vector<glm::vec2> uvs; // 3 per slot (the corners' texture coordinates)
     size_t bytes() const;
 };
 
@@ -89,7 +94,6 @@ struct TopologyUndo {
     std::vector<uint32_t> vertexSlots, triangleSlots;
     TopologyVertexValues vertices;
     TopologyTriangleValues triangles;
-    std::vector<glm::vec2> uvs; // the whole UVs of the other state, when it had them (dynamic topology drops them)
     // Slots whose positions / colours must be worked out again from layers after applying (only when brush undo
     // entries from before the stroke's first remesh were merged in; normally every value is exact).
     std::vector<uint32_t> reevaluate;
@@ -183,6 +187,23 @@ private:
     void moveVertex(uint32_t from, uint32_t to);
     void moveTriangle(uint32_t from, uint32_t to);
     void compact();
+    // UV transfer (a no-op on a mesh without UVs): beginUvDab at a dab's start, saveUv before anything changes a triangle, transferUvs after the operations.
+    void labelCharts();
+    void beginUvDab();
+    void saveUv(uint32_t t);
+    void saveVertexUvs(uint32_t v);
+    void buildUvGrid();
+    void buildUvMask();
+    static uint64_t hashUvs(const Mesh& m);
+    bool uvFits(const glm::vec2* u) const; // a triangle with these UVs samples only texels the charts cover
+    void transferUvs();
+    struct UvHit {
+        uint32_t tri = 0, chart = 0;
+        glm::vec3 bary{0.0f};
+        bool tied = false; // another chart is about as close
+        float dist2 = 0.0f;
+    };
+    bool nearestUv(const glm::vec3& p, uint32_t chart, bool anyChart, float tie, UvHit& out) const;
     // Queries (from the triangle lists, which are always current).
     int edgeTriangles(uint32_t a, uint32_t b, uint32_t* out) const; // up to 4
     void ring(uint32_t v, std::vector<uint32_t>& out) const;
@@ -249,6 +270,38 @@ private:
     bool cut_ = false; // the current remesh's region was cut (limitRegion)
     float meshEdge_ = 0.0f; // the mesh's edge length under the brush (limitRegion)
     std::vector<uint8_t> deadV_, deadT_;
+    // The surface before this dab, for transferUvs: the triangles near the brush (3 corners each: position, UV,
+    // vertex), their chart (triangles joined along edges whose two ends have one UV on both sides), and a grid.
+    struct UvSnap {
+        std::vector<uint32_t> slot;                 // the triangle's slot
+        std::vector<glm::vec3> pos;                 // 3 per triangle
+        std::vector<glm::vec2> uv;                  // 3 per triangle
+        std::vector<glm::uvec3> ids;                // vertex ids
+        std::vector<uint32_t> chart;                // chart label (a representative triangle)
+        std::vector<uint8_t> usable;                // not degenerate
+        glm::vec3 lo{0.0f}, cell{1.0f};
+        glm::ivec3 dims{1};
+        std::vector<uint32_t> head, items;          // CSR grid: cell -> triangles
+        size_t count() const { return slot.size(); }
+    };
+    UvSnap snap_;
+    std::vector<uint32_t> uvCandidates_;
+    std::vector<int8_t> chartSign_; // per chart label: which way its UVs turn (+1 / -1)
+    std::vector<uint32_t> chartOf_; // per triangle slot: its chart (a representative triangle), while the Part has UVs
+    std::vector<uint32_t> triStamp_, triSaved_; // per slot: saved this dab (stamp) and where in snap_
+    uint32_t dabTriangles_ = 0;
+    static constexpr int kUvMask = 1024;
+    std::vector<uint8_t> uvMask_; // the texels the charts covered when the stroke began, and one round them
+    bool uvOn_ = false;
+    uint64_t uvHash_ = 0; // of the UVs and triangles the last stroke left (chartOf_ and uvMask_ describe them)
+    std::vector<uint32_t> snapStamp_, snapHead_, snapNext_; // per vertex: its corners in the snapshot (a list), valid when the stamp is this dab's
+    uint32_t dabStamp_ = 0, hitGen_ = 0;
+    struct VertexHit {
+        UvHit hit;
+        bool ok = false;
+    };
+    std::vector<uint32_t> hitStamp_; // transferUvs: a moved vertex's closest point, found once per dab
+    std::vector<VertexHit> hits_;
     std::vector<uint32_t> freeV_, freeT_;
     std::vector<uint32_t> changedV_, changedT_, regionTris_, slivers_;
     std::vector<uint32_t> mirrorTris_; // the triangles under the brush's mirror images (queryRegion)

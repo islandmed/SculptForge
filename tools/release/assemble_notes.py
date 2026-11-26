@@ -50,6 +50,13 @@ class NoteError(Exception):
     pass
 
 
+def unquote(v):
+    """v without the outer double quotes of a YAML double-quoted value, \\" and \\\\ read back; anything else as it is."""
+    if len(v) >= 2 and v[0] == v[-1] == '"' and not re.search(r'(?<!\\)"', v[1:-1].replace("\\\\", "")):
+        return v[1:-1].replace('\\"', '"').replace("\\\\", "\\")
+    return v
+
+
 def parse(path):
     """A fragment's front matter as {key: [values]}."""
     text = Path(path).read_text(encoding="utf-8")
@@ -82,6 +89,8 @@ def parse(path):
         else:
             out[key].append(body)
             item = len(out[key]) - 1
+    # A value written as a YAML double-quoted string ("...", \" inside) is its text: 0.14.1's CHANGELOG kept the quotes.
+    out = {k: [unquote(v) for v in vs] for k, vs in out.items()}
     if not any(out.get(k) for k in NOTE_KEYS):
         raise NoteError(f"{path}: empty (give at least a whats_new or a CHANGELOG line)")
     if any(v.lower() not in ("true", "false") for v in out.get("member_request", [])):
@@ -267,6 +276,13 @@ def self_test():
             "added: **Soft clay** brush.\nmember_request: true\nmember_credit: @someone\n---\n")
         assert (t / "changes/feat-req.md").read_text().count("true") == 1
         assert dict(fragments(t))[t / "changes/feat-req.md"]["member_request"] == ["true"]
+        # A YAML double-quoted value is its text (0.14.1's CHANGELOG kept the quotes); a quote inside plain text stays.
+        q = t / "changes/fix-quoted.md"
+        q.write_text('---\nfixed: "**AI tools**: answered \\"Unknown tool\\";\n  now fixed."\n'
+                     'testers:\n  - "Try it."\n  - The "Try" button.\n---\n')
+        assert parse(q) == {"fixed": ['**AI tools**: answered "Unknown tool"; now fixed.'],
+                            "testers": ["Try it.", 'The "Try" button.']}, parse(q)
+        q.unlink()
         cjk = t / "changes/fix-lang.md"  # (a language named in its own script: the app's font can't draw it)
         cjk.write_text("---\nwhats_new: **Español, 繁體中文** labels.\n---\n", encoding="utf-8")
         assert run(t, "0.2.0", "--check") == 1
