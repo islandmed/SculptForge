@@ -595,6 +595,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/BenchVideo.cpp
     src/app/BenchTake.cpp
     src/app/Tablet.cpp
+    src/app/OsModifiers.cpp
     src/app/Wintab.cpp
     src/app/SpaceMouse.cpp
     src/app/Touch.cpp

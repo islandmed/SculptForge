@@ -3559,7 +3559,10 @@ private:
     // picked again or another brush is picked.
     void registerStrokePopupActions();
     void openStrokePopup(bool held, int key);
-    void closeStrokePopup() { strokePopup_.open = false; }
+    void closeStrokePopup() {
+        strokePopup_.open = false;
+        syncModifiersFromOs(); // (a popup's key-up can be the one a native menu took)
+    }
     void pickStrokePopupItem(int item, bool close);
     bool strokePopupMouseEvent(const SDL_Event& e); // true: the popup used the event
     void strokePopupKeyUp(SDL_Keycode key);
@@ -3681,6 +3684,12 @@ private:
     // latch: a latched Mask still lets a drag beside the model turn the view.
     SDL_Keymod inputMods(bool latch = true) const;
     SDL_Keymod keyMods() const;   // the keyboard's alone (in the input style's terms)
+    // Clears the Shift / Ctrl / Alt / Cmd SDL thinks are held but the system says are up (a key-up that never reached us:
+    // OsModifiers.h). Once a frame, on focus changes and when the stroke popup closes. UI tests: `os_mods` fakes the system.
+    void syncModifiersFromOs();
+    int osModsOverride_ = -1;     // UI tests: the modifiers the "system" reports (kOsMod bits), -1 = ask the system
+                                  // (a test run never asks: its held keys are SDL_SetModState's, the real keyboard has none)
+    bool osModsEachFrame_ = true; // UI tests: false = only the event paths sync (focus, popup close)
     bool erasing() const;         // the pen's eraser end is drawing
     PenAction eraserAction() const { return uiPrefs_.tablet.eraser; }
     void firstDab(float x, float y); // the stroke's first dab, once the pen reports a real pressure

@@ -374,6 +374,11 @@
 //                            beside the pen's, a press at each touch whose release never comes; right_after / right_first: the
 //                            driver also clicks the right mouse button for a pen side button, after / before the pen's own event
 //                            (right_late: with the pen's first motion after it)
+//   os_mods none|shift+ctrl+alt+cmd|off [events_only]   the modifiers the system reports are held (pair it with stuck_mods;
+//                            off asks the system again; events_only:
+//                            only a focus change or the stroke popup closing re-syncs, not each frame (OsModifiers.h)
+//   stuck_mods none|shift+ctrl+alt+cmd   SDL's held modifiers set once, with no key-up to come (unlike `hold`, the script's
+//                            held keys, which every step applies again)
 //   window_focus 1|0         the window gains or loses keyboard focus; mouse_leave: the pointer leaves the window
 //                            (another screen); values: focus_frames (1 while focus keeps it drawing), wants_frames (1
 //                            while anything keeps the idle loop drawing: input, a job, an animation),
@@ -434,6 +439,7 @@
 //   expect_value look (0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint), shell_layout (0 classic, 1 SculptForge)
 #include "app/App.h"
 #include "app/Python.h"
+#include "app/OsModifiers.h"
 #include "ai/Http.h"
 #include "ai/GradioClient.h"
 #include "ai/ImageTo3DService.h"
@@ -2328,7 +2334,7 @@ enum class StepVerb { None,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
     Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, DumpUi, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
-    PenStream, MouseSteps, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
+    PenStream, MouseSteps, OsMods, StuckMods, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
     SpacemouseEcho, PenRest, ViewTrace, Shot,
 };
@@ -2442,6 +2448,8 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"sdl_pen_mouse", StepVerb::SdlPenMouse},
         {"pen_lost", StepVerb::PenLost},
         {"pen_stream", StepVerb::PenStream}, {"mouse_steps", StepVerb::MouseSteps},
+        {"os_mods", StepVerb::OsMods},
+        {"stuck_mods", StepVerb::StuckMods},
         {"window_focus", StepVerb::WindowFocus},
         {"mouse_leave", StepVerb::MouseLeave},
         {"wheel", StepVerb::Wheel},
@@ -4936,6 +4944,23 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             kdeStall_ = kdeTick_ = 0;
             driverRight_ = mode == "right_after" ? 1 : mode == "right_first" ? 2 : mode == "right_late" ? 3 : 0;
         });
+        break;
+    }
+    case StepVerb::OsMods: { // os_mods none|shift+ctrl+alt+cmd|off [events_only]
+        if (!need(1)) return false;
+        const bool frames = !(w.size() > 2 && w[2] == "events_only");
+        run([this, text = w[1], frames] {
+            app_.osModsEachFrame_ = frames;
+            if (text == "off") return void(app_.osModsOverride_ = -1);
+            const SDL_Keymod m = text == "none" ? SDL_KMOD_NONE : parseMods(text);
+            app_.osModsOverride_ = ((m & SDL_KMOD_SHIFT) ? kOsModShift : 0) | ((m & SDL_KMOD_CTRL) ? kOsModCtrl : 0) |
+                                   ((m & SDL_KMOD_ALT) ? kOsModAlt : 0) | ((m & SDL_KMOD_GUI) ? kOsModCmd : 0);
+        });
+        break;
+    }
+    case StepVerb::StuckMods: { // stuck_mods none|shift+ctrl+alt+cmd: SDL's idea of the held modifiers, set once (a key-up never came)
+        if (!need(1)) return false;
+        run([mods = w[1] == "none" ? SDL_KMOD_NONE : parseMods(w[1])] { SDL_SetModState(mods); });
         break;
     }
     case StepVerb::WindowFocus: {
