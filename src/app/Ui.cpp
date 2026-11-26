@@ -272,6 +272,8 @@ bool touchPressNear(const ImRect& r) { // the press (still down or just let go) 
     return r.Contains(io.MouseClickedPos[0]) && d.x * d.x + d.y * d.y <= slop * slop;
 }
 
+ImGuiID g_heldSlider = 0; // the slider SliderInside kept read-only under the press this frame
+
 bool touchArmedPress() { return g_touchPin.armed && g_touchPin.pressedAt == ImGui::GetIO().MouseClickedTime[0]; }
 
 // A finger or the pen is holding still on r: whatever is there keeps its value for now.
@@ -367,7 +369,9 @@ void touchPinItem(const std::string& entry, const char* label) {
                 } else if (ImGui::GetTime() - t.pressedAt >= kLongPress) {
                     t.armed = true;
                     ++t.armedCount;
-                    ImGui::ClearActiveID(); // the press is ours: no click on release, no slider drag
+                    // The press is ours: no click on release. A slider keeps it (read-only while the finger is still): a drag
+                    // that starts after the rest, past the slop, hands it back to the slider (the menu is dropped below).
+                    if (g_heldSlider != id) ImGui::ClearActiveID();
                     // A choice opens its list on the press: close it again.
                     const ImGuiID combo = ImHashStr("##ComboPopup", 0, id);
                     for (int i = 0; i < g.OpenPopupStack.Size; ++i)
@@ -378,6 +382,10 @@ void touchPinItem(const std::string& entry, const char* label) {
                 } else {
                     g_animating = true; // (the loop wakes for it: the finger is still, nothing else would draw)
                 }
+            }
+            if (t.armed && io.MouseDown[0] && d.x * d.x + d.y * d.y > 64.0f * s * s) { // it moved after all: a drag, not a hold
+                t.armed = false;
+                t.item = 0;
             }
             if (t.armed) {
                 const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
@@ -1150,7 +1158,10 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     if (tapped) ImGui::GetIO().MouseDown[0] = true;
     const bool changed = ImGui::SliderFloat(id, v, lo, hi, format ? tr(format) : format, flags);
     if (tapped) ImGui::GetIO().MouseDown[0] = false;
-    if (held) ImGui::PopItemFlag();
+    if (held) {
+        ImGui::PopItemFlag();
+        g_heldSlider = ImGui::GetItemID();
+    }
     if (format) { // the label inside, as drawn: wider than the slider is cut off
         char shown[128];
         ImFormatString(shown, sizeof(shown), tr(format), double(*v));

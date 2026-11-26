@@ -84,3 +84,18 @@ touch_hold "Tool/##bakesize"
 expect_value touch_pin_menu == 1
 click "Add to the bottom shelf"
 expect_value "shelf_has_control:tool.bake/Map size" == 1
+
+# A rest, then a slide (a pen lands, looks, then slides): the slider follows, no ring left, no menu (artist-qa 8d15c404).
+click "Bake##tool.bake"
+click "Draw##palette.draw"
+click "Draw/##totray"
+brush_size 60
+expect "Draw/##drawsize"
+expect_value touch_pin_menu == 0
+touch_hold "Draw/##drawsize" 0.8 60
+expect_value touch_pin_menu == 0
+expect_value draw_size > 60
+brush_size 60
+pen_hold "Draw/##drawsize" 0.8 60
+expect_value touch_pin_menu == 0
+expect_value draw_size > 60

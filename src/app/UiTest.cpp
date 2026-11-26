@@ -394,7 +394,7 @@
 //   touch_tap "label"        one finger taps an item as it is on screen (no wheel, no scrolling: a finger can't scroll a
 //                            window that doesn't drag-scroll; fails when the item is not visible)
 //   touch_tap_at X Y         the same at window fractions (0..1): a tap outside a window, on the canvas
-//   touch_hold "label" [S]   one finger rests still on an item for S seconds (0.8) and lifts: a long press (ui::TouchPin: the
+//   touch_hold "label" [S [DX]]  one finger rests still on an item for S seconds (0.8), slides DX px sideways if given, and lifts: a long press (ui::TouchPin: the
 //                            menu to add it to My Panel or a shelf opens as it lifts). pen_hold is the same with the pen
 //   touch_drag_at X0 Y0 X1 Y1  one finger lands at window fractions and swipes to the others over 0.4 s (scrolls a window)
 //   touch_tap_welcome_x      a tap on the welcome window's title-bar X
@@ -2562,7 +2562,7 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         const std::string label = w[1];
         const bool pen = verb == "pen_hold";
         const SDL_MouseID which = pen ? SDL_PEN_MOUSEID : SDL_TOUCH_MOUSEID;
-        const float seconds = num(2, 0.8f);
+        const float seconds = num(2, 0.8f), dx = num(3, 0.0f);
         auto at = std::make_shared<ImVec2>();
         steps_.push_back([this, line, label, which, at, pen](float t) {
             ImVec2 to;
@@ -2603,6 +2603,14 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         };
         run([finger] { finger(SDL_EVENT_FINGER_DOWN); });
         wait(seconds);
+        if (dx != 0.0f) { // ... then drags sideways by DX px over 0.3 s before it lifts (a rest, then a slide)
+            steps_.push_back([this, at, which, pen, dx](float t) {
+                const float k = std::min(t / 0.3f, 1.0f);
+                if (pen) penMove(at->x + dx * k, at->y);
+                else mouseMotion(at->x + dx * k, at->y, which);
+                return t >= 0.3f;
+            });
+        }
         steps_.push_back([this, finger, which, pen](float) {
             if (pen) {
                 penTouch(false, false);
