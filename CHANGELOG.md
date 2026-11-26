@@ -351,7 +351,7 @@ All notable changes to SculptForge are listed here. The format follows
 
 ### Known issues
 - Sculpting with Dynamic on a painted Part can still erase its texture; workaround: turn Dynamic off
-  on painted Parts or save first. The fix ships in the next release (0.14.1).
+  on painted Parts or save first. A fix follows in a later release.
 
 ## [0.13.13] - 2026-11-23
 
