@@ -3,7 +3,9 @@
 #include "core/QuickRemesh.h"
 
 #include <algorithm>
+#include <cmath>
 #include <glm/geometric.hpp>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -37,6 +39,40 @@ StrokeStretch strokeStretch(const Mesh& mesh, std::span<const uint32_t> moved, s
         }
     }
     return s;
+}
+
+namespace {
+template <class Next> float medianEdge(const Mesh& mesh, size_t count, Next next) {
+    const size_t nv = mesh.positions.size(), nt = mesh.triangleCount();
+    std::vector<float> lengths;
+    lengths.reserve(3 * count);
+    for (size_t i = 0; i < count; ++i) {
+        const size_t t = next(i);
+        if (t >= nt) continue;
+        const glm::uvec3 tri = mesh.triangles[t];
+        if (tri.x >= nv || tri.y >= nv || tri.z >= nv) continue;
+        for (int c = 0; c < 3; ++c) {
+            const float l = glm::distance(mesh.positions[tri[c]], mesh.positions[tri[(c + 1) % 3]]);
+            if (std::isfinite(l) && l > 0.0f) lengths.push_back(l);
+        }
+    }
+    if (lengths.empty()) return 0.0f;
+    std::nth_element(lengths.begin(), lengths.begin() + lengths.size() / 2, lengths.end());
+    return lengths[lengths.size() / 2];
+}
+} // namespace
+
+float typicalEdgeLength(const Mesh& mesh) {
+    const size_t nt = mesh.triangleCount();
+    if (nt == 0) return 0.0f;
+    constexpr size_t kSampleTriangles = 100'000;
+    const size_t stride = std::max<size_t>(1, nt / kSampleTriangles);
+    return medianEdge(mesh, (nt + stride - 1) / stride, [&](size_t i) { return i * stride; });
+}
+
+float typicalEdgeLength(const Mesh& mesh, std::span<const uint32_t> triangles) {
+    if (triangles.size() < 64) return typicalEdgeLength(mesh);
+    return medianEdge(mesh, triangles.size(), [&](size_t i) { return size_t(triangles[i]); });
 }
 
 } // namespace sf

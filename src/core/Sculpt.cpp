@@ -1,6 +1,7 @@
 // SculptForge - open source digital sculpting
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/Sculpt.h"
+#include "core/QuickRemesh.h"
 #include "core/SculptKernel.h"
 
 #include "core/AtomicRef.h"
@@ -14,6 +15,7 @@
 #include <cstdlib>
 #include <iterator>
 #include <limits>
+#include <mutex>
 #include <queue>
 #include <unordered_map>
 
@@ -145,7 +147,7 @@ bool lineRayClosest(const glm::vec3& point, const glm::vec3& dir, const glm::vec
 }
 
 void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t>& verts, ConnectedScratch& sc,
-                   std::vector<float>* surface) {
+                   std::vector<float>* surface, const glm::vec3* facingHint) {
     if (surface) surface->clear();
     if (verts.empty()) return;
     const size_t n = mesh.vertexCount();
@@ -156,14 +158,17 @@ void keepConnected(const Mesh& mesh, const glm::vec3& seed, std::vector<uint32_t
         sc.epoch = 0;
     }
     const uint32_t inside = ++sc.epoch, reached = ++sc.epoch;
-    uint32_t start = verts[0];
-    float best = std::numeric_limits<float>::max();
+    uint32_t start = verts[0], startFacing = verts[0];
+    float best = std::numeric_limits<float>::max(), bestFacing = best;
+    const bool hinted = facingHint && mesh.normals.size() == n;
     for (uint32_t v : verts) {
         sc.stamp[v] = inside;
         const glm::vec3 d = mesh.positions[v] - seed;
         const float d2 = glm::dot(d, d);
         if (d2 < best) best = d2, start = v;
+        if (hinted && d2 < bestFacing && glm::dot(mesh.normals[v], *facingHint) > 0.5f) bestFacing = d2, startFacing = v;
     }
+    if (hinted && bestFacing < std::numeric_limits<float>::max()) start = startFacing, best = bestFacing;
     // Breadth first through the edges between vertices in the region.
     std::vector<uint32_t>& q = sc.queue;
     q.clear();
@@ -609,12 +614,12 @@ void Sculptor::microBaseKernel(Mesh& mesh, BVH& bvh, BrushType type, const DabPa
             const DabParams mp = m.identity() ? p : transformed(p, m);
             const glm::vec3 contact = contactNormal(mesh, baseVerts_, c, r, contactHint(mp));
             facingVerts_ = baseVerts_;
-            keepConnected(mesh, c, facingVerts_, connected_, &surface_);
+            keepConnected(mesh, c, facingVerts_, connected_, &surface_, &contact);
             PieceStamps st{connected_.epoch, 0};
             if (facingVerts_.size() != baseVerts_.size()) { // (a fold within the brush: how far round, keepFacing's)
                 bvh.queryVertices(mesh, c, r * kDetourFlood + float(mm.rangeMax) * mm.step, wideVerts_);
                 facingVerts_ = wideVerts_;
-                keepConnected(mesh, c, facingVerts_, connected_, &surface_);
+                keepConnected(mesh, c, facingVerts_, connected_, &surface_, &contact);
                 st = markClosedPieces(mesh, wideVerts_, connected_);
             }
             poolFor(nv, [&](size_t b, size_t e) {
@@ -772,6 +777,36 @@ void Sculptor::remeshDab(Mesh& mesh, BVH& bvh, const DabParams& p, Symmetry sym,
     lastMirrors_ = ms;
     followRemesh(mesh);
     timings.remeshMs += lapMs(clock);
+}
+
+bool Sculptor::refreshTopologyDab(Mesh& mesh, BVH& bvh, const glm::vec3& center, float radius, float edgeLength, Symmetry sym) {
+    if (!active_ || !(edgeLength > 0.0f) || !(radius > 0.0f) || !dyntopoBlocker(mesh).empty()) return false;
+    auto clock = std::chrono::steady_clock::now();
+    const std::vector<SymCopy> ms = copies(sym);
+    struct RefineOnly { // (set for this dab only, whatever happens inside)
+        DynamicTopology& d;
+        explicit RefineOnly(DynamicTopology& t) : d(t) { d.refineOnly = true; }
+        ~RefineOnly() { d.refineOnly = false; }
+    } refine(dynTopo_);
+    const bool changed = dynTopo_.remesh(mesh, bvh, center, radius, edgeLength, ms);
+    lastRemesh_ = true;
+    lastCenter_ = center;
+    lastRadius_ = radius;
+    lastEdge_ = edgeLength;
+    lastMirrors_ = ms;
+    followRemesh(mesh);
+    timings.remeshMs += lapMs(clock);
+    return changed;
+}
+
+float Sculptor::refreshEdgeLength(const Mesh& mesh, const BVH& bvh, const glm::vec3& center, float radius) const {
+    if (dyntopo.enabled) return dyntopoEdgeLength(dyntopo, radius, glm::length(mesh.bounds().extent()));
+    // The smaller of the detail around the brush and the Part's: around a long tendril everything near is stretched (the
+    // Part's detail is what it should come back to); a dense face on a coarse body refreshes to the face's.
+    std::vector<uint32_t> around;
+    bvh.queryTriangles(mesh, center, 3.0f * radius, around);
+    const float local = typicalEdgeLength(mesh, around), whole = typicalEdgeLength(mesh);
+    return local > 0.0f && whole > 0.0f ? std::min(local, whole) : std::max(local, whole);
 }
 
 // After the brush: when it squashed a triangle flat (pinching or flattening a fold), the dab is remeshed
@@ -1246,6 +1281,7 @@ UndoRecord Sculptor::endStroke() {
     // A pinching recipe's per-stroke state (24 bytes a vertex: 120 MB on a 5M mesh) goes with the stroke, not with the mesh.
     std::vector<uint32_t>().swap(pinchStamp_), std::vector<glm::vec3>().swap(pinchStart_);
     std::vector<uint32_t>().swap(pinchDabStamp_), std::vector<float>().swap(pinchTaper_);
+    clayStart_ = StartStore();
     clearRecorded();
     active_ = false;
     grabVerts_.clear();
@@ -1343,6 +1379,7 @@ void Sculptor::dab(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& p, Sym
         const bool useAlpha = p.alpha && !p.alpha->empty(); // (the reach dabSingle gives the brush)
         const float reach = useAlpha ? kAlphaReach : type == BrushType::ClayBlock ? 1.3f : 1.0f;
         const float scale = type == BrushType::Smooth ? dyntopoSmoothScale(dyntopo) : 1.0f;
+        dynTopo_.dissolveNeedles = type == BrushType::Smooth;
         if (scale > 0.0f) remeshDab(mesh, bvh, p, sym, scale, reach);
         else lastRemesh_ = false; // (Smooth only: no repair pass either)
     }
@@ -1513,13 +1550,13 @@ bool Sculptor::keepFacing(const Mesh& mesh, const BVH& bvh, const DabParams& p, 
     surface_.clear();
     if (surface) {
         facingVerts_ = verts_;
-        keepConnected(mesh, p.center, facingVerts_, connected_, &surface_); // (fills connected_.dist)
+        keepConnected(mesh, p.center, facingVerts_, connected_, &surface_, &contact); // (fills connected_.dist)
         PieceStamps st{connected_.epoch, 0};
         if (facingVerts_.size() != verts_.size()) {
             brushVertices(mesh, bvh, p.center, R * kDetourFlood, wideVerts_);
             if (mesh.hasHidden()) std::erase_if(wideVerts_, [&](uint32_t v) { return mesh.vertexHidden(v); });
             facingVerts_ = wideVerts_;
-            keepConnected(mesh, p.center, facingVerts_, connected_, &surface_);
+            keepConnected(mesh, p.center, facingVerts_, connected_, &surface_, &contact);
             st = markClosedPieces(mesh, wideVerts_, connected_);
         }
         surface_.resize(verts_.size());
@@ -1609,6 +1646,14 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     const bool analyticEarly = earlyNormals_ && !adaptiveDab_ && isPlaneKernelBrush(type) && !trimSheet && !p.viewFalloff && !useAlpha && !useStencil && !facing &&
                                !dynTopo_.active() && !draft_ && mesh.normals.size() == mesh.vertexCount() &&
                                mesh.mask.size() != mesh.vertexCount() && !mesh.hasHidden();
+    // Clay weighs a vertex that lies far below its plane (more than 0.6 of the radius: the foot of a wall, at the edge of the reach) by
+    // where it stood when the stroke first reached it (pinchStart_): each dab pulls a vertex along the area normal to the plane, and
+    // where a wall leans away from that normal (the lip of a squeezed band) the pull moved it toward the dab, its falloff rose, and
+    // the next dab pulled it further, a runaway x1.5 a dab at the edge of the reach that left ribs along it. On a surface that bends
+    // away gently (a head under a big brush: up to half the radius at the edge) the weights are what they were. (The exact path
+    // only: the adaptive and the early-normals paths weigh by where a vertex is.)
+    const bool startWanted = !analyticEarly && clayStartWeights && type == BrushType::Clay && !adaptiveDab_ &&
+                             !useAlpha && !useStencil && !p.viewFalloff && !dynTopo_.active() && !draft_;
     earlyNormals_ = false;
     const size_t stride = adaptiveDab_ ? std::max<size_t>(1, verts_.size() / kAreaSamples) : 1;
 
@@ -1683,6 +1728,44 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
     plane.invert = p.invert;
     plane.viewFalloff = p.viewFalloff;
 
+    // The stroke's start positions (16 bytes a vertex) are kept from the first dab that reaches a vertex far below its plane: an
+    // ordinary stroke never allocates them.
+    bool startWeights = startWanted;
+    if (startWeights) {
+        float kk;
+        const glm::vec3 planeAt = plane.clayPlane(kk);
+        const float deepAt = kStartDeep * p.radius;
+        // The deep vertices of the dab (those the stroke has kept not counted when `all` is off), gathered in parallel.
+        const auto gather = [&](bool all) {
+            std::vector<uint32_t> found;
+            std::mutex foundLock;
+            poolFor(verts_.size(), [&](size_t b, size_t e) {
+                std::vector<uint32_t> mine;
+                for (size_t i = b; i < e; ++i) {
+                    const uint32_t v = verts_[i];
+                    if (std::abs(glm::dot(pos[v] - planeAt, areaNormal)) > deepAt && (all || !(clayStart_.bits[v >> 6] >> (v & 63) & 1u))) mine.push_back(v);
+                }
+                if (!mine.empty()) {
+                    std::lock_guard<std::mutex> lk(foundLock);
+                    found.insert(found.end(), mine.begin(), mine.end());
+                }
+            }, 65536);
+            return found;
+        };
+        const size_t kBudget = clayStartBudget;
+        std::vector<uint32_t> found = gather(clayStart_.bits.empty());
+        if (clayStart_.count + found.size() > kBudget) { // (the budget is spent: start afresh with this dab's own, or none if they alone are over it, so
+            clayStart_ = StartStore();                   // that every deep vertex of a dab is weighed alike, never a mix of kept and not)
+            found = gather(true);
+            if (found.size() > kBudget) found.clear();
+        }
+        if (!found.empty()) {
+            if (clayStart_.bits.empty()) clayStart_.bits.assign((mesh.vertexCount() + 63) / 64, 0);
+            for (const uint32_t v : found) clayStart_.insert(v, pos[v]);
+        }
+        startWeights = clayStart_.count > 0;
+    }
+
     // Inflate swells along each vertex's own normal, unless the dab reaches a groove or a packed grid (see inflateAlongNormals).
     bool inflateAlongNormals = true;
     if (type == BrushType::Inflate) {
@@ -1734,9 +1817,17 @@ void Sculptor::dabSingle(Mesh& mesh, BVH& bvh, BrushType type, const DabParams& 
                         viewDepthFade(x, p.center, p.viewDir, r);
             if (reachFade <= 0.0f) return glm::vec3(0.0f);
         }
-        const glm::vec3 o = x - p.center;
+        glm::vec3 xw = x; // (where the falloff weighs it)
+        glm::vec3 st;
+        if (startWeights && clayStart_.find(v, st)) {
+            float kk;
+            const float deep = std::abs(glm::dot(st - plane.clayPlane(kk), areaNormal)) / r;
+            const float t = std::clamp((deep - kStartDeep) * 4.0f, 0.0f, 1.0f);
+            if (t > 0.0f) xw = x + (st - x) * (t * t * (3.0f - 2.0f * t));
+        }
+        const glm::vec3 o = xw - p.center;
         float f = useAlpha ? p.alpha->stamp(glm::dot(o, right) / r, glm::dot(o, up) / r, p.focal)
-                           : brushFalloff(brushDistance(p, x), r, p.focal);
+                           : brushFalloff(brushDistance(p, xw), r, p.focal);
         if (useStencil && f > 0.0f) f *= stencil.weight(x);
         glm::vec3 d(0.0f);
 

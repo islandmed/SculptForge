@@ -41,6 +41,10 @@ if [ -z "$warm" ] && ! python3 -I tools/check_marks.py > "$out/output.txt" 2>&1;
 base=$(git merge-base origin/main HEAD 2>/dev/null || echo origin/main)
 # t0-ci.sh adds t0.yml to a branch based before it in one commit "t0-ci overlay: ...": tests come from the branch's own files.
 tip=HEAD; git log -1 --format=%s | grep -q '^t0-ci overlay' && tip=HEAD^
+# The public gallery repository must already carry a change to tools/brush-gallery/repo (tools/ci/gallery_gate.sh): seconds, before the build.
+stage=gallery
+if ! bash tools/ci/gallery_gate.sh "$base" "$tip" > "$out/output.txt" 2>&1; then failed=gallery_published; finish; fi
+cat "$out/output.txt"; : > "$out/output.txt"
 stage=configure
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF \
   -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \

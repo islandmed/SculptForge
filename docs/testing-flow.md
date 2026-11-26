@@ -61,7 +61,8 @@ stay in `~/Work/.sf/t0-ci/<worktree>/`.
 - `spawn.sh` starts agents on Sonnet (`--opus` for hard design or perf work); the model is a column of `agents.tsv`.
 - `tidy.sh --apply` closes the herdr pane of an idle agent whose branch is merged and whose REPORT.md says done.
 
-- The run (`tools/ci/t0.sh`): `check_marks`, a Ninja build, impacted.py against the merge base with `origin/main`,
+- The run (`tools/ci/t0.sh`): `check_marks`, the gallery gate (a diff touching `tools/brush-gallery/repo/` must already match the
+  public gallery repo: `tools/ci/gallery_gate.sh`), a Ninja build, impacted.py against the merge base with `origin/main`,
   the picked tests through `run.py` on the CPU (Mesa llvmpipe, `SDL_VIDEO_DRIVER=offscreen`, `SF_TEST_BUDGET=150`;
   `GITHUB_ACTIONS` gives the in-test time limits their CI slack).
 - **A full run fits**: all ~390 tests finish in about 10 minutes on a runner, as long as the warm UI servers
@@ -261,6 +262,8 @@ script's first 40 lines: it logs `XFAIL` and passes while the bug stands, and lo
 line then). A script that names a hook its fix adds (it doesn't parse yet) is XFAIL too. `# xfail` never blocks a batch,
 and it hides any failure in that script, so keep such a script to the one bug.
 
+A script that must start from saved settings puts `# prefs: {"key": value, ...}` (JSON, one line) in its first lines: it
+becomes the isolated profile's project.json before the app reads it (tests/ui/discord_options_note.sfui).
 Run one: `build/sculptforge --ui-test tests/e2e/NAME.sfui --ui-out DIR` (a failure prints `FAIL file:line: why` and
 saves `FAIL-line-N.png` in DIR: read the shot first), or `ctest -R ui_e2e_NAME` / `ctest -L e2e` in a build.
 

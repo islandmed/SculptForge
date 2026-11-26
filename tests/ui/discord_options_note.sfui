@@ -1,0 +1,15 @@
+# prefs: {"discord_presence": false, "discord_file_name_shown": true, "discord_challenge_shown": true}
+# Settings saved by 0.14.0 or earlier with "Show the file name" or "Show the monthly challenge" on (the line above
+# seeds them): Preferences > Integrations shows the one-time note that both options are gone, Got it dismisses it
+# for good, and Presence itself stays as it was saved (off here). Never a connection (PanelIntegrations.cpp).
+run ui_look look=classic layout=classic
+expect_value discord_options_note == 1
+expect_value discord_presence == 0
+click "Preferences##palette.preferences"
+click "Integrations##preferences.integrations"
+expect "Show SculptForge on Discord##prefs.discord"
+expect_text "Those two options are gone"
+shot discord-options-note
+click "Got it##prefs.discord.note"
+expect_value discord_options_note == 0
+expect_value discord_connects == 0

@@ -1,0 +1,96 @@
+# My Panel, single controls (Member Request, Hameron + ebarranco): hold Alt and drag any one checkbox, slider, choice or
+# readout from a palette into My Panel. It is the palette's own widget, cropped out of its section: live both ways, a
+# drag that starts on a slider picks it up without changing it, hidden neighbours of the crop are no items, a choice
+# opens its list from My Panel, and a control its palette hides shows as its dim name. Saved as "control:<scope>/<key>".
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar
+run new_sphere subdivisions=3
+# My Panel in the left tray (Shift+click the tray icon), the Tool palette stays in the right one.
+click "Edit##palette.edit"
+click "My Panel...##edit.mypanel"
+hold shift
+click "My Panel/##totray"
+hold none
+expect_value left_tray == 1
+expect_value mypanel_entries == 0
+# A checkbox: Alt+drag Backface culling out of Tool > Viewport Look. The drag did not tick it.
+click "Parts##tool.part"                # (closed: the sections below are then in view)
+click "Viewport Look##tool.display"
+expect "Backface culling##display"
+expect_value backface_culling == 0
+hold alt
+drag_to "Backface culling##display" "My Panel/##totray" 0 100
+hold none
+expect_value mypanel_entries == 1
+expect_value "mypanel_at@control:tool.display/Backface culling" == 0
+expect_value backface_culling == 0
+expect "My Panel/Backface culling##display"
+# Live both ways: ticked in My Panel, the view culls and the Tool palette's box is ticked too (one value).
+click "My Panel/Backface culling##display"
+expect_value backface_culling == 1
+click "Tool/Backface culling##display"
+expect_value backface_culling == 0
+# A checkbox from the middle of a row: only Mask comes; Wireframe and Groups beside it are cropped away and are no items here.
+hold alt
+drag_to "Tool/Mask##display" "My Panel/##totray" 0 100
+hold none
+expect_value mypanel_entries == 2
+expect "My Panel/Mask##display"
+expect_not "My Panel/Groups##display"
+expect_not "My Panel/Wireframe##display"
+expect_value "past_right:My Panel" == 0
+# A readout: the triangle count at the top of the Tool palette (with the Part's name: its line's start comes along).
+hold alt
+drag_to "Tool/##part.tris" "My Panel/##totray" 0 100
+hold none
+expect_value mypanel_entries == 3
+expect "My Panel/##part.tris"
+# A slider: the Draw palette's Size. Alt held, the drag picks it up and the size stays; in My Panel it works.
+click "Draw##palette.draw"
+click "Draw/##totray"
+brush_size 60
+expect "Draw/##drawsize"
+hold alt
+drag_to "Draw/##drawsize" "My Panel/##totray" 0 100
+hold none
+expect_value mypanel_entries == 4
+expect_value "mypanel_at@control:draw/Size" == 3
+expect_value draw_size == 60
+drag_item "My Panel/##drawsize" 60 0
+expect_value draw_size > 60
+click "Draw/##totray"                   # (out of the tray again: Preferences > Input then fits the tray)
+# Preferences > Input: Orbit around the pointer (a checkbox) and Rotation (a choice: its list opens from My Panel).
+click "Tool/##totray"                   # (Tool out of the tray: Preferences then starts at its top, Rotation in view)
+click "Preferences##palette.preferences"
+click "Preferences/##totray"
+click "Input##preferences.input"
+expect "Preferences/##rotation_input"
+hold alt
+drag_to "Preferences/Orbit around the pointer##input.orbit_at_pointer" "My Panel/##totray" 0 100
+hold none
+hold alt
+drag_to "Preferences/##rotation_input" "My Panel/##totray" 0 100
+hold none
+expect_value mypanel_entries == 6
+expect_value "mypanel_at@control:preferences.input/Orbit around the pointer" != -1
+expect_value "mypanel_at@control:preferences.input/Rotation" != -1
+click "My Panel/##rotation_input"
+expect "Turntable"
+click "Turntable"
+expect_value orbit_lock == 1
+shot filled
+# Reorder: Alt+drag the Size slider above Backface culling.
+hold alt
+drag_to "My Panel/##drawsize" "My Panel/Backface culling##display" 0 -6
+hold none
+expect_value "mypanel_at@control:draw/Size" == 0
+expect_value "mypanel_at@control:tool.display/Backface culling" == 1
+# Right-click removes; so does a drag out of the panel.
+right_click "My Panel/Mask##display"
+click "Remove from My Panel"
+expect_value mypanel_entries == 5
+expect_value "mypanel_at@control:tool.display/view.mask" == -1
+hold alt
+drag_item "My Panel/##part.tris" 500 300
+hold none
+expect_value mypanel_entries == 4
+expect_value "past_right:My Panel" == 0

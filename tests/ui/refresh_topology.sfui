@@ -1,0 +1,77 @@
+# Tool > Remesh: the Quick Remesh drag key (N) held and a drag ON the model refreshes only the stretched triangles under the
+# brush at the Part's detail (dynamic topology's remesher, refine only), as you drag, no dialog, one undo step per drag; on
+# the background it still remeshes the whole Part (quick_remesh.sfui).
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=4
+key f
+camera 0 0
+click "Remesh##tool.remesh"
+click "Quick Remesh##remesh.quick"
+expect_value quick_remesh == 1
+remember triangles before
+remember camera_yaw yaw0
+
+# A long Move pull stretches the surface (as in quick_remesh.sfui).
+click "Move##brush.move"
+snapshot
+stroke 0.86 0.5 0.98 0.38
+expect_value moved > 0
+expect_value voxel_remesh_running == 0
+remember triangles pulled
+expect_value undo_steps == 1
+click "Standard##brush.standard"
+
+# N held and a drag over the pulled area: the stretched triangles split, no whole-Part remesh, the view stays, one undo step.
+key_down n
+stroke 0.80 0.52 0.94 0.42
+key_up n
+expect_value refresh_dabs > 0
+expect_value refresh_active == 0
+expect_value voxel_remesh_running == 0
+expect_value camera_yaw == $yaw0
+expect_status Refreshed the topology under the brush
+expect_value triangles > $pulled
+expect_value undo_steps == 2
+expect_value open_edges == 0
+expect_mesh_valid
+action view.wireframe
+shot refresh_topology
+action view.wireframe
+key ctrl+z
+expect_value triangles == $pulled
+expect_value undo_steps == 1
+
+# Nothing stretched under the brush (the top: its mirror image, X symmetry is on, is itself): nothing changes, no undo step.
+key_down n
+stroke 0.46 0.3 0.54 0.3
+key_up n
+expect_value refresh_dabs > 0
+expect_status nothing under the brush was stretched
+expect_value triangles == $pulled
+expect_value undo_steps == 1
+
+# Keys unchanged in every input style: N stays the Quick Remesh drag key, no conflicts.
+input_style blender
+expect_shortcut geometry.quick_remesh_drag N
+expect_value shortcut_conflicts == 0
+input_style classic
+
+# A Part with subdivision levels can't be refreshed: the status bar says why, nothing is sculpted.
+run subdiv_divide
+remember triangles divided
+remember undo_steps steps
+key_down n
+stroke 0.80 0.52 0.94 0.42
+key_up n
+expect_status subdivision levels
+expect_value triangles == $divided
+expect_value undo_steps == $steps
+
+# Quick Remesh off (the Classic default): N held on the model is a plain brush stroke again.
+click "Quick Remesh##remesh.quick"
+expect_value quick_remesh == 0
+key_down n
+stroke 0.46 0.3 0.54 0.3
+key_up n
+expect_value undo_steps == $steps+1
+expect_value refresh_active == 0

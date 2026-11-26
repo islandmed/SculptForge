@@ -140,9 +140,12 @@ class Document(_core.Document):
         )
 
     def remesh(self, resolution: int | None = None, *, keep_masked: bool | None = None,
-               keep_texture: bool | None = None) -> str:
-        """Rebuild the active Part as an even, watertight surface (voxel resolution, default 256)."""
-        return _core.run(self, "remesh", **_args(resolution=resolution, keep_masked=keep_masked, keep_texture=keep_texture))
+               keep_texture: bool | None = None, keep_groups: bool | None = None) -> str:
+        """Rebuild the active Part as an even, watertight surface (voxel resolution, default 256).
+
+        keep_groups: the face groups come through (each new polygon takes the nearest original group)."""
+        return _core.run(self, "remesh", **_args(resolution=resolution, keep_masked=keep_masked, keep_texture=keep_texture,
+                                                 keep_groups=keep_groups))
 
     def decimate(self, ratio: float | None = None, *, triangles: int | None = None,
                  keep_masked: bool | None = None) -> str:

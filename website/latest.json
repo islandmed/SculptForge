@@ -1,19 +1,19 @@
 {
-  "version": "0.14.0",
+  "version": "0.14.1",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Polygon mode: pick Points, Edges or Faces, then Extrude, Inset, Bevel, Edge loops and Span",
-    "Split view shows a second live view of your scene, each with its own camera",
-    "Place curves point by point, straight or smooth, and edit their points with the Gizmo",
-    "An orientation widget in the canvas corner: click a dot to look from that side",
-    "Remesh one click away: right-click or Space for Quick Remesh, Quad Remesh and Remove Hidden"
+    "Up to four lights of your own, balanced to one light's exposure, and a Shadow strength slider",
+    "Any control on any shelf: hold Alt and drag a checkbox, slider or readout where you want it",
+    "Navigation bindings: hold a key and drag to orbit, pan or zoom, set up in one place",
+    "Primitive settings for appended Parts, and Solidify gives a flat Part thickness",
+    "Keep Face Groups through Voxel Remesh, and N-drag refreshes stretched topology under the brush"
   ],
   "support": {
     "founding": {
       "taken": 17,
       "limit": 100
     },
-    "member_requests_this_release": 8
+    "member_requests_this_release": 9
   }
 }

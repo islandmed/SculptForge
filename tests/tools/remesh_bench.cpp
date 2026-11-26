@@ -4,12 +4,15 @@
 // sf_remesh_bench: times every remesh path at the UI defaults on spheres of a given size (tests/perf,
 // docs/testing-flow.md).
 //   sf_remesh_bench [--runs N] [--tris 1000,10000,...] [--paths qr2,legacy,voxel] [--bumpy] [--shape
-//   sphere|cube|torus|horn|starter:<id>]
+//   sphere|cube|torus|horn|creased|starter:<id>]
 //                   [--target Q] [--voxel-res R] [--cancel-after MS] [--noise A] [--holes N] [--detail KIND]
 //                   [--symmetry x|y|z]
 // --noise A: every vertex moved along its normal by up to A x the bounding-box diagonal (scan or pore-like grain);
 // --holes N: N round holes punched through the surface (open boundaries, as a sculpt with deleted faces).
 // --detail KIND: a whole-surface detail_pass (pores, skin, wrinkles, scales, scars), as a finished sculpt has.
+// --no-crease-snap: Voxel Remesh without its crease pass (A/B). --keep-groups: with Keep Face Groups.
+// --shape creased: a sphere with V-creases under two voxels wide at Resolution 200 (tests/CreaseProbe.h, gh#240; --tris
+// is ignored); each voxel row is followed by a CREASE line: serration and distances along the creases.
 // --cancel-after MS: Cancel each run MS ms after it starts (from another thread, as the app's button does) and print
 // the Cancel latency (gh#226: how long the remesh takes to notice and return). One CSV row per run on stdout: path,
 // input triangles, run, total ms, the time between progress marks (stages), the output size and the Hausdorff / mean
@@ -21,6 +24,8 @@
 #include "core/QRemesh.h"
 #include "core/StarterMeshes.h"
 #include "core/Voxel.h"
+
+#include "../CreaseProbe.h"
 
 #include <algorithm>
 #include <atomic>
@@ -220,7 +225,7 @@ int main(int argc, char** argv) {
     float noise = 0.0f, adaptive = -1.0f; // (adaptive < 0: the option's default)
     std::string detail;
     int symmetry = -1;
-    bool bumpy = false;
+    bool bumpy = false, keepGroups = false;
     std::vector<long> sizes = {1000, 10000, 100000, 1000000};
     std::string paths = "qr2,legacy,voxel", shape = "sphere";
     for (int i = 1; i < argc; ++i) {
@@ -232,6 +237,8 @@ int main(int argc, char** argv) {
         else if (a == "--target" && more) target = std::atoi(argv[++i]);
         else if (a == "--voxel-res" && more) voxelRes = std::atoi(argv[++i]);
         else if (a == "--bumpy") bumpy = true;
+        else if (a == "--no-crease-snap") setVoxelCreaseSnap(false);
+        else if (a == "--keep-groups") keepGroups = true;
         else if (a == "--shape" && more) shape = argv[++i];
         else if (a == "--cancel-after" && more) cancelAfter = std::atoi(argv[++i]);
         else if (a == "--noise" && more) noise = float(std::atof(argv[++i]));
@@ -244,7 +251,7 @@ int main(int argc, char** argv) {
         else {
             std::fprintf(stderr,
                          "usage: sf_remesh_bench [--runs N] [--tris a,b,c] [--paths qr2,legacy,voxel] [--bumpy] "
-                         "[--shape sphere|cube|torus|horn|starter:<id>] [--target Q] [--voxel-res R] [--cancel-after "
+                         "[--shape sphere|cube|torus|horn|creased|starter:<id>] [--target Q] [--voxel-res R] [--cancel-after "
                          "MS] [--noise A] [--holes N] [--detail KIND] [--symmetry x|y|z]\n");
             return 2;
         }
@@ -252,10 +259,13 @@ int main(int argc, char** argv) {
     // A compact summary at the end (median, min, max per path and size), for logs that keep only the tail.
     std::vector<std::string> summary;
     std::printf("path,tris,run,total_ms,stages,out_tris,hausdorff_pct,mean_pct,poles,angle_dev,angle_p99,edge_cv,hash,max_gap_ms,seam_poles,near_seam_poles\n");
+    const bool creased = shape == "creased";
+    const crease::Fixture creases = creased ? crease::makeCreasedSphere() : crease::Fixture{};
+    if (creased) sizes = {long(creases.mesh.triangleCount())};
     for (long n : sizes) {
-        Mesh src = noise > 0.0f || holes > 0 ? roughen(sphere(size_t(n), bumpy, shape), noise, holes)
+        Mesh src = creased ? creases.mesh : noise > 0.0f || holes > 0 ? roughen(sphere(size_t(n), bumpy, shape), noise, holes)
                                              : sphere(size_t(n), bumpy, shape);
-        if (!detail.empty()) src = withDetail(src, detail);
+        if (!creased && !detail.empty()) src = withDetail(src, detail);
         if (const char* path =
                 std::getenv("SF_BENCH_SOURCE")) { // SF_BENCH_SOURCE=<file>: the input as OBJ (to open it in the app)
             if (std::FILE* fo = std::fopen(path, "w")) {
@@ -309,7 +319,7 @@ int main(int argc, char** argv) {
                 QuadQuality q;
                 bool ok;
                 if (std::string(path) == "voxel") {
-                    out = voxelRemesh(src, voxelRes, &error, mark);
+                    out = voxelRemesh(src, voxelRes, &error, mark, false, keepGroups);
                     ok = out.triangleCount() > 0;
                 } else {
                     QRemeshOptions o; // the UI defaults (App::startQRemesh with retopo_ untouched)
@@ -347,6 +357,24 @@ int main(int argc, char** argv) {
                 std::printf("%s,%zu,%d,%.1f,%s,%zu,%.4f,%.4f,%zu,%.2f,%.2f,%.3f,%016llx,%.1f,%zu,%zu\n", path, src.triangleCount(), run, total,
                             stages.c_str(), out.triangleCount(), q.hausdorff, q.meanDistance, q.poles, q.angleDeviation,
                             q.angleDeviationMax, q.edgeLengthCv, (unsigned long long)meshHash(out), maxGap, onSeam, nearSeam);
+                if (std::getenv("SF_BENCH_SELFX")) // SF_BENCH_SELFX=1: the result's self-intersections (tests/CreaseProbe.h)
+                    std::printf("SELFX %s %zu: %zu self-intersections\n", path, src.triangleCount(), crease::selfIntersections(out));
+                if (creased && std::string(path) == "voxel") {
+                    const glm::vec3 ext = src.bounds().extent();
+                    const crease::Measure cm = crease::measure(creases, out, std::max({ext.x, ext.y, ext.z}) / float(voxelRes));
+                    std::printf("CREASE res %d: serration %.3f deg, normal error %.3f deg, Hausdorff %.3f, mean %.4f, bottom gap "
+                                "%.3f voxels (%zu samples), wiggle %.3f voxels, depth cv %.3f, profile error %.3f voxels, %zu self-intersections\n",
+                                voxelRes, cm.serrationDeg, cm.normalErrDeg, cm.hausdorff, cm.mean, cm.bottomGap, cm.samples,
+                                cm.wiggleVox, cm.depthCv, cm.profileErr,
+                                crease::selfIntersections(out));
+                    if (const char* img = std::getenv("SF_CREASE_IMAGE")) { // SF_CREASE_IMAGE=<prefix>: close-ups, source and result
+                        for (size_t g : {size_t(1), size_t(4)}) {
+                            const std::string pre = std::string(img) + "-g" + std::to_string(g);
+                            crease::renderPatch(creases, src, g, 0.6f, 0.25f, (pre + "-source.ppm").c_str());
+                            crease::renderPatch(creases, out, g, 0.6f, 0.25f, (pre + "-result.ppm").c_str());
+                        }
+                    }
+                }
                 std::fflush(stdout);
                 totals.push_back(total);
                 lastQuality = q;

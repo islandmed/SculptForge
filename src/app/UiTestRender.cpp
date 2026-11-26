@@ -73,6 +73,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
     float distance = 0.0f; // 0 = frame the scene
     glm::vec3 target(0.0f);
     bool splats = false;
+    bool lights = false;
     for (size_t i = 2; i < w.size(); ++i) {
         if (w[i].rfind("mode=", 0) == 0) mode = w[i].substr(5);
         else if (w[i].rfind("min=", 0) == 0) floor = std::strtod(w[i].c_str() + 4, nullptr);
@@ -86,6 +87,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
             }
         }
         else if (w[i] == "splats=1") splats = true;
+        else if (w[i] == "lights=1") lights = true; // four added lights (Key, Fill, Rim, Fill: Material > Light > Lights)
         else {
             error = "'render_cell': unknown argument '" + w[i] + "'";
             return false;
@@ -96,7 +98,7 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         return false;
     }
     const std::string name = w[1];
-    steps_.push_back([this, line, name, mode, floor, most, size, splats, distance, target](float t) {
+    steps_.push_back([this, line, name, mode, floor, most, size, splats, lights, distance, target](float t) {
         if (t == 0.0f) return false; // a settled frame
         App& app = app_;
         const RenderSettings saved = app.renderSettings_;
@@ -105,6 +107,9 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
         s.flatShading = mode == "flat";
         s.wireframe = mode == "wire";
         s.showFaceGroups = mode == "groups";
+        if (lights)
+            s.lights = {viewLightPreset(ViewLight::Role::Key), viewLightPreset(ViewLight::Role::Fill), viewLightPreset(ViewLight::Role::Rim),
+                        viewLightPreset(ViewLight::Role::Fill)};
         s.gradientBackground = false;
         s.backgroundColor = glm::vec3(0.06f, 0.30f, 0.12f); // (unlike any shaded surface's colour)
         s.dimInactive = false;

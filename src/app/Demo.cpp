@@ -11,6 +11,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -70,6 +71,13 @@ ItemTable& items() {
 void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb, const ImGuiLastItemData*) {
     sf::ui::NoteItem(ctx, id, bb.Min, bb.Max); // the hover and focus rings (Ui.cpp)
     ImRect clip = bb;
+    // My Panel and the shelves show one control of a section by drawing the section cropped to it (PanelMyPanel.cpp
+    // drawPinnedControl, "##pinned.control." and "##pinned.measure." children): what the crop hides is not in the interface,
+    // and is no item here.
+    if (ctx && ctx->CurrentWindow && std::strstr(ctx->CurrentWindow->Name, "/##pinned.") && !ctx->CurrentWindow->ClipRect.Overlaps(bb)) {
+        items().rects.erase(id); // (a child window's name is "<parent>/<child>_<id>"; rects outlive the frame: none for it)
+        return;
+    }
     if (ctx && ctx->CurrentWindow) {
         clip = ctx->CurrentWindow->ClipRect;
         // Out of reach: past the screen, or cut off by its window where that window can't scroll to it (#105).

@@ -5,6 +5,101 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.14.1
+
+```features
+date: 2026-11-25
+tagline: Up to four lights of your own with a shadow strength, any control on any shelf, and one place for the camera's navigation bindings.
+highlight: Up to four lights of your own, balanced to one light's exposure, and a Shadow strength slider
+highlight: Any control on any shelf: hold Alt and drag a checkbox, slider or readout where you want it
+highlight: Navigation bindings: hold a key and drag to orbit, pan or zoom, set up in one place
+highlight: Primitive settings for appended Parts, and Solidify gives a flat Part thickness
+highlight: Keep Face Groups through Voxel Remesh, and N-drag refreshes stretched topology under the brush
+highlight: UI scale from 70% to 300%, remembered per monitor
+highlight: One-click update on macOS
+highlight: Any control in My Panel (requested by a member)
+highlight: Hold any key and drag to orbit, pan or zoom (requested by a member)
+highlight: Blockout primitives with live settings, and Solidify
+highlight: Face groups survive Voxel Remesh; N-drag refreshes stretched topology (requested by a member)
+highlight: Up to four lights of your own, and deeper shadows (requested by a member)
+highlight: Any option on a shelf (requested by a member)
+highlight: UI scale down to 70% for high-resolution screens (requested by a member)
+title: Lights of your own
+line: Render > Materials > Light > Lights adds up to four lights on top of the environment; together they keep one light's exposure, and Shadow strength sets how dark the cast shadows are.
+action: guide:pbr-painting.md
+title: Any control on any shelf
+line: Hold Alt and drag a checkbox, slider, choice or readout from a palette onto a shelf or My Panel; it works there just as it does in its palette.
+action: guide:interface.md
+title: Navigation bindings
+line: Edit > Preferences > Navigation: hold a key and drag to orbit, pan or zoom, set drag gestures and the pen's Zoom view, with a warning for every clash.
+action: guide:navigation.md
+```
+
+- **Lights** (**Render > Materials > Light > Lights**): up to four directional lights on top of the environment, balanced so
+  together they add one light's worth of exposure; **Shadow strength** sets how dark cast shadows are.
+- **Shelves and My Panel**: any single control can go on any shelf or on My Panel; a floating My Panel keeps its size.
+- **Navigation bindings** (**Edit > Preferences > Navigation**): hold-to-orbit, pan and zoom keys, drag gestures and the
+  pen's Zoom view in one place; the status bar shows the held key.
+- **Parts**: **Primitive settings** for a Part from Append, and **Solidify** (**Tool > Parts > Extract**) gives a flat,
+  single-sided Part thickness. **Tool > Cloth** gathers the Cloth brush and Drape settings in one section.
+- **Remesh**: **Keep Face Groups** carries face groups through Voxel Remesh; with Quick Remesh on, hold <kbd>N</kbd> and
+  drag to refresh stretched topology under the brush. Narrow creases come out cleaner (#240).
+- **View**: **UI scale** from 70% to 300%, a **Floor grid at Y=0**, <kbd>Alt</kbd>+middle click centres the view on the
+  pointer, and Duplicate numbers the copies.
+- **Fixes**: Android on some Mali phones and tablets draws large models and Micro levels; Dynamic + Smooth no longer
+  leaves a hair-thin strand (#238); Clay keeps a slot's lip clean; Stencil strokes outside the image work; Trim
+  Intensity scales all the way down; typing 1 in the Intensity pop-up means 1%, and a decimal comma works; layered
+  Parts no longer flicker against the body.
+- "**Tool > Cloth**: the Cloth brush settings and Drape together in one place; **Cloth settings...** under the Cloth
+  brush and under Drape opens it. **Wind for Drape**: speed, heading, lift and gusts, live while it runs." *Requested
+  by a member*
+- **Show SculptForge on Discord** (Edit > Preferences > Integrations) now shows one word for what you're doing,
+  **Sculpting**, **Painting** or **Idle**, and nothing from your scene: the file name and monthly challenge options
+  are gone.
+- **One-click update on macOS**: the update banner's **Update** button now works for the Mac app too. It downloads the
+  new release, checks it, and **Restart now** swaps it into place; the old version is kept until the new one has
+  started.
+- **My Panel takes single controls**: hold <kbd>Alt</kbd> and drag any slider, checkbox, choice or readout (**Backface
+  culling**, the brush **Size**, the triangle count, **Edit > Preferences > Input** options) from any palette into
+  **Edit > My Panel**, next to the buttons and sections it already holds. Reorder and remove them the same way; saved
+  with the layout; in both setups. *Requested by a member*
+- **Blockout primitives with settings** (Tool > Parts > Append): Cylinder, Cone, Torus, Capsule and the new Pipe come
+  with Segments, Rings, Cap rings, Quad caps, Radius and Height sliders that stay editable until you sculpt; a
+  **Low-poly** switch in the Append menu gives the clean quad cages Polygon mode starts from.
+- **Solidify** (Tool > Parts > Extract): gives a flat, single-sided Part real thickness in place, both sides joined by
+  a rim of quads.
+- **Keep Face Groups** (Tool > Remesh, under Voxel Remesh): the new surface keeps your face groups with hard borders.
+  **Refresh the topology under the brush**: hold <kbd>N</kbd> and drag over stretched triangles to even them out at
+  the Part's detail, no dialog, one undo step (on the background <kbd>N</kbd> still remeshes the whole Part).
+  Requested by members. *Requested by a member*
+- **Shelves for every option**: hold <kbd>Alt</kbd> and drag any checkbox, slider, choice, readout or button from any
+  palette (**Backface culling**, the brush **Size**, **Edit > Preferences > Input > Orbit around the pointer**,
+  **Subdivide**) onto any of the four shelves around the canvas, no Customize mode needed; a line shows where it
+  lands. It stays the palette's own control, live. Rearrange with Customize Shelves as before, right-click to remove,
+  saved with the layout, in both setups. *Requested by a member*
+- **UI scale** (**Edit > Preferences > Interface**) now goes down to **70%** for 4K and 5K screens: a slider from 70%
+  to 300%, text built sharp at every size, and the size remembered per monitor. *Requested by a member*
+- **Floor grid at Y=0** (**View > Display**, next to Floor grid): keep the grid at the world's height zero instead of
+  under the model. *Requested by a member*
+- **Centre view on the pointer**: <kbd>Alt</kbd>+middle click on the canvas slides the point under the pointer to the
+  middle of the view, zoom and angle unchanged; the view then turns about it. Can take a key (Controls window,
+  <kbd>F1</kbd>). *Requested by a member*
+- **Numbered duplicates**: **Duplicate** names copies `Head.01`, `Head.02`, ... (a copy of a copy counts on), no more
+  `copy copy`. *Requested by a member*
+- **Clay** builds a smooth slab along the lip of a squeezed band or a deep fold: passes no longer leave ribs at the
+  edge of the brush.
+- **Smooth with Dynamic on** now melts away a hair-thin strand (a Tendril pulled long and thin) instead of leaving a
+  line of triangles standing out of the surface.
+- **AI agents (MCP)**: a checkpoint restore now notices more cases where the checkpoint can't be reached exactly (the
+  start of a history the undo budget has trimmed, selection sets, paint layers, UV seams, splat edits) and leaves your
+  scene as it was.
+- **Stencil**: a stroke past the image's edge now sculpts and paints as if there were no Stencil; **Outside the image:
+  Block** keeps the old behaviour.
+- **Voxel Remesh** keeps creases and hard edges 1.5-3 voxels wide cleaner; finer creases need a higher Resolution, and
+  Remesh now tells you which.
+- **Layered Parts at rest**: a garment, Shell, Drape result or Duplicate lying close over or under the body no longer
+  flickers or shows through in patches when the view stands still.
+
 ## Version 0.14.0
 
 ```features

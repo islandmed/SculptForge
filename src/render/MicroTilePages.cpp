@@ -24,9 +24,10 @@ constexpr uint32_t kChunkTexels = 1u << 26;                       // (MicroRende
 MicroTilePages::~MicroTilePages() { release(); }
 
 void MicroTilePages::release() {
-    for (GLuint* b : {&pool_, &slope_, &table_})
+    table_.release();
+    for (GLuint* b : {&pool_, &slope_})
         if (*b) gl::DeleteBuffers(1, b), *b = 0;
-    for (GLuint* t : {&poolTex_, &slopeTex_, &tableTex_})
+    for (GLuint* t : {&poolTex_, &slopeTex_})
         if (*t) gl::DeleteTextures(1, t), *t = 0;
     capacity_ = 0;
     page_.clear(), owner_.clear(), lastUse_.clear(), free_.clear(), drawn_.clear();
@@ -35,7 +36,7 @@ void MicroTilePages::release() {
     level_ = -1;
 }
 
-void MicroTilePages::setup(uint32_t slots, int pageLevel) {
+void MicroTilePages::setup(uint32_t slots, int pageLevel, bool wide) {
     release();
     level_ = pageLevel;
     m_ = 1u << pageLevel;
@@ -43,14 +44,7 @@ void MicroTilePages::setup(uint32_t slots, int pageLevel) {
     slots_ = slots;
     page_.assign(slots, 0);
     if (const char* e = std::getenv("SF_MICRO_TILE_PAGES"); e && *e) budgetPages = uint32_t(std::max(1L, std::atol(e)));
-    gl::GenBuffers(1, &table_);
-    gl::GenTextures(1, &tableTex_);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, table_);
-    gl::BufferData(GL_TEXTURE_BUFFER, GLsizeiptr(size_t(slots) * 4), page_.data(), GL_DYNAMIC_DRAW);
-    gl::BindTexture(GL_TEXTURE_BUFFER, tableTex_);
-    gl::TexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, table_);
-    gl::BindBuffer(GL_TEXTURE_BUFFER, 0);
-    gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+    table_.create(TexelStore::Format::R32UI, slots, page_.data(), wide, GL_DYNAMIC_DRAW);
     bytes_ = size_t(slots) * 4;
 }
 
@@ -206,7 +200,8 @@ void MicroTilePages::sync(const Mesh& mesh, MicroRenderer& r, const std::vector<
         lastFilled = fill.size();
     }
     if (tableLo_ < tableHi_) {
-        r.upload_.write(table_, size_t(tableLo_) * 4, page_.data() + tableLo_, size_t(tableHi_ - tableLo_) * 4);
+        if (table_.wide()) table_.writeWide(tableLo_, tableHi_ - tableLo_, page_.data() + tableLo_);
+        else r.upload_.write(table_.buffer(), size_t(tableLo_) * 4, page_.data() + tableLo_, size_t(tableHi_ - tableLo_) * 4);
         tableLo_ = ~0u, tableHi_ = 0;
     }
     lastFillMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
@@ -232,7 +227,7 @@ void MicroTilePages::bind(GLuint program, const std::vector<uint8_t>& visible, c
     gl::Uniform1i(u_.samples, int(samples_));
     if (!on) return;
     gl::ActiveTexture(kUnitTilePages);
-    gl::BindTexture(GL_TEXTURE_BUFFER, tableTex_);
+    table_.bind();
     gl::ActiveTexture(kUnitTilePool);
     gl::BindTexture(GL_TEXTURE_BUFFER, poolTex_);
     gl::ActiveTexture(kUnitTileSlope);
@@ -243,6 +238,7 @@ void MicroTilePages::unbind() {
     for (GLenum unit : {kUnitTilePages, kUnitTilePool, kUnitTileSlope}) {
         gl::ActiveTexture(unit);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
+        gl::BindTexture(GL_TEXTURE_2D, 0);
     }
 }
 

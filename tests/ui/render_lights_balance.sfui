@@ -1,0 +1,56 @@
+# Added lights share one light's worth of exposure (viewLightsBalance): with one light nothing changes, with more the
+# colours are scaled so their luminance-weighted intensities sum to the strongest light's own intensity (at least 1),
+# so four lights at their presets stay balanced instead of washing the model out.
+run ui_look look=classic layout=classic
+run new_head
+camera 25 5
+key f
+run lights remove=all
+expect_value lights_balance == 1
+run view_shadows ao=on shadows=on lit_sphere=true shadow_strength=1
+wait 0.3
+shot no-lights
+
+run lights add=key
+expect_value light_count == 1
+expect_value lights_balance == 1
+wait 0.3
+shot one-light
+# The one-light look sets the range: its mean luminance over the head, its highlights (99.5th percentile) and how much clips.
+remember view_mean_luma one_mean
+remember view_max_luma one_max
+remember view_clipped_share one_clipped
+
+run lights add=fill
+expect_value light_count == 2
+expect_value lights_balance < 1
+expect_value lights_balance > 0.6
+wait 0.3
+shot two-lights
+
+# Key + Fill + Rim (the first setup anyone tries) stays within the one-light look: not brighter overall, no new clipping.
+run lights add=rim
+expect_value light_count == 3
+wait 0.3
+shot three-lights
+expect_value view_mean_luma < $one_mean*1.2
+expect_value view_mean_luma > $one_mean*0.7
+expect_value view_max_luma < $one_max+12
+expect_value view_clipped_share < $one_clipped+1
+
+run lights add=fill
+expect_value light_count == 4
+expect_value lights_balance < 0.5
+wait 0.3
+shot four-lights
+expect_value view_mean_luma < $one_mean*1.2
+expect_value view_clipped_share < $one_clipped+1
+
+# A single bright light keeps what its slider says; two bright ones share the brightest one's level.
+run lights remove=all
+run lights add=key intensity=1.5
+expect_value lights_balance == 1
+run lights add=rim intensity=1.5
+expect_value lights_balance < 0.6
+run lights remove=all
+run view_shadows ao=auto shadows=auto lit_sphere=false shadow_strength=1

@@ -1,0 +1,83 @@
+# Added lights (Material > Light > Lights, the `lights` command): up to four Key / Fill / Rim lights on top of the
+# material's light or the PBR environment, each with a direction, colour, intensity and a Shadows tick (one light
+# casts the view's shadows); and the Shadow strength slider of Shadows & AO (1 = the shipped darkness, 2 = black).
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_head
+camera 25 5
+key f
+run lights remove=all
+expect_value light_count == 0
+run view_shadows ao=on shadows=on lit_sphere=true shadow_strength=1
+expect_value shadow_strength == 1
+wait 0.3
+shot lit-sphere-no-lights
+
+# A key light: warm, upper left, it takes the shadows.
+run lights add=key
+expect_status "Lights: 1 Key (-35, 30) x1.00 shadows"
+expect_value light_count == 1
+expect_value shadow_light_count == 1
+wait 0.3
+shot lit-sphere-key
+
+# Fill and rim on top; the rim comes from behind (yaw past 90).
+run lights add=fill
+run lights add=rim
+expect_value light_count == 3
+expect_value added_light_yaw == 145
+expect_value shadow_light_count == 1
+wait 0.3
+shot lit-sphere-key-fill-rim
+
+# Setting one light: colour (hex, a name or r,g,b), intensity, direction; the last one when none is named.
+run lights light=1 color=ff8040 intensity=1.5
+expect_status "1 Key (-35, 30) x1.50 shadows"
+run lights yaw=90 pitch=10
+expect_value added_light_yaw == 90
+run lights light=2 shadows=true
+expect_status "2 Fill (55, -5) x0.40 shadows"
+expect_value shadow_light_count == 1
+wait 0.3
+shot lit-sphere-fill-shadows
+
+# Four at most.
+run lights add=key
+expect_value light_count == 4
+run_fails lights add=key
+run lights remove=4
+expect_value light_count == 3
+
+# The PBR view: the same lights on the environment, then Shadow strength.
+run viewport_shading mode=pbr
+wait_value environment_pending == 0
+wait 0.3
+shot pbr-three-lights
+run view_shadows shadow_strength=2
+expect_value shadow_strength == 2
+wait 0.3
+shot pbr-shadow-strength-black
+run view_shadows shadow_strength=0.5
+wait 0.3
+shot pbr-shadow-strength-half
+run view_shadows shadow_strength=1
+
+# The controls: Material > Light > Lights, and the Add buttons.
+click "Material##palette.material"
+wait 0.2
+shot material-lights
+click "Rim light##lights.add_rim"
+expect_value light_count == 4
+wait 0.2
+shot material-four-lights
+key escape
+
+# Errors and the empty state.
+run lights remove=all
+expect_status "Lights: none added"
+expect_value light_count == 0
+run_fails lights remove=1
+run_fails lights add=spot
+run_fails lights yaw=10
+run_fails lights add=key color=notacolour
+run lights remove=all
+run view_shadows ao=auto shadows=auto lit_sphere=false shadow_strength=1

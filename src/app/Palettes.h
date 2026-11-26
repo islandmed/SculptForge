@@ -13,6 +13,11 @@ class App;
 
 namespace sf::tray {
 
+// Items skipped AND an empty clip rect (nothing drawn, not even straight onto the draw list) while a scope body runs for one My
+// Panel or shelf entry (App::drawMyPanelScope); scopeSkip(false) lets the wanted section through; scopeSkipEnd() at the end.
+void scopeSkip(bool skip);
+void scopeSkipEnd();
+
 // The content of an open sub-palette, indented to line up with its header title. Scoped: construct it right after
 // subpalette() returns true; it unindents and leaves a little room before the next header when it goes.
 struct Section {

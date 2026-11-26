@@ -35,6 +35,8 @@ MESH_SETS = [[], ["PAINT"], ["PRIM"], ["FLAT"], ["GHOST"], ["PBR"], ["PAINT", "P
              ["TEXTURED", "FLAT"], ["TEXTURED", "PBR"], ["TEXTURED", "NORMALMAP"], ["TEXTURED", "NORMALMAP", "PAINT", "PBR"],
              ["TEXTURED", "NORMALMAP", "PAINT", "PBR", "FLAT"], ["TEXTURED", "PAINT", "FLAT"]]
 MICRO_SETS = [["MICRO"], ["MICRO", "FOCUS"], ["MICRO", "TILES"], ["MICRO", "PBR"], ["MICRO", "FLAT"]]
+# (WIDE: a base mesh past a small GPU's buffer-texture limit, the per-slot tables are 2D textures: render/TexelStore.h)
+MICRO_SETS += [[*s, "WIDE"] for s in MICRO_SETS]
 
 # every program: name -> (file, [(stage, constant or constant + constant)...], defines)
 # stage is vert, frag or geom; "A+B" is the text of A followed by B.

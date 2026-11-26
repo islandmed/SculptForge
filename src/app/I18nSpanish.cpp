@@ -566,6 +566,32 @@ constexpr Entry kSpanish[] = {
     {"Double", "Doble"},
     {"Thickness %.3f", "Grosor %.3f"},
     {"Both Sides", "Ambos lados"},
+    {"Axis", "Eje"},
+    {"The shape's axis: up (Y), or along X or Z", "El eje de la forma: hacia arriba (Y), o a lo largo de X o Z"},
+    {"Low-poly (Polygon mode)", "Low-poly (modo Polígonos)"},
+    {"New primitives come as a low-poly cage (12 segments, 1 ring, a 1-cell cube) for Polygon mode; off: the dense sculpting mesh. The settings stay editable below the list until you sculpt.", "Los nuevos primitivos vienen como una jaula low-poly (12 segmentos, 1 anillo, un cubo de 1 celda) para el modo Polígonos; desactivado: la malla densa para esculpir. Los ajustes siguen editables bajo la lista hasta que esculpes."},
+    {"Primitive", "Primitivo"},
+    {"This Part is still the primitive Append made: change its segments, rings, caps, radius or height here and it is built again (one undo step each). Sculpting, remeshing or editing its faces turns it into an ordinary mesh and the settings go; undo brings them back. Moving it whole with the Gizmo keeps them.", "Esta pieza sigue siendo el primitivo que creó Añadir: cambia aquí sus segmentos, anillos, tapas, radio o altura y se construye de nuevo (un paso de deshacer cada vez). Esculpir, remallar o editar sus caras la convierte en una malla normal y los ajustes desaparecen; deshacer los devuelve. Moverla entera con el Gizmo los conserva."},
+    {"Dense", "Densa"},
+    {"The low-poly cage for Polygon mode", "La jaula low-poly para el modo Polígonos"},
+    {"The dense mesh for sculpting", "La malla densa para esculpir"},
+    {"Segments %d", "Segmentos %d"},
+    {"Cells %d", "Celdas %d"},
+    {"Subdivisions %d", "Subdivisiones %d"},
+    {"Rings %d", "Anillos %d"},
+    {"Cap rings %d", "Anillos de tapa %d"},
+    {"0: open ends; 1: a fan; more: rings of quads, then a fan", "0: extremos abiertos; 1: un abanico; más: anillos de quads y luego un abanico"},
+    {"Quad caps", "Tapas de quads"},
+    {"Caps as an all-quad grid with no pole (segments become a multiple of 4)", "Tapas como una rejilla solo de quads sin polo (los segmentos pasan a ser múltiplo de 4)"},
+    {"Radius %.2f", "Radio %.2f"},
+    {"Top radius %.2f", "Radio superior %.2f"},
+    {"Tube radius %.2f", "Radio del tubo %.2f"},
+    {"Inner radius %.2f", "Radio interior %.2f"},
+    {"Solidify", "Solidificar"},
+    {"Centred", "Centrado"},
+    {"Give a flat, single-sided Part thickness in place: a back pushed along the normals by Thickness, joined by a rim of quads along every open edge, one closed mesh. For a Plane, or an Extract made with Thickness 0.", "Da grosor en el sitio a una pieza plana de una sola cara: un reverso desplazado a lo largo de las normales según el Grosor, unido por un borde de quads en cada arista abierta, una sola malla cerrada. Para un Plano, o una extracción hecha con Grosor 0."},
+    {"Solidify centres the thickness on the surface, half in front and half behind, instead of all behind it.", "Solidificar centra el grosor en la superficie, mitad delante y mitad detrás, en vez de todo detrás."},
+    {"Thickness Solidify adds, as a fraction of the Part's size (0.03 is 3%). Positive grows behind the surface, negative in front of it.", "Grosor que añade Solidificar, como fracción del tamaño de la pieza (0.03 es el 3%). Positivo crece detrás de la superficie, negativo delante."},
     {"Project Detail", "Project Detail"},
     {"Dist", "Dist"},
 
@@ -603,6 +629,7 @@ constexpr Entry kSpanish[] = {
     {"Level", "Nivel"},
     {"Decimate", "Diezmar"},
     {"Keep", "Conservar"},
+    {"Keep Face Groups", "Mantener grupos de caras"},
     {"Keep Masked", "Conservar máscara"},
     {"Follow Face Groups", "Seguir grupos de caras"},
     {"Keep Original", "Conservar original"},
@@ -901,6 +928,30 @@ constexpr Entry kSpanish[] = {
     {"press a key", "pulsa una tecla"},
     {"Default shortcuts", "Atajos predeterminados"},
 
+    // --- Preferences > Navigation (NavBindings.h, Config.cpp drawNavigationSection) ---
+    {"%s and %s both use %s: %s wins. Change one of them.", "%s y %s usan %s: gana %s. Cambia uno de los dos."},
+    {"Hold to orbit", "Mantener para orbitar"},
+    {"Hold to pan", "Mantener para desplazar"},
+    {"Hold to zoom", "Mantener para hacer zoom"},
+    {"No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, to turn the view: it never sculpts while the key is down. Preferences > Navigation sets it beside the other camera keys.", "Sin tecla por defecto. Mantén la tecla que asignes aquí y arrastra en cualquier parte del lienzo, con cualquier botón del ratón o el lápiz, para girar la vista: nunca esculpe mientras la tecla está pulsada. Preferencias > Navegación la ajusta junto a las demás teclas de cámara."},
+    {"No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, to pan the view: it never sculpts while the key is down. Preferences > Navigation sets it beside the other camera keys.", "Sin tecla por defecto. Mantén la tecla que asignes aquí y arrastra en cualquier parte del lienzo, con cualquier botón del ratón o el lápiz, para desplazar la vista: nunca esculpe mientras la tecla está pulsada. Preferencias > Navegación la ajusta junto a las demás teclas de cámara."},
+    {"No key by default. Hold the key you bind here and drag anywhere on the canvas, with any mouse button or the pen, to zoom: drag up to come closer, down to back away (the Classic sculpting keys the other way round). Preferences > Navigation sets it beside the other camera keys.", "Sin tecla por defecto. Mantén la tecla que asignes aquí y arrastra en cualquier parte del lienzo, con cualquier botón del ratón o el lápiz, para hacer zoom: arrastra hacia arriba para acercarte y hacia abajo para alejarte (al revés con las teclas clásicas de escultura). Preferencias > Navegación la ajusta junto a las demás teclas de cámara."},
+    {"Hold a key and drag with any button or the pen, or drag with a mouse button and Ctrl, Shift or Alt. Nothing is set until you choose it: the key style's own gestures stay.", "Mantén una tecla y arrastra con cualquier botón o el lápiz, o arrastra con un botón del ratón y Ctrl, Mayús o Alt. Nada queda fijado hasta que lo elijas: los gestos propios del estilo de teclas se mantienen."},
+    {"Hold key", "Tecla mantenida"},
+    {"Drag gesture", "Gesto de arrastre"},
+    {"The mouse button that drags this camera move, with the keys beside it held: Left needs Ctrl, Shift or Alt (a plain left drag sculpts). None: the key style's own gestures. A gesture set here comes first, before what the key style does with that button; the warning under the list says what it takes over.", "El botón del ratón que arrastra este movimiento de cámara, con las teclas de al lado pulsadas: Izquierdo necesita Ctrl, Mayús o Alt (un arrastre izquierdo sin más esculpe). Ninguno: los gestos propios del estilo de teclas. Un gesto fijado aquí va primero, antes de lo que el estilo de teclas hace con ese botón; el aviso bajo la lista dice qué sustituye."},
+    {"Hold this key with the button for the gesture. Orange: part of the gesture.", "Mantén esta tecla con el botón para el gesto. Naranja: forma parte del gesto."},
+    {"Also bound to:", "También asignado a:"},
+    {"View keys", "Teclas de vista"},
+    {"Pen buttons", "Botones del lápiz"},
+    {"Navigation defaults", "Navegación por defecto"},
+    {"The hold keys unbound, no drag gestures, the view keys above back to the key style's defaults, and the pen's side buttons as the Tablet defaults. Other shortcuts stay as they are.", "Las teclas mantenidas sin asignar, sin gestos de arrastre, las teclas de vista de arriba a los valores del estilo de teclas y los botones laterales del lápiz como en Tableta por defecto. Los demás atajos quedan como están."},
+    {"a plain left drag sculpts: add Ctrl, Shift or Alt", "un arrastre izquierdo sin más esculpe: añade Ctrl, Mayús o Alt"},
+    {"is also", "también es"},
+    {"takes over", "sustituye a"},
+    {"Orbit", "Orbitar"},
+    {"Pan", "Desplazar"},
+    {"Middle", "Central"},
     // --- Preferences > Display, Library, Tablet, Performance, Updates, Autosave ---
     {"Show at startup", "Mostrar al iniciar"},
     {"Show startup splash", "Mostrar pantalla de inicio"},
@@ -1349,10 +1400,31 @@ constexpr Entry kSpanish[] = {
     {"Clone Spacing", "Espaciado del clon"},
     {"Clone follows stroke", "El clon sigue el trazo"},
     {"Drape", "Drapeado"},
+    {"Cloth in one place: how the Cloth brush behaves while you sculpt, and dropping a whole Part as fabric.", "Tela en un solo lugar: cómo se comporta el pincel Cloth al esculpir, y cómo dejar caer una Part entera como tela."},
+    {"Cloth brush", "Pincel Cloth"},
+    {"Fabric, gravity and folds for the brush on the shelf: drag, push or settle cloth by hand.", "Tejido, gravedad y pliegues del pincel de la barra: arrastra, empuja o asienta la tela a mano."},
+    {"Drape a Part", "Drapear una Part"},
+    {"Lets the active Part fall as cloth until it rests on the other Parts (a shirt on a body).", "Deja caer la Part activa como tela hasta que descanse sobre las otras Parts (una camisa sobre un cuerpo)."},
+    {"Cloth settings...", "Ajustes de tela..."},
+    {"Opens Tool > Cloth: the Cloth brush settings and Drape together in one place.", "Abre Herramienta > Tela: los ajustes del pincel Cloth y el drapeado juntos."},
     {"Drops the active Part as cloth under gravity until it rests on the other Parts. It shows live; at rest the result is kept as one undo step.", "Deja caer la Part activa como una tela por gravedad hasta que reposa sobre las otras Parts. Se ve en directo; al reposar, el resultado se guarda como un solo paso de deshacer."},
     {"How big the sculpt is in real life: 1 when it is modelled at real size (a SculptForge unit is a metre). A body 2 units tall that should be a 1.8 m person: 1.11. Cloth drapes by real size. The value was guessed from the size of the scene (centimetres above 20 units, millimetres above 600); move it to set it yourself.", "Qué tamaño tiene la escultura en la vida real: 1 si está modelada a tamaño real (una unidad de SculptForge es un metro). Un cuerpo de 2 unidades que debe ser una persona de 1,8 m: 1,11. La tela cae según el tamaño real. El valor se estimó por el tamaño de la escena (centímetros por encima de 20 unidades, milímetros por encima de 600); muévelo para fijarlo tú."},
     {"How the cloth hangs: Silk flows into many fine folds, Cotton medium ones, Denim holds broad folds, Leather barely folds.", "Cómo cae la tela: la seda fluye en muchos pliegues finos, el algodón en medianos, la mezclilla mantiene pliegues anchos y el cuero apenas se pliega."},
     {"Masked areas hold still, like pins (a waistband, a collar).", "Las zonas enmascaradas se quedan quietas, como alfileres (una cintura, un cuello)."},
+    {"From view", "Desde la vista"},
+    {"Gusts", "Ráfagas"},
+    {"Gusts %.0f%%", "Ráfagas %.0f%%"},
+    {"How hard the air blows on the cloth, in metres per second: 0 none, 3 a breeze, 8 makes flags fly, 15 is hard to walk in. It pushes on the cloth's face and skims along it. Change it while the simulation runs, too.", "Con qué fuerza sopla el aire sobre la tela, en metros por segundo: 0 nada, 3 una brisa, 8 hace ondear banderas, 15 cuesta caminar. Empuja la cara de la tela y se desliza a lo largo de ella. Cámbialo también mientras se ejecuta la simulación."},
+    {"How much the wind varies from place to place and moment to moment: the cloth ripples and flaps and never quite settles, so press Keep at the frame you like (it stops by itself after a minute).", "Cuánto varía el viento de un lugar a otro y de un momento a otro: la tela ondula y aletea y nunca se asienta del todo, así que pulsa Conservar en el fotograma que te guste (se detiene solo después de un minuto)."},
+    {"Lift", "Elevación"},
+    {"Lift %.0f deg", "Elevación %.0f deg"},
+    {"Points the wind away from you: it blows from the camera toward the model (heading and lift).", "Apunta el viento lejos de ti: sopla desde la cámara hacia el modelo (rumbo y elevación)."},
+    {"Tilts the wind up from level (a skirt lifts) or down, in degrees.", "Inclina el viento hacia arriba desde el nivel horizontal (una falda se levanta) o hacia abajo, en grados."},
+    {"Toward", "Hacia"},
+    {"Toward %.0f deg", "Hacia %.0f deg"},
+    {"Where the wind blows toward, as a heading: 0 is away from the front view, 90 to the right, 180 toward it.", "Hacia dónde sopla el viento, como rumbo: 0 se aleja de la vista frontal, 90 a la derecha, 180 hacia ella."},
+    {"Wind", "Viento"},
+    {"Wind %.1f m/s", "Viento %.1f m/s"},
     {"Pins from mask", "Alfileres desde la máscara"},
     {"Resume", "Reanudar"},
     {"Simulate", "Simular"},
@@ -1640,9 +1712,8 @@ constexpr Entry kSpanish[] = {
      "Carga un archivo de diseño y atajos que alguien compartió (o que guardaste con Exportar interfaz)."},
     {"Save the layout, shortcuts and interface preferences to a file you can share.",
      "Guarda el diseño, los atajos y las preferencias de la interfaz en un archivo que puedes compartir."},
-    {"Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it.",
-     "Reorganiza los estantes: Ctrl+Alt+arrastra cualquier botón a un estante para añadirlo o moverlo, o fuera de "
-     "los estantes para quitarlo."},
+    {"Rearrange the shelves: Ctrl+Alt+drag any button onto a shelf to add or move it, or off the shelves to remove it. (At any time, Customize off too, hold Alt and drag any button, checkbox, slider or choice from a palette onto a shelf.)",
+     "Reorganiza los estantes: Ctrl+Alt+arrastra cualquier botón a un estante para añadirlo o moverlo, o fuera de los estantes para quitarlo. (En cualquier momento, también con Personalizar desactivado, mantén Alt y arrastra cualquier botón, casilla, deslizador u opción de una paleta a un estante.)"},
     {"The short notes SculptForge shows over the 3D view (a mode that is on, the next step of a tool). Off hides them "
      "all; each also has its own Don't show again.",
      "Las notas breves que SculptForge muestra sobre la vista 3D (un modo activado, el siguiente paso de una "
@@ -1653,10 +1724,19 @@ constexpr Entry kSpanish[] = {
     {"Off: File and Edit come first in the palette bar and Help last, the rest A to Z. On: every palette A to Z.",
      "Desactivado: Archivo y Editar van primero en la barra de paletas y Ayuda al final, el resto de la A a la Z. "
      "Activado: todas las paletas de la A a la Z."},
-    {"Size of text and controls, applied at once. Automatic follows the display the window is on (Windows: Settings > "
-     "Display > Scale, per monitor).",
-     "Tamaño del texto y los controles, aplicado al instante. Automático sigue a la pantalla en la que está la "
-     "ventana (Windows: Configuración > Pantalla > Escala, por monitor)."},
+    {"Follow the display the window is on (Windows: Settings > Display > Scale, per monitor; macOS and Wayland: the "
+     "display's scaling; X11: the desktop's font DPI). Untick, or move the slider, to choose a size.",
+     "Seguir la pantalla en la que está la ventana (Windows: Configuración > Pantalla > Escala, por monitor; macOS y "
+     "Wayland: el escalado de la pantalla; X11: el DPI de fuente del escritorio). Desmarque, o mueva el control "
+     "deslizante, para elegir un tamaño."},
+    {"Size of text and controls, 70% to 300%, applied when you let the slider go (double-click it to type a value). "
+     "Below 100% the buttons keep a little more room around their text, so they stay easy to hit. The size is "
+     "remembered for the monitor the window is on, so a laptop screen and a 4K monitor can each have their own.",
+     "Tamaño del texto y los controles, del 70% al 300%, aplicado al soltar el control deslizante (haga doble clic "
+     "para escribir un valor). Por debajo del 100%, los botones conservan un poco más de espacio alrededor de su "
+     "texto, para que sigan siendo fáciles de pulsar. El tamaño se recuerda para el monitor en el que está la "
+     "ventana, así que la pantalla de un portátil y un monitor 4K pueden tener cada uno el suyo."},
+    {"Aa Bb 123", "Aa Bb 123"},
     {"Free: dragging turns the model about the screen's axes and can roll it over the top; press Shift while rotating "
      "to snap to the nearest front, side, top or bottom view. Turntable: the model stays upright and turns about its "
      "vertical axis, as in Blender or Maya. X axis, Z axis: it turns about that world axis only (View > Orbit lock).",
@@ -2168,11 +2248,21 @@ constexpr Entry kSpanish[] = {
     {"Floor grid", "Cuadrícula del suelo"},
     {"A faint grid on the floor the model stands on (its lowest point, Y up), fading into the distance: a "
      "reference for perspective and lining up Parts; the red and blue lines are the X and Z axes. It moves when "
-     "a stroke or a move ends. Off by default; saved automatically.",
+     "a stroke or a move ends (Floor grid at Y=0 keeps it still). Off by default; saved automatically.",
      "Una cuadrícula tenue en el suelo sobre el que se apoya el modelo (su punto más bajo, Y hacia arriba), que "
      "se desvanece a lo lejos: una referencia para la perspectiva y para alinear Piezas; las líneas roja y azul "
-     "son los ejes X y Z. Se mueve al terminar un trazo o un movimiento. Desactivada por defecto; se guarda "
+     "son los ejes X y Z. Se mueve al terminar un trazo o un movimiento (Cuadrícula del suelo en Y=0 la deja fija). Desactivada por defecto; se guarda "
      "automáticamente."},
+    {"Floor grid at Y=0", "Cuadrícula del suelo en Y=0"},
+    {"Keep the floor grid at world height zero (Y=0) instead of under the lowest point of the visible Parts: a "
+     "fixed reference while you move Parts up and down or work on a base. Off by default (the grid follows the "
+     "model); saved automatically.",
+     "Mantén la cuadrícula del suelo a la altura cero del mundo (Y=0) en lugar de bajo el punto más bajo de las Piezas visibles: una referencia fija mientras subes y bajas Piezas o trabajas en una base. Desactivada por defecto (la cuadrícula sigue al modelo); se guarda automáticamente."},
+    {"Centre view on the pointer", "Centrar la vista en el puntero"},
+    {"Slide the view so the point under the pointer is in the middle, keeping the zoom and the angle; the view then "
+     "turns about that point. Alt+middle click on the canvas does it in every key style (a drag still pans); this "
+     "action does the same at the pointer when you press its key (no key by default: bind one in Preferences > Hotkeys).",
+     "Desplaza la vista para que el punto bajo el puntero quede en el centro, manteniendo el zoom y el ángulo; después la vista gira alrededor de ese punto. Alt+clic central en el lienzo lo hace en todos los estilos de teclas (arrastrar sigue desplazando); esta acción hace lo mismo en el puntero al pulsar su tecla (sin tecla por defecto: asigna una en Preferencias > Atajos)."},
     {"Backface culling", "Ocultar caras traseras"},
     {"Don't draw the back faces of the model: faster on dense meshes, and you see through the openings of open meshes "
      "(a scan, a garment) instead of their inside. Brushes then work only on faces you can see. Off by default; "
@@ -2496,16 +2586,23 @@ constexpr Entry kSpanish[] = {
      "esculpen en tiempo real. Move cambia la forma del nivel inferior y el detalle va con él."},
     // --- PanelIntegrations.cpp (tools/i18n/coverage.py) ---
     {"Show SculptForge on Discord", "Mostrar SculptForge en Discord"},
-    {"Your Discord profile shows SculptForge, its icon and how long you've been sculpting. Sent only to the Discord "
-     "app on this computer, which shows it to your friends. Off by default.",
-     "Tu perfil de Discord muestra SculptForge, su icono y cuánto llevas esculpiendo. Se envía solo a la app de "
-     "Discord de este equipo, que lo muestra a tus amigos. Desactivado por defecto."},
-    {"Show the monthly challenge", "Mostrar el reto mensual"},
-    {"Adds \"Monthly challenge: <theme>\", with the theme you type below.",
-     "Añade \"Monthly challenge: <theme>\", con el tema que escribas abajo."},
-    {"Show the file name", "Mostrar el nombre del archivo"},
-    {"Adds the name of the file you're working on (never its folder). Off by default.",
-     "Añade el nombre del archivo en el que trabajas (nunca su carpeta). Desactivado por defecto."},
+    {"Your Discord profile shows SculptForge, its icon, the time since you started it and one word for what you're "
+     "doing: Sculpting, Painting or Idle. Sent only to the Discord app on this computer, which shows it to your "
+     "friends. Needs the Discord app running. Off by default.",
+     "Tu perfil de Discord muestra SculptForge, su icono, el tiempo desde que lo iniciaste y una palabra para lo "
+     "que estás haciendo: Sculpting, Painting o Idle. Se envía solo a la aplicación de Discord de este equipo, que "
+     "lo muestra a tus amigos. Necesita la aplicación de Discord abierta. Desactivado por defecto."},
+    {"Shown on your Discord profile: SculptForge, its icon, the time since you started it, and Sculpting, Painting "
+     "or Idle (nothing done for five minutes). Sent only to the Discord app on this computer. Nothing else: no "
+     "file names, folders, Part names, user name or model details.",
+     "Se muestra en tu perfil de Discord: SculptForge, su icono, el tiempo desde que lo iniciaste y Sculpting, "
+     "Painting o Idle (sin actividad durante cinco minutos). Se envía solo a la aplicación de Discord de este "
+     "equipo. Nada más: ni nombres de archivo, ni carpetas, ni nombres de piezas, ni nombre de usuario, ni "
+     "detalles del modelo."},
+    {"Discord now shows only SculptForge and what you're doing, never the file name or a challenge theme. Those "
+     "two options are gone.",
+     "Discord ahora solo muestra SculptForge y lo que estás haciendo, nunca el nombre del archivo ni el tema de un "
+     "reto. Esas dos opciones han desaparecido."},
     // --- PanelKelvinlet.cpp (tools/i18n/coverage.py) ---
     {"How the Kelvinlet brushes' material keeps its volume (Poisson's ratio): 0 is rubbery (it stretches without "
      "bulging), 100 is incompressible clay (pressing in bulges the surface up around the thumb, pulling out draws "
@@ -3235,6 +3332,16 @@ constexpr Entry kSpanish[] = {
      "Cuánto se ve este trazo: 1 = tal como se esculpió, 0 = nada, 2 = el doble de fuerte. Los trazos posteriores no "
      "se rehacen: donde se solapan con este conservan su propio desplazamiento encima."},
     // --- PanelUpdate.cpp (tools/i18n/coverage.py) ---
+    {"SculptForge %s (%.0f MB) is downloaded from github.com/islandmed/SculptForge releases and checked.",
+     "SculptForge %s (%.0f MB) se descarga desde los lanzamientos de github.com/islandmed/SculptForge y se comprueba."},
+    {"Restart now replaces %s after its code signature is checked too.",
+     "Reiniciar ahora reemplaza %s después de que su firma de código también sea comprobada."},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge checks the download arrived intact (its checksum must match the release's checksum list) and that the app inside passes macOS's code signature check and comes from the same developer as this one. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "Descargue la nueva versión desde las versiones de GitHub de SculptForge a través de una conexión verificada. SculptForge comprueba que la descarga haya llegado intacta (su suma de comprobación debe coincidir con la lista de sumas de comprobación del lanzamiento) y que la aplicación que contiene pase la comprobación de firma de código de macOS y provenga del mismo desarrollador que esta. Usted confirma antes de que se reemplace nada; la versión actual se conserva hasta que la nueva se haya iniciado."},
+    {"Download the new version from SculptForge's GitHub releases over a checked connection. SculptForge checks the download arrived intact (its checksum must match the release's checksum list) and that the app inside passes macOS's code signature check. You confirm before anything is replaced; the current version is kept until the new one has started.",
+     "Descargue la nueva versión desde las versiones de GitHub de SculptForge a través de una conexión verificada. SculptForge comprueba que la descarga haya llegado intacta (su suma de comprobación debe coincidir con la lista de sumas de comprobación del lanzamiento) y que la aplicación que contiene pase la comprobación de firma de código de macOS. Usted confirma antes de que se reemplace nada; la versión actual se conserva hasta que la nueva se haya iniciado."},
+    {"Download the new version from SculptForge's GitHub releases, check the download arrived intact, and install it. The current version is kept until the new one has started.",
+     "Descargue la nueva versión desde las versiones de GitHub de SculptForge, compruebe que la descarga haya llegado intacta e instálela. La versión actual se conserva hasta que la nueva se haya iniciado."},
     {"Downloading the update...", "Descargando la actualización..."},
     {"It installs when you quit.", "Se instala al salir."},
     {"Restart now", "Reiniciar ahora"},
@@ -3252,10 +3359,6 @@ constexpr Entry kSpanish[] = {
     {"Try again", "Reintentar"},
     {"Switched off by the Space's owner, use Image to 3D", "El propietario del Space lo desactivó; usa Imagen a 3D"},
     {"Update", "Actualizar"},
-    {"Download the new version from SculptForge's GitHub releases, check its signature and checksum, and install it. "
-     "The current version is kept until the new one has started.",
-     "Descarga la versión nueva de las versiones de SculptForge en GitHub, comprueba su firma y su suma de "
-     "verificación, y la instala. La versión actual se conserva hasta que arranca la nueva."},
     {"Asking GitHub...", "Preguntando a GitHub..."},
     {"On GitHub, enter this code:", "En GitHub, escribe este código:"},
     {"Open github.com/login/device", "Abrir github.com/login/device"},
@@ -3953,8 +4056,8 @@ constexpr Entry kSpanish[] = {
     {"Remesh the active Part at the Voxel Remesh resolution, in the background (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
      "Remalla la Pieza activa a la resolución de Remallado por vóxeles, en segundo plano (activado por defecto en la disposición SculptForge, desactivado en Classic; Herramienta > Remallado > Remallado rápido lo cambia)."},
     {"Quick Remesh (hold and drag)", "Remallado rápido (mantén y arrastra)"},
-    {"Hold this key and click or drag on the background (not on the model) to remesh the active Part (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
-     "Mantén esta tecla y haz clic o arrastra sobre el fondo (no sobre el modelo) para remallar la Pieza activa (activado por defecto en la disposición SculptForge, desactivado en Classic; Herramienta > Remallado > Remallado rápido lo cambia)."},
+    {"Hold this key and click or drag on the background to remesh the active Part; hold it and drag on the model to refresh only the stretched triangles under the brush at the Part's detail (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
+     "Mantén esta tecla y haz clic o arrastra sobre el fondo para remallar la Pieza activa; mantenla y arrastra sobre el modelo para actualizar solo los triángulos estirados bajo el pincel al detalle de la Pieza (activado por defecto en la disposición SculptForge, desactivado en Classic; Herramienta > Remallado > Remallado rápido lo cambia)."},
     {"Turn the sculpt into Gaussian splats.", "Convierte la escultura en splats gaussianos."},
     {"Fill the unmasked area with the colour.", "Rellena la zona sin máscara con el color."},
     {"Hide or show the shelves and trays around the canvas.",
@@ -4819,8 +4922,6 @@ constexpr Entry kSpanish[] = {
     {"Terms & refunds", "Términos y reembolsos"},
     {"Nothing about memberships for a week.",
      "Nada sobre membresías durante una semana."},
-    {"Nothing else is sent: no folders, no user name, no model details. Needs the Discord app running.",
-     "No se envía nada más: ni carpetas, ni nombre de usuario, ni detalles del modelo. Necesita la aplicación de Discord abierta."},
     {"Off (raw mesh)",
      "Desactivado (malla original)"},
     {"Off in this run: tests, renders and recordings use fixed settings.",
@@ -5073,8 +5174,6 @@ constexpr Entry kSpanish[] = {
      "¿El teléfono no puede abrir la página?"},
     {"The phone link couldn't start.",
      "No se pudo iniciar el enlace con el teléfono."},
-    {"Theme (64 characters at most)",
-     "Tema (64 caracteres como máximo)"},
     {"There is no ready-made %s for this computer. %s",
      "No hay un %s listo para este ordenador. %s"},
     {"Thickness",
@@ -5247,6 +5346,12 @@ constexpr Entry kSpanish[] = {
      "Pintar sus colores"},
     {"Hide while navigating",
      "Ocultar al navegar"},
+    {"Outside the image",
+     "Fuera de la imagen"},
+    {"Block",
+     "Bloquear"},
+    {"What a stroke does where the Stencil's image isn't. Sculpt: it works as if there were no Stencil. Block: it does nothing (the image's edge is a wall). A tiled image covers the whole view.",
+     "Qué hace un trazo donde no está la imagen de la plantilla. Esculpir: funciona como si no hubiera plantilla. Bloquear: no hace nada (el borde de la imagen es un muro). Una imagen en mosaico cubre toda la vista."},
     {"Reset placement",
      "Restablecer posición"},
     {"Lay an image over the view and sculpt or paint through it: the sculpt brushes take its brightness (white = full effect), Vertex Paint its colours, only where it covers the model.",
@@ -5906,10 +6011,12 @@ constexpr Entry kSpanish[] = {
     {"Alt+drag to add or move. Right-click an entry to remove it.", "Alt+arrastrar para añadir o mover. Clic derecho en una entrada para quitarla."},
     {"Drop on My Panel to add", "Suelta en Mi panel para añadir"},
     {"Drop on My Panel to move, elsewhere to remove", "Suelta en Mi panel para mover, en otro sitio para quitar"},
+    {"Drop on My Panel or a shelf to add", "Suelta en Mi panel o en un estante para añadir"},
+    {"Drop on My Panel or a shelf to move, elsewhere to remove", "Suelta en Mi panel o en un estante para mover, en otro sitio para quitar"},
     {"Hold Alt and drag a button, or a section's title, from any palette into this panel. Right-click an entry to remove it.", "Mantén Alt y arrastra un botón, o el título de una sección, desde cualquier paleta hasta este panel. Clic derecho en una entrada para quitarla."},
     {"My Panel", "Mi panel"},
     {"Remove from My Panel", "Quitar de Mi panel"},
-    {"Your own panel, floating at the cursor: the buttons and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "Tu propio panel, flotando junto al cursor: los botones y secciones que arrastraste a él (mantén Alt y arrastra desde cualquier paleta). Pulsa la tecla otra vez, o Esc, para cerrarlo. También es una paleta (Editar > Mi panel) para una bandeja, y puede pasar a una ventana propia."},
+    {"Your own panel, floating at the cursor: the buttons, controls and sections you dragged into it (hold Alt and drag from any palette). Press the key again, or Esc, to close it. It is also a palette (Edit > My Panel) for a tray, and can be moved to a window of its own.", "Tu propio panel, flotando junto al cursor: los botones, controles y secciones que arrastraste a él (mantén Alt y arrastra desde cualquier paleta). Pulsa la tecla otra vez, o Esc, para cerrarlo. También es una paleta (Editar > Mi panel) para una bandeja, y puede pasar a una ventana propia."},
     {"Add images...",
      "Añadir imágenes..."},
     {"Adjust Reference",
@@ -6000,6 +6107,24 @@ constexpr Entry kSpanish[] = {
     {"How dark the occlusion gets.", "Cuánto se oscurece la oclusión."},
     {"How soft and wide the occlusion looks.", "Qué tan suave y ancha se ve la oclusión."},
     {"How soft the shadows' edges are.", "Qué tan suaves son los bordes de las sombras."},
+    {"Add a fill light: cool and soft, from the right, to lift the dark side.", "Añadir una luz de relleno: fría y suave, desde la derecha, para aclarar el lado oscuro."},
+    {"Add a key light: warm, from the upper left in front; it casts the view's shadows.", "Añadir una luz principal: cálida, desde la parte superior izquierda frontal; proyecta las sombras de la vista."},
+    {"Add a rim light: from behind and above, along the silhouette.", "Añadir una luz de contorno: desde atrás y arriba, a lo largo de la silueta."},
+    {"Drag on the ball to move the light around the model (the dot is the light; past the edge it goes round the back and shows as a ring); double-click puts it back where the material has it. Lit Sphere and studio shading.", "Arrastra la bola para mover la luz alrededor del modelo (el punto es la luz; más allá del borde pasa a la parte posterior y se muestra como un anillo); hacer doble clic la devuelve a la posición del material. Lit Sphere y sombreado de estudio."},
+    {"Drag on the ball to move this light around the model (the dot is the light; past the edge it goes round the back and shows as a ring); double-click puts it back where its role starts.", "Arrastra la bola para mover esta luz alrededor del modelo (el punto es la luz; más allá del borde pasa a la parte posterior y se muestra como un anillo); hacer doble clic la devuelve a la posición inicial de su función."},
+    {"Fill light", "Luz de relleno"},
+    {"Four lights at most: remove one to add another.", "Cuatro luces como máximo: elimina una para añadir otra."},
+    {"How bright this light is. With several lights, the brightest one's intensity is the total they share.", "Qué tan brillante es esta luz. Con varias luces, la intensidad de la más brillante es el total que comparten."},
+    {"How dark the shadows get: 1 is the light's own share, towards 2 they deepen to black.", "Qué tan oscuras se vuelven las sombras: 1 es la proporción propia de la luz, hacia 2 se oscurecen hasta el negro."},
+    {"Key light", "Luz principal"},
+    {"Lights", "Luces"},
+    {"Rim light", "Luz de contorno"},
+    {"Shadow strength", "Intensidad de sombra"},
+    {"Shadow strength %.2f", "Intensidad de sombra %.2f"},
+    {"Take this light away.", "Eliminar esta luz."},
+    {"The light's colour: warm for a key, cool for a fill, white for a rim.", "El color de la luz: cálido para una luz principal, frío para una de relleno, blanco para una de contorno."},
+    {"The view's cast shadows come from this light (Shadows & AO on). One light at most casts them: ticking it here takes them over; with none ticked they come from the material's light or the environment, as before.", "Las sombras proyectadas de la vista provienen de esta luz (Sombras y AO activado). Como máximo una luz las proyecta: marcarla aquí toma el control; sin ninguna marcada provienen de la luz del material o del entorno, como antes."},
+    {"Up to four lights of your own on top of the material's light or the PBR environment: a Key (the main light; it starts with the view's shadows), a Fill (soft, from the other side) and a Rim (from behind, along the edges). Each has a direction pad, a colour, an intensity and a Shadows tick (one light casts them). Together they add one light's worth of exposure: a second light shares it with the first instead of piling on, up to the strongest light's own intensity. Saved in the project.", "Hasta cuatro luces propias además de la luz del material o del entorno PBR: una luz principal (la luz principal; comienza con las sombras de la vista), una de relleno (suave, desde el otro lado) y una de contorno (desde atrás, a lo largo de los bordes). Cada una tiene un control direccional, un color, una intensidad y una casilla de Sombras (una sola luz las proyecta). Juntas añaden la exposición equivalente a una luz: una segunda luz la comparte con la primera en lugar de acumularse, hasta la intensidad propia de la luz más fuerte. Se guarda en el proyecto."},
     {"Shadow softness", "Suavidad de sombras"},
     {"Shadows", "Sombras"},
     {"Shadows & AO", "Sombras y AO"},
@@ -6220,6 +6345,13 @@ constexpr Entry kSpanish[] = {
      "Borra los puntos seleccionados (naranja; Shift+clic selecciona varios). Alt+clic en un punto hace lo mismo."},
     {"Shift+click dots to select several; Move, Scale and Rotate (W, E, R) work on them.",
      "Shift+clic en los puntos para seleccionar varios; Mover, Escalar y Rotar (W, E, R) actúan sobre ellos."},
+    {"Hold Alt and drag a button, a slider, a checkbox or a section's title from any palette into this panel. Right-click an entry to remove it.", "Mantén Alt y arrastra un botón, un deslizador, una casilla o el título de una sección desde cualquier paleta hasta este panel. Clic derecho en una entrada para quitarla."},
+    {"(not shown now)", "(no se muestra ahora)"},
+    {"Its palette does not show this control right now (it depends on the Part or the mode). It comes back when it does.", "Su paleta no muestra este control ahora mismo (depende de la parte o del modo). Vuelve cuando lo haga."},
+    {"Triangle count", "Recuento de triángulos"},
+    {"How many triangles the active Part has at its current level. Hold Alt and drag it into My Panel to keep it in view.", "Cuántos triángulos tiene la parte activa en su nivel actual. Mantén Alt y arrástralo a Mi panel para tenerlo a la vista."},
+    {"Subdivision levels", "Niveles de subdivisión"},
+    {"The level you are on, how many the Part has, and the triangles of the lowest and highest. Hold Alt and drag it into My Panel to keep it in view.", "El nivel en el que estás, cuántos tiene la parte y los triángulos del más bajo y del más alto. Mantén Alt y arrástralo a Mi panel para tenerlo a la vista."},
     // Tool > Scatter (PanelScatter.cpp)
     {"Another seed gives another random scatter with the same settings.",
      "Otra semilla genera otra dispersión aleatoria con los mismos ajustes."},
@@ -6299,6 +6431,38 @@ constexpr Entry kSpanish[] = {
      "Dónde se sitúan las copias, en función de su propia altura a lo largo de la superficie: 0 es semihundida en ella, 0.5 apoyada sobre ella, por debajo de 0 más profunda."},
     {"to %.2f",
      "hasta %.2f"},
+    // --- Navigation: gesture names, hold-key status lines (NavBindings.h, Input.cpp) ---
+    {"Brush size, finely (Ctrl+Shift+right-drag)", "Tamaño del pincel, con precisión (Ctrl+Shift+arrastrar con botón derecho)"},
+    {"Centre the view on the pointer (Alt+middle click); a drag pans", "Centrar la vista en el puntero (Alt+clic central); arrastrar desplaza"},
+    {"Erase mask (Ctrl+Alt+drag)", "Borrar máscara (Ctrl+Alt+arrastrar)"},
+    {"Hide / show by a shape (Ctrl+Shift+drag)", "Ocultar / mostrar mediante una forma (Ctrl+Shift+arrastrar)"},
+    {"Invert a stroke (Alt+drag; on the background: pan)", "Invertir un trazo (Alt+arrastrar; en el fondo: desplazar)"},
+    {"Invert a stroke (Ctrl+drag)", "Invertir un trazo (Ctrl+arrastrar)"},
+    {"Mask (Ctrl+Alt+drag)", "Máscara (Ctrl+Alt+arrastrar)"},
+    {"Mask (Ctrl+drag; on the background: clear the mask)", "Máscara (Ctrl+arrastrar; en el fondo: borrar la máscara)"},
+    {"Mask (Ctrl+drag; on the background: zoom)", "Máscara (Ctrl+arrastrar; en el fondo: zoom)"},
+    {"Pan (Alt+middle-drag)", "Desplazar (Alt+arrastrar con botón central)"},
+    {"Pan (Alt+right-drag)", "Desplazar (Alt+arrastrar con botón derecho)"},
+    {"Pan (Shift+Alt+left-drag)", "Desplazar (Shift+Alt+arrastrar con botón izquierdo)"},
+    {"Pan (Shift+drag)", "Desplazar (Shift+arrastrar)"},
+    {"Pan (middle-drag)", "Desplazar (arrastrar con botón central)"},
+    {"Select and frame a Part (Shift+Alt+click)", "Seleccionar y encuadrar una pieza (Shift+Alt+clic)"},
+    {"Smooth (Shift+drag)", "Suavizar (Shift+arrastrar)"},
+    {"Turn the view", "Girar la vista"},
+    {"Turn the view (Alt+left-drag)", "Girar la vista (Alt+arrastrar con botón izquierdo)"},
+    {"Turn the view (Alt+left-drag, Blender's emulated middle button)", "Girar la vista (Alt+arrastrar con botón izquierdo, botón central emulado de Blender)"},
+    {"Turn the view (right-drag)", "Girar la vista (arrastrar con botón derecho)"},
+    {"Turn the view, snapping (Shift+right-drag)", "Girar la vista, con ajuste (Shift+arrastrar con botón derecho)"},
+    {"Zoom (Alt+right-drag)", "Zoom (Alt+arrastrar con botón derecho)"},
+    {"Zoom (Ctrl+drag)", "Zoom (Ctrl+arrastrar)"},
+    {"Zoom (Ctrl+middle-drag)", "Zoom (Ctrl+arrastrar con botón central)"},
+    {"Zoom (Ctrl+right-drag)", "Zoom (Ctrl+arrastrar con botón derecho)"},
+    {"Zoom beside the model, Erase mask on it (Ctrl+Alt+left-drag)", "Zoom junto al modelo, borrar máscara sobre él (Ctrl+Alt+arrastrar con botón izquierdo)"},
+    {"%s: give it a key in Preferences > Navigation, then hold it and drag", "%s: asígnale una tecla en Preferencias > Navegación, luego mantenla y arrastra"},
+    {"Hold %s and drag anywhere to turn the view", "Mantén %s y arrastra en cualquier parte para girar la vista"},
+    {"Hold %s and drag anywhere to pan the view", "Mantén %s y arrastra en cualquier parte para desplazar la vista"},
+    {"Hold %s and drag anywhere to zoom", "Mantén %s y arrastra en cualquier parte para hacer zoom"},
+    {"Navigation bindings back to their defaults", "Navegación restablecida a sus valores por defecto"},
 };
 
 } // namespace

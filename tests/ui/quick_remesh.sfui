@@ -1,5 +1,5 @@
-# #121: Tool > Remesh > Quick Remesh (Shift+R, or N held while clicking or dragging on the background) and Remesh
-# after each stroke. Both remesh the active Part at the Voxel Remesh resolution in the background, one undo step each.
+# #121: Tool > Remesh > Quick Remesh (Shift+R, or N held while clicking or dragging on the background; N held on the
+# model refreshes the topology under the brush, refresh_topology.sfui) and Remesh after each stroke. Both remesh the active Part at the Voxel Remesh resolution in the background, one undo step each.
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=4
 key f
@@ -48,14 +48,15 @@ drag_path 0.03 0.03 0.1 0.05
 expect_value camera_yaw != $yaw0
 expect_value voxel_remesh_running == 0
 camera 0 0
-# N held on the model: still a brush stroke.
+# N held on the model: the topology refresh (refresh_topology.sfui); nothing is stretched here, so nothing changes.
 key_down n
 stroke 0.4 0.5 0.6 0.5
 key_up n
-expect_value can_undo == 1
+expect_value refresh_dabs > 0
+expect_status nothing under the brush was stretched
+expect_value can_undo == 0
 expect_value voxel_remesh_running == 0
 expect_value triangles == $before
-key ctrl+z
 
 # Remesh after each stroke: a gentle stroke leaves the mesh alone; a long Move pull remeshes it after pen-up.
 click "Remesh after each stroke##remesh.after_stroke"

@@ -403,6 +403,14 @@ words_ok() {
     [ "${1:-}" = bump ] || python3 tools/release/pin_whats_new_test.py "$BASE" --check >/dev/null ||
         die "tests/ui/whats_new.sfui isn't pinned to $BASE's What's New" "run step bump (it pins it): $(resume bump)"
 }
+# The guide's own check (links, images, characters, the What's New tagline), run before the bump touches anything: CI's
+# guide_site test runs it an hour into a stage (0.14.0: a colon in the tagline). --out keeps it from rewriting website/guide.
+guide_ok() {
+    local out
+    out=$(python3 tools/guide/build_site.py --check --out "$work/guide-check" 2>&1) ||
+        die "the guide check fails (CI's guide_site test would): $(grep -v '^wrote ' <<<"$out" | head -5)" "fix docs/guide (what-new tagline: the headline and up to 2 short items, no 'X: verb' colon chains), commit, push main"
+    rm -rf "$work/guide-check"
+}
 # UI scale / DPI (#87): the Windows manifest still asks for per-monitor DPI v2 (a grep: nothing is built), and the "dpi"
 # UI tests (100-200 %, a display-scale event) pass. Those run in ci.yml's suite (Linux and Windows), and step ci does not
 # tag without CI green on this commit, or on the main commit it differs from only by release paperwork (ci_reused): CI's
@@ -447,6 +455,7 @@ preflight() {
     auth=$(gh auth status 2>&1 || true)
     grep -q "account $AUTHOR_NAME" <<<"$auth" || die "gh is not logged in as $AUTHOR_NAME" "gh auth login (or gh auth switch -u $AUTHOR_NAME)"
     words_ok "$mode"
+    [ "$mode" != bump ] || guide_ok
     local gallery rc=0
     gallery=$(python3 tools/brush-gallery/check_published.py 2>/dev/null) || rc=$?
     [ $rc -ne 2 ] || die "$(head -1 <<<"$gallery")" "check the network and gh auth status, then run again"

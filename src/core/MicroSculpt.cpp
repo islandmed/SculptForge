@@ -547,12 +547,12 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
         flood.stamp.swap(floodStamp_), flood.queue.swap(floodQueue_), flood.dist.swap(floodDist_), flood.epoch = floodEpoch_;
         brushVertices(m, bvh, center, r * reach + pad, floodVerts_);
         const size_t within = floodVerts_.size();
-        keepConnected(m, center, floodVerts_, flood, &floodSurface_);
+        keepConnected(m, center, floodVerts_, flood, &floodSurface_, &contact);
         PieceStamps st{flood.epoch, 0};
         if (floodVerts_.size() != within) {
             brushVertices(m, bvh, center, r * reach * kDetourFlood + pad, floodWide_);
             floodVerts_ = floodWide_;
-            keepConnected(m, center, floodVerts_, flood, &floodSurface_);
+            keepConnected(m, center, floodVerts_, flood, &floodSurface_, &contact);
             st = markClosedPieces(m, floodWide_, flood);
         }
         flood.stamp.swap(floodStamp_), flood.queue.swap(floodQueue_), flood.dist.swap(floodDist_), floodEpoch_ = flood.epoch;
@@ -823,7 +823,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                         if (!reachesPlane) break;
                         const glm::vec3 pp = areaCenter - areaNormal * (sign * r * 0.02f * s);
                         const float h = glm::dot(p - pp, areaNormal);
-                        if (sign * h > 0.0f) delta = std::clamp(-h * std::min(1.0f, std::sqrt(f) * (0.5f + s)) / facing, -planeCap, planeCap);
+                        if (sign * h > 0.0f) delta = std::clamp(-h * std::min(1.0f, std::sqrt(f) * trimGain(s)) / facing, -planeCap, planeCap);
                         break;
                     }
                     case BrushType::Layer: {
@@ -1055,7 +1055,7 @@ bool MicroStroke::dabTiles(Mesh& m, BrushType type, const glm::vec3& center, flo
                         if (!reachesPlane) break;
                         const glm::vec3 pp = areaCenter - areaNormal * (sign * r * 0.02f * s);
                         const float h = glm::dot(pt - pp, areaNormal);
-                        if (sign * h > 0.0f) delta = std::clamp(-h * std::min(1.0f, std::sqrt(f) * (0.5f + s)) / facing, -planeCap, planeCap);
+                        if (sign * h > 0.0f) delta = std::clamp(-h * std::min(1.0f, std::sqrt(f) * trimGain(s)) / facing, -planeCap, planeCap);
                         break;
                     }
                     default: break;

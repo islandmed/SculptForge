@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SculptForge VERSION 0.14.0 LANGUAGES C CXX)
+project(SculptForge VERSION 0.14.1 LANGUAGES C CXX)
 if(APPLE)
   enable_language(OBJCXX) # src/app/MacAppMenu.mm (here: enabled later, CMake leaves its rule variables unset)
 endif()
@@ -27,6 +27,9 @@ set(SCULPTFORGE_PACKAGE_SUFFIX "" CACHE STRING "Extra tag in package file names,
 option(SCULPTFORGE_BUILD_TESTS "Build unit tests" ON)
 option(SCULPTFORGE_USE_SYSTEM_SDL "Use an installed SDL3 if one is found" ON)
 option(SCULPTFORGE_UPDATE_CHECK "The app checks the website for a newer version once a day (OFF for package managers)" ON)
+# The macOS one-click update (core/SelfUpdate.h installMacApp). OFF: the banner's Download link on a Mac, as before 0.14.1
+# (a release cut before a real-Mac tester has run its checklist ships OFF; release manager's call).
+option(SCULPTFORGE_MAC_SELF_UPDATE "The update banner's Update button replaces the macOS app bundle itself" ON)
 # Android (android/README.md): the app is libmain.so inside an APK, drawing with OpenGL ES 3.2. SCULPTFORGE_GLES=ON on a
 # desktop builds that same ES path against the desktop's GLES driver (Mesa), to test it without a device.
 option(SCULPTFORGE_GLES "Draw with OpenGL ES 3.2 instead of desktop OpenGL 3.3 (ON for Android)" ${ANDROID})
@@ -100,6 +103,8 @@ add_library(sculptforge_core STATIC
   src/core/GarmentPrint.cpp
   src/core/GarmentTemplates.cpp
   src/core/ExtractMirror.cpp
+  src/core/Solidify.cpp
+  src/core/PrimitiveKit.cpp
   src/core/MeshTransform.cpp
   src/core/FigurePose.cpp
   src/core/Deform.cpp
@@ -225,6 +230,7 @@ add_library(sculptforge_core STATIC
   src/core/LitSphere.cpp
   src/core/Trash.cpp
   src/core/DiscordPresence.cpp
+  src/core/UiTestSeed.cpp
   src/core/ExitWatchdog.cpp
   src/core/Project.cpp
   src/core/Guide.cpp
@@ -330,7 +336,8 @@ if(SF_ZSTD_FOUND)
   target_link_libraries(sculptforge_core PRIVATE PkgConfig::SF_ZSTD)
   target_compile_definitions(sculptforge_core PRIVATE SF_HAVE_ZSTD)
 endif()
-target_compile_definitions(sculptforge_core PUBLIC GLM_FORCE_XYZW_ONLY)
+target_compile_definitions(sculptforge_core PUBLIC GLM_FORCE_XYZW_ONLY
+                                                   SF_MAC_SELF_UPDATE=$<BOOL:${SCULPTFORGE_MAC_SELF_UPDATE}>) # core/SelfUpdate.h, app and tests alike
 target_compile_definitions(sculptforge_core PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}") # written into projects
 if(MSVC)
   target_compile_options(sculptforge_core PRIVATE /W4 /utf-8 /permissive-)
@@ -1234,6 +1241,14 @@ if(SCULPTFORGE_BUILD_TESTS)
       add_test(NAME release_script_beta COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_beta_test.sh)
       set_tests_properties(release_script_beta PROPERTIES TIMEOUT 300)
     endif()
+    # release.sh's guide check before the bump (a colon in the What's New tagline stops the stage at once, not an hour in), and T0's
+    # gallery gate (a branch changing tools/brush-gallery/repo must match the public gallery repo first).
+    if(UNIX AND NOT APPLE AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+      add_test(NAME release_guide_check COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_guide_check_test.sh)
+      set_tests_properties(release_guide_check PROPERTIES TIMEOUT 120)
+      add_test(NAME gallery_gate COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/gallery_gate_test.sh)
+      set_tests_properties(gallery_gate PROPERTIES TIMEOUT 60)
+    endif()
     # release.sh's one rerun of a CI run red in a test step: flaky.md row when it passes, red and named when it fails again.
     if(UNIX AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
       add_test(NAME release_rerun COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/release_rerun_test.sh)
@@ -1326,6 +1341,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     file(GLOB SCULPTFORGE_UI_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/*.sfui)
     list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/mode_matrix\\.sfui$") # (four shards, below)
     list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/hardware_tier_panel\\.sfui$") # (only at 1440 and 2880, below)
+    if(NOT SCULPTFORGE_MAC_SELF_UPDATE) # (the banner shows Download on a Mac: nothing of that script to drive)
+      list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/self_update_mac\\.sfui$")
+    endif()
     if(NOT TARGET sculptforge_pyhost) # (a build without Python in the app: its console says so, nothing to drive)
       list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/python_[a-z_]+\\.sfui$")
     endif()
@@ -1349,6 +1367,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
     sculptforge_ui_test(scatter_1440 scatter --size 1440x900) # Tool > Scatter, its live redo and Separate Parts over 500
     sculptforge_ui_test(scatter_2880 scatter --size 2880x1800)
+    sculptforge_ui_test(floor_grid_fixed_1440 floor_grid_fixed --size 1440x900) # View > Display > Floor grid at Y=0
+    sculptforge_ui_test(floor_grid_fixed_2880 floor_grid_fixed --size 2880x1800)
+    sculptforge_ui_test(parts_numbered_duplicates_1440 parts_numbered_duplicates --size 1440x900) # Head.01, Head.02 in the Parts list
+    sculptforge_ui_test(parts_numbered_duplicates_2880 parts_numbered_duplicates --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(orientation_widget_1440 orientation_widget --size 1440x900) # Draw > Camera > Corner gizmo > Orientation
@@ -1387,6 +1409,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(ui_async_stroke_undo PROPERTIES
                          ENVIRONMENT "SF_TRIANGLE_BUDGET=40000;SF_STILL_FRAME_MS=0.001;SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=40")
     sculptforge_ui_test(keep_strokes_editable_checkbox_tablet keep_strokes_editable_checkbox --size 1024x768)
+    sculptforge_ui_test(primitives_kit_1440 primitives_kit --size 1440x900) # Parts > Append primitive settings, Solidify
+    sculptforge_ui_test(primitives_kit_2880 primitives_kit --size 2880x1800)
+    sculptforge_ui_test(render_lights_1440 render_lights --size 1440x900) # Material > Light > Lights, Shadow strength
+    sculptforge_ui_test(render_lights_2880 render_lights --size 2880x1800)
+    sculptforge_ui_test(render_lights_balance_1440 render_lights_balance --size 1440x900) # several lights share one light's exposure
+    sculptforge_ui_test(render_lights_balance_2880 render_lights_balance --size 2880x1800)
     sculptforge_ui_test(render_bridge_1440 render_bridge --size 1440x900) # File > Render with... (the Render window)
     sculptforge_ui_test(render_bridge_2880 render_bridge --size 2880x1620)
     # Heavy-mesh and benchmark scripts (tests/perf/*.sfui, e.g. 33M-triangle precision): nightly only (T3).
@@ -1478,6 +1506,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(whats_new_since_phone whats_new_since --size 800x1280)
     sculptforge_ui_test(selection_space_1440 selection_space --size 1440x900)
     sculptforge_ui_test(selection_space_2880 selection_space --size 2880x1800)
+    # Preferences > Navigation: hold keys, drag gestures, pen buttons, warnings (tests/ui/nav_bindings.sfui), at the review sizes.
+    sculptforge_ui_test(nav_bindings_1440 nav_bindings --size 1440x900)
+    sculptforge_ui_test(nav_bindings_2880 nav_bindings --size 2880x1800)
     # The Remesh palette's Voxel Resolution slider dropped on a shelf (tests/ui/shelf_value_drop.sfui, #191), at the review sizes.
     sculptforge_ui_test(shelf_value_drop_1440 shelf_value_drop --size 1440x900)
     sculptforge_ui_test(shelf_value_drop_2880 shelf_value_drop --size 2880x1800)
@@ -1631,6 +1662,11 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(tool_palettes_1440 tool_palettes --size 1440x900)
     sculptforge_ui_test(tool_palettes_2880 tool_palettes --size 2880x1800)
     sculptforge_ui_test(tool_palettes_1024 narrow/tool_palettes --size 1024x768)
+    # Tool > Cloth (tests/ui/cloth_panel.sfui) at 1440 and 2880 px.
+    sculptforge_ui_test(cloth_panel_1440 cloth_panel --size 1440x900)
+    sculptforge_ui_test(cloth_panel_2880 cloth_panel --size 2880x1800)
+    # Drape with wind (tests/ui/cloth_drape_wind.sfui): blown downwind, changed while it runs, Keep in gusts.
+    sculptforge_ui_test(cloth_drape_wind_1440 cloth_drape_wind --size 1440x900)
     # Edges mode and creases (tests/ui/edge_select.sfui) at 1440 px of UI, 100% and 200% (#108).
     sculptforge_ui_test(edge_select_1440 edge_select --size 1440x900)
     sculptforge_ui_test(edge_select_2880 edge_select --size 2880x1800) # its 200% shots: 1440 px of UI
@@ -1716,6 +1752,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # UI scale (#87) at 1600x900, where Automatic in a test is exactly 100 %; label "dpi": release.sh step check runs them before the tag.
     sculptforge_ui_test(ui_scale_900 ui_scale --size 1600x900)
     set_tests_properties(ui_ui_scale_900 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
+    # The UI scale slider (70-300 %, Automatic tick) at 1440 and 2880 px (Automatic = 100 / 200 % there).
+    sculptforge_ui_test(ui_scale_prefs_1440 ui_scale_prefs --size 1440x900)
+    sculptforge_ui_test(ui_scale_prefs_2880 ui_scale_prefs --size 2880x1800)
+    set_tests_properties(ui_ui_scale_prefs_1440 ui_ui_scale_prefs_2880 PROPERTIES LABELS "ui;dpi" TIMEOUT 300)
     if(TEST ui_ui_scale)
       set_tests_properties(ui_ui_scale PROPERTIES LABELS "ui;dpi")
     endif()
@@ -1795,6 +1835,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     # My Panel (Member Request), for the look review at 1440 px, 100 % and 200 %.
     sculptforge_ui_test(my_panel_1440 sizes/my_panel --size 1440x900)
     sculptforge_ui_test(my_panel_1440_200 sizes/my_panel --size 2880x1800)
+    sculptforge_ui_test(my_panel_controls_1440 sizes/my_panel_controls --size 1440x900)
+    sculptforge_ui_test(my_panel_controls_1440_200 sizes/my_panel_controls --size 2880x1800)
+    sculptforge_ui_test(shelves_anything_1440 sizes/shelves_anything --size 1440x900)
+    sculptforge_ui_test(shelves_anything_1440_200 sizes/shelves_anything --size 2880x1800)
     sculptforge_ui_test(my_panel_paths_1440 sizes/my_panel_paths --size 1440x900)
     sculptforge_ui_test(my_panel_paths_1440_200 sizes/my_panel_paths --size 2880x1800)
     # A crash leaves a note in the log file (#16). Needs no window.

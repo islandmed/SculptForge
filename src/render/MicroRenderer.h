@@ -26,6 +26,7 @@
 
 #include "core/Micro.h"
 #include "render/BufferUpload.h"
+#include "render/TexelStore.h"
 #include "render/Clusters.h"
 #include "render/MicroFocus.h"
 #include "render/MicroTilePages.h"
@@ -91,6 +92,7 @@ public:
     // The tile pages want one more frame (MicroTilePages::wantsFrame).
     bool tilePagesWantFrame() const { return tilePages_ && tilePages_->wantsFrame(); }
     // Tile pages to draw: the plain program's TILES variant (without pages the draw is the program without tiles).
+    bool wide() const { return wide_; } // the tables are 2D textures (the programs are built with WIDE)
     bool tilePagesOn() const { return tilePages_ && tilePages_->pages() > 0; }
 
 private:
@@ -130,7 +132,9 @@ private:
     };
     std::vector<Chunk> chunks_;
     uint32_t chunkSlots_ = 0;
-    GLuint triData_ = 0, triTex_ = 0, baseData_ = 0, baseTex_ = 0, levelData_ = 0, levelTex_ = 0;
+    // The per-slot and per-vertex tables the shader indexes: buffer textures, or 2D ones past the GPU's buffer-texture limit (wide_).
+    TexelStore triStore_, baseStore_, levelStore_;
+    bool wide_ = false;
     struct Patch {
         GLuint vao = 0, vbo = 0, ibo = 0;
         GLsizei indices = 0;

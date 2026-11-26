@@ -1,0 +1,91 @@
+# Floor grid at Y=0 (Discord ask): View > Display > Floor grid at Y=0 (also Tool > Viewport Look, the command palette) keeps the
+# floor grid at world height zero instead of under the lowest point of the visible Parts. Off by default (the grid follows the
+# model, floor_grid.sfui); a preference.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=4
+camera 30 -20
+wait 0.3
+expect_value floor_grid == 0
+expect_value floor_grid_fixed == 0
+
+# The grid on, the model moved down: the floor follows its lowest point (as before).
+click "View##menu.view"
+click "Floor grid##render"
+expect "Floor grid at Y=0##render"
+shot view-menu
+key escape
+# (The camera stays aimed at the origin from above, a little further back: both the grid and the moved model in view.)
+run transform translate=0,-3,0 masked=false
+camera 30 -20
+camera_distance 11
+wait 0.3
+expect_value floor_grid_drawn == 1
+expect_value floor_height < -3.9
+shot follows
+
+# Fixed at Y=0: the grid stays at the origin's height, the model hangs below it.
+click "View##menu.view"
+click "Floor grid at Y=0##render"
+expect_value floor_grid_fixed == 1
+key escape
+wait 0.3
+expect_value floor_height == 0
+expect_value floor_grid_drawn == 1
+shot fixed-below
+
+# Moving the model does not move the grid any more.
+run transform translate=0,5,0 masked=false
+wait 0.3
+expect_value floor_height == 0
+shot fixed-above
+key ctrl+z
+wait 0.3
+expect_value floor_height == 0
+
+# Off again: the floor goes back under the model at once.
+click "View##menu.view"
+click "Floor grid at Y=0##render"
+expect_value floor_grid_fixed == 0
+key escape
+wait 0.3
+expect_value floor_height < -3.9
+
+# Kept after a restart; the command palette flips it. (A frame for the click to land before the restart's flush: without
+# it the toggle raced the save, 1 run in 3.)
+click "View##menu.view"
+click "Floor grid at Y=0##render"
+key escape
+wait 0.3
+expect_value floor_grid_fixed == 1
+restart
+expect_value floor_grid == 1
+expect_value floor_grid_fixed == 1
+key f3
+type "##Command palette" "floor grid at y=0"
+key enter
+expect_value floor_grid_fixed == 0
+restart
+expect_value floor_grid_fixed == 0
+
+# Tool > Viewport Look has the same switch. The Classic layout keeps its old rows: the row shows with Preferences >
+# Interface > Show newer menu rows (the command palette reaches it either way), and once the switch is on, the row stays.
+run ui_look look=classic layout=classic
+expect_value newer_menu_rows == 0
+click "Tool##palette.tool"
+click "Viewport Look##tool.display"
+expect "Floor grid##display"
+expect_not "Floor grid at Y=0##display"
+shot classic-off
+# (The Viewport Look section stays open across ui_look: clicking it again would fold it.)
+run ui_look layout=classic newer_rows=true
+expect_value newer_menu_rows == 1
+expect "Floor grid at Y=0##display"
+click "Floor grid at Y=0##display"
+expect_value floor_grid_fixed == 1
+shot classic-on
+run ui_look layout=classic newer_rows=false
+expect_value newer_menu_rows == 0
+expect "Floor grid at Y=0##display"
+click "Floor grid at Y=0##display"
+expect_value floor_grid_fixed == 0
+expect_not "Floor grid at Y=0##display"

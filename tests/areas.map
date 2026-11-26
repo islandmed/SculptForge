@@ -302,6 +302,7 @@ test_selection_sets         mesh
 test_starter_meshes         mesh
 test_transform              mesh
 test_tube                   mesh
+test_voxel_crease           mesh
 test_uv_editor              mesh
 test_deform_panel           mesh
 test_radial_symmetry        mesh
