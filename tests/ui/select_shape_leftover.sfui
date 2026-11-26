@@ -1,0 +1,77 @@
+# Cut Line latched from the stroke popup, used, and turned off must not leave itself on the Ctrl+Shift drag (a macOS tester,
+# Discord 11-26: the grey half-plane stayed, "even with the Cut tool off it is still there when I click Shift+Ctrl"). The
+# popup's shape borrows the Ctrl+Shift shape (hide_shape) while it is latched; when the latch ends, the panel's own choice
+# comes back: Select Rectangle by default, or whatever the panel had.
+run new_sphere subdivisions=4
+camera 0 0
+key x
+expect_value symmetry_x == 0
+expect_value hide_shape == 2
+
+# His sequence: Cut Line from the stroke popup, one cut with a plain drag, Esc, then a Ctrl+Shift drag.
+key g
+stroke_popup_item cut_line click
+key escape
+expect_value stroke_latch == 3
+expect_value hide_shape == 3
+view_drag 0.25 0.3 0.75 0.7
+wait 0.1
+expect_value undo_steps == 1
+expect_value stroke_latch == 3
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+hold ctrl+shift
+drag_path 0.4 0.4 0.6 0.45 keep
+wait 0.1
+shot select_after_latch_dragging
+release
+hold none
+wait 0.2
+# a rectangle selection (hides what is outside), not a second cut
+expect_value hidden > 0
+expect_value undo_steps == 2
+
+# Turned off by picking Cut Line in the popup again: the same.
+key g
+stroke_popup_item cut_line click
+key escape
+expect_value hide_shape == 3
+key g
+stroke_popup_item cut_line click
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+
+# Another brush picked ends the latch: the same.
+key g
+stroke_popup_item cut_lasso click
+key escape
+expect_value hide_shape == 4
+key 2
+wait 0.1
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+key 1
+
+# The panel's own choice stays: Select Circle chosen on Tool > Visibility, a Cut Line latch on top, off: Select Circle.
+click "Visibility"
+click "Select Circle##select.circle"
+expect_value hide_shape == 7
+key g
+stroke_popup_item cut_line click
+key escape
+expect_value hide_shape == 3
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 7
+
+# A shape picked on the panel while the latch is on is the user's: it stays when the latch ends.
+key g
+stroke_popup_item cut_line click
+key escape
+click "Select Rectangle##select.rect"
+expect_value hide_shape == 2
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2

@@ -111,6 +111,15 @@ void App::setStrokeLatch(StrokeLatch latch) {
                   : std::string(strokeLatchName(latch)) + " on: strokes " +
                         (latch == StrokeLatch::Smooth ? "smooth" : latch == StrokeLatch::Mask ? "mask" : "select") +
                         " until you pick " + strokeLatchName(latch) + " again or another brush";
+    settleHideLatch();
+}
+
+void App::settleHideLatch() {
+    if (!hideLatch_.active || strokeLatch() == StrokeLatch::Select) return;
+    hideLatch_.active = false;
+    if (hideShape_ != hideLatch_.latched) return; // a shape picked on the panel meanwhile stays
+    hideShape_ = hideLatch_.before;
+    cutPolyline_.clear(); // (points of a Cut Polyline the latch was placing)
 }
 
 App::SelectShape App::selectShapeOf(StrokeShape shape) {
@@ -171,6 +180,10 @@ void App::pickStrokePopupItem(int item, bool close) {
         const StrokeShape shape = strokePopupShape(item);
         const bool off = strokeShapeOn(shape);
         const StrokeLatch latch = strokeShapeLatch(shape);
+        if (latch == StrokeLatch::Select) {
+            if (!hideLatch_.active) hideLatch_ = {true, hideShape_, hideShape_};
+            hideLatch_.latched = selectShapeOf(shape);
+        }
         (latch == StrokeLatch::Mask ? maskShape_ : hideShape_) = selectShapeOf(shape);
         setStrokeLatch(off ? StrokeLatch::None : latch);
         const ShapeLook& look = kShapes[int(shape)];
@@ -255,6 +268,7 @@ void App::drawStrokePopup() {
     const StrokeLatch latch = strokeLatch();
     // Another brush picked ends the latch for good: going back to the first brush doesn't bring it back.
     if (latch == StrokeLatch::None) strokeLatch_.latch = StrokeLatch::None;
+    settleHideLatch();
     if (!strokePopup_.open) {
         if (latch == StrokeLatch::None) return;
         // A latched modifier shows beside the brush cursor: strokes do something other than sculpt.
