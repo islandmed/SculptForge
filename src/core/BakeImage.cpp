@@ -313,6 +313,7 @@ bool loadExr(const std::string& path, int& width, int& height, int& channels, st
                 pos += 16;
             }
         } else if (name == "compression") {
+            if (size < 1) return bad("compression"); // (the value is read: it must be there)
             compression = b[pos];
         } else if (name == "dataWindow" && size == 16) {
             x0 = int32_t(u32(pos)), y0 = int32_t(u32(pos + 4)), x1 = int32_t(u32(pos + 8)), y1 = int32_t(u32(pos + 12));
@@ -343,8 +344,9 @@ bool loadExr(const std::string& path, int& width, int& height, int& channels, st
         for (int k = 0; k < 8; ++k) off |= uint64_t(b[table + size_t(line) * 8 + size_t(k)]) << (8 * k);
         // (compared by subtraction)
         if (off > b.size() || b.size() - size_t(off) < 8 + pixelBytes * size_t(width)) return bad("scanline");
-        const int y = int(u32(size_t(off))) - y0;
-        if (y < 0 || y >= height) return bad("scanline y");
+        const int64_t y64 = int64_t(int32_t(u32(size_t(off)))) - y0;
+        if (y64 < 0 || y64 >= height) return bad("scanline y");
+        const int y = int(y64);
         size_t p = size_t(off) + 8;
         for (const Chan& c : chans) {
             const auto it = slot.find(c.name);

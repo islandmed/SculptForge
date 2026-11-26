@@ -559,6 +559,13 @@ TEST(exr_damaged_headers_are_refused) {
         const std::string body = table + std::string(4 * 16 * 12, '\0');
         CHECK(!loadExr(writeFile("sf_exr_claim.exr", exrClaiming(0, 0, 15, 3, 0, 3, body)), w, h, c, px, err));
     }
+    // A "compression" attribute with no value as the very last bytes of the file (and other attributes cut at the end).
+    {
+        const std::string head = std::string("\x76\x2f\x31\x01\x02\x00\x00\x00", 8) + std::string("compression\0compression\0", 24);
+        CHECK(!loadExr(writeFile("sf_exr_claim.exr", head + std::string(4, '\0')), w, h, c, px, err));
+        CHECK(!loadExr(writeFile("sf_exr_claim.exr", head), w, h, c, px, err));
+        CHECK(!loadExr(writeFile("sf_exr_claim.exr", head.substr(0, head.size() - 3)), w, h, c, px, err));
+    }
     // Many channels, and a data window past the pixel cap.
     CHECK(!loadExr(writeFile("sf_exr_claim.exr", exrClaiming(0, 0, 3, 3, 4096, 1000)), w, h, c, px, err));
     CHECK(!loadExr(writeFile("sf_exr_claim.exr", exrClaiming(0, 0, 32767, 32767, 4096)), w, h, c, px, err));
