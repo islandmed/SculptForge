@@ -1560,7 +1560,6 @@ constexpr HintInfo kHints[] = {
     {"air_strokes", "Strokes start off the model"},
     {"lod_preview", "Previewing an LOD"},
     {"face_landmarks", "Face landmark steps"},
-    {"dynamic_paint", "Dynamic on a painted Part"},
 };
 } // namespace
 

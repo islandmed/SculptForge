@@ -70,10 +70,11 @@ It is a preference (saved automatically) and is saved with the project; from a s
 - **Vertex Paint, mask values and sculpt layers** are carried onto new vertices (blended between their
   neighbours).
 - **Quads** under the brush become triangles. The rest of the mesh keeps its quads.
-- **UVs and the painted texture are kept.** New triangles get UVs from the ones they split, so paint
-  stays where you put it and the texture itself is never touched. Along a UV seam the remesh
-  is careful (its vertices merge only along it and are not relaxed, a seam edge is never flipped), so a seam can stay
-  a little finer than the rest. Undo brings back the exact UVs.
+- **UVs and the painted texture are kept.** The remesh is the same as on a Part without UVs; afterwards every
+  triangle it changed takes its UVs from the surface as it was, so paint stays where you put it and the texture
+  itself is never touched. A triangle across a seam takes the map of one side, so paint right at a seam can look a
+  little squeezed; where Dynamic grew new surface (a pulled-out horn), the paint is stretched over it. **Auto UV**
+  again gives it room. Undo brings back the exact UVs.
 
 ## Subdivision levels
 
