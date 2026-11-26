@@ -22,7 +22,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
-#if defined(__linux__)
+#if defined(__linux__) && !defined(__ANDROID__)
 #include <sched.h>
 #endif
 
@@ -55,7 +55,7 @@ App::StrokeSolver::~StrokeSolver() {
 
 namespace {
 int currentCpu() { // (SF_STROKE_LOG: a hybrid CPU's efficiency cores take the same work about twice as long)
-#if defined(__linux__)
+#if defined(__linux__) && !defined(__ANDROID__) // (Android: bionic declares sched_getcpu from a later API than our minSdk)
     return sched_getcpu();
 #else
     return -1;

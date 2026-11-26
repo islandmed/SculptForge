@@ -1248,7 +1248,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             pointerEventNs_ = 0;
             if (u >= 1.0) {
                 const double up = nowSeconds();
-#if defined(__linux__)
+#if defined(__linux__) && !defined(__ANDROID__)
                 if (std::getenv("SF_STROKE_LOG")) SDL_Log("bench: pen up at %.3f s (%s), main thread on cpu %d", double(SDL_GetTicksNS()) * 1e-9, spec.name, sched_getcpu());
 #endif
                 onMouseUp(); // places the dabs still waiting, ends the stroke (undo step, timeline)
