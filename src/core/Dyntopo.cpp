@@ -1010,6 +1010,13 @@ uint32_t DynamicTopology::split(uint32_t a, uint32_t b) {
         const glm::vec3 pc = m.positions[c];
         if (glm::length(glm::cross(mid - pa, pc - pa)) < minArea || glm::length(glm::cross(pb - mid, pc - mid)) < minArea) return kNone;
     }
+    if (!m.uvs.empty()) // (a painted Part: a split adds a triangle to the vertex opposite its edge, and long thin triangles fanning from one vertex split into
+                        // a fan of thousands when the UV rules keep their repairs away: no vertex takes more than kMaxValence)
+        for (int i = 0; i < n; ++i) {
+            const glm::uvec3& tri = m.triangles[tris[i]];
+            for (int k = 0; k < 3; ++k)
+                if (tri[k] != a && tri[k] != b && m.vertexTriangles(tri[k]).size() >= kMaxValence) return kNone;
+        }
     const uint32_t v = newVertex();
     interpolateVertex(v, a, b, 0.5f, mid);
     if (!m.base.empty()) m.base[v] += bend; // (sculpt layers: positions stay base + offsets)
@@ -1512,6 +1519,7 @@ bool DynamicTopology::flipGain(uint32_t a, uint32_t b, uint32_t& c, uint32_t& d)
     }
     if (c == kNone || d == kNone || c == d) return false;
     uint32_t tmp[4];
+    if (!m.uvs.empty() && (m.vertexTriangles(c).size() >= kMaxValence || m.vertexTriangles(d).size() >= kMaxValence)) return false; // (a painted Part: no hubs, see splitEdge)
     if (edgeTriangles(c, d, tmp) > 0) return false;
     if (!m.uvs.empty()) { // (the new pair covers the old pair's UV quad only where that is convex: neither turns over)
         const glm::vec2 ua = cornerUv(tris[0], a), ub = cornerUv(tris[0], b);

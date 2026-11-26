@@ -292,7 +292,7 @@ private:
     std::vector<uint8_t> uvMask_;
     const Mesh* uvMaskMesh_ = nullptr;
     uint64_t uvMaskHash_ = 0;
-    static constexpr size_t kMaxValence = 24; // painted Parts: a collapse that would leave a vertex more neighbours than this is refused
+    static constexpr size_t kMaxValence = 24; // painted Parts: no collapse, split or flip gives a vertex more neighbours than this (no hubs)
     mutable std::vector<std::pair<uint32_t, glm::vec2>> uvPlan_; // collapseUvPlan's result (triangle, UV of the merged vertex)
 };
 
