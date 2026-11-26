@@ -29,6 +29,8 @@ struct PathStroke {
     float alphaAngle = 0.0f; // the alpha turned by this much (radians, counter-clockwise on screen; Alpha > Angle)
     uint32_t seed = 1;     // recipe jitter is deterministic per seed
     Symmetry symmetry{false, false, false};
+    bool contactFacing = false; // Brush > Contact facing (DabParams::contactFacing), with its Facing angle in degrees
+    float facingAngle = 180.0f;
 };
 
 // Parses "x,y,z x,y,z ..." (points separated by spaces or '|'). False on malformed input.

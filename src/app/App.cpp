@@ -4427,6 +4427,11 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
             ImGui::Checkbox(tr("Crisp edge##recipe"), &recipe.crispEdge);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr("A hard, clean tip edge and a full plane pull, for hard-surface planes."));
+            if (recipe.pinch != 0.0f && recipe.depth < 0.0f && (newerMenuRows() || !recipe.stopAtMeshDepth)) { // (a row after 0.13.14: Classic keeps its old rows unless asked)
+                ImGui::Checkbox(tr("Stop at mesh depth##recipe"), &recipe.stopAtMeshDepth);
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                    ImGui::SetTooltip("%s", tr("A pinching cut stops deepening and tightening once the mesh can't hold its groove (about a brush radius deep): repeated passes no longer saw the walls into teeth. Untick it, or turn on Dynamic, to cut on."));
+            }
             continue; // (each has its own tooltip)
         case RecipeParam::Kind::Enum: {
             int idx = recipe.enumIndex(p.key);

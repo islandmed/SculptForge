@@ -1392,6 +1392,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(floor_grid_fixed_2880 floor_grid_fixed --size 2880x1800)
     sculptforge_ui_test(parts_numbered_duplicates_1440 parts_numbered_duplicates --size 1440x900) # Head.01, Head.02 in the Parts list
     sculptforge_ui_test(parts_numbered_duplicates_2880 parts_numbered_duplicates --size 2880x1800)
+    sculptforge_ui_test(stop_at_mesh_depth_1440 stop_at_mesh_depth --size 1440x900) # Crease Line ten laps over one line: no sawtooth; Stop at mesh depth
+    sculptforge_ui_test(stop_at_mesh_depth_2880 stop_at_mesh_depth --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(orientation_widget_1440 orientation_widget --size 1440x900) # Draw > Camera > Corner gizmo > Orientation
