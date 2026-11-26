@@ -1540,6 +1540,32 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
     }, 1);
     if (sealedOpened) *sealedOpened = opened.load();
     std::vector<uint8_t>().swap(nearOutside);
+    // Loose samples the sign test got wrong next to the surface (an inside sample with at most 3 of its 6 face neighbours inside that
+    // the nearest triangle puts outside the source): extra voxels that make a dotted rim along a deep crease (gh#240). Decided on the
+    // signs as they are, then applied (VoxelSparse.cpp does the same on the bricks).
+    {
+        constexpr float kBand = 3.0f;
+        constexpr int kT = 3; // (a wire of one voxel has 2 inside neighbours; what keeps a real fin or wire is the source's own side)
+        const size_t X0 = size_t(dims.x), S0 = X0 * size_t(dims.y);
+        std::vector<std::vector<uint32_t>> flips(size_t(dims.z));
+        poolFor(size_t(dims.z), [&](size_t zb, size_t ze) {
+            for (size_t z = std::max<size_t>(zb, 1); z < std::min<size_t>(ze, size_t(dims.z) - 1); ++z)
+                for (int y = 1; y + 1 < dims.y; ++y)
+                    for (int x = 1; x + 1 < dims.x; ++x) {
+                        const size_t i = grid.index(x, y, int(z));
+                        if (!solid[i] || !inside[i] || nearest[i] < 0 || dist2[i] > kBand * kBand) continue;
+                        const int in = inside[i - 1] + inside[i + 1] + inside[i - X0] + inside[i + X0] + inside[i - S0] + inside[i + S0];
+                        if (in > kT) continue;
+                        // (only when the nearest triangle of the source says it is outside too; a thin fin or wire of the source itself is
+                        // inside it and stays)
+                        if (sideOfTriangle(mesh, uint32_t(nearest[i]), grid.position(x, y, int(z))) > 0.0f) flips[z].push_back(uint32_t(i));
+                    }
+        }, 1);
+        for (auto& v : flips) {
+            for (uint32_t i : v) inside[i] ^= 1;
+            std::vector<uint32_t>().swap(v);
+        }
+    }
     // The late gather: a solid sample 3 from the outside next to one the sign test turned may be half of a straddling
     // pair, so it needs its value too (the small triangles' part; the big ones splatted it already). Rare.
     if (smallCount) {

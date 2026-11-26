@@ -476,6 +476,37 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
         opened.fetch_add(openedHere, std::memory_order_relaxed);
     }, 1 << 14);
     if (creases) creases->sealedOpened = opened.load();
+    // Loose samples the sign test got wrong next to the surface (an inside sample with at most 3 of its 6 face neighbours inside that the
+    // nearest triangle puts outside the source): extra voxels that make a dotted rim along a deep crease (gh#240). As in Voxel.cpp,
+    // decided on the signs as they are, then applied.
+    {
+        constexpr float kBand = 3.0f;
+        constexpr int kT = 3; // (a wire of one voxel has 2 inside neighbours; what keeps a real fin or wire is the source's own side)
+        const glm::ivec3 dirs0[6] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
+        std::vector<std::vector<uint64_t>> flips((g.at.size() + 255) / 256);
+        poolFor(g.at.size(), [&](size_t b0, size_t b1) {
+            std::vector<uint64_t>& out = flips[b0 / 256];
+            for (size_t i = b0 * kB3; i < b1 * kB3; ++i) {
+                if (!(flags[i] & kSolid) || !(flags[i] & kInside) || nearest[i] < 0 || dist2[i] > kBand * kBand) continue;
+                const glm::ivec3 p = g.sample(i);
+                if (!g.inGrid(p) || p.x < 1 || p.y < 1 || p.z < 1 || p.x + 1 >= g.dims.x || p.y + 1 >= g.dims.y || p.z + 1 >= g.dims.z) continue;
+                int in = 0;
+                for (const glm::ivec3& d : dirs0) {
+                    const glm::ivec3 q = p + d;
+                    const int64_t j = g.find(q.x, q.y, q.z);
+                    in += j < 0 ? !g.out[g.brickOf(q.x, q.y, q.z)] : (flags[size_t(j)] & kInside) != 0; // (a uniform brick: all inside or all outside)
+                }
+                if (in > kT) continue;
+                // (only when the nearest triangle of the source says it is outside too; a thin fin or wire of the source itself is inside it
+                // and stays)
+                if (sideOfTriangle(mesh, uint32_t(nearest[i]), origin + glm::vec3(p) * cell) > 0.0f) out.push_back(i);
+            }
+        }, 256);
+        for (auto& v : flips) {
+            for (uint64_t i : v) flags[size_t(i)] ^= kInside;
+            std::vector<uint64_t>().swap(v);
+        }
+    }
     {
         auto storageAt = [&](const glm::ivec3& p) { return g.inGrid(p) ? g.find(p.x, p.y, p.z) : int64_t(-1); };
         const glm::ivec3 dirs[6] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};

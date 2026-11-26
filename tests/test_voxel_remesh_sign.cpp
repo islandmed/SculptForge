@@ -405,6 +405,65 @@ TEST(voxel_remesh_invariant_repeated_crease_strokes_stay_clean) {
         CHECK_MSG(components(out) == 1, tag + std::to_string(components(out)) + " pieces");
         CHECK_MSG(nonManifoldEdges(out) <= 12, tag + std::to_string(nonManifoldEdges(out)) + " non-manifold edges");
         CHECK_MSG(far == 0, tag + std::to_string(far) + " sampled points over 3 voxels off the surface");
+        if (resolution != 752) continue;
+        // The dots along the crease (gh#240): the vertices in a box along it (x within 0.08, |y| < 0.35, z > 0, about 20k) that are over
+        // 0.7, 1.0 and 1.2 voxels off the source (exact distances), beside a box of the same size away from the crease (x near 0.5, 0 of each).
+        // Before the loose-sample cleanup of the sign pass: 159 over 0.7, 19 over 1.0, none over 1.2.
+        auto boxCounts = [&](float x0, size_t& n, size_t& over07, size_t& over10, size_t& over12) {
+            n = over07 = over10 = over12 = 0;
+            for (const glm::vec3& p : out.positions) {
+                if (std::abs(p.x - x0) >= 0.08f || p.z <= 0.0f || std::abs(p.y) >= 0.35f || !bvh.closestPoint(p, 1e9f, hit)) continue;
+                const float d = hit.distance / cell;
+                ++n, over07 += d > 0.7f, over10 += d > 1.0f, over12 += d > 1.2f;
+            }
+        };
+        size_t nC, c07, c10, c12, nK, k07, k10, k12;
+        boxCounts(0.0f, nC, c07, c10, c12);
+        boxCounts(0.5f, nK, k07, k10, k12);
+        std::printf("  crease box %zu vertices: %zu over 0.7, %zu over 1.0, %zu over 1.2 voxels off; control box %zu: %zu, %zu, %zu\n", nC, c07, c10, c12, nK,
+                    k07, k10, k12);
+        CHECK_MSG(nC > 10000 && nK > 10000, "the boxes hold " + std::to_string(nC) + " and " + std::to_string(nK) + " vertices");
+        CHECK_MSG(c12 == 0, std::to_string(c12) + " crease vertices over 1.2 voxels off");
+        CHECK_MSG(c10 <= 5, std::to_string(c10) + " crease vertices over 1.0 voxel off");
+        CHECK_MSG(c07 <= nC / 1000 + 2 * k07, std::to_string(c07) + " of " + std::to_string(nC) + " over 0.7 voxel off, the control " + std::to_string(k07) +
+                                                  " of " + std::to_string(nK));
+    }
+}
+
+// The despeckle of the sign pass (a solid sample with at most 2 of 6 neighbours inside that the nearest triangle puts outside the
+// source) must not eat what is really thin: a fin one voxel thick and a square wire 1.2 voxels across, sticking out of a block, reach
+// their far ends at 200 and at 752 (the brick grid).
+namespace {
+void addBox(Mesh& m, const glm::vec3& lo, const glm::vec3& hi) {
+    const uint32_t b = uint32_t(m.positions.size());
+    for (int k = 0; k < 8; ++k) m.positions.push_back({k & 1 ? hi.x : lo.x, k & 2 ? hi.y : lo.y, k & 4 ? hi.z : lo.z});
+    const uint32_t f[12][3] = {{0, 2, 1}, {1, 2, 3}, {4, 5, 6}, {5, 7, 6}, {0, 1, 4}, {1, 5, 4}, {2, 6, 3}, {3, 6, 7}, {0, 4, 2}, {2, 4, 6}, {1, 3, 5}, {3, 7, 5}};
+    for (const auto& t : f) m.triangles.push_back({b + t[0], b + t[1], b + t[2]});
+}
+} // namespace
+
+TEST(voxel_remesh_invariant_thin_fin_and_wire_survive) {
+    for (int resolution : {200, 752}) {
+        const float cell = 2.4f / float(resolution);
+        Mesh m;
+        addBox(m, {-1, -1, -1}, {1, 1, 1});                                          // the block
+        addBox(m, {0.9f, -0.5f, -0.5f * cell}, {1.4f, 0.5f, 0.5f * cell});           // a fin one voxel thick, 0.5 out of the block's +x face
+        addBox(m, {-0.6f * cell, 0.9f, 0.9f}, {0.6f * cell, 1.3f, 0.9f + 1.2f * cell}); // a wire 1.2 voxels across, 0.4 out of its +y face
+        m.rebuildTopology();
+        std::string error;
+        const Mesh out = voxelRemesh(m, resolution, &error);
+        CHECK_MSG(out.triangleCount() > 0, error);
+        if (out.triangleCount() == 0) continue;
+        float maxX = -1e9f, maxY = -1e9f;
+        for (const glm::vec3& p : out.positions) {
+            if (std::abs(p.z) < 2.0f * cell && std::abs(p.y) < 0.5f) maxX = std::max(maxX, p.x);
+            if (std::abs(p.x) < 2.0f * cell && p.z > 0.8f) maxY = std::max(maxY, p.y);
+        }
+        const std::string tag = "res " + std::to_string(resolution) + ": ";
+        CHECK_MSG(maxX >= 1.4f - 1.5f * cell, tag + "the fin reaches x " + std::to_string(maxX) + " of 1.4");
+        CHECK_MSG(maxY >= 1.3f - 1.5f * cell, tag + "the wire reaches y " + std::to_string(maxY) + " of 1.3");
+        // (at 752 this synthetic block of 12-triangle boxes makes 6 pieces with or without the despeckle, a brick-grid matter of its own)
+        if (resolution == 200) CHECK_MSG(components(out) == 1, tag + std::to_string(components(out)) + " pieces");
     }
 }
 
