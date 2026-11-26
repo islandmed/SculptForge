@@ -1,19 +1,18 @@
 {
-  "version": "0.14.1",
+  "version": "0.14.2",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Up to four lights of your own, balanced to one light's exposure, and a Shadow strength slider",
-    "Any control on any shelf: hold Alt and drag a checkbox, slider or readout where you want it",
-    "Navigation bindings: hold a key and drag to orbit, pan or zoom, set up in one place",
-    "Primitive settings for appended Parts, and Solidify gives a flat Part thickness",
-    "Keep Face Groups through Voxel Remesh, and N-drag refreshes stretched topology under the brush"
+    "Dynamic keeps a painted Part's texture: sculpt with Dynamic on and the paint stays",
+    "Crease Line, Engrave and the other pinching cuts keep smooth walls over repeated passes",
+    "Dense Micro levels shade the surface right behind the brush (#184)",
+    "Add any control to a shelf or My Panel by touch: long-press it (requested by a member)"
   ],
   "support": {
     "founding": {
       "taken": 17,
       "limit": 100
     },
-    "member_requests_this_release": 9
+    "member_requests_this_release": 1
   }
 }
