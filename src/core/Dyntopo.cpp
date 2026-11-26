@@ -485,7 +485,7 @@ void DynamicTopology::buildUvMask() {
 
 bool DynamicTopology::uvFits(const glm::vec2* u) const {
     const glm::vec2 centre = (u[0] + u[1] + u[2]) * (1.0f / 3.0f);
-    constexpr int n = 8;
+    constexpr int n = 16;
     for (int i = 0; i <= n; ++i)
         for (int j = 0; i + j <= n; ++j) {
             const glm::vec2 p = u[0] * (float(i) / float(n)) + u[1] * (float(j) / float(n)) + u[2] * (float(n - i - j) / float(n));
