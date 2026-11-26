@@ -1922,9 +1922,9 @@ constexpr Entry kSpanish[] = {
     {"Mask what is unmasked and unmask what is masked (also: Ctrl+click the background).",
      "Enmascara lo que no tiene máscara y quita la máscara de lo que la tiene (también: Ctrl+clic en el fondo)."},
     {"Turn the masked part into a new face group and clear the mask. With nothing masked, everything visible becomes "
-     "one group.",
+     "one group (its own group when part of the mesh is hidden).",
      "Convierte lo enmascarado en un grupo de caras nuevo y borra la máscara. Sin nada enmascarado, todo lo visible "
-     "pasa a ser un grupo."},
+     "pasa a ser un grupo (con parte de la malla oculta, la parte visible forma su propio grupo)."},
     {"One face group per UV island: triangles that touch without a UV seam share a group. Only the visible part is "
      "regrouped. Needs UVs (Tool > Texture Image > Auto UV makes some).",
      "Un grupo de caras por isla UV: los triángulos que se tocan sin costura UV comparten grupo. Solo se reagrupa la "

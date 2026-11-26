@@ -252,6 +252,15 @@ std::vector<uint32_t> groupsMergeVisible(const Mesh& mesh) {
     for (uint32_t t = 0; t < mesh.triangleCount(); ++t)
         if (!mesh.triangleHidden(t)) id = std::min(id, groups[t]);
     if (id == kUnassigned) return groups;
+    // The lowest id is often shared with the hidden part (an ungrouped mesh is all group 0): then the visible part
+    // takes a fresh id, so it becomes its own group instead of staying what it was.
+    bool sharedWithHidden = false;
+    uint32_t fresh = 1;
+    for (uint32_t t = 0; t < mesh.triangleCount(); ++t) {
+        fresh = std::max(fresh, groups[t] + 1);
+        sharedWithHidden = sharedWithHidden || (mesh.triangleHidden(t) && groups[t] == id);
+    }
+    if (sharedWithHidden) id = fresh;
     for (uint32_t t = 0; t < mesh.triangleCount(); ++t)
         if (!mesh.triangleHidden(t)) groups[t] = id;
     return groups;

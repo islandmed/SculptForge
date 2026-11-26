@@ -1,0 +1,20 @@
+# Ctrl+W (Group from Mask) with nothing masked on an UNGROUPED mesh with part of it hidden: the visible part becomes
+# its own face group (it used to keep group 0, the id the hidden faces have, so nothing changed).
+run new_sphere subdivisions=4
+camera 0 0
+remember groups g0
+
+# Hide part of the mesh with the rectangle selection (X symmetry is on: stop short of the middle).
+hold ctrl+shift
+click "##tile.stroke"
+wait 0.1
+click "Rect##held.select.rect"
+hold none
+hold ctrl+shift
+drag_path -0.2 -0.05 0.3 1.2
+hold none
+expect_value hidden > 100
+
+key ctrl+w
+expect_value groups > $g0
+expect_value show_facegroups == 1
