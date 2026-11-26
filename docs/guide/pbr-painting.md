@@ -95,8 +95,22 @@ the light, emissive glows.
 - **Environment**: **Studio** (made by SculptForge), **Photo Studio**, **Small Studio** and **Outdoor Sky** (free
   CC0 photographs from Poly Haven). HDR images (`.hdr`, `.exr`) in the folders listed in the
   `SCULPTFORGE_HDRI_PATH` environment variable are added to the list.
+- **Add HDRI...** (the last row of the Environment list) picks a `.hdr` or `.exr` file of your own. It is listed by
+  its name from then on, in every session, and used at once. The file stays where it is: SculptForge keeps its path,
+  not a copy, so if you move or delete it, its entry greys out (marked "missing") until you put it back; a project that uses it opens with Studio's light meanwhile.
+  **Remove from list** takes an added HDRI out of the list again and never touches the file. Images up to
+  8192 x 4096 are read; for a bigger one, use a smaller copy (the view uses at most 256 pixels across).
+  SculptForge reads `.hdr` files and **uncompressed** `.exr` files. An `.exr` saved with ZIP, PIZ or another
+  compression is listed greyed out ("can't be used") with the reason, and Add HDRI... refuses it with the
+  same reason: save it again with compression off, or as `.hdr`.
 - **Exposure** in stops, **Rotation** of the environment, and the **Tone map**: ACES (filmic contrast), AgX
   (softer, keeps bright colours from going flat), Reinhard or None.
+- **Environment: Fixed in the world / Follows the view** chooses what the environment, and the background if
+  you show it, is fixed to. *Fixed in the world* (the default) keeps it where it is while you orbit, so the
+  highlights stay on the same side of the model and the background moves on screen. *Follows the view* keeps
+  the background and the highlights still on screen while the model turns, as the Lit Sphere view does. The
+  lights you add (Key, Fill, Rim) always follow the view, whichever you choose. **Rotation** works in both.
+  The setting is saved with the project.
 - **Show environment** puts the environment behind the model, with a **Blur**.
 - **Roughness** and **Metallic** apply to Parts without a material texture (their colour comes from vertex paint
   or the base colour), so you can judge a sculpt as metal or clay too.

@@ -1,0 +1,164 @@
+# Material > Viewport Shading > Environment > Add HDRI...: a .hdr / .exr file the user picks is listed by its path and used; Remove
+# takes it out again; a file that goes missing greys its entry out (the view shows Studio, no crash); and the Environment "Fixed in the world / Follows the view" choice
+# keeps the environment where it is while the camera orbits, or still on screen (Rotation works in both).
+# The file dialog never opens in a test: dialog_answer queues the pick (src/app/NativeDialog.h).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+click "Material##palette.material"
+click "PBR##view.shading_pbr"
+wait_value environment_pending == 0
+expect_value environment_count == 4
+expect_value environment_added == 0
+
+# Add HDRI... in the Environment list: the picked file is added, selected and loaded.
+copy ../data/hdri/test_sky.hdr sf_ui_hdri/sky_a.hdr
+copy ../data/hdri/test_sky.exr sf_ui_hdri/sky_b.exr
+dialog_answer ../data/hdri/test_sky.hdr
+click "##environment"
+click "Add HDRI...##addhdri"
+wait_value environment_count == 5 10
+expect_value dialog_kind == 1
+expect_value environment == 4
+expect_value environment_added == 1
+expect_value environment_missing == 0
+wait_value environment_pending == 0
+expect_status "Added HDRI: test_sky"
+shot hdri-added
+# Two more by the command the dialog runs (an EXR too); the same file again is the same entry.
+run add_hdri path=sf_ui_hdri/sky_a.hdr
+expect_value environment_count == 6
+run add_hdri path=sf_ui_hdri/sky_b.exr
+expect_value environment_count == 7
+expect_value environment == 6
+run add_hdri path=sf_ui_hdri/sky_b.exr
+expect_value environment_count == 7
+run_fails add_hdri path=../data/stud.obj
+run_fails add_hdri path=sf_ui_hdri/nowhere.hdr
+# An EXR with a compression we do not read is refused with a reason (not silently listed and ignored).
+run_fails add_hdri path=../data/hdri/test_piz.exr
+expect_value environment_count == 7
+# Back to a built-in and to an added one by name.
+run viewport_shading environment=photo_studio
+expect_value environment == 1
+run viewport_shading environment=sky_a
+expect_value environment == 5
+
+# Saved with the project by name: it opens on the same entry.
+run save_project path=sf_ui_hdri_proj.sfproj
+run viewport_shading environment=studio
+run open path=sf_ui_hdri_proj.sfproj
+expect_value environment == 5
+
+# A file that goes missing: its entry is greyed out with a note, choosing it is refused, and a project that names it opens
+# on Studio's light (no crash).
+run viewport_shading environment=studio
+wait_value environment_pending == 0
+delete_file sf_ui_hdri/sky_a.hdr
+run open path=sf_ui_hdri_proj.sfproj
+expect_value environment == 5
+wait_value environment_pending == 0
+wait 0.3
+expect_value environment_missing == 1
+shot hdri-missing-view
+expect_text "file is missing"
+click "##environment"
+expect_text "sky_a (missing)"
+shot hdri-missing
+key escape
+run_fails viewport_shading environment=sky_a
+wait_value environment_pending == 0
+wait 0.3
+expect_value view_pbr == 1
+# Remove from list: the missing entry goes, the later one moves up, and the view is back on Studio.
+click "Material##palette.material"
+click "Remove from list##removehdri"
+expect_value environment_count == 6
+expect_value environment_added == 2
+expect_value environment == 0
+run viewport_shading environment=sky_b
+expect_value environment == 5
+run remove_hdri
+expect_value environment_count == 5
+expect_value environment == 0
+run remove_hdri environment=test_sky
+expect_value environment_count == 4
+expect_value environment_added == 0
+run_fails remove_hdri environment=studio
+
+# Environment: Fixed in the world (the default): the environment stays where it is while the camera orbits.
+run viewport_shading environment=outdoor_sky rotation=0
+wait_value environment_pending == 0
+expect_value environment_fixed_to_view == 0
+camera 0 10
+wait 0.3
+shot env-view
+remember env_look_yaw look0
+camera 90 10
+wait 0.3
+shot env-view
+# (a quarter turn of the camera: the direction the view centre looks at in the environment is another one)
+expect_value env_look_yaw != $look0
+# Follows the view: the environment stays still on screen, so the same direction is seen from every side.
+click "##envfixed"
+click "Follows the view##envfollow_view"
+expect_value environment_fixed_to_view == 1
+camera 0 10
+wait 0.3
+shot env-view
+remember env_look_yaw free0
+camera 90 10
+wait 0.3
+shot env-view
+expect_value env_look_yaw == $free0
+# The Rotation slider turns it in both modes.
+run viewport_shading rotation=90
+wait 0.2
+shot env-rotated
+expect_value env_look_yaw != $free0
+run_fails viewport_shading fixed=sideways
+run viewport_shading fixed=world rotation=0
+expect_value environment_fixed_to_view == 0
+# The whole picture, in each mode: a mirror sphere under the environment and a Key light, the camera turned a quarter.
+# Fixed in the world the reflections move (the picture changes); Follows the view the environment and the light stay put.
+run viewport_shading mode=pbr environment=outdoor_sky roughness=0.05 metallic=1 background=false fixed=world rotation=0
+run lights remove=all
+run lights add=key
+wait_value environment_pending == 0
+camera 0 10
+wait 0.4
+shot pic-a
+mark_view
+camera 90 10
+wait 0.4
+shot pic-b
+print view_vs_mark
+expect_value view_vs_mark > 1.5
+run viewport_shading fixed=view
+camera 0 10
+wait 0.4
+shot pic-c
+mark_view
+camera 90 10
+wait 0.4
+shot pic-d
+print view_vs_mark
+expect_value view_vs_mark < 0.3
+# The lights alone, in the Lit Sphere view (no environment): they follow the view in either setting.
+run viewport_shading mode=lit_sphere fixed=world
+camera 0 10
+wait 0.4
+shot pic-e
+mark_view
+camera 90 10
+wait 0.4
+shot pic-f
+print view_vs_mark
+expect_value view_vs_mark < 0.3
+run viewport_shading mode=pbr fixed=world
+run lights remove=all
+# Saved with the project.
+run viewport_shading fixed=view
+run save_project path=sf_ui_hdri_proj.sfproj
+run viewport_shading fixed=world
+run open path=sf_ui_hdri_proj.sfproj
+expect_value environment_fixed_to_view == 1

@@ -1,0 +1,5 @@
+---
+added: **Add HDRI...** in the PBR view's Environment list: pick a `.hdr` or `.exr` file of your own once and it is listed and remembered (by its path; the file is not copied). A file that goes missing greys its entry out instead of failing, and **Remove from list** takes it out again. Images up to 8192 x 4096 are read, and `.exr` files must be uncompressed.
+added: **Environment: Fixed in the world / Follows the view** (Material > Viewport Shading): fixed in the world (as before) the environment's highlights and background stay where they are while you orbit; following the view they stay still on screen while the model turns, as the Lit Sphere view does (the lights you add already follow the view). The Rotation slider works in both, and the choice is saved with the project.
+---
+Requested by a member. Reviewers: src/core/EnvironmentMath.cpp (the one decoder, size caps from the header, user entries), src/core/BakeImage.cpp (loadExr: header parse shared with probeExr; its hardening is in fix/exr-damaged-headers), tests/test_environment.cpp (fuzz). CODEOWNERS parsers: cto.

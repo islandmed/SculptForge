@@ -2000,6 +2000,8 @@ int hiddenDiagonal(const Mesh& mesh, uint32_t t) {
 // keeps the environment it has until the new one is ready (the very first one is waited for).
 struct Renderer::EnvJob {
     int index = -1;
+    EnvironmentInfo info; // (a copy: the list may change while the worker reads the file)
+    std::string error;
     std::atomic<bool> done{false};
     bool ok = false;
     EnvironmentLighting light;
@@ -3275,6 +3277,12 @@ void Renderer::syncNormalMap(MeshSlot& s, const Mesh& mesh, const NormalMapView*
 // ---------------------------------------------------------------------------
 
 bool Renderer::ensureEnvironment(int index) {
+    if (envRevision_ != environmentsRevision()) { // entries were added or removed: what was kept by index may be another entry
+        envRevision_ = environmentsRevision();
+        envIndex_ = envFailedIndex_ = envErrorIndex_ = -1;
+        envError_.clear();
+        envJob_.reset();
+    }
     if (index < 0 || index >= environmentCount()) index = 0;
     if (envFailedIndex_ == index) index = 0; // (a file that failed once: the built-in studio instead)
     if (!brdfTexture_) {
@@ -3292,10 +3300,10 @@ bool Renderer::ensureEnvironment(int index) {
     if (!envJob_ || envJob_->index != index) {
         auto job = std::make_shared<EnvJob>();
         job->index = index;
+        job->info = environments()[size_t(index)];
         envJob_ = job;
         std::thread([job, wake = envWake_] {
-            std::string error;
-            job->ok = buildEnvironmentLighting(job->index, job->light, error);
+            job->ok = buildEnvironmentLighting(job->info, job->index, job->light, job->error);
             job->done = true;
             if (wake) wake();
         }).detach();
@@ -3307,6 +3315,8 @@ bool Renderer::ensureEnvironment(int index) {
     std::shared_ptr<EnvJob> job = std::move(envJob_);
     if (!job->ok) {
         envFailedIndex_ = job->index;
+        envError_ = job->error;
+        envErrorIndex_ = job->index;
         if (job->index == 0) return envTexture_ != 0;
         return ensureEnvironment(0);
     }
@@ -3905,7 +3915,10 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         const float yaw = glm::radians(settings.environmentRotation);
         const glm::mat3 spin(glm::vec3(std::cos(yaw), 0.0f, -std::sin(yaw)), glm::vec3(0.0f, 1.0f, 0.0f),
                              glm::vec3(std::sin(yaw), 0.0f, std::cos(yaw)));
-        frameViewToEnv_ = spin * glm::transpose(glm::mat3(view));
+        // Fixed in the world: view space -> world -> the environment's yaw, so the environment stays where it is as the
+        // camera orbits. Fixed to the view: view space straight into the environment, which turns with the camera.
+        frameViewToEnv_ = settings.environmentFixedToView ? spin : spin * glm::transpose(glm::mat3(view));
+        if (!thumbnailPass_) envLookDirection_ = frameViewToEnv_ * glm::vec3(0.0f, 0.0f, -1.0f); // (not the Parts' thumbnails)
     }
 
     // Background: charcoal with a radial vignette (or the flat colour cleared above); in the PBR view optionally

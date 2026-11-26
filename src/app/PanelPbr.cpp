@@ -447,6 +447,15 @@ double App::pbrTestValue(const std::string& name) const {
     if (name == "mesh_maps") return tex && m.texture->meshMaps ? double(m.texture->meshMaps->kinds) : 0.0;
     if (name == "view_pbr") return renderSettings_.pbr() ? 1.0 : 0.0;
     if (name == "environment") return double(renderSettings_.environment);
+    if (name == "environment_count") return double(environmentCount());
+    if (name == "environment_fixed_to_view") return renderSettings_.environmentFixedToView ? 1.0 : 0.0;
+    if (name == "environment_missing") return environmentFileMissing(renderSettings_.environment) ? 1.0 : 0.0;
+    if (name == "environment_added") return double(userEnvironmentPaths().size());
+    if (name == "env_look_yaw") { // whole degrees, 0-359: where in the environment the centre of the view looks
+        const glm::vec3 d = renderer_.environmentLookDirection();
+        const double deg = std::atan2(double(d.x), double(-d.z)) * 180.0 / 3.14159265358979323846;
+        return double((int(std::lround(deg)) % 360 + 360) % 360);
+    }
     if (name == "environment_pending") return renderer_.environmentPending() ? 1.0 : 0.0;
     if (name == "texture_uv_width") return double(renderer_.textureUvWidth(doc_.meshKey(doc_.activePart)));
     if (name == "texture_rejected") return renderer_.textureRejected(doc_.meshKey(doc_.activePart)) ? 1.0 : 0.0;
