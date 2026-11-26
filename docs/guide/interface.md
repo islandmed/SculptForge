@@ -272,6 +272,8 @@ works like any other palette: put it in a tray, or open it in a window of its ow
   the Tool palette, or **Orbit around the pointer** (Edit > Preferences > Input). It stays the palette's own control, live: a
   change in My Panel is a change everywhere. While <kbd>Alt</kbd> is held a slider is picked up, not changed. A control
   its palette shows only sometimes (the Levels line of a Part without levels) shows as its dim name until it is back.
+- **On a tablet**: long-press a button, a control or a section's title (finger or pen held still for half a second), lift, and
+  choose **Add to My Panel**. It goes to the end of the panel. With a mouse, right-click the control for the same menu.
 - **Reorder**: hold <kbd>Alt</kbd> and drag an entry to a new place in My Panel.
 - **Take one out**: drag it out of My Panel (still holding <kbd>Alt</kbd>) and let go anywhere else, or right-click it
   and choose **Remove from My Panel**.
@@ -289,7 +291,9 @@ Shelves surround the canvas and hold the controls you use all the time. Point at
 held to see what it does. **Any control from any palette can go on a shelf**: hold <kbd>Alt</kbd> and drag a checkbox,
 slider, choice, readout or button (**Backface culling**, the brush **Size**, **Orbit around the pointer** from
 Edit > Preferences > Input, **Subdivide**) onto the shelf you want; an orange line shows where it lands. It stays the
-palette's own control, live. Right-click an item for **Remove from shelf**; see [Customizing the
+palette's own control, live. On a tablet, with no keyboard: **long-press** a control (hold a finger or the pen still on it for half a
+second; a ring shows it took), lift, and pick **Add to the top shelf** (or left, right, bottom) from the small menu; with a mouse,
+right-click the control. Right-click an item on a shelf for **Remove from shelf**; see [Customizing the
 interface](#customizing-the-interface) to move items around.
 
 ### Top shelf
@@ -607,7 +611,8 @@ is picked up, not changed. On the top or bottom shelf it is as wide as it is in 
 column's width (a long label is cut short there and ends in "...": drag the left shelf's inner edge to widen the column, or
 point at it with <kbd>Ctrl</kbd> for its name). A control its palette shows only sometimes (the Levels line of a Part without levels) is hidden on the
 shelf until it is back; Customize Shelves shows it dim so you can move or remove it. The same drag puts a control into
-[My Panel](#my-panel), and an entry dragged out of My Panel onto a shelf moves there.
+[My Panel](#my-panel), and an entry dragged out of My Panel onto a shelf moves there. Without a keyboard, long-press the control
+(or right-click it) and choose the shelf: it lands at the end of that shelf, where an <kbd>Alt</kbd>-drop at its end would put it.
 
 A shelf you empty is hidden when Customize Shelves is off, and the canvas takes its room. Turn Customize Shelves
 back on and the empty shelf returns, outlined, so you can drag buttons onto it again.

@@ -1,0 +1,87 @@
+# gh#184 (0.13.13 lag): a dab marks dirty only the patches it changed (an alpha's square reaches far more than it
+# moves: Bolt changes well under half), not every one it looked at. Shading reads the neighbours, so a patch the dab
+# left alone next to one it moved must still come out right: once the stroke's shading has drained, the view must
+# match the same mesh sent up whole and shaded again (view_stale, mean pixel difference 0-255), exactly. Micro 3 and
+# 4, with and without Focus Detail. Priming strokes first widen the level's height range, so the stroke measured
+# doesn't (a widen keeps the shading it had, within a step's rounding: micro_widen_keeps_shading); view_stale itself
+# sends the primed level up whole. (cold: SF_FOCUS_DETAIL is set here, and a warm server doesn't keep it between scripts.)
+run ui_look look=classic layout=classic
+
+# Micro 3, no Focus Detail
+env SF_FOCUS_DETAIL 0
+run new_sphere subdivisions=6
+run micro_divide level=3
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+click "Standard##brush.standard"
+run brush_set_alpha name=Bolt
+brush_size 120
+stroke 0.30 0.30 0.30 0.70 1.0
+stroke 0.30 0.70 0.30 0.30 1.0
+stroke 0.30 0.30 0.30 0.70 1.0
+stroke 0.30 0.70 0.30 0.30 1.0
+wait_value micro_pending_shading == 0 120 # (real time: llvmpipe takes far longer than this computer)
+wait_idle 60
+print view_stale
+remember micro_step primed
+stroke 0.62 0.40 0.70 0.60 1.0
+wait_value micro_pending_shading == 0 120
+wait_idle 60
+expect_value micro_step == $primed
+print view_stale
+expect_value view_stale < 0.00001
+
+# Micro 4, no Focus Detail
+run new_sphere subdivisions=6
+run micro_divide level=4
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+click "Standard##brush.standard"
+run brush_set_alpha name=Bolt
+brush_size 120
+stroke 0.30 0.30 0.30 0.70 1.0
+stroke 0.30 0.70 0.30 0.30 1.0
+stroke 0.30 0.30 0.30 0.70 1.0
+stroke 0.30 0.70 0.30 0.30 1.0
+wait_value micro_pending_shading == 0 120
+wait_idle 60
+print view_stale
+remember micro_step primed
+stroke 0.62 0.40 0.70 0.60 1.0
+wait_value micro_pending_shading == 0 120
+wait_idle 60
+expect_value micro_step == $primed
+print view_stale
+expect_value view_stale < 0.00001
+
+# Micro 4, Focus Detail (POSIX; elsewhere the same level without it)
+env SF_FOCUS_DETAIL 1
+run new_sphere subdivisions=6
+run micro_divide level=4
+env SF_FOCUS_DETAIL 0
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+click "Standard##brush.standard"
+run brush_set_alpha name=Bolt
+brush_size 120
+stroke 0.30 0.30 0.30 0.70 1.0
+stroke 0.30 0.70 0.30 0.30 1.0
+stroke 0.30 0.30 0.30 0.70 1.0
+stroke 0.30 0.70 0.30 0.30 1.0
+wait_value micro_pending_coarse == 0 120
+wait_idle 60
+print view_stale
+remember micro_step primed
+stroke 0.62 0.40 0.70 0.60 1.0
+wait_value micro_pending_coarse == 0 120
+wait_idle 60
+expect_value micro_step == $primed
+print view_stale
+expect_value view_stale < 0.00001
+shot micro_alpha_stroke_shading

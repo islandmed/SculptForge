@@ -622,21 +622,25 @@ if(SCULPTFORGE_BUILD_APP)
   target_compile_definitions(sculptforge PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}"
                                                  SCULPTFORGE_PRERELEASE="${SCULPTFORGE_PRERELEASE}"
                                                  SF_UPDATE_CHECK=$<BOOL:${SCULPTFORGE_UPDATE_CHECK}>)
-  # The commit a build came from, for proof mode's results and HUD (src/app/ProofMode.cpp, BenchTake.cpp); taken when CMake configures.
-  find_package(Git QUIET)
-  if(GIT_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
-    execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                    OUTPUT_VARIABLE SF_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-  endif()
-  if(SF_GIT_COMMIT)
-    set_source_files_properties(src/app/ProofMode.cpp src/app/BenchTake.cpp PROPERTIES COMPILE_DEFINITIONS "SF_GIT_COMMIT=\"${SF_GIT_COMMIT}\"")
-  endif()
-  # A developer's build says so beside the version (window title, top bar): "0.11.13 dev 1a2b3c4". AUTO = a git
-  # checkout built outside CI; release packages build in CI or from a tarball (AUR, brew, Flatpak skip .git).
+  # The commit a build came from (proof mode's results and HUD, src/app/ProofMode.cpp, BenchTake.cpp) and a developer's
+  # build says so beside the version (window title, top bar): "0.11.13 dev 1a2b3c4". Taken at BUILD time: a target that runs
+  # every build and rewrites BuildStamp.cpp only when the commit changes (cmake/BuildStamp.cmake), so an incremental build after
+  # a commit shows the new one. AUTO = a git checkout built outside CI; release packages build in CI or from a tarball
+  # (AUR, brew, Flatpak skip .git) and carry no dev stamp.
   set(SCULPTFORGE_DEV_BUILD AUTO CACHE STRING "Show 'dev <commit>' beside the version: AUTO, ON or OFF")
-  if(SF_GIT_COMMIT AND (SCULPTFORGE_DEV_BUILD STREQUAL "ON" OR (SCULPTFORGE_DEV_BUILD STREQUAL "AUTO" AND NOT DEFINED ENV{CI})))
-    set_property(SOURCE src/app/PanelProject.cpp APPEND PROPERTY COMPILE_DEFINITIONS "SF_DEV_COMMIT=\"${SF_GIT_COMMIT}\"")
+  if(SCULPTFORGE_DEV_BUILD STREQUAL "ON" OR (SCULPTFORGE_DEV_BUILD STREQUAL "AUTO" AND NOT DEFINED ENV{CI}))
+    set(SF_STAMP_DEV ON)
+  else()
+    set(SF_STAMP_DEV OFF)
   endif()
+  set(SF_BUILD_STAMP_CPP ${CMAKE_CURRENT_BINARY_DIR}/BuildStamp.cpp)
+  add_custom_target(sf_build_stamp
+    COMMAND ${CMAKE_COMMAND} -DSF_SRC=${CMAKE_CURRENT_SOURCE_DIR} -DSF_OUT=${SF_BUILD_STAMP_CPP} -DSF_DEV=${SF_STAMP_DEV}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildStamp.cmake
+    BYPRODUCTS ${SF_BUILD_STAMP_CPP} COMMENT "Build stamp" VERBATIM)
+  target_sources(sculptforge PRIVATE ${SF_BUILD_STAMP_CPP})
+  set_source_files_properties(${SF_BUILD_STAMP_CPP} PROPERTIES GENERATED TRUE SKIP_PRECOMPILE_HEADERS ON)
+  add_dependencies(sculptforge sf_build_stamp)
   if(MSVC)
     target_compile_options(sculptforge PRIVATE /W4 /utf-8 /permissive-)
   else()
@@ -986,6 +990,16 @@ if(SCULPTFORGE_BUILD_TESTS)
     set_tests_properties(sculptforge_tests_${k}of${SCULPTFORGE_TEST_SHARDS} PROPERTIES COST 1000 # the longest: start first
                          ENVIRONMENT "TMPDIR=${shard_tmp};TMP=${shard_tmp};TEMP=${shard_tmp}")
   endforeach()
+  # The build stamp follows the commit at build time (cmake/BuildStamp.cmake), and a release build carries no dev stamp.
+  add_test(NAME build_stamp COMMAND ${CMAKE_COMMAND} -DSF_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildStamp.cmake
+           -DSF_WORK=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/build-stamp -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/build_stamp_test.cmake)
+  if(SCULPTFORGE_BUILD_APP) # the binary reports the version, plus "dev <commit>" only when this is a dev build
+    add_test(NAME build_stamp_version COMMAND sculptforge --version)
+    set_tests_properties(build_stamp_version PROPERTIES PASS_REGULAR_EXPRESSION "SculptForge ${PROJECT_VERSION}[^\n]*\n")
+    if(NOT SF_STAMP_DEV)
+      set_tests_properties(build_stamp_version PROPERTIES FAIL_REGULAR_EXPRESSION " dev ")
+    endif()
+  endif()
   if(SCULPTFORGE_BUILD_APP) # the start-up splash by each of its three ways onto the window (surface, renderer, software), on SDL's dummy driver
     add_test(NAME splash_paths COMMAND sculptforge --splash-selftest)
     set_tests_properties(splash_paths PROPERTIES ENVIRONMENT "SDL_VIDEO_DRIVER=dummy")
@@ -1380,6 +1394,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(floor_grid_fixed_2880 floor_grid_fixed --size 2880x1800)
     sculptforge_ui_test(parts_numbered_duplicates_1440 parts_numbered_duplicates --size 1440x900) # Head.01, Head.02 in the Parts list
     sculptforge_ui_test(parts_numbered_duplicates_2880 parts_numbered_duplicates --size 2880x1800)
+    sculptforge_ui_test(stop_at_mesh_depth_1440 stop_at_mesh_depth --size 1440x900) # Crease Line ten laps over one line: no sawtooth; Stop at mesh depth
+    sculptforge_ui_test(stop_at_mesh_depth_2880 stop_at_mesh_depth --size 2880x1800)
     sculptforge_ui_test(gizmo_pick_clarity_1440 gizmo_pick_clarity --size 1440x900)
     sculptforge_ui_test(gizmo_pick_clarity_2880 gizmo_pick_clarity --size 2880x1800)
     sculptforge_ui_test(orientation_widget_1440 orientation_widget --size 1440x900) # Draw > Camera > Corner gizmo > Orientation
@@ -1848,6 +1864,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(my_panel_controls_1440_200 sizes/my_panel_controls --size 2880x1800)
     sculptforge_ui_test(shelves_anything_1440 sizes/shelves_anything --size 1440x900)
     sculptforge_ui_test(shelves_anything_1440_200 sizes/shelves_anything --size 2880x1800)
+    sculptforge_ui_test(touch_add_to_shelf_1440 sizes/touch_add_to_shelf --size 1440x900)
+    sculptforge_ui_test(touch_add_to_shelf_1440_200 sizes/touch_add_to_shelf --size 2880x1800)
     sculptforge_ui_test(my_panel_paths_1440 sizes/my_panel_paths --size 1440x900)
     sculptforge_ui_test(my_panel_paths_1440_200 sizes/my_panel_paths --size 2880x1800)
     # A crash leaves a note in the log file (#16). Needs no window.

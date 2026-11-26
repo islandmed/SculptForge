@@ -1986,6 +1986,8 @@ void App::dispatchEvent(const SDL_Event& event) {
         closeTopPopupOnEscape())
         return; // Esc closes the top context menu or combo list and nothing else sees it (#210; the Library's Esc would close it)
     pressSpent_ = closePopupsOnPressOutside(e); // a press outside open menus and popups acts, not only closes them (Shell.cpp)
+    if (e.type == SDL_EVENT_MOUSE_MOTION) ui::NotePointerPen(e.motion.which == SDL_PEN_MOUSEID);
+    else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) ui::NotePointerPen(e.button.which == SDL_PEN_MOUSEID);
     ImGui_ImplSDL3_ProcessEvent(&e);
     const ImGuiIO& io = ImGui::GetIO();
     if (touchMouseEvent(e)) return; // a finger's press waits for a second finger; a gesture's stay off (Touch.cpp)
@@ -4420,6 +4422,11 @@ void App::drawRecipeEditor(BrushRecipe& recipe) {
             ImGui::Checkbox(tr("Crisp edge##recipe"), &recipe.crispEdge);
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr("A hard, clean tip edge and a full plane pull, for hard-surface planes."));
+            if (recipe.pinch != 0.0f && recipe.depth < 0.0f && (newerMenuRows() || !recipe.stopAtMeshDepth)) { // (a row after 0.13.14: Classic keeps its old rows unless asked)
+                ImGui::Checkbox(tr("Stop at mesh depth##recipe"), &recipe.stopAtMeshDepth);
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                    ImGui::SetTooltip("%s", tr("A pinching cut stops deepening and tightening once the mesh can't hold its groove (about a brush radius deep): repeated passes no longer saw the walls into teeth. Untick it, or turn on Dynamic, to cut on."));
+            }
             continue; // (each has its own tooltip)
         case RecipeParam::Kind::Enum: {
             int idx = recipe.enumIndex(p.key);

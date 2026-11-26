@@ -394,6 +394,8 @@
 //   touch_tap "label"        one finger taps an item as it is on screen (no wheel, no scrolling: a finger can't scroll a
 //                            window that doesn't drag-scroll; fails when the item is not visible)
 //   touch_tap_at X Y         the same at window fractions (0..1): a tap outside a window, on the canvas
+//   touch_hold "label" [S [DX]]  one finger rests still on an item for S seconds (0.8), slides DX px sideways if given, and lifts: a long press (ui::TouchPin: the
+//                            menu to add it to My Panel or a shelf opens as it lifts). pen_hold is the same with the pen
 //   touch_drag_at X0 Y0 X1 Y1  one finger lands at window fractions and swipes to the others over 0.4 s (scrolls a window)
 //   touch_tap_welcome_x      a tap on the welcome window's title-bar X
 //   android_back             Android's Back button (SDLK_AC_BACK) down and up
@@ -1371,6 +1373,9 @@ double Demo::query(const std::string& name, bool& known) const {
         for (const std::string& p : py.pathScripts()) all = !py.setRunAtStartup(p, true) && !py.runsAtStartup(p) && all;
         return all ? 1.0 : 0.0;
     }
+    if (name == "touch_pin_menu") return ui::TouchPinMenuEntry().empty() ? 0.0 : 1.0; // the long-press menu is open
+    if (name == "touch_pin_armed") return double(ui::TouchPinArmed());               // long presses that took, so far
+    if (name == "my_panel_entries") return double(app_.layout_.myPanel.size());
     if (name.rfind("shelf_has_", 0) == 0) { // how many shelf slots hold the item (shelf_has_widget.color)
         const std::string id = name.substr(10);
         int n = 0;
@@ -2312,7 +2317,7 @@ void Demo::testKey(int line, const std::string& combo, int phase) {
 // Step verb -> its case in parseStep's switch. (A 147-link else-if chain reached MSVC's block-nesting limit, C1061;
 // a table + switch has no depth, and a new step is a name here, an enumerator and a case.)
 enum class StepVerb { None,
-    SafeArea, AndroidBack, TouchDragAt, TouchTap,
+    SafeArea, AndroidBack, TouchDragAt, TouchTap, TouchHold,
     Click, JumpClick, TierCard, Hover, HoverModel, Type, TypeHere, Key, KeyDown, Hold, Stroke, ViewDrag, DragFrames, AxisClick,
     AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
@@ -2333,6 +2338,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"android_back", StepVerb::AndroidBack},
         {"touch_drag_at", StepVerb::TouchDragAt},
         {"touch_tap", StepVerb::TouchTap}, {"touch_tap_at", StepVerb::TouchTap}, {"touch_tap_welcome_x", StepVerb::TouchTap},
+        {"touch_hold", StepVerb::TouchHold}, {"pen_hold", StepVerb::TouchHold},
         {"click", StepVerb::Click}, {"double_click", StepVerb::Click}, {"right_click", StepVerb::Click},
         {"jump_click", StepVerb::JumpClick},
         {"tier_card", StepVerb::TierCard},
@@ -2548,6 +2554,74 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             return true;
         });
         wait(0.2f);
+        return true;
+    }
+    case StepVerb::TouchHold: {
+        // A finger (SDL's mouse events for it, the finger event) or the pen rests on an item without moving, then lifts.
+        if (!need(1)) return false;
+        const std::string label = w[1];
+        const bool pen = verb == "pen_hold";
+        const SDL_MouseID which = pen ? SDL_PEN_MOUSEID : SDL_TOUCH_MOUSEID;
+        const float seconds = num(2, 0.8f), dx = num(3, 0.0f);
+        auto at = std::make_shared<ImVec2>();
+        steps_.push_back([this, line, label, which, at, pen](float t) {
+            ImVec2 to;
+            bool visible = false;
+            if (!findItem(label, to, &visible)) {
+                if (t > 3.0f) fail(line, notFound(label));
+                return t > 3.0f;
+            }
+            if (!visible) {
+                if (t > 0.5f) fail(line, "\"" + label + "\" is not visible (off screen or scrolled out of view): a finger can't reach it");
+                return t > 0.5f;
+            }
+            *at = to;
+            if (pen) { // (the pen's own events, as pen_tap sends them)
+                if (!penIn_) penProximity(true);
+                penMove(to.x, to.y);
+                penTouch(true, false);
+                penPressure(0.3f);
+                return true;
+            }
+            mouseMotion(to.x, to.y, which);
+            mouseButton(true, SDL_BUTTON_LEFT, which);
+            return true;
+        });
+        auto finger = [this, at, pen](SDL_EventType type) {
+            if (pen) return;
+            int ww = 1, wh = 1;
+            SDL_GetWindowSize(app_.window_, &ww, &wh);
+            SDL_Event e{};
+            e.type = type;
+            e.tfinger.touchID = App::kUiTestTouchScreen;
+            e.tfinger.fingerID = 1;
+            e.tfinger.x = at->x / float(ww);
+            e.tfinger.y = at->y / float(wh);
+            e.tfinger.pressure = type == SDL_EVENT_FINGER_UP ? 0.0f : 1.0f;
+            e.tfinger.windowID = SDL_GetWindowID(app_.window_);
+            app_.handleEvent(e);
+        };
+        run([finger] { finger(SDL_EVENT_FINGER_DOWN); });
+        wait(seconds);
+        if (dx != 0.0f) { // ... then drags sideways by DX px over 0.3 s before it lifts (a rest, then a slide)
+            steps_.push_back([this, at, which, pen, dx](float t) {
+                const float k = std::min(t / 0.3f, 1.0f);
+                if (pen) penMove(at->x + dx * k, at->y);
+                else mouseMotion(at->x + dx * k, at->y, which);
+                return t >= 0.3f;
+            });
+        }
+        steps_.push_back([this, finger, which, pen](float) {
+            if (pen) {
+                penTouch(false, false);
+                penPressure(0.0f);
+                return true;
+            }
+            mouseButton(false, SDL_BUTTON_LEFT, which);
+            finger(SDL_EVENT_FINGER_UP);
+            return true;
+        });
+        wait(0.3f);
         return true;
     }
     case StepVerb::TouchTap: {

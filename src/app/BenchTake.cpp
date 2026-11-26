@@ -12,6 +12,7 @@
 // commands, read files or change other settings are refused when the take loads, and shots and expectations are
 // skipped (Demo::loadTake).
 #include "app/App.h"
+#include "core/BuildStamp.h"
 #include "app/BenchVideo.h"
 #include "app/Demo.h"
 #include "app/Theme.h"
@@ -25,10 +26,6 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
-
-#ifndef SF_GIT_COMMIT
-#define SF_GIT_COMMIT "unknown"
-#endif
 
 namespace sf {
 
@@ -263,7 +260,7 @@ void App::drawTakeHud() {
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     ImFont* font = ImGui::GetFont();
     const float bigSize = ImGui::GetFontSize() * 1.35f, smallSize = ImGui::GetFontSize() * 1.05f;
-    const std::string brand = std::string("SculptForge ") + SCULPTFORGE_VERSION + " (" + SF_GIT_COMMIT + ")  -  benchmark take";
+    const std::string brand = std::string("SculptForge ") + SCULPTFORGE_VERSION + " (" + commitOrUnknown() + ")  -  benchmark take";
     const char* lines[] = {brand.c_str(), t.hud[0].c_str(), t.hud[1].c_str(), t.hud[2].c_str()};
     float w = 0, h = 0;
     for (int i = 0; i < 4; ++i) {

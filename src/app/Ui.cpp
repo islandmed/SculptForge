@@ -218,6 +218,192 @@ void SameLineAt(float cursorPosX) {
 }
 
 namespace {
+// Touch and pen without a keyboard (Ui.h TouchPin): a finger or the pen held still on an item for kLongPress opens a menu that
+// adds it to My Panel or a shelf, as an Alt-drag would. The press is taken from the item when it fires (its click and a
+// slider's drag are cancelled), a slider is read-only while the press is still (it does not jump to the finger before it is
+// known to be a hold), and a quick tap on one is replayed on release so tapping a slider still sets it.
+constexpr double kLongPress = 0.5; // seconds
+struct TouchPinState {
+    ImGuiID item = 0;        // the item the press in progress began on
+    double pressedAt = 0.0;  // io.MouseClickedTime[0] of that press
+    ImVec2 at;               // where it began
+    bool armed = false;      // it was held long enough: the ring shows, the menu opens as the finger lifts
+    bool pressOnUi = false;  // the press by a finger or the pen began on a window (not the model)
+    bool menuOpen = false, menuOpenNow = false; // the menu for menuEntry; the frame it is to be opened
+    std::string menuEntry;
+    ImGuiID menuPopup = 0;
+    int menuFrame = 0;
+    bool rcPending = false;  // a right-click, waiting a frame to see whether the control opened a menu of its own
+    std::string rcEntry;
+    int rcFrame = 0, rcPopups = 0;
+    bool picked = false;
+    std::string pickEntry;
+    int pickTarget = HostMyPanel;
+    int armedCount = 0;
+} g_touchPin;
+
+bool g_pointerPen = false; // the last mouse event was the pen's (the SDL backend tells a mouse from a finger, not from a pen)
+
+bool fingerSource() { return g_pointerPen || ImGui::GetIO().MouseSource == ImGuiMouseSource_TouchScreen; }
+
+// Does this frame need the touch and right-click work (so the controls it looks at are all counted alike)?
+bool touchPinWanted() {
+    ImGuiContext& g = *GImGui;
+    static const ImGuiContext* ctx = nullptr;
+    static int frame = -1;
+    static bool wanted = false;
+    if (ctx == &g && frame == g.FrameCount) return wanted;
+    ctx = &g;
+    frame = g.FrameCount;
+    TouchPinState& t = g_touchPin;
+    const ImGuiIO& io = g.IO;
+    if (io.MouseClicked[0]) t.pressOnUi = fingerSource() && io.WantCaptureMouse;
+    if (t.menuOpen && g.FrameCount - t.menuFrame > 3) t.menuOpen = false;   // its control stopped drawing
+    if (t.rcPending && g.FrameCount - t.rcFrame > 3) t.rcPending = false;
+    wanted = t.menuOpen || t.rcPending || io.MouseReleased[1] ||
+             (t.pressOnUi && fingerSource() && (io.MouseDown[0] || io.MouseReleased[0]));
+    return wanted;
+}
+
+bool touchPressNear(const ImRect& r) { // the press (still down or just let go) began on r and has not moved
+    const ImGuiIO& io = ImGui::GetIO();
+    const ImVec2 d(io.MousePos.x - io.MouseClickedPos[0].x, io.MousePos.y - io.MouseClickedPos[0].y);
+    const float slop = 8.0f * uiScale();
+    return r.Contains(io.MouseClickedPos[0]) && d.x * d.x + d.y * d.y <= slop * slop;
+}
+
+ImGuiID g_heldSlider = 0; // the slider SliderInside kept read-only under the press this frame
+
+bool touchArmedPress() { return g_touchPin.armed && g_touchPin.pressedAt == ImGui::GetIO().MouseClickedTime[0]; }
+
+// A finger or the pen is holding still on r: whatever is there keeps its value for now.
+bool touchHoldsOn(const ImRect& r) {
+    if (!touchPinWanted() || !ImGui::GetIO().MouseDown[0]) return false;
+    return touchPressNear(r);
+}
+
+// A finger or the pen just lifted from r after a tap that never moved (and was not a long press).
+bool touchTappedOn(const ImRect& r) {
+    if (!touchPinWanted() || !ImGui::GetIO().MouseReleased[0] || touchArmedPress()) return false;
+    return touchPressNear(r);
+}
+
+void openTouchPinMenu(const std::string& entry) {
+    TouchPinState& t = g_touchPin;
+    t.menuOpen = t.menuOpenNow = true;
+    t.menuEntry = entry;
+    t.menuFrame = GImGui->FrameCount;
+}
+
+// The menu, drawn where its control is (so its ID stack is the control's): one level, rows a finger can hit.
+void drawTouchPinMenu(const std::string& entry, const char* label) {
+    TouchPinState& t = g_touchPin;
+    const char* name = "##touchpin.menu";
+    if (t.menuOpenNow) {
+        t.menuOpenNow = false;
+        t.menuPopup = ImGui::GetID(name);
+        ImGui::OpenPopup(name);
+    }
+    if (ImGui::GetID(name) != t.menuPopup) return; // (the same control drawn in another place)
+    const float s = uiScale();
+    ImGui::SetNextWindowSizeConstraints(ImVec2(220.0f * s, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
+    if (!ImGui::BeginPopup(name)) {
+        t.menuOpen = false;
+        return;
+    }
+    t.menuFrame = GImGui->FrameCount;
+    ImGui::TextDisabled("%s", label);
+    ImGui::Separator();
+    ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.0f, 0.5f));
+    auto row = [&](const char* text, int target) {
+        if (!ImGui::Selectable(tr(text), false, 0, ImVec2(0.0f, 34.0f * s))) return;
+        t.picked = true;
+        t.pickEntry = entry;
+        t.pickTarget = target;
+        t.menuOpen = false;
+        ImGui::CloseCurrentPopup();
+    };
+    row("Add to My Panel", HostMyPanel);
+    if (entry.rfind("section:", 0) != 0) { // (a section is My Panel's alone)
+        row("Add to the top shelf", ShelfTop);
+        row("Add to the left shelf", ShelfLeft);
+        row("Add to the right shelf", ShelfRight);
+        row("Add to the bottom shelf", ShelfBottom);
+    }
+    ImGui::PopStyleVar();
+    ImGui::EndPopup();
+}
+
+// The item just drawn, as the entry `entry`: follow a press on it, a right-click on it, and its menu.
+void touchPinItem(const std::string& entry, const char* label) {
+    ImGuiContext& g = *GImGui;
+    ImGuiIO& io = g.IO;
+    TouchPinState& t = g_touchPin;
+    const ImGuiID id = ImGui::GetItemID();
+    const float s = uiScale();
+    if (!AltHeld()) {
+        // A right-click: where the control has a menu of its own (a brush tile, a layer) it opens in this very frame, after
+        // this call; look a frame later and add ours only if none did.
+        if (t.rcPending && t.rcEntry == entry && g.FrameCount > t.rcFrame) {
+            t.rcPending = false;
+            if (g.OpenPopupStack.Size <= t.rcPopups) openTouchPinMenu(entry);
+        }
+        if (io.MouseReleased[1] && io.MouseDragMaxDistanceSqr[1] < 16.0f * s * s && ImGui::IsItemHovered()) {
+            t.rcPending = true;
+            t.rcEntry = entry;
+            t.rcFrame = g.FrameCount;
+            t.rcPopups = g.OpenPopupStack.Size;
+        }
+        // A finger or the pen.
+        if (io.MouseClicked[0] && t.pressOnUi && ImGui::IsItemHovered()) {
+            t.item = id;
+            t.pressedAt = io.MouseClickedTime[0];
+            t.at = io.MouseClickedPos[0];
+            t.armed = false;
+        }
+        if (t.item == id && t.pressedAt == io.MouseClickedTime[0]) {
+            const ImVec2 d(io.MousePos.x - t.at.x, io.MousePos.y - t.at.y);
+            if (!t.armed) {
+                if (!io.MouseDown[0] || d.x * d.x + d.y * d.y > 64.0f * s * s) {
+                    t.item = 0; // lifted early (a tap) or moved (a drag)
+                } else if (ImGui::GetTime() - t.pressedAt >= kLongPress) {
+                    t.armed = true;
+                    ++t.armedCount;
+                    // The press is ours: no click on release. A slider keeps it (read-only while the finger is still): a drag
+                    // that starts after the rest, past the slop, hands it back to the slider (the menu is dropped below).
+                    if (g_heldSlider != id) ImGui::ClearActiveID();
+                    // A choice opens its list on the press: close it again.
+                    const ImGuiID combo = ImHashStr("##ComboPopup", 0, id);
+                    for (int i = 0; i < g.OpenPopupStack.Size; ++i)
+                        if (g.OpenPopupStack[i].PopupId == combo) {
+                            ImGui::ClosePopupToLevel(i, false);
+                            break;
+                        }
+                } else {
+                    g_animating = true; // (the loop wakes for it: the finger is still, nothing else would draw)
+                }
+            }
+            if (t.armed && io.MouseDown[0] && d.x * d.x + d.y * d.y > 64.0f * s * s) { // it moved after all: a drag, not a hold
+                t.armed = false;
+                t.item = 0;
+            }
+            if (t.armed) {
+                const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+                ImGui::GetForegroundDrawList()->AddRect(ImVec2(a.x - 2.0f * s, a.y - 2.0f * s), ImVec2(b.x + 2.0f * s, b.y + 2.0f * s),
+                                                        theme::u32(theme::accent), 4.0f * s, 0, 2.0f * s);
+                if (!io.MouseDown[0]) { // lifted: the menu, where the finger is
+                    t.armed = false;
+                    t.item = 0;
+                    openTouchPinMenu(entry);
+                }
+            }
+        }
+    }
+    if (t.menuOpen && t.menuEntry == entry) drawTouchPinMenu(entry, label);
+}
+} // namespace
+
+namespace {
 // Controls as My Panel entries (PinPalette / PinSection / BeginPinnedControl, Ui.h).
 std::string g_pinPalette, g_pinSection;
 std::unordered_map<std::string, int> g_pinCountPalette, g_pinCountSection; // key -> times seen in the scope this pass
@@ -231,7 +417,9 @@ void pinLastItem(const std::string& key, const char* label) {
     if (scope.empty() || key.empty() || g_inActionButton) return;
     ImGuiWindow* window = ImGui::GetCurrentWindow();
     if (window->SkipItems) return; // the control was not drawn (a section My Panel is not drawing): no item to mark
-    if (!g_pinActive && !(AltHeld() && !CtrlHeld())) return; // nothing to do this frame: no counting either (every pass counts alike)
+    const bool alt = AltHeld() && !CtrlHeld();
+    const bool touch = !g_pinActive && !alt && touchPinWanted();
+    if (!g_pinActive && !alt && !touch) return; // nothing to do this frame: no counting either (every pass counts alike)
     if (isDragItem()) return;      // a section header or a button: an entry of its own already
     auto& counts = !g_pinSection.empty() ? g_pinCountSection : g_pinCountPalette;
     const int n = ++counts[key];
@@ -255,9 +443,32 @@ void pinLastItem(const std::string& key, const char* label) {
         }
         return;
     }
-    if (AltHeld() && !CtrlHeld()) MyPanelDragEntry(myPanelControlEntry(scope, fullKey), label, false);
+    if (alt) MyPanelDragEntry(myPanelControlEntry(scope, fullKey), label, false);
+    else touchPinItem(myPanelControlEntry(scope, fullKey), label);
 }
 } // namespace
+
+void TouchPin(const std::string& entry, const char* label) {
+    if (g_pinActive || !touchPinWanted()) return;
+    touchPinItem(entry, label);
+}
+
+void NotePointerPen(bool pen) { g_pointerPen = pen; }
+
+bool TakeTouchPin(std::string& entry, int& target) {
+    if (!g_touchPin.picked) return false;
+    g_touchPin.picked = false;
+    entry = std::move(g_touchPin.pickEntry);
+    target = g_touchPin.pickTarget;
+    return true;
+}
+
+const std::string& TouchPinMenuEntry() {
+    static const std::string none;
+    return g_touchPin.menuOpen ? g_touchPin.menuEntry : none;
+}
+
+int TouchPinArmed() { return g_touchPin.armedCount; }
 
 void PinPalette(const char* paletteId) {
     g_pinPalette = paletteId ? paletteId : "";
@@ -860,6 +1071,7 @@ bool ActionButton(App& app, const char* actionId, ImVec2 size, Look look) {
     const bool customize = app.layout().customize;
     dragSource(app, id.c_str(), label.c_str(), shelf, index);
     MyPanelDragSource(id.c_str(), false, label.c_str());
+    if (shelf == ShelfNone) TouchPin("action:" + id, label.c_str()); // (a shelf's own button is not offered to a shelf again)
     g_inActionButton = true; // (the button is an "action:" entry: not a control too)
     HelpAction(app, id.c_str());
     g_inActionButton = false;
@@ -937,7 +1149,19 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     // No grab over the label: the position shows as the fill and a thin accent bar along the bottom.
     ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
+    // A finger or the pen holding still on it is maybe a long press (TouchPin): the value waits (until it moves, or lifts: a
+    // tap sets it, one frame late, as the press would have).
+    const ImRect where(p, ImVec2(p.x + w, p.y + h));
+    const bool held = touchHoldsOn(where);
+    const bool tapped = !held && touchTappedOn(where);
+    if (held) ImGui::PushItemFlag(ImGuiItemFlags_ReadOnly, true);
+    if (tapped) ImGui::GetIO().MouseDown[0] = true;
     const bool changed = ImGui::SliderFloat(id, v, lo, hi, format ? tr(format) : format, flags);
+    if (tapped) ImGui::GetIO().MouseDown[0] = false;
+    if (held) {
+        ImGui::PopItemFlag();
+        g_heldSlider = ImGui::GetItemID();
+    }
     if (format) { // the label inside, as drawn: wider than the slider is cut off
         char shown[128];
         ImFormatString(shown, sizeof(shown), tr(format), double(*v));

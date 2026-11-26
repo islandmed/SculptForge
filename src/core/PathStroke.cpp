@@ -141,6 +141,8 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
     base.pressure = std::clamp(stroke.pressure, 0.0f, 1.0f);
     base.invert = stroke.invert;
     base.frontFacesOnly = recipe && recipe->frontFacesOnly;
+    base.contactFacing = stroke.contactFacing;
+    base.facingAngle = stroke.facingAngle;
     base.alpha = &doc.brushAlpha;
     base.alphaUp = up;
     base.vdm = doc.brushVdm.get();
@@ -211,6 +213,7 @@ int strokePath(Document& doc, const BrushRecipe* recipe, BrushType type, const P
             if (stroke.pressureEnd >= 0.0f && samples.size() > 1)
                 p.pressure = std::clamp(glm::mix(stroke.pressure, stroke.pressureEnd, float(index) / float(samples.size() - 1)), 0.0f, 1.0f);
             p.center = hit.position;
+            if (stroke.contactFacing && glm::length(hit.normal) > 0.0f) p.pickNormal = glm::normalize(hit.normal); // (as the app's pick)
             p.strokeDelta = haveLast ? hit.position - last : glm::vec3(0.0f);
             last = hit.position;
             haveLast = true;
