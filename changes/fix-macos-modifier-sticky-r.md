@@ -1,9 +1,0 @@
----
-whats_new: **Cmd+W, Cmd+H and Cmd+M on macOS**: Cmd+W (Group from Mask) also asked to close the window and Cmd+H (View Mask) also hid the app; now only SculptForge's own action runs. A Shift, Ctrl or Alt release that a macOS menu or another app took is now noticed, so the key no longer stays held down.
-fixed: **A modifier key held down after the system took its release** (macOS first, also Windows): when a native menu or another window took the key-up of Shift, Ctrl/Cmd or Alt, the app kept it held. The held keys are now compared with the system's own state every frame while one is down and when the window gains or loses focus; a key the system says is up is released. Linux has no system query: the window system already tells SDL.
-fixed: **macOS: Cmd+W also asked to close the window, Cmd+H also hid the app.** SDL's menu bound Close (Cmd+W), Minimize (Cmd+M) and Hide (Cmd+H) and ran them after the app had used the key (Cmd is Ctrl here): Group from Mask also opened the save and quit prompt, View Mask also hid SculptForge. The menu items stay, without those keys.
-testers:
-  - macOS: Cmd+W (or Ctrl+W) turns the masked part into a face group and nothing else happens; Cmd+H toggles the view mask, the app stays; Cmd+M does not minimize the window.
-  - macOS: hold Shift, open a menu in the menu bar (or Cmd+Tab away and back), let go of Shift, return to the window; Shift is no longer held.
----
-Trimmed 11-26 after the reporter's test on macOS 27.2.1: "something has improved", but the selection-shape modes (Line, Lasso, Rectangle) still stay latched and cannot be switched off. That is a separate bug, queued for the next train; this note claims only the two fixes above. The popup-close resync stays in the code (tests/ui/modifier_stuck_resync.sfui covers frame, focus gained / lost, popup close).

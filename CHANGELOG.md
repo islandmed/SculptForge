@@ -6,6 +6,64 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-11-26
+
+### Added
+- **`sculptforge --version`** prints the version and exits; a developer's build adds the commit it was built at
+  ("0.13.14 dev 1a2b3c4").
+- **Touch way to add shelf and My Panel items**: hold a finger or the pen still on any control, button or section
+  title for half a second (a ring shows it took) and, as it lifts, a one-level menu offers **Add to My Panel** and the
+  four shelves; the item lands where an Alt-drop at the end would put it. A mouse's right-click opens the same menu on
+  a control with no menu of its own. A slider held this way does not move, and a quick tap on one still sets it.
+- **Stop at mesh depth** (Brush > Edit recipe, pinching carve brushes; Classic shows it with Show newer menu rows): on
+  by default; untick it to cut on, as before. With Dynamic on the groove keeps deepening (it adds the triangles it
+  needs) and only its pinch stops.
+
+### Changed
+- A developer's build shows the commit it was compiled at, not the one it was configured at, so an incremental rebuild
+  after a commit no longer shows the previous commit in the title bar.
+- **Release tooling**: a release's staging holds `main` until its promote has finished, so site pushes and the merge
+  queue cannot move it between the two; the merge queue judges a CI run only once it has finished, and retries a watch
+  that errors mid-run instead of reading it as red.
+- **Navigation bindings**: while a hold key is bound, the status bar keeps the HOLD TO ORBIT, PAN or ZOOM label's
+  place free when the bar is wide enough, so no item moves when the key goes down; in a narrower bar the label shows
+  in place of the status text while the key is held. No item ever moves or drops.
+- `SF_STROKE_LOG=1` (start SculptForge with it set) now gives each stroke batch, commit and stroke end the time it
+  happened (and on Linux the CPU core it ran on), and marks the batches that run after the pen lifts (catch-up,
+  finalize). On Linux with a CPU that has efficiency cores, a slow release then shows whether its last batches ran on
+  one.
+
+### Fixed
+- Pinching carve brushes (Crease Line, Engrave, Fold Valley, Panel Groove, Scratches, Check Split, Board Gap): ten
+  up-and-down passes over one line, with Mirror X on or off and Contact facing on or off, left serrated, sawtooth
+  walls inside the groove (its walls squeezed past the mesh's own triangle rows). The groove now stops deepening and
+  tightening at about a brush radius and a quarter under its rim, and a stroke on the mirror plane is one dab instead
+  of two done one after the other. The first passes dig as before.
+- Dynamic topology no longer erases a Part's painted texture. The remesh runs exactly as on a Part without UVs;
+  afterwards every triangle it changed takes its UVs from the surface as it was before the dab (closest point, one
+  chart per triangle, drawn in where it would sample outside the painted area), so the paint stays in place, no white
+  specks appear where big brushes simplify a painted head, and Undo restores the UVs exactly.
+- **Group visible / Ctrl+W**: after hiding part of an ungrouped mesh, Group from Mask with nothing masked now makes
+  the visible part its own face group. It kept group 0, the same group the hidden faces have, so nothing changed. A
+  fully visible mesh and an already grouped mesh behave as before.
+- **A modifier key held down after the system took its release** (macOS first, also Windows): when a native menu or
+  another window took the key-up of Shift, Ctrl/Cmd or Alt, the app kept it held. The held keys are now compared with
+  the system's own state every frame while one is down and when the window gains or loses focus; a key the system says
+  is up is released. Linux has no system query: the window system already tells SDL.
+- **macOS: Cmd+W also asked to close the window, Cmd+H also hid the app.** SDL's menu bound Close (Cmd+W), Minimize
+  (Cmd+M) and Hide (Cmd+H) and ran them after the app had used the key (Cmd is Ctrl here): Group from Mask also opened
+  the save and quit prompt, View Mask also hid SculptForge. The menu items stay, without those keys.
+- **The surface lagging a second or two behind the brush on a dense Micro level** (#184, thanks @HG4Science): each dab
+  re-shaded every patch within reach of the brush, not just the ones it changed. With an alpha (whose square reaches
+  well past what it moves) that was more than twice the work, and the shading fell behind the stroke. A dab now
+  re-shades only what it changed and the patches next to it.
+- **A stroke on a Micro level showing only when released** (#184, thanks @HG4Science): on a level that isn't streamed
+  (Micro 3 on a 2.6M base, for one), each frame shaded fewer patches than its dabs changed, and the surface behind the
+  brush kept its old shading until you let go. On computers at the High or Extreme hardware tier every frame now
+  shades what it changed, so the stroke shows as you draw. On the Essential and Standard tiers that cost a fifth to a
+  third of the stroke's frame rate, so there the shading still follows the stroke and catches up when you release,
+  with the smaller per-dab shading above.
+
 ## [0.14.1] - 2026-11-25
 
 ### Added

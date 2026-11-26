@@ -25,6 +25,16 @@ line: On a tablet, long-press a control, a button or a section's title and pick 
 action: guide:interface.md
 ```
 
+- **Add to a shelf by touch**: on a tablet, long-press a control, a button or a section's title and choose **Add to My
+  Panel** or a shelf from the small menu. With a mouse, right-click it. *Requested by a member*
+- **Crease Line, Engrave and the other pinching cuts**: repeated passes over one line no longer saw the groove's walls
+  into teeth. The groove stops deepening once the mesh can't hold it; untick **Brush > Edit recipe > Stop at mesh
+  depth** or turn on Dynamic to cut deeper.
+- **Dynamic** keeps a painted Part's texture: sculpting with Dynamic on no longer erases the paint.
+- **Cmd+W, Cmd+H and Cmd+M on macOS**: Cmd+W (Group from Mask) also asked to close the window and Cmd+H (View Mask)
+  also hid the app; now only SculptForge's own action runs. A Shift, Ctrl or Alt release that a macOS menu or another
+  app took is now noticed, so the key no longer stays held down.
+
 ## Version 0.14.1
 
 ```features

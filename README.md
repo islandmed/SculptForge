@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.14.1:</strong> up to four lights of your own with a shadow strength, any control on any shelf, and one place for the camera&#x27;s navigation bindings (<a href="https://sculptforge.app/guide/pbr-painting.md">how it works</a>)
+  <strong>New in 0.14.2:</strong> dynamic keeps your painted texture, pinching cuts hold smooth walls, and dense Micro levels shade closer behind the brush (<a href="https://sculptforge.app/guide/dynamic-topology.md">how it works</a>)
 </p>
 
 <p align="center">
