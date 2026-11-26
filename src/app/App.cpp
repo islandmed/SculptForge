@@ -3007,11 +3007,6 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     strokeColourSmooth_ = strokeBrush_ == BrushType::Smooth && paintMode_;
     strokePaint_ = strokeColourSmooth_ || (strokeBrush_ != BrushType::Smooth && (paintMode_ || paintRgb_));
     strokeSculpt_ = !(strokePaint_ && paintMode_);
-    if (strokeSculpt_ && dynamicPaintNoticeDue()) { // (the press asks first: no dab, Continue then stroke again)
-        openDynamicPaintNotice_ = true;
-        drag_ = Drag::None;
-        return;
-    }
     // Show SculptForge on Discord: a stroke counts as activity (Idle five minutes after the last input or stroke).
     // When it started, never where, what or on which file (PanelIntegrations.cpp).
     discordStrokeAt_ = double(SDL_GetTicksNS()) * 1e-9;

@@ -747,10 +747,6 @@ constexpr Entry kTraditionalChinese[] = {
     {"Show all hints again", "重新顯示所有提示"},
     {"Previewing an LOD", "正在預覽 LOD"},
     {"Face landmark steps", "臉部特徵點步驟"},
-    {"Dynamic rebuilds triangles and drops this Part's painted texture. Undo brings it back.", "動態會重建三角形，並丟棄此部件上繪製的紋理。復原可恢復。"},
-    {"Press Continue, then stroke again.", "按「繼續」後再重新落筆。"},
-    {"Continue", "繼續"},
-    {"Dynamic on a painted Part", "在已繪製的部件上使用動態"},
     {"Subtle", "細微"},
     {"Outline opacity", "輪廓線不透明度"},
     {"Pop-up colours", "彈出視窗顏色"},
@@ -3559,11 +3555,10 @@ constexpr Entry kTraditionalChinese[] = {
      "筆刷從表面減去。按住 Alt 可在單一筆畫中增加。"},
     {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
      "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
-     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
-     "are dropped (Undo brings them back).",
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles; UVs and the "
+     "painted texture are kept.",
      "動態拓樸：筆刷在需要細節處加入三角面，不需要處則移除，讓你拉出角或手指而不會拉伸。「細節」設定三角面的大小；拉"
-     "近視圖或縮小筆刷可得到更細的三角面。需要沒有細分層級的網格；筆刷下的四邊面會變成三角面，UV 會被捨棄（復原可找回"
-     "）。"},
+     "近視圖或縮小筆刷可得到更細的三角面。需要沒有細分層級的網格；筆刷下的四邊面會變成三角面，UV 與繪製的貼圖會保留。"},
     {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
      "sculpting.",
      "Lit Sphere 著色（預設）：所選的材質球或攝影棚燈光，便於雕刻時判讀形體。"},

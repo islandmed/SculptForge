@@ -1,0 +1,62 @@
+# Member bug (Android, Mali-G72, GL_MAX_TEXTURE_BUFFER_SIZE 65536 texels; see texture_mali_buffers.sfui): a buffer texture past the limit
+# is rejected at the draw. Dynamic keeps a painted Part's texture, and the renderer then draws the Part from patches that carry its UVs
+# (a texture buffer of 3 texels a triangle, per patch part of 4096 triangles). A Part small enough to keep its UVs in a buffer (a 20k
+# triangle sphere: 61k texels) must keep the patches' UV buffer under the limit whatever parts the patches grow to (5 parts fit; the
+# patches' 8-part minimum was 98k texels): past it the Part takes the full upload, and the paint shows either way.
+run ui_look look=classic layout=classic
+gl_limits texels=65536
+# A Part without UVs draws from patches during a Dynamic stroke too, and has no UV buffer to bind (the patches' 8-part minimum made one of
+# 98k texels, past the limit).
+run new_sphere subdivisions=5
+run dyntopo enabled=true detail=100
+click "Standard##brush.standard"
+stroke 0.42 0.30 0.47 0.33
+stroke 0.42 0.62 0.47 0.66
+stroke 0.36 0.45 0.40 0.50
+stroke 0.45 0.20 0.48 0.24
+wait 0.5
+expect_value texbuffer_over_limit == 0
+expect_value empty_buffer_samplers == 0
+render_cell "Dynamic on a Part without UVs x 65536-texel buffer limit" mode=lit
+run dyntopo enabled=false
+run new_sphere subdivisions=5
+run uv_auto resolution=2048
+run texture_create size=2048
+wait 0.5
+action draw.paint
+run set_color color=00ff00
+stroke 0.2 0.5 0.8 0.5
+wait 0.5
+expect_value texture_painted > 3000
+remember texture_painted painted
+# A painted Part without Dynamic never draws from patches (only a remeshing stroke makes them): the same path as before UVs were kept.
+click "Standard##brush.standard"
+stroke 0.3 0.4 0.7 0.5
+wait 0.3
+expect_value render_patches == 0
+expect_value texture_painted == $painted
+run dyntopo enabled=true detail=100
+stroke 0.42 0.30 0.47 0.33
+stroke 0.42 0.62 0.47 0.66
+stroke 0.36 0.45 0.40 0.50
+stroke 0.45 0.20 0.48 0.24
+stroke 0.44 0.75 0.47 0.79
+stroke 0.33 0.36 0.36 0.40
+wait 0.5
+expect_value uvs == 1
+expect_value texture_painted == $painted
+expect_value texbuffer_over_limit == 0
+expect_value empty_buffer_samplers == 0
+expect_value texture_not_shown == 0
+render_cell "Dynamic on a painted sphere x 65536-texel buffer limit (patches carry UVs, or a full upload)" mode=lit
+gl_limits texels=16384
+stroke 0.47 0.45 0.49 0.55
+stroke 0.32 0.28 0.35 0.31
+stroke 0.32 0.68 0.35 0.71
+wait 0.5
+expect_value texbuffer_over_limit == 0
+expect_value empty_buffer_samplers == 0
+expect_value texture_painted == $painted
+render_cell "Dynamic on a painted sphere x 16384-texel buffer limit" mode=lit
+shot texture_mali_dynamic_patches
+gl_limits texels=0

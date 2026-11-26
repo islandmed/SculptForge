@@ -38,6 +38,8 @@ from collections import Counter, defaultdict
 NIGHTLY_AREAS = [
     ("src/core/Voxel*", "sculptforge_tests_nightly_voxel"), ("src/core/MemoryGuard*", "sculptforge_tests_nightly_voxel"),
     ("src/core/*Remesh*", "sculptforge_tests_nightly_voxel"),
+    ("src/core/Dyntopo*", "sculptforge_tests_nightly_dyntopo"), ("src/core/Uv*", "sculptforge_tests_nightly_dyntopo"),
+    ("src/core/AutoUv*", "sculptforge_tests_nightly_dyntopo"),
 ]
 HAND_MAP = [
     ("CMakeLists.txt", "."), ("cmake/*", "."),
@@ -462,7 +464,8 @@ def self_test():
                  T("ui_shell_layout", app), T("marks", "python3", root + "/tools/check_marks.py"),
                  T("guide_site", "python3", root + "/tools/guide/build_site.py", "--check"),
                  T("release_notes_fragments", "python3", "x.py"),
-                 T("sculptforge_tests_nightly_voxel", os.path.join(b, "sculptforge_tests"), "--nightly", "voxel", labels=["nightly_area"])]
+                 T("sculptforge_tests_nightly_voxel", os.path.join(b, "sculptforge_tests"), "--nightly", "voxel", labels=["nightly_area"]),
+                 T("sculptforge_tests_nightly_dyntopo", os.path.join(b, "sculptforge_tests"), "--nightly", "dyntopo", labels=["nightly_area"])]
         r = lambda *f: impacted(root, b, list(f), graph=g, tests=tests, history=False)
         assert r("src/core/Mesh.h") == "^(marks|sculptforge_tests_0of2|sculptforge_tests_1of2|ui_shell_layout)$", r("src/core/Mesh.h")
         assert r("src/app/PanelMicro.cpp") == "^(marks|ui_micro_levels|ui_shell_layout)$", r("src/app/PanelMicro.cpp")
@@ -477,6 +480,7 @@ def self_test():
         assert r("tools/guide/lib.py") == "^(guide_site|marks)$", r("tools/guide/lib.py")
         # a nightly test only through its area: a Voxel change runs the real-model voxel nightlies, a Mesh change does not
         assert "sculptforge_tests_nightly_voxel" in r0("src/core/Voxel.cpp"), r0("src/core/Voxel.cpp")
+        assert "sculptforge_tests_nightly_dyntopo" in r0("src/core/Dyntopo.cpp"), r0("src/core/Dyntopo.cpp")
         assert "nightly" not in r("src/core/Mesh.h"), r("src/core/Mesh.h")
         assert r("changes/x.md") == "^(marks|release_notes_fragments)$"  # (stale_tree: not in this fake build)
         assert r("CMakeLists.txt") == "."

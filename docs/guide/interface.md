@@ -735,7 +735,7 @@ two identical monitors share one setting). A monitor the window has never been o
 | **Hide ring while stroking** | Off | While a stroke runs, only the dot where the brush touches (and the symmetry dots) shows, not the ring |
 
 **Edit > Preferences > Hints**: **Show hints in the viewport** (on) and one box per hint (Strokes start off the model,
-Previewing an LOD, Face landmark steps, Dynamic on a painted Part). Each hint over the 3D view also has its own **Don't show again**; **Show
+Previewing an LOD, Face landmark steps). Each hint over the 3D view also has its own **Don't show again**; **Show
 all hints again** brings them all back. Saved automatically.
 
 **Scrolling panels with a pen**: on small screens a palette or tray that doesn't fit scrolls with the mouse wheel,

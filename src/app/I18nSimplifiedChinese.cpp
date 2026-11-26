@@ -747,10 +747,6 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Show all hints again", "重新显示所有提示"},
     {"Previewing an LOD", "正在预览 LOD"},
     {"Face landmark steps", "脸部特征点步骤"},
-    {"Dynamic rebuilds triangles and drops this Part's painted texture. Undo brings it back.", "动态会重建三角形，并丢弃此部件上绘制的纹理。撤销可恢复。"},
-    {"Press Continue, then stroke again.", "点击“继续”，然后重新落笔。"},
-    {"Continue", "继续"},
-    {"Dynamic on a painted Part", "在已绘制的部件上使用动态"},
     {"Subtle", "细微"},
     {"Outline opacity", "轮廓线不透明度"},
     {"Pop-up colours", "弹窗颜色"},
@@ -3559,11 +3555,10 @@ constexpr Entry kSimplifiedChinese[] = {
      "笔刷从表面减去。按住 Alt 可在单一笔触中增加。"},
     {"Dynamic topology: brushes add triangles where they need detail and remove them where they don't, so you can "
      "pull out horns or fingers without stretching. Detail sets how small the triangles get; zoom in or shrink the "
-     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles and UVs "
-     "are dropped (Undo brings them back).",
+     "brush for finer ones. Needs a mesh without subdivision levels; quads under the brush become triangles; UVs and the "
+     "painted texture are kept.",
      "动态拓扑：笔刷在需要细节处加入三角面，不需要处则移除，让你拉出角或手指而不会拉伸。“细节”设置三角面的大小；拉"
-     "近视图或缩小笔刷可得到更细的三角面。需要没有细分层级的网格；笔刷下的四边面会变成三角面，UV 会被丢弃（可撤销恢复"
-     "）。"},
+     "近视图或缩小笔刷可得到更细的三角面。需要没有细分层级的网格；笔刷下的四边面会变成三角面，UV 与绘制的贴图会保留。"},
     {"Lit Sphere shading (the default): the chosen material sphere or the studio lights, made for reading forms while "
      "sculpting.",
      "Lit Sphere 着色（默认）：所选的材质球或摄影棚灯光，便于雕刻时判读形体。"},

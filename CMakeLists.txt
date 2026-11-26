@@ -1021,6 +1021,10 @@ if(SCULPTFORGE_BUILD_TESTS)
   add_test(NAME sculptforge_tests_nightly_voxel COMMAND sculptforge_tests --nightly voxel remesh)
   set_tests_properties(sculptforge_tests_nightly_voxel PROPERTIES LABELS nightly_area TIMEOUT 900
                        ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
+  # The Dynamic topology nightlies alone (a painted Part's UVs: its strays only show in the nightly, 0.13.14).
+  add_test(NAME sculptforge_tests_nightly_dyntopo COMMAND sculptforge_tests --nightly dyntopo)
+  set_tests_properties(sculptforge_tests_nightly_dyntopo PROPERTIES LABELS nightly_area TIMEOUT 1800
+                       ENVIRONMENT "TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly;TEMP=${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly")
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test-tmp/nightly)
   # Opt-in benches: own entry, labels bench + nightly (T0, CI and the shards never run them), hard timeout.
   # SF_FIGURE_POSE_MTRIS=2,20,50 selects the sizes (tests/test_figure_pose.cpp); without it the entry does nothing.
@@ -1385,8 +1389,6 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(color_material_entries_2880 color_material_entries --size 2880x1800)
     sculptforge_ui_test(fill_effect_slider_keeps_1440 fill_effect_slider_keeps --size 1440x900)
     sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
-    sculptforge_ui_test(dyntopo_paint_notice_1440 dyntopo_paint_notice --size 1440x900) # the first Dynamic stroke on a painted Part asks first
-    sculptforge_ui_test(dyntopo_paint_notice_2880 dyntopo_paint_notice --size 2880x1800)
     sculptforge_ui_test(scatter_1440 scatter --size 1440x900) # Tool > Scatter, its live redo and Separate Parts over 500
     sculptforge_ui_test(scatter_2880 scatter --size 2880x1800)
     sculptforge_ui_test(floor_grid_fixed_1440 floor_grid_fixed --size 1440x900) # View > Display > Floor grid at Y=0
@@ -1454,6 +1456,12 @@ if(SCULPTFORGE_BUILD_TESTS)
       endif()
       sculptforge_ui_test(e2e_${name} ../e2e/${name})
       set_tests_properties(ui_e2e_${name} PROPERTIES LABELS "ui;e2e")
+    endforeach()
+    # The Dynamic-on-a-painted-Part scenario at the shots bar's sizes too (the stills of the paint surviving the stroke).
+    foreach(size 1440x900 2880x1800)
+      string(REGEX REPLACE "x.*" "" w ${size})
+      sculptforge_ui_test(e2e_dynamic_keeps_texture_${w} ../e2e/dynamic_keeps_texture --size ${size})
+      set_tests_properties(ui_e2e_dynamic_keeps_texture_${w} PROPERTIES LABELS "ui;e2e")
     endforeach()
     if(NOT WIN32 AND Python3_Interpreter_FOUND AND TARGET sf_fake_splat_tools)
       # Quitting the app, every way, with a trainer child running: nothing outside it is signalled (#183).
