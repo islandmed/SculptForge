@@ -213,20 +213,40 @@ void dropSpecks(Mesh& m, const Mesh& source, size_t maxTriangles, int resolution
     bool anySmall = false;
     for (uint32_t v = 0; v < m.vertexCount() && !anySmall; ++v) anySmall = size[v] > 0 && size[v] < kSmall;
     if (!anySmall) return;
-    std::unordered_map<uint32_t, double> volume; // (of the small pieces, in voxels)
-    if (minCells > 0.0f && resolution > 0) {
+    std::unordered_map<uint32_t, double> volume;     // (of the small pieces, in voxels)
+    std::unordered_map<uint32_t, uint8_t> membrane;  // (pieces with no thickness)
+    if (resolution > 0) {
         glm::vec3 lo(1e30f), hi(-1e30f);
         for (const glm::vec3& p : m.positions) lo = glm::min(lo, p), hi = glm::max(hi, p);
         const double cell = double(std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z})) / double(resolution);
+        // Each small piece's volume against its own centre (a closed piece's volume doesn't depend on the origin, an open sheet's does:
+        // measured from its own centre a flat one is 0) and its area: a piece thinner than 0.05 voxel on average is a membrane, whatever
+        // its triangle count (a flat piece along the tip line of a crease, gh#240); a one-voxel fin is 0.5.
+        std::unordered_map<uint32_t, std::pair<glm::dvec3, double>> centre;
         for (const glm::uvec3& t : m.triangles)
-            if (const uint32_t root = find(t.x); size[root] < kSmall)
-                volume[root] += double(glm::dot(m.positions[t.x] - lo, glm::cross(m.positions[t.y] - lo, m.positions[t.z] - lo))) / 6.0;
-        for (auto& [root, v] : volume) v = std::abs(v) / (cell * cell * cell);
+            if (const uint32_t root = find(t.x); size[root] < kSmall) {
+                auto& c = centre[root];
+                c.first += glm::dvec3(m.positions[t.x]) + glm::dvec3(m.positions[t.y]) + glm::dvec3(m.positions[t.z]), c.second += 3.0;
+            }
+        for (auto& [root, c] : centre) c.first /= c.second;
+        std::unordered_map<uint32_t, double> area;
+        for (const glm::uvec3& t : m.triangles)
+            if (const uint32_t root = find(t.x); size[root] < kSmall) {
+                const glm::dvec3 o = centre[root].first, a = glm::dvec3(m.positions[t.x]) - o, b = glm::dvec3(m.positions[t.y]) - o,
+                                 c = glm::dvec3(m.positions[t.z]) - o;
+                volume[root] += glm::dot(a, glm::cross(b, c)) / 6.0;
+                area[root] += 0.5 * glm::length(glm::cross(b - a, c - a));
+            }
+        for (auto& [root, v] : volume) {
+            membrane[root] = std::abs(v) < 0.05 * area[root] * cell;
+            v = std::abs(v) / (cell * cell * cell);
+        }
     }
     auto isSpeckRaw = [&](uint32_t root) {
         if (size[root] < maxTriangles) return true;
+        if (const auto mem = membrane.find(root); mem != membrane.end() && mem->second) return true;
         const auto it = volume.find(root);
-        return it != volume.end() && it->second < double(minCells);
+        return minCells > 0.0f && it != volume.end() && it->second < double(minCells);
     };
     // (the specks' boxes, then the source's small shells: only when there is a speck to judge)
     std::vector<uint32_t> specks;
@@ -318,6 +338,8 @@ void dropSpecks(Mesh& m, const Mesh& source, size_t maxTriangles, int resolution
 
 
 } // namespace
+
+void dropVoxelSpecks(Mesh& m, const Mesh& source, int resolution) { dropSpecks(m, source, 64, resolution, kSpeckCells); }
 
 // The stages with Cancel and progress inside (StagePoll above); Voxel.h's plain versions call these with no poll.
 std::vector<uint8_t> solidifyShellPolled(const VoxelGrid& shell, float threshold, int closeRadius, bool keepAllParts,
@@ -1568,7 +1590,7 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
     std::vector<float> f(n);
     poolFor(n, [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
-            const float d = std::sqrt(dist2[i]);
+            const float d = std::max(std::sqrt(dist2[i]), kOnSurface); // (a sample exactly on the source keeps its sign: +0 would read as outside)
             f[i] = inside[i] || !reached[i] ? d : -d;
         }
     }, 1 << 16);

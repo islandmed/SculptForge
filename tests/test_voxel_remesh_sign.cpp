@@ -407,3 +407,63 @@ TEST(voxel_remesh_invariant_repeated_crease_strokes_stay_clean) {
         CHECK_MSG(far == 0, tag + std::to_string(far) + " sampled points over 3 voxels off the surface");
     }
 }
+
+// The reporter's repro at the Resolutions above the brick grid's start (1024, 1536, 2048: 10, 24 and 40 million triangles): the grid has
+// samples exactly on the crease's tip line there, and a sample on the source read as outside whatever the sign pass said, which left
+// zero-thickness membranes in the slot (dark flakes at 2048, artist-qa 11-26). One piece, as release/0.14 makes. Nightly: 2048 needs ~10 GB.
+TEST(nightly_voxel_remesh_repeated_crease_strokes_stay_one_piece_at_high_resolutions) {
+    Document doc = makeDoc(makeIcosphere(8, 1.0f));
+    doc.mesh.recomputeAllNormals();
+    PathStroke stroke;
+    for (int i = 0; i <= 8; ++i) stroke.points.push_back(glm::normalize(glm::vec3(0.0f, -0.4f + 0.1f * float(i), 1.0f)) * 1.2f);
+    stroke.view = glm::vec3(0, 0, -1);
+    stroke.radius = 0.04f;
+    stroke.strength = 0.8f;
+    std::string error;
+    for (int lap = 0; lap < 12; ++lap) {
+        std::reverse(stroke.points.begin(), stroke.points.end());
+        CHECK(strokePath(doc, nullptr, BrushType::Crease, stroke, error) > 0);
+    }
+    for (int resolution : {1024, 1536, 2048}) {
+        const Mesh out = voxelRemesh(doc.mesh, resolution, &error);
+        CHECK_MSG(out.triangleCount() > 0, error);
+        if (out.triangleCount() == 0) continue;
+        std::printf("  res %d: %zu triangles, %zu pieces\n", resolution, out.triangleCount(), components(out));
+        CHECK_MSG(components(out) == 1, "res " + std::to_string(resolution) + ": " + std::to_string(components(out)) + " pieces");
+    }
+}
+
+// Defence in depth for the same membranes (gh#240): a piece with no thickness is dropped whatever its triangle count, the thin fin of the next test stays (it is part of a remesh, not of this call).
+TEST(voxel_remesh_invariant_zero_thickness_pieces_are_dropped) {
+    Mesh m = uvSphere({0, 0, 0}, 1.0f, 48, 96);
+    const int resolution = 200;
+    const float cell = 2.0f / float(resolution);
+    // A flat sheet of 400 triangles one-sided (an open membrane) and a double-sided one (two coincident layers), both far bigger than 64 triangles.
+    auto sheet = [&](const glm::vec3& o, bool both) {
+        Mesh s;
+        for (int j = 0; j <= 10; ++j)
+            for (int i = 0; i <= 10; ++i) s.positions.push_back(o + glm::vec3(0.0f, float(i) * cell, float(j) * cell));
+        auto at = [](int i, int j) { return uint32_t(j * 11 + i); };
+        for (int j = 0; j < 10; ++j)
+            for (int i = 0; i < 10; ++i) {
+                s.triangles.push_back({at(i, j), at(i + 1, j), at(i + 1, j + 1)});
+                s.triangles.push_back({at(i, j), at(i + 1, j + 1), at(i, j + 1)});
+                if (both) {
+                    s.triangles.push_back({at(i, j), at(i + 1, j + 1), at(i + 1, j)});
+                    s.triangles.push_back({at(i, j), at(i, j + 1), at(i + 1, j + 1)});
+                }
+            }
+        return s;
+    };
+    auto add = [&](const Mesh& b) {
+        for (const glm::uvec3& t : b.triangles) m.triangles.push_back(t + glm::uvec3(uint32_t(m.positions.size())));
+        m.positions.insert(m.positions.end(), b.positions.begin(), b.positions.end());
+    };
+    add(sheet({1.5f, 0, 0}, false));
+    add(sheet({1.5f, 0, 0.5f}, true));
+    m.rebuildTopology();
+    const size_t before = components(m);
+    dropVoxelSpecks(m, Mesh{}, resolution);
+    CHECK_MSG(before == 3, std::to_string(before) + " pieces made");
+    CHECK_MSG(components(m) == 1, std::to_string(components(m)) + " pieces left, the sphere only");
+}

@@ -511,7 +511,7 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
     std::vector<float>& f = dist2; // the signed distance, in place
     poolFor(stored, [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
-            const float d = std::sqrt(dist2[i]);
+            const float d = std::max(std::sqrt(dist2[i]), kOnSurface);
             f[i] = (flags[i] & kInside) || !(flags[i] & kReached) ? d : -d;
         }
     }, 1 << 16);

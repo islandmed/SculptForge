@@ -34,3 +34,7 @@ bits along a rim). Surface nets (core/SurfaceNetsCell.h, both grids) now makes o
 surface instead of one per cell: a cell with two inside corners opposite on a face (two walls touching along a line, a
 1-3 voxel slit) used to weld its walls at one vertex and give an edge with 4 faces; now they are two sheets that touch.
 Tests: tests/test_voxel_remesh_sign.cpp (slabs at 100, 200 and 752; starter head non-manifold edges).
+At Resolution 2048 the grid has samples exactly on a crease's tip line; the signed field gave such a sample +0, which the surface nets read as
+outside whatever the sign pass said, and the slot got zero-thickness membranes (dark flakes). Every sample now has at least 0.001 of a cell
+of distance (kOnSurface), and dropSpecks also drops a piece thinner than 0.05 voxel on average. Tests: voxel_remesh_invariant_zero_thickness_pieces_are_dropped,
+nightly_voxel_remesh_repeated_crease_strokes_stay_one_piece_at_high_resolutions (1024, 1536, 2048).

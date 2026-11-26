@@ -47,6 +47,11 @@ Mesh meshFromSolid(const VoxelGrid& grid, const std::vector<uint8_t>& solid, int
 // then `smoothIterations` of Taubin smoothing. Triangles face outwards, in quad pairs (Mesh::quadPartners).
 Mesh meshFromField(const VoxelGrid& grid, const std::vector<float>& field, float iso, int smoothIterations);
 
+// The clean-up the remesh does after the surface nets (tests): drops the loose pieces of `m` that are under 64 triangles, under 64 voxels
+// of volume (at `resolution` across) or have no thickness, unless they are a small shell of `source` itself; keeps everything when no
+// bigger piece is left.
+void dropVoxelSpecks(Mesh& m, const Mesh& source, int resolution);
+
 // Signed distance in cells from each sample to `mesh` (positive inside, by `solid`; exact within `band` cells of the
 // surface, +-band beyond).
 std::vector<float> insideDistanceField(const Mesh& mesh, const VoxelGrid& grid, const std::vector<uint8_t>& solid, float band);
