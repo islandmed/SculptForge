@@ -233,7 +233,10 @@ void dropSpecks(Mesh& m, const Mesh& source, size_t maxTriangles, int resolution
     for (uint32_t v = 0; v < m.vertexCount(); ++v)
         if (size[v] > 0 && size[v] < kSmall && find(v) == v && isSpeckRaw(v)) specks.push_back(v);
     std::vector<uint8_t> detail(m.vertexCount(), 0);
-    if (!specks.empty() && resolution > 0) {
+    // (a piece of under 24 triangles is under two voxels across: no shell of the source is that small, nothing to look up for it)
+    constexpr uint32_t kTiny = 24;
+    const bool judge = resolution > 0 && std::any_of(specks.begin(), specks.end(), [&](uint32_t v) { return size[v] >= kTiny; });
+    if (judge) {
         glm::vec3 lo(1e30f), hi(-1e30f);
         for (const glm::vec3& p : m.positions) lo = glm::min(lo, p), hi = glm::max(hi, p);
         const float cell = std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z}) / float(resolution);
@@ -269,7 +272,8 @@ void dropSpecks(Mesh& m, const Mesh& source, size_t maxTriangles, int resolution
             if (std::max({b.hi.x - b.lo.x, b.hi.y - b.lo.y, b.hi.z - b.lo.z}) < 8.0f * cell) small.push_back(b);
         if (!small.empty()) {
             std::unordered_map<uint32_t, Box> pieceBoxes;
-            for (uint32_t v : specks) pieceBoxes[v];
+            for (uint32_t v : specks)
+                if (size[v] >= kTiny) pieceBoxes[v];
             for (uint32_t v = 0; v < m.vertexCount(); ++v)
                 if (auto it = pieceBoxes.find(find(v)); it != pieceBoxes.end()) {
                     it->second.lo = glm::min(it->second.lo, m.positions[v]);
