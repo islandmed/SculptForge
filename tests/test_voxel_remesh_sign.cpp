@@ -10,6 +10,8 @@
 
 #include "core/Document.h"
 #include "core/Mesh.h"
+#include "core/PathStroke.h"
+#include "core/Primitives.h"
 #include "core/StarterMeshes.h"
 #include "core/SurfaceQuery.h"
 #include "core/Voxel.h"
@@ -364,4 +366,44 @@ TEST(voxel_remesh_invariant_small_separate_shell_survives) {
     const Mesh out = voxelRemesh(m, 200, &error);
     CHECK_MSG(out.triangleCount() > 0, error);
     CHECK_MSG(components(out) == 2, std::to_string(components(out)) + " pieces (the head and the bead)");
+}
+
+// gh#240, the reporter's own repro: "make a deep crease on a subdivided mesh with the Crease brush, repeat the stroke until the crease
+// is deep, then Voxel Remesh: you see the same problem". A sphere of 1.3M triangles (a subdivided one), twelve Crease strokes (radius 0.04 of its 1.0,
+// strength 0.8) down one line, Voxel Remesh at the default Resolution and at 752 (the brick grid). Measured with release/0.14's
+// sculptforge-cli on the same recipe: at 752 28 pieces (27 stray) and 71 non-manifold edges, at 200 8 non-manifold edges (an 82k
+// sphere: 42 non-manifold edges at 752). Now: one piece, at most a few pinched edges, and no point of the result more than 3 voxels
+// off the sculpted surface (sampled; crease floors under 2 voxels are off by up to 2 in the base as well).
+TEST(voxel_remesh_invariant_repeated_crease_strokes_stay_clean) {
+    Document doc = makeDoc(makeIcosphere(8, 1.0f));
+    doc.mesh.recomputeAllNormals();
+    PathStroke stroke;
+    for (int i = 0; i <= 8; ++i) stroke.points.push_back(glm::normalize(glm::vec3(0.0f, -0.4f + 0.1f * float(i), 1.0f)) * 1.2f);
+    stroke.view = glm::vec3(0, 0, -1);
+    stroke.radius = 0.04f;
+    stroke.strength = 0.8f;
+    std::string error;
+    for (int lap = 0; lap < 12; ++lap) {
+        std::reverse(stroke.points.begin(), stroke.points.end());
+        CHECK(strokePath(doc, nullptr, BrushType::Crease, stroke, error) > 0);
+    }
+    const Mesh source = doc.mesh;
+    TriangleBVH bvh;
+    bvh.build(source);
+    for (int resolution : {200, 752}) {
+        const float cell = 2.0f / float(resolution);
+        const Mesh out = voxelRemesh(source, resolution, &error);
+        CHECK_MSG(out.triangleCount() > 0, error);
+        if (out.triangleCount() == 0) continue;
+        size_t far = 0, sampled = 0;
+        SurfaceHit hit;
+        for (size_t v = 0; v < out.positions.size(); v += 16, ++sampled)
+            if (bvh.closestPoint(out.positions[v], 1e9f, hit) && hit.distance > 3.0f * cell) ++far;
+        const std::string tag = "res " + std::to_string(resolution) + ": ";
+        std::printf("  %s%zu triangles, %zu pieces, %zu non-manifold edges, %zu of %zu sampled points over 3 voxels off\n", tag.c_str(),
+                    out.triangleCount(), components(out), nonManifoldEdges(out), far, sampled);
+        CHECK_MSG(components(out) == 1, tag + std::to_string(components(out)) + " pieces");
+        CHECK_MSG(nonManifoldEdges(out) <= 6, tag + std::to_string(nonManifoldEdges(out)) + " non-manifold edges");
+        CHECK_MSG(far == 0, tag + std::to_string(far) + " sampled points over 3 voxels off the surface");
+    }
 }

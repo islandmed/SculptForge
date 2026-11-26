@@ -14,9 +14,9 @@ fixed: **Voxel Remesh filled narrow creases and left speckled bits along them** 
   Resolution 752, points of the result more than a voxel off the original along the face went from 1311 to 368. Reported
   by @nino3thd.
 testers:
-  - Any OS: take a dense head with deep wrinkles (carve lines with Detail Crease, or import one), Decimate it, then Tool >
-    Remesh > Voxel Remesh at the default Resolution and at a higher one. Close up on the eye bags and the folds beside the nose:
-    the creases are continuous and no speckled rim or loose bits sit along them.
+  - Any OS (the reporter's own steps): on a subdivided sphere or head, cut a crease with the Crease brush, repeat the stroke
+    until the crease is deep, then Tool > Remesh > Voxel Remesh at the default Resolution and at 752: the crease is one clean
+    line, no speckled rim or loose bits along it.
   - Windows: the same at Resolution 752 or higher (an imported, decimated head): the eye bags and nasolabial folds have no speckled
     rim; the closed lips of the starter head stay one seam, no chips along it.
   - Remesh two overlapping spheres (or any sculpt built from overlapping blobs): still one closed surface, no slits at the
