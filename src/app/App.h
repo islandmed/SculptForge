@@ -3688,6 +3688,7 @@ private:
     // OsModifiers.h). Once a frame, on focus changes and when the stroke popup closes. UI tests: `os_mods` fakes the system.
     void syncModifiersFromOs();
     int osModsOverride_ = -1;     // UI tests: the modifiers the "system" reports (kOsMod bits), -1 = ask the system
+                                  // (a test run never asks: its held keys are SDL_SetModState's, the real keyboard has none)
     bool osModsEachFrame_ = true; // UI tests: false = only the event paths sync (focus, popup close)
     bool erasing() const;         // the pen's eraser end is drawing
     PenAction eraserAction() const { return uiPrefs_.tablet.eraser; }

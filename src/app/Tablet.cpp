@@ -518,7 +518,8 @@ SDL_Keymod App::keyMods() const {
 void App::syncModifiersFromOs() {
     const SDL_Keymod sdl = SDL_GetModState();
     if (!(sdl & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI))) return; // nothing held as far as SDL knows: nothing to clear, no system call
-    const int os = osModsOverride_ >= 0 ? osModsOverride_ : osModifiers();
+    // (A scripted run, UI tests and demo recordings, sets the held keys itself: the real keyboard reports none of them.)
+    const int os = osModsOverride_ >= 0 ? osModsOverride_ : demo_ ? -1 : osModifiers();
     const SDL_Keymod fixed = modsWithStaleCleared(sdl, os);
     if (fixed == sdl) return;
     SDL_SetModState(fixed);
