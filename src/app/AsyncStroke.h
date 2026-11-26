@@ -35,6 +35,7 @@ struct App::StrokeSolver {
     std::vector<uint8_t> hitProbe;
     double dabSeconds = 0.0;      // the batch's mean cost per dab
     double prepSeconds = 0.0;     // what packing its upload cost
+    double endWorkSeconds = 0.0;  // a finalize batch's end work: the flush and the upload's packing (not its dabs)
     uint32_t uploadId = 0;        // the active Part's renderer slot
     bool prepare = true;          // pack the upload on the thread
     bool finalize = false;        // before the batch: Sculptor::flushDraft (a draft stroke's end)
