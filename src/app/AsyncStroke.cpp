@@ -41,10 +41,13 @@ constexpr double kFusedBatchSeconds = 0.05;
 constexpr size_t kBackgroundDabVertices = 2'000'000;
 // The settle (the exact normals after a deferred stroke end) goes on the stroke thread while frames draw: in one batch
 // (about 230 ms for a 240 px dab at 28M triangles on the floor tier), as batches cost frame gaps and a pass each over
-// the dirty marks; a press during it waits for it, held (never a frame). Batches after the first (SF_SETTLE_LEAVES)
-// take about kSettleBatchSeconds of work; nothing is sent until the last, which packs every normal word once.
+// the dirty marks. It goes in chunks of a few ms: a press during it stops it after the chunk in
+// flight (App::settleForPress waits that out), and the new stroke takes the rest over. Batches after the first (SF_SETTLE_LEAVES) take about
+// kSettleBatchSeconds of work; nothing is sent until the last, which packs every normal word once.
 constexpr double kSettleBatchSeconds = 0.1;
 constexpr size_t kSettleFirstLeaves = SIZE_MAX;
+constexpr size_t kSettleChunkLeaves = 4096;    // the first chunk; then sized toward kSettleChunkSeconds of work
+constexpr double kSettleChunkSeconds = 0.003; // (what a press waits at most, about: the chunk in flight)
 
 } // namespace
 
@@ -74,6 +77,8 @@ void App::StrokeSolver::start() {
         std::lock_guard<std::mutex> lock(mutex_);
         pending_ = true;
         done = false;
+        preempted = false;
+        preempt.store(false, std::memory_order_relaxed);
         busy_.store(true, std::memory_order_release);
     }
     wake_.notify_one();
@@ -92,6 +97,38 @@ void App::StrokeSolver::wait() {
 bool App::StrokeSolver::waitFor(double seconds) {
     std::unique_lock<std::mutex> lock(mutex_);
     return idle_.wait_for(lock, std::chrono::duration<double>(seconds), [this] { return !busy_.load(std::memory_order_acquire); });
+}
+
+void App::StrokeSolver::settleChunks() {
+    // A settle batch's catch-up (catchUpLeaves), chunk by chunk, the same leaves in the same order as in one go, until a
+    // press asks for the mesh (App::onMouseDown): the leaves left then are the new stroke's (Sculptor::takeOverSettle).
+    static const size_t fixedChunk = [] { // (tests: SF_SETTLE_CHUNK_LEAVES fixes it, so a small mesh's settle has several)
+        const char* v = std::getenv("SF_SETTLE_CHUNK_LEAVES");
+        return v && *v ? size_t(std::max(1, std::atoi(v))) : size_t(0);
+    }();
+    size_t chunkLeaves = fixedChunk ? fixedChunk : kSettleChunkLeaves;
+    static const int delayMs = [] { // (tests: SF_SETTLE_DELAY_MS holds each chunk, so input lands inside the settle)
+        const char* v = std::getenv("SF_SETTLE_DELAY_MS");
+        return v && *v ? std::max(0, std::atoi(v)) : 0;
+    }();
+    size_t done = 0;
+    while (done < catchUpLeaves && app.doc_.sculptor.normalsPending()) {
+        if (preempt.load(std::memory_order_acquire)) {
+            preempted = true;
+            break;
+        }
+        const size_t n = std::min(chunkLeaves, catchUpLeaves - done);
+        const auto t0 = std::chrono::steady_clock::now();
+        app.doc_.sculptor.catchUpNormals(app.doc_.mesh, app.doc_.bvh, n);
+        const double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        chunkMaxMs = std::max(chunkMaxMs, sec * 1000.0);
+        done += n;
+        if (!fixedChunk && sec > 0.0) // (the next toward kSettleChunkSeconds, changing at most 2x a chunk)
+            chunkLeaves = size_t(std::clamp(double(chunkLeaves) * std::clamp(kSettleChunkSeconds / sec, 0.5, 2.0), 256.0, 262144.0));
+        for (int ms = 0; ms < delayMs && !preempt.load(std::memory_order_acquire); ++ms)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    catchUpLeaves = done; // (what it took: App::pumpSettle sizes the next batch by it)
 }
 
 void App::StrokeSolver::loop() {
@@ -128,7 +165,8 @@ void App::StrokeSolver::loop() {
             catchUpSeconds = 0.0;
             app.doc_.sculptor.endBatch(app.doc_.mesh, app.doc_.bvh);
             // Nothing more waiting: the exact normals behind the brush catch up (a frame's share of them).
-            if (catchUp && !finalize) app.doc_.sculptor.catchUpNormals(app.doc_.mesh, app.doc_.bvh, catchUpLeaves);
+            if (catchUp && !finalize && !settle) app.doc_.sculptor.catchUpNormals(app.doc_.mesh, app.doc_.bvh, catchUpLeaves);
+            if (settle) settleChunks();
             // A share of the exact normals the brush has left behind, every batch: lifting the pen then waits for
             // the last stretch only (they cost a tenth of what the dab-by-dab normals did over the stroke).
             else if (!finalize) app.doc_.sculptor.catchUpBehind(app.doc_.mesh, app.doc_.bvh, 0.35);
@@ -157,11 +195,6 @@ void App::StrokeSolver::loop() {
         if (((finalize && !deferEnd) || settled) && uploadReady) app.renderer_.refineStrokeBoundsInto(uploadId, app.doc_.mesh, upload);
         prepSeconds = finalize || settle ? 0.0 : std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
         if (settle) catchUpSeconds = spent + std::chrono::duration<double>(std::chrono::steady_clock::now() - prepStart).count();
-        static const int settleDelayMs = [] { // (tests: SF_SETTLE_DELAY_MS holds each settle batch, so input lands inside it)
-            const char* v = std::getenv("SF_SETTLE_DELAY_MS");
-            return v && *v ? std::max(0, std::atoi(v)) : 0;
-        }();
-        if (settle && settleDelayMs > 0) std::this_thread::sleep_for(std::chrono::milliseconds(settleDelayMs));
         static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
         if (log) {
             const SculptTimings& t = app.doc_.sculptor.timings;
@@ -284,8 +317,10 @@ void App::pumpSettle() {
     }
     StrokeSolver& s = *solver_;
     if (s.busy()) return;
+    const bool preempted = s.done && s.preempted;
     if (s.done) {
         const bool last = s.settle && s.settled;
+        if (s.settle) settleChunkMaxMs_ = s.chunkMaxMs;
         if (s.settle && s.catchUpSeconds > 0.0) // (the next batch toward kSettleBatchSeconds of work)
             settleLeaves_ = size_t(std::clamp(double(s.catchUpLeaves) * kSettleBatchSeconds / s.catchUpSeconds, 4096.0, 4194304.0));
         commitSolverBatch();
@@ -296,7 +331,8 @@ void App::pumpSettle() {
     }
     // A press waited for the batch in flight: it goes now (a sculpt stroke takes the rest over, anything else lets it go on).
     if (!drainQueue_.empty() && drainQueue_.front().first == kHeldPress) {
-        drainNextFrame_ = true;
+        if (preempted) runDrainQueue(); // (it stopped the settle for it: the press goes this frame)
+        else drainNextFrame_ = true;
         return;
     }
     // A shortcut waiting for the settle (queued, as for a stroke's end): the rest in one batch, then it runs.
@@ -359,11 +395,12 @@ void App::settleNow() {
 }
 
 void App::settleForPress() {
-    // A press while the last stroke settles: the batch in flight first (at most one: the settle, kSettleFirstLeaves), so the
+    // A press while the last stroke settles: the batch in flight first (onMouseDown stopped it after its chunk), so the
     // pick and the stroke's start see the mesh; a sculpt stroke then takes the rest over (beginStroke).
     if (!doc_.sculptor.settling() || !solver_) return;
     const auto t0 = std::chrono::steady_clock::now();
     solver_->wait();
+    if (solver_->done && solver_->settle) settleChunkMaxMs_ = solver_->chunkMaxMs;
     if (solver_->done) commitSolverBatch();
     solver_->settle = solver_->settled = false;
     static const bool log = std::getenv("SF_STROKE_LOG") != nullptr;
@@ -447,8 +484,10 @@ void App::commitSolverBatch() {
     if (strokeRadiusProbe_) strokeRadiusProbe_->insert(strokeRadiusProbe_->end(), s.radiusProbe.begin(), s.radiusProbe.end());
     if (strokeHitProbe_) strokeHitProbe_->insert(strokeHitProbe_->end(), s.hitProbe.begin(), s.hitProbe.end());
     if (s.prepSeconds > 0.0) prepSeconds_ = prepSeconds_ > 0.0 ? prepSeconds_ * 0.7 + s.prepSeconds * 0.3 : s.prepSeconds;
-    if (!s.batch.empty() && strokeFirstCommitAt_ == 0.0)
+    if (!s.batch.empty() && strokeFirstCommitAt_ == 0.0) {
         strokeFirstCommitAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        strokeFirstCommitFrame_ = frameCounter_;
+    }
     if (!s.batch.empty()) {
         lastDabScreen_ = glm::vec2(s.batch.back().x, s.batch.back().y);
         if (s.view.lastHitSeen) noteStrokePoint(s.view.lastHit);
@@ -659,6 +698,8 @@ void App::finishStrokeNow() {
         settleStartAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
         settledAt_ = 0.0;
         settleLeaves_ = kSettleFirstLeaves;
+        if (solver_) solver_->chunkMaxMs = 0.0;
+        settleChunkMaxMs_ = 0.0;
     }
     if (traceStroke) tracePerfStroke(r.label);
     finishPaintStroke(r);

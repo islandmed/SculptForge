@@ -725,6 +725,7 @@ int App::runUiTest(int w, int h, int fps) {
         touchTick(); // a finger's press that waited for a second finger long enough goes through
         if (interactiveStrokes_) { // (`interactive_strokes on`: what run() does each frame for a stroke's queued dabs)
             flushGrab();
+            ++frameCounter_;
             if (drainNextFrame_) {
                 drainNextFrame_ = false;
                 runDrainQueue();
@@ -1466,6 +1467,7 @@ int App::run() {
         flushGrab(); // Move: the pointer's moves since the last frame, as one
         flushGizmoDrag(); // a Gizmo drag: where the pointer is now
         flushForgeSphereDrag(); // a Forge Sphere drag: the same
+        ++frameCounter_;
         if (drainNextFrame_) { // (the stroke ended last frame: what waited for it runs now, its own frame)
             drainNextFrame_ = false;
             runDrainQueue();
@@ -2264,21 +2266,22 @@ BrushType App::activeBrush() const {
 }
 
 void App::onMouseDown(float x, float y, Uint8 button) {
-    // The last stroke's dabs still being placed (or what waited for them), or a settle batch of its normals running (the
-    // press goes once that one batch is in: a stroke then takes the rest over; waiting for it here froze the frame): this
-    // press waits.
-    const bool settleBatch = doc_.sculptor.settling() && solverBusy();
-    if (holdingPointer_ || strokeDraining() || settleBatch || !drainQueue_.empty()) {
+    // A settle batch of the last stroke's normals running: it stops after its chunk in flight (a few ms: settleForPress
+    // below waits that out), and a stroke then takes the rest over.
+    if (doc_.sculptor.settling() && solverBusy()) solver_->preempt.store(true, std::memory_order_release);
+    // The last stroke's dabs still being placed (or what waited for them): this press waits.
+    if (holdingPointer_ || strokeDraining() || !drainQueue_.empty()) {
         if (!holdingPointer_) drainQueue_.emplace_back(kHeldPress, Args{});
         holdingPointer_ = true;
         heldPointer_.push_back({HeldPointer::Down, x, y, 0.0f, 0.0f, button, false, pointerEventNs_ ? pointerEventNs_ : SDL_GetTicksNS()});
         mouseX_ = x;
         mouseY_ = y;
-        if (!settleBatch) status_ = drainStatus(); // (a batch is a frame or two: no status for it)
+        status_ = drainStatus();
         return;
     }
     if (strokeFinishing_) endStroke(); // (a stroke ending on this thread)
-    settleForPress(); // (the last stroke's normals still settling: the batch in flight first)
+    if (doc_.sculptor.settling()) pressDuringSettleFrame_ = frameCounter_; // (UI tests: press_to_takeover_frames)
+    settleForPress(); // (the last stroke's normals still settling: the chunk in flight first)
     cancelCameraMove(); // the orientation widget's eased turn ends where it is: a stroke or drag never runs under a moving view
     mouseX_ = x;
     mouseY_ = y;
@@ -3036,6 +3039,8 @@ void App::beginStroke(float x, float y, const RayHit& hit) {
     BrushAlpha::finishCreature(doc_.brushAlpha, true); // (picked a moment ago: the full alpha, never its tile)
     // A background stroke takes the last one's settling normals over (its first batch); any other settles them first.
     strokeFirstCommitAt_ = 0.0;
+    strokeBeganFrame_ = frameCounter_;
+    strokeFirstCommitFrame_ = 0;
     // (Not Kelvinlet, Cloth or fused batches: their dabs reach past the ball Sculptor::flushInheritedAround works out.)
     strokeTakeOver_ = doc_.sculptor.settling() && asyncStrokeAllowed() && solver_ && !solver_->busy() && !kelvinStrokeBrush() &&
                       strokeBrush_ != BrushType::Cloth && !fastBigBrushes();
@@ -3314,6 +3319,10 @@ void App::drainStrokeDabs(double budgetSeconds) {
         if (budgetSeconds > 0.0 &&
             std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >= budgetSeconds)
             break; // at least one dab per call, so a stroke always moves on
+    }
+    if (placed > 0 && strokeFirstCommitAt_ == 0.0) { // (this thread's dabs: on the GPU with this frame's sync; the bench's restroke_ms)
+        strokeFirstCommitAt_ = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        strokeFirstCommitFrame_ = frameCounter_;
     }
     if (const size_t fused = doc_.sculptor.batchWaiting(); fused > 0) {
         const auto batchStart = std::chrono::steady_clock::now();

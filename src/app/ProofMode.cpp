@@ -396,6 +396,7 @@ struct PhaseResult {
     // SF_BENCH_RESTROKE=<ms> (the 240 px phase): a new press that long after pen-up, then pen-up to its first dabs on
     // the GPU (what a quick second stroke waits for: the last one's end work, or with deferred normals what is left of it).
     double restrokeMs = -1;
+    double settleChunkMaxMs = -1; // the settle's slowest chunk (what a press during it waits at most, about)
     int restroke = 0; // 0 not yet, 1 pressed, 2 measured
     float pathRadiusPx = 0; // the stroke path's size (strokePoint's R, fitted to the model)
     double pathLaps = 1.0;  // ... how often round it relative to the full-size path (ProofState::laps)
@@ -1144,9 +1145,12 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     onMouseDown(at.x, at.y, SDL_BUTTON_LEFT); // (held while the stroke drains, as a person's press is)
                     onMouseMove(at.x + 2.0f, at.y, 0.0f, 0.0f, false);
                     ph.restroke = 1;
-                } else if (ph.restroke == 1 && drag_ == Drag::Stroke && !holdingPointer_ && strokeFirstCommitAt_ > p.releaseAt) {
-                    ph.restrokeMs = (strokeFirstCommitAt_ - p.releaseAt) * 1000.0;
+                } else if (ph.restroke == 1 && ((drag_ == Drag::Stroke && !holdingPointer_ && strokeFirstCommitAt_ > p.releaseAt) ||
+                                                nowSeconds() - p.releaseAt > restrokeAfter + 5.0)) {
+                    // (no first dabs within 5 s, a hook that can't see them: -1, the phase goes on)
+                    ph.restrokeMs = strokeFirstCommitAt_ > p.releaseAt ? (strokeFirstCommitAt_ - p.releaseAt) * 1000.0 : -1.0;
                     ph.restroke = 2;
+                    ph.settleChunkMaxMs = settleChunkMaxMs_; // (the settle the press stopped)
                     onMouseUp();
                     if (std::getenv("SF_STROKE_LOG")) SDL_Log("bench: restroke first dabs %.1f ms after pen-up", ph.restrokeMs);
                 }
@@ -1162,6 +1166,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             }
             if (doc_.sculptor.settling()) break; // (the exact normals still to come: the next stroke would wait for them too)
             if (settledAt_ >= p.releaseAt) ph.settledMs = (nowSeconds() - p.releaseAt) * 1000.0;
+            if (settledAt_ >= p.releaseAt) ph.settleChunkMaxMs = settleChunkMaxMs_;
             p.releasing = false;
             ph.stroke = perf_.lastStroke;
             ph.strokeSyncMs = perf_.lastStrokeSyncMs;
@@ -1496,6 +1501,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     }
                     if (ph.settledMs >= 0) j.set("settled_ms", std::round(ph.settledMs * 10) / 10);
                     if (ph.restrokeMs >= 0) j.set("restroke_ms", std::round(ph.restrokeMs * 10) / 10);
+                    if (ph.settleChunkMaxMs >= 0) j.set("settle_chunk_max_ms", std::round(ph.settleChunkMaxMs * 10) / 10);
                     if (ph.stroke.dabs > 0) { // where the stroke's time went, beside frame_split_ms (which is the main thread's)
                         Json t = Json::object();
                         t.set("kernel", std::round(ph.stroke.kernelMs * 10) / 10);
@@ -1520,6 +1526,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                     }
                     if (ph.settledMs >= 0) j.set("settled_ms", std::round(ph.settledMs * 10) / 10);
                     if (ph.restrokeMs >= 0) j.set("restroke_ms", std::round(ph.restrokeMs * 10) / 10);
+                    if (ph.settleChunkMaxMs >= 0) j.set("settle_chunk_max_ms", std::round(ph.settleChunkMaxMs * 10) / 10);
                 }
                 phases.push(j);
             }

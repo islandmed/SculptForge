@@ -44,6 +44,10 @@ struct App::StrokeSolver {
     bool settle = false;          // a settle batch (App::pumpSettle): catchUp, then the exact bounds once none are left
     bool settled = false;         // ... it took the last leaves and the bounds
     double catchUpSeconds = 0.0;  // what the batch's catch-up and packing cost
+    // A press while a settle batch runs (main thread): it stops after the chunk in flight (settleChunks).
+    std::atomic<bool> preempt{false};
+    bool preempted = false; // ... it stopped there, leaves still pending
+    double chunkMaxMs = 0.0; // the slowest settle chunk of this settle (the stroke's end resets it; App::settleChunkMaxMs_)
     // Kelvinlet strokes (PanelKelvinlet.cpp): after the batch's dabs, these moves (taken on the main thread, by
     // value) and, when kelvinFar, one group of the deferred far field.
     std::vector<KelvinletStep> kelvinSteps;
@@ -56,6 +60,7 @@ struct App::StrokeSolver {
 
 private:
     void loop();
+    void settleChunks();
     std::thread thread_;
     std::mutex mutex_;
     std::condition_variable wake_, idle_;

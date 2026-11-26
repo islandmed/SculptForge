@@ -549,6 +549,10 @@ private:
     bool strokeTakeOver_ = false;
     bool strokeTookOver_ = false;      // (UI tests: taken_over; stays until the next stroke begins)
     double strokeFirstCommitAt_ = 0.0; // this stroke's first dabs on the GPU (steady_clock seconds; the bench's restroke_ms)      // this stroke took the last one's pending normals over: its first batch does them
+    // (UI tests: press_to_takeover_frames, stroke_to_dab_frames) frames counted where a stroke's batches go (pumpStroke):
+    // a press during a settle, the stroke it began, that stroke's first dabs on the GPU.
+    double settleChunkMaxMs_ = 0.0; // the last settle's slowest chunk on the stroke thread (bench: settle_chunk_max_ms)
+    uint64_t frameCounter_ = 0, pressDuringSettleFrame_ = 0, strokeBeganFrame_ = 0, strokeFirstCommitFrame_ = 0;
     double settleStartAt_ = 0.0, settledAt_ = 0.0; // (steady_clock seconds: the bench's settled_ms)
     size_t settleLeaves_ = 0;          // leaves per settle batch (toward kSettleBatchSeconds of work)
     void commitSolverBatch();

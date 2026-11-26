@@ -4,7 +4,7 @@
 # ring), a shortcut waits for the settle instead of freezing a frame, and the settled mesh is the one the stroke leaves
 # with SF_DEFER_NORMALS=0 (tests/test_deferred_normals.cpp checks that bit for bit). ctest sets SF_BACKGROUND_DABS and
 # SF_SETTLE_DELAY_MS + SF_SETTLE_LEAVES (batches of 4 leaves, each held 50 ms, so the input below lands inside the settle and a
-# press waits for one batch, then takes the rest over); all are read once at startup.
+# press stops the batch in flight, then takes the rest over); all are read once at startup.
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=6
 interactive_strokes on
@@ -40,7 +40,7 @@ wait_value normals_settling == 0 20000
 wait_idle 30
 expect_value undo_steps == 1
 
-# A stroke pressed during the settle waits for the batch in flight, then takes the pending normals over (each dab first works
+# A stroke pressed during the settle stops the batch in flight, then takes the pending normals over (each dab first works
 # out those it reads: tests/test_deferred_normals.cpp checks the result bit for bit against a settle first). Its dabs aren't
 # compared here: a held press replays its moves at once and places fewer (the xfail in async_stroke_press_waits.sfui).
 key ctrl+z

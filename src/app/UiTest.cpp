@@ -2124,6 +2124,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "pen_y") return penAt_.y;
     if (name == "surface_cursor") return app_.surfaceCursorShown_ ? 1.0 : 0.0;
     if (name == "normals_settling") return app_.doc_.sculptor.settling() ? 1.0 : 0.0; // (App::deferNormals)
+    if (name == "press_to_takeover_frames") // a press during a settle: frames until the stroke it began took the settle over
+        return app_.strokeTookOver_ && app_.pressDuringSettleFrame_ ? double(app_.strokeBeganFrame_) - double(app_.pressDuringSettleFrame_) : -1.0;
+    if (name == "stroke_to_dab_frames") // the last stroke: frames from its start until its first dabs were on the GPU (-1: not yet)
+        return app_.strokeFirstCommitFrame_ ? double(app_.strokeFirstCommitFrame_) - double(app_.strokeBeganFrame_) : -1.0;
     if (name == "taken_over") return app_.strokeTookOver_ ? 1.0 : 0.0; // the last stroke began mid-settle and took it over
     if (name == "size_ring_preview") return app_.sizeRingPreview_ ? 1.0 : 0.0; // the S / O pop-up's ring (#138)
     if (name == "size_ring_px") return double(app_.sizeRingPreviewPx_);

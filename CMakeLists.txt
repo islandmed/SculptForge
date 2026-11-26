@@ -1400,6 +1400,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     endif()
     set_tests_properties(ui_async_stroke_settle PROPERTIES
                          ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_SETTLE_DELAY_MS=50;SF_SETTLE_LEAVES=4")
+    set_tests_properties(ui_settle_preempt PROPERTIES
+                         ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_SETTLE_DELAY_MS=50;SF_SETTLE_CHUNK_LEAVES=4")
     sculptforge_ui_test(vertex_streams_persistent vertex_streams) # (the stroke uploads through the staging buffer)
     set_tests_properties(ui_vertex_streams PROPERTIES ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_SETTLE_DELAY_MS=50;SF_SETTLE_LEAVES=4")
     set_tests_properties(ui_vertex_streams_persistent PROPERTIES

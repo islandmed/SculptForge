@@ -1,0 +1,36 @@
+# cold
+# A press during the settle (App::deferNormals) stops it after the chunk in flight, and the stroke it begins takes the rest
+# over at once: within a frame of the press, its first dabs at most a frame later than a stroke's on a settled mesh. ctest sets SF_BACKGROUND_DABS and
+# SF_SETTLE_DELAY_MS + SF_SETTLE_CHUNK_LEAVES (one settle batch of 4-leaf chunks, each held 50 ms: seconds in all, so a press
+# that waited for the batch would wait seconds), all read once at startup.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=6
+interactive_strokes on
+camera 0 0
+key f
+wait_idle 30
+brush_size 60
+snapshot
+
+# A stroke on the settled mesh: how many frames its first dabs take here (the strokes below go the same way).
+stroke 0.30 0.60 0.60 0.65 0.5
+wait_value normals_settling == 0 20000
+wait_idle 30
+wait_value stroke_to_dab_frames > -1 20000
+remember stroke_to_dab_frames plain_frames
+
+stroke 0.30 0.40 0.60 0.45 0.5
+wait_value normals_settling == 1 60
+wait_real 0.2
+expect_value normals_settling == 1
+stroke 0.55 0.45 0.70 0.60 0.5
+wait_value taken_over == 1 20000
+expect_value press_to_takeover_frames <= 1
+wait_value stroke_to_dab_frames > -1 20000
+expect_value stroke_to_dab_frames <= $plain_frames+1
+wait_value normals_settling == 0 20000
+wait_idle 30
+expect_value undo_steps == 3
+expect_value moved > 100
+wait_value gpu_vertex_mismatches > -1 20000
+expect_value gpu_vertex_mismatches == 0
