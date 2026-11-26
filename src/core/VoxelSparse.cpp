@@ -10,6 +10,7 @@
 
 #include "core/AtomicRef.h"
 #include "core/MemoryGuard.h"
+#include "core/SurfaceNetsCell.h"
 #include "core/ThreadPool.h"
 
 #include <algorithm>
@@ -530,6 +531,8 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
     for (size_t r = 0; r + 1 < rowStart.size(); ++r) rowStart[r + 1] += rowStart[r];
     // (g.at is in brick order: z, y, x, so a row's bricks are consecutive and its slots run from rowStart[row].)
     auto row = [&](int y, int z) { return size_t(z >> 3) * size_t(g.bd.y) + size_t(y >> 3); };
+    const SurfaceNetsCells& cells3 = SurfaceNetsCells::get();
+    std::atomic<size_t> split{0};
     const bool snap = voxelCreaseSnap();
     std::vector<int32_t> ownCells;
     if (snap) ownCells.assign(stored, -1);
@@ -553,27 +556,34 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
                             inside += c[size_t(k)] > iso;
                         }
                         if (inside == 0 || inside == 8) continue;
-                        glm::vec3 sum(0.0f);
-                        int crossings = 0;
+                        const int config = SurfaceNetsCells::key(c, iso);
+                        glm::vec3 sum[4] = {glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)};
+                        int crossings[4] = {0, 0, 0, 0};
                         for (int a = 0; a < 8; ++a)
-                            for (int bit = 1; bit < 8; bit <<= 1) {
-                                if (a & bit) continue;
-                                const int b = a | bit;
+                            for (int axis = 0; axis < 3; ++axis) {
+                                if (a >> axis & 1) continue;
+                                const int b = a | 1 << axis;
                                 const float fa = c[size_t(a)], fb = c[size_t(b)];
                                 if ((fa > iso) == (fb > iso)) continue;
                                 const float t = (iso - fa) / (fb - fa);
                                 const glm::vec3 pa(a & 1, (a >> 1) & 1, (a >> 2) & 1);
                                 const glm::vec3 pb(b & 1, (b >> 1) & 1, (b >> 2) & 1);
-                                sum += glm::mix(pa, pb, t);
-                                ++crossings;
+                                const int piece = cells3.piece[size_t(config)][size_t(SurfaceNetsCells::edgeId(a, axis))];
+                                sum[piece] += glm::mix(pa, pb, t);
+                                ++crossings[piece];
                             }
-                        cellVertex[s * kB3 + size_t(Bricks::local(x, y, z))] = int32_t(out.size());
-                        out.push_back(origin + glm::vec3(x, y, z) * cell + sum / float(crossings) * cell);
+                        const int pieces = cells3.count[size_t(config)];
+                        if (pieces > 1) split.fetch_add(1, std::memory_order_relaxed);
+                        const int32_t first = int32_t(out.size());
+                        cellVertex[s * kB3 + size_t(Bricks::local(x, y, z))] = pieces == 1 ? first : -(first + 2); // (several pieces: -(first + 2))
+                        for (int i = 0; i < pieces; ++i)
+                            out.push_back(origin + glm::vec3(x, y, z) * cell + sum[i] / float(crossings[i]) * cell);
                     }
                 }
             }
         }
     }, 1);
+    if (creases) creases->splitCells = split.load();
     std::vector<size_t> firstVertex(size_t(cells.z) + 1, 0);
     for (size_t z = 0; z < size_t(cells.z); ++z) firstVertex[z + 1] = firstVertex[z] + slicePositions[z].size();
     if (firstVertex.back() >= size_t(INT32_MAX)) return fail("Voxel Remesh: the surface would have over 2 billion points; lower the Resolution");
@@ -589,14 +599,28 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
                 for (uint32_t s = rowStart[r]; s < rowStart[r + 1]; ++s) {
                     const int bx = g.at[s].x * kB;
                     for (int x = bx; x < std::min(bx + kB, cells.x); ++x)
-                        if (int32_t& v = cellVertex[s * kB3 + size_t(Bricks::local(x, y, int(z)))]; v >= 0) v += int32_t(firstVertex[z]);
+                    {
+                        int32_t& v = cellVertex[s * kB3 + size_t(Bricks::local(x, y, int(z)))];
+                        if (v >= 0) v += int32_t(firstVertex[z]);
+                        else if (v != -1) v -= int32_t(firstVertex[z]);
+                    }
                 }
             }
         }
     }, 1);
-    auto vertexAt = [&](const glm::ivec3& c) {
+    // The vertex of cell c for the grid edge at p along axis (a cell of several pieces: the one holding that edge).
+    auto vertexAt = [&](const glm::ivec3& c, const glm::ivec3& p, int axis) {
         const int64_t i = g.find(c.x, c.y, c.z);
-        return i < 0 ? int32_t(-1) : cellVertex[size_t(i)];
+        if (i < 0) return int32_t(-1);
+        int32_t v = cellVertex[size_t(i)];
+        if (v < -1) {
+            std::array<float, 8> cv;
+            for (int j = 0; j < 8; ++j) cv[size_t(j)] = fAt(c.x + (j & 1), c.y + ((j >> 1) & 1), c.z + ((j >> 2) & 1));
+            const int config = SurfaceNetsCells::key(cv, iso);
+            const glm::ivec3 lo = p - c;
+            v = -v - 2 + cells3.piece[size_t(config)][size_t(SurfaceNetsCells::edgeId(lo.x | lo.y << 1 | lo.z << 2, axis))];
+        }
+        return v;
     };
     std::vector<std::vector<glm::uvec3>> sliceTriangles(size_t(g.dims.z));
     poolFor(size_t(g.dims.z), [&](size_t zb, size_t ze) {
@@ -625,7 +649,7 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
                                 glm::ivec3 c = p;
                                 c[u] += du[k];
                                 c[v] += dv[k];
-                                quad[size_t(k)] = vertexAt(c);
+                                quad[size_t(k)] = vertexAt(c, p, axis);
                                 ok &= quad[size_t(k)] >= 0;
                             }
                             if (!ok) continue;

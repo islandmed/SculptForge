@@ -21,6 +21,7 @@ glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::v
 struct CreaseReport {
     size_t creases = 0, fine = 0;
     float fineWidth = 0.0f;
+    size_t splitCells = 0;   // (surface-nets cells whose surface is more than one piece: two walls touching)
     size_t sealedOpened = 0; // (samples of a crease the wall closing had sealed that the sign test turned outside again)
 };
 // Which side of triangle `t` the point `p` is on, by the triangle's own plane at the point on it nearest to `p`: > 0 outside

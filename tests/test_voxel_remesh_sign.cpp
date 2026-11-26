@@ -8,7 +8,9 @@
 // long thin triangles (what decimation leaves along a fold).
 #include "TestHarness.h"
 
+#include "core/Document.h"
 #include "core/Mesh.h"
+#include "core/StarterMeshes.h"
 #include "core/SurfaceQuery.h"
 #include "core/Voxel.h"
 
@@ -277,4 +279,89 @@ TEST(voxel_remesh_invariant_smooth_blobs_stay_manifold) {
         CHECK_MSG(nonManifoldEdges(out) <= baseEdges[k], "res " + std::to_string(resolution) + ": " + std::to_string(nonManifoldEdges(out)) + " non-manifold edges");
         ++k;
     }
+}
+
+namespace {
+size_t openEdges(const Mesh& m) {
+    std::vector<uint64_t> edges;
+    for (const glm::uvec3& t : m.triangles)
+        for (int k = 0; k < 3; ++k) {
+            const uint64_t a = t[k], b = t[(k + 1) % 3];
+            edges.push_back((std::min(a, b) << 32) | std::max(a, b));
+        }
+    std::sort(edges.begin(), edges.end());
+    size_t n = 0;
+    for (size_t i = 0; i < edges.size();) {
+        size_t j = i;
+        while (j < edges.size() && edges[j] == edges[i]) ++j;
+        n += j - i == 1;
+        i = j;
+    }
+    return n;
+}
+} // namespace
+
+// Surface nets gave a cell whose surface is two walls touching (a slit 1-3 voxels wide seen end on: the lip line, an eyelid, a
+// nasolabial fold) one vertex for both, so the mesh pinched there: edges with 4 faces. It makes one vertex per piece now, so the
+// walls are two sheets that touch. Our starter head, Voxel Remesh at 200 and 400: release/0.14 made 20 / 6 non-manifold edges and
+// 5 / 0 folds over 150 degrees (measured with its sculptforge-cli); one piece, closed, and nothing worse than it is the bar.
+TEST(voxel_remesh_invariant_starter_head_stays_manifold) {
+    const StarterMesh* starter = findStarterMesh("human-head");
+    CHECK(starter != nullptr);
+    if (!starter) return;
+    Document d;
+    std::string error;
+    CHECK(loadStarterMesh(*starter, d, starter->levels, error));
+    const size_t baseEdges[] = {20, 6};
+    int k = 0;
+    for (int resolution : {200, 400}) {
+        const Mesh out = voxelRemesh(d.mesh, resolution, &error);
+        CHECK_MSG(out.triangleCount() > 0, error);
+        CHECK_MSG(components(out) == 1, "res " + std::to_string(resolution) + ": " + std::to_string(components(out)) + " pieces");
+        CHECK_MSG(openEdges(out) == 0, "res " + std::to_string(resolution) + ": open edges");
+        CHECK_MSG(nonManifoldEdges(out) <= baseEdges[k], "res " + std::to_string(resolution) + ": " + std::to_string(nonManifoldEdges(out)) + " non-manifold edges");
+        ++k;
+    }
+}
+
+// gh#240 at the reporter's size: Resolution 752 (the brick grid) on creases 2.5 and 4 voxels wide, 12 deep, straight and slanted:
+// one piece (no loose voxels along the rim), no pinched edge, near the source.
+TEST(voxel_remesh_invariant_creases_at_reporter_resolution) {
+    const int resolution = 752;
+    const float cell = kSize / float(resolution);
+    for (float cells : {2.5f, 4.0f})
+        for (bool wobble : {false, true}) {
+            const Mesh source = creasedSlab(cells * cell, 12.0f * cell, wobble, 0.0037f);
+            std::string error;
+            const Mesh out = voxelRemesh(source, resolution, &error);
+            CHECK_MSG(out.triangleCount() > 0, error);
+            if (out.triangleCount() == 0) continue;
+            const CreaseError e = measure(source, out, cell, 0.25f);
+            const std::string tag = "res 752 width " + std::to_string(cells) + " wobble " + std::to_string(int(wobble)) + ": ";
+            CHECK_MSG(e.pieces == 1, tag + std::to_string(e.pieces) + " pieces");
+            CHECK_MSG(nonManifoldEdges(out) == 0, tag + std::to_string(nonManifoldEdges(out)) + " non-manifold edges");
+            CHECK_MSG(e.worstOut < 2.1f, tag + std::to_string(e.worstOut) + " cells off the source");
+        }
+}
+
+// Dropping the loose bits of a rim must not drop real detail: a separate small sphere (2.2 voxels in radius, under the 64 voxels
+// of volume a speck is) beside the head is a shell of the source itself and survives the remesh at 200.
+TEST(voxel_remesh_invariant_small_separate_shell_survives) {
+    const StarterMesh* starter = findStarterMesh("human-head");
+    CHECK(starter != nullptr);
+    if (!starter) return;
+    Document d;
+    std::string error;
+    CHECK(loadStarterMesh(*starter, d, starter->levels, error));
+    Mesh m = d.mesh;
+    glm::vec3 lo(1e30f), hi(-1e30f);
+    for (const glm::vec3& p : m.positions) lo = glm::min(lo, p), hi = glm::max(hi, p);
+    const float cell = std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z}) / 200.0f;
+    const Mesh bead = uvSphere({hi.x + 8.0f * cell, 0.5f * (lo.y + hi.y), 0.5f * (lo.z + hi.z)}, 2.2f * cell, 12, 24);
+    for (const glm::uvec3& t : bead.triangles) m.triangles.push_back(t + glm::uvec3(uint32_t(m.positions.size())));
+    m.positions.insert(m.positions.end(), bead.positions.begin(), bead.positions.end());
+    m.rebuildTopology();
+    const Mesh out = voxelRemesh(m, 200, &error);
+    CHECK_MSG(out.triangleCount() > 0, error);
+    CHECK_MSG(components(out) == 2, std::to_string(components(out)) + " pieces (the head and the bead)");
 }
