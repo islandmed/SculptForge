@@ -1,0 +1,21 @@
+# The long-press menu (tests/ui/touch_add_to_shelf.sfui), for the look review at 1440 logical px (CMake: ui_touch_add_to_shelf_1440 at
+# 100 %, ui_touch_add_to_shelf_1440_200 at 200 %): the menu over a checkbox after a long press, then the control on the shelf it was
+# added to, in the Classic setup; then the menu from a section's title.
+logical_width 1440
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Parts##tool.part"
+click "Viewport Look##tool.display"
+touch_hold "Tool/Backface culling##display"
+expect_value touch_pin_menu == 1
+wait 0.3
+shot classic_menu
+click "Add to the top shelf"
+wait 0.3
+expect "Top shelf/Backface culling##display"
+shot classic_shelf
+# A section's title: only My Panel is offered.
+touch_hold "Parts##tool.part"
+expect_value touch_pin_menu == 1
+wait 0.3
+shot section_menu

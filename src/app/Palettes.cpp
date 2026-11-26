@@ -300,6 +300,7 @@ bool App::subpalette(const char* id, const char* englishTitle) {
     bool clicked = ImGui::InvisibleButton((std::string(title) + "##" + id).c_str(), ImVec2(w, h));
     const bool hovered = ImGui::IsItemHovered();
     ui::MyPanelDragSource(id, true, title);
+    ui::TouchPin(std::string("section:") + id, title);
     if (clicked && ui::MyPanelDragged()) clicked = false; // the end of an Alt-drag into My Panel, not a click
     // A quiet section header in the palette header's grammar: title at the left, chevron at the right. No fill until
     // hovered or open, a hairline under it. The title lines up with the section's content (tray::Section). The accent
