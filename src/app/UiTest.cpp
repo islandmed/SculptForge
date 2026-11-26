@@ -209,6 +209,8 @@
 //                            axis), camera_distance, camera_pan (target offset);
 //                            N may be $NAME or $NAME*K for a value kept by `remember`
 //                            paint_layers (paint layers above Base), active_paint_layer (-1 = Base),
+//                            paint_layers_visible (those that show), active_paint_layer_opacity (0..1; Base 1) /
+//                            active_paint_layer_blend (BlendMode index; Base 0),
 //                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255),
 //                            paint_rough (how uneven the vertex paint is: the mean distance, sRGB 0-255, between a vertex's colour
 //                            and its neighbours' average; Shift with the Paint brush lowers it),
@@ -778,6 +780,17 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "colored") return m.hasColors() ? 1.0 : 0.0;
     if (name == "paint_layers") return double(m.paintLayers.size());
     if (name == "active_paint_layer") return m.paintLayers.empty() ? -1.0 : double(m.activePaintLayer);
+    if (name == "paint_layers_visible") { // layers above Base that show (the Color palette's list and Tool > Paint Layers)
+        double n = 0.0;
+        for (const PaintLayer& l : m.paintLayers) n += l.visible ? 1.0 : 0.0;
+        return n;
+    }
+    if (name == "active_paint_layer_opacity" || name == "active_paint_layer_blend") { // 0..1 / the BlendMode index; Base 1 / 0
+        const bool on = !m.paintLayers.empty() && m.activePaintLayer >= 0 && m.activePaintLayer < int(m.paintLayers.size());
+        const PaintLayer* l = on ? &m.paintLayers[size_t(m.activePaintLayer)] : nullptr;
+        if (name == "active_paint_layer_blend") return l ? double(int(l->blend)) : 0.0;
+        return l ? double(l->opacity) : 1.0;
+    }
     if (name == "paint_mean_r" || name == "paint_mean_g" || name == "paint_mean_b") {
         if (!m.hasColors()) return 255.0;
         const int k = name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2;

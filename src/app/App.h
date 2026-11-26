@@ -2635,6 +2635,9 @@ private:
     void drawLayersContents();
     // Paint Layers sub-palette (PanelPaintLayers.cpp).
     void drawPaintLayersContents();
+    void drawActiveLayerBlendOpacity();  // the active layer's blend mode + opacity (shared with the Color palette's list)
+    void drawColorLayersCompact();       // Color palette > Layers: the same stack as a compact list
+    int listedColorLayer_ = -2;          // the compact list's active row last scrolled into view
     int renamingPaintLayer_ = -2; // layer being renamed inline (-2 = none)
     bool focusPaintRename_ = false;
     char paintRenameBuffer_[64] = "";

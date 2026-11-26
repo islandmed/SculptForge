@@ -1,0 +1,11 @@
+# Color > Layers is off in the Classic layout (its Color palette keeps its old look) unless Show newer menu rows is on.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Color##palette.color"
+expect_not "Vertex Paint & Materials/Layers"
+shot classic-off
+key escape
+run ui_look look=classic layout=classic newer_rows=1
+click "Color##palette.color"
+expect "Vertex Paint & Materials/Layers"
+shot classic-on

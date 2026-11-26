@@ -1,0 +1,12 @@
+# Color > Layers in the SculptForge layout: the Paint menu's Color palette carries the compact list by default (no setting
+# needed), closed until opened, and a layer added there is the Part's paint layer.
+run ui_look look=forge layout=sculptforge
+run new_sphere subdivisions=3
+click "Paint##menu.paint"
+expect "Color/Layers"
+click "Color/Layers"
+expect "Color/Base"
+click "Color/New layer"
+expect_value paint_layers == 1
+expect "Color/Layer 1"
+shot menu-layers
