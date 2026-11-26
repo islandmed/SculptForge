@@ -257,6 +257,11 @@ bool saveExr(const std::string& path, int width, int height, int channels, const
     return writeFile(path, out, error);
 }
 
+namespace {
+constexpr size_t kMaxExrChannels = 64;
+constexpr int64_t kMaxExrPixels = int64_t(1) << 27; // 16384 x 8192
+}
+
 bool loadExr(const std::string& path, int& width, int& height, int& channels, std::vector<float>& pixels,
              std::string& error) {
     std::vector<uint8_t> b;
@@ -277,7 +282,8 @@ bool loadExr(const std::string& path, int& width, int& height, int& channels, st
         int type;
     };
     std::vector<Chan> chans;
-    int compression = -1, x0 = 0, y0 = 0, x1 = -1, y1 = -1;
+    int compression = -1;
+    int64_t x0 = 0, y0 = 0, x1 = -1, y1 = -1; // (64 bits)
     for (;;) {
         if (pos >= b.size()) return bad("truncated header");
         if (b[pos] == 0) {
@@ -291,30 +297,33 @@ bool loadExr(const std::string& path, int& width, int& height, int& channels, st
             return s;
         };
         const std::string name = str(), type = str();
-        if (pos + 4 > b.size()) return bad("truncated header");
+        if (b.size() - std::min(pos, b.size()) < 4) return bad("truncated header"); // (checked by subtraction, also on 32 bits)
         const uint32_t size = u32(pos);
         pos += 4;
-        if (pos + size > b.size()) return bad("truncated header");
+        if (size > b.size() - pos) return bad("truncated header");
         const size_t end = pos + size;
         if (name == "channels") {
             while (pos < end && b[pos]) {
+                if (chans.size() >= kMaxExrChannels) return bad("too many channels");
                 Chan c;
                 c.name = str();
-                if (pos + 16 > end) return bad("channel list");
+                if (pos > end || end - pos < 16) return bad("channel list");
                 c.type = int(u32(pos));
                 chans.push_back(c);
                 pos += 16;
             }
         } else if (name == "compression") {
+            if (size < 1) return bad("compression"); // (the value is read: it must be there)
             compression = b[pos];
         } else if (name == "dataWindow" && size == 16) {
-            x0 = int(u32(pos)), y0 = int(u32(pos + 4)), x1 = int(u32(pos + 8)), y1 = int(u32(pos + 12));
+            x0 = int32_t(u32(pos)), y0 = int32_t(u32(pos + 4)), x1 = int32_t(u32(pos + 8)), y1 = int32_t(u32(pos + 12));
         }
         pos = end;
     }
     if (compression != 0) return bad("compressed");
-    width = x1 - x0 + 1, height = y1 - y0 + 1;
-    if (width <= 0 || height <= 0 || chans.empty() || width > 65536 || height > 65536) return bad("size");
+    const int64_t w64 = x1 - x0 + 1, h64 = y1 - y0 + 1;
+    if (w64 <= 0 || h64 <= 0 || chans.empty() || w64 > 65536 || h64 > 65536 || w64 * h64 > kMaxExrPixels) return bad("size");
+    width = int(w64), height = int(h64);
     // Map file channels to output channels: Y alone -> 1, else R, G, B -> 3.
     std::map<std::string, int> slot = {{"Y", 0}, {"R", 0}, {"G", 1}, {"B", 2}};
     const bool rgb = chans.size() >= 3;
@@ -324,15 +333,20 @@ bool loadExr(const std::string& path, int& width, int& height, int& channels, st
         if (c.type != 1 && c.type != 2) return bad("unsupported pixel type");
         pixelBytes += c.type == 1 ? 2 : 4;
     }
-    pixels.assign(size_t(width) * size_t(height) * size_t(channels), 0.0f);
     const size_t table = pos;
-    if (table + size_t(height) * 8 > b.size()) return bad("offset table");
+    // An uncompressed file holds every pixel: a header that claims more than the file has is refused first.
+    if (table > b.size() || size_t(height) > (b.size() - table) / 8 ||
+        (b.size() - table - size_t(height) * 8) / size_t(height) < pixelBytes * size_t(width))
+        return bad("offset table");
+    pixels.assign(size_t(width) * size_t(height) * size_t(channels), 0.0f);
     for (int line = 0; line < height; ++line) {
         uint64_t off = 0;
         for (int k = 0; k < 8; ++k) off |= uint64_t(b[table + size_t(line) * 8 + size_t(k)]) << (8 * k);
-        if (off + 8 + pixelBytes * size_t(width) > b.size()) return bad("scanline");
-        const int y = int(u32(size_t(off))) - y0;
-        if (y < 0 || y >= height) return bad("scanline y");
+        // (compared by subtraction)
+        if (off > b.size() || b.size() - size_t(off) < 8 + pixelBytes * size_t(width)) return bad("scanline");
+        const int64_t y64 = int64_t(int32_t(u32(size_t(off)))) - y0;
+        if (y64 < 0 || y64 >= height) return bad("scanline y");
+        const int y = int(y64);
         size_t p = size_t(off) + 8;
         for (const Chan& c : chans) {
             const auto it = slot.find(c.name);
