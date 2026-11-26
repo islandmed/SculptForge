@@ -804,9 +804,9 @@ void DynamicTopology::transferUvs() {
             UvHit h;
             if (nearestUv((p[0] + p[1] + p[2]) * (1.0f / 3.0f), chosen, false, 0.0f, h)) centre = uvAt(h.tri, h.bary);
             glm::vec2 shrunk[3];
-            for (float f : {0.85f, 0.7f, 0.55f, 0.4f, 0.3f, 0.2f, 0.12f, 0.06f, 0.02f}) {
+            for (float f : {0.85f, 0.7f, 0.55f, 0.4f, 0.3f, 0.2f, 0.12f, 0.06f, 0.02f, 0.0f}) {
                 for (int c = 0; c < 3; ++c) shrunk[c] = centre + (uv[c] - centre) * f;
-                if (f == 0.02f || uvFits(shrunk)) break; // (a thin chart: the paint in a speck, never a flat triangle)
+                if (f == 0.0f || uvFits(shrunk)) break; // (a thin chart: the paint in a speck)
             }
             for (int c = 0; c < 3; ++c) uv[c] = shrunk[c];
         }
