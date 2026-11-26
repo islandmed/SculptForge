@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cstdio>
 #include <iterator>
 #include <string>
 #include <string_view>
@@ -255,22 +256,31 @@ void App::drawStrokePopup() {
     // Another brush picked ends the latch for good: going back to the first brush doesn't bring it back.
     if (latch == StrokeLatch::None) strokeLatch_.latch = StrokeLatch::None;
     if (!strokePopup_.open) {
+        if (latch == StrokeLatch::None) return;
         // A latched modifier shows beside the brush cursor: strokes do something other than sculpt.
         const ImGuiIO& io = ImGui::GetIO();
-        if (latch != StrokeLatch::None && !io.WantCaptureMouse && canvasRect().contains(mouseX_, mouseY_) &&
-            radial_.menu < 0 && !quickMenu_.open) {
-            ImFont* font = fontSmall_ ? fontSmall_ : ImGui::GetFont();
-            std::string label = strokeLatchName(latch); // with the shape it draws: "Lasso Mask", "Cut Line"
-            for (int i = 0; i < kStrokePopupShapes; ++i)
-                if (StrokeShape(i) != StrokeShape::MaskPen && strokeShapeOn(StrokeShape(i)))
-                    label = std::string(kShapes[i].kind) + " " + kShapes[i].label;
-            const char* text = label.c_str();
+        std::string label = strokeLatchName(latch); // with the shape it draws: "Lasso Mask", "Cut Line"
+        for (int i = 0; i < kStrokePopupShapes; ++i)
+            if (StrokeShape(i) != StrokeShape::MaskPen && strokeShapeOn(StrokeShape(i)))
+                label = std::string(kShapes[i].kind) + " " + kShapes[i].label;
+        ImFont* font = fontSmall_ ? fontSmall_ : ImGui::GetFont();
+        auto pill = [&](const char* text, ImVec2 a) {
             const ImVec2 ts = font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text);
-            const ImVec2 a(mouseX_ + 14.0f * s, mouseY_ + 14.0f * s);
             const ImVec2 b(a.x + ts.x + 12.0f * s, a.y + ts.y + 6.0f * s);
             fg->AddRectFilled(a, b, theme::u32(theme::panelBg, 0.92f), (b.y - a.y) * 0.5f);
             fg->AddRect(a, b, theme::u32(theme::accent), (b.y - a.y) * 0.5f, 0, 1.0f * s);
             fg->AddText(font, font->FontSize, ImVec2(a.x + 6.0f * s, a.y + 3.0f * s), theme::u32(theme::textBright), text);
+            return ts.x + 12.0f * s;
+        };
+        if (!io.WantCaptureMouse && canvasRect().contains(mouseX_, mouseY_) && radial_.menu < 0 && !quickMenu_.open)
+            pill(label.c_str(), ImVec2(mouseX_ + 14.0f * s, mouseY_ + 14.0f * s));
+        // Always in the corner of the canvas too, with the way out (users could not find it: Discord 11-26).
+        if (radial_.menu < 0 && !quickMenu_.open) {
+            char text[160];
+            std::snprintf(text, sizeof text, tr("%s on  \xc2\xb7  Esc turns it off"), label.c_str());
+            const CanvasRect c = canvasRect();
+            const ImVec2 ts = font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text);
+            pill(text, ImVec2(c.x + (c.w - ts.x - 12.0f * s) * 0.5f, c.y + 44.0f * s)); // below the history strip
         }
         return;
     }
