@@ -722,6 +722,7 @@ int App::runUiTest(int w, int h, int fps) {
         updateCameraAspect();
         updateSpaceMouse(dt);
         updateKeyNav(dt);
+        if (osModsEachFrame_) syncModifiersFromOs();
         touchTick(); // a finger's press that waited for a second finger long enough goes through
         if (interactiveStrokes_) { // (`interactive_strokes on`: what run() does each frame for a stroke's queued dabs)
             flushGrab();
@@ -1540,6 +1541,7 @@ int App::run() {
         // spaceMouseMoving() is true and a loop that waits for events when idle must keep drawing.
         updateSpaceMouse(dt);
         updateKeyNav(dt); // the held pan and zoom keys (runUiTest calls it too)
+        if (osModsEachFrame_) syncModifiersFromOs(); // a modifier's key-up the system took (OsModifiers.h)
         touchTick(); // a finger's press that waited for a second finger long enough goes through
 
         hardwareProfileFrameBegin(); // the frame governor's CPU and GPU timing
@@ -2015,9 +2017,11 @@ void App::dispatchEvent(const SDL_Event& event) {
         break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
         windowFocused_ = true;
+        syncModifiersFromOs(); // (keys let go while another window had focus)
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         windowFocused_ = false;
+        syncModifiersFromOs(); // (SDL lets go of every key itself when no window has focus; this covers a handover)
         // A pen button or the tip let go in another window never reaches us: its view drag, held buttons and stroke end
         // here, or the pen's next press only navigates (#216).
         if (penInProximity_ || penButtons_ || (dragFromPen_ && drag_ != Drag::None)) penLeft();

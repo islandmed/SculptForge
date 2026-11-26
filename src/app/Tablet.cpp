@@ -9,6 +9,7 @@
 // like a mouse. The settings live in UiPrefs::tablet (saved automatically);
 // the math is in core/Tablet.h. User guide: docs/tablet.md.
 #include "app/App.h"
+#include "app/OsModifiers.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
 
@@ -512,6 +513,23 @@ SDL_Keymod App::keyMods() const {
         else if (ctrl && !shift) mods = SDL_Keymod((mods & ~SDL_KMOD_CTRL) | SDL_KMOD_LALT);
     }
     return mods;
+}
+
+void App::syncModifiersFromOs() {
+    const SDL_Keymod sdl = SDL_GetModState();
+    if (!(sdl & (SDL_KMOD_SHIFT | SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI))) return; // nothing held as far as SDL knows: nothing to clear, no system call
+    const int os = osModsOverride_ >= 0 ? osModsOverride_ : osModifiers();
+    const SDL_Keymod fixed = modsWithStaleCleared(sdl, os);
+    if (fixed == sdl) return;
+    SDL_SetModState(fixed);
+    // What SDL let go as far as we are concerned, ImGui and the held-key list must forget as well (as a modifier's key-up does).
+    ImGuiIO& io = ImGui::GetIO();
+    const SDL_Keymod gone = SDL_Keymod(sdl & ~fixed);
+    if (gone & SDL_KMOD_SHIFT) io.AddKeyEvent(ImGuiMod_Shift, false);
+    if (gone & SDL_KMOD_CTRL) io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    if (gone & SDL_KMOD_ALT) io.AddKeyEvent(ImGuiMod_Alt, false);
+    if (gone & SDL_KMOD_GUI) io.AddKeyEvent(ImGuiMod_Super, false);
+    keysDown_.clear();
 }
 
 bool App::erasing() const { return (lastInputPen_ || wintabPen_) && penEraser_; }

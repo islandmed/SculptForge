@@ -1,0 +1,79 @@
+# A modifier key-up the app never saw (macOS: a native menu or another app took it; Windows: Win key, UAC): SDL says
+# Shift / Ctrl / Alt / Cmd is held, the system says it isn't. Strokes smoothed, masked or selected and Alt kept inverting,
+# with the stroke popup's latch looking stuck (0.14.1, a macOS tester on Discord). `stuck_mods` is what SDL believes,
+# `os_mods` what the system reports. The state re-syncs each frame, when the window gains or loses focus and when the
+# stroke popup closes, and only ever clears: a key the system agrees is held stays held.
+run new_sphere subdivisions=4
+camera 0 0
+expect_value sculpt_mods == 0
+
+# Each frame: Shift stuck, then Ctrl, Alt and Cmd (Cmd is Ctrl on a Mac), then all of them.
+os_mods none
+stuck_mods shift
+wait 0.1
+expect_value sculpt_mods == 0
+stuck_mods ctrl
+wait 0.1
+expect_value sculpt_mods == 0
+stuck_mods alt
+wait 0.1
+expect_value sculpt_mods == 0
+stuck_mods cmd
+wait 0.1
+expect_value sculpt_mods == 0
+stuck_mods shift+ctrl+alt
+wait 0.1
+expect_value sculpt_mods == 0
+
+# A key the system agrees is held stays held, and only the ones it lists: Shift + Alt held, Ctrl stuck.
+os_mods shift+alt
+stuck_mods shift+alt+ctrl
+wait 0.1
+expect_value sculpt_mods == 5
+stuck_mods none
+os_mods none
+wait 0.1
+expect_value sculpt_mods == 0
+
+# A stroke after a stuck Shift sculpts (it didn't smooth: the surface moves).
+snapshot
+stuck_mods shift
+wait 0.1
+hover_model 0.5 0.5
+stroke 0.3 0.5 0.7 0.5
+expect_value moved > 0
+os_mods off
+
+# Focus, the frame check off: Ctrl stuck is cleared when the window gains focus, Alt when it loses it.
+os_mods none events_only
+stuck_mods ctrl
+wait 0.1
+expect_value sculpt_mods == 2
+window_focus 1
+expect_value sculpt_mods == 0
+stuck_mods alt
+wait 0.1
+expect_value sculpt_mods == 4
+window_focus 0
+expect_value sculpt_mods == 0
+window_focus 1
+
+# The stroke popup (Select latched: a stuck Shift is the one thing the user can't see): closing it re-syncs, the latch
+# itself stays until it is picked again.
+key g
+stroke_popup_item select click
+expect_value stroke_latch == 3
+expect_value stroke_popup_open == 1
+stuck_mods shift
+wait 0.1
+expect_value sculpt_mods == 1
+stroke_popup_item dots click
+expect_value stroke_popup_open == 0
+expect_value sculpt_mods == 0
+expect_value stroke_latch == 3
+key g
+stroke_popup_item select click
+expect_value stroke_latch == 0
+stroke_popup_item dots click
+os_mods off
+expect_value sculpt_mods == 0

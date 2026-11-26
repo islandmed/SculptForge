@@ -41,4 +41,12 @@ void install() {
         }
 }
 
+// The modifier keys the system says are down at this moment ([NSEvent modifierFlags]: one read of the hardware state, no
+// allocation). SDL tracks them from the events it sees; a key-up a native menu or another app took never reaches it.
+int osModifierFlags() {
+    const NSEventModifierFlags f = [NSEvent modifierFlags];
+    return ((f & NSEventModifierFlagShift) ? 1 : 0) | ((f & NSEventModifierFlagControl) ? 2 : 0) |
+           ((f & NSEventModifierFlagOption) ? 4 : 0) | ((f & NSEventModifierFlagCommand) ? 8 : 0);
+}
+
 } // namespace sf::macmenu
