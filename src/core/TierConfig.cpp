@@ -37,6 +37,12 @@ size_t microShadeBudget(const TierConfig& tier, bool stroking, bool viewMoving, 
     return stroking || viewMoving ? strokeShadeBudget(points, tier.strokeShadeMs, nsPerPoint, minPoints) : points;
 }
 
+bool strokeShadeKeepsPace(const TierConfig& tier) {
+    const char* e = std::getenv("SF_STROKE_KEEP_PACE");
+    if (e && (e[0] == '0' || e[0] == '1') && !e[1]) return e[0] == '1';
+    return tier.strokeShadeKeepPace;
+}
+
 int targetHzForDisplay(int hz) {
     if (hz >= 143) return 144;
     if (hz >= 119) return 120;
@@ -87,6 +93,7 @@ TierConfig tierConfigFor(const HardwareProfile& p, PowerSource power, int displa
     c.memoryStepDown = std::clamp(memoryStepDown, 0, int(p.hwTier));
     c.hwTier = HwTier(int(p.hwTier) - c.memoryStepDown);
     c.budgets = budgetsForTier(c.hwTier);
+    c.strokeShadeKeepPace = c.hwTier >= HwTier::High;
     // Focus Detail's GPU pool on a small graphics card: 256 MB under a 1.5 GB video memory budget.
     if (c.hwTier == HwTier::Floor && s.vramBudgetMB && s.vramBudgetMB < 1536) c.budgets.focusGpuPoolMB = 256;
     c.budgets.maxTextureSize = s.maxTextureSize;
@@ -106,6 +113,7 @@ Json tierConfigJson(const TierConfig& c) {
     j.set("active_triangle_budget", double(c.activeTriangleBudget));
     j.set("shade_budget_points", double(c.shadeBudgetPoints));
     j.set("stroke_shade_ms", c.strokeShadeMs);
+    j.set("stroke_shade_keep_pace", c.strokeShadeKeepPace);
     j.set("out_of_core_points", double(c.outOfCorePoints));
     j.set("upload_budget_mb_per_frame", double(c.uploadBudgetMBPerFrame));
     j.set("draft_brush_mode", c.draftBrushMode);

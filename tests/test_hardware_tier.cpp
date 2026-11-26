@@ -261,6 +261,27 @@ TEST(hw_tier_env_pins_and_simulate) {
     CHECK(choices.any());
 }
 
+TEST(hw_tier_stroke_shading_keeps_pace_on_high_and_extreme) {
+    // #184: a level without Focus Detail shades every patch a stroke frame changed (the view current while drawing), on
+    // the High and Extreme tiers (on Floor and Standard it cost a fifth to a third of the stroke's frame rate);
+    // SF_STROKE_KEEP_PACE pins it.
+    setEnv("SF_STROKE_KEEP_PACE", nullptr);
+    const HardwareInfo pcHw = box("NVIDIA Corporation", "NVIDIA GeForce RTX 3060/PCIe/SSE2", 12288, 32020, 12);
+    for (const char* name : {"floor", "standard", "high", "extreme"}) {
+        setEnv("SF_HW_SIMULATE", name);
+        const TierConfig c = tierConfigFor(mapProfile(pcHw, fast()), PowerSource::AC, 60);
+        const bool off = c.hwTier < HwTier::High; // (Floor, Standard)
+        CHECK(c.strokeShadeKeepPace == !off);
+        CHECK(strokeShadeKeepsPace(c) == !off);
+        setEnv("SF_STROKE_KEEP_PACE", off ? "1" : "0");
+        CHECK(strokeShadeKeepsPace(c) == off);
+        setEnv("SF_STROKE_KEEP_PACE", "tier");
+        CHECK(strokeShadeKeepsPace(c) == !off);
+        setEnv("SF_STROKE_KEEP_PACE", nullptr);
+    }
+    setEnv("SF_HW_SIMULATE", nullptr);
+}
+
 TEST(hw_tier_memory_guard) {
     TierMemoryGuard g;
     const uint64_t total = 32768;
