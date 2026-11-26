@@ -188,7 +188,7 @@ void App::drawFillLayerControls() {
     }
     ui::HelpText("Material Recipe", nullptr,
                  "Lay a ready-made stack of Fill layers on the Part: Worn Metal, Painted Edges, Dirt and Dust, Rusted "
-                 "Iron. They read the Part's Mesh Maps, so each model wears where it would. Undoable.",
+                 "Iron, Wax, Oil Stain. They read the Part's Mesh Maps, so each model wears where it would. Undoable.",
                  kFillPath);
 
     // Mesh Maps.

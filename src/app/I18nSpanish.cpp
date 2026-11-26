@@ -2490,9 +2490,9 @@ constexpr Entry kSpanish[] = {
      "(Edge Wear, Dirt, Gradient, Thickness, Light Direction, Noise, una máscara pintada, Levels, Blur, Invert). "
      "Cámbiala cuando quieras; sigue a la escultura."},
     {"Material Recipe", "Receta de material"},
-    {"Lay a ready-made stack of Fill layers on the Part: Worn Metal, Painted Edges, Dirt and Dust, Rusted Iron. They "
+    {"Lay a ready-made stack of Fill layers on the Part: Worn Metal, Painted Edges, Dirt and Dust, Rusted Iron, Wax, Oil Stain. They "
      "read the Part's Mesh Maps, so each model wears where it would. Undoable.",
-     "Pone en la Pieza una pila lista de capas de relleno: Worn Metal, Painted Edges, Dirt and Dust, Rusted Iron. "
+     "Pone en la Pieza una pila lista de capas de relleno: Worn Metal, Painted Edges, Dirt and Dust, Rusted Iron, Wax, Oil Stain. "
      "Leen los Mesh Maps de la Pieza, así cada modelo se desgasta donde lo haría. Se puede deshacer."},
     {"Baking Mesh Maps...", "Horneando Mesh Maps..."},
     {"No Mesh Maps yet", "Aún no hay Mesh Maps"},

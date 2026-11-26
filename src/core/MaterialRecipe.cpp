@@ -25,6 +25,10 @@ extern const unsigned char recipeDirtAndDust[];
 extern const unsigned long long recipeDirtAndDust_size;
 extern const unsigned char recipeRustedIron[];
 extern const unsigned long long recipeRustedIron_size;
+extern const unsigned char recipeWax[];
+extern const unsigned long long recipeWax_size;
+extern const unsigned char recipeOilStain[];
+extern const unsigned long long recipeOilStain_size;
 } // namespace assets
 
 namespace {
@@ -70,7 +74,9 @@ const std::vector<MaterialRecipe>& builtinMaterialRecipes() {
             {assets::recipeWornMetal, assets::recipeWornMetal_size},
             {assets::recipePaintedEdges, assets::recipePaintedEdges_size},
             {assets::recipeDirtAndDust, assets::recipeDirtAndDust_size},
-            {assets::recipeRustedIron, assets::recipeRustedIron_size}};
+            {assets::recipeRustedIron, assets::recipeRustedIron_size},
+            {assets::recipeWax, assets::recipeWax_size},
+            {assets::recipeOilStain, assets::recipeOilStain_size}};
         for (const auto& [data, size] : files) {
             MaterialRecipe r;
             std::string err;
@@ -148,7 +154,7 @@ void registerMaterialRecipeCommands(CommandRegistry& reg) {
     using T = ParamSpec::Type;
     reg.add({"material_recipe",
              "Material Recipes: stacks of Fill layers that read the Part's Mesh Maps, so they wear each model where it "
-             "would wear. apply lays one on the active Part (worn_metal, painted_edges, dirt_and_dust, rusted_iron, or a "
+             "would wear. apply lays one on the active Part (worn_metal, painted_edges, dirt_and_dust, rusted_iron, wax, oil_stain, or a "
              ".sfmaterial file), list names the built-in ones, save writes the Part's Fill layers as a recipe file.",
              {{"action", T::String, "apply (default), list or save.", false},
               {"name", T::String, "apply: a built-in recipe; save: the recipe's name.", false},

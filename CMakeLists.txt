@@ -296,7 +296,9 @@ embed_files(${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp sf::assets
   recipeWornMetal ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/worn_metal.sfmaterial
   recipePaintedEdges ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/painted_edges.sfmaterial
   recipeDirtAndDust ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/dirt_and_dust.sfmaterial
-  recipeRustedIron ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/rusted_iron.sfmaterial)
+  recipeRustedIron ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/rusted_iron.sfmaterial
+  recipeWax ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/wax.sfmaterial
+  recipeOilStain ${CMAKE_CURRENT_SOURCE_DIR}/assets/materials/oil_stain.sfmaterial)
 target_sources(sculptforge_core PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp)
 # The built-in insert sets (core/Parts.h builtinInsertSets): Creature bones (#154), original pieces made by
 # tools/creature-bones/build.sh, a zlib-compressed multi-object OBJ.

@@ -2195,9 +2195,9 @@ constexpr Entry kSimplifiedChinese[] = {
      "添加填充图层：通过你以效果创建的遮罩，将材质覆盖整个部件（Edge Wear、Dirt、Gradient、Thickness、Light "
      "Direction、Noise、绘制遮罩、Levels、Blur、Invert）。可随时修改；会跟随雕刻。"},
     {"Material Recipe", "材质配方"},
-    {"Lay a ready-made stack of Fill layers on the Part: Worn Metal, Painted Edges, Dirt and Dust, Rusted Iron. They "
+    {"Lay a ready-made stack of Fill layers on the Part: Worn Metal, Painted Edges, Dirt and Dust, Rusted Iron, Wax, Oil Stain. They "
      "read the Part's Mesh Maps, so each model wears where it would. Undoable.",
-     "在部件上应用现成的填充图层堆栈：Worn Metal、Painted Edges、Dirt and Dust、Rusted Iron。它们读取部件的 Mesh "
+     "在部件上应用现成的填充图层堆栈：Worn Metal、Painted Edges、Dirt and Dust、Rusted Iron、Wax、Oil Stain。它们读取部件的 Mesh "
      "Maps，让每个模型在该磨损的地方磨损。可撤销。"},
     {"Baking Mesh Maps...", "正在烘焙 Mesh Maps..."},
     {"No Mesh Maps yet", "尚无 Mesh Maps"},
