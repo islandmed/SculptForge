@@ -134,14 +134,14 @@ ImVec4 readable(const ImVec4& c, const ImVec4& bg, const ImVec4& toward, float r
 // The pop-up roles in the current look (Theme.h Role): fixed hues, so a tip reads as a tip in every scheme, with the
 // scheme's own yellow and red for warnings and deletes; Phosphor and Blueprint keep their one-ink screens by mixing
 // the hues halfway into their accent. Then each is nudged until it reads on the lifted surface.
-void setRoles(const ImVec4& yellow, const ImVec4& red, bool mono) {
+void setRoles(const ImVec4& yellow, const ImVec4& red, bool mono, float monoMix = 0.5f) {
     // The surface the roles are measured on: one step lighter than the panels (Ui.cpp PushRole lifts it and its buttons).
     const bool light = luminance(panelBg) > 0.4f;
     popupLift = light ? 0.5f : 0.05f;
     popupBg = mixc(panelBg, ImVec4(1, 1, 1, 1), popupLift);
     const ImVec4 hues[] = {rgb(0x4d9de0), rgb(0x2fb5a5), brand, yellow, red};
     for (int r = 0; r < int(Role::Count); ++r) {
-        const ImVec4 hue = mono && r != int(Role::Danger) ? mixc(hues[r], accent, 0.5f) : hues[r];
+        const ImVec4 hue = mono && r != int(Role::Danger) ? mixc(hues[r], accent, monoMix) : hues[r];
         roleEdge[r] = readable(hue, popupBg, textBright, 3.0f);
         roleInk[r] = readable(mixc(hue, textBright, 0.25f), popupBg, textBright, 4.5f);
     }
@@ -176,12 +176,15 @@ void setTokens(const looks::Palette& p, looks::LookId id) {
     buttonHover = s1;
     buttonPressed = s2;
     accent = ac;
-    accentHover = mixc(ac, p.light ? rgb(0x000000) : rgb(0xffffff), 0.18f);
+    // (A near-white accent, Monochrome's, can only get darker on hover.)
+    accentHover = mixc(ac, p.light || luminance(ac) > 0.85f ? rgb(0x000000) : rgb(0xffffff), 0.18f);
     toggleOff = mixc(mantle, s0, 0.6f);
     toggleOffHover = s0;
     // On: a fill tinted with the accent, not just one surface step up (a review couldn't tell on from off).
-    toggleOn = mixc(s1, ac, p.light ? 0.28f : 0.32f);
-    toggleOnHover = mixc(s2, ac, p.light ? 0.34f : 0.38f);
+    // (A near-white accent tints less: its label has to stay 5:1 on the fill.)
+    const bool pale = luminance(ac) > 0.85f;
+    toggleOn = mixc(s1, ac, p.light ? 0.28f : pale ? 0.16f : 0.32f);
+    toggleOnHover = mixc(s2, ac, p.light ? 0.34f : pale ? 0.17f : 0.38f);
     trough = mixc(mantle, s0, 0.7f);
     selection = mixc(s0, s1, 0.7f);
     selectionActive = s2;
@@ -276,7 +279,10 @@ void applyLook(const LookSettings& settings, std::string* status) {
     const float opacity = std::clamp(settings.outlineOpacity, 0.0f, 1.0f);
     tileBorder = look.outlines == 0 ? panelBg : mixc(panelBg, strong, (look.outlines == 1 ? 0.4f : 1.0f) * opacity);
     focusBorder = look.outlines == 2 ? mixc(tileBorder, textDim, 0.35f * opacity) : tileBorder;
-    setRoles(rgb(palette.yellow), rgb(palette.red), id == looks::LookId::Phosphor || id == looks::LookId::Blueprint);
+    // Monochrome has no hue to mix into: the roles go fully grey and keep only their icons (and red for Danger).
+    const bool monochrome = id == looks::LookId::ForgeTerminal && !settings.matchOmarchy && settings.scheme == "monochrome";
+    setRoles(rgb(palette.yellow), rgb(palette.red), id == looks::LookId::Phosphor || id == looks::LookId::Blueprint || monochrome,
+             monochrome ? 1.0f : 0.5f);
     applyStyle();
     ImGuiStyle& s = ImGui::GetStyle();
     s.WindowRounding = s.ChildRounding = s.PopupRounding = s.FrameRounding = s.GrabRounding = s.TabRounding = 0.0f;
@@ -300,7 +306,7 @@ void applyLook(const LookSettings& settings, std::string* status) {
     c[ImGuiCol_TableBorderStrong] = s1;
     c[ImGuiCol_TableBorderLight] = mixc(rgb(palette.surface0), s1, 0.5f);
     c[ImGuiCol_TableRowBgAlt] = ImVec4(text.x, text.y, text.z, 0.03f);
-    c[ImGuiCol_TextSelectedBg] = ImVec4(accent.x, accent.y, accent.z, 0.30f);
+    c[ImGuiCol_TextSelectedBg] = ImVec4(accent.x, accent.y, accent.z, luminance(accent) > 0.85f ? 0.22f : 0.30f); // text stays 4.5:1 on it
     syncUiColors();
 }
 

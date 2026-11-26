@@ -8,6 +8,7 @@
 #include "app/LookSchemes.h"
 #include "app/ShellGeometry.h"
 
+#include <algorithm>
 #include <cmath>
 #include <set>
 #include <string>
@@ -35,7 +36,7 @@ TEST(looks_keys_round_trip) {
 TEST(looks_schemes_complete_and_readable) {
     int count = 0;
     const looks::SchemeInfo* list = looks::schemes(count);
-    CHECK(count == 8);
+    CHECK(count == 9);
     CHECK(std::string(list[0].key) == "neutral"); // the default comes first (0.10.9)
     std::set<std::string> keys;
     auto lum = [](unsigned c) { return 0.2126f * float((c >> 16) & 0xff) + 0.7152f * float((c >> 8) & 0xff) + 0.0722f * float(c & 0xff); };
@@ -53,6 +54,34 @@ TEST(looks_schemes_complete_and_readable) {
     }
     CHECK(keys.size() == size_t(count));
     CHECK(looks::findScheme("solarized") == nullptr);
+}
+
+// Monochrome (a member's ask): brightness only, no hue, and every state still reads by lightness alone.
+TEST(looks_monochrome_has_no_hue_and_stays_readable) {
+    const looks::SchemeInfo* mono = looks::findScheme("monochrome");
+    CHECK(mono != nullptr);
+    if (!mono) return;
+    CHECK(std::string(mono->name) == "Monochrome");
+    const looks::Palette& p = mono->palette;
+    auto grey = [](unsigned c) { return ((c >> 16) & 0xff) == ((c >> 8) & 0xff) && ((c >> 8) & 0xff) == (c & 0xff); };
+    for (unsigned c : {p.crust, p.mantle, p.base, p.surface0, p.surface1, p.surface2, p.overlay, p.subtext, p.text, p.bright,
+                       p.accent, p.accent2, p.green, p.yellow})
+        CHECK(grey(c));
+    CHECK(!grey(p.red)); // the one colour left: deletes and errors
+    // WCAG contrast ratio of two 0xRRGGBB colours.
+    auto lin = [](unsigned v) { const float c = float(v & 0xff) / 255.0f; return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); };
+    auto lum = [&](unsigned c) { return 0.2126f * lin(c >> 16) + 0.7152f * lin(c >> 8) + 0.0722f * lin(c); };
+    auto ratio = [&](unsigned a, unsigned b) { const float x = lum(a), y = lum(b); return (std::max(x, y) + 0.05f) / (std::min(x, y) + 0.05f); };
+    CHECK(ratio(p.text, p.base) >= 7.0f);
+    CHECK(ratio(p.subtext, p.base) >= 4.5f);
+    CHECK(ratio(p.overlay, p.base) >= 3.0f);           // dim text and rules
+    CHECK(ratio(p.accent, p.base) >= 7.0f);             // the current tool, on switches and focus against the panels
+    CHECK(ratio(p.crust, p.accent) >= 7.0f);            // dark label on the accent fill (textOnAccent)
+    CHECK(ratio(p.accent, p.surface0) >= 7.0f);         // active against an idle button
+    CHECK(ratio(p.accent, p.text) >= 1.3f);             // an active label is brighter than plain text
+    CHECK(ratio(p.surface2, p.base) >= 1.5f);           // borders and pressed buttons against the panels
+    CHECK(ratio(p.surface1, p.base) >= 1.25f);          // hover and selection against the panels
+    CHECK(ratio(p.text, p.surface1) >= 4.5f);           // text on a hovered or selected row
 }
 
 TEST(looks_parse_hex) {

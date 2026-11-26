@@ -53,6 +53,8 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Gaussian Splats", "高斯 Splat"},
     {"Look", "外观"},
     {"Colours:", "色彩："},
+    {"Monochrome", "单色"},
+    {"Grey only, no hue: the accent is white. Warnings and deletes keep their red.", "仅灰阶、无色相：强调色为白色。警告与删除仍保留红色。"},
     {"Match my desktop theme", "配合我的桌面主题"},
     {"Uses your Omarchy theme's colours when Omarchy is installed", "安装 Omarchy 后，使用您的 Omarchy 主题颜色"},
     {"Green", "绿色"},

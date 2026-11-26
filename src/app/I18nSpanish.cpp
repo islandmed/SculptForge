@@ -50,6 +50,8 @@ constexpr Entry kSpanish[] = {
     {"Gaussian Splats", "Splats gaussianos"},
     {"Look", "Aspecto"},
     {"Colours:", "Colores:"},
+    {"Monochrome", "Monocromo"},
+    {"Grey only, no hue: the accent is white. Warnings and deletes keep their red.", "Solo grises, sin tono: el acento es blanco. Las advertencias y los borrados conservan su rojo."},
     {"Match my desktop theme", "Usar el tema de mi escritorio"},
     {"Uses your Omarchy theme's colours when Omarchy is installed", "Usa los colores de tu tema de Omarchy cuando Omarchy está instalado"},
     {"Green", "Verde"},

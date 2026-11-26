@@ -66,7 +66,9 @@ Switching the layout swaps the shelves for that layout's standard ones; the tray
 - **Forge Terminal** (the default): tiles with small gaps and thin borders, JetBrains Mono for labels and numbers.
   **Colours** picks the scheme: **Neutral** (the default since 0.10.9: pure grey panels and the orange accent, so
   your model's colours read true), Tokyo Night (the default in 0.10.7 and 0.10.8), Catppuccin Mocha, Gruvbox Dark,
-  Nord, Rosé Pine, Kanagawa or Everforest. **Match my desktop theme** uses your Omarchy theme's colours when Omarchy
+  Nord, Rosé Pine, Kanagawa or Everforest. **Monochrome** is brightness only, no hue anywhere: panels in greys and a
+  white accent (a light fill with dark text marks the current tool, the switches that are on and the focus; deletes
+  and errors keep their red; masks, face groups and paint stay coloured, they are your data). **Match my desktop theme** uses your Omarchy theme's colours when Omarchy
   is installed (Linux; the option shows only then). SculptForge never changes the theme; toggle it again after
   switching themes.
 - **Classic**: the dark grey interface with the orange accent that SculptForge had before 0.10.7, now exactly
