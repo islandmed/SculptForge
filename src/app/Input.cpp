@@ -166,7 +166,7 @@ void App::registerInputActions() {
     actions_.setDefaultShortcut("view.mask", "Ctrl+H"); // View Mask
     add("facegroup.group_masked", "Group from Mask", ICON_LC_SHAPES, "Tool > Face Groups", "Ctrl+W",
         "Turn the masked part into a new face group and clear the mask. With nothing masked, "
-        "everything visible becomes one group.",
+        "everything visible becomes one group (its own group when part of the mesh is hidden).",
         [this] { groupMasked(); });
     add("facegroup.uv_groups", "Group by UVs", ICON_LC_GRID_2X2, "Tool > Face Groups", "",
         "One face group per UV island: triangles that touch without a UV seam share a group. "

@@ -1678,8 +1678,8 @@ constexpr Entry kTraditionalChinese[] = {
      "遮罩未遮罩的部分並取消已遮罩的部分（也可以：Ctrl+按一下背景）。"},
     {"Group from Mask", "從遮罩建立群組"},
     {"Turn the masked part into a new face group and clear the mask. With nothing masked, everything visible becomes "
-     "one group.",
-     "將遮罩部分轉為新的面群組並清除遮罩。若沒有遮罩，所有可見部分會成為一個群組。"},
+     "one group (its own group when part of the mesh is hidden).",
+     "將遮罩部分轉為新的面群組並清除遮罩。若沒有遮罩，所有可見部分會成為一個群組（部分網格被隱藏時，可見部分自成一組）。"},
     {"One face group per UV island: triangles that touch without a UV seam share a group. Only the visible part is "
      "regrouped. Needs UVs (Tool > Texture Image > Auto UV makes some).",
      "每個 UV 島一個面群組：相鄰且無 UV 接縫的三角面屬於同一群組。只重新分組可見部分。需要 UV（工具 > 紋理影像 > 自動 UV "
