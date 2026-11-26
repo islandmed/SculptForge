@@ -1,5 +1,5 @@
 ---
-whats_new: **Voxel Remesh** now follows deep, narrow creases (wrinkles, eye bags, folds) all the way down, and a crease's two sides are two clean sheets, so the speckled rim of extra voxels along it is gone.
+whats_new: **Voxel Remesh** now follows deep, narrow creases (wrinkles, eye bags, folds) all the way down, keeps a closed lip line or fold as one clean seam, and leaves no loose bits of voxels along a crease.
 fixed: **Voxel Remesh filled narrow creases and left speckled bits along them** (#240). On a sculpt with deep, narrow
   creases (face wrinkles, eye bags, nasolabial folds, especially a decimated mesh), the remesh rebuilt a crease only down
   to where its two walls came within about four voxels of each other, then filled the rest and left stray sheets and
@@ -16,9 +16,9 @@ fixed: **Voxel Remesh filled narrow creases and left speckled bits along them** 
 testers:
   - Any OS (the reporter's own steps): on a subdivided sphere or head, cut a crease with the Crease brush, repeat the stroke
     until the crease is deep, then Tool > Remesh > Voxel Remesh at the default Resolution and at 752: the crease is one clean
-    line, no speckled rim or loose bits along it.
-  - Windows: the same at Resolution 752 or higher (an imported, decimated head): the eye bags and nasolabial folds have no speckled
-    rim; the closed lips of the starter head stay one seam, no chips along it.
+    line, no loose bits along it (its edge can still show a one-voxel stair-step at 752; that is not the loose bits).
+  - Windows: the same at Resolution 752 or higher (an imported, decimated head): the eye bags and nasolabial folds have no loose
+    bits along them; the closed lips of the starter head stay one seam, no chips along it.
   - Remesh two overlapping spheres (or any sculpt built from overlapping blobs): still one closed surface, no slits at the
     seam where they cross.
   - Remesh a smooth sphere and a bumpy sculpt: the result looks as it did in the previous version.
