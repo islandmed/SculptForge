@@ -328,13 +328,23 @@ endif()
 # zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
 # Not on macOS: Homebrew's zstd is single-architecture and breaks the universal (x86_64 + arm64) build.
 # Not on Android: pkg-config finds the build machine's zstd, and the NDK has no zstd.h.
+# SF_SYSTEM_ZSTD=OFF: the vendored decoder alone, as Windows and macOS build (tests the reader everywhere).
+option(SF_SYSTEM_ZSTD "Use the system libzstd for Focus Detail tiles when it is found" ON)
 find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND AND NOT APPLE AND NOT ANDROID)
+if(PkgConfig_FOUND AND NOT APPLE AND NOT ANDROID AND SF_SYSTEM_ZSTD)
   pkg_check_modules(SF_ZSTD QUIET IMPORTED_TARGET libzstd)
 endif()
-if(SF_ZSTD_FOUND)
+if(SF_ZSTD_FOUND AND SF_SYSTEM_ZSTD) # (the found result is cached: turning the option off later still takes effect)
   target_link_libraries(sculptforge_core PRIVATE PkgConfig::SF_ZSTD)
   target_compile_definitions(sculptforge_core PRIVATE SF_HAVE_ZSTD)
+else()
+  # Elsewhere the release's decoder (third_party/zstd/VENDORED.md): zstd tiles written on Linux open everywhere; these
+  # builds write their own codec, which every build reads.
+  target_sources(sculptforge_core PRIVATE third_party/zstd/lib/zstddeclib.c)
+  target_include_directories(sculptforge_core PRIVATE third_party/zstd/lib)
+  target_compile_definitions(sculptforge_core PRIVATE SF_HAVE_ZSTD_DECODER)
+  set_source_files_properties(third_party/zstd/lib/zstddeclib.c PROPERTIES COMPILE_OPTIONS "$<IF:$<C_COMPILER_ID:MSVC>,/w,-w>"
+                              SKIP_PRECOMPILE_HEADERS ON)
 endif()
 target_compile_definitions(sculptforge_core PUBLIC GLM_FORCE_XYZW_ONLY
                                                    SF_MAC_SELF_UPDATE=$<BOOL:${SCULPTFORGE_MAC_SELF_UPDATE}>) # core/SelfUpdate.h, app and tests alike
@@ -1371,12 +1381,6 @@ if(SCULPTFORGE_BUILD_TESTS)
     if(NOT TARGET sculptforge_pyhost) # (a build without Python in the app: its console says so, nothing to drive)
       list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/python_[a-z_]+\\.sfui$")
     endif()
-    if(WIN32) # (Focus Detail is Unix and macOS only, core/FocusDetail.cpp: no deferred range widen to see on Windows)
-      list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/micro_widen_live_stroke\\.sfui$")
-    endif()
-    if(WIN32) # (Focus Detail streams memory-mapped files: Linux and macOS for now, core/FocusDetail.h; enable with focus-detail-windows)
-      list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/focus_detail_open_command\\.sfui$")
-    endif()
     foreach(script ${SCULPTFORGE_UI_TESTS})
       get_filename_component(name ${script} NAME_WE)
       sculptforge_ui_test(${name} ${name})
@@ -1421,9 +1425,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(async_stroke_undo_view_2880 async_stroke_undo_view --size 2880x1800)
     set_tests_properties(ui_async_stroke_undo_view ui_async_stroke_undo_view_1440 ui_async_stroke_undo_view_2880 PROPERTIES
                          ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=100")
-    if(NOT WIN32) # (any widen splits over two frames here, whatever this computer's speed; tests/ui/micro_widen_live_stroke.sfui)
-      set_tests_properties(ui_micro_widen_live_stroke PROPERTIES ENVIRONMENT "SF_WIDEN_SPLIT_MS=0")
-    endif()
+    # (any widen splits over two frames here, whatever this computer's speed; tests/ui/micro_widen_live_stroke.sfui)
+    set_tests_properties(ui_micro_widen_live_stroke PROPERTIES ENVIRONMENT "SF_WIDEN_SPLIT_MS=0")
     set_tests_properties(ui_async_stroke_press_waits PROPERTIES
                          ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=40")
     set_tests_properties(ui_async_stroke_undo PROPERTIES

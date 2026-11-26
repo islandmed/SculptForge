@@ -5,8 +5,9 @@
 // than what is worth decompressing, streamed by where the brush and the camera are.
 //
 // - On disk (a .sfdetail file, memory-mapped): the base mesh, then every base triangle's micro grid ("tile") as
-//   quantized 16-bit heights, row-delta coded and compressed (zstd when the build has it, else the tile codec of
-//   core/MicroStore.h). A directory gives each tile's place, its exact range and how far its coarse grid is from
+//   quantized 16-bit heights, row-delta coded and compressed (zstd with the system libzstd, as on Linux; else the
+//   tile codec of core/MicroStore.h, and zstd files read through third_party/zstd, so a file opens on every
+//   platform). A directory gives each tile's place, its exact range and how far its coarse grid is from
 //   it. Coarse grids (level kCoarseLevel, a subsample of the full grid) sit in compressed chunks of kChunk tiles.
 // - In memory: MicroMesh::disp keeps its full-size layout, so brushes and the renderer work unchanged. A tile
 //   outside the focus holds its coarse grid upsampled (exact at the coarse points, linear in between, so shared
@@ -143,7 +144,8 @@ private:
     bool mapFile(std::string& error);
     bool loadIndex(std::string& error);                // header, directory and coarse grids of the mapped file
     bool attachTo(Mesh& m, std::vector<uint8_t> mask, std::string& error); // m's micro level: every tile coarse
-    bool saveAsLocked(const Mesh& m, const std::string& path, std::string& error);
+    // renameRefused: only the last step failed (Windows: path is mapped elsewhere); the old file and its view are kept.
+    bool saveAsLocked(const Mesh& m, const std::string& path, std::string& error, bool* renameRefused = nullptr);
     void unmap();
     bool readTile(uint32_t t, int16_t* out) const;    // the full grid (parked first, else the file)
     void fillCoarse(MicroMesh& mm, uint32_t t) const; // upsamples the coarse grid into disp
@@ -153,6 +155,7 @@ private:
     std::string path_;
     int level_ = 0;
     uint32_t n_ = 0, samples_ = 0, coarseN_ = 0, coarseSamples_ = 0, codec_ = 0;
+    uint32_t writeCodec_ = 0; // what this build writes (codec_ = the file's; this one's own when it only reads that)
     float step_ = 0;
     uint64_t generation_ = 0, garbage_ = 0;
     uint64_t baseOffset_ = 0;                    // the base block in the mapped file
@@ -184,7 +187,11 @@ private:
     std::vector<uint32_t> lru_; // demotion candidates, kept while the list drains (scoring frozen: the same order)
     bool lruValid_ = false;
     // The mapped file
+#if defined(_WIN32)
+    void* fd_ = nullptr; // the file's HANDLE (open while mapped)
+#else
     int fd_ = -1;
+#endif
     const uint8_t* map_ = nullptr;
     size_t mapBytes_ = 0;
 };
