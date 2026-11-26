@@ -118,7 +118,9 @@ public:
     // 0 = coarse (upsampled), 1 = full.
     int tileLevel(uint32_t tri) const { return tri < state_.size() && state_[tri] != kCoarse ? 1 : 0; }
     FocusStats stats() const;
-    double lastUpdateMs() const { std::lock_guard<std::mutex> lock(mutex_); return stats_.lastUpdateMs; } // (stats() without its counts: per frame)
+    // stats().lastUpdateMs and lastPending without the lock (per frame: never waits on a brush's promotion)
+    double lastUpdateMs() const { return lastMs_.load(std::memory_order_relaxed); }
+    size_t lastPending() const { return lastPending_.load(std::memory_order_relaxed); }
     const std::string& path() const { return path_; }
     bool unsaved() const; // edits since the last save
 
@@ -150,7 +152,8 @@ private:
     bool readTile(uint32_t t, int16_t* out) const;    // the full grid (parked first, else the file)
     void fillCoarse(MicroMesh& mm, uint32_t t) const; // upsamples the coarse grid into disp
     void promoteLocked(MicroMesh& mm, std::span<const uint32_t> tris, bool edit, bool sync);
-    void demoteLocked(MicroMesh& mm, uint32_t t);
+    void parkLocked(MicroMesh& mm, uint32_t t);                // a dirty tile's edit into parked_ (thread-safe per tile)
+    void demoteLocked(MicroMesh& mm, uint32_t t, bool park = true, bool fill = true); // (fill = false: its grid is filled already)
 
     std::string path_;
     int level_ = 0;
@@ -185,7 +188,15 @@ private:
         bool stalled = false; // tiles still wanted but none went in (the budget full of wanted tiles)
     } scored_;
     std::vector<uint32_t> lru_; // demotion candidates, kept while the list drains (scoring frozen: the same order)
+    std::vector<uint32_t> victims_; // (update: one frame's demotions)
     bool lruValid_ = false;
+    std::atomic<double> lastMs_{0.0};
+    std::atomic<size_t> lastPending_{0};
+    std::atomic<int> brushWaiting_{0}; // ensureFull callers waiting for the lock: update() gives way to them
+    int gaveWay_ = 0;      // (update, main thread: frames in a row it gave way to a brush)
+    // (update: a promoted / an edited demoted tile's recent cost, [1] while another thread has the pool and batches
+    // run on this thread alone; sizing a frame's batches to its budget)
+    double tileMs_[2] = {0.0, 0.0}, parkMs_[2] = {0.0, 0.0}, demoteMs_[2] = {0.0, 0.0};
     // The mapped file
 #if defined(_WIN32)
     void* fd_ = nullptr; // the file's HANDLE (open while mapped)

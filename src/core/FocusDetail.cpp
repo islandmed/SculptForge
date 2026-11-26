@@ -44,6 +44,11 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 double msSince(Clock::time_point t) { return std::chrono::duration<double, std::milli>(Clock::now() - t).count(); }
+// SF_FOCUS_TRACE=1: a line on stderr for each update() or brush promotion over 10 ms (where a frame's time went)
+bool focusTrace() {
+    static const bool on = [] { const char* e = std::getenv("SF_FOCUS_TRACE"); return e && e[0] == '1'; }();
+    return on;
+}
 
 // Files by their UTF-8 names (Windows: the wide API, so a name outside the code page works too).
 std::FILE* openWrite(const std::string& path) {
@@ -740,7 +745,7 @@ void FocusDetail::promoteLocked(MicroMesh& mm, std::span<const uint32_t> tris, b
             const uint32_t t = tris[k];
             if (!readTile(t, mm.disp.data() + size_t(t) * samples_)) fillCoarse(mm, t); // (a damaged tile stays coarse)
         }
-    }, 4);
+    }, 1, 2); // (a tile a block: a frame's batch is a few tiles, each thousands of points)
     // A promoted tile's real edges go into its coarse neighbours (no cracks along the focus border).
     for (uint32_t t : tris) {
         state_[t] = edit ? kDirty : kFull;
@@ -757,15 +762,19 @@ void FocusDetail::promoteLocked(MicroMesh& mm, std::span<const uint32_t> tris, b
     stats_.promoteMs += msSince(t0);
 }
 
-void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t) {
-    int16_t* g = mm.disp.data() + size_t(t) * samples_;
-    if (state_[t] == kDirty) { // keep the edit: compressed in memory until saved, coarse grid refreshed
-        const TileInfo info = analyse(g, n_, samples_, coarseN_, step_, coarse_.data() + size_t(t) * coarseSamples_);
-        dir_[t].coarseErr = info.coarseErr;
-        dir_[t].range = std::max(dir_[t].range, info.range);
-        compressTile(writeCodec_, g, n_, samples_, parked_[t]);
-    }
-    fillCoarse(mm, t);
+void FocusDetail::parkLocked(MicroMesh& mm, uint32_t t) {
+    if (state_[t] != kDirty) return;
+    // keep the edit: compressed in memory until saved, coarse grid refreshed (this tile's own fields only: parallel)
+    const int16_t* g = mm.disp.data() + size_t(t) * samples_;
+    const TileInfo info = analyse(g, n_, samples_, coarseN_, step_, coarse_.data() + size_t(t) * coarseSamples_);
+    dir_[t].coarseErr = info.coarseErr;
+    dir_[t].range = std::max(dir_[t].range, info.range);
+    compressTile(writeCodec_, g, n_, samples_, parked_[t]);
+}
+
+void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t, bool park, bool fill) {
+    if (park) parkLocked(mm, t);
+    if (fill) fillCoarse(mm, t);
     state_[t] = kCoarse;
     --fullTiles_;
     mm.markDirty(t);
@@ -775,7 +784,11 @@ void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t) {
 }
 
 void FocusDetail::ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool edit) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    const auto t0 = Clock::now();
+    brushWaiting_.fetch_add(1, std::memory_order_acq_rel); // (update() stops between batches and lets this in)
+    std::unique_lock<std::mutex> lock(mutex_);
+    brushWaiting_.fetch_sub(1, std::memory_order_acq_rel);
+    const double waited = msSince(t0);
     std::vector<uint32_t> need;
     for (uint32_t t : tris) {
         if (t >= state_.size()) continue;
@@ -783,7 +796,11 @@ void FocusDetail::ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool
         if (state_[t] == kCoarse) need.push_back(t);
         else if (edit) state_[t] = kDirty;
     }
+    const bool busy = ThreadPool::shared().busy();
     if (!need.empty()) promoteLocked(mm, need, edit, true);
+    if (focusTrace() && msSince(t0) > 10.0)
+        std::fprintf(stderr, "focus ensureFull %.1f ms: waited %.1f, %zu of %zu tiles promoted (pool %s)\n", msSince(t0), waited,
+                     need.size(), tris.size(), busy ? "busy" : "free");
 }
 
 void FocusDetail::ensureAllFull(MicroMesh& mm, bool edit) {
@@ -843,7 +860,21 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     const auto t0 = Clock::now();
     MicroMesh& mm = *m.micro;
     const uint32_t T = uint32_t(state_.size());
-    std::unique_lock<std::mutex> lock(mutex_);
+    // A brush's promotion (ensureFull on the stroke thread) holds or wants the lock: this frame doesn't wait for it
+    // (that wait was the 120 px stroke's 80-150 ms frames); the next frame goes on. At most kGiveWay frames in a row,
+    // then it waits (demotions keep a long stroke within the budget).
+    constexpr int kGiveWay = 4;
+    std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+    if (gaveWay_ < kGiveWay && (brushWaiting_.load(std::memory_order_acquire) > 0 || !lock.try_lock())) {
+        ++gaveWay_;
+        lastMs_.store(msSince(t0), std::memory_order_relaxed);
+        return;
+    }
+    if (!lock.owns_lock()) lock.lock();
+    const double lockWait = msSince(t0);
+    gaveWay_ = 0;
+    double promoteMs = 0.0, demoteMs = 0.0;
+    size_t promotedNow = 0, parkedNow = 0;
     // Scoring looks at every tile (2.5M base triangles: most of a floor-tier frame, every frame, #184). The same
     // view, brush, detail and budget, within the budget, want the same tiles: skipped (or the last list's rest promoted),
     // but rescored every kRescore updates (a backstop: the app names base changes in view.baseRevision / baseMoving;
@@ -873,6 +904,7 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
         ++scored_.frames;
         ++stats_.skippedUpdates;
         stats_.lastUpdateMs = msSince(t0);
+        lastMs_.store(stats_.lastUpdateMs, std::memory_order_relaxed);
         return;
     }
     // Still promoting what the last scoring wanted (a view after strokes: tens of thousands of tiles, a batch a
@@ -940,8 +972,6 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     // Demotion candidates: full tiles not wanted for kLinger frames, least recently wanted first (never a dirty
     // one while stroking: a dab on the solver thread may be writing it).
     constexpr uint32_t kLinger = 8;
-    constexpr size_t kDemoteBatch = 64;
-    size_t demoted = 0; // (this update's, over all the calls below)
     std::vector<uint32_t>& lru = lru_;
     auto demoteFor = [&](size_t room) {
         if (fullTiles_ + room <= maxFull) return true;
@@ -953,36 +983,85 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
                 if (state_[t] != kCoarse && lastWanted_[t] + kLinger < frame_ && !(mm.stroking && state_[t] == kDirty)) lru.push_back(t);
             std::sort(lru.begin(), lru.end(), [&](uint32_t a, uint32_t b) { return lastWanted_[a] > lastWanted_[b] || (lastWanted_[a] == lastWanted_[b] && a > b); });
         }
-        // Within the frame's budget (a long stroke leaves thousands of edited tiles over it, each compressed as it
-        // goes: #184, 1.6-2.8 s in one floor frame); the rest goes on the next frames (at least a batch a frame).
-        while (fullTiles_ + room > maxFull && !lru.empty()) { // (back = oldest)
-            if (demoted >= kDemoteBatch && msSince(t0) > budgetMs) break;
-            const uint32_t t = lru.back();
-            lru.pop_back();
-            if (t < T && state_[t] != kCoarse) demoteLocked(mm, t), ++demoted;
-        }
+        // The tiles to demote first, then their edits compressed in parallel (after strokes a new view demotes
+        // hundreds of dirty tiles at once: one by one that was a 389 ms frame on Windows), then demoted in order.
+        // At most kDirtyBatch edited tiles a batch, more batches while the frame's budget lasts: the rest on the
+        // next frames (promotions wait while over the budget; one batch was still a 214 ms frame).
+        constexpr size_t kDirtyBatch = 64;
+        std::vector<uint32_t>& victims = victims_;
+        do {
+            const bool busy = ThreadPool::shared().busy(); // (a stroke's dabs have the pool: this batch runs here alone)
+            const double left = budgetMs - msSince(t0);
+            const size_t maxDirty = parkMs_[busy] > 0.0 ? size_t(std::clamp(left / parkMs_[busy], 1.0, double(kDirtyBatch)))
+                                                        : (busy ? 1 : 16);
+            // (an unedited tile costs its coarse grid's upsampling into the full grid: 10-135 ms frames under a 120 px
+            // stroke when every victim went in one batch)
+            const size_t maxVictims = demoteMs_[busy] > 0.0 ? size_t(std::clamp(left / demoteMs_[busy], 1.0, 4096.0))
+                                                            : (busy ? 4 : 64);
+            victims.clear();
+            size_t dirty = 0;
+            for (size_t full = fullTiles_; full + room > maxFull && !lru.empty() && victims.size() < maxVictims;) { // (back = oldest)
+                const uint32_t t = lru.back();
+                if (t < T && state_[t] == kDirty && dirty == maxDirty) break;
+                lru.pop_back();
+                if (t < T && state_[t] != kCoarse) victims.push_back(t), --full, dirty += state_[t] == kDirty;
+            }
+            const auto p0 = Clock::now();
+            poolFor(victims.size(), [&](size_t b, size_t e) {
+                for (size_t k = b; k < e; ++k) parkLocked(mm, victims[k]);
+            }, 1, 2);
+            parkedNow += dirty;
+            if (dirty > 0) {
+                const double per = msSince(p0) / double(dirty);
+                parkMs_[busy] = parkMs_[busy] > 0.0 ? 0.7 * parkMs_[busy] + 0.3 * per : per;
+            }
+            const auto f0 = Clock::now();
+            poolFor(victims.size(), [&](size_t b, size_t e) { // (each tile's own grid: in parallel; edges after, in order)
+                for (size_t k = b; k < e; ++k) fillCoarse(mm, victims[k]);
+            }, 1, 2);
+            for (uint32_t t : victims) demoteLocked(mm, t, false, false);
+            if (!victims.empty()) {
+                const double per = msSince(f0) / double(victims.size());
+                demoteMs_[busy] = demoteMs_[busy] > 0.0 ? 0.7 * demoteMs_[busy] + 0.3 * per : per;
+            }
+            demoteMs += msSince(p0);
+        } while (fullTiles_ + room > maxFull && !victims.empty() && !lru.empty() && msSince(t0) <= budgetMs);
         return fullTiles_ + room <= maxFull;
     };
     size_t done = 0;
     constexpr size_t kBatch = 64;
     while (done < scratch_.size()) {
-        size_t count = std::min(kBatch, scratch_.size() - done);
+        // Batches sized to what is left of the budget at the recent cost a tile (64 big tiles were 50-180 ms frames
+        // at level 7 on Windows, run on this thread alone while a stroke had the pool): at least one tile a frame.
+        const bool busy = ThreadPool::shared().busy(); // (a stroke's dabs have the pool: this batch runs here alone)
+        const double left = budgetMs - msSince(t0);
+        const size_t fit = tileMs_[busy] > 0.0 ? size_t(std::clamp(left / tileMs_[busy], 1.0, double(kBatch))) : (busy ? 1 : 8);
+        size_t count = std::min(fit, scratch_.size() - done);
         const bool mustHave = score_[scratch_[done]] >= 1e5f; // the brush's tiles go in over the budget
         if (!demoteFor(count) && !mustHave) {
             count = std::min(count, maxFull - std::min(maxFull, fullTiles_));
             if (count == 0) break;
         }
+        const auto b0 = Clock::now();
         promoteLocked(mm, std::span<const uint32_t>(scratch_.data() + done, count), false, false);
+        promoteMs += msSince(b0), promotedNow += count;
+        const double per = msSince(b0) / double(count);
+        tileMs_[busy] = tileMs_[busy] > 0.0 ? 0.7 * tileMs_[busy] + 0.3 * per : per;
         done += count;
         if (msSince(t0) > budgetMs) break;
-        lock.unlock(); // let a brush's ensureFull in between batches
-        lock.lock();
+        if (brushWaiting_.load(std::memory_order_acquire) > 0) break; // a brush's ensureFull goes first (demotions still run)
     }
     demoteFor(0);
     scored_ = {true, view, brush, mm.revision, fullTiles_, budgetBytes, fromQueue ? scored_.frames + 1 : 0, done == 0 && !scratch_.empty()};
     stats_.lastWanted = wanted;
     stats_.lastPending = scratch_.size() - done;
     stats_.lastUpdateMs = msSince(t0);
+    lastMs_.store(stats_.lastUpdateMs, std::memory_order_relaxed);
+    lastPending_.store(stats_.lastPending, std::memory_order_relaxed);
+    if (focusTrace() && stats_.lastUpdateMs > 10.0)
+        std::fprintf(stderr, "focus update %.1f ms: lock wait %.1f, promote %zu tiles %.1f, demote (%zu parked) %.1f, %s, pending %zu\n",
+                     stats_.lastUpdateMs, lockWait, promotedNow, promoteMs, parkedNow, demoteMs, fromQueue ? "queue" : "scored",
+                     stats_.lastPending);
 }
 
 FocusStats FocusDetail::stats() const {

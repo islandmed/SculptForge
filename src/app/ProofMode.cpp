@@ -30,6 +30,7 @@
 #include "core/BrushAlpha.h"
 #include "core/HardwareProfile.h"
 #include "core/HardwareTier.h"
+#include "core/ThreadPool.h"
 #include "core/TierConfig.h"
 #include "core/MemoryGuard.h"
 #include "core/Primitives.h"
@@ -1026,6 +1027,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             p.hardware.set("gpu_name", std::string(reinterpret_cast<const char*>(gl::GetString(GL_RENDERER))));
             p.hardware.set("driver", std::string(reinterpret_cast<const char*>(gl::GetString(GL_VERSION))));
             p.hardware.set("hw_tier", std::string(hwTierName(currentTierConfig().hwTier)));
+            p.hardware.set("brush_threads", double(ThreadPool::shared().threads())); // (like-for-like comparisons: the tier sets it)
             int ww = 0, wh = 0;
             SDL_GetWindowSize(window_, &ww, &wh);
             Json win = Json::array();
@@ -1172,7 +1174,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
                 double f[MicroFocus::kParts] = {};
                 renderer_.takeFocusSplit(f);
                 ph.focusSplit[0].push_back(doc_.mesh.micro->focus->lastUpdateMs());
-                ph.pendingPromote.push_back(double(doc_.mesh.micro->focus->stats().lastPending));
+                ph.pendingPromote.push_back(double(doc_.mesh.micro->focus->lastPending()));
                 ph.pendingShade.push_back(double(renderer_.microPendingCoarse()));
                 for (int k = 0; k < MicroFocus::kParts; ++k) ph.focusSplit[k + 1].push_back(f[k]);
             }
