@@ -13,6 +13,8 @@
 #include "app/UiServe.h"
 #include "ai/AiPolicy.h"
 #include "core/BenchPack.h"
+#include "core/BuildStamp.h"
+#include "core/UpdateCheck.h"
 #include "core/Benchmark.h"
 #include "core/DataDir.h"
 #include "core/Utf8Path.h"
@@ -110,6 +112,7 @@ void usage() {
         "  --splash-selftest        Open the splash by each way the window system allows, check its picture, exit\n"
         "  --portable-selftest [V]  Say where this copy keeps its data (portable: a portable.txt or data/ folder beside\n"
         "                           the program), save V there if given, print what is saved, exit\n"
+        "  --version                Print the version (a developer's build adds \"dev <commit>\"), exit\n"
         "  --acp-selftest           Windows: check the process code page is UTF-8 (0 = it is), exit\n"
         "  --python-selftest        Start the Python scripting runtime, run a few lines, exit (0 = it works)\n"
         "  --timelapse out.mp4      Render the opened project's history (saved beside it as .sfhist) as a\n"
@@ -315,6 +318,7 @@ static int runMain(int argc, char** argv) {
         else if (a == "--splash-shot") options.splashShotPath = next();
         else if (a == "--portable-selftest") return portableSelfTest(i + 1 < argc ? argv[i + 1] : nullptr);
         else if (a == "--splash-selftest") return sf::splash::selfTest(); // (SDL_VIDEO_DRIVER=dummy in the test run)
+        else if (a == "--version") { std::printf("SculptForge %s\n", sf::shownVersion(SCULPTFORGE_VERSION, SCULPTFORGE_PRERELEASE, sf::devCommit()).text().c_str()); return 0; }
         else if (a == "--acp-selftest") return sf::utf8CodePageSelfTest(); // (core/Utf8Path.h: Windows' manifest code page)
         else if (a == "--python-selftest") return sf::pythonSelfTest(); // (app/Python.h: the shipped Python starts)
         else if (a == "--timelapse") options.timelapsePath = next();

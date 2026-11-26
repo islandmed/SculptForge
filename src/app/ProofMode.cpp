@@ -13,6 +13,7 @@
 // numbers live; the frames go, HUD included, to an MP4 (read back through pixel buffers, encoded by ffmpeg on
 // its own thread: BenchVideo.h), and a JSON result with the hardware and version is written at the end.
 #include "app/ProofMode.h"
+#include "core/BuildStamp.h"
 #include "app/NativeDialog.h"
 
 #include "core/Precision.h"
@@ -60,10 +61,6 @@
 #else
 #include <sys/utsname.h>
 #include <unistd.h>
-#endif
-
-#ifndef SF_GIT_COMMIT
-#define SF_GIT_COMMIT "unknown"
 #endif
 
 namespace sf {
@@ -761,7 +758,7 @@ void App::drawProofUi() {
     ImFont* font = ImGui::GetFont();
     const float bigSize = ImGui::GetFontSize() * 1.35f, smallSize = ImGui::GetFontSize() * 1.05f;
     const ImVec2 at(c.x + 14 * sc, c.y + 14 * sc);
-    const std::string brand = std::string("SculptForge ") + SCULPTFORGE_VERSION + " (" + SF_GIT_COMMIT + ")  -  proof mode";
+    const std::string brand = std::string("SculptForge ") + SCULPTFORGE_VERSION + " (" + commitOrUnknown() + ")  -  proof mode";
     const char* lines[] = {brand.c_str(), p.hudTitle.c_str(), p.hudLine2.c_str(), p.hudLine3.c_str()};
     float w = 0, h = 0;
     for (int i = 0; i < 4; ++i) {
@@ -1292,7 +1289,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         root.set("schema", "sculptforge-benchmark/1");
         Json app = Json::object();
         app.set("version", SCULPTFORGE_VERSION);
-        app.set("commit", SF_GIT_COMMIT);
+        app.set("commit", commitOrUnknown());
         root.set("sculptforge", app);
         root.set("date", isoDate());
         root.set("hardware", p.hardware);
@@ -1463,7 +1460,7 @@ void App::proofBeforeSwap(int fbW, int fbH) {
             if (!f) p.error += (p.error.empty() ? "" : "; ") + ("couldn't write " + p.jsonPath);
         }
         // A summary on the terminal too.
-        std::printf("SculptForge %s (%s) proof mode%s%s on %s | %s\n", SCULPTFORGE_VERSION, SF_GIT_COMMIT,
+        std::printf("SculptForge %s (%s) proof mode%s%s on %s | %s\n", SCULPTFORGE_VERSION, commitOrUnknown(),
                     p.scene.empty() ? "" : ", scene ", p.scene.c_str(), root["hardware"]["cpu"].asString().c_str(), p.gpu.c_str());
         for (const SizeResult& r : p.results) {
             if (!r.skipped.empty()) {
