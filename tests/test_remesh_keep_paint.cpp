@@ -58,7 +58,7 @@ Document paintedSphere() {
 
 } // namespace
 
-TEST(remesh_keeps_vertex_paint) {
+TEST(remesh_vertex_paint_invariant_follows_the_surface) {
     CommandRegistry reg;
     Document doc = paintedSphere();
     const size_t before = doc.mesh.triangleCount();
@@ -75,7 +75,7 @@ TEST(remesh_keeps_vertex_paint) {
     CHECK(colourError(doc.mesh).worst < 1e-5f);
 }
 
-TEST(remesh_keeps_vertex_paint_with_paint_layers) {
+TEST(remesh_vertex_paint_invariant_with_paint_layers) {
     CommandRegistry reg;
     Document doc = paintedSphere();
     const int layer = addPaintLayer(doc.mesh, "Top");
@@ -104,7 +104,7 @@ TEST(remesh_keeps_vertex_paint_with_paint_layers) {
     (void)old;
 }
 
-TEST(remesh_keeps_vertex_paint_with_keep_masked_and_groups) {
+TEST(remesh_vertex_paint_invariant_with_keep_masked_and_groups) {
     CommandRegistry reg;
     Document doc = paintedSphere();
     doc.mesh.mask.assign(doc.mesh.positions.size(), 0.0f);
@@ -119,7 +119,7 @@ TEST(remesh_keeps_vertex_paint_with_keep_masked_and_groups) {
     CHECK(e.worst < 0.12f);
 }
 
-TEST(remesh_keeps_vertex_paint_on_the_sparse_path) {
+TEST(remesh_vertex_paint_invariant_on_the_sparse_path) {
     CommandRegistry reg;
     Document doc = paintedSphere();
     CHECK(reg.execute(doc, "remesh", {{"resolution", 640.0}}).ok);
@@ -139,7 +139,7 @@ TEST(remesh_leaves_the_part_shading_alone) {
     CHECK(doc.parts[size_t(doc.activePart)].shading == shading);
 }
 
-TEST(remesh_vertex_paint_is_smooth_from_a_coarse_source) {
+TEST(remesh_vertex_paint_invariant_smooth_from_a_coarse_source) {
     // A 1280-triangle Part remeshed much denser: the nearest-vertex copy left blocks the size of the old triangles
     // ; the interpolated copy follows the field within about a percent.
     CommandRegistry reg;
@@ -171,4 +171,19 @@ TEST(remesh_says_when_vertex_paint_is_resampled_coarser) {
     CHECK(r.message.find("raise the Resolution") != std::string::npos);
     Document plain = makeDoc(makeIcosphere(5)); // no paint: no note
     CHECK(reg.execute(plain, "remesh", {{"resolution", 32.0}}).message.find("vertex paint") == std::string::npos);
+}
+
+TEST(remesh_vertex_paint_invariant_never_changes_the_shape) {
+    // Carrying paint is only colour: the remeshed surface is bit for bit the one a Part without paint gets.
+    CommandRegistry reg;
+    Document painted = paintedSphere();
+    Document plain = makeDoc(makeIcosphere(5));
+    CHECK(reg.execute(painted, "remesh", {{"resolution", 96.0}}).ok);
+    CHECK(reg.execute(plain, "remesh", {{"resolution", 96.0}}).ok);
+    CHECK(painted.mesh.positions.size() == plain.mesh.positions.size());
+    CHECK(painted.mesh.triangles.size() == plain.mesh.triangles.size());
+    size_t moved = 0;
+    for (size_t v = 0; v < painted.mesh.positions.size() && v < plain.mesh.positions.size(); ++v)
+        moved += painted.mesh.positions[v] != plain.mesh.positions[v];
+    CHECK(moved == 0);
 }
