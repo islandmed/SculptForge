@@ -83,8 +83,20 @@ if ! command -v gradle >/dev/null; then # (pinned; checked against Gradle's publ
 fi
 task=assembleRelease
 [ $type = debug ] && task=assembleDebug
-(cd android && gradle --no-daemon -q "$task" -PsfJniLibs="$jni" -PsfRes="$res" \
-  -PsfSdlJava="$sdl/android-project/app/src/main/java" -PsfVersion="$version" -PsfVersionCode="$code" $unsigned)
+# Maven Central rate-limits shared CI IPs (429, or a "not found" Gradle then caches for 24 h): a dependency-resolution failure is
+# tried again, twice, after a pause and with --refresh-dependencies (drops those cached misses). Any other failure stops at once.
+refresh=
+for attempt in 1 2 3; do
+  if (cd android && gradle --no-daemon -q "$task" -PsfJniLibs="$jni" -PsfRes="$res" \
+        -PsfSdlJava="$sdl/android-project/app/src/main/java" -PsfVersion="$version" -PsfVersionCode="$code" $unsigned $refresh) \
+        2>&1 | tee "$out/gradle.log"; then break; fi
+  if [ "$attempt" -ge 3 ] || ! grep -qE 'Could not (resolve|find|get|GET)|Received status code (429|5[0-9][0-9])|timed out|Connection reset' "$out/gradle.log"; then
+    exit 1
+  fi
+  echo "gradle: dependency resolution failed (attempt $attempt of 3); trying again in $((attempt * 45)) s" >&2
+  sleep $((attempt * 45))
+  refresh=--refresh-dependencies
+done
 apk=$(find android/app/build/outputs/apk/$type -name '*.apk' -print -quit)
 suffix=-test
 [ $type = debug ] && suffix=-debug
