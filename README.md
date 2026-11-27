@@ -76,7 +76,7 @@ SculptForge has no telemetry, no account and no servers of its own. AI features 
 SculptForge is free, and nothing in the app is ever paywalled. Every release stays free for everyone; bug-fix and security releases go out to all the same day.
 
 - **[Member](https://sculptforge.app/support.html?utm_campaign=github)** ($5 / month or $48 / year):
-  - Early builds, like SculptForge for Android today, and the monthly feature vote
+  - Early builds (from SculptForge 2027, each release about two weeks early), and the monthly feature vote
   - One Member Request a month, built first and credited to you
   - #members on Discord and your name in the [credits](https://sculptforge.app/supporters.html)
   - The first 100 are Founding Members, price locked for good

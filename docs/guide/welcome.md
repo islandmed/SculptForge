@@ -31,7 +31,7 @@ start asks what you are coming from, or pick **Classic** in **Edit > Preferences
 It is free software under the GNU General Public License v3.0 or later. You own everything you make with it: the
 GPL covers the program, not your models.
 
-SculptForge is free for everyone. Members get early builds, like SculptForge for Android today and vote on what's built: see
+SculptForge is free for everyone. Members get early builds (the next version before everyone else; from SculptForge 2027, each release about two weeks early) and vote on what's built: see
 [Support and membership](support.md).
 
 ## What you can do with it

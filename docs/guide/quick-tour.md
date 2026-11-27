@@ -126,7 +126,7 @@ the top shelf paints into a texture instead (Auto UV runs first), with paint lay
 ## SculptForge stays free
 
 Everything in this tour is free, and stays free. If SculptForge helps your work, a membership keeps it moving: members
-get early builds, like SculptForge for Android today, vote on what we build next and ask for the brushes and alphas they want.
+get early builds (the next version before everyone else; from SculptForge 2027, each release about two weeks early), vote on what we build next and ask for the brushes and alphas they want.
 
 See [sculptforge.app/support.html](https://sculptforge.app/support.html). **Maybe later** on the tour's last slide
 closes it, and it doesn't come back by itself.
