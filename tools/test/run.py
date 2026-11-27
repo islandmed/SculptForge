@@ -295,13 +295,24 @@ GPU_LOST = re.compile(r"Could not find a valid EGL device|D3D12: Removing Device
 FAIL_LINE = re.compile(r"^(?:FAIL\b|FAILED\b|TIMEOUT\b|.*\b(?:assert|error|exception|crash|lost)\b)", re.I)
 
 
+# An absolute path of 2+ segments (/a/b, C:\a\b, a trailing separator too), not the tail of a relative one (src/app/x, 4/255, 58%/x).
+ABS_PATH = re.compile(r"(?<![\w.%/\\])(?:[A-Za-z]:)?(?:[\\/][\w.+~@<>-]+){2,}[\\/]?")
+HOME_DIR = re.compile(r"^(?:[A-Za-z]:)?[\\/](?:home|Users)[\\/][^\\/]+[\\/]?$", re.I)
+
+
+def _short_path(m):
+    """A path's last segment; a home folder itself (/home/u, C:\\Users\\u: its last segment is the user's name) becomes ~."""
+    p = m.group(0)
+    return "~" if HOME_DIR.match(p) else re.split(r"[\\/]", p.rstrip("\\/"))[-1]
+
+
 def failure_reason(out):
     """One line for a retried test's first failure (the stage summary shows it beside "passed after retry"): the first
     FAIL/error line of its output, else its last line, capped. Absolute paths (a home folder, the PC's /root/wt, C:\\...) shrink to
     their file name: the line goes into logs that can be public and must not name a machine or a user."""
     lines = [l.strip() for l in out.splitlines() if l.strip()]
     line = next((l for l in lines if FAIL_LINE.match(l)), lines[-1] if lines else "")
-    line = re.sub(r"(?:[A-Za-z]:)?(?:[\\/][\w.+~@-]+){2,}[\\/]([\w.+~@-]+)", r"\1", line)
+    line = ABS_PATH.sub(_short_path, line)
     return re.sub(r"\s+", " ", re.sub(r"^FAIL\s+", "", line))[:400]
 
 
@@ -557,6 +568,11 @@ def self_test():
     assert failure_reason("FAIL m.sfui:6: x (picture: /root/wt/r014/src/build/ui-shots/m/FAIL-cell.png)") == \
         "m.sfui:6: x (picture: FAIL-cell.png)"
     assert failure_reason("error: cannot open /home/u/Work/c.txt and C:\\Users\\u\\x\\y.png") == "error: cannot open c.txt and y.png"
+    assert failure_reason("error: cannot open /home/<user>") == "error: cannot open ~"  # (2 segments: the home folder itself)
+    assert failure_reason("error: cwd /home/<user>/ now") == "error: cwd ~ now"  # (trailing separator)
+    assert failure_reason("error: C:\\Users\\<user>") == "error: ~"
+    assert failure_reason("error: no /tmp/x/ here") == "error: no x here"  # (any 2-segment path: its last segment)
+    assert failure_reason("error: src/app/x.cpp:4 differs 4/255, 58.5%/x") == "error: src/app/x.cpp:4 differs 4/255, 58.5%/x"  # (relative: kept)
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
         f.write("# name | owner | until | task | why\nui_x | qa-lean | 2026-11-18 | fix/x | seed 1064 # leak\n"
                 "ui_y | qa | 2026-11-18 |  | no task\nbad line\n")
