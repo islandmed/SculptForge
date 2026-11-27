@@ -1,0 +1,45 @@
+# What's New's one quiet membership line (Support.h kWhatsNewMemberNote, WhatsNewPopup.cpp): shown when the appeal would be
+# due for this version, then instead of the appeal card; its link opens the membership page (never a checkout); Close ends it
+# for the version. Members and tests never get it (tests/test_support.cpp).
+env SF_WHATS_NEW_VERSION 0.12.0
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+# Not due (the first start belongs to the tour): What's New has no line.
+member_card appeal starts=1
+click "Help##palette.help"
+click "What's New##help.whats_new"
+wait 0.5
+expect_value whats_new_open == 1
+expect_value whats_new_note == 0
+expect_no_text SculptForge is free and stays free
+key escape
+wait 0.3
+# The second start: the line shows and is this version's ask (no appeal card, then or later).
+member_card appeal starts=2
+click "Help##palette.help"
+click "What's New##help.whats_new"
+wait 0.5
+expect_value whats_new_note == 1
+expect_value appeal_pending == 0
+expect_text SculptForge is free and stays free
+expect_text their name in the credits
+expect "Membership##whats_new.membership"
+shot whats-new-member-note
+# The link opens the membership page tagged whats-new (no checkout); the card stays open.
+click "Membership##whats_new.membership"
+expect_value support_requests == 1
+expect_status https://sculptforge.app/support.html?utm_source=app&utm_medium=in-app&utm_campaign=whats-new
+expect_value whats_new_open == 1
+# Close ends it for this version: reopened, no line; the appeal does not come either.
+click "Close##whats_new"
+wait 0.4
+expect_value whats_new_open == 0
+member_card appeal starts=3
+wait 0.3
+expect_value appeal_open == 0
+expect_value appeal_pending == 0
+click "Help##palette.help"
+click "What's New##help.whats_new"
+wait 0.5
+expect_value whats_new_note == 0
+expect_no_text SculptForge is free and stays free

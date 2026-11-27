@@ -37,6 +37,7 @@ struct App::WhatsNewPopup {
     double closingAt = 0.0;
     std::vector<float> hover; // per card, eased
     int focus = -1;           // the card the keyboard is on
+    bool memberNote = false;  // the footer's one membership line (Support.h kWhatsNewMemberNote): this version's ask
 };
 
 void App::WhatsNewDelete::operator()(WhatsNewPopup* p) const { delete p; }
@@ -64,6 +65,8 @@ void coverUv(float image, float box, ImVec2& uv0, ImVec2& uv1) {
 bool App::whatsNewOpen() const { return whatsNew_ && !whatsNew_->closing; }
 
 const whatsnew::Version* App::whatsNewVersion() const { return whatsNew_ ? &whatsNew_->version : nullptr; }
+
+bool App::whatsNewNote() const { return whatsNewOpen() && whatsNew_->memberNote; }
 
 int App::whatsNewMore() const { return whatsNew_ ? whatsNew_->more : 0; }
 
@@ -93,6 +96,7 @@ void App::showWhatsNew(const std::string& sinceVersion) {
         whatsNew_->cardVersions = gathered.cardVersions;
         whatsNew_->more = gathered.more;
     }
+    whatsNew_->memberNote = takeWhatsNewNote();
     whatsNew_->openedAt = nowSeconds();
     whatsNew_->hover.assign(whatsNew_->version.cards.size(), 0.0f);
     redrawIn(0.0);
@@ -189,12 +193,14 @@ void App::drawWhatsNew() {
                  accent = theme::rolePopups ? theme::edge(theme::Role::New) : theme::accent;
     const ImVec4 ink = theme::textBright, body = theme::text, dim = theme::textDim, line = theme::text;
 
-    // Logical 920 x 660, fitted to the window and the UI scale; scaled from 96 % while opening.
+    // Logical 920 x 660 (704 with the membership line), fitted to the window and the UI scale; scaled from 96 % while opening.
     const float s = uiScale_;
     const ImVec2 view = io.DisplaySize;
-    const float fit = std::min({1.0f, (view.x - 32.0f * s) / (920.0f * s), (view.y - 32.0f * s) / (660.0f * s)});
+    // (the membership line adds its own row under the cards: the card grows by it, so the cards keep their height)
+    const float noteRow = pop.memberNote ? 44.0f : 0.0f, logicalH = 660.0f + noteRow;
+    const float fit = std::min({1.0f, (view.x - 32.0f * s) / (920.0f * s), (view.y - 32.0f * s) / (logicalH * s)});
     const float k = s * std::max(fit, 0.4f) * lerp(0.96f, 1.0f, shown);
-    const ImVec2 size(920.0f * k, 660.0f * k);
+    const ImVec2 size(920.0f * k, logicalH * k);
     const ImVec2 a(std::floor((view.x - size.x) * 0.5f), std::floor((view.y - size.y) * 0.5f));
     const ImVec2 b(a.x + size.x, a.y + size.y);
     const float radius = 18.0f * k, hair = std::max(1.0f, k);
@@ -289,7 +295,9 @@ void App::drawWhatsNew() {
         tried = pop.focus;
 
     // The cards: the first one large (picture left, words right), the others in a row below.
-    const float footerH = 72.0f * k;
+    const float barH = 72.0f * k;
+    const float noteH = noteRow * k; // the membership line sits above the footer bar
+    const float footerH = barH + noteH;
     const float top = a.y + 124.0f * k, bottom = b.y - footerH, innerW = size.x - pad * 2.0f, gap = 16.0f * k;
     const int rest = n - 1;
     const int cols = std::clamp(rest, 1, 4), rows = rest > 0 ? (rest + cols - 1) / cols : 0; // the small cards: up to 4 a row
@@ -467,12 +475,13 @@ void App::drawWhatsNew() {
     }
 
     // Footer: the full release notes and the Discord on the left, Close on the right.
-    const float fy = b.y - footerH * 0.5f;
+    const float fy = b.y - barH * 0.5f;
     const float fa = easeOut((t - 0.12f) / 0.2f) * A;
     dl->AddLine(ImVec2(a.x + pad, b.y - footerH), ImVec2(b.x - pad, b.y - footerH), tc(line, 0.08f * fa), hair);
-    auto pill = [&](const char* label, const char* id, float x, bool primary) {
+    auto pill = [&](const char* label, const char* id, float x, bool primary, float cy = -1.0f) {
+        const float py = cy < 0.0f ? fy : cy;
         const ImVec2 ls = paint.measure(boldUi, 14.0f, label);
-        const ImVec2 c0(x, fy - 17.0f * k), c1(x + ls.x + 36.0f * k, fy + 17.0f * k);
+        const ImVec2 c0(x, py - 17.0f * k), c1(x + ls.x + 36.0f * k, py + 17.0f * k);
         ImGui::SetCursorScreenPos(c0);
         ImGui::InvisibleButton(id, ImVec2(c1.x - c0.x, c1.y - c0.y));
         const bool hot = ImGui::IsItemHovered();
@@ -482,11 +491,19 @@ void App::drawWhatsNew() {
         } else if (hot) {
             dl->AddRectFilled(c0, c1, tc(theme::button, 0.6f * fa), 17.0f * k);
         }
-        paint.text(boldUi, 14.0f, ImVec2(std::floor(c0.x + 18.0f * k), std::floor(fy - ls.y * 0.5f)), tc(primary || hot ? ink : body, fa),
+        paint.text(boldUi, 14.0f, ImVec2(std::floor(c0.x + 18.0f * k), std::floor(py - ls.y * 0.5f)), tc(primary || hot ? ink : body, fa),
                    label);
         return std::pair<float, bool>(c1.x - c0.x, ImGui::IsItemClicked());
     };
-    bool notes = false, discord = false;
+    bool notes = false, discord = false, membership = false;
+    if (pop.memberNote) { // one quiet line and a link to the membership page (never a checkout); Close ends it
+        const float cy = b.y - barH - noteH * 0.5f;
+        const char* link = tr(kWhatsNewMemberLink);
+        const float lw = paint.measure(boldUi, 14.0f, link).x + 36.0f * k, tw = size.x - pad * 2.0f - lw - 24.0f * k;
+        const ImVec2 ts = paint.measure(bodyFont, 13.5f, tr(kWhatsNewMemberNote), tw);
+        paint.text(bodyFont, 13.5f, ImVec2(a.x + pad, std::floor(cy - ts.y * 0.5f)), tc(dim, fa), tr(kWhatsNewMemberNote), tw);
+        membership = pill(link, "Membership##whats_new.membership", b.x - pad - lw, false, cy).second;
+    }
     {
         float x = a.x + pad - 18.0f * k;
         const auto [w0, n0] = pill("Full release notes", "Full release notes##whats_new", x, false);
@@ -511,6 +528,8 @@ void App::drawWhatsNew() {
         } else if (notes) {
             guide_.open("whats-new.md");
             closeWhatsNew();
+        } else if (membership) {
+            openSupportPage("whats-new"); // the membership page; stays open (Close ends the ask)
         } else if (discord) {
             openDiscordPage(); // stays open
         } else if (close || ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {

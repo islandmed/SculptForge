@@ -628,7 +628,9 @@ void App::tickMemberCard(float dt) {
 }
 
 bool App::appealUpdateCheckOff() const {
-#if SF_UPDATE_CHECK
+#if defined(SF_STORE_BUILD)
+    return true; // an app-store build: no price text, no membership link (none today; package managers are off below)
+#elif SF_UPDATE_CHECK
     return !checkUpdates_ || std::getenv("SF_NO_UPDATE_CHECK") != nullptr;
 #else
     return true;
@@ -644,10 +646,26 @@ void App::startupUpdateMoment() {
 void App::launchAppeal() {
     const bool testMode = supportCardTestMode() && !memberCardTestMode_;
     if (pleaBlocked() || !appealDue(supportCardPrefs_, appVersionLabel(), memberSignedIn(), studioMembership(), appealUpdateCheckOff(), testMode)) return;
+    if (showWhatsNew_) return; // an update's What's New carries this version's one ask (its footer line, takeWhatsNewNote)
     appealPending_ = true;
     appealOwesUpdate_ = memberMomentPending_ == MemberMoment::Updated;
     memberMomentPending_ = MemberMoment::None; // (an update's small card steps aside, and comes at the next start)
     redrawIn(0.0);
+}
+
+// What's New's footer line: the same conditions as the appeal. Taking it is the version's ask, so the appeal and the small
+// update card step aside exactly as the appeal does for the update card (it comes at the next start).
+bool App::takeWhatsNewNote() {
+    const bool testMode = supportCardTestMode() && !memberCardTestMode_;
+    if (pleaBlocked() || !appealDue(supportCardPrefs_, appVersionLabel(), memberSignedIn(), studioMembership(), appealUpdateCheckOff(), testMode))
+        return false;
+    supportCardPrefs_.appealVersion = appVersionLabel();
+    supportCardPrefs_.shownAt = memberClock(); // (no small card for the week after it)
+    if (std::exchange(appealOwesUpdate_, false) || memberMomentPending_ == MemberMoment::Updated) supportCardPrefs_.updateOwed = true;
+    if (memberMomentPending_ == MemberMoment::Updated) memberMomentPending_ = MemberMoment::None;
+    appealPending_ = false;
+    saveProjectPrefs(); // (recorded as it shows: a crash can't bring it back)
+    return true;
 }
 
 void App::memberCardChoice(MemberCardChoice c) {

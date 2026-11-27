@@ -1535,6 +1535,7 @@ double Demo::query(const std::string& name, bool& known) const {
     // entries (versions in full, then groups) and its open sections.
     if (name == "whats_new_open") return app_.whatsNewOpen() ? 1.0 : 0.0;
     if (name == "whats_new_cards") return app_.whatsNewVersion() ? double(app_.whatsNewVersion()->cards.size()) : 0.0;
+    if (name == "whats_new_note") return app_.whatsNewNote() ? 1.0 : 0.0; // the footer's membership line is showing
     if (name == "whats_new_scrolled") return app_.whatsNewScrolled() ? 1.0 : 0.0;
     if (name == "whats_new_more") return double(app_.whatsNewMore());
     if (name == "whats_new_tries") return double(app_.whatsNewTries_);
