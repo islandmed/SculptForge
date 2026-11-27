@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.14.3:</strong> SculptForge on Android as a free early build, HDRIs of your own, a Clean view, Monochrome colours and Focus Detail on Windows (<a href="https://sculptforge.app/guide/installing.md#android-early">how it works</a>)
+  <strong>New in 0.14.4:</strong> both sides of a mirrored Micro stroke shade as you sculpt, and Monochrome reaches the last orange corners (<a href="https://sculptforge.app/guide/performance.md">how it works</a>)
 </p>
 
 <p align="center">

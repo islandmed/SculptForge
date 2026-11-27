@@ -6,6 +6,18 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.14.4] - 2026-11-27
+
+### Fixed
+- **Micro levels: both sides of a stroke show while you sculpt**. When a stroke changed more patches per frame than
+  the shading budget takes, the budget always went to the same patches first, so with X symmetry one side showed live
+  and the other only once you lifted the pen. The budget now moves through the changed patches in turn, so every one
+  is shaded within a few frames and both sides update together; the total shading per frame is the same. Reported by
+  @HG4Science.
+- Monochrome: the Command palette's frame and highlighted row, the shortcut boxes, the radial menu's highlight, the
+  corner gizmo's hover dot, the guide's search highlight and selected text in a field were still orange. They take the
+  white accent now, and the Library's selected page button keeps a light fill when hovered so its dark text reads.
+
 ## [0.14.3] - 2026-11-27
 
 ### Added
