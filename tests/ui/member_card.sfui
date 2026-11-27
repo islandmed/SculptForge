@@ -69,7 +69,7 @@ expect_value member_card_open == 0
 member_card updated days=15.1
 wait 0.4
 expect_value member_card_open == 1
-expect_text is here. Members get early builds, like SculptForge for Android today.
+expect_text is here. Members' requests are built first, and most ship within days.
 shot updated
 click "Not now##member_card.not_now"
 

@@ -258,6 +258,10 @@ TEST(support_card_links_match_the_website) {
 TEST(support_card_opens_only_its_fixed_links) {
     for (const char* url : {kSupportUrlMember, kSupportUrlMemberYearly, kStudioPageUrl, kTermsUrl})
         CHECK(url[0] == '\0' || supportLinkAllowed(url));
+    // The card's button opens the membership page tagged with the source (what the funnel counts), nothing else on the site.
+    CHECK(supportLinkAllowed(supportPageUrl(kSupportSourceTag)));
+    CHECK(!supportLinkAllowed(supportPageUrl("other")));
+    CHECK(!supportLinkAllowed(std::string(kSupportUrl)));
     for (const char* url : {"", "https://sculptforge.app/terms.html.evil.example", "https://sculptforge.app/terms.htm",
                             "file:///etc/passwd", "https://buy.stripe.com/", "javascript:alert(1)"})
         CHECK(!supportLinkAllowed(url));

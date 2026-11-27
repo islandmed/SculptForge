@@ -3230,6 +3230,18 @@ constexpr Entry kSpanish[] = {
      "builds are on.",
      "Inicia sesión con GitHub, como las versiones para miembros (Preferencias > Actualizaciones): no más tarjetas "
      "de membresía, y las versiones para miembros quedan activadas."},
+    {"Member Requests: one a month, built first (most ship within days), credited to you",
+     "Member Requests: una al mes, desarrollada primero (la mayoría en cuestión de días) y acreditada a ti"},
+    {"The monthly feature vote: pick what we build next",
+     "La votación mensual de funciones: elige qué desarrollamos a continuación"},
+    {"The members' channel on Discord",
+     "El canal para miembros en Discord"},
+    {"Your name in the credits, in the app and on the website",
+     "Tu nombre en los créditos, en la app y en el sitio web"},
+    {"Members' requests are built first, and most ship within days.",
+     "Las peticiones de los miembros se desarrollan primero, y la mayoría llega en cuestión de días."},
+    {"$48 a year or $5 a month: the feature vote, Member Requests built first, and your name in the credits. Nothing in the app is ever paywalled.",
+     "$48 al año o $5 al mes: la votación de funciones, Member Requests desarrolladas primero y tu nombre en los créditos. Nada en la app está nunca de pago."},
     // --- PanelTexture.cpp (tools/i18n/coverage.py) ---
     {"Paint into the vertices (vertex paint): the colour resolution is the mesh's. Shown when the Part has a texture "
      "(Tool > Texture Image).",

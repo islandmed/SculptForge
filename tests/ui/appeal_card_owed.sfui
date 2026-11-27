@@ -18,7 +18,7 @@ wait 0.3
 expect_value appeal_open == 0
 expect_value appeal_pending == 0
 expect_value member_card_open == 1
-expect_text is here. Members get early builds, like SculptForge for Android today.
+expect_text is here. Members' requests are built first, and most ship within days.
 expect_value update_card_owed == 0
 click "Not now##member_card.not_now"
 # And not a third time.

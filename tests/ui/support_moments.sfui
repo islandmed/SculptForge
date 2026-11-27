@@ -99,7 +99,7 @@ expect_value member_card_pending == 0
 member_card updated days=200
 wait 0.4
 expect_value member_card_open == 1
-expect_text is here. Members get early builds, like SculptForge for Android today.
+expect_text is here. Members' requests are built first, and most ship within days.
 
 # A member: the heart becomes a small badge (no count, nothing that moves), and no more cards.
 click "I'm already a member##member_card.already"
