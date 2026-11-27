@@ -76,7 +76,7 @@ ImU32 kInlineCodeBg() { return theme::u32(theme::frameHover); }
 ImU32 kRule() { return theme::u32(mix(pageBg(), theme::text, 0.14f)); }
 ImU32 kBox() { return theme::u32(mix(pageBg(), theme::text, 0.06f)); }     // callouts, cards
 ImU32 kBoxEdge() { return theme::u32(mix(pageBg(), theme::text, 0.16f)); } // their outline
-constexpr ImU32 kHighlight = IM_COL32(0xf0, 0x88, 0x2e, 0x5a);
+ImU32 kHighlight() { return theme::ink(IM_COL32(0xf0, 0x88, 0x2e, 0x5a)); } // (white in Monochrome)
 
 // --- Where the guide's files come from: embedded, or SCULPTFORGE_GUIDE_DIR while writing it ---
 
@@ -329,7 +329,7 @@ private:
                     const float x0 = tx + textWidth(f, p.text.substr(0, at2));
                     const float x1 = tx + textWidth(f, p.text.substr(0, at2 + w.size()));
                     dl->AddRectFilled(ImVec2(x0 - 1.0f * s_, ty - 1.0f * s_), ImVec2(x1 + 1.0f * s_, ty + f->FontSize + 1.0f * s_),
-                                      kHighlight, 2.0f * s_);
+                                      kHighlight(), 2.0f * s_);
                 }
         }
         ImU32 col = st_.color;
@@ -867,7 +867,7 @@ void UserGuide::drawSearchResults(App& app) {
             const float mx1 = mx0 + small->CalcTextSizeA(small->FontSize, FLT_MAX, 0, begin + h.matchStart,
                                                          begin + h.matchStart + h.matchLength)
                                          .x;
-            dl->AddRectFilled(ImVec2(mx0 - 1, ly), ImVec2(mx1 + 1, ly + small->FontSize), kHighlight, 2.0f * s);
+            dl->AddRectFilled(ImVec2(mx0 - 1, ly), ImVec2(mx1 + 1, ly + small->FontSize), kHighlight(), 2.0f * s);
             dl->AddText(small, small->FontSize, ImVec2(mx0, ly), kStrong(), begin + h.matchStart,
                         begin + h.matchStart + h.matchLength);
         }

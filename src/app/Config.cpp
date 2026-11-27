@@ -1833,7 +1833,7 @@ void App::drawShortcutConflict() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f * s);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, col(IM_COL32(0x18, 0x18, 0x1a, 0xff)));
-    ImGui::PushStyleColor(ImGuiCol_Border, col(IM_COL32(0xf0, 0x88, 0x2e, 0xa0)));
+    ImGui::PushStyleColor(ImGuiCol_Border, col(theme::ink(IM_COL32(0xf0, 0x88, 0x2e, 0xa0))));
     const bool shown = ImGui::BeginPopup(id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
     if (shown) {
         if (!shortcutConflictOpen()) { // answered (Enter or Esc went through captureShortcutKey): close just this box
@@ -1926,7 +1926,7 @@ void App::drawHelpConsoleUi() {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f * s);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
         ImGui::PushStyleColor(ImGuiCol_WindowBg, col(IM_COL32(0x18, 0x18, 0x1a, 0xff)));
-        ImGui::PushStyleColor(ImGuiCol_Border, col(IM_COL32(0xf0, 0x88, 0x2e, 0xa0)));
+        ImGui::PushStyleColor(ImGuiCol_Border, col(theme::ink(IM_COL32(0xf0, 0x88, 0x2e, 0xa0))));
         if (ImGui::Begin("##shortcut_capture", nullptr,
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs)) {

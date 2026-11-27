@@ -86,7 +86,7 @@ void applyStyle() {
     c[ImGuiCol_TableBorderLight] = rgb(0x333333);
     c[ImGuiCol_TableRowBg] = ImVec4(0, 0, 0, 0);
     c[ImGuiCol_TableRowBgAlt] = rgb(0xffffff, 0.025f);
-    c[ImGuiCol_TextSelectedBg] = rgb(0xf0882e, 0.30f);
+    c[ImGuiCol_TextSelectedBg] = look.monochrome ? ImVec4(accent.x, accent.y, accent.z, 0.30f) : rgb(0xf0882e, 0.30f);
     c[ImGuiCol_DragDropTarget] = accentHover;
     c[ImGuiCol_NavCursor] = ImVec4(0, 0, 0, 0); // the keyboard focus gets the hover ring instead (ui::DrawHover)
     c[ImGuiCol_ModalWindowDimBg] = rgb(0x000000, 0.45f);

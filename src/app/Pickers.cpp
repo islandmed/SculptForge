@@ -704,7 +704,7 @@ void drawBrushGrid(App& app, GridMode mode) {
             std::string shownTyped = typed;
             for (auto& c : shownTyped)
                 c = char(std::toupper(static_cast<unsigned char>(c)));
-            ImGui::TextColored(ImVec4(0.94f, 0.53f, 0.18f, 1.0f), "%s", shownTyped.c_str());
+            ImGui::TextColored(theme::ink(ImVec4(0.94f, 0.53f, 0.18f, 1.0f)), "%s", shownTyped.c_str());
             ImGui::SameLine();
             ImGui::TextDisabled("%s", tr(substring ? "(contains)  Backspace: undo a letter  Enter: first match"
                                           : "Backspace: undo a letter  Enter: first match"));

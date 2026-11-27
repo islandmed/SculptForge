@@ -1,0 +1,40 @@
+# Monochrome has no hue in the pop-ups either (a member's report: the Command palette's frame and its highlighted row
+# were still orange): the Command palette, a context menu and the radial menu, each with no pixel in the chrome with a hue.
+# The 3D view and the colour picker are content and stay out of the regions.
+run new_sphere subdivisions=3
+run ui_look look=forge scheme=monochrome layout=sculptforge
+wait 0.2
+key f3
+wait 0.2
+type "##Command palette" "brush"
+wait 0.2
+shot mono-palette
+expect_value tint@0.27,0.1,0.58,0.32 == 0       # its frame, the field, the highlighted row and the keycaps
+key esc
+wait 0.2
+
+right_click "Clay##brush.clay"
+wait 0.2
+shot mono-context-menu
+expect_value tint@0.07,0.9,0.18,0.995 == 0       # the menu (the brush thumbnails beside it are content)
+key esc
+wait 0.2
+
+hover_window 0.5 0.5
+key t
+wait 0.2
+expect_value radial_open == 1
+hover_window 0.6 0.5                              # the pointer on Move: its pill is the lit one
+wait 0.2
+shot mono-radial
+expect_value tint@0.555,0.475,0.625,0.525 == 0   # (the sphere behind the other pills is content)
+key esc
+wait 0.2
+
+# Neutral keeps the orange frame: the probe sees it.
+run ui_look look=forge scheme=neutral
+wait 0.2
+key f3
+wait 0.2
+shot neutral-palette
+expect_value tint@0.27,0.1,0.58,0.32 > 0
