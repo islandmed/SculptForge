@@ -5,6 +5,7 @@
 // rejected with an error (or loaded safely), never crash or allocate wildly.
 #include "TestHarness.h"
 
+#include "core/BakeImage.h"
 #include "core/Mesh.h"
 #include "core/Splats.h"
 #include "io/GltfIO.h"
@@ -16,12 +17,15 @@
 #include "core/Texture.h"
 #include "io/Zip.h"
 
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iterator>
+#include <random>
 #include <string>
 
 using namespace sf;
@@ -512,4 +516,84 @@ TEST(malformed_glb_containers_are_rejected) {
     CHECK(rejects(good.substr(0, good.size() - 10)));             // truncated
     CHECK(rejects(setU32(good, 16, 0x12345678u)));                // no JSON chunk
     CHECK(rejects(glb(json, std::vector<uint8_t>(20, 0))));       // BIN shorter than the buffer views need
+}
+
+// An uncompressed scanline EXR header that claims w x h RGB float pixels (the data window as given), followed by `data` bytes.
+static std::string exrClaiming(int32_t x0, int32_t y0, int32_t x1, int32_t y1, size_t data, int channels = 3,
+                               const std::string& dataBytes = std::string()) {
+    auto u32 = [](uint32_t v) { return std::string(reinterpret_cast<const char*>(&v), 4); };
+    auto attr = [&](const std::string& name, const std::string& type, const std::string& value) {
+        return name + '\0' + type + '\0' + u32(uint32_t(value.size())) + value;
+    };
+    std::string chans;
+    for (int i = 0; i < channels; ++i)
+        chans += (channels == 3 ? std::string(1, "BGR"[i]) : "C" + std::to_string(i)) + '\0' + u32(2) + u32(0) + u32(1) + u32(1);
+    chans += '\0';
+    std::string out = u32(20000630) + u32(2);
+    out += attr("channels", "chlist", chans);
+    out += attr("compression", "compression", std::string(1, '\0'));
+    out += attr("dataWindow", "box2i", u32(uint32_t(x0)) + u32(uint32_t(y0)) + u32(uint32_t(x1)) + u32(uint32_t(y1)));
+    out += std::string(1, '\0');
+    return out + (dataBytes.empty() ? std::string(data, '\0') : dataBytes);
+}
+
+// Damaged .exr headers (sizes the file can't hold, odd data windows, many channels, scanline offsets past the end) are
+// refused with an error, quickly.
+TEST(exr_damaged_headers_are_refused) {
+    const auto t0 = std::chrono::steady_clock::now();
+    int w = 0, h = 0, c = 0;
+    std::vector<float> px;
+    std::string err;
+    for (const auto& claim : {std::array<int32_t, 4>{0, 0, 65535, 65535}, std::array<int32_t, 4>{0, 0, 65535, 0},
+                              std::array<int32_t, 4>{0, 0, 0, 65535}, std::array<int32_t, 4>{0, 0, 8191, 8191},
+                              std::array<int32_t, 4>{INT32_MIN, 0, INT32_MAX, 0}, std::array<int32_t, 4>{0, INT32_MIN, 0, INT32_MAX},
+                              std::array<int32_t, 4>{INT32_MAX, 0, INT32_MIN, 0}}) {
+        px.clear();
+        CHECK(!loadExr(writeFile("sf_exr_claim.exr", exrClaiming(claim[0], claim[1], claim[2], claim[3], 64)), w, h, c, px, err));
+        CHECK(px.empty() && !err.empty());
+    }
+    // A scanline offset table whose first entry is near 2^64 (and one just past the end), in a file big enough for the table.
+    for (uint64_t evil : {~uint64_t(0) - 7, ~uint64_t(0), uint64_t(1) << 63, uint64_t(100000)}) {
+        std::string table(4 * 8, '\0');
+        std::memcpy(&table[0], &evil, 8);
+        const std::string body = table + std::string(4 * 16 * 12, '\0');
+        CHECK(!loadExr(writeFile("sf_exr_claim.exr", exrClaiming(0, 0, 15, 3, 0, 3, body)), w, h, c, px, err));
+    }
+    // A "compression" attribute with no value as the very last bytes of the file (and other attributes cut at the end).
+    {
+        const std::string head = std::string("\x76\x2f\x31\x01\x02\x00\x00\x00", 8) + std::string("compression\0compression\0", 24);
+        CHECK(!loadExr(writeFile("sf_exr_claim.exr", head + std::string(4, '\0')), w, h, c, px, err));
+        CHECK(!loadExr(writeFile("sf_exr_claim.exr", head), w, h, c, px, err));
+        CHECK(!loadExr(writeFile("sf_exr_claim.exr", head.substr(0, head.size() - 3)), w, h, c, px, err));
+    }
+    // Many channels, and a data window past the pixel cap.
+    CHECK(!loadExr(writeFile("sf_exr_claim.exr", exrClaiming(0, 0, 3, 3, 4096, 1000)), w, h, c, px, err));
+    CHECK(!loadExr(writeFile("sf_exr_claim.exr", exrClaiming(0, 0, 32767, 32767, 4096)), w, h, c, px, err));
+    CHECK(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < 2.0);
+    // A good file still loads, and damaged copies of it (bytes changed, cut short) are refused or load, never crash.
+    std::vector<float> good(size_t(16) * 8 * 3);
+    for (size_t i = 0; i < good.size(); ++i) good[i] = float(i) * 0.1f;
+    const std::string path = tempPath("sf_exr_fuzz.exr");
+    CHECK(saveExr(path, 16, 8, 3, good, err));
+    CHECK(loadExr(path, w, h, c, px, err) && w == 16 && h == 8 && px == good);
+    std::string bytes;
+    {
+        std::ifstream f(path, std::ios::binary);
+        bytes.assign(std::istreambuf_iterator<char>(f), {});
+    }
+    std::mt19937 rng(1126);
+    int refused = 0;
+    for (int round = 0; round < 1500; ++round) {
+        std::string d = bytes;
+        if (round % 3 == 0) d.resize(rng() % d.size());
+        else
+            for (int k = 0, n = 1 + int(rng() % 5); k < n; ++k) d[rng() % std::min<size_t>(d.size(), 300)] = char(rng());
+        px.clear();
+        if (!loadExr(writeFile("sf_exr_fuzz2.exr", d), w, h, c, px, err)) ++refused;
+        else CHECK(px.size() == size_t(w) * size_t(h) * size_t(c));
+    }
+    CHECK(refused > 100);
+    std::filesystem::remove(path);
+    std::filesystem::remove(tempPath("sf_exr_fuzz2.exr"));
+    std::filesystem::remove(tempPath("sf_exr_claim.exr"));
 }

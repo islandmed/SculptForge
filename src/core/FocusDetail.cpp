@@ -19,11 +19,18 @@
 #include <cstring>
 #include <filesystem>
 
-#if defined(SF_HAVE_ZSTD)
+#if defined(SF_HAVE_ZSTD) || defined(SF_HAVE_ZSTD_DECODER) // (the decoder alone: third_party/zstd)
 #include <zstd.h>
 #endif
 
-#if defined(__unix__) || defined(__APPLE__)
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <io.h>
+#include <windows.h>
+#elif defined(__unix__) || defined(__APPLE__)
 #define SF_FOCUS_POSIX 1
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -37,10 +44,78 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 double msSince(Clock::time_point t) { return std::chrono::duration<double, std::milli>(Clock::now() - t).count(); }
+// SF_FOCUS_TRACE=1: a line on stderr for each update() or brush promotion over 10 ms (where a frame's time went)
+bool focusTrace() {
+    static const bool on = [] { const char* e = std::getenv("SF_FOCUS_TRACE"); return e && e[0] == '1'; }();
+    return on;
+}
+
+// Files by their UTF-8 names (Windows: the wide API, so a name outside the code page works too).
+std::FILE* openWrite(const std::string& path) {
+#if defined(_WIN32)
+    return _wfopen(pathFromUtf8(path).c_str(), L"wb");
+#else
+    return std::fopen(path.c_str(), "wb");
+#endif
+}
+
+// On the disk, not only in the cache (after fflush).
+bool syncFile(std::FILE* f) {
+#if defined(_WIN32)
+    return FlushFileBuffers(HANDLE(_get_osfhandle(_fileno(f)))) != 0;
+#elif defined(SF_FOCUS_POSIX)
+    return ::fsync(fileno(f)) == 0;
+#else
+    (void)f;
+    return true;
+#endif
+}
+
+// `from` renamed over `to` (Windows refuses while `to` has a mapped view, ours or another's: `to` then stays as it was).
+bool replaceFile(const std::string& from, const std::string& to) {
+#if defined(_WIN32)
+    return MoveFileExW(pathFromUtf8(from).c_str(), pathFromUtf8(to).c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+#else
+    std::error_code ec;
+    std::filesystem::rename(pathFromUtf8(from), pathFromUtf8(to), ec);
+    return !ec;
+#endif
+}
+
+#if defined(_WIN32)
+// A regular file on a disk, not through a reparse point (a symlink or junction), as O_NOFOLLOW + S_ISREG; nullptr if
+// not. Shared for reading, writing and deleting like a POSIX descriptor (save() writes beside the open view).
+HANDLE openRegular(const std::string& path, DWORD access, BY_HANDLE_FILE_INFORMATION& info) {
+    HANDLE h = CreateFileW(pathFromUtf8(path).c_str(), access, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return nullptr;
+    if (GetFileType(h) != FILE_TYPE_DISK || !GetFileInformationByHandle(h, &info) ||
+        (info.dwFileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY))) {
+        CloseHandle(h);
+        return nullptr;
+    }
+    return h;
+}
+
+// The same file (volume serial + file index, as st_dev + st_ino).
+bool sameFile(const BY_HANDLE_FILE_INFORMATION& a, const BY_HANDLE_FILE_INFORMATION& b) {
+    return a.dwVolumeSerialNumber == b.dwVolumeSerialNumber && a.nFileIndexHigh == b.nFileIndexHigh &&
+           a.nFileIndexLow == b.nFileIndexLow;
+}
+#endif
 
 constexpr char kMagic[8] = {'S', 'F', 'D', 'E', 'T', 'A', 'I', 'L'};
 constexpr uint32_t kVersion = 1, kHeaderBytes = 128;
 constexpr uint32_t kCodecZstd = 1, kCodecPack = 2;
+
+// The codec this build writes `codec` tiles in: the same, or its own when it only decodes zstd (third_party/zstd).
+uint32_t writableCodec(uint32_t codec) {
+#if defined(SF_HAVE_ZSTD)
+    return codec;
+#else
+    return codec == kCodecZstd ? kCodecPack : codec;
+#endif
+}
 
 uint32_t defaultCodec() {
 #if defined(SF_HAVE_ZSTD)
@@ -99,10 +174,13 @@ void compressValues(uint32_t codec, const int16_t* values, size_t tiles, uint32_
 }
 
 bool decompressValues(uint32_t codec, const uint8_t* data, size_t size, size_t tiles, uint32_t samples, int16_t* out) {
-#if defined(SF_HAVE_ZSTD)
+#if defined(SF_HAVE_ZSTD) || defined(SF_HAVE_ZSTD_DECODER)
     if (codec == kCodecZstd) {
         thread_local ZSTD_DCtx* dctx = ZSTD_createDCtx();
         const size_t bytes = tiles * samples * sizeof(int16_t);
+        // Exactly the bytes a tile holds: a frame saying otherwise is refused before decoding, and decoding never
+        // writes past `bytes` (one pass into `out`: no window buffer, whatever a crafted frame asks for).
+        if (!dctx || ZSTD_getFrameContentSize(data, size) != bytes) return false;
         const size_t r = ZSTD_decompressDCtx(dctx, out, bytes, data, size);
         return !ZSTD_isError(r) && r == bytes;
     }
@@ -237,7 +315,7 @@ bool decodeHeader(const uint8_t* b, size_t size, Header& h, std::string& error) 
         error = "Detail file codec unknown";
         return false;
     }
-#if !defined(SF_HAVE_ZSTD)
+#if !defined(SF_HAVE_ZSTD) && !defined(SF_HAVE_ZSTD_DECODER)
     if (h.codec == kCodecZstd) {
         error = "This build can't read zstd detail files";
         return false;
@@ -333,7 +411,7 @@ bool FocusDetail::write(const std::string& path, const Mesh& baseIn, int level, 
     if (base.normals.size() != base.vertexCount()) base.recomputeAllNormals();
     const uint32_t T = uint32_t(base.triangleCount()), V = uint32_t(base.vertexCount());
     const uint32_t n = 1u << level, S = (n + 1) * (n + 2) / 2, cn = 1u << kCoarseLevel, CS = (cn + 1) * (cn + 2) / 2;
-    std::FILE* f = std::fopen(path.c_str(), "wb");
+    std::FILE* f = openWrite(path);
     if (!f) {
         error = "Can't write " + path;
         return false;
@@ -407,10 +485,7 @@ bool FocusDetail::write(const std::string& path, const Mesh& baseIn, int level, 
     h.dirHash = fnv1a(dirBytes.data(), dirBytes.size());
     ok = ok && std::fwrite(dirBytes.data(), 1, dirBytes.size(), f) == dirBytes.size();
     ok = ok && std::fseek(f, 0, SEEK_SET) == 0 && std::fwrite(encodeHeader(h).data(), 1, kHeaderBytes, f) == kHeaderBytes;
-    ok = ok && std::fflush(f) == 0;
-#if defined(SF_FOCUS_POSIX)
-    ok = ok && ::fsync(fileno(f)) == 0;
-#endif
+    ok = ok && std::fflush(f) == 0 && syncFile(f);
     ok = std::fclose(f) == 0 && ok;
     if (!ok) error = "Writing " + path + " failed (disk full?)";
     return ok;
@@ -423,7 +498,13 @@ bool FocusDetail::write(const std::string& path, const Mesh& baseIn, int level, 
 FocusDetail::~FocusDetail() { unmap(); }
 
 void FocusDetail::unmap() {
-#if defined(SF_FOCUS_POSIX)
+#if defined(_WIN32)
+    if (map_) UnmapViewOfFile(map_);
+    map_ = nullptr;
+    mapBytes_ = 0;
+    if (fd_) CloseHandle(HANDLE(fd_));
+    fd_ = nullptr;
+#elif defined(SF_FOCUS_POSIX)
     if (map_) ::munmap(const_cast<uint8_t*>(map_), mapBytes_);
     map_ = nullptr;
     mapBytes_ = 0;
@@ -433,7 +514,28 @@ void FocusDetail::unmap() {
 }
 
 bool FocusDetail::mapFile(std::string& error) {
-#if defined(SF_FOCUS_POSIX)
+#if defined(_WIN32)
+    if (map_) UnmapViewOfFile(map_);
+    map_ = nullptr;
+    // Read only (save() opens it for writing itself); a regular file, not through a reparse point, a pipe or a device.
+    BY_HANDLE_FILE_INFORMATION info{};
+    if (!fd_) fd_ = openRegular(path_, GENERIC_READ, info);
+    LARGE_INTEGER size{};
+    if (!fd_ || !GetFileSizeEx(HANDLE(fd_), &size) || size.QuadPart < LONGLONG(kHeaderBytes)) {
+        error = "Can't open " + path_;
+        return false;
+    }
+    mapBytes_ = size_t(size.QuadPart);
+    HANDLE section = CreateFileMappingW(HANDLE(fd_), nullptr, PAGE_READONLY, 0, 0, nullptr);
+    void* p = section ? MapViewOfFile(section, FILE_MAP_READ, 0, 0, 0) : nullptr;
+    if (section) CloseHandle(section); // (the view keeps it)
+    if (!p) {
+        error = "Can't map " + path_;
+        return false;
+    }
+    map_ = static_cast<const uint8_t*>(p);
+    return true;
+#elif defined(SF_FOCUS_POSIX)
     if (map_) ::munmap(const_cast<uint8_t*>(map_), mapBytes_);
     map_ = nullptr;
     // Read only (save() opens it for writing itself); a regular file, not through a symlink, a FIFO (nonblocking:
@@ -453,7 +555,7 @@ bool FocusDetail::mapFile(std::string& error) {
     map_ = static_cast<const uint8_t*>(p);
     return true;
 #else
-    error = "Focus Detail needs Linux or macOS for now (memory-mapped files)";
+    error = "Focus Detail needs a desktop system (memory-mapped files)";
     return false;
 #endif
 }
@@ -476,6 +578,7 @@ bool FocusDetail::loadIndex(std::string& error) {
     coarseN_ = 1u << h.coarseLevel;
     coarseSamples_ = (coarseN_ + 1) * (coarseN_ + 2) / 2;
     codec_ = h.codec;
+    writeCodec_ = writableCodec(h.codec);
     step_ = h.step;
     generation_ = h.generation;
     garbage_ = h.garbage;
@@ -609,7 +712,7 @@ std::shared_ptr<FocusDetail> FocusDetail::create(const std::string& path, Mesh& 
 // ---------------------------------------------------------------------------
 
 bool FocusDetail::readTile(uint32_t t, int16_t* out) const {
-    if (!parked_[t].empty()) return decompressTile(codec_, parked_[t].data(), parked_[t].size(), n_, samples_, out);
+    if (!parked_[t].empty()) return decompressTile(writeCodec_, parked_[t].data(), parked_[t].size(), n_, samples_, out);
     const Entry& e = dir_[t];
     if (!map_ || !decompressTile(codec_, map_ + e.offset, e.bytes, n_, samples_, out)) return false;
     if (e.shift) { // in an older step: as MicroMesh::widen divides (truncating; successive divisions compose)
@@ -625,12 +728,24 @@ void FocusDetail::fillCoarse(MicroMesh& mm, uint32_t t) const {
 
 void FocusDetail::promoteLocked(MicroMesh& mm, std::span<const uint32_t> tris, bool edit, bool sync) {
     const auto t0 = Clock::now();
+#if defined(_WIN32)
+    // The tiles' bytes read in one go before decoding: a mapped view's faults read little at a time on Windows (no
+    // readahead as on Linux), so an orbit's fresh tiles stalled the frame on the disk one page at a time.
+    if (map_ && tris.size() > 1) {
+        thread_local std::vector<WIN32_MEMORY_RANGE_ENTRY> ranges;
+        ranges.clear();
+        for (uint32_t t : tris)
+            if (parked_[t].empty() && dir_[t].bytes)
+                ranges.push_back({const_cast<uint8_t*>(map_ + dir_[t].offset), SIZE_T(dir_[t].bytes)});
+        if (!ranges.empty()) PrefetchVirtualMemory(GetCurrentProcess(), ranges.size(), ranges.data(), 0);
+    }
+#endif
     poolFor(tris.size(), [&](size_t b, size_t e) {
         for (size_t k = b; k < e; ++k) {
             const uint32_t t = tris[k];
             if (!readTile(t, mm.disp.data() + size_t(t) * samples_)) fillCoarse(mm, t); // (a damaged tile stays coarse)
         }
-    }, 4);
+    }, 1, 2); // (a tile a block: a frame's batch is a few tiles, each thousands of points)
     // A promoted tile's real edges go into its coarse neighbours (no cracks along the focus border).
     for (uint32_t t : tris) {
         state_[t] = edit ? kDirty : kFull;
@@ -647,15 +762,19 @@ void FocusDetail::promoteLocked(MicroMesh& mm, std::span<const uint32_t> tris, b
     stats_.promoteMs += msSince(t0);
 }
 
-void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t) {
-    int16_t* g = mm.disp.data() + size_t(t) * samples_;
-    if (state_[t] == kDirty) { // keep the edit: compressed in memory until saved, coarse grid refreshed
-        const TileInfo info = analyse(g, n_, samples_, coarseN_, step_, coarse_.data() + size_t(t) * coarseSamples_);
-        dir_[t].coarseErr = info.coarseErr;
-        dir_[t].range = std::max(dir_[t].range, info.range);
-        compressTile(codec_, g, n_, samples_, parked_[t]);
-    }
-    fillCoarse(mm, t);
+void FocusDetail::parkLocked(MicroMesh& mm, uint32_t t) {
+    if (state_[t] != kDirty) return;
+    // keep the edit: compressed in memory until saved, coarse grid refreshed (this tile's own fields only: parallel)
+    const int16_t* g = mm.disp.data() + size_t(t) * samples_;
+    const TileInfo info = analyse(g, n_, samples_, coarseN_, step_, coarse_.data() + size_t(t) * coarseSamples_);
+    dir_[t].coarseErr = info.coarseErr;
+    dir_[t].range = std::max(dir_[t].range, info.range);
+    compressTile(writeCodec_, g, n_, samples_, parked_[t]);
+}
+
+void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t, bool park, bool fill) {
+    if (park) parkLocked(mm, t);
+    if (fill) fillCoarse(mm, t);
     state_[t] = kCoarse;
     --fullTiles_;
     mm.markDirty(t);
@@ -665,7 +784,11 @@ void FocusDetail::demoteLocked(MicroMesh& mm, uint32_t t) {
 }
 
 void FocusDetail::ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool edit) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    const auto t0 = Clock::now();
+    brushWaiting_.fetch_add(1, std::memory_order_acq_rel); // (update() stops between batches and lets this in)
+    std::unique_lock<std::mutex> lock(mutex_);
+    brushWaiting_.fetch_sub(1, std::memory_order_acq_rel);
+    const double waited = msSince(t0);
     std::vector<uint32_t> need;
     for (uint32_t t : tris) {
         if (t >= state_.size()) continue;
@@ -673,7 +796,11 @@ void FocusDetail::ensureFull(MicroMesh& mm, std::span<const uint32_t> tris, bool
         if (state_[t] == kCoarse) need.push_back(t);
         else if (edit) state_[t] = kDirty;
     }
+    const bool busy = ThreadPool::shared().busy();
     if (!need.empty()) promoteLocked(mm, need, edit, true);
+    if (focusTrace() && msSince(t0) > 10.0)
+        std::fprintf(stderr, "focus ensureFull %.1f ms: waited %.1f, %zu of %zu tiles promoted (pool %s)\n", msSince(t0), waited,
+                     need.size(), tris.size(), busy ? "busy" : "free");
 }
 
 void FocusDetail::ensureAllFull(MicroMesh& mm, bool edit) {
@@ -701,9 +828,9 @@ void FocusDetail::rescale(MicroMesh& mm, int doublings) {
             Entry& d = dir_[t];
             d.shift = uint16_t(std::min(int(d.shift) + doublings, 15));
             d.range = uint16_t(std::min(int(d.range) / div + 1, 32767));
-            if (parked_[t].empty() || !decompressTile(codec_, parked_[t].data(), parked_[t].size(), n_, samples_, g.data())) continue;
+            if (parked_[t].empty() || !decompressTile(writeCodec_, parked_[t].data(), parked_[t].size(), n_, samples_, g.data())) continue;
             for (int16_t& v : g) v = int16_t(int(v) / div);
-            compressTile(codec_, g.data(), n_, samples_, parked_[t]);
+            compressTile(writeCodec_, g.data(), n_, samples_, parked_[t]);
         }
     }, 64);
     step_ *= float(div);
@@ -733,7 +860,21 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     const auto t0 = Clock::now();
     MicroMesh& mm = *m.micro;
     const uint32_t T = uint32_t(state_.size());
-    std::unique_lock<std::mutex> lock(mutex_);
+    // A brush's promotion (ensureFull on the stroke thread) holds or wants the lock: this frame doesn't wait for it
+    // (that wait was the 120 px stroke's 80-150 ms frames); the next frame goes on. At most kGiveWay frames in a row,
+    // then it waits (demotions keep a long stroke within the budget).
+    constexpr int kGiveWay = 4;
+    std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+    if (gaveWay_ < kGiveWay && (brushWaiting_.load(std::memory_order_acquire) > 0 || !lock.try_lock())) {
+        ++gaveWay_;
+        lastMs_.store(msSince(t0), std::memory_order_relaxed);
+        return;
+    }
+    if (!lock.owns_lock()) lock.lock();
+    const double lockWait = msSince(t0);
+    gaveWay_ = 0;
+    double promoteMs = 0.0, demoteMs = 0.0;
+    size_t promotedNow = 0, parkedNow = 0;
     // Scoring looks at every tile (2.5M base triangles: most of a floor-tier frame, every frame, #184). The same
     // view, brush, detail and budget, within the budget, want the same tiles: skipped (or the last list's rest promoted),
     // but rescored every kRescore updates (a backstop: the app names base changes in view.baseRevision / baseMoving;
@@ -763,6 +904,7 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
         ++scored_.frames;
         ++stats_.skippedUpdates;
         stats_.lastUpdateMs = msSince(t0);
+        lastMs_.store(stats_.lastUpdateMs, std::memory_order_relaxed);
         return;
     }
     // Still promoting what the last scoring wanted (a view after strokes: tens of thousands of tiles, a batch a
@@ -830,8 +972,6 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
     // Demotion candidates: full tiles not wanted for kLinger frames, least recently wanted first (never a dirty
     // one while stroking: a dab on the solver thread may be writing it).
     constexpr uint32_t kLinger = 8;
-    constexpr size_t kDemoteBatch = 64;
-    size_t demoted = 0; // (this update's, over all the calls below)
     std::vector<uint32_t>& lru = lru_;
     auto demoteFor = [&](size_t room) {
         if (fullTiles_ + room <= maxFull) return true;
@@ -843,36 +983,85 @@ void FocusDetail::update(Mesh& m, const FocusView& view, const FocusBrush& brush
                 if (state_[t] != kCoarse && lastWanted_[t] + kLinger < frame_ && !(mm.stroking && state_[t] == kDirty)) lru.push_back(t);
             std::sort(lru.begin(), lru.end(), [&](uint32_t a, uint32_t b) { return lastWanted_[a] > lastWanted_[b] || (lastWanted_[a] == lastWanted_[b] && a > b); });
         }
-        // Within the frame's budget (a long stroke leaves thousands of edited tiles over it, each compressed as it
-        // goes: #184, 1.6-2.8 s in one floor frame); the rest goes on the next frames (at least a batch a frame).
-        while (fullTiles_ + room > maxFull && !lru.empty()) { // (back = oldest)
-            if (demoted >= kDemoteBatch && msSince(t0) > budgetMs) break;
-            const uint32_t t = lru.back();
-            lru.pop_back();
-            if (t < T && state_[t] != kCoarse) demoteLocked(mm, t), ++demoted;
-        }
+        // The tiles to demote first, then their edits compressed in parallel (after strokes a new view demotes
+        // hundreds of dirty tiles at once: one by one that was a 389 ms frame on Windows), then demoted in order.
+        // At most kDirtyBatch edited tiles a batch, more batches while the frame's budget lasts: the rest on the
+        // next frames (promotions wait while over the budget; one batch was still a 214 ms frame).
+        constexpr size_t kDirtyBatch = 64;
+        std::vector<uint32_t>& victims = victims_;
+        do {
+            const bool busy = ThreadPool::shared().busy(); // (a stroke's dabs have the pool: this batch runs here alone)
+            const double left = budgetMs - msSince(t0);
+            const size_t maxDirty = parkMs_[busy] > 0.0 ? size_t(std::clamp(left / parkMs_[busy], 1.0, double(kDirtyBatch)))
+                                                        : (busy ? 1 : 16);
+            // (an unedited tile costs its coarse grid's upsampling into the full grid: 10-135 ms frames under a 120 px
+            // stroke when every victim went in one batch)
+            const size_t maxVictims = demoteMs_[busy] > 0.0 ? size_t(std::clamp(left / demoteMs_[busy], 1.0, 4096.0))
+                                                            : (busy ? 4 : 64);
+            victims.clear();
+            size_t dirty = 0;
+            for (size_t full = fullTiles_; full + room > maxFull && !lru.empty() && victims.size() < maxVictims;) { // (back = oldest)
+                const uint32_t t = lru.back();
+                if (t < T && state_[t] == kDirty && dirty == maxDirty) break;
+                lru.pop_back();
+                if (t < T && state_[t] != kCoarse) victims.push_back(t), --full, dirty += state_[t] == kDirty;
+            }
+            const auto p0 = Clock::now();
+            poolFor(victims.size(), [&](size_t b, size_t e) {
+                for (size_t k = b; k < e; ++k) parkLocked(mm, victims[k]);
+            }, 1, 2);
+            parkedNow += dirty;
+            if (dirty > 0) {
+                const double per = msSince(p0) / double(dirty);
+                parkMs_[busy] = parkMs_[busy] > 0.0 ? 0.7 * parkMs_[busy] + 0.3 * per : per;
+            }
+            const auto f0 = Clock::now();
+            poolFor(victims.size(), [&](size_t b, size_t e) { // (each tile's own grid: in parallel; edges after, in order)
+                for (size_t k = b; k < e; ++k) fillCoarse(mm, victims[k]);
+            }, 1, 2);
+            for (uint32_t t : victims) demoteLocked(mm, t, false, false);
+            if (!victims.empty()) {
+                const double per = msSince(f0) / double(victims.size());
+                demoteMs_[busy] = demoteMs_[busy] > 0.0 ? 0.7 * demoteMs_[busy] + 0.3 * per : per;
+            }
+            demoteMs += msSince(p0);
+        } while (fullTiles_ + room > maxFull && !victims.empty() && !lru.empty() && msSince(t0) <= budgetMs);
         return fullTiles_ + room <= maxFull;
     };
     size_t done = 0;
     constexpr size_t kBatch = 64;
     while (done < scratch_.size()) {
-        size_t count = std::min(kBatch, scratch_.size() - done);
+        // Batches sized to what is left of the budget at the recent cost a tile (64 big tiles were 50-180 ms frames
+        // at level 7 on Windows, run on this thread alone while a stroke had the pool): at least one tile a frame.
+        const bool busy = ThreadPool::shared().busy(); // (a stroke's dabs have the pool: this batch runs here alone)
+        const double left = budgetMs - msSince(t0);
+        const size_t fit = tileMs_[busy] > 0.0 ? size_t(std::clamp(left / tileMs_[busy], 1.0, double(kBatch))) : (busy ? 1 : 8);
+        size_t count = std::min(fit, scratch_.size() - done);
         const bool mustHave = score_[scratch_[done]] >= 1e5f; // the brush's tiles go in over the budget
         if (!demoteFor(count) && !mustHave) {
             count = std::min(count, maxFull - std::min(maxFull, fullTiles_));
             if (count == 0) break;
         }
+        const auto b0 = Clock::now();
         promoteLocked(mm, std::span<const uint32_t>(scratch_.data() + done, count), false, false);
+        promoteMs += msSince(b0), promotedNow += count;
+        const double per = msSince(b0) / double(count);
+        tileMs_[busy] = tileMs_[busy] > 0.0 ? 0.7 * tileMs_[busy] + 0.3 * per : per;
         done += count;
         if (msSince(t0) > budgetMs) break;
-        lock.unlock(); // let a brush's ensureFull in between batches
-        lock.lock();
+        if (brushWaiting_.load(std::memory_order_acquire) > 0) break; // a brush's ensureFull goes first (demotions still run)
     }
     demoteFor(0);
     scored_ = {true, view, brush, mm.revision, fullTiles_, budgetBytes, fromQueue ? scored_.frames + 1 : 0, done == 0 && !scratch_.empty()};
     stats_.lastWanted = wanted;
     stats_.lastPending = scratch_.size() - done;
     stats_.lastUpdateMs = msSince(t0);
+    lastMs_.store(stats_.lastUpdateMs, std::memory_order_relaxed);
+    lastPending_.store(stats_.lastPending, std::memory_order_relaxed);
+    if (focusTrace() && stats_.lastUpdateMs > 10.0)
+        std::fprintf(stderr, "focus update %.1f ms: lock wait %.1f, promote %zu tiles %.1f, demote (%zu parked) %.1f, %s, pending %zu\n",
+                     stats_.lastUpdateMs, lockWait, promotedNow, promoteMs, parkedNow, demoteMs, fromQueue ? "queue" : "scored",
+                     stats_.lastPending);
 }
 
 FocusStats FocusDetail::stats() const {
@@ -892,7 +1081,7 @@ FocusStats FocusDetail::stats() const {
 // ---------------------------------------------------------------------------
 
 bool FocusDetail::save(const Mesh& m, std::string& error) {
-#if defined(SF_FOCUS_POSIX)
+#if defined(SF_FOCUS_POSIX) || defined(_WIN32)
     if (!m.micro || m.micro->focus.get() != this) {
         error = "Not this detail file's mesh";
         return false;
@@ -907,8 +1096,17 @@ bool FocusDetail::save(const Mesh& m, std::string& error) {
             tiles.push_back(t);
             replaced += dir_[t].bytes;
         }
-    // Compaction: a fresh file once the garbage would pass half of it.
-    if ((garbage_ + replaced) * 2 > mapBytes_) return saveAsLocked(m, path_, error);
+    // Compaction: a fresh file once the garbage would pass half of it. Windows refuses the rename while another view
+    // maps the file (a second Part streaming it): then appended in place as usual, compacted on a later save.
+    // A file in a codec this build only reads (zstd on Windows and macOS) is written afresh in this build's own.
+    // (Only the base cage moved: no tiles to write, in place as usual.)
+    const bool recode = writeCodec_ != codec_ && (!tiles.empty() || rescaled_);
+    if ((garbage_ + replaced) * 2 > mapBytes_ || recode) {
+        bool busy = false;
+        const bool compacted = saveAsLocked(m, path_, error, &busy);
+        if (compacted || !busy || recode) return compacted;
+        error.clear();
+    }
     // The base cage moved (Move on a micro level): its block goes too.
     std::vector<uint8_t> baseBlock;
     if (m.normals.size() == m.vertexCount()) {
@@ -928,7 +1126,7 @@ bool FocusDetail::save(const Mesh& m, std::string& error) {
                 const TileInfo info = analyse(g, n_, S, coarseN_, step_, coarse_.data() + size_t(t) * CS);
                 dir_[t].coarseErr = info.coarseErr;
                 dir_[t].range = info.range;
-                compressTile(codec_, g, n_, S, blobs[k]);
+                compressTile(writeCodec_, g, n_, S, blobs[k]);
             } else {
                 blobs[k] = parked_[t];
             }
@@ -945,7 +1143,7 @@ bool FocusDetail::save(const Mesh& m, std::string& error) {
     poolFor(chunkList.size(), [&](size_t b, size_t e) {
         for (size_t k = b; k < e; ++k) {
             const uint32_t first = chunkList[k] * kChunk, count = std::min(kChunk, T - first);
-            compressValues(codec_, coarse_.data() + size_t(first) * CS, count, CS, chunkBlobs[k]);
+            compressValues(writeCodec_, coarse_.data() + size_t(first) * CS, count, CS, chunkBlobs[k]);
         }
     }, 1);
     // Append blobs, then the directory; the header last.
@@ -986,6 +1184,28 @@ bool FocusDetail::save(const Mesh& m, std::string& error) {
     h.garbage = garbage;
     h.step = step_;
     // Written through its own descriptor, only when it is still the file we read (same inode, not a symlink).
+#if defined(_WIN32)
+    BY_HANDLE_FILE_INFORMATION was{}, now{};
+    HANDLE wfd = openRegular(path_, GENERIC_WRITE, now);
+    if (!wfd || !GetFileInformationByHandle(HANDLE(fd_), &was) || !sameFile(was, now)) {
+        if (wfd) CloseHandle(wfd);
+        error = "Can't write " + path_;
+        return false;
+    }
+    auto pwriteAll = [&](const uint8_t* p, size_t size, uint64_t at) {
+        while (size) {
+            OVERLAPPED o{}; // (the offset to write at; the handle itself is synchronous)
+            o.Offset = DWORD(at);
+            o.OffsetHigh = DWORD(at >> 32);
+            DWORD w = 0;
+            if (!WriteFile(wfd, p, DWORD(std::min<size_t>(size, size_t(1) << 30)), &w, &o) || w == 0) return false;
+            p += w, size -= size_t(w), at += uint64_t(w);
+        }
+        return true;
+    };
+    auto syncW = [&] { return FlushFileBuffers(wfd) != 0; };
+    auto closeW = [&] { CloseHandle(wfd); };
+#else
     struct stat was {}, now {};
     const int wfd = ::open(path_.c_str(), O_WRONLY | O_NOFOLLOW | O_CLOEXEC);
     if (wfd < 0 || ::fstat(fd_, &was) != 0 || ::fstat(wfd, &now) != 0 || was.st_dev != now.st_dev || was.st_ino != now.st_ino) {
@@ -1001,10 +1221,13 @@ bool FocusDetail::save(const Mesh& m, std::string& error) {
         }
         return true;
     };
+    auto syncW = [&] { return ::fsync(wfd) == 0; };
+    auto closeW = [&] { ::close(wfd); };
+#endif
     const std::vector<uint8_t> head = encodeHeader(h);
-    const bool written = pwriteAll(tail.data(), tail.size(), offset) && ::fsync(wfd) == 0 &&
-                         pwriteAll(head.data(), head.size(), 0) && ::fsync(wfd) == 0;
-    ::close(wfd);
+    const bool written = pwriteAll(tail.data(), tail.size(), offset) && syncW() &&
+                         pwriteAll(head.data(), head.size(), 0) && syncW();
+    closeW();
     if (!written) {
         error = "Saving " + path_ + " failed (disk full?)";
         return false;
@@ -1022,7 +1245,7 @@ bool FocusDetail::save(const Mesh& m, std::string& error) {
     }
     return mapFile(error);
 #else
-    error = "Focus Detail needs Linux or macOS for now";
+    error = "Focus Detail needs a desktop system (memory-mapped files)";
     return false;
 #endif
 }
@@ -1036,18 +1259,18 @@ bool FocusDetail::saveAs(const Mesh& m, const std::string& path, std::string& er
     return saveAsLocked(m, path, error);
 }
 
-bool FocusDetail::saveAsLocked(const Mesh& m, const std::string& path, std::string& error) {
-#if defined(SF_FOCUS_POSIX)
+bool FocusDetail::saveAsLocked(const Mesh& m, const std::string& path, std::string& error, bool* renameRefused) {
+#if defined(SF_FOCUS_POSIX) || defined(_WIN32)
     MicroMesh& mm = *m.micro;
     const uint32_t T = uint32_t(state_.size()), S = samples_, CS = coarseSamples_, V = uint32_t(m.vertexCount());
     const std::string tmp = path + ".part";
-    std::FILE* f = std::fopen(tmp.c_str(), "wb");
+    std::FILE* f = openWrite(tmp);
     if (!f) {
         error = "Can't write " + tmp;
         return false;
     }
     Header h;
-    h.codec = codec_;
+    h.codec = writeCodec_;
     h.level = uint32_t(level_);
     h.coarseLevel = kCoarseLevel;
     h.tris = T;
@@ -1072,8 +1295,10 @@ bool FocusDetail::saveAsLocked(const Mesh& m, const std::string& path, std::stri
     uint64_t offset = kHeaderBytes + h.baseBytes;
     std::vector<Entry> dir = dir_;
     std::vector<ChunkEntry> chunkDir(chunks_.size());
-    // Tiles in batches: edited ones compressed in parallel, parked ones as they are, the rest copied as stored.
+    // Tiles in batches: edited ones compressed in parallel, parked ones as they are, the rest copied as stored (or
+    // decoded and compressed again when the codec changes).
     const uint32_t batch = kChunk * 4;
+    const bool recode = writeCodec_ != codec_;
     std::vector<std::vector<uint8_t>> blobs(batch);
     for (uint32_t b0 = 0; ok && b0 < T; b0 += batch) {
         const uint32_t b1 = std::min(T, b0 + batch);
@@ -1087,16 +1312,25 @@ bool FocusDetail::saveAsLocked(const Mesh& m, const std::string& path, std::stri
                     dir[t].coarseErr = info.coarseErr;
                     dir[t].range = info.range;
                     dir[t].shift = 0;
-                    compressTile(codec_, g, n_, S, blobs[k]);
+                    compressTile(writeCodec_, g, n_, S, blobs[k]);
                 } else if (!parked_[t].empty()) {
                     dir[t].shift = 0;
+                } else if (recode) { // (the values as stored: their shift stays)
+                    thread_local std::vector<int16_t> g;
+                    g.resize(S);
+                    if (!decompressTile(codec_, map_ + dir_[t].offset, dir_[t].bytes, n_, S, g.data())) {
+                        // A damaged tile: its coarse grid, as it shows (never a save that can't happen).
+                        upsample(coarse_.data() + size_t(t) * CS, coarseN_, n_, g.data());
+                        dir[t].shift = 0;
+                    }
+                    compressTile(writeCodec_, g.data(), n_, S, blobs[k]);
                 }
             }
         }, 16);
         for (uint32_t t = b0; ok && t < b1; ++t) {
             const uint8_t* p;
             size_t bytes;
-            if (state_[t] == kDirty) p = blobs[t - b0].data(), bytes = blobs[t - b0].size();
+            if (state_[t] == kDirty || (recode && parked_[t].empty())) p = blobs[t - b0].data(), bytes = blobs[t - b0].size();
             else if (!parked_[t].empty()) p = parked_[t].data(), bytes = parked_[t].size();
             else p = map_ + dir_[t].offset, bytes = dir_[t].bytes;
             dir[t].offset = offset;
@@ -1109,7 +1343,7 @@ bool FocusDetail::saveAsLocked(const Mesh& m, const std::string& path, std::stri
     poolFor(chunks_.size(), [&](size_t b, size_t e) {
         for (size_t c = b; c < e; ++c) {
             const uint32_t first = uint32_t(c) * kChunk, count = std::min(kChunk, T - first);
-            compressValues(codec_, coarse_.data() + size_t(first) * CS, count, CS, chunkBlobs[c]);
+            compressValues(writeCodec_, coarse_.data() + size_t(first) * CS, count, CS, chunkBlobs[c]);
         }
     }, 1);
     for (size_t c = 0; ok && c < chunkBlobs.size(); ++c) {
@@ -1126,13 +1360,23 @@ bool FocusDetail::saveAsLocked(const Mesh& m, const std::string& path, std::stri
     h.dirHash = fnv1a(dirBytes.data(), dirBytes.size());
     ok = ok && std::fwrite(dirBytes.data(), 1, dirBytes.size(), f) == dirBytes.size();
     ok = ok && std::fseek(f, 0, SEEK_SET) == 0 && std::fwrite(encodeHeader(h).data(), 1, kHeaderBytes, f) == kHeaderBytes;
-    ok = ok && std::fflush(f) == 0 && ::fsync(fileno(f)) == 0;
+    ok = ok && std::fflush(f) == 0 && syncFile(f);
     ok = std::fclose(f) == 0 && ok;
     std::error_code ec;
-    if (ok) std::filesystem::rename(tmp, path, ec);
-    if (!ok || ec) {
-        std::filesystem::remove(tmp, ec);
+    if (!ok) {
+        std::filesystem::remove(pathFromUtf8(tmp), ec);
         error = "Writing " + path + " failed (disk full?)";
+        return false;
+    }
+#if defined(_WIN32)
+    unmap(); // (Windows refuses to rename over a file with a live view: this one when compacting)
+#endif
+    if (!replaceFile(tmp, path)) {
+        std::filesystem::remove(pathFromUtf8(tmp), ec);
+        error = "Writing " + path + " failed (open in another program?)";
+        // The old file stays as it was; back to it.
+        if (!map_ && !mapFile(error)) return false;
+        if (renameRefused) *renameRefused = true;
         return false;
     }
     // Continue in the new file (an old one stays as it was saved).
@@ -1146,6 +1390,7 @@ bool FocusDetail::saveAsLocked(const Mesh& m, const std::string& path, std::stri
     baseOffset_ = h.baseOffset;
     baseHash_ = fnv1a(map_ + h.baseOffset, size_t(V) * 24);
     rescaled_ = false;
+    codec_ = writeCodec_;
     for (uint32_t t = 0; t < T; ++t) {
         if (state_[t] == kDirty) state_[t] = kFull;
         std::vector<uint8_t>().swap(parked_[t]);
@@ -1154,7 +1399,8 @@ bool FocusDetail::saveAsLocked(const Mesh& m, const std::string& path, std::stri
 #else
     (void)m;
     (void)path;
-    error = "Focus Detail needs Linux or macOS for now";
+    (void)renameRefused;
+    error = "Focus Detail needs a desktop system (memory-mapped files)";
     return false;
 #endif
 }
@@ -1210,7 +1456,7 @@ bool focusWriteSyntheticHead(const std::string& path, size_t baseTriangles, int 
 }
 
 bool microWantsFocus(size_t microTriangles, int level) {
-#if defined(SF_FOCUS_POSIX)
+#if defined(SF_FOCUS_POSIX) || defined(_WIN32)
     if (level <= FocusDetail::kCoarseLevel) return false;
     if (const char* e = std::getenv("SF_FOCUS_DETAIL"); e && *e) return e[0] == '1';
     return microTriangles > kFocusTriangles;
@@ -1223,7 +1469,7 @@ bool microWantsFocus(size_t microTriangles, int level) {
 
 std::string focusUnsavedPath() {
     namespace fs = std::filesystem;
-    const fs::path dir = MicroStore::swapFolder();
+    const fs::path dir = pathFromUtf8(MicroStore::swapFolder());
     std::error_code ec;
     fs::create_directories(dir, ec);
     focusRemoveStaleUnsaved();
@@ -1232,16 +1478,18 @@ std::string focusUnsavedPath() {
     char name[96];
     std::snprintf(name, sizeof name, "unsaved-%lld-%u.sfdetail",
                   (long long)std::chrono::duration_cast<std::chrono::milliseconds>(now).count(), unsigned(serial++));
-    return (dir / name).string();
+    return pathToUtf8(dir / name);
 }
 
 void focusRemoveStaleUnsaved() {
     namespace fs = std::filesystem;
     std::error_code ec;
     const auto old = fs::file_time_type::clock::now() - std::chrono::hours(24 * 7);
-    for (fs::directory_iterator it(MicroStore::swapFolder(), ec), end; !ec && it != end; it.increment(ec)) {
-        const std::string name = it->path().filename().string();
-        if (name.rfind("unsaved-", 0) != 0) continue;
+    // (Native names: any name in the folder compares, none converted. A file another SculptForge still streams is
+    // refused on Windows (mapped); it goes on a later run.)
+    const fs::path::string_type prefix = fs::path("unsaved-").native();
+    for (fs::directory_iterator it(pathFromUtf8(MicroStore::swapFolder()), ec), end; !ec && it != end; it.increment(ec)) {
+        if (it->path().filename().native().rfind(prefix, 0) != 0) continue;
         std::error_code e2;
         if (const auto t = it->last_write_time(e2); !e2 && t < old) fs::remove(it->path(), e2);
     }
@@ -1249,28 +1497,30 @@ void focusRemoveStaleUnsaved() {
 
 std::string focusStandard1bPath(std::string& error, const std::function<void(const std::string&)>& log) {
     namespace fs = std::filesystem;
-    const fs::path dir = MicroStore::swapFolder();
+    const fs::path dir = pathFromUtf8(MicroStore::swapFolder());
     std::error_code ec;
     fs::create_directories(dir, ec);
     const fs::path path = dir / "standard-1b-v1.sfdetail";
-    if (std::FILE* f = std::fopen(path.string().c_str(), "rb")) { // (the header is written last: a valid one = a whole file)
+#if defined(_WIN32)
+    if (std::FILE* f = _wfopen(path.c_str(), L"rb")) {
+#else
+    if (std::FILE* f = std::fopen(path.c_str(), "rb")) {
+#endif // (the header is written last: a valid one = a whole file)
         uint8_t head[kHeaderBytes];
         Header h;
         std::string why;
         const bool ok = std::fread(head, 1, kHeaderBytes, f) == kHeaderBytes && decodeHeader(head, kHeaderBytes, h, why) &&
                         h.dirOffset > 0;
         std::fclose(f);
-        if (ok) return path.string();
+        if (ok) return pathToUtf8(path);
     }
-    if (log) log("Writing the standard-1b asset (once): " + path.string());
-    const fs::path tmp = fs::path(path.string() + ".tmp");
-    if (!focusWriteSyntheticHead(tmp.string(), 61035, 7, error)) return {};
-    fs::rename(tmp, path, ec);
-    if (ec) {
-        error = "Can't write " + path.string();
+    if (log) log("Writing the standard-1b asset (once): " + pathToUtf8(path));
+    const std::string tmp = pathToUtf8(path) + ".tmp";
+    if (!focusWriteSyntheticHead(tmp, 61035, 7, error) || !replaceFile(tmp, pathToUtf8(path))) {
+        if (error.empty()) error = "Can't write " + pathToUtf8(path);
         return {};
     }
-    return path.string();
+    return pathToUtf8(path);
 }
 
 } // namespace sf

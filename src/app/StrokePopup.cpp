@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cstdio>
 #include <iterator>
 #include <string>
 #include <string_view>
@@ -100,7 +101,21 @@ StrokeLatch App::strokeLatch() const {
     const StrokeLatchState& l = strokeLatch_;
     if (l.latch == StrokeLatch::None) return StrokeLatch::None;
     const bool sameBrush = brush_ == l.brush && doc_.activeBrush == l.custom && paintMode_ == l.paint && !guidesMode_;
-    return sameBrush ? l.latch : StrokeLatch::None;
+    return sameBrush && latchToolOk() ? l.latch : StrokeLatch::None;
+}
+
+// A latch is for sculpting strokes: choosing the Gizmo (any mode) or another tool that takes the drags ends it, for good
+// (drawStrokePopup clears it), so a drag on a handle or a point never turns into a cut, a selection or a mask.
+bool App::latchToolOk() const {
+    return !gizmoActive() && !polyMode_ && !edgesMode_ && !tubeDraw_ && insertType_.empty() && !facePlacing_ &&
+           !gradient_.armed && !capture_.armed && !stencil_.adjust && !forgesphereActive();
+}
+
+// The popup's Smooth / Mask / Select / shape tiles are sculpting strokes: the Gizmo and the tools that take the drags give way.
+void App::leaveToolsForLatch() {
+    if (gizmoActive()) setGizmoMode(GizmoMode::Off);
+    if (polyMode_) setPolyMode(false);
+    leaveDrawModes();
 }
 
 void App::setStrokeLatch(StrokeLatch latch) {
@@ -110,6 +125,15 @@ void App::setStrokeLatch(StrokeLatch latch) {
                   : std::string(strokeLatchName(latch)) + " on: strokes " +
                         (latch == StrokeLatch::Smooth ? "smooth" : latch == StrokeLatch::Mask ? "mask" : "select") +
                         " until you pick " + strokeLatchName(latch) + " again or another brush";
+    settleHideLatch();
+}
+
+void App::settleHideLatch() {
+    if (!hideLatch_.active || strokeLatch() == StrokeLatch::Select) return;
+    hideLatch_.active = false;
+    if (hideShape_ != hideLatch_.latched) return; // a shape picked on the panel meanwhile stays
+    hideShape_ = hideLatch_.before;
+    cutPolyline_.clear(); // (points of a Cut Polyline the latch was placing)
 }
 
 App::SelectShape App::selectShapeOf(StrokeShape shape) {
@@ -167,9 +191,14 @@ void App::pickStrokePopupItem(int item, bool close) {
         return;
     }
     if (strokePopupIsShape(item)) { // the shape, latched: a plain drag masks or cuts with it (Discord 11-03)
+        leaveToolsForLatch();
         const StrokeShape shape = strokePopupShape(item);
         const bool off = strokeShapeOn(shape);
         const StrokeLatch latch = strokeShapeLatch(shape);
+        if (latch == StrokeLatch::Select) {
+            if (!hideLatch_.active) hideLatch_ = {true, hideShape_, hideShape_};
+            hideLatch_.latched = selectShapeOf(shape);
+        }
         (latch == StrokeLatch::Mask ? maskShape_ : hideShape_) = selectShapeOf(shape);
         setStrokeLatch(off ? StrokeLatch::None : latch);
         const ShapeLook& look = kShapes[int(shape)];
@@ -178,6 +207,7 @@ void App::pickStrokePopupItem(int item, bool close) {
                       (latch == StrokeLatch::Mask ? "mask" : "cut") + " on: " +
                       (latch == StrokeLatch::Mask ? "drags mask without Ctrl (Ctrl unmasks)" : "drags cut without Ctrl+Shift") +
                       " until you pick it again or another brush";
+        if (!latchToolOk()) status_ = "Leave the Forge Spheres or Stencil tool first: a latched shape is for sculpting strokes";
         if (close) closeStrokePopup();
         return;
     }
@@ -187,6 +217,7 @@ void App::pickStrokePopupItem(int item, bool close) {
         status_ = invertToggle_ ? "Sub: brushes subtract (Alt adds for one stroke)"
                                 : "Add: brushes add (Alt subtracts for one stroke)";
     } else {
+        leaveToolsForLatch();
         setStrokeLatch(toggledStrokeLatch(strokeLatch(), strokeModifierLatch(m)));
     }
     if (close) closeStrokePopup();
@@ -254,23 +285,33 @@ void App::drawStrokePopup() {
     const StrokeLatch latch = strokeLatch();
     // Another brush picked ends the latch for good: going back to the first brush doesn't bring it back.
     if (latch == StrokeLatch::None) strokeLatch_.latch = StrokeLatch::None;
+    settleHideLatch();
     if (!strokePopup_.open) {
+        if (latch == StrokeLatch::None) return;
         // A latched modifier shows beside the brush cursor: strokes do something other than sculpt.
         const ImGuiIO& io = ImGui::GetIO();
-        if (latch != StrokeLatch::None && !io.WantCaptureMouse && canvasRect().contains(mouseX_, mouseY_) &&
-            radial_.menu < 0 && !quickMenu_.open) {
-            ImFont* font = fontSmall_ ? fontSmall_ : ImGui::GetFont();
-            std::string label = strokeLatchName(latch); // with the shape it draws: "Lasso Mask", "Cut Line"
-            for (int i = 0; i < kStrokePopupShapes; ++i)
-                if (StrokeShape(i) != StrokeShape::MaskPen && strokeShapeOn(StrokeShape(i)))
-                    label = std::string(kShapes[i].kind) + " " + kShapes[i].label;
-            const char* text = label.c_str();
+        std::string label = strokeLatchName(latch); // with the shape it draws: "Lasso Mask", "Cut Line"
+        for (int i = 0; i < kStrokePopupShapes; ++i)
+            if (StrokeShape(i) != StrokeShape::MaskPen && strokeShapeOn(StrokeShape(i)))
+                label = std::string(kShapes[i].kind) + " " + kShapes[i].label;
+        ImFont* font = fontSmall_ ? fontSmall_ : ImGui::GetFont();
+        auto pill = [&](const char* text, ImVec2 a) {
             const ImVec2 ts = font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text);
-            const ImVec2 a(mouseX_ + 14.0f * s, mouseY_ + 14.0f * s);
             const ImVec2 b(a.x + ts.x + 12.0f * s, a.y + ts.y + 6.0f * s);
             fg->AddRectFilled(a, b, theme::u32(theme::panelBg, 0.92f), (b.y - a.y) * 0.5f);
             fg->AddRect(a, b, theme::u32(theme::accent), (b.y - a.y) * 0.5f, 0, 1.0f * s);
             fg->AddText(font, font->FontSize, ImVec2(a.x + 6.0f * s, a.y + 3.0f * s), theme::u32(theme::textBright), text);
+            return ts.x + 12.0f * s;
+        };
+        if (!io.WantCaptureMouse && canvasRect().contains(mouseX_, mouseY_) && radial_.menu < 0 && !quickMenu_.open)
+            pill(label.c_str(), ImVec2(mouseX_ + 14.0f * s, mouseY_ + 14.0f * s));
+        // Always in the corner of the canvas too, with the way out (users could not find it: Discord 11-26).
+        if (radial_.menu < 0 && !quickMenu_.open) {
+            char text[160];
+            std::snprintf(text, sizeof text, tr("%s on  \xc2\xb7  Esc turns it off"), label.c_str());
+            const CanvasRect c = canvasRect();
+            const ImVec2 ts = font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, text);
+            pill(text, ImVec2(c.x + (c.w - ts.x - 12.0f * s) * 0.5f, c.y + 44.0f * s)); // below the history strip
         }
         return;
     }

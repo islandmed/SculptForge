@@ -5,8 +5,9 @@
 // than what is worth decompressing, streamed by where the brush and the camera are.
 //
 // - On disk (a .sfdetail file, memory-mapped): the base mesh, then every base triangle's micro grid ("tile") as
-//   quantized 16-bit heights, row-delta coded and compressed (zstd when the build has it, else the tile codec of
-//   core/MicroStore.h). A directory gives each tile's place, its exact range and how far its coarse grid is from
+//   quantized 16-bit heights, row-delta coded and compressed (zstd with the system libzstd, as on Linux; else the
+//   tile codec of core/MicroStore.h, and zstd files read through third_party/zstd, so a file opens on every
+//   platform). A directory gives each tile's place, its exact range and how far its coarse grid is from
 //   it. Coarse grids (level kCoarseLevel, a subsample of the full grid) sit in compressed chunks of kChunk tiles.
 // - In memory: MicroMesh::disp keeps its full-size layout, so brushes and the renderer work unchanged. A tile
 //   outside the focus holds its coarse grid upsampled (exact at the coarse points, linear in between, so shared
@@ -117,7 +118,9 @@ public:
     // 0 = coarse (upsampled), 1 = full.
     int tileLevel(uint32_t tri) const { return tri < state_.size() && state_[tri] != kCoarse ? 1 : 0; }
     FocusStats stats() const;
-    double lastUpdateMs() const { std::lock_guard<std::mutex> lock(mutex_); return stats_.lastUpdateMs; } // (stats() without its counts: per frame)
+    // stats().lastUpdateMs and lastPending without the lock (per frame: never waits on a brush's promotion)
+    double lastUpdateMs() const { return lastMs_.load(std::memory_order_relaxed); }
+    size_t lastPending() const { return lastPending_.load(std::memory_order_relaxed); }
     const std::string& path() const { return path_; }
     bool unsaved() const; // edits since the last save
 
@@ -143,16 +146,19 @@ private:
     bool mapFile(std::string& error);
     bool loadIndex(std::string& error);                // header, directory and coarse grids of the mapped file
     bool attachTo(Mesh& m, std::vector<uint8_t> mask, std::string& error); // m's micro level: every tile coarse
-    bool saveAsLocked(const Mesh& m, const std::string& path, std::string& error);
+    // renameRefused: only the last step failed (Windows: path is mapped elsewhere); the old file and its view are kept.
+    bool saveAsLocked(const Mesh& m, const std::string& path, std::string& error, bool* renameRefused = nullptr);
     void unmap();
     bool readTile(uint32_t t, int16_t* out) const;    // the full grid (parked first, else the file)
     void fillCoarse(MicroMesh& mm, uint32_t t) const; // upsamples the coarse grid into disp
     void promoteLocked(MicroMesh& mm, std::span<const uint32_t> tris, bool edit, bool sync);
-    void demoteLocked(MicroMesh& mm, uint32_t t);
+    void parkLocked(MicroMesh& mm, uint32_t t);                // a dirty tile's edit into parked_ (thread-safe per tile)
+    void demoteLocked(MicroMesh& mm, uint32_t t, bool park = true, bool fill = true); // (fill = false: its grid is filled already)
 
     std::string path_;
     int level_ = 0;
     uint32_t n_ = 0, samples_ = 0, coarseN_ = 0, coarseSamples_ = 0, codec_ = 0;
+    uint32_t writeCodec_ = 0; // what this build writes (codec_ = the file's; this one's own when it only reads that)
     float step_ = 0;
     uint64_t generation_ = 0, garbage_ = 0;
     uint64_t baseOffset_ = 0;                    // the base block in the mapped file
@@ -182,9 +188,21 @@ private:
         bool stalled = false; // tiles still wanted but none went in (the budget full of wanted tiles)
     } scored_;
     std::vector<uint32_t> lru_; // demotion candidates, kept while the list drains (scoring frozen: the same order)
+    std::vector<uint32_t> victims_; // (update: one frame's demotions)
     bool lruValid_ = false;
+    std::atomic<double> lastMs_{0.0};
+    std::atomic<size_t> lastPending_{0};
+    std::atomic<int> brushWaiting_{0}; // ensureFull callers waiting for the lock: update() gives way to them
+    int gaveWay_ = 0;      // (update, main thread: frames in a row it gave way to a brush)
+    // (update: a promoted / an edited demoted tile's recent cost, [1] while another thread has the pool and batches
+    // run on this thread alone; sizing a frame's batches to its budget)
+    double tileMs_[2] = {0.0, 0.0}, parkMs_[2] = {0.0, 0.0}, demoteMs_[2] = {0.0, 0.0};
     // The mapped file
+#if defined(_WIN32)
+    void* fd_ = nullptr; // the file's HANDLE (open while mapped)
+#else
     int fd_ = -1;
+#endif
     const uint8_t* map_ = nullptr;
     size_t mapBytes_ = 0;
 };

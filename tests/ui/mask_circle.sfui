@@ -161,7 +161,7 @@ shot hover_mask_circle
 stroke_popup_item mask_circle click
 expect_value stroke_latch == 2
 expect_value mask_shape == 7
-key escape
+key g
 hover_model 0.5 0.5
 view_drag 0.5 0.5 0.7 0.7
 expect_value masked > 100

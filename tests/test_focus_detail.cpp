@@ -17,9 +17,11 @@
 #include "core/Sculpt.h"
 #include "io/Zip.h"
 
+#include <algorithm>
 #include <atomic>
-#include <sys/stat.h>
+#include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <thread>
 #include <filesystem>
@@ -27,9 +29,20 @@
 
 using namespace sf;
 
-#if defined(__unix__) || defined(__APPLE__)
+#if !defined(_WIN32)
+#include <sys/stat.h>
+#endif
 
 namespace {
+
+void setEnv(const char* name, const char* value) {
+#if defined(_WIN32)
+    _putenv_s(name, value ? value : "");
+#else
+    if (value) setenv(name, value, 1);
+    else unsetenv(name);
+#endif
+}
 
 std::string focusTempPath(const char* name) {
     const auto dir = std::filesystem::temp_directory_path() / "sf-focus-detail-test";
@@ -418,7 +431,7 @@ TEST(focus_detail_unchanged_frames_skip_scoring) {
     for (size_t t = 0; t < got.size(); ++t)
         if (got[t]) CHECK(want[t]);
     CHECK(edgesShared(m));
-    // A list longer than a frame's budget (budget 0: one batch an update): the next updates promote the rest of it
+    // A list longer than a frame's budget (budget 0: one tile an update): the next updates promote the rest of it
     // without scoring again, and end where one unlimited update ends.
     Mesh m3, m4;
     auto fd3 = FocusDetail::open(path, m3, err), fd4 = FocusDetail::open(path, m4, err);
@@ -430,7 +443,7 @@ TEST(focus_detail_unchanged_frames_skip_scoring) {
     fd3->update(m3, v, wide, 0.0);
     CHECK(fd3->stats().lastPending > 0);
     const uint64_t s3 = fd3->stats().skippedUpdates;
-    for (int i = 0; i < 25 && fd3->stats().lastPending > 0; ++i) fd3->update(m3, v, wide, 0.0);
+    for (int i = 0; i < 20000 && fd3->stats().lastPending > 0; ++i) fd3->update(m3, v, wide, 0.0);
     CHECK(fd3->stats().lastPending == 0);
     CHECK(fd3->stats().skippedUpdates > s3); // (drained from the list, not rescored)
     for (uint32_t t = 0; t < m3.micro->baseTriangles; ++t) CHECK(fd3->tileLevel(t) == fd4->tileLevel(t));
@@ -479,9 +492,11 @@ TEST(focus_detail_brush_thread_and_frames_together) {
             std::vector<uint32_t> tiles;
             for (int i = 0; i < 8; ++i) tiles.push_back((k = k * 1664525u + 1013904223u) % mm.baseTriangles);
             fd->ensureFull(mm, tiles, false);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1)); // (the dab's own work)
         }
     });
-    for (int f = 0; f < 60; ++f) {
+    // (frames give way to the brush's promotions a few at a time: until the budget demotes, while the brush runs)
+    for (int f = 0; f < 2000 && (f < 60 || fd->stats().demoted == 0); ++f) {
         FocusBrush b;
         b.present = true;
         b.position = glm::vec3(std::sin(float(f) * 0.2f), 0.1f, 0.8f);
@@ -563,6 +578,38 @@ TEST(focus_detail_widened_range_rescales_streamed_tiles) {
     CHECK(fd->save(m, err));
     CHECK(!fd->unsaved());
     CHECK(fullValues(path) == expected);
+}
+
+// After strokes a new view demotes every edited tile at once: a frame compresses at most a batch of them past its
+// time budget (one tile at budget 0), the rest on the next frames, and no edit is lost.
+TEST(focus_detail_demotions_spread_over_frames) {
+    const std::string path = writeSmall("spread.sfdetail");
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    MicroMesh& mm = *m.micro;
+    const uint32_t T = mm.baseTriangles;
+    fd->ensureFull(mm, allTiles(m), true);
+    for (uint32_t t = 0; t < T; ++t) mm.disp[size_t(t) * mm.samples + 3] = int16_t(mm.disp[size_t(t) * mm.samples + 3] + 1 + int(t % 50));
+    const std::vector<int16_t> edited = mm.disp.toVector();
+    fd->budgetBytes = 0;
+    size_t parked = 0;
+    int frames = 0;
+    for (; frames < 5000 && parked + 1 < T; ++frames) { // (a budget of 0 keeps one tile)
+        fd->update(m, FocusView{}, FocusBrush{}, 0.0);
+        const size_t now = fd->stats().parkedTiles;
+        CHECK(now - parked <= 64);
+        if (parked > 0) CHECK(now > parked); // (once lingering is over: progress every frame)
+        parked = now;
+    }
+    CHECK(parked + 1 == T);
+    CHECK(frames > int(T / 64));
+    CHECK(fd->stats().fullTiles == 1);
+    CHECK(edgesShared(m));
+    fd->budgetBytes = size_t(1) << 30;
+    CHECK(streamedFull(m) == edited);
 }
 
 // Divide to Micro beyond the budget: create() writes the live level to a detail file and streams it; Save As writes
@@ -788,22 +835,33 @@ TEST(focus_detail_project_detail_names_are_confined) {
         CHECK(err == "Detail file name is invalid");
     }
     // A symlink beside the project, a FIFO, a directory: refused when opened (no hang on the FIFO).
+#if defined(_WIN32) // (a symlink needs Developer Mode or an administrator: tested where it can be made)
+    std::error_code ec;
+    std::filesystem::create_symlink(dir / "head.sfdetail", dir / "link.sfdetail", ec);
+    if (!ec) CHECK(!withDetail("link.sfdetail"));
+#else
     std::filesystem::create_symlink(dir / "head.sfdetail", dir / "link.sfdetail");
     CHECK(!withDetail("link.sfdetail"));
     CHECK(::mkfifo((dir / "pipe.sfdetail").c_str(), 0600) == 0);
     CHECK(!withDetail("pipe.sfdetail"));
+#endif
     std::filesystem::create_directories(dir / "dir.sfdetail");
     CHECK(!withDetail("dir.sfdetail"));
     // Devices: FocusDetail itself only maps regular files.
     Mesh none;
+#if defined(_WIN32)
+    CHECK(FocusDetail::open("NUL", none, err) == nullptr);
+    CHECK(FocusDetail::open("\\\\.\\pipe\\sf-focus-detail-test", none, err) == nullptr);
+#else
     CHECK(FocusDetail::open("/dev/zero", none, err) == nullptr);
     CHECK(FocusDetail::open((dir / "pipe.sfdetail").string(), none, err) == nullptr);
+#endif
 }
 
 // Divide to Micro past the memory budget streams the new level; undo and redo swap it whole.
 TEST(focus_detail_divide_to_micro_switches_when_large) {
-    setenv("SF_FOCUS_DETAIL", "1", 1); // (the budget is hundreds of millions of micro triangles)
-    setenv("SF_MICRO_SWAP_DIR", focusTempPath("swap").c_str(), 1);
+    setEnv("SF_FOCUS_DETAIL", "1"); // (the budget is hundreds of millions of micro triangles)
+    setEnv("SF_MICRO_SWAP_DIR", focusTempPath("swap").c_str());
     Mesh base;
     {
         Mesh head;
@@ -817,8 +875,8 @@ TEST(focus_detail_divide_to_micro_switches_when_large) {
     Document doc = makeDoc(std::move(base));
     std::string msg;
     CHECK(microDivideUndoable(doc, 5, msg));
-    unsetenv("SF_FOCUS_DETAIL");
-    unsetenv("SF_MICRO_SWAP_DIR");
+    setEnv("SF_FOCUS_DETAIL", nullptr);
+    setEnv("SF_MICRO_SWAP_DIR", nullptr);
     CHECK(doc.mesh.micro && doc.mesh.micro->focus);
     CHECK(msg.find("Focus Detail") != std::string::npos);
     if (!doc.mesh.micro || !doc.mesh.micro->focus) return;
@@ -838,7 +896,7 @@ TEST(focus_detail_divide_to_micro_switches_when_large) {
 // A micro level in memory still saves as format 7 (no detail file) and loads back exactly: format 9 is written
 // only when a level streams, so builds before 0.11.12 keep opening these projects.
 TEST(focus_detail_in_memory_micro_project_stays_format_7) {
-    setenv("SF_FOCUS_DETAIL", "0", 1);
+    setEnv("SF_FOCUS_DETAIL", "0");
     Mesh base;
     {
         Mesh head;
@@ -852,7 +910,7 @@ TEST(focus_detail_in_memory_micro_project_stays_format_7) {
     Document doc = makeDoc(std::move(base));
     std::string msg, err;
     CHECK(microDivideUndoable(doc, 5, msg));
-    unsetenv("SF_FOCUS_DETAIL");
+    setEnv("SF_FOCUS_DETAIL", nullptr);
     CHECK(doc.mesh.micro && !doc.mesh.micro->focus);
     if (!doc.mesh.micro) return;
     dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.1f, 0.8f);
@@ -918,6 +976,193 @@ TEST(focus_detail_every_micro_brush_matches_in_memory) {
     CHECK(edgesShared(streamed.mesh));
 }
 
+namespace {
+
+std::vector<uint8_t> fileBytes(const std::string& path) {
+    std::error_code ec;
+    const auto size = std::filesystem::file_size(path, ec);
+    CHECK(!ec);
+    if (ec) return {};
+    std::vector<uint8_t> b(size);
+    FILE* f = std::fopen(path.c_str(), "rb");
+    CHECK(f && std::fread(b.data(), 1, b.size(), f) == b.size());
+    if (f) std::fclose(f);
+    return b;
+}
+
+void putBytes(const std::string& path, const std::vector<uint8_t>& b) {
+    FILE* f = std::fopen(path.c_str(), "wb");
+    CHECK(f && std::fwrite(b.data(), 1, b.size(), f) == b.size());
+    if (f) std::fclose(f);
+}
+
+uint64_t fnv(const void* p, size_t n, uint64_t h = 1469598103934665603ull) {
+    for (size_t i = 0; i < n; ++i) h = (h ^ static_cast<const uint8_t*>(p)[i]) * 1099511628211ull;
+    return h;
+}
+
+// What a detail file holds, as one number: its base positions and every full tile's values.
+uint64_t contentHash(const std::string& path) {
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    if (!fd) return 0;
+    fd->ensureFull(*m.micro, allTiles(m), false);
+    const std::vector<int16_t> v = m.micro->disp.toVector();
+    return fnv(v.data(), v.size() * 2, fnv(m.positions.data(), m.positions.size() * 12));
+}
+
+} // namespace
+
+// Windows can't rename over a mapped file, and a second view (another Part streaming the same file) is open: a save
+// still writes in place beside both views, a compaction it can't rename falls back to appending (the old file intact),
+// and with the other view gone the next save compacts. On Linux and macOS the same saves just compact.
+TEST(focus_detail_save_in_place_and_compaction_while_mapped) {
+    const std::string path = writeSmall("mapped.sfdetail");
+    Mesh m0, other;
+    std::string err;
+    auto fd = FocusDetail::open(path, m0, err);
+    auto fd2 = FocusDetail::open(path, other, err); // the second view
+    CHECK(fd != nullptr && fd2 != nullptr);
+    if (!fd || !fd2) return;
+    const std::vector<int16_t> before = streamedFull(other);
+    Document doc = makeDoc(std::move(m0));
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.1f, 0.8f);
+    const std::vector<int16_t> edited = streamedFull(doc.mesh);
+    CHECK(edited != before);
+    const size_t size0 = std::filesystem::file_size(path);
+    CHECK(fd->save(doc.mesh, err)); // in place: appended
+    CHECK(std::filesystem::file_size(path) > size0);
+    CHECK(fullValues(path) == edited);
+    // Saves past half garbage: compacted, or (Windows, the other view open) appended; either way saved and whole.
+    for (int k = 0; k < 3; ++k) {
+        doc.mesh.micro->focus->ensureAllFull(*doc.mesh.micro, true);
+        CHECK(fd->save(doc.mesh, err));
+        CHECK(!fd->unsaved());
+        CHECK(!std::filesystem::exists(path + ".part"));
+        CHECK(fullValues(path) == edited);
+    }
+    CHECK(fd->path() == path);
+    // The other view only goes when its mesh lets go; then the next save compacts everywhere.
+    other = Mesh();
+    fd2.reset();
+    doc.mesh.micro->focus->ensureAllFull(*doc.mesh.micro, true);
+    CHECK(fd->save(doc.mesh, err));
+    CHECK(fd->stats().fileBytes < size0 * 2 + 4096);
+    CHECK(std::filesystem::file_size(path) < size0 * 2 + 4096);
+    CHECK(fullValues(path) == edited);
+}
+
+// tests/data/focus_detail_linux.sfdetail was written on Linux with zstd tiles (as Linux writes them: the system
+// libzstd). Every build reads it to the same values (builds without libzstd through third_party/zstd), keeps
+// sculpting on it and saves it (those builds write the whole file again in their own codec, which every build reads).
+// Its content hash was taken on Linux when it was written (SF_FOCUS_FIXTURE_OUT=<path> writes a new one).
+TEST(focus_detail_linux_file_opens_everywhere) {
+    constexpr uint64_t kLinuxHash = 0xd0da634a5903aceaull;
+    if (const char* out = std::getenv("SF_FOCUS_FIXTURE_OUT"); out && *out) {
+        std::string err;
+        CHECK(focusWriteSyntheticHead(out, 200, 4, err));
+        std::printf("  fixture %s: content hash 0x%016llxull\n", out, (unsigned long long)contentHash(out));
+        const std::vector<uint8_t> b = fileBytes(out); // (as hex lines too: a build machine's file comes back in its log)
+        for (size_t i = 0; i < b.size(); i += 64) {
+            std::printf("FIXTURE ");
+            for (size_t k = i; k < std::min(b.size(), i + 64); ++k) std::printf("%02x", b[k]);
+            std::printf("\n");
+        }
+    }
+    const std::string fixture = std::string(SF_TEST_DATA_DIR) + "/focus_detail_linux.sfdetail";
+    const std::vector<uint8_t> bytes = fileBytes(fixture);
+    uint32_t codec = 0;
+    if (bytes.size() >= 16) std::memcpy(&codec, bytes.data() + 12, 4);
+    CHECK(codec == 1); // zstd
+    const std::string path = focusTempPath("linux-copy.sfdetail");
+    putBytes(path, bytes);
+    CHECK(contentHash(path) == kLinuxHash);
+    // Sculpt on it, save, reopen: the edit is there and the rest unchanged.
+    Mesh m;
+    std::string err;
+    auto fd = FocusDetail::open(path, m, err);
+    CHECK(fd != nullptr);
+    if (!fd) return;
+    const std::vector<int16_t> ref = streamedFull(m);
+    Document doc = makeDoc(std::move(m));
+    dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.2f, 0.8f);
+    const std::vector<int16_t> edited = streamedFull(doc.mesh);
+    CHECK(edited != ref);
+    CHECK(fd->save(doc.mesh, err));
+    CHECK(fullValues(path) == edited);
+    // A second save after more sculpting (in place, in whichever codec the file now has).
+    dabAt(doc, BrushType::Inflate, "Inflate", glm::vec3(-0.1f, 0.0f, 5.0f), 0.2f, 0.6f);
+    const std::vector<int16_t> edited2 = streamedFull(doc.mesh);
+    CHECK(fd->save(doc.mesh, err));
+    CHECK(fullValues(path) == edited2);
+    CHECK(fileBytes(fixture) == bytes); // (the fixture itself untouched)
+}
+
+// Damaged tile data (the directory intact, so the file opens): a tile cut short, overwritten, its first bytes zeroed,
+// one byte flipped, in the zstd fixture and in a file this build writes. A damaged tile is refused (it stays coarse)
+// or decodes to its own wrong values; every other tile comes back exact, nothing reads or writes out of bounds (the
+// sanitizer builds run this too), and the file still sculpts and saves.
+TEST(focus_detail_damaged_tiles_stay_coarse) {
+    auto get64 = [](const std::vector<uint8_t>& b, size_t at) { uint64_t v; std::memcpy(&v, b.data() + at, 8); return v; };
+    auto get32 = [](const std::vector<uint8_t>& b, size_t at) { uint32_t v; std::memcpy(&v, b.data() + at, 4); return v; };
+    auto put32 = [](std::vector<uint8_t>& b, size_t at, uint32_t v) { std::memcpy(b.data() + at, &v, 4); };
+    auto rehash = [&](std::vector<uint8_t>& b) {
+        const uint64_t h = fnv(b.data() + get64(b, 56), get64(b, 64));
+        std::memcpy(b.data() + 88, &h, 8);
+    };
+    const std::string own = writeSmall("damaged-tiles-src.sfdetail");
+    for (const std::string& src : {std::string(SF_TEST_DATA_DIR) + "/focus_detail_linux.sfdetail", own}) {
+        const std::vector<uint8_t> good = fileBytes(src);
+        const std::vector<int16_t> ref = fullValues(src);
+        CHECK(!ref.empty());
+        if (ref.empty() || good.size() < 128) continue;
+        const size_t dir = get64(good, 56);
+        const uint32_t T = get32(good, 24);
+        CHECK(T > 8);
+        if (T <= 8) continue;
+        auto entry = [&](uint32_t t) { return dir + size_t(t) * 24; };
+        int variant = 0;
+        for (auto patch : std::initializer_list<void (*)(std::vector<uint8_t>&, size_t, size_t, size_t)>{
+                 [](std::vector<uint8_t>& b, size_t e, size_t, size_t) { // cut short
+                     uint32_t n; std::memcpy(&n, b.data() + e + 8, 4); n /= 2; std::memcpy(b.data() + e + 8, &n, 4); },
+                 [](std::vector<uint8_t>& b, size_t e, size_t, size_t) { // overwritten
+                     uint64_t at; uint32_t n; std::memcpy(&at, b.data() + e, 8); std::memcpy(&n, b.data() + e + 8, 4);
+                     for (uint32_t i = 0; i < n; ++i) b[at + i] = uint8_t(0xA5 ^ (i * 31)); },
+                 [](std::vector<uint8_t>& b, size_t e, size_t e2, size_t) { // first bytes zeroed
+                     (void)e2; uint64_t at; std::memcpy(&at, b.data() + e, 8); for (int i = 0; i < 8; ++i) b[at + i] = 0; },
+                 [](std::vector<uint8_t>& b, size_t e, size_t, size_t one) { // a single byte (a length or a count)
+                     uint64_t at; std::memcpy(&at, b.data() + e, 8); b[at + one] ^= 0xFF; }}) {
+            std::vector<uint8_t> b = good;
+            const uint32_t hit[] = {0, T / 2, T - 1};
+            for (uint32_t t : hit) patch(b, entry(t), entry((t + 1) % T), size_t(get32(b, entry(t) + 8)) / 3);
+            rehash(b);
+            const std::string path = focusTempPath("damaged-tiles.sfdetail");
+            putBytes(path, b);
+            Mesh m;
+            std::string err;
+            auto fd = FocusDetail::open(path, m, err);
+            CHECK(fd != nullptr);
+            if (!fd) continue;
+            fd->ensureFull(*m.micro, allTiles(m), false);
+            const MicroMesh& mm = *m.micro;
+            size_t wrong = 0;
+            for (uint32_t t = 0; t < mm.baseTriangles; ++t) {
+                if (t == hit[0] || t == hit[1] || t == hit[2]) continue;
+                for (uint32_t k = 0; k < mm.samples; ++k) wrong += mm.disp[size_t(t) * mm.samples + k] != ref[size_t(t) * mm.samples + k];
+            }
+            if (wrong) std::printf("  variant %d of %s: %zu values off in undamaged tiles\n", variant, src.c_str(), wrong);
+            CHECK(wrong == 0);
+            // Sculpting on it still saves (a build that writes the file afresh in its own codec too) and reopens.
+            Document doc = makeDoc(std::move(m));
+            dabAt(doc, BrushType::Clay, "Clay", glm::vec3(0.0f, 0.1f, 5.0f), 0.2f, 0.8f);
+            CHECK(fd->save(doc.mesh, err));
+            CHECK(!fullValues(path).empty());
+            ++variant;
+        }
+    }
+}
+
 // #184: a long stroke leaves thousands of edited tiles full, far over the budget; each demotion compresses one. The
 // demotions go within the frame's budget (a batch at least), over the following frames, never all in one (1.6-2.8 s on
 // the floor tier), and no edit is lost on the way.
@@ -954,5 +1199,3 @@ TEST(focus_detail_demotions_over_budget_spread_over_frames) {
     for (uint32_t t = 0; t < mm.baseTriangles; ++t) kept = kept && mm.disp[size_t(t) * mm.samples + inner] == int16_t(t % 97 + 1);
     CHECK(kept);
 }
-
-#endif

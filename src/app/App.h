@@ -1041,6 +1041,14 @@ private:
     void drawSelectionOverlay();
     SelectShape maskShape_ = SelectShape::Pen;
     SelectShape hideShape_ = SelectShape::Rect;
+    // A Select shape latched from the stroke popup borrows hideShape_ (the Ctrl+Shift shape) while it is on; when the latch ends
+    // the panel's own choice comes back, so a Cut Line used through the popup never draws on the next Ctrl+Shift drag.
+    struct HideShapeLatch {
+        bool active = false;
+        SelectShape before = SelectShape::Rect;  // the panel's choice when the popup latched a shape
+        SelectShape latched = SelectShape::Rect; // the shape the latch set
+    } hideLatch_;
+    void settleHideLatch();
     SelectTarget selectTarget_ = SelectTarget::Hide;
     SelectShape selectShape_ = SelectShape::Rect;
     // Window pixels: the start, then the lasso's points (a rectangle's other corner is the cursor).
@@ -2636,6 +2644,9 @@ private:
     void drawLayersContents();
     // Paint Layers sub-palette (PanelPaintLayers.cpp).
     void drawPaintLayersContents();
+    void drawActiveLayerBlendOpacity();  // the active layer's blend mode + opacity (shared with the Color palette's list)
+    void drawColorLayersCompact();       // Color palette > Layers: the same stack as a compact list
+    int listedColorLayer_ = -2;          // the compact list's active row last scrolled into view
     int renamingPaintLayer_ = -2; // layer being renamed inline (-2 = none)
     bool focusPaintRename_ = false;
     char paintRenameBuffer_[64] = "";
@@ -3568,6 +3579,8 @@ private:
     std::string strokeModifierKeysText(StrokeModifier m) const; // the active input style's keys for a popup tile
     StrokeLatch strokeLatch() const; // the latch in effect (None once another brush was picked)
     void setStrokeLatch(StrokeLatch latch);
+    bool latchToolOk() const; // no Gizmo or other tool is taking the drags
+    void leaveToolsForLatch();
     struct StrokePopupOpen {
         bool open = false;
         ImVec2 at{0, 0};       // the panel's top-left

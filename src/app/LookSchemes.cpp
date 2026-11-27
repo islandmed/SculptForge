@@ -25,6 +25,11 @@ const SchemeInfo kSchemes[] = {
     {"neutral", "Neutral", "SculptForge (original)", "GPL-3.0-or-later",
      {0x111111, 0x191919, 0x202020, 0x2b2b2b, 0x363636, 0x494949, 0x777777, 0xaaaaaa, 0xd7d7d7, 0xf2f2f2, 0xf0882e,
       0xaaaaaa, 0xe5604a, 0x8cbf6a, 0xe0b050, false}},
+    // Brightness only, no hue anywhere: the accent is white, so the current tool, the on switches and the focus read by
+    // lightness (a light fill with dark text on it) where Neutral uses orange. Only red stays, on deletes and errors.
+    {"monochrome", "Monochrome", "SculptForge (original)", "GPL-3.0-or-later",
+     {0x111111, 0x191919, 0x202020, 0x2b2b2b, 0x363636, 0x494949, 0x808080, 0xa6a6a6, 0xc8c8c8, 0xe6e6e6, 0xffffff,
+      0x9a9a9a, 0xe5604a, 0x9a9a9a, 0xc8c8c8, false}},
     {"tokyo_night", "Tokyo Night", "github.com/enkia/tokyo-night-vscode-theme", "MIT",
      {0x101118, 0x16161e, 0x1a1b26, 0x232535, 0x292e42, 0x414868, 0x6a73a0, 0xa9b1d6, 0xc0caf5, 0xdfe5ff, 0x7aa2f7,
       0xbb9af7, 0xf7768e, 0x9ece6a, 0xe0af68, false}},

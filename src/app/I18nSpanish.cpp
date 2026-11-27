@@ -50,6 +50,8 @@ constexpr Entry kSpanish[] = {
     {"Gaussian Splats", "Splats gaussianos"},
     {"Look", "Aspecto"},
     {"Colours:", "Colores:"},
+    {"Monochrome", "Monocromo"},
+    {"Grey only, no hue: the accent is white. Warnings and deletes keep their red.", "Solo grises, sin tono: el acento es blanco. Las advertencias y los borrados conservan su rojo."},
     {"Match my desktop theme", "Usar el tema de mi escritorio"},
     {"Uses your Omarchy theme's colours when Omarchy is installed", "Usa los colores de tu tema de Omarchy cuando Omarchy está instalado"},
     {"Green", "Verde"},
@@ -2806,6 +2808,10 @@ constexpr Entry kSpanish[] = {
      "del proyecto, o ? para elegir uno al ejecutarla."},
     {"Recording macro", "Grabando macro"},
     // --- PanelPaintLayers.cpp (tools/i18n/coverage.py) ---
+    {"New layer", "Capa nueva"},
+    {"A paint layer, as in Tool > Paint Layers. Click to paint on it. Layers composite bottom to top with their blend mode and opacity.",
+     "Una capa de pintura, como en Tool > Paint Layers. Haz clic para pintar en ella. Las capas se componen de abajo arriba con su modo de fusión y su opacidad."},
+    {"Fill layer with a mask. Edit it under Tool > Paint Layers.", "Capa de relleno con máscara. Edítala en Tool > Paint Layers."},
     {"Lock the layer: the Paint brush, fills, clears and merges leave it alone.",
      "Bloquea la capa: el pincel Paint, los rellenos, los borrados y las fusiones no la tocan."},
     {"Show or hide the layer. Hidden layers don't show or export.",
@@ -5744,8 +5750,6 @@ constexpr Entry kSpanish[] = {
      "Activado:"},
     {"What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
      "Lo que este equipo puede llevar más allá de lo esencial: cachés de Focus Detail más grandes, texturas de 16K y los niveles que vendrán se activan solos donde caben, nunca donde no. Todos los niveles esculpen con fluidez; no se envía nada a ningún sitio."},
-    {"What this computer can carry beyond the essentials: 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
-     "Lo que este equipo puede llevar más allá de lo esencial: texturas de 16K y los niveles que vendrán se activan solos donde caben, nunca donde no. Todos los niveles esculpen con fluidez; no se envía nada a ningún sitio."},
     {"What this turns on:",
      "Qué activa:"},
     {"Where the heavy work runs: on the processor (CPU) or the graphics card (GPU). Auto takes the GPU only where it measured faster on this computer, and never on the Essential tier. If a GPU path fails, that task switches to the CPU and says so once. Tasks without a GPU path yet stay on the CPU.",
@@ -6470,6 +6474,7 @@ constexpr Entry kSpanish[] = {
     {"Hold %s and drag anywhere to pan the view", "Mantén %s y arrastra en cualquier parte para desplazar la vista"},
     {"Hold %s and drag anywhere to zoom", "Mantén %s y arrastra en cualquier parte para hacer zoom"},
     {"Navigation bindings back to their defaults", "Navegación restablecida a sus valores por defecto"},
+    {"%s on  \xc2\xb7  Esc turns it off", "%s activado  \xc2\xb7  Esc lo desactiva"},
 };
 
 } // namespace

@@ -209,6 +209,8 @@
 //                            axis), camera_distance, camera_pan (target offset);
 //                            N may be $NAME or $NAME*K for a value kept by `remember`
 //                            paint_layers (paint layers above Base), active_paint_layer (-1 = Base),
+//                            paint_layers_visible (those that show), active_paint_layer_opacity (0..1; Base 1) /
+//                            active_paint_layer_blend (BlendMode index; Base 0),
 //                            paint_mean_r / paint_mean_g / paint_mean_b (mean displayed vertex paint, sRGB 0-255),
 //                            paint_rough (how uneven the vertex paint is: the mean distance, sRGB 0-255, between a vertex's colour
 //                            and its neighbours' average; Shift with the Paint brush lowers it),
@@ -233,7 +235,7 @@
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
 //                            quads (quad pairs in the active Part), quad_percent (quads among its polygons)
-//                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect, 7 MaskCircle), hide_shape (1 SelectLasso, 2 SelectRect, 7 SelectCircle, 8 CutCircle)
+//                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect, 7 MaskCircle), hide_shape (1 SelectLasso, 2 SelectRect, 7 SelectCircle, 8 CutCircle), cut_polyline_points, held_tile (the shape the left tray's tiles show while Ctrl / Ctrl+Shift is held: same numbers, -1 none)
 //                            subdiv_level (the current subdivision level, 1 = base; 0 without levels), sdiv_levels (0 = none)
 //                            antialiasing (Preferences > Performance: 1, 2, 4, 8), view_samples (what the interactive
 //                            view draws with now: 1 while Fast Navigation moves a big scene), multithreading (1 on), threads (the shared pool's size), profile_threads (the saved profile's, for the next start),
@@ -248,7 +250,7 @@
 //                            size_popup_open (the S / U / I / O slider), size_knob_x / size_knob_y (its knob, pixels),
 //                            quickmenu_open, right_click_menu, space_camera, space_held, air_strokes, radial_open / radial_menu (-1 none) / radial_held /
 //                            radial_hover / radial_ran (radial menus: open, the menu, held by its key or button, the
-//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), invert_toggle, sculpt_mods (the held keys as sculpting reads them: Shift 1, Ctrl 2, Alt 4), lazy_mouse (the Lazy Stroke type),
+//                            slot pointed at, the slot run last), radial_menus, radial_slots_N, stroke_popup_open / stroke_popup_held / stroke_popup_hover / stroke_popup_picked (the stroke popup: items are strokes 0-4, then Add, Sub, Smooth, Mask, Select, then the shapes 10-16), stroke_latch (0 none, 1 Smooth, 2 Mask, 3 Select), stroke_latch_badge (1: the "on, Esc turns it off" label is drawn in the corner of the canvas), invert_toggle, sculpt_mods (the held keys as sculpting reads them: Shift 1, Ctrl 2, Alt 4), lazy_mouse (the Lazy Stroke type),
 //                            steady_stroke (Steady Stroke on, any type), steady_lag (px from the pointer to the brush on
 //                            its string), steady_catch_up, world_size, world_radius_mm, draw_size_exact (px, unrounded),
 //                            precision_active (Shift+Alt mid-stroke), precision_lag (px from the pointer to the brush),
@@ -778,6 +780,17 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "colored") return m.hasColors() ? 1.0 : 0.0;
     if (name == "paint_layers") return double(m.paintLayers.size());
     if (name == "active_paint_layer") return m.paintLayers.empty() ? -1.0 : double(m.activePaintLayer);
+    if (name == "paint_layers_visible") { // layers above Base that show (the Color palette's list and Tool > Paint Layers)
+        double n = 0.0;
+        for (const PaintLayer& l : m.paintLayers) n += l.visible ? 1.0 : 0.0;
+        return n;
+    }
+    if (name == "active_paint_layer_opacity" || name == "active_paint_layer_blend") { // 0..1 / the BlendMode index; Base 1 / 0
+        const bool on = !m.paintLayers.empty() && m.activePaintLayer >= 0 && m.activePaintLayer < int(m.paintLayers.size());
+        const PaintLayer* l = on ? &m.paintLayers[size_t(m.activePaintLayer)] : nullptr;
+        if (name == "active_paint_layer_blend") return l ? double(int(l->blend)) : 0.0;
+        return l ? double(l->opacity) : 1.0;
+    }
     if (name == "paint_mean_r" || name == "paint_mean_g" || name == "paint_mean_b") {
         if (!m.hasColors()) return 255.0;
         const int k = name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2;
@@ -1076,6 +1089,21 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "look_outline_opacity") return double(std::lround(app_.uiPrefs_.look.outlineOpacity * 100.0f)); // percent
     if (name == "look_outlines") return double(app_.uiPrefs_.look.outlines); // 0 off, 1 subtle, 2 on
     if (name == "look_neutral") return app_.uiPrefs_.look.scheme == "neutral" ? 1.0 : 0.0; // Forge Terminal's Neutral colours
+    if (name == "look_monochrome") return app_.uiPrefs_.look.scheme == "monochrome" ? 1.0 : 0.0; // Forge Terminal's grey-only colours
+    if (name == "style_accent_chroma") { // 0 when the accent has no hue (Monochrome), else the spread of its channels in 0-255
+        const ImVec4& a = theme::accent;
+        return std::round(std::max({a.x, a.y, a.z}) * 255.0f - std::min({a.x, a.y, a.z}) * 255.0f);
+    }
+    if (name == "style_active_contrast" || name == "style_on_contrast" || name == "style_text_contrast" || name == "style_on_text_contrast") { // WCAG ratio x10
+        auto lin = [](float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); };
+        auto lum = [&](const ImVec4& c) { return 0.2126f * lin(c.x) + 0.7152f * lin(c.y) + 0.0722f * lin(c.z); };
+        auto ratio = [&](const ImVec4& a, const ImVec4& b) { return (std::max(lum(a), lum(b)) + 0.05f) / (std::min(lum(a), lum(b)) + 0.05f); };
+        const double r = name == "style_active_contrast" ? ratio(theme::accent, theme::button)       // current tool against an idle button
+                         : name == "style_on_contrast"   ? ratio(theme::toggleOn, theme::toggleOff) // an on switch against an off one
+                         : name == "style_on_text_contrast" ? std::min(ratio(theme::textBright, theme::toggleOn), ratio(theme::textBright, theme::toggleOnHover)) // its label
+                                                         : ratio(theme::textOnAccent, theme::accent); // the label on the accent fill
+        return std::round(r * 10.0);
+    }
     if (name == "look") return double(app_.uiPrefs_.look.look); // 0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint
     if (name == "hover_rings") return double(ui::HoverRingsShown()); // hover and focus rings drawn last frame
     if (name == "hover_lifts") return double(ui::HoverLiftsShown()); // tiles lifted last frame
@@ -1097,6 +1125,8 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "stroke_popup_hover") return double(app_.strokePopup_.hover); // item: strokes 0-4, Add 5 ... Select 9
     if (name == "stroke_popup_picked") return double(app_.strokePopup_.picked); // -1: none yet
     if (name == "stroke_latch") return double(int(app_.strokeLatch())); // 0 none, 1 Smooth, 2 Mask, 3 Select
+    if (name == "stroke_latch_badge")
+        return app_.strokeLatch() != StrokeLatch::None && !app_.strokePopup_.open && app_.radial_.menu < 0 && !app_.quickMenu_.open ? 1.0 : 0.0;
     if (name == "invert_toggle") return app_.invertToggle_ ? 1.0 : 0.0;
     if (name == "sculpt_mods") { // the held keys as the sculpting reads them (the classic meanings): Shift 1 + Ctrl 2 + Alt 4
         const SDL_Keymod k = app_.keyMods();
@@ -1231,6 +1261,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "undo_ai") return app_.doc_.undo.canUndo() && app_.doc_.undo.undoLabel().rfind("AI: ", 0) == 0 ? 1.0 : 0.0;
     if (name == "mask_shape") return double(int(app_.maskShape_)); // 0 MaskPen, 1 MaskLasso, 2 MaskRect, 7 MaskCircle
     if (name == "hide_shape") return double(int(app_.hideShape_)); // 1 SelectLasso, 2 SelectRect, 7 SelectCircle, 8 CutCircle
+    if (name == "cut_polyline_points") return double(app_.cutPolyline_.size()); // the points of a Cut Polyline being placed
+    if (name == "held_tile") { // the shape the left tray's Brush / Stroke tiles show while Ctrl or Ctrl+Shift is held (-1: not showing one)
+        const App::HeldBrushItem* it = app_.heldBrushCurrent(app_.heldBrush());
+        return it ? double(int(it->shape)) : -1.0;
+    }
     if (name.rfind("phone_", 0) == 0) {
         const bool on = app_.phone_ && app_.phone_->running();
         const link::PhoneLinkStatus st = on ? app_.phone_->status() : link::PhoneLinkStatus{};

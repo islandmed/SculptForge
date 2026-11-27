@@ -65,6 +65,9 @@ struct HardwareInfo {
     std::string appVersion;
 };
 
+// Logical threads this process can use: the C++ library's count, and on Windows every processor group's (the library
+// counts the current group). SF_CPU_THREADS=N pretends the machine has N (tests).
+int detectLogicalThreads();
 // Fills the machine fields (os, cpu, cpuThreads, ramMB, simd, simdBuild, appVersion).
 void probeSystem(HardwareInfo& info);
 // Processor time this process has used so far, every thread's (user + system), in seconds. Not std::clock(): on

@@ -48,16 +48,15 @@ Most PCs are x86_64; ARM64 is for ARM laptops, Raspberry Pi and Apple Silicon Ma
 ### Android (early)
 
 An early test build for Android 9 or later: tablets, phones and Chromebooks (arm64 and x86_64), with touch and pen.
-It is not in an app store. Members get it today; it is free for everyone on 26 November.
+It is not in an app store, and members get builds first.
 
-1. **Members:** accepting the invitation to the member repository (it comes with [membership](https://sculptforge.app/support.html))
-   lets you open its releases on GitHub. Download the `.apk` for your device from the newest member release
+1. Download the `.apk` for your device from the [latest release](https://github.com/islandmed/SculptForge/releases/latest)
    (`arm64-v8a` for most phones and tablets, `x86_64` for Chromebooks with Intel or AMD) and check it against
    `SHA256SUMS-android.txt`.
 2. Open it from your browser or file manager and allow installs from that app when Android asks.
-3. If you installed an earlier test APK, uninstall it first: it is signed with a different key, and Android won't
-   update over it. Copy projects out of its Projects folder before you do. This is a test build: a later version,
-   signed with our own key, will need one more uninstall and reinstall.
+3. Each test build is signed with a new key for now, so before installing a newer one, save your sculpts somewhere
+   outside the app (Files / Downloads), uninstall the old SculptForge, then install the new APK. A stable key, so
+   updates install over the old app, is coming.
 
 It is early: expect rough edges, and report bugs on [GitHub](https://github.com/islandmed/SculptForge/issues) or Discord.
 

@@ -328,13 +328,23 @@ endif()
 # zstd for Focus Detail tiles (core/FocusDetail.h), when the system has it; without it the tiles use our own codec.
 # Not on macOS: Homebrew's zstd is single-architecture and breaks the universal (x86_64 + arm64) build.
 # Not on Android: pkg-config finds the build machine's zstd, and the NDK has no zstd.h.
+# SF_SYSTEM_ZSTD=OFF: the vendored decoder alone, as Windows and macOS build (tests the reader everywhere).
+option(SF_SYSTEM_ZSTD "Use the system libzstd for Focus Detail tiles when it is found" ON)
 find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND AND NOT APPLE AND NOT ANDROID)
+if(PkgConfig_FOUND AND NOT APPLE AND NOT ANDROID AND SF_SYSTEM_ZSTD)
   pkg_check_modules(SF_ZSTD QUIET IMPORTED_TARGET libzstd)
 endif()
-if(SF_ZSTD_FOUND)
+if(SF_ZSTD_FOUND AND SF_SYSTEM_ZSTD) # (the found result is cached: turning the option off later still takes effect)
   target_link_libraries(sculptforge_core PRIVATE PkgConfig::SF_ZSTD)
   target_compile_definitions(sculptforge_core PRIVATE SF_HAVE_ZSTD)
+else()
+  # Elsewhere the release's decoder (third_party/zstd/VENDORED.md): zstd tiles written on Linux open everywhere; these
+  # builds write their own codec, which every build reads.
+  target_sources(sculptforge_core PRIVATE third_party/zstd/lib/zstddeclib.c)
+  target_include_directories(sculptforge_core PRIVATE third_party/zstd/lib)
+  target_compile_definitions(sculptforge_core PRIVATE SF_HAVE_ZSTD_DECODER)
+  set_source_files_properties(third_party/zstd/lib/zstddeclib.c PROPERTIES COMPILE_OPTIONS "$<IF:$<C_COMPILER_ID:MSVC>,/w,-w>"
+                              SKIP_PRECOMPILE_HEADERS ON)
 endif()
 target_compile_definitions(sculptforge_core PUBLIC GLM_FORCE_XYZW_ONLY
                                                    SF_MAC_SELF_UPDATE=$<BOOL:${SCULPTFORGE_MAC_SELF_UPDATE}>) # core/SelfUpdate.h, app and tests alike
@@ -1368,17 +1378,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     file(GLOB SCULPTFORGE_UI_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/*.sfui)
     list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/mode_matrix\\.sfui$") # (four shards, below)
     list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/hardware_tier_panel\\.sfui$") # (only at 1440 and 2880, below)
+    list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/color_panel_layers\\.sfui$") # (only at 1440 and 2880, below: the default window is short enough that the Color window scrolls while rows are added)
     if(NOT SCULPTFORGE_MAC_SELF_UPDATE) # (the banner shows Download on a Mac: nothing of that script to drive)
       list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/self_update_mac\\.sfui$")
     endif()
     if(NOT TARGET sculptforge_pyhost) # (a build without Python in the app: its console says so, nothing to drive)
       list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/python_[a-z_]+\\.sfui$")
-    endif()
-    if(WIN32) # (Focus Detail is Unix and macOS only, core/FocusDetail.cpp: no deferred range widen to see on Windows)
-      list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/micro_widen_live_stroke\\.sfui$")
-    endif()
-    if(WIN32) # (Focus Detail streams memory-mapped files: Linux and macOS for now, core/FocusDetail.h; enable with focus-detail-windows)
-      list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/focus_detail_open_command\\.sfui$")
     endif()
     foreach(script ${SCULPTFORGE_UI_TESTS})
       get_filename_component(name ${script} NAME_WE)
@@ -1390,6 +1395,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(curve_edit_2880 curve_edit --size 2880x1800)
     sculptforge_ui_test(color_material_entries_1440 color_material_entries --size 1440x900) # Color > Material rows before any channel is on
     sculptforge_ui_test(color_material_entries_2880 color_material_entries --size 2880x1800)
+    sculptforge_ui_test(color_panel_layers_1440 color_panel_layers --size 1440x900) # Color > Layers: the compact paint layer list
+    sculptforge_ui_test(color_panel_layers_2880 color_panel_layers --size 2880x1800)
+    sculptforge_ui_test(color_panel_layers_menu_1440 color_panel_layers_menu --size 1440x900)
+    sculptforge_ui_test(color_panel_layers_menu_2880 color_panel_layers_menu --size 2880x1800)
+    sculptforge_ui_test(color_panel_layers_classic_1440 color_panel_layers_classic --size 1440x900) # off in the Classic layout
+    sculptforge_ui_test(color_panel_layers_classic_2880 color_panel_layers_classic --size 2880x1800)
     sculptforge_ui_test(fill_effect_slider_keeps_1440 fill_effect_slider_keeps --size 1440x900)
     sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
     sculptforge_ui_test(scatter_1440 scatter --size 1440x900) # Tool > Scatter, its live redo and Separate Parts over 500
@@ -1424,9 +1435,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(async_stroke_undo_view_2880 async_stroke_undo_view --size 2880x1800)
     set_tests_properties(ui_async_stroke_undo_view ui_async_stroke_undo_view_1440 ui_async_stroke_undo_view_2880 PROPERTIES
                          ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=100")
-    if(NOT WIN32) # (any widen splits over two frames here, whatever this computer's speed; tests/ui/micro_widen_live_stroke.sfui)
-      set_tests_properties(ui_micro_widen_live_stroke PROPERTIES ENVIRONMENT "SF_WIDEN_SPLIT_MS=0")
-    endif()
+    # (any widen splits over two frames here, whatever this computer's speed; tests/ui/micro_widen_live_stroke.sfui)
+    set_tests_properties(ui_micro_widen_live_stroke PROPERTIES ENVIRONMENT "SF_WIDEN_SPLIT_MS=0")
     set_tests_properties(ui_async_stroke_press_waits PROPERTIES
                          ENVIRONMENT "SF_BACKGROUND_DABS=1;SF_DAB_DELAY_MS=40")
     set_tests_properties(ui_async_stroke_undo PROPERTIES
@@ -1778,6 +1788,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # The popup's key labels per input style (gh#233) at 100% and 200%: the 1440 and 2880 shots.
     sculptforge_ui_test(stroke_popup_style_keys_1440 stroke_popup_style_keys --size 1440x810)
     sculptforge_ui_test(stroke_popup_style_keys_2880 stroke_popup_style_keys --size 2880x1620)
+    sculptforge_ui_test(stroke_latch_off_1440 stroke_latch_off --size 1440x810)
+    sculptforge_ui_test(stroke_latch_off_2880 stroke_latch_off --size 2880x1620)
     # Library single click (#142) on a UI scaled 1.5x: tiles still take one click.
     sculptforge_ui_test(library_click_scaled library_click --size 2400x1350)
     # UI scale (#87) at 1600x900, where Automatic in a test is exactly 100 %; label "dpi": release.sh step check runs them before the tag.

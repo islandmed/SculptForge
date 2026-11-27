@@ -1,0 +1,71 @@
+# Color > Layers: the paint layer stack in a compact list above the PBR channels, so painting stays in one palette
+# (a member's request, 11-26). It is the same stack as Tool > Paint Layers: same data, order and undo; selecting a layer in
+# one selects it in the other. The section opens and closes, and stays as it was left.
+run ui_look look=classic layout=classic newer_rows=1   # the tray palette (the SculptForge layout shows it in the Paint menu: color_panel_layers_menu)
+run new_sphere subdivisions=4
+click "Color##palette.color"
+expect "Vertex Paint & Materials/Layers"
+# Closed to start: no rows yet. One click opens it: Base only, with the New button.
+expect_not "Vertex Paint & Materials/##eye Layer 1"
+click "Vertex Paint & Materials/Layers"
+wait 0.4
+expect "Vertex Paint & Materials/Base"
+expect "Vertex Paint & Materials/New layer"
+
+# New layers: they stack up, the newest on top and selected.
+click "Vertex Paint & Materials/New layer"
+wait 0.3
+click "Vertex Paint & Materials/New layer"
+wait 0.3
+expect_value paint_layers == 2
+expect_value active_paint_layer == 1
+expect "Vertex Paint & Materials/Layer 1"
+expect "Vertex Paint & Materials/Layer 2"
+shot list
+
+# Selecting a row selects the layer everywhere: Tool > Paint Layers shows the same one.
+click "Vertex Paint & Materials/Layer 1"
+expect_value active_paint_layer == 0
+
+# Visibility: the eye hides and shows the layer (one undo step each).
+expect_value paint_layers_visible == 2
+click "Vertex Paint & Materials/##eye Layer 2"
+expect_value paint_layers_visible == 1
+key ctrl+z
+expect_value paint_layers_visible == 2
+key ctrl+shift+z
+expect_value paint_layers_visible == 1
+click "Vertex Paint & Materials/##eye Layer 2"
+expect_value paint_layers_visible == 2
+
+# Blend mode and opacity of the selected layer; the row says both. Undo takes each back.
+click "Vertex Paint & Materials/##blend"
+click "Multiply"
+expect_value active_paint_layer_blend == 1
+expect_text "Mult 100%"
+drag_item "Vertex Paint & Materials/##opacity" -35 0
+expect_value active_paint_layer_opacity < 1.0
+shot blend-opacity
+key ctrl+z
+expect_value active_paint_layer_opacity == 1.0
+key ctrl+z
+expect_value active_paint_layer_blend == 0
+key ctrl+shift+z
+expect_value active_paint_layer_blend == 1
+
+# The same order in Tool > Paint Layers: moving a layer there reorders the list here, and selecting there selects here.
+click "Paint Layers##tool.paint_layers"
+click "Paint Layers/Layer 2"
+expect_value active_paint_layer == 1
+click "Color##palette.color"
+expect "Vertex Paint & Materials/Layer 2"
+
+# Open and closed is remembered: close the section, open another palette and come back.
+click "Vertex Paint & Materials/Layers"
+expect_not "Vertex Paint & Materials/##eye Layer 1"
+click "Paint Layers##tool.paint_layers"
+click "Color##palette.color"
+expect_not "Vertex Paint & Materials/##eye Layer 1"
+click "Vertex Paint & Materials/Layers"
+expect "Vertex Paint & Materials/##eye Layer 1"
+shot reopened

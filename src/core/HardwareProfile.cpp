@@ -247,9 +247,20 @@ double processCpuSeconds() {
 #endif
 }
 
+int detectLogicalThreads() {
+    // SF_CPU_THREADS: a test pretends the machine has this many (tests/threads_restart.py).
+    if (const char* env = std::getenv("SF_CPU_THREADS"); env && std::atoi(env) > 0) return std::min(std::atoi(env), ThreadPool::kMaxThreads);
+    int n = int(std::thread::hardware_concurrency()); // (Linux: the threads this process may run on, cgroup and taskset included)
+#if defined(_WIN32)
+    // The C++ library counts the current processor group only (at most 64); the app may use every group's.
+    n = std::max(n, int(GetActiveProcessorCount(ALL_PROCESSOR_GROUPS)));
+#endif
+    return std::max(1, n);
+}
+
 void probeSystem(HardwareInfo& info) {
     info.appVersion = SCULPTFORGE_VERSION;
-    info.cpuThreads = int(std::max(1u, std::thread::hardware_concurrency()));
+    info.cpuThreads = detectLogicalThreads();
     // --- RAM and OS ---
 #if defined(_WIN32)
     MEMORYSTATUSEX ms{};
@@ -543,7 +554,7 @@ HardwareProfile mapProfile(const HardwareInfo& hardware, const Calibration& cali
     if (const int cap = budgetsForTier(p.hwTier).maxTextureSize; cap > p.automatic.maxTextureSize && p.automatic.vramBudgetMB >= 6144)
         p.automatic.maxTextureSize = hardware.maxTextureSize > 0 ? std::min(cap, hardware.maxTextureSize) : p.automatic.maxTextureSize;
     p.settings = applyOverrides(p.automatic, overrides);
-    // A threads value set by hand goes past the default of 16, up to every hardware thread (#184: 32 on a 48-thread machine).
+    // A threads value set by hand goes past the default of 16, up to every logical thread (#184: 32 on a 48-thread machine).
     if (overrides.threads && hardware.cpuThreads > 0) p.settings.threads = std::min(p.settings.threads, hardware.cpuThreads);
     const uint64_t gpu = usableGpuMemoryMB(hardware);
     std::string gpuName = hardware.glRenderer.empty() ? std::string("no GPU probed") : hardware.glRenderer;
@@ -795,7 +806,15 @@ bool loadHardwareProfile(const std::string& path, HardwareProfile& out) {
     if (text.empty()) return false;
     Json j;
     std::string error;
-    return Json::parse(text, j, error) && hardwareProfileFromJson(j, out);
+    if (!Json::parse(text, j, error) || !hardwareProfileFromJson(j, out)) return false;
+    // The thread count is read again on every start, not trusted from the file: one saved while the app was limited
+    // (a taskset, a container, another machine's copy) capped a Threads override at that count for good (#184).
+    if (const int live = detectLogicalThreads(); live != out.hardware.cpuThreads) {
+        out.hardware.cpuThreads = live;
+        const ProfileTier measured = out.measuredTier;
+        out = mapProfile(out.hardware, out.calibration, out.overrides, &measured);
+    }
+    return true;
 }
 
 bool saveHardwareProfile(const std::string& path, const HardwareProfile& profile, std::string& error) {

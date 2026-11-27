@@ -5,7 +5,7 @@
 # #184: a Threads value saved in Preferences > Performance reaches the shared thread pool at the next start. The pool is
 # made by the first brush or stamp work, and the App's own Document makes it before App::init: the saved count has to be
 # read before that. The test starts the app (a window run, settings in its own folder) so it writes a hardware profile,
-# saves threads = 48 on a profile that says the machine has 48, starts it again and reads the "Threads: pool of N" line.
+# saves threads = 48 on a profile with a stale thread count (4) on a machine that now has 48 (SF_CPU_THREADS), starts it again and reads the "Threads: pool of N" line.
 #
 #   python3 tests/threads_restart.py path/to/sculptforge DIR
 import json
@@ -70,11 +70,12 @@ def main():
 
     with open(profile, encoding="utf-8") as f:
         p = json.load(f)
-    p["hardware"]["cpu_threads"] = WANT
+    p["hardware"]["cpu_threads"] = 4  # stale: saved while the app was limited; the machine's own count wins at the start
     p.setdefault("overrides", {})["threads"] = WANT
     with open(profile, "w", encoding="utf-8") as f:
         json.dump(p, f)
 
+    env["SF_CPU_THREADS"] = str(WANT)  # this machine "has" 48 threads now
     second = start(app, env)
     line = wait_for(second, "Threads: pool of", 120)
     stop(second)

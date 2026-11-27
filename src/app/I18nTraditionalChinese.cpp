@@ -51,6 +51,8 @@ constexpr Entry kTraditionalChinese[] = {
     {"Gaussian Splats", "高斯 Splat"},
     {"Look", "外觀"},
     {"Colours:", "色彩："},
+    {"Monochrome", "單色"},
+    {"Grey only, no hue: the accent is white. Warnings and deletes keep their red.", "僅灰階、無色相：強調色為白色。警告與刪除仍保留紅色。"},
     {"Match my desktop theme", "配合我的桌面佈景主題"},
     {"Uses your Omarchy theme's colours when Omarchy is installed", "安裝 Omarchy 後，使用您的 Omarchy 主題顏色"},
     {"Green", "綠色"},
@@ -2514,6 +2516,10 @@ constexpr Entry kTraditionalChinese[] = {
      "每行一個命令，與主控台相同（# 開頭為註解）。檔案：專案資料夾內的路徑，或用 ? 在執行時選取。"},
     {"Recording macro", "正在錄製巨集"},
     // --- PanelPaintLayers.cpp (tools/i18n/coverage.py) ---
+    {"New layer", "新增圖層"},
+    {"A paint layer, as in Tool > Paint Layers. Click to paint on it. Layers composite bottom to top with their blend mode and opacity.",
+     "繪製圖層，與 Tool > Paint Layers 相同。點擊即可在其上繪製。圖層由下而上依其混合模式與不透明度合成。"},
+    {"Fill layer with a mask. Edit it under Tool > Paint Layers.", "帶有遮罩的填充圖層。請在 Tool > Paint Layers 中編輯。"},
     {"Lock the layer: the Paint brush, fills, clears and merges leave it alone.",
      "鎖定圖層：Paint 筆刷、填滿、清除與合併都不會影響它。"},
     {"Show or hide the layer. Hidden layers don't show or export.", "顯示或隱藏圖層。隱藏的圖層不會顯示或匯出。"},
@@ -5249,8 +5255,6 @@ constexpr Entry kTraditionalChinese[] = {
      "已開啟："},
     {"What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
      "這台電腦在基本功能之外還能負擔的東西：更大的 Focus Detail 快取、16K 紋理以及之後的等級，會在容納得下的地方自動開啟，容納不下就不開。每個等級都能流暢雕刻；不會傳送任何資料。"},
-    {"What this computer can carry beyond the essentials: 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
-     "這台電腦在基本功能之外還能負擔的東西：16K 紋理以及之後的等級，會在容納得下的地方自動開啟，容納不下就不開。每個等級都能流暢雕刻；不會傳送任何資料。"},
     {"What this turns on:",
      "這會開啟："},
     {"Where the heavy work runs: on the processor (CPU) or the graphics card (GPU). Auto takes the GPU only where it measured faster on this computer, and never on the Essential tier. If a GPU path fails, that task switches to the CPU and says so once. Tasks without a GPU path yet stay on the CPU.",
@@ -5975,6 +5979,7 @@ constexpr Entry kTraditionalChinese[] = {
     {"Hold %s and drag anywhere to pan the view", "按住 %s 並在任何位置拖曳即可平移視圖"},
     {"Hold %s and drag anywhere to zoom", "按住 %s 並在任何位置拖曳即可縮放"},
     {"Navigation bindings back to their defaults", "導覽設定已還原為預設值"},
+    {"%s on  \xc2\xb7  Esc turns it off", "%s 已開啟  \xc2\xb7  按 Esc 關閉"},
 };
 
 } // namespace

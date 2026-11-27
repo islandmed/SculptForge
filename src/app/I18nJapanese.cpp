@@ -87,6 +87,8 @@ constexpr Entry kJapanese[] = {
      "外観"},
     {"Colours:",
      "カラー:"},
+    {"Monochrome", "モノクロ"},
+    {"Grey only, no hue: the accent is white. Warnings and deletes keep their red.", "グレーのみで色相なし。アクセントは白です。警告と削除は赤のままです。"},
     {"Match my desktop theme",
      "デスクトップテーマに合わせる"},
     {"Uses your Omarchy theme's colours when Omarchy is installed",
@@ -1761,6 +1763,10 @@ constexpr Entry kJapanese[] = {
      "ペイントブラシ (P)"},
     {"Paint into",
      "ペイント先"},
+    {"New layer", "新規レイヤー"},
+    {"A paint layer, as in Tool > Paint Layers. Click to paint on it. Layers composite bottom to top with their blend mode and opacity.",
+     "Tool > Paint Layers と同じペイントレイヤーです。クリックするとそのレイヤーに描画します。レイヤーはブレンドモードと不透明度で下から順に合成されます。"},
+    {"Fill layer with a mask. Edit it under Tool > Paint Layers.", "マスク付きのフィルレイヤーです。Tool > Paint Layers で編集します。"},
     {"Paint layer",
      "ペイントレイヤー"},
     {"Painting on: %s",
@@ -6340,8 +6346,6 @@ constexpr Entry kJapanese[] = {
      "有効:"},
     {"What this computer can carry beyond the essentials: bigger Focus Detail caches, 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
      "このコンピューターが基本機能を超えて処理できる項目: より大きなFocus Detailキャッシュ、16Kテクスチャ、および今後追加されるレベルが、適切な場合に自動で有効化され、不適切な場合は有効化されません。どのティアでもスムーズにスカルプトでき、データが外部へ送信されることはありません。"},
-    {"What this computer can carry beyond the essentials: 16K textures and the levels to come switch on by themselves where they fit, never where they don't. Every tier sculpts smoothly; nothing is sent anywhere.",
-     "このコンピューターが基本機能を超えて処理できる項目: 16Kテクスチャ、および今後追加されるレベルが、適切な場合に自動で有効化され、不適切な場合は有効化されません。どのティアでもスムーズにスカルプトでき、データが外部へ送信されることはありません。"},
     {"What this turns on:",
      "有効になる機能:"},
     {"Where the heavy work runs: on the processor (CPU) or the graphics card (GPU). Auto takes the GPU only where it measured faster on this computer, and never on the Essential tier. If a GPU path fails, that task switches to the CPU and says so once. Tasks without a GPU path yet stay on the CPU.",
@@ -7191,6 +7195,7 @@ constexpr Entry kJapanese[] = {
     {"Hold %s and drag anywhere to pan the view", "%s を押しながらどこでもドラッグすると視点がパンします"},
     {"Hold %s and drag anywhere to zoom", "%s を押しながらどこでもドラッグするとズームします"},
     {"Navigation bindings back to their defaults", "ナビゲーションの設定を初期設定に戻しました"},
+    {"%s on  \xc2\xb7  Esc turns it off", "%s オン  \xc2\xb7  Esc で解除"},
 };
 
 } // namespace

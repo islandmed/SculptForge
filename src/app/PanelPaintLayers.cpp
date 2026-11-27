@@ -21,6 +21,8 @@
 
 #include <IconsLucide.h>
 
+#include "core/LayerStack.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <string>
@@ -91,6 +93,56 @@ std::vector<LayerRow> layerRows(const Mesh& m, bool texture, int& active) {
 }
 
 } // namespace
+
+// The active layer's blend mode and opacity side by side (Base is always Normal, 100%): shared by Tool > Paint Layers and the
+// Color palette's compact list, so both edit the same layer through the same commands.
+void App::drawActiveLayerBlendOpacity() {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    int act = -1;
+    const std::vector<LayerRow> now = layerRows(doc_.mesh, paintsTexture(doc_.mesh), act);
+    const LayerRow* cur = act >= 0 ? &now[size_t(act)] : nullptr;
+    // Live opacity preview on the real layer, recomposited (the command records the change on release).
+    auto setOpacity = [this, act](float value) {
+        if (paintsTexture(doc_.mesh)) {
+            PaintTexture& t = mutableTexture(doc_.mesh);
+            t.layers[size_t(act)].opacity = value;
+            compositeTextureAll(t);
+        } else {
+            doc_.mesh.paintLayers[size_t(act)].opacity = value;
+            compositePaintAll(doc_.mesh);
+        }
+    };
+    const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
+    ImGui::BeginDisabled(!cur);
+    ImGui::SetNextItemWidth(half);
+    if (ImGui::BeginCombo("##blend", blendModeLabel(cur ? cur->blend : BlendMode::Normal))) {
+        for (int m = 0; m < kBlendModeCount; ++m) {
+            const BlendMode mode = BlendMode(m);
+            if (ImGui::Selectable(blendModeLabel(mode), cur && cur->blend == mode) && cur && cur->blend != mode)
+                runCommand("paint_layer_set", {{"index", double(act)}, {"blend", std::string(blendModeId(mode))}});
+        }
+        ImGui::EndCombo();
+    }
+    ui::HelpText("Blend mode", nullptr,
+                 "How the active layer mixes with the layers below, with Photoshop's maths: Multiply darkens, Screen "
+                 "lightens, Overlay adds contrast (50% grey changes nothing), Add brightens, ...",
+                 kPath);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1);
+    float opacity = cur ? cur->opacity * 100.0f : 100.0f;
+    if (ui::SliderInside("##opacity", &opacity, 0.0f, 100.0f, "Opacity %.0f%%") && cur) {
+        if (paintOpacityDrag_ < 0.0f) paintOpacityDrag_ = cur->opacity; // live preview; committed on release
+        setOpacity(std::clamp(opacity / 100.0f, 0.0f, 1.0f));
+    }
+    if (ImGui::IsItemDeactivated() && paintOpacityDrag_ >= 0.0f && cur) {
+        const float committed = std::clamp(opacity / 100.0f, 0.0f, 1.0f);
+        setOpacity(paintOpacityDrag_); // so the command's undo step records the value before the drag
+        paintOpacityDrag_ = -1.0f;
+        runCommand("paint_layer_set", {{"index", double(act)}, {"opacity", double(committed)}});
+    }
+    ui::HelpText("Opacity", nullptr, "How strongly the active layer shows (0-100%). Painting keeps its own coverage.", kPath);
+    ImGui::EndDisabled();
+}
 
 void App::drawPaintLayersContents() {
     const Mesh& mesh = doc_.mesh;
@@ -241,47 +293,8 @@ void App::drawPaintLayersContents() {
     const std::vector<LayerRow> now = layerRows(doc_.mesh, paintsTexture(doc_.mesh), act);
     const LayerRow* cur = act >= 0 ? &now[size_t(act)] : nullptr;
     const int stackSize = int(now.size());
-    // Live opacity preview on the real layer, recomposited (the command records the change on release).
-    auto setOpacity = [this, act](float value) {
-        if (paintsTexture(doc_.mesh)) {
-            PaintTexture& t = mutableTexture(doc_.mesh);
-            t.layers[size_t(act)].opacity = value;
-            compositeTextureAll(t);
-        } else {
-            doc_.mesh.paintLayers[size_t(act)].opacity = value;
-            compositePaintAll(doc_.mesh);
-        }
-    };
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
-    ImGui::BeginDisabled(!cur);
-    ImGui::SetNextItemWidth(half);
-    if (ImGui::BeginCombo("##blend", blendModeLabel(cur ? cur->blend : BlendMode::Normal))) {
-        for (int m = 0; m < kBlendModeCount; ++m) {
-            const BlendMode mode = BlendMode(m);
-            if (ImGui::Selectable(blendModeLabel(mode), cur && cur->blend == mode) && cur && cur->blend != mode)
-                runCommand("paint_layer_set", {{"index", double(act)}, {"blend", std::string(blendModeId(mode))}});
-        }
-        ImGui::EndCombo();
-    }
-    ui::HelpText("Blend mode", nullptr,
-                 "How the active layer mixes with the layers below, with Photoshop's maths: Multiply darkens, Screen "
-                 "lightens, Overlay adds contrast (50% grey changes nothing), Add brightens, ...",
-                 kPath);
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(-1);
-    float opacity = cur ? cur->opacity * 100.0f : 100.0f;
-    if (ui::SliderInside("##opacity", &opacity, 0.0f, 100.0f, "Opacity %.0f%%") && cur) {
-        if (paintOpacityDrag_ < 0.0f) paintOpacityDrag_ = cur->opacity; // live preview; committed on release
-        setOpacity(std::clamp(opacity / 100.0f, 0.0f, 1.0f));
-    }
-    if (ImGui::IsItemDeactivated() && paintOpacityDrag_ >= 0.0f && cur) {
-        const float committed = std::clamp(opacity / 100.0f, 0.0f, 1.0f);
-        setOpacity(paintOpacityDrag_); // so the command's undo step records the value before the drag
-        paintOpacityDrag_ = -1.0f;
-        runCommand("paint_layer_set", {{"index", double(act)}, {"opacity", double(committed)}});
-    }
-    ui::HelpText("Opacity", nullptr, "How strongly the active layer shows (0-100%). Painting keeps its own coverage.", kPath);
-    ImGui::EndDisabled();
+    drawActiveLayerBlendOpacity();
 
     const float third = (ImGui::GetContentRegionAvail().x - 2 * style.ItemSpacing.x) / 3.0f;
     ImGui::BeginDisabled(mesh.vertexCount() == 0);
@@ -334,6 +347,104 @@ void App::drawPaintLayersContents() {
     ui::HelpText("Fill", nullptr, "Fill the active layer with the current colour (respects the mask, like Color > Fill).",
                  kPath);
     if (texture) drawFillLayerControls(); // (PanelFill.cpp)
+}
+
+// `text` shortened with "..." to fit `width` pixels (whole UTF-8 characters).
+static std::string fitName(const std::string& text, float width) {
+    if (ImGui::CalcTextSize(text.c_str()).x <= width) return text;
+    std::string s = text;
+    while (!s.empty() && ImGui::CalcTextSize((s + "...").c_str()).x > width) {
+        s.pop_back();
+        while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80) s.pop_back();
+    }
+    return s + "...";
+}
+
+// Color palette > Layers: the same stack as Tool > Paint Layers in a compact list, so painting stays in one place. Each row:
+// name (ellipsized), blend and opacity, a mask mark on a Fill layer, the eye. The active layer's blend mode and opacity edit
+// under the list. Selecting, showing and editing go through the paint_layer_* commands, so the data, the undo and the order
+// are the Paint Layers palette's own.
+void App::drawColorLayersCompact() {
+    const Mesh& mesh = doc_.mesh;
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const bool texture = paintsTexture(mesh);
+    int active = -1;
+    const std::vector<LayerRow> rows = layerRows(mesh, texture, active);
+    const int count = int(rows.size());
+    int selectIndex = -2, toggleVisible = -2;
+    const float scale = uiScale_;
+    const ImVec2 cellPad(4.0f * scale, 2.0f * scale);
+    const float rowH = ImGui::GetTextLineHeight() + 2.0f * cellPad.y;
+    constexpr int kRows = 5; // the list scrolls beyond this many rows (Base included)
+    const float listH = rowH * float(std::min(count + 1, kRows)) + 2.0f;
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, cellPad);
+    if (ImGui::BeginTable("##colorlayers", 4, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter,
+                          ImVec2(-1, listH))) {
+        const float iconW = ImGui::GetTextLineHeight() * 1.2f;
+        ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("mode", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Light 100%").x);
+        ImGui::TableSetupColumn("mask", ImGuiTableColumnFlags_WidthFixed, iconW);
+        ImGui::TableSetupColumn("eye", ImGuiTableColumnFlags_WidthFixed, iconW);
+        for (int i = count - 1; i >= -1; --i) {
+            const LayerRow* l = i >= 0 ? &rows[size_t(i)] : nullptr;
+            const bool isActive = i == active;
+            const bool dim = l && !l->visible;
+            ImGui::PushID(i);
+            ImGui::TableNextRow(ImGuiTableRowFlags_None, rowH);
+            ImGui::TableSetColumnIndex(0);
+            const std::string full = l ? l->name : std::string(tr("Base"));
+            if (dim) ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+            const std::string shown = fitName(full, ImGui::GetContentRegionAvail().x - 2.0f * scale);
+            if (ImGui::Selectable((shown + "##row").c_str(), isActive,
+                                  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap) &&
+                !isActive)
+                selectIndex = i;
+            if (dim) ImGui::PopStyleColor();
+            if (shown != full && ImGui::IsItemHovered() && !ui::CtrlHeld()) ImGui::SetTooltip("%s", full.c_str());
+            else
+                ui::HelpText(full.c_str(), nullptr,
+                             "A paint layer, as in Tool > Paint Layers. Click to paint on it. Layers composite bottom to top "
+                             "with their blend mode and opacity.",
+                             "Color > Layers");
+            ImGui::TableSetColumnIndex(1);
+            char mode[32] = "";
+            if (l) std::snprintf(mode, sizeof mode, "%s %d%%", blendShort(l->blend), int(l->opacity * 100.0f + 0.5f));
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(mode).x));
+            ImVec4 modeCol = style.Colors[isActive ? ImGuiCol_Text : ImGuiCol_TextDisabled];
+            if (isActive) modeCol.w *= 0.75f;
+            ImGui::TextColored(modeCol, "%s", mode);
+            if (l) {
+                ImGui::TableSetColumnIndex(2);
+                if (texture && isFillLayer(*mesh.texture, i)) { // the only layers with a mask (Tool > Texture Image > Fill Layer)
+                    ImGui::TextDisabled("M");
+                    if (ImGui::IsItemHovered() && !ui::CtrlHeld())
+                        ImGui::SetTooltip("%s", tr("Fill layer with a mask. Edit it under Tool > Paint Layers."));
+                }
+                ImGui::TableSetColumnIndex(3);
+                if (iconToggle(("##eye " + full).c_str(), l->visible ? ICON_LC_EYE : ICON_LC_EYE_OFF, l->visible,
+                               tr(l->visible ? "Hide layer" : "Show layer")))
+                    toggleVisible = i;
+            }
+            if (isActive && listedColorLayer_ != i) {
+                ImGui::SetScrollHereY(0.5f);
+                listedColorLayer_ = i;
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+    ImGui::PopStyleVar();
+    if (selectIndex >= -1) runCommand("paint_layer_select", {{"index", double(selectIndex)}});
+    if (toggleVisible >= 0)
+        runCommand("paint_layer_set", {{"index", double(toggleVisible)}, {"visible", !rows[size_t(toggleVisible)].visible}});
+
+    ImGui::PushID("colorlayer");
+    drawActiveLayerBlendOpacity();
+    ImGui::PopID();
+    ImGui::BeginDisabled(mesh.vertexCount() == 0);
+    if (ImGui::Button(tr(ICON_LC_PLUS " New layer##color"), ImVec2(-1, 0))) runCommand("paint_layer_add");
+    ImGui::EndDisabled();
+    ui::HelpText("New paint layer", nullptr, "Add a transparent paint layer above the active one and paint on it.", "Color > Layers");
 }
 
 } // namespace sf

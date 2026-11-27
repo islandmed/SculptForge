@@ -1,0 +1,90 @@
+# A mask / Select / Cut shape (or Smooth, Mask, Select) latched from the stroke popup has three ways off, none of
+# them needing the popup (a macOS tester could not find any: Line, Lasso and Rectangle "stay on", Discord 11-26):
+# Esc, the badge shows the way (a latch label in the corner of the canvas), and the panel's own button for the shape
+# that is latched. Each way ends the latch only when it is on; another shape's button keeps it on.
+run new_sphere subdivisions=4
+camera 0 0
+key x
+expect_value symmetry_x == 0
+expect_value stroke_latch == 0
+
+# One Esc: with the popup open it closes and a latch it left on ends with it (artist-qa 11-27: a second Esc was needed).
+key g
+stroke_popup_item cut_line click
+expect_value stroke_latch == 3
+key escape
+expect_value stroke_popup_open == 0
+expect_value stroke_latch == 0
+expect_status Modifiers off
+# G closes the popup and keeps the latch; then Esc turns it off.
+key g
+stroke_popup_item cut_line click
+expect_value stroke_latch == 3
+expect_value hide_shape == 3
+key g
+expect_value stroke_popup_open == 0
+expect_value stroke_latch == 3
+shot latch_badge
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_status Modifiers off
+expect_value stroke_latch_badge == 0
+# Plain Esc with nothing latched does nothing.
+key escape
+expect_value stroke_latch == 0
+
+# Esc with a Mask latch too, and Smooth.
+key g
+stroke_popup_item mask_rect click
+key g
+expect_value stroke_latch == 2
+key escape
+expect_value stroke_latch == 0
+key g
+stroke_popup_item smooth click
+key g
+expect_value stroke_latch == 1
+key escape
+expect_value stroke_latch == 0
+
+# The panel's own button for the latched shape: Visibility > Select Rectangle turns a Select latch off.
+click "Visibility"
+click "Select Rectangle##select.rect"
+key g
+stroke_popup_item cut_rect click
+key g
+expect_value stroke_latch == 3
+expect_value hide_shape == 5
+# Another shape's button changes the shape and keeps the latch.
+click "Select Rectangle##select.rect"
+expect_value hide_shape == 2
+expect_value stroke_latch == 3
+# The same button again (its shape is the latched one now): off.
+click "Select Rectangle##select.rect"
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+
+# Tool > Cut: Cut Line latched, its button again: off.
+click "Cut"
+key g
+stroke_popup_item cut_line click
+key g
+expect_value stroke_latch == 3
+click "Cut Line##cut.line"
+expect_value stroke_latch == 0
+expect_value hide_shape == 3
+
+# Tool > Masking: Rectangle Mask latched, its button again: off; a plain drag then sculpts, no mask.
+click "Masking"
+key g
+stroke_popup_item mask_rect click
+key g
+expect_value stroke_latch == 2
+expect_value mask_shape == 2
+click "Rectangle Mask##mask.rect"
+expect_value stroke_latch == 0
+expect_value mask_shape == 2
+hover_model 0.5 0.5
+view_drag 0.3 0.3 0.6 0.7
+expect_value masked == 0
