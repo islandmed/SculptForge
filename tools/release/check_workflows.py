@@ -247,8 +247,14 @@ def check(files):
         if re.search(r":\s*write\b", t0) or not re.search(r"^permissions:\s*\n\s+contents:\s*read\s*$", t0, re.M):
             errs.append("t0.yml: permissions must be contents: read only")
         for step in re.split(r"\n(?=      - )", t0):
-            if re.search(r"actions/cache(/save)?@", step) and "if: github.ref == 'refs/heads/main'" not in step:
-                errs.append("t0.yml: saves a cache in a step not limited to main (if: github.ref == 'refs/heads/main')")
+            if re.search(r"actions/cache(/save)?@", step):
+                cond = re.search(r"^\s+(?:- )?if:\s*(.*)$", step, re.M)
+                cond = cond.group(1) if cond else ""
+                # main, or a t0/release/** run (a release batch's T0 repeats all day; its cache is read only by that ref)
+                if not (cond == "github.ref == 'refs/heads/main'" or
+                        ("startsWith(github.ref, 'refs/heads/t0/release/')" in cond and "||" not in cond)):
+                    errs.append("t0.yml: saves a cache in a step not limited to main or t0/release/** "
+                                "(if: github.ref == 'refs/heads/main', or a condition with startsWith(github.ref, 'refs/heads/t0/release/') and no ||)")
         for job, lines in jobs(t0).items():
             if not any(re.match(r"^    continue-on-error:\s*true\b", l) for l in lines):
                 errs.append(f"t0.yml: job {job} isn't continue-on-error: true (a red T0 must not fail the run)")
@@ -530,6 +536,9 @@ def self_test():
         "t0 unpinned": ({"release.yml": GOOD, "t0.yml": T0.replace("@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1", "@v7")}, 1),
         "t0 cache save": ({"release.yml": GOOD, "t0.yml": T0.replace("cache/restore@", "cache/save@")}, 1),
         "t0 cache save any ref": ({"release.yml": GOOD, "t0.yml": T0.replace("      - if: github.ref == 'refs/heads/main'\n        uses", "      - uses")}, 1),
+        "t0 release cache save": ({"release.yml": GOOD, "t0.yml": T0 + "      - if: ${{ !cancelled() && startsWith(github.ref, 'refs/heads/t0/release/') }}\n        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0\n"}, 0),
+        "t0 cache save main or any": ({"release.yml": GOOD, "t0.yml": T0 + "      - if: github.ref == 'refs/heads/main' || true\n        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0\n"}, 1),
+        "t0 cache save release or any": ({"release.yml": GOOD, "t0.yml": T0 + "      - if: startsWith(github.ref, 'refs/heads/t0/release/') || github.ref != 'x'\n        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0\n"}, 1),
         "t0 can go red": ({"release.yml": GOOD, "t0.yml": T0.replace("    continue-on-error: true\n", "")}, 1),
         "t0 set -x": ({"release.yml": GOOD, "t0.yml": T0.replace("run: bash", "run: set -x; bash")}, 1),
         "t0 other on all branches": ({"release.yml": GOOD, "t0.yml": T0, "a.yml": "on:\n  push:\n    paths: [x]\njobs:\n  a:\n"}, 1),

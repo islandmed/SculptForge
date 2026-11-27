@@ -1316,6 +1316,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME ci_prune_caches COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/prune_caches.py --self-test)
     add_test(NAME test_warm_ui COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/warm_ui.py self-test)
     add_test(NAME ci_slowest_tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/slowest_tests.py --self-test)
+    # T0's test jobs: the split by measured duration and the merged verdict (t0.yml, tools/ci/t0.sh).
+    add_test(NAME ci_shard COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/shard.py --self-test)
+    add_test(NAME ci_verdict COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/verdict.py --self-test)
     add_test(NAME test_impact COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/impacted.py --self-test)
     add_test(NAME test_run COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test/run.py --self-test)
     # Areas (tests/areas.map, docs/testing-flow.md): the picker's self-test, and every test in exactly one area.

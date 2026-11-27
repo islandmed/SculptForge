@@ -19,7 +19,7 @@ need a maintainer's review.
 
 | Workflow | When | What |
 |---|---|---|
-| `t0.yml` | a branch pushed for a quick check | Builds the branch and runs only the tests the change can break (`tools/test/impacted.py`), plus the trademark check |
+| `t0.yml` | a branch pushed for a quick check | Builds the branch once, then runs only the tests the change can break (`tools/test/impacted.py`), plus the trademark check, split over runners by measured duration (jobs `build`, `test` x N, `iwyu`, `verdict`) |
 | `ci.yml` | push, pull request | The full matrix above |
 | `nightly.yml` | daily | The tests labelled `nightly`: stress and benchmark checks left out of CI |
 | `android.yml` | push, daily | The Android APK build (see [android](../android/README.md)) |
