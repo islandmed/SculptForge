@@ -255,6 +255,7 @@ struct TouchPinState {
     double pressedAt = 0.0;  // io.MouseClickedTime[0] of that press
     ImVec2 at;               // where it began
     bool armed = false;      // it was held long enough: the ring shows, the menu opens as the finger lifts
+    bool slider = false;     // the item is a slider (SliderInside held it): any movement of the finger is a drag, not a hold
     bool pressOnUi = false;  // the press by a finger or the pen began on a window (not the model)
     bool menuOpen = false, menuOpenNow = false; // the menu for menuEntry; the frame it is to be opened
     std::string menuEntry;
@@ -292,10 +293,16 @@ bool touchPinWanted() {
     return wanted;
 }
 
-bool touchPressNear(const ImRect& r) { // the press (still down or just let go) began on r and has not moved
+// How far a finger may stray and still be holding: a button or a box allows a little shake; a slider none beyond the finger's own
+// tremor, since a slow drag (a fine adjustment) covers only a few pixels in the half second that arms the long press, and that
+// drag must not be taken for a hold (member bug, 11-27: the value froze half a second in and the menu opened).
+constexpr float kHoldSlop = 8.0f; // px at scale 1
+float sliderSlop() { return g_pointerPen ? 3.0f : 1.5f; } // (the pen's hand shakes more than a finger lying flat)
+
+bool touchPressNear(const ImRect& r, float slopPx = kHoldSlop) { // the press (still down or just let go) began on r and has not moved
     const ImGuiIO& io = ImGui::GetIO();
     const ImVec2 d(io.MousePos.x - io.MouseClickedPos[0].x, io.MousePos.y - io.MouseClickedPos[0].y);
-    const float slop = 8.0f * uiScale();
+    const float slop = slopPx * uiScale();
     return r.Contains(io.MouseClickedPos[0]) && d.x * d.x + d.y * d.y <= slop * slop;
 }
 
@@ -306,13 +313,13 @@ bool touchArmedPress() { return g_touchPin.armed && g_touchPin.pressedAt == ImGu
 // A finger or the pen is holding still on r: whatever is there keeps its value for now.
 bool touchHoldsOn(const ImRect& r) {
     if (!touchPinWanted() || !ImGui::GetIO().MouseDown[0]) return false;
-    return touchPressNear(r);
+    return touchPressNear(r, sliderSlop()); // (only sliders ask: SliderInside)
 }
 
 // A finger or the pen just lifted from r after a tap that never moved (and was not a long press).
 bool touchTappedOn(const ImRect& r) {
     if (!touchPinWanted() || !ImGui::GetIO().MouseReleased[0] || touchArmedPress()) return false;
-    return touchPressNear(r);
+    return touchPressNear(r, sliderSlop());
 }
 
 void openTouchPinMenu(const std::string& entry) {
@@ -387,11 +394,13 @@ void touchPinItem(const std::string& entry, const char* label) {
             t.pressedAt = io.MouseClickedTime[0];
             t.at = io.MouseClickedPos[0];
             t.armed = false;
+            t.slider = g_heldSlider == id;
         }
         if (t.item == id && t.pressedAt == io.MouseClickedTime[0]) {
             const ImVec2 d(io.MousePos.x - t.at.x, io.MousePos.y - t.at.y);
+            const float slop = (t.slider ? sliderSlop() : kHoldSlop) * s;
             if (!t.armed) {
-                if (!io.MouseDown[0] || d.x * d.x + d.y * d.y > 64.0f * s * s) {
+                if (!io.MouseDown[0] || d.x * d.x + d.y * d.y > slop * slop) {
                     t.item = 0; // lifted early (a tap) or moved (a drag)
                 } else if (ImGui::GetTime() - t.pressedAt >= kLongPress) {
                     t.armed = true;
@@ -410,7 +419,7 @@ void touchPinItem(const std::string& entry, const char* label) {
                     g_animating = true; // (the loop wakes for it: the finger is still, nothing else would draw)
                 }
             }
-            if (t.armed && io.MouseDown[0] && d.x * d.x + d.y * d.y > 64.0f * s * s) { // it moved after all: a drag, not a hold
+            if (t.armed && io.MouseDown[0] && d.x * d.x + d.y * d.y > slop * slop) { // it moved after all: a drag, not a hold
                 t.armed = false;
                 t.item = 0;
             }

@@ -1,0 +1,30 @@
+# A slow drag on a slider by finger (Android member, 11-27: Exposure, Roughness, Metallic): the finger covered only a few pixels in the
+# half second that arms the long press, the value froze and the Add to My Panel / shelf menu opened over the drag. Now any movement of
+# the finger on a slider is a drag, never a hold; a finger resting still on one still opens the menu and leaves the value as it was.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Draw##palette.draw"
+click "Draw/##totray"
+brush_size 60
+expect "Draw/##drawsize"
+expect_value draw_size == 60
+expect_value touch_pin_armed == 0
+# A slow slide: 12 px over 1.6 s (about 7 px a second). The value follows, the menu never opens.
+touch_slide "Draw/##drawsize" 1.6 12
+expect_value touch_pin_menu == 0
+expect_value touch_pin_armed == 0
+expect_value draw_size != 60
+brush_size 60
+# A slower one still, 8 px over 2 s (2 px in the half second): just past the finger's own tremor.
+touch_slide "Draw/##drawsize" 2.0 8
+expect_value touch_pin_menu == 0
+expect_value touch_pin_armed == 0
+expect_value draw_size != 60
+brush_size 60
+# Resting still: the menu, and the value untouched (the long press of tests/ui/touch_add_to_shelf.sfui).
+touch_hold "Draw/##drawsize"
+expect_value touch_pin_menu == 1
+expect_value touch_pin_armed == 1
+expect_value draw_size == 60
+click "Add to My Panel"
+click "Draw/##totray"
