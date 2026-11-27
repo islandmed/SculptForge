@@ -612,7 +612,7 @@ column's width (a long label is cut short there and ends in "...": drag the left
 point at it with <kbd>Ctrl</kbd> for its name). A control its palette shows only sometimes (the Levels line of a Part without levels) is hidden on the
 shelf until it is back; Customize Shelves shows it dim so you can move or remove it. The same drag puts a control into
 [My Panel](#my-panel), and an entry dragged out of My Panel onto a shelf moves there. Without a keyboard, long-press the control
-(or right-click it) and choose the shelf: it lands at the end of that shelf, where an <kbd>Alt</kbd>-drop at its end would put it.
+(or right-click it) and choose the shelf: it lands at the end of that shelf, where an <kbd>Alt</kbd>-drop at its end would put it. Every control of every palette can be added this way, **Remove Hidden** (Tool > Visibility) included; only lists, text boxes, presets next to a slider and menu rows are left out.
 
 A shelf you empty is hidden when Customize Shelves is off, and the canvas takes its room. Turn Customize Shelves
 back on and the empty shelf returns, outlined, so you can drag buttons onto it again.
