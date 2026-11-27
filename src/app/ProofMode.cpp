@@ -1092,6 +1092,8 @@ void App::proofBeforeSwap(int fbW, int fbH) {
         r.triangles = m.micro ? microTriangleCount(m) : m.triangleCount(); // (a micro level: its micro triangles)
         r.vertices = m.vertexCount();
         doc_.setMesh(std::move(m), "Benchmark");
+        // SF_BENCH_GLASS=1 (bench.sh with SHA_ENV): the scene is one glass Part (core/PartGlass.h), to read what glass costs a frame.
+        if (const char* g = std::getenv("SF_BENCH_GLASS"); g && std::string(g) == "1") doc_.activePartInfo().glass = glassFromPreset(GlassPreset::Glass);
         r.buildSeconds = nowSeconds() - t0;
         p.buildStart = t0;
         r.vramFreeBeforeKb = vramBefore;
