@@ -395,6 +395,30 @@ TEST(hdri_loader_fuzz_damaged_files) {
     CHECK(refused > 500 && seconds < 60.0);
 }
 
+TEST(hdri_network_paths_are_never_opened) {
+    UserEnvironmentsReset reset;
+    const int base = environmentCount();
+    const std::string forms[] = {"\\\\server\\share\\sky.hdr", "//server/share/sky.hdr", "\\\\?\\UNC\\server\\share\\sky.hdr",
+                                 "//?/UNC/server/share/sky.exr", "\\\\.\\pipe\\sky.hdr"};
+    for (const std::string& f : forms) {
+        std::string err;
+        int w = 0, h = 0;
+        CHECK(isNetworkPath(f));
+        CHECK(!probeEnvironmentFile(f, w, h, err) && err == "Pick a file on this computer (or a mapped drive)");
+        CHECK(addEnvironmentFile(f, err) == -1 && environmentCount() == base);
+        EnvironmentInfo info;
+        info.path = f;
+        EnvImage img;
+        CHECK(!loadEnvironment(info, img, err) && err == "Pick a file on this computer (or a mapped drive)");
+    }
+    // A remembered one is dropped when the preferences are read; nothing is listed or looked at.
+    setUserEnvironmentPaths({forms[0], forms[1], forms[2], SF_TEST_DATA_DIR "/hdri/test_sky.hdr"});
+    CHECK(environmentCount() == base + 1 && !environmentFileMissing(base));
+    // Local paths, mapped drive letters and the extended-length form of a drive are not network paths.
+    for (const char* f : {"C:\\sky.hdr", "Z:/maps/sky.hdr", "\\\\?\\C:\\maps\\sky.hdr", "/home/me/sky.hdr", "sky.hdr", "relative/dir/sky.exr", "/"})
+        CHECK(!isNetworkPath(f));
+}
+
 TEST(hdri_unusable_files_say_why) {
     UserEnvironmentsReset reset;
     const int base = environmentCount();

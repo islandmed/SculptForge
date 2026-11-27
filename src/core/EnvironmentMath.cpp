@@ -517,7 +517,23 @@ int findEnvironment(const std::string& text) {
     return -1;
 }
 
+bool isNetworkPath(const std::string& path) {
+    std::string p = path;
+    std::replace(p.begin(), p.end(), '\\', '/');
+    if (p.size() < 2 || p[0] != '/' || p[1] != '/') return false;
+    // The extended-length forms: //?/C:/x is a local drive, //?/UNC/server/x and //./... are not.
+    if (p.size() >= 4 && (p[2] == '?' || p[2] == '.') && p[3] == '/') {
+        const bool drive = p.size() >= 6 && std::isalpha(static_cast<unsigned char>(p[4])) && p[5] == ':';
+        return !drive;
+    }
+    return true;
+}
+
 bool probeEnvironmentFile(const std::string& path, int& width, int& height, std::string& error) {
+    if (isNetworkPath(path)) {
+        error = "Pick a file on this computer (or a mapped drive)";
+        return false;
+    }
     const std::string ext = lowerExtension(path);
     if (ext != ".hdr" && ext != ".exr") {
         error = "Pick a .hdr or .exr file";
@@ -643,7 +659,7 @@ void setUserEnvironmentPaths(const std::vector<std::string>& paths) {
     int added = 0;
     for (const std::string& path : paths) {
         if (added >= kMaxUserEnvironments) break;
-        if (path.empty() || path.size() > 4096) continue;
+        if (path.empty() || path.size() > 4096 || isNetworkPath(path)) continue; // (a remembered path is read at every start)
         const std::string ext = lowerExtension(path);
         if (ext != ".hdr" && ext != ".exr") continue;
         const bool listed = std::any_of(list.begin(), list.end(), [&](const EnvironmentInfo& e) { return e.user && e.path == path; });
@@ -659,6 +675,7 @@ void setUserEnvironmentPaths(const std::vector<std::string>& paths) {
 bool environmentFileMissing(int index) {
     const auto& list = environments();
     if (index < 0 || index >= int(list.size()) || list[size_t(index)].path.empty()) return false;
+    if (isNetworkPath(list[size_t(index)].path)) return true; // (never looked at)
     std::error_code ec;
     return !std::filesystem::is_regular_file(fsPath(list[size_t(index)].path), ec);
 }

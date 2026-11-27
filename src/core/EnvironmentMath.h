@@ -102,6 +102,9 @@ int findEnvironment(const std::string& text);
 // Loads environment `index` (generated, decoded from the embedded file, or read from disk).
 bool loadEnvironment(int index, EnvImage& out, std::string& error);
 bool loadEnvironment(const EnvironmentInfo& info, EnvImage& out, std::string& error);
+// A path on another computer: UNC (\\server\share, //server/share, \\?\UNC\...). Never opened, not even to look at it: on
+// Windows the system would send the user's credentials to that host. Mapped drive letters are not this.
+bool isNetworkPath(const std::string& path);
 // Reads only the header of a .hdr / .exr file: its size, and an error when it is not one, is too big or is unreadable
 // (the message says what to do). addEnvironmentFile and loadEnvironment both start with this.
 bool probeEnvironmentFile(const std::string& path, int& width, int& height, std::string& error);
