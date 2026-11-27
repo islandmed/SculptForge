@@ -276,7 +276,8 @@ works like any other palette: put it in a tray, or open it in a window of its ow
   change in My Panel is a change everywhere. While <kbd>Alt</kbd> is held a slider is picked up, not changed. A control
   its palette shows only sometimes (the Levels line of a Part without levels) shows as its dim name until it is back.
 - **On a tablet**: long-press a button, a control or a section's title (finger or pen held still for half a second), lift, and
-  choose **Add to My Panel**. It goes to the end of the panel. With a mouse, right-click the control for the same menu.
+  choose **Add to My Panel**. It goes to the end of the panel. A slider is the exception: a finger on one is always dragging it, so it does not
+  take a long press. With a mouse, right-click the control for the same menu.
 - **Reorder**: hold <kbd>Alt</kbd> and drag an entry to a new place in My Panel.
 - **Take one out**: drag it out of My Panel (still holding <kbd>Alt</kbd>) and let go anywhere else, or right-click it
   and choose **Remove from My Panel**.
@@ -295,8 +296,8 @@ held to see what it does. **Any control from any palette can go on a shelf**: ho
 slider, choice, readout or button (**Backface culling**, the brush **Size**, **Orbit around the pointer** from
 Edit > Preferences > Input, **Subdivide**) onto the shelf you want; an orange line shows where it lands. It stays the
 palette's own control, live. On a tablet, with no keyboard: **long-press** a control (hold a finger or the pen still on it for half a
-second; a ring shows it took), lift, and pick **Add to the top shelf** (or left, right, bottom) from the small menu; with a mouse,
-right-click the control. Right-click an item on a shelf for **Remove from shelf**; see [Customizing the
+second; a ring shows it took), lift, and pick **Add to the top shelf** (or left, right, bottom) from the small menu (not a slider: a
+touch on one is always a drag); with a mouse, right-click the control. Right-click an item on a shelf for **Remove from shelf**; see [Customizing the
 interface](#customizing-the-interface) to move items around.
 
 ### Top shelf

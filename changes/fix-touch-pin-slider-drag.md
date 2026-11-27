@@ -1,8 +1,11 @@
 ---
-fixed: On a touch screen or with a pen, a slow drag on a slider (Exposure, Roughness, Metallic and the rest) froze after half a second and the Add to My Panel / shelf menu opened over it. A finger that moves on a slider is now always dragging it; the menu still opens when the finger rests still.
+fixed: On a touch screen or with a pen, dragging a slider (Exposure, Roughness, Metallic and the rest) could freeze after half a second and open the Add to My Panel / shelf menu over the drag. A touch on a slider is now always a drag; the long-press menu is for buttons, boxes and section titles.
 testers:
-  - Android or any touch screen: drag a slider slowly (a few pixels a second) for two seconds; it keeps following the finger and no menu opens. Rest a finger still on a slider for half a second; the menu opens and the value stays.
+  - Android tablet, finger and pen: drag any slider (Lit Sphere Exposure, Roughness, Metallic, brush size), fast and very slowly, and rest a finger on one for a second; the value always follows the finger and no menu ever opens. Long-press a button (Remove Hidden) still opens the menu.
+  - Anyone with a keyboard: Alt-drag a slider onto a shelf still works.
 ---
-Branch fix/touch-pin-slider-drag. Cause (since 0.14.1): the long press (ui::TouchPin, kLongPress 0.5 s) allowed 8 px of travel and kept the slider
-read-only while the finger was within it; a slow drag covers a few px in that half second, so it armed. A slider now allows only the finger's own
-tremor (1.5 px, the pen 3 px; sliderSlop in Ui.cpp), so any real movement is a drag. Test: tests/ui/touch_slider_drag.sfui (verb touch_slide).
+Branch fix/touch-pin-slider-drag. Cause (since 0.14.1): the long press (ui::TouchPin, kLongPress 0.5 s) took a press that stayed within 8 px for half a
+second and cancelled the slider's drag; a slow drag, or one whose moves arrive late, looked like a hold. A first try with a 1.5 px slop for sliders
+still failed on a device (ebarranco, 11-27). Now a slider or any drag/typed-value box (the item hook's Inputable flag, g_valueItem in Ui.cpp) never
+starts a hold, so the two cannot conflict whatever the touch events look like. Touch pinning of a slider needs a pin handle (not built).
+Tests: tests/ui/touch_slider_drag.sfui (verb touch_slide), touch_add_to_shelf.sfui.

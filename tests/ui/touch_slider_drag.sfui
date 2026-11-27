@@ -1,6 +1,6 @@
 # A slow drag on a slider by finger (Android member, 11-27: Exposure, Roughness, Metallic): the finger covered only a few pixels in the
 # half second that arms the long press, the value froze and the Add to My Panel / shelf menu opened over the drag. Now any movement of
-# the finger on a slider is a drag, never a hold; a finger resting still on one still opens the menu and leaves the value as it was.
+# the finger on a slider is a drag, never a hold; a finger resting still on one is a press (the value goes to it), no menu either.
 run ui_look look=classic layout=classic
 run new_sphere subdivisions=3
 click "Draw##palette.draw"
@@ -21,10 +21,18 @@ expect_value touch_pin_menu == 0
 expect_value touch_pin_armed == 0
 expect_value draw_size != 60
 brush_size 60
-# Resting still: the menu, and the value untouched (the long press of tests/ui/touch_add_to_shelf.sfui).
-touch_hold "Draw/##drawsize"
-expect_value touch_pin_menu == 1
-expect_value touch_pin_armed == 1
-expect_value draw_size == 60
-click "Add to My Panel"
+# Resting still on the track: a press on a slider is a drag, never a hold; no ring, no menu (the value goes to the finger, as a press does).
+touch_hold "Draw/##drawsize" 1.2
+expect_value touch_pin_menu == 0
+expect_value touch_pin_armed == 0
+brush_size 60
+# The same with the pen, on desktop too (SDL's pen events): a slow slide of 12 px over 1.6 s, then a rest.
+pen_slide "Draw/##drawsize" 1.6 12
+expect_value touch_pin_menu == 0
+expect_value touch_pin_armed == 0
+expect_value draw_size != 60
+brush_size 60
+pen_hold "Draw/##drawsize" 1.2
+expect_value touch_pin_menu == 0
+expect_value touch_pin_armed == 0
 click "Draw/##totray"

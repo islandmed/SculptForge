@@ -406,7 +406,7 @@
 //   touch_tap "label"        one finger taps an item as it is on screen (no wheel, no scrolling: a finger can't scroll a
 //                            window that doesn't drag-scroll; fails when the item is not visible)
 //   touch_tap_at X Y         the same at window fractions (0..1): a tap outside a window, on the canvas
-//   touch_slide "label" S DX  one finger lands on an item and drags DX px sideways, evenly, over S seconds (a slow drag), and lifts
+//   touch_slide "label" S DX  one finger lands on an item and drags DX px sideways, evenly, over S seconds (a slow drag), and lifts; pen_slide is the same with the pen
 //   touch_hold "label" [S [DX]]  one finger rests still on an item for S seconds (0.8), slides DX px sideways if given, and lifts: a long press (ui::TouchPin: the
 //                            menu to add it to My Panel or a shelf opens as it lifts). pen_hold is the same with the pen
 //   touch_drag_at X0 Y0 X1 Y1  one finger lands at window fractions and swipes to the others over 0.4 s (scrolls a window)
@@ -2421,7 +2421,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"android_back", StepVerb::AndroidBack},
         {"touch_drag_at", StepVerb::TouchDragAt},
         {"touch_tap", StepVerb::TouchTap}, {"touch_tap_at", StepVerb::TouchTap}, {"touch_tap_welcome_x", StepVerb::TouchTap},
-        {"touch_hold", StepVerb::TouchHold}, {"pen_hold", StepVerb::TouchHold}, {"touch_slide", StepVerb::TouchHold},
+        {"touch_hold", StepVerb::TouchHold}, {"pen_hold", StepVerb::TouchHold}, {"touch_slide", StepVerb::TouchHold}, {"pen_slide", StepVerb::TouchHold},
         {"click", StepVerb::Click}, {"double_click", StepVerb::Click}, {"right_click", StepVerb::Click},
         {"jump_click", StepVerb::JumpClick},
         {"tier_card", StepVerb::TierCard},
@@ -2647,9 +2647,9 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         // A finger (SDL's mouse events for it, the finger event) or the pen rests on an item without moving, then lifts.
         if (!need(1)) return false;
         const std::string label = w[1];
-        const bool pen = verb == "pen_hold";
+        const bool pen = verb == "pen_hold" || verb == "pen_slide";
         const SDL_MouseID which = pen ? SDL_PEN_MOUSEID : SDL_TOUCH_MOUSEID;
-        const bool slide = verb == "touch_slide"; // (no rest: the finger lands and drags DX px over S seconds, slowly)
+        const bool slide = verb == "touch_slide" || verb == "pen_slide"; // (no rest: the finger lands and drags DX px over S seconds, slowly)
         const float seconds = num(2, 0.8f), dx = num(3, 0.0f);
         const float slideSecs = slide ? std::max(seconds, 0.1f) : 0.3f;
         auto at = std::make_shared<ImVec2>();

@@ -52,20 +52,17 @@ expect_value shelf_has_geometry.subdivide == 1
 expect_value undo_steps == $steps0
 click "Geometry##tool.geometry"
 
-# A slider: the Draw palette's Size. The press does not move it; a quick tap does.
+# A slider: the Draw palette's Size. A press on it is a drag, whatever its length: no ring, no menu (an Android member's slow drags
+# were taken for holds, 11-27); it pins with an Alt-drag, as a mouse does.
 click "Draw##palette.draw"
 click "Draw/##totray"
 brush_size 60
 expect "Draw/##drawsize"
-expect_value my_panel_entries == 0
 touch_hold "Draw/##drawsize"
-expect_value touch_pin_menu == 1
-expect_value draw_size == 60
-click "Add to My Panel"
-expect_value my_panel_entries == 1
-expect_value draw_size == 60
+expect_value touch_pin_menu == 0
+expect_value touch_pin_armed == 2
 touch_tap "Draw/##drawsize"
-expect_value draw_size != 60
+expect_value touch_pin_menu == 0
 click "Draw/##totray"
 
 # A mouse: right-click the box.

@@ -119,7 +119,7 @@ struct TileLiftScope {
 void DrawHover(App& app);
 // From the ImGui item hooks (Demo.cpp): where this frame's candidates for a ring are.
 void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& max);
-void NoteItemLabel(ImGuiID id, const char* label);
+void NoteItemLabel(ImGuiID id, const char* label, bool draggable = false); // draggable: a slider or a drag box (no touch long press on those)
 // UI tests (audit_pins): the items a palette body draws between Begin and Gaps that were not offered as a My Panel / shelf entry,
 // as "palette/section/label" (items drawn while PinPalette names a palette; popups and other windows are not its controls).
 void PinAuditBegin();

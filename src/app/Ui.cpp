@@ -246,16 +246,14 @@ void SameLineAt(float cursorPosX) {
 
 namespace {
 // Touch and pen without a keyboard (Ui.h TouchPin): a finger or the pen held still on an item for kLongPress opens a menu that
-// adds it to My Panel or a shelf, as an Alt-drag would. The press is taken from the item when it fires (its click and a
-// slider's drag are cancelled), a slider is read-only while the press is still (it does not jump to the finger before it is
-// known to be a hold), and a quick tap on one is replayed on release so tapping a slider still sets it.
+// adds it to My Panel or a shelf, as an Alt-drag would. The press is taken from the item when it fires (its click is
+// cancelled). Sliders and drag boxes never start one (g_valueItem): their press is always a drag.
 constexpr double kLongPress = 0.5; // seconds
 struct TouchPinState {
     ImGuiID item = 0;        // the item the press in progress began on
     double pressedAt = 0.0;  // io.MouseClickedTime[0] of that press
     ImVec2 at;               // where it began
     bool armed = false;      // it was held long enough: the ring shows, the menu opens as the finger lifts
-    bool slider = false;     // the item is a slider (SliderInside held it): any movement of the finger is a drag, not a hold
     bool pressOnUi = false;  // the press by a finger or the pen began on a window (not the model)
     bool menuOpen = false, menuOpenNow = false; // the menu for menuEntry; the frame it is to be opened
     std::string menuEntry;
@@ -269,6 +267,8 @@ struct TouchPinState {
     int pickTarget = HostMyPanel;
     int armedCount = 0;
 } g_touchPin;
+
+ImGuiID g_valueItem = 0; // the last item that takes a value from a drag (a slider, a drag box): NoteItemLabel, from the item hook
 
 bool g_pointerPen = false; // the last mouse event was the pen's (the SDL backend tells a mouse from a finger, not from a pen)
 
@@ -293,34 +293,6 @@ bool touchPinWanted() {
     return wanted;
 }
 
-// How far a finger may stray and still be holding: a button or a box allows a little shake; a slider none beyond the finger's own
-// tremor, since a slow drag (a fine adjustment) covers only a few pixels in the half second that arms the long press, and that
-// drag must not be taken for a hold (member bug, 11-27: the value froze half a second in and the menu opened).
-constexpr float kHoldSlop = 8.0f; // px at scale 1
-float sliderSlop() { return g_pointerPen ? 3.0f : 1.5f; } // (the pen's hand shakes more than a finger lying flat)
-
-bool touchPressNear(const ImRect& r, float slopPx = kHoldSlop) { // the press (still down or just let go) began on r and has not moved
-    const ImGuiIO& io = ImGui::GetIO();
-    const ImVec2 d(io.MousePos.x - io.MouseClickedPos[0].x, io.MousePos.y - io.MouseClickedPos[0].y);
-    const float slop = slopPx * uiScale();
-    return r.Contains(io.MouseClickedPos[0]) && d.x * d.x + d.y * d.y <= slop * slop;
-}
-
-ImGuiID g_heldSlider = 0; // the slider SliderInside kept read-only under the press this frame
-
-bool touchArmedPress() { return g_touchPin.armed && g_touchPin.pressedAt == ImGui::GetIO().MouseClickedTime[0]; }
-
-// A finger or the pen is holding still on r: whatever is there keeps its value for now.
-bool touchHoldsOn(const ImRect& r) {
-    if (!touchPinWanted() || !ImGui::GetIO().MouseDown[0]) return false;
-    return touchPressNear(r, sliderSlop()); // (only sliders ask: SliderInside)
-}
-
-// A finger or the pen just lifted from r after a tap that never moved (and was not a long press).
-bool touchTappedOn(const ImRect& r) {
-    if (!touchPinWanted() || !ImGui::GetIO().MouseReleased[0] || touchArmedPress()) return false;
-    return touchPressNear(r, sliderSlop());
-}
 
 void openTouchPinMenu(const std::string& entry) {
     TouchPinState& t = g_touchPin;
@@ -389,25 +361,25 @@ void touchPinItem(const std::string& entry, const char* label) {
             t.rcPopups = g.OpenPopupStack.Size;
         }
         // A finger or the pen.
-        if (io.MouseClicked[0] && t.pressOnUi && ImGui::IsItemHovered()) {
+        // Not on a slider or a drag box (anything that takes a value from a drag, g_valueItem): a finger that rests on one while it
+        // thinks, or moves slowly, or whose moves this screen delivers late, would have its drag taken for a hold (member bug on an
+        // Android tablet, 11-27: the value froze half a second in and the menu opened). Those take the Alt-drag, or a right-click.
+        if (io.MouseClicked[0] && t.pressOnUi && ImGui::IsItemHovered() && id != g_valueItem) {
             t.item = id;
             t.pressedAt = io.MouseClickedTime[0];
             t.at = io.MouseClickedPos[0];
             t.armed = false;
-            t.slider = g_heldSlider == id;
         }
         if (t.item == id && t.pressedAt == io.MouseClickedTime[0]) {
             const ImVec2 d(io.MousePos.x - t.at.x, io.MousePos.y - t.at.y);
-            const float slop = (t.slider ? sliderSlop() : kHoldSlop) * s;
             if (!t.armed) {
-                if (!io.MouseDown[0] || d.x * d.x + d.y * d.y > slop * slop) {
+                if (!io.MouseDown[0] || d.x * d.x + d.y * d.y > 64.0f * s * s) {
                     t.item = 0; // lifted early (a tap) or moved (a drag)
                 } else if (ImGui::GetTime() - t.pressedAt >= kLongPress) {
                     t.armed = true;
                     ++t.armedCount;
-                    // The press is ours: no click on release. A slider keeps it (read-only while the finger is still): a drag
-                    // that starts after the rest, past the slop, hands it back to the slider (the menu is dropped below).
-                    if (g_heldSlider != id) ImGui::ClearActiveID();
+                    // The press is ours: no click on release.
+                    ImGui::ClearActiveID();
                     // A choice opens its list on the press: close it again.
                     const ImGuiID combo = ImHashStr("##ComboPopup", 0, id);
                     for (int i = 0; i < g.OpenPopupStack.Size; ++i)
@@ -419,7 +391,7 @@ void touchPinItem(const std::string& entry, const char* label) {
                     g_animating = true; // (the loop wakes for it: the finger is still, nothing else would draw)
                 }
             }
-            if (t.armed && io.MouseDown[0] && d.x * d.x + d.y * d.y > slop * slop) { // it moved after all: a drag, not a hold
+            if (t.armed && io.MouseDown[0] && d.x * d.x + d.y * d.y > 64.0f * s * s) { // it moved after all: a drag, not a hold
                 t.armed = false;
                 t.item = 0;
             }
@@ -865,7 +837,8 @@ void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& ma
     g_seen.push_back({id, ImRect(min, max), ctx->CurrentWindow->ClipRect, ctx->CurrentWindow, false});
 }
 
-void NoteItemLabel(ImGuiID id, const char* label) {
+void NoteItemLabel(ImGuiID id, const char* label, bool draggable) {
+    if (draggable) g_valueItem = id;
     if (g_audit.on && label)
         for (auto it = g_audit.items.rbegin(); it != g_audit.items.rend(); ++it)
             if (it->id == id) {
@@ -1262,19 +1235,7 @@ bool SliderInside(const char* id, float* v, float lo, float hi, const char* form
     // No grab over the label: the position shows as the fill and a thin accent bar along the bottom.
     ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
-    // A finger or the pen holding still on it is maybe a long press (TouchPin): the value waits (until it moves, or lifts: a
-    // tap sets it, one frame late, as the press would have).
-    const ImRect where(p, ImVec2(p.x + w, p.y + h));
-    const bool held = touchHoldsOn(where);
-    const bool tapped = !held && touchTappedOn(where);
-    if (held) ImGui::PushItemFlag(ImGuiItemFlags_ReadOnly, true);
-    if (tapped) ImGui::GetIO().MouseDown[0] = true;
     const bool changed = ImGui::SliderFloat(id, v, lo, hi, format ? tr(format) : format, flags);
-    if (tapped) ImGui::GetIO().MouseDown[0] = false;
-    if (held) {
-        ImGui::PopItemFlag();
-        g_heldSlider = ImGui::GetItemID();
-    }
     if (format) { // the label inside, as drawn: wider than the slider is cut off
         char shown[128];
         ImFormatString(shown, sizeof(shown), tr(format), double(*v));
