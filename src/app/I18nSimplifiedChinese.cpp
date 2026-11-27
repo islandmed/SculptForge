@@ -2895,6 +2895,18 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Signs in with GitHub, as member builds do (Preferences > Updates): no more membership cards, and the member "
      "builds are on.",
      "以 GitHub 登录，与会员版本相同（偏好设置 > 更新）：不再显示会员卡片，并打开会员版本。"},
+    {"Member Requests: one a month, built first, credited to you",
+     "Member Requests：每月一个，优先开发，并署上你的名字"},
+    {"The monthly feature vote: pick what we build next",
+     "每月功能投票：选择我们接下来开发的内容"},
+    {"The members' channel on Discord",
+     "Discord 上的会员专属频道"},
+    {"Your name in the credits, in the app and on the website",
+     "你的名字列入致谢名单，在应用内和网站上"},
+    {"Members' requests are built first.",
+     "会员的请求会优先开发。"},
+    {"$48 a year or $5 a month: the feature vote, Member Requests built first, and your name in the credits. Nothing in the app is ever paywalled.",
+     "每年 $48 或每月 $5：功能投票、优先开发的 Member Requests，以及致谢名单中的你的名字。应用内的任何内容都不会收费。"},
     // --- PanelTexture.cpp (tools/i18n/coverage.py) ---
     {"Paint into the vertices (vertex paint): the colour resolution is the mesh's. Shown when the Part has a texture "
      "(Tool > Texture Image).",

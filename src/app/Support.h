@@ -61,7 +61,7 @@ inline constexpr const char* kTermsUrl = "https://sculptforge.app/terms.html";
 inline bool supportLinkAllowed(std::string_view url) {
     for (const char* u : {kSupportUrlMember, kSupportUrlMemberYearly, kStudioPageUrl, kTermsUrl})
         if (u[0] != '\0' && url == u) return true;
-    return false;
+    return url == supportPageUrl(kSupportSourceTag); // the card's button: the membership page, tagged
 }
 // The promise next to members' early builds. Worded the same in the app, on the membership page and in the guide
 // (tests/test_support.cpp checks the membership page).

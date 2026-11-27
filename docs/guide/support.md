@@ -2,7 +2,7 @@
 
 > **In short:**
 > - SculptForge is free for everyone, and nothing is ever paywalled.
-> - Members get early builds (the next version before everyone else; from SculptForge 2027, each release about two weeks early), vote on what gets built and are thanked by name.
+> - Members get early builds (the next version before everyone else; from SculptForge 2027, each release about two weeks early), vote on what gets built, get their requests built first and are thanked by name.
 > - The app has no payment code, no account and no licence check.
 > - **Help > Support SculptForge...** opens the membership page in your browser.
 
@@ -21,7 +21,7 @@ Every release stays free for everyone. Bug-fix and security releases go out to e
 **Help > Support SculptForge...** opens [sculptforge.app/support.html](https://sculptforge.app/support.html) in your
 browser. That is all it does: payment happens on the website, never in the app.
 
-The small heart at the right of the top bar opens the same page. Members see a small badge there instead.
+The small heart at the right of the top bar opens the same page, and so does **Become a member** on the membership card. Members see a small badge there instead.
 
 ## The membership card
 

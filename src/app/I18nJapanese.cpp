@@ -7224,6 +7224,18 @@ constexpr Entry kJapanese[] = {
     {"Hold %s and drag anywhere to zoom", "%s を押しながらどこでもドラッグするとズームします"},
     {"Navigation bindings back to their defaults", "ナビゲーションの設定を初期設定に戻しました"},
     {"%s on  \xc2\xb7  Esc turns it off", "%s オン  \xc2\xb7  Esc で解除"},
+    {"Member Requests: one a month, built first, credited to you",
+     "メンバーリクエスト：月1件、優先的に開発、クレジットに名前を掲載"},
+    {"The monthly feature vote: pick what we build next",
+     "毎月の機能投票：次に開発する機能を選べます"},
+    {"The members' channel on Discord",
+     "Discord のメンバー専用チャンネル"},
+    {"Your name in the credits, in the app and on the website",
+     "クレジットへの名前の掲載（アプリ内とウェブサイト）"},
+    {"Members' requests are built first.",
+     "メンバーのリクエストは優先的に開発されます。"},
+    {"$48 a year or $5 a month: the feature vote, Member Requests built first, and your name in the credits. Nothing in the app is ever paywalled.",
+     "年額 $48 または月額 $5：機能投票、優先的に開発されるメンバーリクエスト、クレジットへの名前の掲載。アプリの機能が有料になることは一切ありません。"},
 };
 
 } // namespace
