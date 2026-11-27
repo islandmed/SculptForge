@@ -3,7 +3,7 @@
   "version": 1,
   "id": "wax",
   "name": "Wax",
-  "description": "Candle wax: a warm, semi-glossy body whose roughness drifts from satin to matte, with a soft uneven build-up and rolled edges. SculptForge renders no translucency, so thin parts and edges get a lighter, warmer tint as a stand-in for light passing through.",
+  "description": "Candle wax: a warm, semi-glossy body whose roughness drifts from satin to matte, with a soft uneven build-up (height) and glossier edges. SculptForge renders no translucency, so thin parts and edges get a lighter, warmer tint as a stand-in for light passing through.",
   "layers": [
     {
       "name": "Wax Body",
@@ -21,9 +21,9 @@
       }
     },
     {
-      "name": "Rolled Edges",
+      "name": "Glossy Edges",
       "fill": {
-        "material": {"channels": ["roughness", "height"], "roughness": 0.22, "height": 0.58},
+        "material": {"channels": ["roughness"], "roughness": 0.2},
         "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.5, "softness": 0.9, "breakup": 0.0, "scale": 0.04, "seed": 8}]
       }
     },
