@@ -258,14 +258,24 @@ bool saveExr(const std::string& path, int width, int height, int channels, const
 }
 
 namespace {
+
 constexpr size_t kMaxExrChannels = 64;
 constexpr int64_t kMaxExrPixels = int64_t(1) << 27; // 16384 x 8192
-}
 
-bool loadExr(const std::string& path, int& width, int& height, int& channels, std::vector<float>& pixels,
-             std::string& error) {
-    std::vector<uint8_t> b;
-    if (!readFile(path, b, error)) return false;
+struct ExrHeader {
+    struct Chan {
+        std::string name;
+        int type;
+    };
+    std::vector<Chan> chans;
+    int compression = -1, x0 = 0, y0 = 0, width = 0, height = 0;
+    size_t table = 0;      // where the scanline offset table starts
+    size_t pixelBytes = 0; // per pixel, all channels of one scanline's x
+};
+
+// The header of a scanline EXR: everything loadExr and probeExr need before they touch a pixel. `b` may be only the
+// start of the file (probeExr): the data's own size is checked by loadExr.
+bool parseExrHeader(const uint8_t* b, size_t size, const std::string& path, ExrHeader& h, std::string& error) {
     size_t pos = 0;
     auto bad = [&](const char* why) {
         error = std::string("Not a supported EXR (") + why + "): " + path;
@@ -274,66 +284,102 @@ bool loadExr(const std::string& path, int& width, int& height, int& channels, st
     auto u32 = [&](size_t at) {
         return uint32_t(b[at]) | uint32_t(b[at + 1]) << 8 | uint32_t(b[at + 2]) << 16 | uint32_t(b[at + 3]) << 24;
     };
-    if (b.size() < 8 || u32(0) != 20000630) return bad("magic");
+    if (size < 8 || u32(0) != 20000630) return bad("magic");
     if ((u32(4) & 0xFF) != 2 || (u32(4) & 0x1E00)) return bad("only single-part scanline files");
     pos = 8;
-    struct Chan {
-        std::string name;
-        int type;
-    };
-    std::vector<Chan> chans;
-    int compression = -1;
     int64_t x0 = 0, y0 = 0, x1 = -1, y1 = -1; // (64 bits)
     for (;;) {
-        if (pos >= b.size()) return bad("truncated header");
+        if (pos >= size) return bad("truncated header");
         if (b[pos] == 0) {
             ++pos;
             break;
         }
         auto str = [&]() {
             std::string s;
-            while (pos < b.size() && b[pos]) s += char(b[pos++]);
+            while (pos < size && b[pos]) s += char(b[pos++]);
             ++pos;
             return s;
         };
         const std::string name = str(), type = str();
-        if (b.size() - std::min(pos, b.size()) < 4) return bad("truncated header"); // (checked by subtraction, also on 32 bits)
-        const uint32_t size = u32(pos);
+        if (size - std::min(pos, size) < 4) return bad("truncated header"); // (checked by subtraction, also on 32 bits)
+        const uint32_t attr = u32(pos);
         pos += 4;
-        if (size > b.size() - pos) return bad("truncated header");
-        const size_t end = pos + size;
+        if (attr > size - pos) return bad("truncated header");
+        const size_t end = pos + attr;
         if (name == "channels") {
             while (pos < end && b[pos]) {
-                if (chans.size() >= kMaxExrChannels) return bad("too many channels");
-                Chan c;
+                if (h.chans.size() >= kMaxExrChannels) return bad("too many channels");
+                ExrHeader::Chan c;
                 c.name = str();
                 if (pos > end || end - pos < 16) return bad("channel list");
                 c.type = int(u32(pos));
-                chans.push_back(c);
+                h.chans.push_back(c);
                 pos += 16;
             }
         } else if (name == "compression") {
-            if (size < 1) return bad("compression"); // (the value is read: it must be there)
-            compression = b[pos];
-        } else if (name == "dataWindow" && size == 16) {
+            if (attr < 1) return bad("compression"); // (the value is read: it must be there)
+            h.compression = b[pos];
+        } else if (name == "dataWindow" && attr == 16) {
             x0 = int32_t(u32(pos)), y0 = int32_t(u32(pos + 4)), x1 = int32_t(u32(pos + 8)), y1 = int32_t(u32(pos + 12));
         }
         pos = end;
     }
-    if (compression != 0) return bad("compressed");
-    const int64_t w64 = x1 - x0 + 1, h64 = y1 - y0 + 1;
-    if (w64 <= 0 || h64 <= 0 || chans.empty() || w64 > 65536 || h64 > 65536 || w64 * h64 > kMaxExrPixels) return bad("size");
-    width = int(w64), height = int(h64);
+    if (h.compression != 0) {
+        static const char* const kNames[] = {"none", "RLE", "ZIPS", "ZIP", "PIZ", "PXR24", "B44", "B44A", "DWAA", "DWAB"};
+        const std::string name = h.compression >= 0 && h.compression < 10 ? kNames[h.compression] : "unknown";
+        error = "This EXR uses " + name + " compression, which SculptForge can't read yet: save it uncompressed or as .hdr: " + path;
+        return false;
+    }
+    const int64_t w = x1 - x0 + 1, ht = y1 - y0 + 1;
+    if (w <= 0 || ht <= 0 || h.chans.empty() || w > 65536 || ht > 65536 || w * ht > kMaxExrPixels) return bad("size");
+    h.width = int(w), h.height = int(ht), h.x0 = int(x0), h.y0 = int(y0);
+    for (const ExrHeader::Chan& c : h.chans) {
+        if (c.type != 1 && c.type != 2) return bad("unsupported pixel type");
+        h.pixelBytes += c.type == 1 ? 2 : 4;
+    }
+    h.table = pos;
+    return true;
+}
+
+} // namespace
+
+bool probeExr(const std::string& path, int& width, int& height, std::string& error) {
+    std::ifstream f(fsPath(path), std::ios::binary);
+    if (!f) {
+        error = "Cannot open " + path;
+        return false;
+    }
+    std::vector<uint8_t> head(size_t(1) << 16); // (a header is a few hundred bytes)
+    f.read(reinterpret_cast<char*>(head.data()), std::streamsize(head.size()));
+    head.resize(size_t(f.gcount()));
+    ExrHeader h;
+    if (!parseExrHeader(head.data(), head.size(), path, h, error)) return false;
+    width = h.width;
+    height = h.height;
+    return true;
+}
+
+bool loadExr(const std::string& path, int& width, int& height, int& channels, std::vector<float>& pixels,
+             std::string& error, int64_t maxPixels) {
+    std::vector<uint8_t> b;
+    if (!readFile(path, b, error)) return false;
+    ExrHeader h;
+    if (!parseExrHeader(b.data(), b.size(), path, h, error)) return false;
+    auto bad = [&](const char* why) {
+        error = std::string("Not a supported EXR (") + why + "): " + path;
+        return false;
+    };
+    auto u32 = [&](size_t at) {
+        return uint32_t(b[at]) | uint32_t(b[at + 1]) << 8 | uint32_t(b[at + 2]) << 16 | uint32_t(b[at + 3]) << 24;
+    };
+    width = h.width, height = h.height;
+    if (maxPixels > 0 && int64_t(width) * int64_t(height) > maxPixels) return bad("too large");
+    const int y0 = h.y0;
     // Map file channels to output channels: Y alone -> 1, else R, G, B -> 3.
     std::map<std::string, int> slot = {{"Y", 0}, {"R", 0}, {"G", 1}, {"B", 2}};
-    const bool rgb = chans.size() >= 3;
+    const bool rgb = h.chans.size() >= 3;
     channels = rgb ? 3 : 1;
-    size_t pixelBytes = 0;
-    for (const Chan& c : chans) {
-        if (c.type != 1 && c.type != 2) return bad("unsupported pixel type");
-        pixelBytes += c.type == 1 ? 2 : 4;
-    }
-    const size_t table = pos;
+    const size_t pixelBytes = h.pixelBytes, table = h.table;
     // An uncompressed file holds every pixel: a header that claims more than the file has is refused first.
     if (table > b.size() || size_t(height) > (b.size() - table) / 8 ||
         (b.size() - table - size_t(height) * 8) / size_t(height) < pixelBytes * size_t(width))
@@ -348,9 +394,9 @@ bool loadExr(const std::string& path, int& width, int& height, int& channels, st
         if (y64 < 0 || y64 >= height) return bad("scanline y");
         const int y = int(y64);
         size_t p = size_t(off) + 8;
-        for (const Chan& c : chans) {
+        for (const ExrHeader::Chan& c : h.chans) {
             const auto it = slot.find(c.name);
-            const int dst = it == slot.end() || (!rgb && c.name != "Y" && chans.size() > 1) ? -1 : it->second;
+            const int dst = it == slot.end() || (!rgb && c.name != "Y" && h.chans.size() > 1) ? -1 : it->second;
             for (int x = 0; x < width; ++x) {
                 float f;
                 if (c.type == 2) {

@@ -374,7 +374,7 @@ void fromJson(const Json& j, UiPrefs& p) {
 
 namespace {
 
-enum UiFileKind { kSaveUi, kLoadUi, kRunScript, kLibraryFolder, kBlenderKeymap, kRadialImport, kRadialExport, kMayaFolder, kUiFileKinds };
+enum UiFileKind { kSaveUi, kLoadUi, kRunScript, kLibraryFolder, kBlenderKeymap, kRadialImport, kRadialExport, kMayaFolder, kHdriFile, kUiFileKinds };
 
 struct UiFileRequest {
     App* app = nullptr;
@@ -391,6 +391,7 @@ void SDLCALL onUiFileChosen(void* userdata, const char* const* files, int) {
 
 const SDL_DialogFileFilter kUiFilters[] = {{"SculptForge UI layout", "json"}};
 const SDL_DialogFileFilter kBlenderKeymapFilters[] = {{"Blender keymap", "py"}, {"All files", "*"}};
+const SDL_DialogFileFilter kHdriFilters[] = {{"HDR environment", "hdr;exr"}};
 const SDL_DialogFileFilter kRadialFilters[] = {{"SculptForge radial menu", "json"}};
 const SDL_DialogFileFilter kScriptFilters[] = {{"SculptForge script", "sfscript;txt"}, {"Python script", "py"}, {"All files", "*"}};
 
@@ -473,6 +474,7 @@ void App::initUiConfig(bool deterministic) {
     configDir_ = userDataDir();
     layout_ = standardLayout(uiPrefs_.shellLayout);
     if (deterministic) return; // tests, renders and recordings always use the standard layout
+    loadHdriPrefs();
     std::string err;
     if (fileExists(uiConfigPath())) {
         if (!readUiConfig(uiConfigPath(), err, true)) SDL_Log("%s", err.c_str());
@@ -1522,6 +1524,10 @@ void App::exportRadialMenuDialog(int menu) {
     sf::dialogs::saveFile(onUiFileChosen, &g_requests[kRadialExport], window_, kRadialFilters, 1, nullptr);
 }
 
+void App::addHdriDialog() { // Material > Viewport Shading > Add HDRI...: the file comes back through queueUiFile (kHdriFile)
+    sf::dialogs::openFile(onUiFileChosen, &g_requests[kHdriFile], window_, kHdriFilters, 1, nullptr, false, "Add HDRI");
+}
+
 void App::chooseMayaFolder() { // the only way the Maya bridge gets a folder: the user picks it (PanelMaya.cpp)
     const std::string start = uiPrefs_.mayaFolder;
     sf::dialogs::openFolder(onUiFileChosen, &g_requests[kMayaFolder], window_, start.empty() ? nullptr : start.c_str(),
@@ -1884,6 +1890,8 @@ void App::drawHelpConsoleUi() {
                 exportRadialMenu(radialEdit_.exportMenu, path);
             } else if (kind == kMayaFolder) {
                 setMayaFolder(path);
+            } else if (kind == kHdriFile) {
+                runCommand("add_hdri", {{"path", path}});
             } else if (kind == kRunScript) {
                 setConsoleOpen(true);
                 console_.queueScriptFile(path);

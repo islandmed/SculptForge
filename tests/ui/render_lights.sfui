@@ -65,6 +65,9 @@ run view_shadows shadow_strength=1
 click "Material##palette.material"
 wait 0.2
 shot material-lights
+# (the PBR shading rows grew by the Environment choice: scroll the palette down to the Add buttons, as a person does)
+wheel_item "Unlit##unlit" 0 -10
+wait 0.2
 click "Rim light##lights.add_rim"
 expect_value light_count == 4
 wait 0.2

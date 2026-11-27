@@ -1405,6 +1405,12 @@ private:
     void drawBackgroundControls(const char* idSuffix); // Preferences > Display and the Render palette
     void drawShadingControls();     // Material palette and Tool > Viewport Look: Smooth | Flat, and the Part's own
     void drawViewportShadingControls(); // Material palette: Lit Sphere | PBR and the environment
+    // The HDRIs added with Add HDRI... (core/EnvironmentMath.h): paths in <prefs>/hdri.json, never in ui.json, so a
+    // shared layout can't make the app read a file. UI tests neither read nor write it.
+    void addHdriDialog();
+    void loadHdriPrefs();
+    void saveHdriPrefs() const;
+    std::string hdriNote_; // why the last Add HDRI... was refused, shown under the Environment list until the next pick
     void paintAt(const DabParams& p);
     void pickColorUnderCursor();
     // First paint stroke on a mesh without vertex paint: undo swaps this paint stack (no colours) back in, so the

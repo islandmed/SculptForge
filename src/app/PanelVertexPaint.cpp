@@ -9,7 +9,9 @@
 #include "app/I18n.h"
 #include "app/Palettes.h"
 
+#include "core/Json.h"
 #include "core/LitSphere.h"
+#include "core/Utf8Path.h"
 #include "core/VertexPaint.h"
 #include "core/Trash.h"
 #include "core/Parts.h"
@@ -22,7 +24,9 @@
 
 #include <cfloat>
 #include <filesystem>
+#include <fstream>
 #include <iterator>
+#include <map>
 
 namespace sf {
 
@@ -304,8 +308,13 @@ void App::registerPaintUiCommands() {
                    "environment, exposure and a tone map). Only changes what the view shows.",
                    {{"mode", ParamSpec::Type::String, "lit_sphere or pbr (default: unchanged).", false},
                     {"environment", ParamSpec::Type::String,
-                     "studio, photo_studio, small_studio, outdoor_sky, or a file name from SCULPTFORGE_HDRI_PATH.", false},
+                     "studio, photo_studio, small_studio, outdoor_sky, a file name from SCULPTFORGE_HDRI_PATH or an HDRI "
+                     "added with add_hdri.", false},
                     {"rotation", ParamSpec::Type::Number, "Environment rotation in degrees about the up axis.", false},
+                    {"fixed", ParamSpec::Type::String,
+                     "What the environment is fixed to: world (the default: its highlights and background stay where they "
+                     "are while the camera orbits) or view (they stay still on screen while the model turns, as the "
+                     "Lit Sphere does; added lights always follow the view). The rotation works in both.", false},
                     {"exposure", ParamSpec::Type::Number, "Exposure in stops (-6 to 6; default 0).", false},
                     {"tone_map", ParamSpec::Type::String, "aces (default), agx, reinhard or none.", false},
                     {"background", ParamSpec::Type::Bool, "Show the environment behind the model.", false},
@@ -329,11 +338,18 @@ void App::registerPaintUiCommands() {
                                for (const EnvironmentInfo& i : environments()) names += (names.empty() ? "" : ", ") + i.id;
                                return {false, "Unknown environment (" + names + ")"};
                            }
+                           if (std::string why; !environmentUsable(e, why))
+                               return {false, environments()[size_t(e)].label + " can't be used: " + why};
                            v.environment = e;
                        }
                        if (a.contains("tone_map") && !parseToneMap(argString(a, "tone_map"), v.toneMap))
                            return {false, "tone_map must be aces, agx, reinhard or none"};
                        v.environmentRotation = float(std::fmod(argNumber(a, "rotation", v.environmentRotation), 360.0));
+                       if (a.contains("fixed")) {
+                           const std::string f = argString(a, "fixed");
+                           if (f != "world" && f != "view") return {false, "fixed must be world or view"};
+                           v.environmentFixedToView = f == "view";
+                       }
                        v.exposure = std::clamp(float(argNumber(a, "exposure", v.exposure)), -6.0f, 6.0f);
                        v.environmentBackground = argBool(a, "background", v.environmentBackground);
                        v.backgroundBlur = std::clamp(float(argNumber(a, "blur", v.backgroundBlur)), 0.0f, 1.0f);
@@ -347,6 +363,43 @@ void App::registerPaintUiCommands() {
                                      environments()[size_t(v.environment)].label.c_str(), double(v.exposure),
                                      toneMapLabel(v.toneMap), v.environmentBackground ? ", background on" : "");
                        return {true, buf};
+                   }});
+    // Add HDRI...: a .hdr / .exr file of the user's own, listed by its path (never copied) and remembered.
+    commands_.add({"add_hdri",
+                   "Add an HDR environment image (.hdr or .exr) to the PBR view's Environment list and use it. The file is "
+                   "listed by its path, not copied, and remembered; it goes through the same reader as the files of "
+                   "SCULPTFORGE_HDRI_PATH, with a size limit of 8192 x 4096. Only changes what the view shows.",
+                   {{"path", ParamSpec::Type::String, "The .hdr or .exr file.", true}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       std::string err;
+                       const std::string file = argString(a, "path");
+                       const int e = addEnvironmentFile(file, err);
+                       if (e < 0) {
+                           hdriNote_ = err; // (the panel shows it wrapped, without the path the status line repeats)
+                           if (err.size() > file.size() + 2 && err.compare(err.size() - file.size() - 2, std::string::npos, ": " + file) == 0)
+                               hdriNote_.resize(err.size() - file.size() - 2);
+                           return {false, hdriNote_};
+                       }
+                       hdriNote_.clear();
+                       renderSettings_.environment = e;
+                       saveHdriPrefs();
+                       return {true, "Added HDRI: " + environments()[size_t(e)].label};
+                   }});
+    commands_.add({"remove_hdri",
+                   "Remove an HDRI added with add_hdri from the Environment list (the file itself is not touched). The view "
+                   "goes back to Studio when it was showing it.",
+                   {{"environment", ParamSpec::Type::String, "The added HDRI's name (default: the one in use).", false}},
+                   [this](Document&, const Args& a) -> CommandResult {
+                       const int e = a.contains("environment") ? findEnvironment(argString(a, "environment"))
+                                                               : renderSettings_.environment;
+                       if (e < 0 || e >= environmentCount() || !environments()[size_t(e)].user)
+                           return {false, "That is not an HDRI you added"};
+                       const std::string name = environments()[size_t(e)].label;
+                       removeEnvironment(e);
+                       int& cur = renderSettings_.environment;
+                       cur = cur == e ? 0 : (cur > e ? cur - 1 : cur);
+                       saveHdriPrefs();
+                       return {true, "Removed HDRI: " + name};
                    }});
     // The view's background (#21). Also the preference for new sessions.
     commands_.add({"set_background",
@@ -640,6 +693,43 @@ void App::drawPalette_Material() {
     drawSaveRenderControls();
 }
 
+namespace {
+// What the panel knows about an entry's file: missing, or can't be read (an EXR with a compression we don't read, too big,
+// not an HDR image), with the reason. A file on a disconnected drive can make a stat wait, so each entry is asked at most
+// four times a second, not once a frame.
+struct HdriState {
+    bool missing = false;
+    std::string problem; // "" when the file can be used (or is missing)
+};
+const HdriState& hdriState(int index) {
+    struct Entry {
+        double at = -1.0;
+        HdriState state;
+    };
+    static std::map<std::string, Entry> cache;
+    static uint32_t revision = 0;
+    static const HdriState none;
+    if (revision != environmentsRevision()) {
+        revision = environmentsRevision();
+        cache.clear();
+    }
+    const auto& envs = environments();
+    if (index < 0 || index >= int(envs.size()) || envs[size_t(index)].path.empty()) return none;
+    Entry& e = cache[envs[size_t(index)].path];
+    const double now = ImGui::GetTime();
+    if (e.at < 0.0 || now - e.at > 0.25 || now < e.at) {
+        e.state.missing = environmentFileMissing(index);
+        e.state.problem.clear();
+        if (!e.state.missing) {
+            std::string why;
+            if (!environmentUsable(index, why)) e.state.problem = why;
+        }
+        e.at = now;
+    }
+    return e.state;
+}
+} // namespace
+
 // Material > Viewport Shading: Lit Sphere or PBR, and the PBR view's environment. Every change runs
 // viewport_shading, so scripts and the console see the same thing.
 void App::drawViewportShadingControls() {
@@ -657,19 +747,70 @@ void App::drawViewportShadingControls() {
     RenderSettings& v = renderSettings_;
     const auto& envs = environments();
     const int current = std::clamp(v.environment, 0, int(envs.size()) - 1);
+    const HdriState& currentState = hdriState(current);
+    const bool currentMissing = currentState.missing;
     ImGui::SetNextItemWidth(-1);
     if (ImGui::BeginCombo("##environment", envs[size_t(current)].label.c_str())) {
         for (int i = 0; i < int(envs.size()); ++i) {
-            if (ImGui::Selectable(envs[size_t(i)].label.c_str(), i == current))
+            const HdriState& state = hdriState(i);
+            const bool missing = state.missing, unusable = missing || !state.problem.empty();
+            if (unusable) ImGui::BeginDisabled();
+            const std::string label = missing ? envs[size_t(i)].label + " (" + tr("missing") + ")"
+                                              : unusable ? envs[size_t(i)].label + " (" + tr("can't be used") + ")" : envs[size_t(i)].label;
+            const bool added = envs[size_t(i)].user;
+            if (ImGui::Selectable((label + "##env" + std::to_string(i)).c_str(), i == current,
+                                  added ? ImGuiSelectableFlags_AllowOverlap : ImGuiSelectableFlags_None)) {
+                hdriNote_.clear();
                 runCommand("viewport_shading", {{"environment", envs[size_t(i)].id}});
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", envs[size_t(i)].credit.c_str());
+            }
+            if (unusable) ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(unusable ? ImGuiHoveredFlags_AllowWhenDisabled : ImGuiHoveredFlags_None))
+                ImGui::SetTooltip("%s", state.problem.empty() ? envs[size_t(i)].credit.c_str() : state.problem.c_str());
+            if (added) { // an added entry can be taken out of the list from here, current or not (a missing one can't be picked)
+                ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::GetFrameHeight());
+                if (ImGui::SmallButton(("x##hdrirm_" + envs[size_t(i)].id).c_str())) {
+                    runCommand("remove_hdri", {{"environment", envs[size_t(i)].id}});
+                    hdriNote_.clear();
+                    ImGui::CloseCurrentPopup();
+                    break; // (the list changed)
+                }
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Remove from list"));
+            }
         }
+        ImGui::Separator();
+        if (ImGui::Selectable((std::string(tr("Add HDRI...")) + "##addhdri").c_str())) addHdriDialog();
         ImGui::EndCombo();
     }
     ui::HelpText("Environment", nullptr,
                  "The light around the model: Studio (generated), Photo Studio, Small Studio and Outdoor Sky. HDR "
-                 "files (.hdr, .exr) in the folders of SCULPTFORGE_HDRI_PATH are listed after them.",
+                 "files (.hdr, .exr) in the folders of SCULPTFORGE_HDRI_PATH are listed after them, then the files you "
+                 "added with Add HDRI... at the end of the list.",
                  "Material > Viewport Shading");
+    if (const std::string why = !currentState.problem.empty() ? currentState.problem
+                                : currentMissing             ? std::string()
+                                                             : renderer_.environmentError(current);
+        !why.empty()) {
+        ImGui::PushTextWrapPos(0.0f); // (a file that is there but can't be read: say why; the view shows Studio meanwhile)
+        ImGui::TextDisabled("%s: %s", tr("This HDRI can't be used"), why.c_str());
+        ImGui::PopTextWrapPos();
+    }
+    if (currentMissing) { // (the view shows Studio meanwhile: the renderer's fallback for a file it can't read)
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("%s", tr("This HDRI's file is missing. Put it back where it was, or remove it from the list."));
+        ImGui::PopTextWrapPos();
+    }
+    if (!hdriNote_.empty()) { // why the last Add HDRI... was refused (the status line is too short for it)
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("%s: %s", tr("Couldn't add this file"), hdriNote_.c_str());
+        ImGui::PopTextWrapPos();
+    }
+    if (envs[size_t(current)].user &&
+        ImGui::SmallButton((std::string(tr("Remove from list")) + "##removehdri").c_str()))
+        runCommand("remove_hdri", {});
+    if (envs[size_t(current)].user)
+        ui::HelpText("Remove from list", nullptr,
+                     "Takes the HDRI you added out of the Environment list. The file itself is not touched.",
+                     "Material > Viewport Shading");
     // Sliders change the view live and run the command once when let go (one console line per change).
     auto slider = [&](const char* label, const char* key, float* value, float lo, float hi, const char* fmt, const char* help) {
         ImGui::SetNextItemWidth(-1);
@@ -681,6 +822,21 @@ void App::drawViewportShadingControls() {
            "Brightness of the light in stops: +1 doubles it.");
     slider("##Rotation", "rotation", &v.environmentRotation, -180.0f, 180.0f, tr("Rotation %.0f deg"),
            "Turns the environment about the up axis, moving the highlights.");
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::BeginCombo("##envfixed", (std::string(tr("Environment")) + ": " +
+                                         tr(v.environmentFixedToView ? "Follows the view" : "Fixed in the world")).c_str())) {
+        if (ImGui::Selectable((std::string(tr("Fixed in the world")) + "##envfixed_world").c_str(), !v.environmentFixedToView))
+            runCommand("viewport_shading", {{"fixed", std::string("world")}});
+        if (ImGui::Selectable((std::string(tr("Follows the view")) + "##envfollow_view").c_str(), v.environmentFixedToView))
+            runCommand("viewport_shading", {{"fixed", std::string("view")}});
+        ImGui::EndCombo();
+    }
+    ui::HelpText("Environment fixed to", nullptr,
+                 "Fixed in the world: the environment's highlights and background stay where they are while you orbit, "
+                 "so they move on screen. Follows the view: they stay still on screen while the model turns, as the Lit "
+                 "Sphere view does. The lights you add always follow the view. The Rotation slider works either way. "
+                 "Saved with the project.",
+                 "Material > Viewport Shading");
     ImGui::SetNextItemWidth(-1);
     if (ImGui::BeginCombo("##tonemap", (std::string(tr("Tone map")) + ": " + toneMapLabel(v.toneMap)).c_str())) {
         for (int i = 0; i < kToneMapCount; ++i)
@@ -714,6 +870,37 @@ void App::drawShadingControls() {
     ui::Segmented(*this, {"material.smooth", "material.flat"});
     ImGui::TextDisabled("%s", tr("This Part"));
     ui::Segmented(*this, {"part.shading_default", "part.shading_smooth", "part.shading_flat"});
+}
+
+} // namespace sf
+
+namespace sf {
+
+// <prefs>/hdri.json: {"files": ["/path/sky.hdr", ...]}. Read strictly (a small file, strings of path length, 64 entries);
+// a path whose file is gone stays listed and greys out. Never in ui.json: a shared layout must not name files to open.
+void App::loadHdriPrefs() {
+    if (uiConfigDeterministic_ || configDir_.empty()) return;
+    std::ifstream f(pathFromUtf8(configDir_ + "hdri.json"), std::ios::binary);
+    if (!f) return;
+    std::string text(std::istreambuf_iterator<char>(f), {});
+    Json j;
+    std::string err;
+    if (text.size() > 65536 || !Json::parse(text, j, err) || !j.isObject() || !j["files"].isArray()) return;
+    std::vector<std::string> paths;
+    const Json& files = j["files"];
+    for (size_t i = 0; i < files.size() && paths.size() < size_t(kMaxUserEnvironments); ++i)
+        if (files[i].isString() && files[i].asString().size() < 4096) paths.push_back(files[i].asString());
+    setUserEnvironmentPaths(paths);
+}
+
+void App::saveHdriPrefs() const {
+    if (uiConfigDeterministic_ || configDir_.empty()) return;
+    Json files = Json::array();
+    for (const std::string& p : userEnvironmentPaths()) files.push(p);
+    Json j = Json::object();
+    j.set("files", files);
+    std::ofstream f(pathFromUtf8(configDir_ + "hdri.json"), std::ios::binary | std::ios::trunc);
+    f << j.dump(true) << "\n";
 }
 
 } // namespace sf

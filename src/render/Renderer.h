@@ -112,6 +112,7 @@ struct RenderSettings {
     Shading shading = Shading::LitSphere;
     int environment = 0;              // index into environments()
     float environmentRotation = 0.0f; // degrees about the up axis
+    bool environmentFixedToView = false; // false: fixed in the world while the camera orbits; true: it turns with the view
     float exposure = 0.0f;            // stops
     ToneMap toneMap = ToneMap::Aces;
     bool environmentBackground = false; // show the environment behind the model (blurred by backgroundBlur)
@@ -265,6 +266,10 @@ public:
     // PBR view: an environment's lighting is being built (the view shows the previous one meanwhile). `wake` is
     // called from the worker thread when it is ready (the app redraws then).
     bool environmentPending() const;
+    // Why environment `index` could not be loaded, "" when it can or has not been tried.
+    std::string environmentError(int index) const { return index == envErrorIndex_ ? envError_ : std::string(); }
+    // The direction in the environment that the centre of the view looks at (UI tests: the lock keeps it moving with the orbit).
+    glm::vec3 environmentLookDirection() const { return envLookDirection_; }
     // The PBR planes Part `id` has on the GPU (pbrViewPlanes bits: 1 ORM, 2 normal, 4 emissive), for tests.
     uint32_t pbrPlanes(uint32_t id) const;
     void setEnvironmentWake(std::function<void()> wake) { envWake_ = std::move(wake); }
@@ -691,8 +696,12 @@ private:
     std::shared_ptr<EnvJob> envJob_;
     std::function<void()> envWake_;
     int envIndex_ = -1, envFailedIndex_ = -1;
+    std::string envError_; // why environment envErrorIndex_ could not be loaded (the view shows Studio instead)
+    int envErrorIndex_ = -1;
+    uint32_t envRevision_ = 0; // environmentsRevision() when envIndex_ was chosen
     SH9 envSh_;
     glm::mat3 frameViewToEnv_{1.0f};
+    glm::vec3 envLookDirection_{0.0f, 0.0f, -1.0f}; // the main view's (frameViewToEnv_ is the last pass drawn)
     // The clusters of `s` to draw this frame: in full (drawClusters_), and with `proxy` as their motion proxy
     // where it is built (proxyClusters_).
     void cull(const MeshSlot& s, const CullView& view, bool proxy = false);

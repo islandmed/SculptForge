@@ -533,6 +533,7 @@ void App::storeProjectSettings() {
         pbr.set("shading", std::string(v.pbr() ? "pbr" : "lit_sphere"));
         pbr.set("environment", environments()[size_t(std::clamp(v.environment, 0, environmentCount() - 1))].id);
         pbr.set("rotation", double(v.environmentRotation));
+        pbr.set("environment_fixed", std::string(v.environmentFixedToView ? "view" : "world"));
         pbr.set("exposure", double(v.exposure));
         pbr.set("tone_map", std::string(toneMapId(v.toneMap)));
         pbr.set("background", v.environmentBackground);
@@ -672,6 +673,9 @@ void App::applyProjectSettings() {
             const int env = pbr.isObject() && pbr["environment"].isString() ? findEnvironment(pbr["environment"].asString()) : -1;
             v.environment = env >= 0 ? env : 0;
             v.environmentRotation = num("rotation", defaults.environmentRotation, -360.0f, 360.0f);
+            v.environmentFixedToView = pbr.isObject() && pbr["environment_fixed"].isString()
+                                           ? pbr["environment_fixed"].asString() == "view"
+                                           : defaults.environmentFixedToView;
             v.exposure = num("exposure", defaults.exposure, -10.0f, 10.0f);
             v.toneMap = defaults.toneMap;
             if (pbr.isObject() && pbr["tone_map"].isString()) parseToneMap(pbr["tone_map"].asString(), v.toneMap);
