@@ -61,6 +61,33 @@ wait 0.3
 expect_value clean_view == 0
 expect_value chrome_area == $chrome_before
 
+# Esc closes a menu first and keeps Clean view; the next Esc leaves (artist-qa 11-26: one Esc did both).
+key shift+f11
+wait 0.3
+hover_window 0.3 0.3
+key space
+expect_value quickmenu_open == 1
+key esc
+wait 0.2
+expect_value quickmenu_open == 0
+expect_value clean_view == 1
+button_drag right 0.12 0.3 0.12 0.3 0.1
+expect_value quickmenu_open == 1
+key esc
+wait 0.2
+expect_value quickmenu_open == 0
+expect_value clean_view == 1
+key t
+expect_value radial_open == 1
+key esc
+wait 0.2
+expect_value radial_open == 0
+expect_value clean_view == 1
+key esc
+wait 0.3
+expect_value clean_view == 0
+expect_value chrome_area == $chrome_before
+
 # Tab (shelves hidden before) stays as it was: Clean view does not touch the layout.
 key tab
 expect_value shelves_visible == 0

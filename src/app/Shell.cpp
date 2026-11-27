@@ -1643,8 +1643,9 @@ void App::setCleanView(bool on) {
         std::string hint = tr("Press %s to leave Clean view");
         if (const size_t at = hint.find("%s"); at != std::string::npos) hint.replace(at, 2, key);
         toastInViewport(hint, 2.0);
-    } else if (!cleanViewWasFullscreen_ && full) {
-        SDL_SetWindowFullscreen(window_, false);
+    } else {
+        viewportToast_.clear(); // (the "Press ... to leave" note goes with it)
+        if (!cleanViewWasFullscreen_ && full) SDL_SetWindowFullscreen(window_, false);
     }
     updateCameraAspect();
     redrawIn(0.0);

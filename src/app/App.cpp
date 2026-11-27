@@ -2930,8 +2930,12 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
         setGizmoMode(GizmoMode::Off);
         return;
     }
+    // Esc leaves Clean view once nothing else wants it: no drag, and no menu, pop-up, picker or text field (each closes
+    // itself on this same Esc when it is drawn, a frame later; the Quick Menu and the pickers are windows, not pop-ups).
+    const bool escBusy = quickMenu_.open || pickerOpen() || palette_.isOpen() || zsMenu_.open ||
+                         ui::TextFieldFocused() || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
     if (key == SDLK_ESCAPE && cleanView_ && !(mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_SHIFT | SDL_KMOD_GUI)) &&
-        drag_ == Drag::None && !actions_.actionForKey(key, mod)) { // Esc leaves Clean view once nothing else wanted it
+        drag_ == Drag::None && !escBusy && !actions_.actionForKey(key, mod)) {
         setCleanView(false);
         return;
     }
