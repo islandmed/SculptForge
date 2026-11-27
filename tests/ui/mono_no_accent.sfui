@@ -1,0 +1,25 @@
+# Monochrome has no hue in the chrome (a member's report: the Library's active tab underline and its page button were
+# still orange). A panel walk: shots of the top bar, the Library's tabs and pager and the right tray, and no pixel
+# there with a hue (tint@ counts pixels whose channels spread by more than 40). The logo (far left), the 3D view, the
+# thumbnails and the colour picker are content and stay out of the regions.
+run new_sphere subdivisions=3
+run ui_look look=forge scheme=monochrome layout=sculptforge
+wait 0.2
+key ,
+expect_value library_open == 1
+wait 0.2
+shot mono-library-project
+expect_value tint@0.08,0.08,0.88,0.16 == 0     # the Library's tab row: underline, pager, filter, sort
+expect_value tint@0.06,0.0,1.0,0.1 == 0          # the top bar
+expect_value tint@0.79,0.1,1.0,0.95 == 0         # the right tray
+
+click "3##lbrows"                              # another page button is the selected one now
+wait 0.2
+shot mono-library-rows3
+expect_value tint@0.08,0.08,0.88,0.16 == 0
+
+# The Neutral colours keep their orange: the probe sees it (so a pass above means something).
+run ui_look look=forge scheme=neutral
+wait 0.2
+shot neutral-library
+expect_value tint@0.08,0.08,0.88,0.16 > 0

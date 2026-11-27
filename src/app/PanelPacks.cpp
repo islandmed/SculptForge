@@ -51,8 +51,8 @@ std::string slug(const std::string& s) {
     return out.empty() ? "macro" : out.substr(0, 48);
 }
 
-constexpr ImU32 kAccent = IM_COL32(240, 136, 46, 255);
-constexpr ImU32 kInsider = IM_COL32(236, 190, 90, 255);
+ImU32 kAccent() { return theme::ink(IM_COL32(240, 136, 46, 255)); } // (white in Monochrome)
+ImU32 kInsider() { return theme::ink(IM_COL32(236, 190, 90, 255)); }
 
 void SDLCALL onPackDialog(void* userdata, const char* const* files, int) {
     wakeMainLoop();
@@ -313,7 +313,7 @@ void App::drawPackReview() {
         if (fontBold_) ImGui::PopFont();
         if (m.channel == "insider") {
             ImGui::SameLine();
-            ImGui::TextColored(ImColor(kInsider), "%s", tr("Member pack"));
+            ImGui::TextColored(ImColor(kInsider()), "%s", tr("Member pack"));
         } else if (!m.channel.empty()) {
             ImGui::SameLine();
             ImGui::TextDisabled("[%s]", m.channel.c_str());
@@ -325,7 +325,7 @@ void App::drawPackReview() {
                                                     : (std::to_string(std::max<uint64_t>(1, r->bytes / 1024)) + " KB").c_str());
         if (!m.description.empty()) ImGui::TextWrapped("%s", m.description.c_str());
         if (!r->installedVersion.empty())
-            ImGui::TextColored(ImColor(kAccent), "%s %s", tr("Replaces the installed version"), r->installedVersion.c_str());
+            ImGui::TextColored(ImColor(kAccent()), "%s %s", tr("Replaces the installed version"), r->installedVersion.c_str());
         ImGui::Separator();
         ImGui::TextWrapped("%s %s", tr("Contains:"), packCountsText(r->counts).c_str());
         const float listH = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * (4.2f + 2.4f * float(r->plugins.size()));
@@ -339,7 +339,7 @@ void App::drawPackReview() {
         else ImGui::TextWrapped("%s", r->licenseText.c_str());
         ImGui::EndChild();
         for (const PackReview::Plugin& pl : r->plugins) {
-            ImGui::TextColored(ImColor(kAccent), "%s %s %s", ICON_LC_WAND_SPARKLES, pl.name.c_str(), pl.version.c_str());
+            ImGui::TextColored(ImColor(kAccent()), "%s %s %s", ICON_LC_WAND_SPARKLES, pl.name.c_str(), pl.version.c_str());
             ImGui::SameLine();
             ImGui::TextDisabled(tr("%s plugin, %s KB"), tr(pl.kind.c_str()), std::to_string(std::max<uint64_t>(1, pl.bytes / 1024)).c_str());
             ImGui::Indent(20 * s);
@@ -405,7 +405,7 @@ void App::drawPacksTab(float height) {
     ui::ActionButton(*this, "macro.editor", ImVec2(0, 0), ui::Look::IconLabel);
     if (packsSafeMode()) {
         ImGui::SameLine(0, 18 * s);
-        ImGui::TextColored(ImColor(kAccent), "%s", tr("Safe mode (--no-packs): no pack is loaded this session"));
+        ImGui::TextColored(ImColor(kAccent()), "%s", tr("Safe mode (--no-packs): no pack is loaded this session"));
     }
 
     if (packs_.installed.empty())
@@ -426,7 +426,7 @@ void App::drawPacksTab(float height) {
         ImGui::TextUnformatted((m.name + " " + m.version).c_str());
         if (m.channel == "insider") {
             ImGui::SameLine();
-            ImGui::TextColored(ImColor(kInsider), "%s", tr("Member pack"));
+            ImGui::TextColored(ImColor(kInsider()), "%s", tr("Member pack"));
         }
         std::array<int, kPackItemTypes> counts{};
         for (const PackItem& it : m.contents) ++counts[size_t(it.type)];

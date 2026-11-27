@@ -747,6 +747,23 @@ double Demo::query(const std::string& name, bool& known) const {
         const int y = std::clamp(int(fy * float(lastShotH_)), 0, lastShotH_ - 1);
         return double(lastShot_[size_t(y) * size_t(lastShotW_) * 4 + size_t(x) * 4 + size_t(k)]);
     }
+    if (name.rfind("tint@", 0) == 0) { // tint@X0,Y0,X1,Y1: pixels of the last shot there with a hue (channels spread by more than 40)
+        float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
+        if (std::sscanf(name.c_str() + 5, "%f,%f,%f,%f", &x0, &y0, &x1, &y1) != 4) {
+            known = false;
+            return 0.0;
+        }
+        if (lastShot_.empty()) return -1.0;
+        const int ax = std::clamp(int(x0 * float(lastShotW_)), 0, lastShotW_ - 1), bx = std::clamp(int(x1 * float(lastShotW_)), ax, lastShotW_);
+        const int ay = std::clamp(int(y0 * float(lastShotH_)), 0, lastShotH_ - 1), by = std::clamp(int(y1 * float(lastShotH_)), ay, lastShotH_);
+        double n = 0.0;
+        for (int y = ay; y < by; ++y)
+            for (int x = ax; x < bx; ++x) {
+                const uint8_t* px = &lastShot_[size_t(y) * size_t(lastShotW_) * 4 + size_t(x) * 4];
+                n += std::max({px[0], px[1], px[2]}) - std::min({px[0], px[1], px[2]}) > 40;
+            }
+        return n;
+    }
     if (name.rfind("edges@", 0) == 0) { // edges@X0,Y0,X1,Y1: mean luma step between neighbouring pixels of the last shot there
         float x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
         if (std::sscanf(name.c_str() + 6, "%f,%f,%f,%f", &x0, &y0, &x1, &y1) != 4) {
