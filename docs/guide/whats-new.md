@@ -5,6 +5,43 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.14.3
+
+```features
+date: 2026-11-27
+tagline: SculptForge on Android as a free early build, HDRIs of your own, a Clean view, Monochrome colours and Focus Detail on Windows.
+highlight: Focus Detail streams very dense Micro levels on Windows too
+highlight: SculptForge on Android (early test build, free): tablets, phones and Chromebooks, a sideloaded .apk
+highlight: Add your own HDRIs, and Clean view: fullscreen with only the 3D view (requested by a member)
+highlight: Monochrome colours and Paint > Layers in the Color palette (requested by members)
+highlight: Voxel Remesh keeps vertex paint smooth
+title: SculptForge on Android
+line: An early test build for tablets, phones and Chromebooks, free for everyone: download the .apk from the latest release and sideload it. It checks once a day for a newer version, and Edit > Preferences > Updates turns that off.
+action: guide:installing.md#android-early
+title: Your own HDRIs
+line: Add HDRI... in the PBR view's Environment list picks a .hdr or .exr file of your own and remembers it; Fixed in the world or Follows the view sets how it moves while you orbit.
+action: guide:pbr-painting.md
+title: Clean view
+line: View > Clean view (Shift+F11) goes fullscreen with only the 3D view; the same key or Esc brings everything back.
+action: guide:interface.md
+```
+
+- **SculptForge on Android** (early test build): free for everyone, a sideloaded `.apk` for tablets, phones and
+  Chromebooks from the latest release. It checks once a day for a newer version and shows the usual banner; **Edit >
+  Preferences > Updates** or the welcome window turns that off. Members still get builds first.
+- **Add HDRI...** in the PBR view's Environment list: a `.hdr` or `.exr` of your own, listed and remembered. The
+  environment can stay **Fixed in the world** or **Follow the view**.
+- **Clean view** (**View > Clean view**, <kbd>Shift</kbd>+<kbd>F11</kbd>): fullscreen with only the 3D view.
+  *Requested by a member*
+- **Monochrome colours** (**Edit > Preferences > Interface > Look > Colours**): a grey-only scheme with a white accent,
+  and **Paint > Layers** in the Color palette: each paint layer's eye, blend mode and opacity. *Requested by members*
+- **Focus Detail** streams very dense Micro levels on Windows too, and keeps up while you sculpt and orbit.
+- **Voxel Remesh** keeps vertex paint smooth instead of blocky.
+- **Polygon mode**: the selection on the far side of the model shows dimmer (**Tool > Polygon > Show hidden
+  selection**), and Bevel on faces rounds only the outline of the selected faces.
+- **Wax** and **Oil Stain** Material Recipes, and every button, slider and box can now go on a shelf or My Panel.
+- A latched Line, Lasso or Rectangle shape turns off with Esc, by picking it again, or with its own button.
+
 ## Version 0.14.2
 
 ```features
