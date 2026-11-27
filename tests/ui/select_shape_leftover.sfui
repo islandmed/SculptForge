@@ -223,7 +223,7 @@ key escape
 expect_value stroke_latch == 0
 expect_value hide_shape == 2
 
-# Face groups by Ctrl+Shift (Mac report: "the polygroups can't be selected"): a Cut Line left from the latch ate the click (a
+# Face groups by Ctrl+Shift (Mac report: face groups could not be selected): a Cut Line left from the latch ate the click (a
 # click cuts nothing). With the latch ended and no popup pick: Ctrl+Shift+click on a face group isolates it, a click on the
 # background shows everything again.
 run new_sphere subdivisions=4
