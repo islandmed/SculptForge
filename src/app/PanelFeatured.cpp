@@ -6,6 +6,7 @@
 // thumbnails come with the daily update check and are kept in the preferences folder; the card shows one entry a
 // start, opens its link in the browser, and goes when updates are off, the check can't reach the site or the list is
 // empty. The small x hides that video for good.
+#include "app/AndroidHttp.h"
 #include "app/App.h"
 #include "app/I18n.h"
 #include "app/NativeDialog.h"
@@ -75,7 +76,12 @@ bool App::readFeedText(const std::string& from, std::string& body, std::string& 
     error.clear();
     body.clear();
     if (isWebUrl(from)) {
+#ifdef __ANDROID__
+        // No libcurl on Android: the activity's own https GET, for the update feed's two addresses only (app/AndroidHttp.h).
+        ai::HttpResponse r = android::updateFeedGet(from, 15);
+#else
         ai::HttpResponse r = ai::httpRequest("GET", from, {"Accept: application/json"}, {}, 15);
+#endif
         if (r.status == 200) body = std::move(r.body);
         else error = r.status ? "the server answered " + std::to_string(r.status) : (r.error.empty() ? "no connection" : r.error);
     } else if (!readFile(from, body)) {

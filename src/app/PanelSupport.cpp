@@ -483,6 +483,13 @@ void App::drawSupportUi() {
             if (ImGui::SmallButton(tr("Details##welcome.ai"))) // the full wording: ai::kPrivacyLine, also in Help > About
                 sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr(ai::kPrivacyLine));
+#if SF_UPDATE_CHECK && defined(__ANDROID__)
+            // The Android app's one network request, said on the first start (the desktop app says it in Preferences > Updates).
+            ImGui::Spacing();
+            if (ImGui::Checkbox(tr("Check for updates"), &checkUpdates_)) saveProjectPrefs();
+            ImGui::TextDisabled("%s", tr("Once a day it fetches a small file from sculptforge.app that names the newest version. "
+                                         "Nothing about you or your device is sent. Also in Preferences > Updates."));
+#endif
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();

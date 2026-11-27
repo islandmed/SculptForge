@@ -29,7 +29,9 @@ the app), crashes or hangs the app, or changes the scene when its run failed, is
 
 API keys you enter, and studio sign-in tokens, are stored in the operating system's keychain (macOS Keychain,
 Windows Credential Manager, Linux Secret Service), never in settings files or logs. They are only ever sent to the
-service they belong to. SculptForge opens no network listener for AI tools (MCP is stdio only) or for sign-in (the
+service they belong to. The Android app's only network request is the once-a-day update check (a GET of the website's
+latest.json through the activity's HttpURLConnection, two fixed https addresses, no redirects; `INTERNET` is its only
+permission); Preferences > Updates turns it off. SculptForge opens no network listener for AI tools (MCP is stdio only) or for sign-in (the
 device authorization grant). For IT reviews, see docs/guide/security.md.
 
 Local listeners, each off by default and only while the user has it on:

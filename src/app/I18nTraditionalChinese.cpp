@@ -2698,7 +2698,9 @@ constexpr Entry kTraditionalChinese[] = {
      "Nothing about you or your computer is sent.",
      "每天啟動時一次，從 SculptForge 網站下載一個標示最新版本的小檔案，有較新版本時顯示橫幅。歡迎視窗中的「精選創作者」"
      "卡片也隨它而來（關閉此開關即可關閉）。不會傳送任何關於你或你電腦的資訊。"},
-    {"Update channel", "更新頻道"},
+        {"Once a day it fetches a small file from sculptforge.app that names the newest version. Nothing about you or your device is sent. Also in Preferences > Updates.",
+     "每天一次，從 sculptforge.app 取得一個標示最新版本的小檔案。不會傳送任何關於你或你的裝置的資訊。也可在「偏好設定 > 更新」中設定。"},
+{"Update channel", "更新頻道"},
     {"Stable", "穩定版"},
     {"Preview (early builds)",
      "預覽（搶先版本）"},

@@ -7,6 +7,9 @@ telemetry, no account and no servers of its own. When you use an AI feature, Scu
 **Your art is never uploaded or used for training. AI features run only when you use them and can be turned off.** Your sculpts stay on your computer; only what you hand an AI feature (a brush description,
 or the picture or text you give Generate 3D) goes to the service you picked.
 
+**Android:** the Android app has no AI requests yet. Its only network request is the once-a-day update check (the
+same `latest.json`, nothing about you or your device; **Edit > Preferences > Updates** turns it off).
+
 ## Provenance tag on AI output
 
 A Part that Generate 3D (or `image_to_3d` / `text_to_3d`) made carries a small tag: the public **provider**

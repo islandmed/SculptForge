@@ -32,11 +32,14 @@ option(SCULPTFORGE_UPDATE_CHECK "The app checks the website for a newer version 
 option(SCULPTFORGE_MAC_SELF_UPDATE "The update banner's Update button replaces the macOS app bundle itself" ON)
 # Android (android/README.md): the app is libmain.so inside an APK, drawing with OpenGL ES 3.2. SCULPTFORGE_GLES=ON on a
 # desktop builds that same ES path against the desktop's GLES driver (Mesa), to test it without a device.
+# Android: the once-a-day update check (the banner links to the download page; no in-app APK install). ON for the
+# sideloaded APKs; a Play or F-Droid build sets it OFF (the store updates it).
+option(SCULPTFORGE_ANDROID_UPDATE_CHECK "Android: check the website for a newer version once a day (OFF for store builds)" ON)
 option(SCULPTFORGE_GLES "Draw with OpenGL ES 3.2 instead of desktop OpenGL 3.3 (ON for Android)" ${ANDROID})
 if(ANDROID)
   set(SCULPTFORGE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(SCULPTFORGE_WEBRTC OFF CACHE BOOL "" FORCE) # the live face feed is the phone's job, not the tablet's (M1)
-  set(SCULPTFORGE_UPDATE_CHECK OFF CACHE BOOL "" FORCE) # (the insiders release says when a new APK is out)
+  set(SCULPTFORGE_UPDATE_CHECK ${SCULPTFORGE_ANDROID_UPDATE_CHECK} CACHE BOOL "" FORCE)
 endif()
 if(SCULPTFORGE_BUILD_TESTS)
   enable_testing()
@@ -448,8 +451,11 @@ target_link_libraries(sculptforge-cli PRIVATE sculptforge_core sculptforge_ai sc
 if(SCULPTFORGE_BUILD_APP OR SCULPTFORGE_BUILD_TESTS)
   add_library(sculptforge_appshared STATIC src/app/AssetLibrary.cpp src/app/BrushPreview.cpp src/app/OpenUrl.cpp src/app/UiLayout.cpp
     src/app/ShellGeometry.cpp src/app/LookSchemes.cpp src/app/I18n.cpp src/app/I18nSpanish.cpp
-    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/I18nJapanese.cpp src/app/StartupSplash.cpp src/app/ConnectAi.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
+    src/app/I18nTraditionalChinese.cpp src/app/I18nSimplifiedChinese.cpp src/app/I18nJapanese.cpp src/app/StartupSplash.cpp src/app/ConnectAi.cpp src/app/AndroidHttp.cpp src/render/Camera.cpp src/render/Clusters.cpp src/render/Ghost.cpp)
   target_link_libraries(sculptforge_appshared PUBLIC sculptforge_core)
+  if(ANDROID)
+    target_link_libraries(sculptforge_appshared PUBLIC SDL3::SDL3) # (AndroidHttp.cpp: the activity's JNI)
+  endif()
   if(MSVC)
     target_compile_options(sculptforge_appshared PRIVATE /W4 /utf-8 /permissive-)
   else()
