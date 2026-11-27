@@ -1,0 +1,470 @@
+# Cut Line latched from the stroke popup, used, and turned off must not leave itself on the Ctrl+Shift drag (a macOS tester,
+# Discord 11-26: the grey half-plane stayed, "even with the Cut tool off it is still there when I click Shift+Ctrl"). The
+# popup's shape borrows the Ctrl+Shift shape (hide_shape) while it is latched; when the latch ends, the panel's own choice
+# comes back: Select Rectangle by default, or whatever the panel had.
+run new_sphere subdivisions=4
+camera 0 0
+key x
+expect_value symmetry_x == 0
+expect_value hide_shape == 2
+
+# His sequence: Cut Line from the stroke popup, one cut with a plain drag, Esc, then a Ctrl+Shift drag.
+key g
+stroke_popup_item cut_line click
+key g
+expect_value stroke_latch == 3
+expect_value hide_shape == 3
+view_drag 0.25 0.3 0.75 0.7
+wait 0.1
+expect_value undo_steps == 1
+expect_value stroke_latch == 3
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+# The left tray's Brush and Stroke tiles (the green Cut Line icons the tester still saw) show Select Rectangle again.
+hold ctrl+shift
+wait 0.2
+expect_value held_tile == 2
+shot select_after_latch_tray
+drag_path 0.4 0.4 0.6 0.45 keep
+wait 0.1
+shot select_after_latch_dragging
+release
+hold none
+wait 0.2
+# a rectangle selection (hides what is outside), not a second cut
+expect_value hidden > 0
+expect_value undo_steps == 2
+
+# Turned off by picking Cut Line in the popup again: the same.
+key g
+stroke_popup_item cut_line click
+key g
+expect_value hide_shape == 3
+key g
+stroke_popup_item cut_line click
+key g
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+
+# Another brush picked ends the latch: the same.
+key g
+stroke_popup_item cut_lasso click
+key g
+expect_value hide_shape == 4
+key 2
+wait 0.1
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+key 1
+
+# The panel's own choice stays: Select Circle chosen on Tool > Visibility, a Cut Line latch on top, off: Select Circle.
+click "Visibility"
+click "Select Circle##select.circle"
+expect_value hide_shape == 7
+key g
+stroke_popup_item cut_line click
+key g
+expect_value hide_shape == 3
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 7
+hold ctrl+shift
+wait 0.2
+expect_value held_tile == 7
+hold none
+
+# A shape picked on the panel while the latch is on is the user's: it stays when the latch ends.
+key g
+stroke_popup_item cut_line click
+key g
+click "Select Rectangle##select.rect"
+expect_value hide_shape == 2
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+
+# One Esc (artist-qa 11-27): the popup open with a latch on, a single Esc closes it and ends the latch.
+key g
+stroke_popup_item cut_line click
+expect_value stroke_latch == 3
+expect_value stroke_popup_open == 1
+key escape
+expect_value stroke_popup_open == 0
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+
+# The Gizmo ends every latch (any mode), and a handle drag moves the Part instead of cutting, selecting or masking it.
+run new_sphere subdivisions=4
+camera 0 0
+remember triangles full
+remember center_x cx0
+# G > Cut Line, popup closed with G (latched), then the Gizmo: the latch ends, the drag moves the Part and nothing is cut.
+key g
+stroke_popup_item cut_line click
+key g
+expect_value stroke_latch == 3
+key shift+w
+expect_value gizmo_mode == 4
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+gizmo_drag move_x 80 0
+expect_value triangles == $full
+expect_value center_x != $cx0
+key ctrl+z
+expect_value center_x == $cx0
+# Back in Draw the latch does not come back.
+key shift+w
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+
+# The same for Select, Mask, Smooth and the mask shapes, on each Gizmo mode (Move W, Scale E, Rotate R, All Shift+W).
+run mask_clear
+key g
+stroke_popup_item select click
+key g
+expect_value stroke_latch > 0
+key w
+expect_value gizmo_mode == 1
+expect_value stroke_latch == 0
+gizmo_drag move_x 60 0
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key w
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+key g
+stroke_popup_item mask click
+key g
+expect_value stroke_latch > 0
+key e
+expect_value gizmo_mode == 2
+expect_value stroke_latch == 0
+gizmo_drag scale_uniform 40 -40
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key e
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+key g
+stroke_popup_item smooth click
+key g
+expect_value stroke_latch > 0
+key r
+expect_value gizmo_mode == 3
+expect_value stroke_latch == 0
+gizmo_drag rotate_y 40 20
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key r
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_rect click
+key g
+expect_value stroke_latch > 0
+key shift+w
+expect_value gizmo_mode == 4
+expect_value stroke_latch == 0
+gizmo_drag move_x 60 0
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key shift+w
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+key g
+stroke_popup_item mask_rect click
+key g
+expect_value stroke_latch > 0
+key w
+expect_value gizmo_mode == 1
+expect_value stroke_latch == 0
+gizmo_drag move_y 0 40
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key w
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_lasso click
+key g
+expect_value stroke_latch > 0
+key e
+expect_value gizmo_mode == 2
+expect_value stroke_latch == 0
+gizmo_drag scale_uniform 40 -40
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key e
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+
+# A latch picked while the Gizmo is on leaves the Gizmo (the popup's tiles are sculpting strokes) and latches.
+key shift+w
+expect_value gizmo_mode == 4
+key g
+stroke_popup_item cut_line click
+key g
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 3
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+
+# Every shape of the stroke popup: Esc ends its latch and the badge goes (Circle, Lasso, Rect, Pen, Line, Polyline).
+run new_sphere subdivisions=4
+camera 0 0
+key g
+stroke_popup_item mask_pen click
+key g
+expect_value stroke_latch == 2
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item mask_lasso click
+key g
+expect_value stroke_latch == 2
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item mask_rect click
+key g
+expect_value stroke_latch == 2
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item mask_circle click
+key g
+expect_value stroke_latch == 2
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_line click
+key g
+expect_value stroke_latch == 3
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_lasso click
+key g
+expect_value stroke_latch == 3
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_rect click
+key g
+expect_value stroke_latch == 3
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_circle click
+key g
+expect_value stroke_latch == 3
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_polyline click
+key g
+expect_value stroke_latch == 3
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+
+# Cut Polyline with 0, 1 and many points: one Esc drops the points and ends the latch (the latch is not left for a second Esc).
+key g
+stroke_popup_item cut_polyline click
+key g
+expect_value stroke_latch == 3
+expect_value hide_shape == 6
+expect_value cut_polyline_points == 0
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_polyline click
+key g
+drag_path 0.4 0.4 0.4 0.4
+expect_value cut_polyline_points == 1
+key escape
+expect_value cut_polyline_points == 0
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_polyline click
+key g
+drag_path 0.35 0.4 0.35 0.4
+drag_path 0.6 0.4 0.6 0.4
+drag_path 0.5 0.65 0.5 0.65
+expect_value cut_polyline_points == 3
+key escape
+expect_value cut_polyline_points == 0
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+# With no latch (the shape chosen on Tool > Cut) Esc still only drops the points.
+click "Cut"
+click "Cut Polyline##cut.polyline"
+expect_value hide_shape == 6
+hold ctrl+shift
+drag_path 0.4 0.4 0.4 0.4
+hold none
+expect_value cut_polyline_points == 1
+key escape
+expect_value cut_polyline_points == 0
+expect_value hide_shape == 6
+click "Visibility"
+click "Select Rectangle##select.rect"
+expect_value hide_shape == 2
+
+# Each panel's own button for the latched shape turns it off, for the shapes not tried above.
+click "Masking"
+key g
+stroke_popup_item mask_pen click
+key g
+expect_value stroke_latch == 2
+click "Mask Pen##mask.pen"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item mask_lasso click
+key g
+expect_value stroke_latch == 2
+click "Lasso Mask##mask.lasso"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item mask_circle click
+key g
+expect_value stroke_latch == 2
+click "Circle Mask##mask.circle"
+expect_value stroke_latch == 0
+click "Cut"
+key g
+stroke_popup_item cut_lasso click
+key g
+expect_value stroke_latch == 3
+click "Cut Lasso##cut.lasso"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_rect click
+key g
+expect_value stroke_latch == 3
+click "Cut Rectangle##cut.rect"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_circle click
+key g
+expect_value stroke_latch == 3
+click "Cut Circle##cut.circle"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_polyline click
+key g
+expect_value stroke_latch == 3
+click "Cut Polyline##cut.polyline"
+expect_value stroke_latch == 0
+click "Visibility"
+key g
+stroke_popup_item cut_lasso click
+key g
+expect_value stroke_latch == 3
+click "Select Lasso##select.lasso"
+expect_value stroke_latch == 3
+click "Select Lasso##select.lasso"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_circle click
+key g
+expect_value stroke_latch == 3
+click "Select Circle##select.circle"
+expect_value stroke_latch == 3
+click "Select Circle##select.circle"
+expect_value stroke_latch == 0
+click "Select Rectangle##select.rect"
+expect_value hide_shape == 2
+expect_value stroke_latch == 0
+
+# Enter finishes the Cut Polyline being placed and keeps the latch (the next clicks start another one); Esc ends it. W ends it
+# (the Gizmo, tried above for every mode).
+run new_sphere subdivisions=4
+camera 0 0
+key g
+stroke_popup_item cut_polyline click
+key g
+drag_path 0.35 0.4 0.35 0.4
+drag_path 0.6 0.4 0.6 0.4
+drag_path 0.5 0.65 0.5 0.65
+expect_value cut_polyline_points == 3
+key enter
+expect_value cut_polyline_points == 0
+expect_value stroke_latch == 3
+key w
+expect_value stroke_latch == 0
+expect_value gizmo_mode == 1
+key w
+expect_value gizmo_mode == 0
+
+# Face groups by Ctrl+Shift (Mac report: face groups could not be selected): a Cut Line left from the latch ate the click (a
+# click cuts nothing). With the latch ended and no popup pick: Ctrl+Shift+click on a face group isolates it, a click on the
+# background shows everything again.
+run new_sphere subdivisions=4
+camera 0 0
+key g
+stroke_popup_item cut_line click
+key g
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+remember groups g0
+hold ctrl
+drag_path 0.25 0.45 0.75 0.6
+hold none
+expect_value masked > 0
+key ctrl+w
+expect_value groups > $g0
+expect_value hidden == 0
+hold ctrl+shift
+drag_path 0.5 0.52 0.5 0.52
+hold none
+expect_value hidden > 0
+shot group_isolated_after_latch
+hold ctrl+shift
+drag_path 1.5 0.5 1.5 0.5
+hold none
+expect_value hidden == 0

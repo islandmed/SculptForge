@@ -235,7 +235,7 @@
 //                            qremesh_guides (guide curves on the active Part), qremesh_guide_loops (closed ones),
 //                            guides_mode (1 while the QRemesh Guides brush is picked),
 //                            quads (quad pairs in the active Part), quad_percent (quads among its polygons)
-//                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect, 7 MaskCircle), hide_shape (1 SelectLasso, 2 SelectRect, 7 SelectCircle, 8 CutCircle)
+//                            mask_shape (0 MaskPen, 1 MaskLasso, 2 MaskRect, 7 MaskCircle), hide_shape (1 SelectLasso, 2 SelectRect, 7 SelectCircle, 8 CutCircle), cut_polyline_points, held_tile (the shape the left tray's tiles show while Ctrl / Ctrl+Shift is held: same numbers, -1 none)
 //                            subdiv_level (the current subdivision level, 1 = base; 0 without levels), sdiv_levels (0 = none)
 //                            antialiasing (Preferences > Performance: 1, 2, 4, 8), view_samples (what the interactive
 //                            view draws with now: 1 while Fast Navigation moves a big scene), multithreading (1 on), threads (the shared pool's size), profile_threads (the saved profile's, for the next start),
@@ -1261,6 +1261,11 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "undo_ai") return app_.doc_.undo.canUndo() && app_.doc_.undo.undoLabel().rfind("AI: ", 0) == 0 ? 1.0 : 0.0;
     if (name == "mask_shape") return double(int(app_.maskShape_)); // 0 MaskPen, 1 MaskLasso, 2 MaskRect, 7 MaskCircle
     if (name == "hide_shape") return double(int(app_.hideShape_)); // 1 SelectLasso, 2 SelectRect, 7 SelectCircle, 8 CutCircle
+    if (name == "cut_polyline_points") return double(app_.cutPolyline_.size()); // the points of a Cut Polyline being placed
+    if (name == "held_tile") { // the shape the left tray's Brush / Stroke tiles show while Ctrl or Ctrl+Shift is held (-1: not showing one)
+        const App::HeldBrushItem* it = app_.heldBrushCurrent(app_.heldBrush());
+        return it ? double(int(it->shape)) : -1.0;
+    }
     if (name.rfind("phone_", 0) == 0) {
         const bool on = app_.phone_ && app_.phone_->running();
         const link::PhoneLinkStatus st = on ? app_.phone_->status() : link::PhoneLinkStatus{};

@@ -127,7 +127,7 @@ shot hover_cut_circle
 stroke_popup_item cut_circle click
 expect_value stroke_latch == 3
 expect_value hide_shape == 8
-key escape
+key g
 hover_model 0.5 0.5
 view_drag 0.5 0.5 0.66 0.66
 wait 0.2

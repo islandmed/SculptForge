@@ -2889,8 +2889,9 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
         closeRadialMenu();
         return;
     }
-    if (key == SDLK_ESCAPE && strokePopup_.open) {
+    if (key == SDLK_ESCAPE && strokePopup_.open) { // one Esc: the popup closes and a latch it left on ends with it
         closeStrokePopup();
+        if (strokeLatch() != StrokeLatch::None) setStrokeLatch(StrokeLatch::None);
         return;
     }
     if (key == SDLK_ESCAPE && strokeLatch() != StrokeLatch::None && drag_ == Drag::None) { // a latched Smooth / Mask / Select / shape off

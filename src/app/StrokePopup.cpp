@@ -101,7 +101,21 @@ StrokeLatch App::strokeLatch() const {
     const StrokeLatchState& l = strokeLatch_;
     if (l.latch == StrokeLatch::None) return StrokeLatch::None;
     const bool sameBrush = brush_ == l.brush && doc_.activeBrush == l.custom && paintMode_ == l.paint && !guidesMode_;
-    return sameBrush ? l.latch : StrokeLatch::None;
+    return sameBrush && latchToolOk() ? l.latch : StrokeLatch::None;
+}
+
+// A latch is for sculpting strokes: choosing the Gizmo (any mode) or another tool that takes the drags ends it, for good
+// (drawStrokePopup clears it), so a drag on a handle or a point never turns into a cut, a selection or a mask.
+bool App::latchToolOk() const {
+    return !gizmoActive() && !polyMode_ && !edgesMode_ && !tubeDraw_ && insertType_.empty() && !facePlacing_ &&
+           !gradient_.armed && !capture_.armed && !stencil_.adjust && !forgesphereActive();
+}
+
+// The popup's Smooth / Mask / Select / shape tiles are sculpting strokes: the Gizmo and the tools that take the drags give way.
+void App::leaveToolsForLatch() {
+    if (gizmoActive()) setGizmoMode(GizmoMode::Off);
+    if (polyMode_) setPolyMode(false);
+    leaveDrawModes();
 }
 
 void App::setStrokeLatch(StrokeLatch latch) {
@@ -111,6 +125,15 @@ void App::setStrokeLatch(StrokeLatch latch) {
                   : std::string(strokeLatchName(latch)) + " on: strokes " +
                         (latch == StrokeLatch::Smooth ? "smooth" : latch == StrokeLatch::Mask ? "mask" : "select") +
                         " until you pick " + strokeLatchName(latch) + " again or another brush";
+    settleHideLatch();
+}
+
+void App::settleHideLatch() {
+    if (!hideLatch_.active || strokeLatch() == StrokeLatch::Select) return;
+    hideLatch_.active = false;
+    if (hideShape_ != hideLatch_.latched) return; // a shape picked on the panel meanwhile stays
+    hideShape_ = hideLatch_.before;
+    cutPolyline_.clear(); // (points of a Cut Polyline the latch was placing)
 }
 
 App::SelectShape App::selectShapeOf(StrokeShape shape) {
@@ -168,9 +191,14 @@ void App::pickStrokePopupItem(int item, bool close) {
         return;
     }
     if (strokePopupIsShape(item)) { // the shape, latched: a plain drag masks or cuts with it (Discord 11-03)
+        leaveToolsForLatch();
         const StrokeShape shape = strokePopupShape(item);
         const bool off = strokeShapeOn(shape);
         const StrokeLatch latch = strokeShapeLatch(shape);
+        if (latch == StrokeLatch::Select) {
+            if (!hideLatch_.active) hideLatch_ = {true, hideShape_, hideShape_};
+            hideLatch_.latched = selectShapeOf(shape);
+        }
         (latch == StrokeLatch::Mask ? maskShape_ : hideShape_) = selectShapeOf(shape);
         setStrokeLatch(off ? StrokeLatch::None : latch);
         const ShapeLook& look = kShapes[int(shape)];
@@ -179,6 +207,7 @@ void App::pickStrokePopupItem(int item, bool close) {
                       (latch == StrokeLatch::Mask ? "mask" : "cut") + " on: " +
                       (latch == StrokeLatch::Mask ? "drags mask without Ctrl (Ctrl unmasks)" : "drags cut without Ctrl+Shift") +
                       " until you pick it again or another brush";
+        if (!latchToolOk()) status_ = "Leave the Forge Spheres or Stencil tool first: a latched shape is for sculpting strokes";
         if (close) closeStrokePopup();
         return;
     }
@@ -188,6 +217,7 @@ void App::pickStrokePopupItem(int item, bool close) {
         status_ = invertToggle_ ? "Sub: brushes subtract (Alt adds for one stroke)"
                                 : "Add: brushes add (Alt subtracts for one stroke)";
     } else {
+        leaveToolsForLatch();
         setStrokeLatch(toggledStrokeLatch(strokeLatch(), strokeModifierLatch(m)));
     }
     if (close) closeStrokePopup();
@@ -255,6 +285,7 @@ void App::drawStrokePopup() {
     const StrokeLatch latch = strokeLatch();
     // Another brush picked ends the latch for good: going back to the first brush doesn't bring it back.
     if (latch == StrokeLatch::None) strokeLatch_.latch = StrokeLatch::None;
+    settleHideLatch();
     if (!strokePopup_.open) {
         if (latch == StrokeLatch::None) return;
         // A latched modifier shows beside the brush cursor: strokes do something other than sculpt.

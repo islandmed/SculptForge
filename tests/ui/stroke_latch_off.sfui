@@ -8,12 +8,20 @@ key x
 expect_value symmetry_x == 0
 expect_value stroke_latch == 0
 
-# Esc: Cut Line latched, popup closed by its own Esc, a second Esc turns the latch off.
+# One Esc: with the popup open it closes and a latch it left on ends with it (artist-qa 11-27: a second Esc was needed).
+key g
+stroke_popup_item cut_line click
+expect_value stroke_latch == 3
+key escape
+expect_value stroke_popup_open == 0
+expect_value stroke_latch == 0
+expect_status Modifiers off
+# G closes the popup and keeps the latch; then Esc turns it off.
 key g
 stroke_popup_item cut_line click
 expect_value stroke_latch == 3
 expect_value hide_shape == 3
-key escape
+key g
 expect_value stroke_popup_open == 0
 expect_value stroke_latch == 3
 shot latch_badge
@@ -29,13 +37,13 @@ expect_value stroke_latch == 0
 # Esc with a Mask latch too, and Smooth.
 key g
 stroke_popup_item mask_rect click
-key escape
+key g
 expect_value stroke_latch == 2
 key escape
 expect_value stroke_latch == 0
 key g
 stroke_popup_item smooth click
-key escape
+key g
 expect_value stroke_latch == 1
 key escape
 expect_value stroke_latch == 0
@@ -45,7 +53,7 @@ click "Visibility"
 click "Select Rectangle##select.rect"
 key g
 stroke_popup_item cut_rect click
-key escape
+key g
 expect_value stroke_latch == 3
 expect_value hide_shape == 5
 # Another shape's button changes the shape and keeps the latch.
@@ -61,7 +69,7 @@ expect_value hide_shape == 2
 click "Cut"
 key g
 stroke_popup_item cut_line click
-key escape
+key g
 expect_value stroke_latch == 3
 click "Cut Line##cut.line"
 expect_value stroke_latch == 0
@@ -71,7 +79,7 @@ expect_value hide_shape == 3
 click "Masking"
 key g
 stroke_popup_item mask_rect click
-key escape
+key g
 expect_value stroke_latch == 2
 expect_value mask_shape == 2
 click "Rectangle Mask##mask.rect"

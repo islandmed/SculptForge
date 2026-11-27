@@ -49,7 +49,7 @@ expect_value stroke_type == 0
 expect_value stroking == 0
 expect_value moved == 0
 
-# Modifiers: a click toggles and the grid stays open. Sub, then Mask latched; Esc closes, they stay on.
+# Modifiers: a click toggles and the grid stays open. Sub, then Mask latched; G again closes it (Esc would end the latch with it), they stay on.
 key g
 stroke_popup_item sub click
 expect_value invert_toggle == 1
@@ -60,7 +60,7 @@ expect_value stroke_popup_open == 1
 shot modifiers
 stroke_popup_item select
 shot hover_select
-key escape
+key g
 expect_value stroke_popup_open == 0
 expect_value stroke_latch == 2
 
@@ -94,7 +94,7 @@ key escape
 key g
 stroke_popup_item smooth click
 expect_value stroke_latch == 1
-key escape
+key g
 key 2
 expect_value stroke_latch == 0
 key 1
@@ -126,7 +126,7 @@ stroke_popup_item mask_rect click
 expect_value stroke_latch == 2
 expect_value mask_shape == 2
 expect_value stroke_popup_open == 1
-key escape
+key g
 expect_status Rectangle mask on
 hover_model 0.5 0.5
 shot mask_rect_latched
@@ -148,7 +148,7 @@ stroke_popup_item cut_line click
 expect_value stroke_latch == 3
 expect_value hide_shape == 3
 shot shapes
-key escape
+key g
 view_drag 0.25 0.3 0.75 0.7
 expect_status Cut Away
 expect_value triangles != $full
