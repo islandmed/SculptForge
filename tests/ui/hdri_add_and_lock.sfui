@@ -35,7 +35,9 @@ expect_value environment_count == 7
 run_fails add_hdri path=../data/stud.obj
 run_fails add_hdri path=sf_ui_hdri/nowhere.hdr
 # An EXR with a compression we do not read is refused with a reason (not silently listed and ignored).
-run_fails add_hdri path=../data/hdri/test_piz.exr
+copy ../data/hdri/test_piz.exr sf_ui_hdri/piz.exr
+run_fails add_hdri path=sf_ui_hdri/piz.exr
+expect_text "PIZ compression"
 expect_value environment_count == 7
 # Back to a built-in and to an added one by name.
 run viewport_shading environment=photo_studio
@@ -71,18 +73,26 @@ wait 0.3
 expect_value view_pbr == 1
 # Remove from list: the missing entry goes, the later one moves up, and the view is back on Studio.
 click "Material##palette.material"
-click "Remove from list##removehdri"
+# A missing entry that is not the current one is taken out from the list's own "x" (it can't be picked).
+run viewport_shading environment=sky_b
+click "##environment"
+click "x##hdrirm_sky_a"
 expect_value environment_count == 6
 expect_value environment_added == 2
+expect_value environment == 5
+# Remove from list (the current added one), then the last one by command.
+run viewport_shading environment=test_sky
+expect_value environment == 4
+click "Remove from list##removehdri"
+expect_value environment_count == 5
+expect_value environment_added == 1
 expect_value environment == 0
 run viewport_shading environment=sky_b
-expect_value environment == 5
+expect_value environment == 4
 run remove_hdri
-expect_value environment_count == 5
-expect_value environment == 0
-run remove_hdri environment=test_sky
 expect_value environment_count == 4
 expect_value environment_added == 0
+expect_value environment == 0
 run_fails remove_hdri environment=studio
 
 # Environment: Fixed in the world (the default): the environment stays where it is while the camera orbits.

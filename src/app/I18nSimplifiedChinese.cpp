@@ -3260,6 +3260,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "无法使用此 HDRI"},
     {"can't be used",
      "无法使用"},
+    {"Couldn't add this file",
+     "无法添加此文件"},
     {"Add HDRI...",
      "添加 HDRI..."},
     {"Remove from list",

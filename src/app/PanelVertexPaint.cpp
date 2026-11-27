@@ -371,8 +371,15 @@ void App::registerPaintUiCommands() {
                    {{"path", ParamSpec::Type::String, "The .hdr or .exr file.", true}},
                    [this](Document&, const Args& a) -> CommandResult {
                        std::string err;
-                       const int e = addEnvironmentFile(argString(a, "path"), err);
-                       if (e < 0) return {false, err};
+                       const std::string file = argString(a, "path");
+                       const int e = addEnvironmentFile(file, err);
+                       if (e < 0) {
+                           hdriNote_ = err; // (the panel shows it wrapped, without the path the status line repeats)
+                           if (err.size() > file.size() + 2 && err.compare(err.size() - file.size() - 2, std::string::npos, ": " + file) == 0)
+                               hdriNote_.resize(err.size() - file.size() - 2);
+                           return {false, hdriNote_};
+                       }
+                       hdriNote_.clear();
                        renderSettings_.environment = e;
                        saveHdriPrefs();
                        return {true, "Added HDRI: " + environments()[size_t(e)].label};
@@ -743,11 +750,25 @@ void App::drawViewportShadingControls() {
             if (unusable) ImGui::BeginDisabled();
             const std::string label = missing ? envs[size_t(i)].label + " (" + tr("missing") + ")"
                                               : unusable ? envs[size_t(i)].label + " (" + tr("can't be used") + ")" : envs[size_t(i)].label;
-            if (ImGui::Selectable((label + "##env" + std::to_string(i)).c_str(), i == current))
+            const bool added = envs[size_t(i)].user;
+            if (ImGui::Selectable((label + "##env" + std::to_string(i)).c_str(), i == current,
+                                  added ? ImGuiSelectableFlags_AllowOverlap : ImGuiSelectableFlags_None)) {
+                hdriNote_.clear();
                 runCommand("viewport_shading", {{"environment", envs[size_t(i)].id}});
+            }
             if (unusable) ImGui::EndDisabled();
             if (ImGui::IsItemHovered(unusable ? ImGuiHoveredFlags_AllowWhenDisabled : ImGuiHoveredFlags_None))
                 ImGui::SetTooltip("%s", state.problem.empty() ? envs[size_t(i)].credit.c_str() : state.problem.c_str());
+            if (added) { // an added entry can be taken out of the list from here, current or not (a missing one can't be picked)
+                ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::GetFrameHeight());
+                if (ImGui::SmallButton(("x##hdrirm_" + envs[size_t(i)].id).c_str())) {
+                    runCommand("remove_hdri", {{"environment", envs[size_t(i)].id}});
+                    hdriNote_.clear();
+                    ImGui::CloseCurrentPopup();
+                    break; // (the list changed)
+                }
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Remove from list"));
+            }
         }
         ImGui::Separator();
         if (ImGui::Selectable((std::string(tr("Add HDRI...")) + "##addhdri").c_str())) addHdriDialog();
@@ -769,6 +790,11 @@ void App::drawViewportShadingControls() {
     if (currentMissing) { // (the view shows Studio meanwhile: the renderer's fallback for a file it can't read)
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextDisabled("%s", tr("This HDRI's file is missing. Put it back where it was, or remove it from the list."));
+        ImGui::PopTextWrapPos();
+    }
+    if (!hdriNote_.empty()) { // why the last Add HDRI... was refused (the status line is too short for it)
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("%s: %s", tr("Couldn't add this file"), hdriNote_.c_str());
         ImGui::PopTextWrapPos();
     }
     if (envs[size_t(current)].user &&

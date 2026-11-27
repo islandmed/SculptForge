@@ -4026,6 +4026,8 @@ constexpr Entry kJapanese[] = {
      "このHDRIは使用できません"},
     {"can't be used",
      "使用できません"},
+    {"Couldn't add this file",
+     "このファイルは追加できませんでした"},
     {"Add HDRI...",
      "HDRIを追加..."},
     {"Remove from list",

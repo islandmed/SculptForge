@@ -1402,6 +1402,7 @@ private:
     void addHdriDialog();
     void loadHdriPrefs();
     void saveHdriPrefs() const;
+    std::string hdriNote_; // why the last Add HDRI... was refused, shown under the Environment list until the next pick
     void paintAt(const DabParams& p);
     void pickColorUnderCursor();
     // First paint stroke on a mesh without vertex paint: undo swaps this paint stack (no colours) back in, so the

@@ -3657,6 +3657,8 @@ constexpr Entry kSpanish[] = {
      "No se puede usar este HDRI"},
     {"can't be used",
      "no se puede usar"},
+    {"Couldn't add this file",
+     "No se pudo añadir este archivo"},
     {"Add HDRI...",
      "Añadir HDRI..."},
     {"Remove from list",
