@@ -439,6 +439,12 @@ bool g_pinActive = false;
 bool g_inActionButton = false; // ActionButton's own HelpAction: the button is an "action:" entry already
 
 // The control drawn just before: a My Panel drag source while Alt is held; measured and movable while My Panel draws it.
+struct NotedItem {
+    ImGuiWindow* window = nullptr;
+    ImRect rect;
+};
+NotedItem g_lastItem, g_prevItem; // the last two items with an id (NoteItem)
+
 void pinLastItem(const std::string& key, const char* label) {
     const std::string& scope = !g_pinSection.empty() ? g_pinSection : g_pinPalette;
     if (scope.empty() || key.empty() || g_inActionButton) return;
@@ -459,8 +465,11 @@ void pinLastItem(const std::string& key, const char* label) {
         g_pin.max = ImGui::GetItemRectMax();
         // A control that starts mid-line and runs to the right edge ("Rotation [Free]", a label then a stretched combo or
         // slider) keeps what is left of it on the line: its words. Narrow ones (a checkbox in a row) stay on their own.
+        // Not when another control stands before it on the line (the right half of a row of two buttons): that one is not its words.
         const float lineStart = window->DC.CursorPos.x; // (ItemSize moved the cursor to the line's start)
-        if (g_pin.min.x > lineStart + 2.0f && g_pin.max.x >= window->WorkRect.Max.x - 2.0f) g_pin.min.x = lineStart;
+        const bool leftNeighbour = g_prevItem.window == window && g_prevItem.rect.Max.x <= g_pin.min.x + 1.0f &&
+                                   g_prevItem.rect.Min.y < g_pin.max.y && g_prevItem.rect.Max.y > g_pin.min.y;
+        if (!leftNeighbour && g_pin.min.x > lineStart + 2.0f && g_pin.max.x >= window->WorkRect.Max.x - 2.0f) g_pin.min.x = lineStart;
         g_pin.lineX = std::min(lineStart, g_pin.min.x);
         if (g_pin.measuring) return;
         const bool panel = g_pin.host == HostMyPanel;
@@ -816,6 +825,8 @@ int HoverLiftsShown() { return g_liftsShown; }
 
 void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& max) {
     if (!id || !ctx || !ctx->CurrentWindow) return;
+    g_prevItem = g_lastItem; // (pinLastItem asks what stood before the item it marks)
+    g_lastItem = {ctx->CurrentWindow, ImRect(min, max)};
     // A text box pressed while Alt made it read-only (picking a control up) must not stay open once Alt is let go: ImGui keeps no text for a
     // read-only one and then compares that null text and crashes (Alt+click on Selection Sets > Set name, 11-26). Close it, and the
     // note it leaves for the field's next draw, before the field is drawn.
