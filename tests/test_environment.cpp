@@ -6,12 +6,19 @@
 // uploads (pbrViewTexels).
 #include "TestHarness.h"
 
+#include "core/BakeImage.h"
 #include "core/EnvironmentMath.h"
 #include "core/Primitives.h"
 #include "core/Texture.h"
 #include "core/TextureChannels.h"
 
+#include <chrono>
 #include <cmath>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <random>
 
 using namespace sf;
 
@@ -190,4 +197,242 @@ TEST(pbr_view_packs_the_material_channels) {
     CHECK(at(nrm, 40, 50, 0) < 120);                                   // its left edge leans to -X
     CHECK(at(nrm, 59, 50, 0) > 136);                                   // its right edge to +X
     CHECK(at(em, 50, 50, 0) == 0 && at(em, 50, 50, 3) == 255);
+}
+
+// --- Add HDRI...: the user's own files, the caps and the fuzz pass over the loader they go through ---
+
+namespace {
+
+std::string readAll(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(f), {});
+}
+
+std::string writeBytes(const char* name, const std::string& bytes) {
+    const std::string path = tempPath(name);
+    std::ofstream(path, std::ios::binary).write(bytes.data(), std::streamsize(bytes.size()));
+    return path;
+}
+
+// What the environment list holds of the user's, undone after each test: the list is process-wide.
+struct UserEnvironmentsReset {
+    ~UserEnvironmentsReset() { setUserEnvironmentPaths({}); }
+};
+
+// Radiance header + flat scanlines of a W x H image (what the loader reads without run-length coding).
+std::string flatHdr(int w, int h, const std::string& pixels = std::string()) {
+    std::string out = "#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y " + std::to_string(h) + " +X " + std::to_string(w) + "\n";
+    out += pixels.empty() ? std::string(size_t(w) * size_t(h) * 4, '\x80') : pixels;
+    return out;
+}
+
+// A uncompressed scanline EXR header that claims w x h RGB float pixels; `data` bytes follow the header.
+std::string exrClaiming(int w, int h, size_t data, int compression = 0) {
+    auto u32 = [](uint32_t v) { return std::string(reinterpret_cast<const char*>(&v), 4); };
+    auto attr = [&](const std::string& name, const std::string& type, const std::string& value) {
+        return name + '\0' + type + '\0' + u32(uint32_t(value.size())) + value;
+    };
+    std::string chans;
+    for (char c : std::string("BGR")) chans += std::string(1, c) + '\0' + u32(2) + u32(0) + u32(1) + u32(1);
+    chans += '\0';
+    std::string out = u32(20000630) + u32(2);
+    out += attr("channels", "chlist", chans);
+    out += attr("compression", "compression", std::string(1, char(compression)));
+    out += attr("dataWindow", "box2i", u32(0) + u32(0) + u32(uint32_t(w - 1)) + u32(uint32_t(h - 1)));
+    out += std::string(1, '\0');
+    return out + std::string(data, '\0');
+}
+
+} // namespace
+
+TEST(hdri_add_lists_remembers_and_removes) {
+    UserEnvironmentsReset reset;
+    const int base = environmentCount();
+    std::string err;
+    const std::string hdr = SF_TEST_DATA_DIR "/hdri/test_sky.hdr", exr = SF_TEST_DATA_DIR "/hdri/test_sky.exr";
+    const int a = addEnvironmentFile(hdr, err);
+    CHECK(a == base && environmentCount() == base + 1);
+    CHECK(environments()[size_t(a)].user && environments()[size_t(a)].path == hdr && environments()[size_t(a)].label == "test_sky");
+    CHECK(addEnvironmentFile(hdr, err) == a && environmentCount() == base + 1); // the same file: the same entry
+    const int b = addEnvironmentFile(exr, err);
+    CHECK(b == base + 1 && environments()[size_t(b)].label == "test_sky 2"); // (same stem: a name of its own)
+    CHECK(findEnvironment("test_sky 2") == b && findEnvironment("TEST_SKY") == a);
+    // Both load through the one reader and give lit, high-range images.
+    for (int i : {a, b}) {
+        EnvImage img;
+        CHECK(loadEnvironment(i, img, err));
+        CHECK(img.width == 64 && img.height == 32);
+        float peak = 0.0f;
+        for (const glm::vec3& t : img.texels) peak = std::max(peak, t.z);
+        CHECK(peak > 5.0f);
+    }
+    EnvironmentLighting light;
+    CHECK(buildEnvironmentLighting(a, light, err) && int(light.levels.size()) == kEnvLevels);
+    // Saved as paths and restored: what hdri.json holds.
+    const std::vector<std::string> saved = userEnvironmentPaths();
+    CHECK(saved.size() == 2 && saved[0] == hdr && saved[1] == exr);
+    const uint32_t rev = environmentsRevision();
+    setUserEnvironmentPaths(saved);
+    CHECK(environmentCount() == base + 2 && findEnvironment("test_sky 2") == base + 1 && environmentsRevision() != rev);
+    // Remove: the later entry moves up, a built-in can't go.
+    CHECK(!removeEnvironment(0) && !removeEnvironment(-1) && !removeEnvironment(environmentCount()));
+    CHECK(removeEnvironment(a) && environmentCount() == base + 1 && environments()[size_t(base)].path == exr);
+    CHECK(userEnvironmentPaths().size() == 1);
+}
+
+TEST(hdri_missing_file_stays_listed_and_never_throws) {
+    UserEnvironmentsReset reset;
+    const std::string gone = tempPath("sculptforge_gone_sky.hdr");
+    std::filesystem::remove(gone);
+    const int base = environmentCount();
+    setUserEnvironmentPaths({gone, "", "notes.txt"}); // (a path from the preferences: not read when set; a non-HDR name is dropped)
+    CHECK(environmentCount() == base + 1);
+    CHECK(environmentFileMissing(base) && !environmentFileMissing(0) && !environmentFileMissing(2));
+    EnvImage img;
+    std::string err;
+    CHECK(!loadEnvironment(base, img, err) && !err.empty());
+    EnvironmentLighting light;
+    CHECK(!buildEnvironmentLighting(base, light, err));
+    std::string e2;
+    CHECK(addEnvironmentFile(tempPath("sculptforge_never_there.hdr"), e2) == -1 && !e2.empty()); // (can't be added while it is not there)
+    // The file comes back: it loads again, with no restart.
+    const std::string path = writeBytes("sculptforge_gone_sky.hdr", flatHdr(32, 16));
+    CHECK(!environmentFileMissing(base) && loadEnvironment(base, img, err) && img.width == 32);
+    std::filesystem::remove(path);
+}
+
+TEST(hdri_caps_and_wrong_files_are_refused_from_the_header) {
+    UserEnvironmentsReset reset;
+    std::string err;
+    int w = 0, h = 0;
+    // Too wide or tall: refused before a pixel is decoded (the file holds no pixels at all).
+    const std::string wide = writeBytes("sculptforge_wide.hdr", flatHdr(kMaxEnvironmentWidth + 1, 16, std::string(64, '\x80')));
+    CHECK(!probeEnvironmentFile(wide, w, h, err) && err.find("smaller") != std::string::npos);
+    EnvImage img;
+    EnvironmentInfo wideInfo;
+    wideInfo.path = wide;
+    CHECK(!loadEnvironment(wideInfo, img, err) && !img.valid());
+    CHECK(addEnvironmentFile(wide, err) == -1 && environmentCount() == int(environments().size()) && userEnvironmentPaths().empty());
+    // At the limit passes the header check.
+    const std::string edge = writeBytes("sculptforge_edge.hdr", flatHdr(kMaxEnvironmentWidth, kMaxEnvironmentHeight, std::string(16, '\x80')));
+    CHECK(probeEnvironmentFile(edge, w, h, err) && w == kMaxEnvironmentWidth && h == kMaxEnvironmentHeight);
+    // A 40-byte EXR that claims 65536 x 65536 floats (51 GB): refused, quickly, without allocating them.
+    const auto t0 = std::chrono::steady_clock::now();
+    const std::string huge = writeBytes("sculptforge_huge.exr", exrClaiming(65536, 65536, 64));
+    CHECK(!probeEnvironmentFile(huge, w, h, err));
+    int ch = 0;
+    std::vector<float> px;
+    CHECK(!loadExr(huge, w, h, ch, px, err) && px.empty());
+    CHECK(!loadExr(writeBytes("sculptforge_big2.exr", exrClaiming(8192, 8192, 64)), w, h, ch, px, err, 1 << 20) && px.empty());
+    CHECK(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < 2.0);
+    // A hostile data window (-2^31 .. 2^31-1) can't overflow its way to a small size.
+    {
+        std::string e = exrClaiming(1, 1, 16);
+        const size_t at = e.find("box2i");
+        CHECK(at != std::string::npos);
+        const int32_t win[4] = {INT32_MIN, 0, INT32_MAX, 0};
+        std::memcpy(&e[at + 6 + 4], win, sizeof win);
+        CHECK(!loadExr(writeBytes("sculptforge_win.exr", e), w, h, ch, px, err));
+    }
+    // A compressed EXR says so (the reader handles only uncompressed ones); other formats under an HDR name don't load.
+    CHECK(!probeEnvironmentFile(writeBytes("sculptforge_zip.exr", exrClaiming(64, 32, 64, 3)), w, h, err) && err.find("compressed") != std::string::npos);
+    const std::string png = writeBytes("sculptforge_notahdr.hdr", std::string("\x89PNG\r\n\x1a\n", 8) + std::string(64, '\0'));
+    CHECK(!probeEnvironmentFile(png, w, h, err) && !err.empty());
+    CHECK(!probeEnvironmentFile(writeBytes("sculptforge_pic.png", "x"), w, h, err) && err.find(".hdr") != std::string::npos);
+    CHECK(!probeEnvironmentFile(writeBytes("sculptforge_empty.hdr", ""), w, h, err));
+    for (const char* f : {"wide.hdr", "edge.hdr", "huge.exr", "big2.exr", "win.exr", "zip.exr", "notahdr.hdr", "pic.png", "empty.hdr"})
+        std::filesystem::remove(tempPath((std::string("sculptforge_") + f).c_str()));
+}
+
+// Fuzz: the good files with random bytes changed, cut short, or grown, through the path a user-picked file takes
+// (probe, then load). Each must fail with a message or load a bounded, valid image: never crash, never allocate
+// beyond the caps, never hang. (Run under the sanitizers' CI job as well.)
+TEST(hdri_loader_fuzz_damaged_files) {
+    UserEnvironmentsReset reset;
+    const std::string good[2] = {readAll(SF_TEST_DATA_DIR "/hdri/test_sky.hdr"), readAll(SF_TEST_DATA_DIR "/hdri/test_sky.exr")};
+    CHECK(!good[0].empty() && !good[1].empty());
+    std::mt19937 rng(20261126);
+    int loaded = 0, refused = 0;
+    const auto t0 = std::chrono::steady_clock::now();
+    for (int round = 0; round < 3000; ++round) {
+        const int which = round & 1;
+        std::string bytes = good[which];
+        const int kind = int(rng() % 4);
+        if (kind == 0) { // flip a few bytes (the header's first 400 bytes more often: that is where the sizes are)
+            for (int k = 0, n = 1 + int(rng() % 6); k < n; ++k) {
+                const size_t span = (rng() & 1) ? std::min<size_t>(bytes.size(), 400) : bytes.size();
+                bytes[rng() % span] = char(rng());
+            }
+        } else if (kind == 1) { // cut short
+            bytes.resize(rng() % bytes.size());
+        } else if (kind == 2) { // random bytes after a good start
+            const size_t keep = rng() % std::min<size_t>(bytes.size(), 300);
+            bytes.resize(keep);
+            for (size_t k = 0, n = rng() % 200; k < n; ++k) bytes.push_back(char(rng()));
+        } else { // a number in the header made huge
+            const size_t at = rng() % std::min<size_t>(bytes.size(), 200);
+            for (size_t k = 0; k < 4 && at + k < bytes.size(); ++k) bytes[at + k] = char(0xFF);
+        }
+        const std::string path = writeBytes(which ? "sculptforge_fuzz.exr" : "sculptforge_fuzz.hdr", bytes);
+        EnvironmentInfo info;
+        info.id = info.label = "fuzz";
+        info.path = path;
+        info.user = true;
+        EnvImage img;
+        std::string err;
+        if (loadEnvironment(info, img, err)) {
+            ++loaded;
+            CHECK(img.valid() && img.width <= kMaxEnvironmentWidth && img.height <= kMaxEnvironmentHeight);
+        } else {
+            ++refused;
+            CHECK(!err.empty());
+        }
+    }
+    std::filesystem::remove(tempPath("sculptforge_fuzz.exr"));
+    std::filesystem::remove(tempPath("sculptforge_fuzz.hdr"));
+    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    std::printf("  hdri fuzz: %d damaged files loaded, %d refused, %.1f s\n", loaded, refused, seconds);
+    CHECK(refused > 500 && seconds < 60.0);
+}
+
+TEST(hdri_network_paths_are_never_opened) {
+    UserEnvironmentsReset reset;
+    const int base = environmentCount();
+    const std::string forms[] = {"\\\\server\\share\\sky.hdr", "//server/share/sky.hdr", "\\\\?\\UNC\\server\\share\\sky.hdr",
+                                 "//?/UNC/server/share/sky.exr", "\\\\.\\pipe\\sky.hdr"};
+    for (const std::string& f : forms) {
+        std::string err;
+        int w = 0, h = 0;
+        CHECK(isNetworkPath(f));
+        CHECK(!probeEnvironmentFile(f, w, h, err) && err == "Pick a file on this computer (or a mapped drive)");
+        CHECK(addEnvironmentFile(f, err) == -1 && environmentCount() == base);
+        EnvironmentInfo info;
+        info.path = f;
+        EnvImage img;
+        CHECK(!loadEnvironment(info, img, err) && err == "Pick a file on this computer (or a mapped drive)");
+    }
+    // A remembered one is dropped when the preferences are read; nothing is listed or looked at.
+    setUserEnvironmentPaths({forms[0], forms[1], forms[2], SF_TEST_DATA_DIR "/hdri/test_sky.hdr"});
+    CHECK(environmentCount() == base + 1 && !environmentFileMissing(base));
+    // Local paths, mapped drive letters and the extended-length form of a drive are not network paths.
+    for (const char* f : {"C:\\sky.hdr", "Z:/maps/sky.hdr", "\\\\?\\C:\\maps\\sky.hdr", "/home/me/sky.hdr", "sky.hdr", "relative/dir/sky.exr", "/"})
+        CHECK(!isNetworkPath(f));
+}
+
+TEST(hdri_unusable_files_say_why) {
+    UserEnvironmentsReset reset;
+    const int base = environmentCount();
+    // An EXR with a compression we don't read: listed (from the preferences), unusable with the compression named, refused by Add HDRI.
+    const std::string piz = SF_TEST_DATA_DIR "/hdri/test_piz.exr", good = SF_TEST_DATA_DIR "/hdri/test_sky.exr";
+    std::string err, why;
+    CHECK(addEnvironmentFile(piz, err) == -1 && err.find("PIZ") != std::string::npos);
+    CHECK(err.find(".hdr") != std::string::npos);
+    setUserEnvironmentPaths({piz, good, tempPath("sculptforge_gone_x.hdr")});
+    CHECK(environmentCount() == base + 3);
+    CHECK(!environmentUsable(base, why) && why.find("PIZ") != std::string::npos && why.find(piz) == std::string::npos);
+    CHECK(environmentUsable(base + 1, why));
+    CHECK(!environmentUsable(base + 2, why) && why.find("missing") != std::string::npos);
+    CHECK(environmentUsable(0, why) && environmentUsable(2, why)); // built-ins
+    EnvImage img;
+    CHECK(!loadEnvironment(base, img, err) && err.find("PIZ") != std::string::npos);
 }

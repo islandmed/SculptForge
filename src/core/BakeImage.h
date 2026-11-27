@@ -28,7 +28,10 @@ bool loadPng16(const std::string& path, int& width, int& height, int& channels, 
 bool saveExr(const std::string& path, int width, int height, int channels, const std::vector<float>& pixels,
              std::string& error);
 // Reads uncompressed float or half EXR scanline files (what saveExr writes, and other tools' "no compression").
+// maxPixels > 0: a larger image is refused from its header, before any pixel memory is allocated.
 bool loadExr(const std::string& path, int& width, int& height, int& channels, std::vector<float>& pixels,
-             std::string& error);
+             std::string& error, int64_t maxPixels = 0);
+// The size from the header alone (the first 64 KB of the file); false with `error` when it isn't a supported EXR.
+bool probeExr(const std::string& path, int& width, int& height, std::string& error);
 
 } // namespace sf

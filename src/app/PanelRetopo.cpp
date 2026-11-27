@@ -515,7 +515,7 @@ void App::startVoxelRemesh(RemeshTrigger trigger) {
             if (ok) *note = carryTextureNote(*source, *result, keepTexture, [&](float f) {
                 progress->store(0.15f + 0.85f * f);
                 return !cancel->load();
-            }) + *note;
+            }) + vertexPaintNote(*source, *result) + *note;
             if (ok && cancel->load()) {
                 ok = false;
                 *error = "Voxel Remesh cancelled";

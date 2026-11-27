@@ -79,6 +79,7 @@
 //   key_nav_speed X          the pan and zoom key speed (Preferences > Input), 0.1 to 5
 //   input_style STYLE        classic, sculptforge (the default), blender or maya, as Preferences > Input sets it
 //   set_nav_drag MOVE GESTURE  Preferences > Navigation's drag gesture for orbit, pan or zoom, e.g. set_nav_drag zoom Shift+Middle (none clears)
+//   delete_file PATH         delete a file of the working directory (a test that makes a path go missing, e.g. an added HDRI)
 //   copy SRC DST             copy a file or folder (SRC relative to the script's folder, DST to the working
 //                            directory), e.g. to stage what another program would write (the Blender bridge);
 //                            $LIBRARY in DST (and in env values) is the test's Library library folder; a
@@ -1370,6 +1371,22 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "background_r" || name == "background_g" || name == "background_b") // 0-255, display values
         return std::round(app_.renderSettings_.backgroundColor[name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2] * 255.0f);
     if (name == "part_shading") return double(int(app_.doc_.activePartInfo().shading));
+    if (name == "clean_view") return app_.cleanView_ ? 1.0 : 0.0;
+    // Everything the shell draws around the 3D view, in px squared (0 in Clean view): bars, shelves, trays, console.
+    if (name == "chrome_area") {
+        double a = 0.0;
+        for (const CanvasRect* r : {&app_.shell_.title, &app_.shell_.paletteBar, &app_.shell_.topShelf, &app_.shell_.leftShelf,
+                                    &app_.shell_.rightShelf, &app_.shell_.bottomShelf, &app_.shell_.console,
+                                    &app_.shell_.leftTray, &app_.shell_.rightTray})
+            a += double(r->w) * double(r->h);
+        return a;
+    }
+    if (name == "canvas_fills_window") { // the 3D view covers the window below the notch band
+        int w = 0, h = 0;
+        SDL_GetWindowSize(app_.window_, &w, &h);
+        const CanvasRect c = app_.canvasRect();
+        return std::abs(c.w - float(w)) < 1.0f && std::abs(c.y + c.h - float(h)) < 1.0f ? 1.0 : 0.0;
+    }
     if (name == "shelves") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "left_tray") return app_.layout_.leftTrayOpen ? double(app_.layout_.leftTray.size()) : -1.0;
     if (name == "right_tray") return app_.layout_.rightTrayOpen ? double(app_.layout_.rightTray.size()) : -1.0;
@@ -2363,7 +2380,7 @@ enum class StepVerb { None,
     AxisDrag, ViewFigureClick, ClickPart, Drag, ButtonDrag, Action, SetShortcut, ExpectShortcut, ExpectPopupKeys, DragTubePoint,
     DragForgesphere, DragLandmark, GizmoDrag, StrokePopupItem, DragItem, DragTo, DragShelfItems, DragPath, Release,
     Orbit, Camera, Zoom, HideUi, CameraDistance, BrushSize, ResetSliders, Look, Drop, DropLibrary, ChooseFile, DialogAnswer,
-    AnswerDialog, RadialImport, Copy, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
+    AnswerDialog, RadialImport, Copy, DeleteFile, AiClient, DeckMessage, PhoneUpload, UiScale, DisplayScale, PixelDensity, LogicalWidth,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, SetNavDrag, Restart,
     GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
@@ -2426,6 +2443,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"answer_dialog", StepVerb::AnswerDialog},
         {"radial_import", StepVerb::RadialImport}, {"radial_export", StepVerb::RadialImport},
         {"copy", StepVerb::Copy},
+        {"delete_file", StepVerb::DeleteFile},
         {"ai_client", StepVerb::AiClient}, {"deck_message", StepVerb::DeckMessage},
         {"phone_upload", StepVerb::PhoneUpload}, {"phone_face", StepVerb::PhoneUpload}, {"phone_request", StepVerb::PhoneUpload},
         {"ui_scale", StepVerb::UiScale},
@@ -3838,6 +3856,15 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
             fs::copy(src, dst, fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
             if (ec) SDL_Log("copy %s: %s", src.string().c_str(), ec.message().c_str());
             restoreBridgeFixtures(dst);
+        });
+        break;
+    }
+    case StepVerb::DeleteFile: {
+        if (!need(1)) return false;
+        run([to = w[1]] {
+            std::error_code ec;
+            std::filesystem::remove(std::filesystem::path(std::u8string(to.begin(), to.end())), ec);
+            if (ec) SDL_Log("delete_file %s: %s", to.c_str(), ec.message().c_str());
         });
         break;
     }

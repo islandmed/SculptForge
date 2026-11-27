@@ -323,7 +323,7 @@ CommandRegistry::CommandRegistry() {
              }
              opProgress(0.95f, "Carrying the texture");
              if (opCancelled()) return {false, "Remesh cancelled; the scene is unchanged"};
-             const std::string texture = carryTextureNote(doc.mesh, m, argBool(a, "keep_texture", true));
+             const std::string texture = carryTextureNote(doc.mesh, m, argBool(a, "keep_texture", true)) + vertexPaintNote(doc.mesh, m);
              doc.replaceMeshUndoable(std::move(m), "Remesh", true);
              return {true, voxelRemeshNote(notes) + "Remeshed to " + std::to_string(doc.mesh.triangleCount()) + " triangles" + texture +
                            (keepNote.empty() ? "" : "; Keep masked: " + keepNote)};

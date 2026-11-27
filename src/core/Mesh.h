@@ -409,7 +409,8 @@ glm::vec3 linearToSrgb(const glm::vec3& c);
 
 // Gives every vertex of `dst` the mask and colour of the nearest vertex of
 // `src` (only the attributes `src` has). For rebuilt surfaces such as voxel
-// remesh or re-imported scans; needs no topology.
-void transferVertexAttributes(const Mesh& src, Mesh& dst);
+// remesh or re-imported scans; needs no topology. `withColors` false leaves the
+// colour to the caller (Voxel Remesh interpolates it, transferSmoothColors).
+void transferVertexAttributes(const Mesh& src, Mesh& dst, bool withColors = true);
 
 } // namespace sf

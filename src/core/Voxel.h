@@ -60,6 +60,10 @@ constexpr int kVoxelResolutionMin = 32, kVoxelDenseMax = 512, kVoxelResolutionMa
 constexpr int kVoxelResolutionDefault = 200; // (the panel's and the remesh command's)
 // A remeshed surface in the app, per triangle (as MemoryGuard counts a mesh: arrays, adjacency, BVH, GPU, undo).
 constexpr double kVoxelResultBytesPerTriangle = 150.0;
+// Peak memory of the triangle tree transferSmoothColors builds over the old surface, per old triangle (measured: 21M
+// triangles took 1.6 GB). Counted in estimateVoxelRemesh only when the paint is interpolated (a painted Part whose
+// result is denser than it was; a denser Part keeps the nearest-vertex copy, which needs no tree).
+constexpr double kVoxelPaintBvhBytesPerTriangle = 80.0;
 
 // The Resolution slider's travel (0..1): two thirds for 32-512, a sixth for 528-2048 (steps of 16), a sixth for
 // 2112-4096 (steps of 64), so the everyday range keeps its precision.
@@ -114,5 +118,21 @@ std::string voxelRemeshNote(const VoxelRemeshNotes& notes);
 // stays a hard line, one group per polygon). Nothing happens when `source` has no face groups. Safe to call from a
 // worker thread (read-only on `source`).
 void transferFaceGroups(const Mesh& source, Mesh& dst);
+
+// Mask and vertex paint onto a rebuilt surface (what Voxel Remesh does): the mask from the nearest old vertex; the paint
+// interpolated (transferSmoothColors) when the new surface has more triangles than the old one, else from the nearest old
+// vertex, which needs no tree (a source that dense is sampled finely enough, and its tree would cost 80 bytes a triangle).
+void transferRemeshPaint(const Mesh& source, Mesh& dst);
+// Whether transferRemeshPaint interpolates, for a result of `resultTriangles`.
+bool remeshInterpolatesPaint(const Mesh& source, size_t resultTriangles);
+
+// Vertex paint onto a rebuilt surface: each vertex of `dst` takes the colour at the closest point of `source`'s surface,
+// interpolated across that triangle (the nearest-vertex copy of transferVertexAttributes steps in blocks wherever the new
+// surface is denser than the old one, so a paint edge came out jagged). Nothing if `source` has no paint.
+void transferSmoothColors(const Mesh& source, Mesh& dst);
+
+// What a remesh does to vertex paint, for the status line: "" when the Part has none, else how many vertices carry it and,
+// when the new surface has fewer, that paint finer than its vertices is softened.
+std::string vertexPaintNote(const Mesh& source, const Mesh& result);
 
 } // namespace sf

@@ -1,0 +1,120 @@
+# Clean view (View > Clean view, Shift+F11; a member's request on Discord): fullscreen with no menu bar, shelves, trays or
+# status bar, only the 3D view; the same key or Esc brings the layout back exactly. Both shell layouts.
+run new_sphere subdivisions=3
+
+# The SculptForge layout (status bar and task menus on top).
+run ui_look look=forge layout=sculptforge
+key f
+wait 0.2
+remember chrome_area chrome_before
+remember canvas_width canvas_before
+remember title_height title_before
+remember right_tray right_before
+remember left_tray left_before
+expect_value clean_view == 0
+expect_value shelves_visible == 1
+shot 01-before
+
+key shift+f11
+wait 0.3
+expect_value clean_view == 1
+expect_value checked@view.clean == 1
+expect_value chrome_area == 0
+expect_value canvas_fills_window == 1
+shot 02-clean
+
+# Sculpting keeps working inside: a stroke lands, undo takes it back.
+expect_value can_undo == 0
+stroke 0.45 0.5 0.55 0.5
+expect_value can_undo == 1
+key ctrl+z
+expect_value can_undo == 0
+expect_value clean_view == 1
+
+# The key leaves.
+key shift+f11
+wait 0.3
+expect_value clean_view == 0
+expect_value chrome_area == $chrome_before
+expect_value canvas_width == $canvas_before
+expect_value title_height == $title_before
+expect_value right_tray == $right_before
+expect_value left_tray == $left_before
+expect_value shelves_visible == 1
+shot 03-after
+
+# Esc leaves too (nothing else uses it).
+key shift+f11
+wait 0.3
+expect_value clean_view == 1
+key esc
+wait 0.3
+expect_value clean_view == 0
+expect_value chrome_area == $chrome_before
+
+# F11 inside Clean view leaves it too (and fullscreen): the bars are not left hidden in a window.
+key shift+f11
+wait 0.2
+expect_value clean_view == 1
+key f11
+wait 0.3
+expect_value clean_view == 0
+expect_value chrome_area == $chrome_before
+
+# Esc closes a menu first and keeps Clean view; the next Esc leaves (artist-qa 11-26: one Esc did both).
+key shift+f11
+wait 0.3
+hover_window 0.3 0.3
+key space
+expect_value quickmenu_open == 1
+key esc
+wait 0.2
+expect_value quickmenu_open == 0
+expect_value clean_view == 1
+button_drag right 0.12 0.3 0.12 0.3 0.1
+expect_value quickmenu_open == 1
+key esc
+wait 0.2
+expect_value quickmenu_open == 0
+expect_value clean_view == 1
+key t
+expect_value radial_open == 1
+key esc
+wait 0.2
+expect_value radial_open == 0
+expect_value clean_view == 1
+key esc
+wait 0.3
+expect_value clean_view == 0
+expect_value chrome_area == $chrome_before
+
+# Tab (shelves hidden before) stays as it was: Clean view does not touch the layout.
+key tab
+expect_value shelves_visible == 0
+remember chrome_area chrome_tab
+key shift+f11
+wait 0.2
+expect_value chrome_area == 0
+key shift+f11
+wait 0.2
+expect_value shelves_visible == 0
+expect_value chrome_area == $chrome_tab
+key tab
+expect_value shelves_visible == 1
+
+# The Classic layout (title strip and palette bar).
+run ui_look look=classic layout=classic
+wait 0.3
+remember chrome_area classic_before
+remember canvas_width classic_canvas
+key shift+f11
+wait 0.3
+expect_value clean_view == 1
+expect_value chrome_area == 0
+expect_value canvas_fills_window == 1
+shot 04-clean-classic
+key shift+f11
+wait 0.3
+expect_value chrome_area == $classic_before
+expect_value canvas_width == $classic_canvas
+shot 05-after-classic
