@@ -149,6 +149,10 @@ You can also add files as Parts from elsewhere:
 - **X-Ray**, next to **Solo**, shows the active Part through the others: the other Parts turn see-through and only
   their nearest surface shows. When only the active Part is shown, it is see-through itself. Click **X-Ray** again
   to make them solid. **View > X-Ray** does the same.
+- **See-through**, the slider under the row, sets how much X-Ray lets through: 0% is solid, 100% a faint ghost, and
+  70% is the usual X-Ray look. Moving it turns X-Ray on. It only changes the view (never the Part or an export),
+  brushes, masks and picking work on the visible front surface as always, and it is saved with the project. A
+  reference image behind the model stays visible while you sculpt. **View > Render > X-Ray** has the same slider.
 - **Unhide all** shows every Part.
 
 Hidden Parts aren't drawn, can't be selected with <kbd>Alt</kbd>+click, and are left out of exports.

@@ -185,11 +185,16 @@ void App::registerViewUiCommands() {
                    "X-Ray (#80, #91): draw the other visible Parts see-through so the active Part shows through them "
                    "(with only the active Part shown, it is see-through itself). Only changes the view.",
                    {{"on", T::Bool, "On or off (default: toggle).", false},
-                    {"opacity", T::Number, "How solid the see-through Parts look, 0.05 to 1 (default 0.3).", false}},
+                    {"opacity", T::Number, "How solid the see-through Parts look, 0.03 to 1 (default 0.3).", false},
+                    {"strength", T::Number, "See-through strength in percent, 0 (solid) to 100 (a faint ghost); default 70. "
+                                            "Instead of opacity.", false}},
                    [this](Document&, const Args& a) -> CommandResult {
                        RenderSettings& v = renderSettings_;
-                       v.xray = argBool(a, "on", a.contains("opacity") ? v.xray : !v.xray);
-                       v.xrayOpacity = std::clamp(float(argNumber(a, "opacity", v.xrayOpacity)), 0.05f, 1.0f);
+                       const bool sets = a.contains("opacity") || a.contains("strength");
+                       v.xray = argBool(a, "on", sets ? v.xray : !v.xray);
+                       if (a.contains("strength")) v.xrayOpacity = 1.0f - float(argNumber(a, "strength", 70.0)) / 100.0f;
+                       else v.xrayOpacity = float(argNumber(a, "opacity", v.xrayOpacity));
+                       v.xrayOpacity = std::clamp(v.xrayOpacity, kXrayMinOpacity, 1.0f);
                        return {true, v.xray ? "X-Ray on" : "X-Ray off"};
                    }});
     commands_.add({"view_resolution",

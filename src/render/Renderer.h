@@ -37,6 +37,7 @@ struct ViewLight {
     bool shadows = false;          // the view's cast shadows come from this light (one light at most; a Key starts so)
 };
 constexpr int kMaxViewLights = 4;
+constexpr float kXrayMinOpacity = 0.03f; // X-Ray at 100% See-through still leaves a faint ghost (never an invisible Part)
 // What a light of that role starts as: the key from the upper left front, a cool fill from the right, a rim from
 // behind and above. The names are what the interface shows.
 ViewLight viewLightPreset(ViewLight::Role role);
@@ -143,7 +144,9 @@ struct RenderSettings {
     float lightYaw = 0.0f, lightPitch = 0.0f;
     float lightIntensity = 1.0f, lightAmbient = 0.0f;
     // X-Ray (#80, #91): the other visible Parts are drawn see-through (only their nearest surface, at
-    // xrayOpacity), so the active Part shows through them; with no other Part shown, the active one is see-through.
+    // xrayOpacity), so the active Part shows through them; with no other Part shown, the active one is see-through
+    // (its nearest back and front faces). The "See-through" strength is 1 - xrayOpacity (the default 70% = today's look);
+    // display only: no material, mesh or export reads it.
     bool xray = false;
     float xrayOpacity = 0.3f;
     // The 3D view's resolution as a share of the window's (#80): lower draws fewer pixels on slow GPUs and scales

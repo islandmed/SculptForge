@@ -4011,7 +4011,7 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
     if (xray) {
         gl::Enable(GL_BLEND);
         gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        const float opacity = std::clamp(settings.xrayOpacity, 0.05f, 1.0f);
+        const float opacity = std::clamp(settings.xrayOpacity, kXrayMinOpacity, 1.0f);
         if (others) {
             // Only each see-through Part's nearest surface: its depth first, then its colour where that depth is
             // (no inside folds or back faces piling up), over the opaque active Part.
@@ -4026,16 +4026,25 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
                 if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && seeThrough(item))
                     drawItem(*s, item, settings);
         } else {
-            // The lone active Part: its back faces first, then its front faces over them, so its far side and
-            // insides show through in order (exact for a convex Part, close for the rest).
-            gl::DepthMask(GL_FALSE);
+            // The lone active Part: its nearest back faces, then its nearest front faces over them, so the far side and
+            // insides show through in order and a dense Part doesn't pile its folds into soup: each layer is a depth
+            // pre-pass (colour off) and then its colour where that depth is. The same sorted blended path any later
+            // see-through material (glass) can reuse: depth first, colour at equal depth, no depth write while blending.
             keepBackfaces_ = true;
-            drawAlpha_ = opacity;
             for (GLenum cull : {GL_FRONT, GL_BACK}) {
                 xrayCull_ = cull;
+                gl::ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+                gl::DepthMask(GL_TRUE);
                 for (const DrawItem& item : drawList_)
                     if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0)
                         drawItem(*s, item, settings);
+                gl::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+                gl::DepthMask(GL_FALSE);
+                drawAlpha_ = opacity;
+                for (const DrawItem& item : drawList_)
+                    if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0)
+                        drawItem(*s, item, settings);
+                drawAlpha_ = 1.0f;
             }
             xrayCull_ = 0;
             keepBackfaces_ = false;

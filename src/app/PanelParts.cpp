@@ -783,6 +783,7 @@ void App::drawPartsContents() {
     if (ImGui::Button(tr("Unhide all"), ImVec2(-1, 0))) runCommand("part_show_all");
     ui::PinControl("Unhide all");
     ImGui::EndDisabled();
+    drawSeeThroughSlider("##seethrough_parts");
 
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
     ImGui::BeginDisabled(active >= count - 1);
@@ -1268,6 +1269,23 @@ void App::drawPartPopups() {
     ImGui::SameLine();
     if (ImGui::Button(tr("Cancel"), ImVec2(w, 0)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
+}
+
+// X-Ray's strength: how much the see-through Parts let through, 0% (solid) to 100% (a faint ghost); the default 70% is
+// the look X-Ray always had. Display only (RenderSettings::xrayOpacity): nothing in the material, the mesh or an export
+// reads it. Moving it turns X-Ray on; a reference image behind the model stays visible while sculpting.
+void App::drawSeeThroughSlider(const char* id) {
+    float percent = std::round((1.0f - renderSettings_.xrayOpacity) * 100.0f);
+    ImGui::SetNextItemWidth(-1);
+    if (ui::SliderInside(id, &percent, 0.0f, 100.0f, "See-through %.0f%%")) {
+        renderSettings_.xrayOpacity = std::clamp(1.0f - percent / 100.0f, kXrayMinOpacity, 1.0f);
+        renderSettings_.xray = true;
+    }
+    ui::HelpText("See-through", nullptr,
+                 "How much X-Ray lets through, 0 (solid) to 100 (a faint ghost); 70 is the usual X-Ray look. Only changes the "
+                 "view, never the Part or an export, and sculpting works on the visible front surface as always. Saved with "
+                 "the project; Ctrl+click to type.",
+                 "Tool > Parts");
 }
 
 } // namespace sf

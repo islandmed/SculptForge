@@ -1984,6 +1984,10 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Integrations", "集成"},
     {"Support", "支持"},
     {"X-Ray", "X 光"},
+    {"See-through %.0f%%", "透视 %.0f%%"},
+    {"See-through", "透视"},
+    {"How much X-Ray lets through, 0 (solid) to 100 (a faint ghost); 70 is the usual X-Ray look. Only changes the view, never the Part or an export, and sculpting works on the visible front surface as always. Saved with the project; Ctrl+click to type.",
+     "X 光透视的程度:0(实体)到 100(淡淡的虚影);70 为常见的 X 光效果。只改变视图,不影响部件或导出,雕刻仍作用于可见的正面。随项目保存;Ctrl+点击可输入数值。"},
     {"View resolution", "视图分辨率"},
     {"Decimate leaves masked vertices where they are, so masked areas keep their triangles exactly; the rest is "
      "decimated around them.",
