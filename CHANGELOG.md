@@ -1525,7 +1525,7 @@ All notable changes to SculptForge are listed here. The format follows
 - **Braid** strands are now flat ribbons that pass over and under each other instead of three round strands like a
   rope. A saved braid keeps its stored mesh until the tube is edited, then it is rebuilt in the new look. Requested by
   Artizmo on Discord.
-- The membership links in the app (Become a member, the yearly Member checkout, Founding Studio) carry a source tag,
+- The membership links in the app (Become a member, the yearly Member checkout, Studio) carry a source tag,
   `client_reference_id=app-card`, so a checkout started in the app is attributed to it. Nothing else is sent; no
   tracking, no new preferences.
 
@@ -1758,7 +1758,7 @@ All notable changes to SculptForge are listed here. The format follows
   it and a drag on its rim resizes it (the cursor and a tag beside it say which); each drag is one undo step. Move and
   Scale work as before, and Drag places child (or Ctrl+drag) still grows and places a new sphere in one drag. Thanks
   @tristratos (#167)
-- **Founding Studio** is now for the first 5 studios (was 10): a flat $150 a month, locked, on the Help > Support
+- **Founding Studio** is now for the first 5 studios (was 10): a personal quote, on the Help > Support
   card, the user guide's Studio membership and docs/studios.md.
 - **Keyboard and mouse** guide: Option is Alt on macOS, and how to make Option Alt and Cmd Ctrl when the Windows
   version runs under CrossOver or Wine on a Mac (their Mac driver sends Cmd as Alt by default; thanks @fenixpoints).
@@ -2274,9 +2274,8 @@ All notable changes to SculptForge are listed here. The format follows
   table, the Flatpak section and the press kit's platform list say so.
 - Site: our email address is no longer in any public page; the Studios page's "Start a Studio membership" and "email
   us" links build it when clicked (Discord without JavaScript), and the guide points to the SculptForge Discord.
-- Studio membership is now a flat $300 a month for the whole studio, any number of artists (no per-artist charge);
-  Founding Studio is a flat $150 a month for the first 10 studios. The Studios and Membership pages get a direct
-  "Studio: $300 / month" checkout button.
+- Studio membership is now a personal quote for the whole studio, any number of artists (no per-artist charge);
+  Founding Studio is for the first 10 studios. The Studios and Membership pages get a direct Studio button.
 
 ### Fixed
 - Text people type (Part, folder, layer and brush-set names, file names, Library items, pasted text) with a character
@@ -2802,15 +2801,14 @@ All notable changes to SculptForge are listed here. The format follows
   during a job. **Become a member**, **Not now** (a week) and **I'm already a member**, which signs in with GitHub
   like member builds: a member never sees it again (and gets member builds); no sign-in hides it for three months.
   Signed-in members never see it. The 10-hour reminder and the old "Maybe later" are gone.
-- Memberships: Member ($5 / month or $48 / year) and Studio ($150 / month, up to 10 artists) replace Supporter,
+- Memberships: Member ($5 / month or $48 / year) and Studio (a personal quote, up to 10 artists) replace Supporter,
   Insider, Studio and the one-time payment, on the website, in the support card, the Quick tour, the welcome note, the
   update banner ("Members get betas early") and the guide.
 - Betas are a member perk: `X.Y.Z-beta.N` is published in the private members' repository and posted in
 - **Release packages on staging**: the merge batch builds the release packages on the `staging` branch beside CI, and
   main reuses them. A release batch carries the version bump, so the release promotes packages that were already built
   and tested for the exact tagged commit: tag to published takes about 5 minutes instead of about 25.
-- **Studio membership**: $300 a month for up to 10 artists (+$25 per extra artist; Founding Studio $150 for the first
-  10 studios), now with the studio's own isolated build, a pinned version with security fixes, an offline signed
+- **Studio membership**: a personal quote for up to 10 artists (Founding Studio for the first 10 studios), now with the studio's own isolated build, a pinned version with security fixes, an offline signed
   installer and up to 3 custom items a month.
 - **Testing flow** (docs/testing-flow.md): each change is tested once per tier instead of four times. T0 is
   `tools/test/impacted.py`, the tests a change can break, from the build graph. T1 is the whole suite once per merge
