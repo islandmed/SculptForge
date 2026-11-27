@@ -223,6 +223,223 @@ key escape
 expect_value stroke_latch == 0
 expect_value hide_shape == 2
 
+# Every shape of the stroke popup: Esc ends its latch and the badge goes (Circle, Lasso, Rect, Pen, Line, Polyline).
+run new_sphere subdivisions=4
+camera 0 0
+key g
+stroke_popup_item mask_pen click
+key g
+expect_value stroke_latch == 2
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item mask_lasso click
+key g
+expect_value stroke_latch == 2
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item mask_rect click
+key g
+expect_value stroke_latch == 2
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item mask_circle click
+key g
+expect_value stroke_latch == 2
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_line click
+key g
+expect_value stroke_latch == 3
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_lasso click
+key g
+expect_value stroke_latch == 3
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_rect click
+key g
+expect_value stroke_latch == 3
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_circle click
+key g
+expect_value stroke_latch == 3
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_polyline click
+key g
+expect_value stroke_latch == 3
+expect_value stroke_latch_badge == 1
+key escape
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+
+# Cut Polyline with 0, 1 and many points: one Esc drops the points and ends the latch (the latch is not left for a second Esc).
+key g
+stroke_popup_item cut_polyline click
+key g
+expect_value stroke_latch == 3
+expect_value hide_shape == 6
+expect_value cut_polyline_points == 0
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_polyline click
+key g
+drag_path 0.4 0.4 0.4 0.4
+expect_value cut_polyline_points == 1
+key escape
+expect_value cut_polyline_points == 0
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+key g
+stroke_popup_item cut_polyline click
+key g
+drag_path 0.35 0.4 0.35 0.4
+drag_path 0.6 0.4 0.6 0.4
+drag_path 0.5 0.65 0.5 0.65
+expect_value cut_polyline_points == 3
+key escape
+expect_value cut_polyline_points == 0
+expect_value stroke_latch == 0
+expect_value stroke_latch_badge == 0
+expect_value hide_shape == 2
+# With no latch (the shape chosen on Tool > Cut) Esc still only drops the points.
+click "Cut"
+click "Cut Polyline##cut.polyline"
+expect_value hide_shape == 6
+hold ctrl+shift
+drag_path 0.4 0.4 0.4 0.4
+hold none
+expect_value cut_polyline_points == 1
+key escape
+expect_value cut_polyline_points == 0
+expect_value hide_shape == 6
+click "Visibility"
+click "Select Rectangle##select.rect"
+expect_value hide_shape == 2
+
+# Each panel's own button for the latched shape turns it off, for the shapes not tried above.
+click "Masking"
+key g
+stroke_popup_item mask_pen click
+key g
+expect_value stroke_latch == 2
+click "Mask Pen##mask.pen"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item mask_lasso click
+key g
+expect_value stroke_latch == 2
+click "Lasso Mask##mask.lasso"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item mask_circle click
+key g
+expect_value stroke_latch == 2
+click "Circle Mask##mask.circle"
+expect_value stroke_latch == 0
+click "Cut"
+key g
+stroke_popup_item cut_lasso click
+key g
+expect_value stroke_latch == 3
+click "Cut Lasso##cut.lasso"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_rect click
+key g
+expect_value stroke_latch == 3
+click "Cut Rectangle##cut.rect"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_circle click
+key g
+expect_value stroke_latch == 3
+click "Cut Circle##cut.circle"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_polyline click
+key g
+expect_value stroke_latch == 3
+click "Cut Polyline##cut.polyline"
+expect_value stroke_latch == 0
+click "Visibility"
+key g
+stroke_popup_item cut_lasso click
+key g
+expect_value stroke_latch == 3
+click "Select Lasso##select.lasso"
+expect_value stroke_latch == 3
+click "Select Lasso##select.lasso"
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_circle click
+key g
+expect_value stroke_latch == 3
+click "Select Circle##select.circle"
+expect_value stroke_latch == 3
+click "Select Circle##select.circle"
+expect_value stroke_latch == 0
+click "Select Rectangle##select.rect"
+expect_value hide_shape == 2
+expect_value stroke_latch == 0
+
+# Enter finishes the Cut Polyline being placed and keeps the latch (the next clicks start another one); Esc ends it. W ends it
+# (the Gizmo, tried above for every mode).
+run new_sphere subdivisions=4
+camera 0 0
+key g
+stroke_popup_item cut_polyline click
+key g
+drag_path 0.35 0.4 0.35 0.4
+drag_path 0.6 0.4 0.6 0.4
+drag_path 0.5 0.65 0.5 0.65
+expect_value cut_polyline_points == 3
+key enter
+expect_value cut_polyline_points == 0
+expect_value stroke_latch == 3
+key w
+expect_value stroke_latch == 0
+expect_value gizmo_mode == 1
+key w
+expect_value gizmo_mode == 0
+
 # Face groups by Ctrl+Shift (Mac report: face groups could not be selected): a Cut Line left from the latch ate the click (a
 # click cuts nothing). With the latch ended and no popup pick: Ctrl+Shift+click on a face group isolates it, a click on the
 # background shows everything again.

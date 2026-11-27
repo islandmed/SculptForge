@@ -101,6 +101,10 @@ bool App::cutPolylineKey(SDL_Keycode key) {
     if (key == SDLK_ESCAPE) {
         cutPolyline_.clear();
         status_ = "Cut Polyline dropped";
+        if (strokeLatch() != StrokeLatch::None) { // one Esc: the points go and so does the latch the popup left on
+            setStrokeLatch(StrokeLatch::None);
+            status_ = "Cut Polyline dropped, Modifiers off: strokes sculpt";
+        }
         return true;
     }
     if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
