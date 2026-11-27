@@ -9,18 +9,16 @@
       "name": "Oil Soak",
       "fill": {
         "material": {"channels": ["base_color", "roughness", "metallic"], "color": [0.42, 0.22, 0.07], "roughness": 0.62, "metallic": 0.0},
-        "mask": [{"kind": "noise", "scale": 0.16, "octaves": 3, "seed": 52, "contrast": 1.3},
-                 {"kind": "levels", "in_low": 0.5, "in_high": 0.8},
-                 {"kind": "blur", "radius": 8}]
+        "mask": [{"kind": "noise", "scale": 0.11, "octaves": 3, "seed": 52, "contrast": 1.1},
+                 {"kind": "levels", "in_low": 0.5, "in_high": 0.85}]
       }
     },
     {
       "name": "Oil Gloss Centre",
       "fill": {
         "material": {"channels": ["base_color", "roughness", "metallic"], "color": [0.27, 0.12, 0.03], "roughness": 0.08, "metallic": 0.0},
-        "mask": [{"kind": "noise", "scale": 0.16, "octaves": 3, "seed": 52, "contrast": 1.3},
-                 {"kind": "levels", "in_low": 0.66, "in_high": 0.88},
-                 {"kind": "blur", "radius": 8}]
+        "mask": [{"kind": "noise", "scale": 0.11, "octaves": 3, "seed": 52, "contrast": 1.1},
+                 {"kind": "levels", "in_low": 0.66, "in_high": 0.92}]
       }
     }
   ]

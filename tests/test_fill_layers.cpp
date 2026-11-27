@@ -316,6 +316,11 @@ TEST(wax_and_oil_recipes_use_real_channels_and_say_so) {
         for (const Json& l : r->layers.items())
             for (const Json& c : l["fill"]["material"]["channels"].items())
                 CHECK(c.asString() == "base_color" || c.asString() == "roughness" || c.asString() == "metallic" || c.asString() == "height");
+    // Blur works within UV islands only: on these wide, soft masks it leaves hard straight steps along the island borders
+    // (artist-qa 11-26), so their softness comes from the generators' Softness and Levels instead.
+    for (const MaterialRecipe* r : {wax, oil})
+        for (const Json& l : r->layers.items())
+            for (const Json& e : l["fill"]["mask"].items()) CHECK(e["kind"].asString() != "blur");
 
     // The spread of one channel over the texture's covered texels.
     auto spread = [](const PaintTexture& t, Channel c, float& lo, float& hi) {
