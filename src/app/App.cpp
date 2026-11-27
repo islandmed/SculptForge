@@ -4288,9 +4288,12 @@ void App::pollUnreal() {
 void App::drawGameExportContents() {
     ImGui::PushItemWidth(-ImGui::CalcTextSize("Reduction").x - ImGui::GetStyle().ItemInnerSpacing.x);
     if (ImGui::SliderInt(tr("LODs"), &lodLevels_, 2, 6)) clearLods();
+    ui::PinControl("LODs");
     if (ImGui::SliderFloat(tr("Reduction"), &lodRatio_, 0.1f, 0.9f, tr("x%.2f / level"))) clearLods();
+    ui::PinControl("Reduction");
     ImGui::PopItemWidth();
     if (ImGui::Button(tr(lods_.empty() ? "Generate LOD chain" : "Regenerate"), ImVec2(-1, 0))) generateLods();
+    ui::PinControl("Generate LOD chain");
 
     if (!lods_.empty()) {
         if (ImGui::BeginTable("lods", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
@@ -4328,13 +4331,16 @@ void App::drawGameExportContents() {
     ImGui::SeparatorText(tr("Unreal Engine"));
     ImGui::PushItemWidth(-ImGui::CalcTextSize("Folder").x - ImGui::GetStyle().ItemInnerSpacing.x);
     ImGui::InputText(tr("Folder"), unrealDestination_, sizeof unrealDestination_);
+    ui::PinControl("Unreal folder");
     if (unrealHeightCm_ <= 0.0f) unrealHeightCm_ = std::max(1.0f, doc_.mesh.bounds().extent().y * 100.0f);
     ImGui::DragFloat(tr("Height"), &unrealHeightCm_, 1.0f, 1.0f, 100000.0f, "%.0f cm");
+    ui::PinControl("Unreal height");
     ImGui::PopItemWidth();
     ImGui::Checkbox(tr("Unreal is on another computer"), &unrealNetwork_);
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", tr("In Unreal: Project Settings > Plugins > Python > Advanced:\nMulticast Time-To-Live = 1, "
                           "Multicast Bind Address = 0.0.0.0"));
+    ui::PinControl("Unreal is on another computer");
     if (pendingUnreal_.valid()) {
         ImGui::ProgressBar(-1.0f * float(ImGui::GetTime()), ImVec2(-1, 0), tr("Sending to Unreal..."));
     } else if (ImGui::Button(tr("Send to Unreal"), ImVec2(-1, 0))) {
@@ -4343,7 +4349,9 @@ void App::drawGameExportContents() {
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", tr("Imports (or updates) the asset in the open Unreal Editor.\nNeeds the Python Editor Script "
                           "Plugin and Project Settings > Python > Enable Remote Execution."));
+    ui::PinControl("Send to Unreal");
     if (ImGui::Button(tr("Export FBX for Unreal..."), ImVec2(-1, 0))) saveFileDialog(FileAction::ExportUnreal);
+    ui::PinControl("Export FBX for Unreal...");
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     if (doc_.mesh.layers.empty()) ImGui::TextWrapped(tr("Static mesh with %d LODs."), lodLevels_);
     else ImGui::TextWrapped(tr("Skeletal mesh with %zu morph targets."), doc_.mesh.layers.size());
@@ -4351,7 +4359,9 @@ void App::drawGameExportContents() {
 
     ImGui::SeparatorText(tr("Export"));
     if (ImGui::Button(tr("GLB + blend shapes"), ImVec2(-1, 0))) saveFileDialog(FileAction::ExportGlb);
+    ui::PinControl("GLB + blend shapes");
     if (ImGui::Button(tr("LOD chain (GLB per level)"), ImVec2(-1, 0))) saveFileDialog(FileAction::ExportLods);
+    ui::PinControl("LOD chain (GLB per level)");
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("%s", tr("Unreal, Unity, Godot, Blender, three.js"));
     ImGui::PopStyleColor();
@@ -4611,6 +4621,7 @@ void App::drawAiSettings() {
                                                                                      : "AI settings saved";
         storeAiKeys();
     }
+    ui::PinControl("Save settings");
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     if (aiSettings_.provider == P::Free)
         ImGui::TextWrapped("%s", tr("Rate limited to a request every few seconds; if it can't be reached, a running "
@@ -4977,6 +4988,7 @@ void App::drawImageTo3D() {
         if (aiSettings_.generatorService == serviceIds[i]) service = i;
     ImGui::SetNextItemWidth(-1);
     if (ImGui::Combo("##service", &service, services, kServices)) aiSettings_.generatorService = serviceIds[service];
+    ui::PinControl("Image to 3D service");
     const std::string serviceId = serviceIds[service];
     if (std::string why; serviceId != "inflate" && !policy::aiProviderAllowed(serviceId, &why)) { // (studio policy)
         ui::ManagedBadge();
@@ -5182,6 +5194,7 @@ void App::drawImageTo3D() {
                                                                                         : "Save failed " + err;
         storeAiKeys();
     }
+    ui::PinControl("Save settings");
     drawGeneratedCandidates(); // PanelGenerate3D.cpp
     if (serviceId != "inflate") drawSculptingBase();
 
@@ -5238,6 +5251,7 @@ void App::drawPalette_Splats() {
         ImGui::TextWrapped("%s", tr("Open or drop a .ply capture (Polycam, Luma, Postshot, Scaniverse...) to sculpt against it."));
         ImGui::PopStyleColor();
         if (ImGui::Button(tr("Sculpt to splats"), ImVec2(-1, 0))) runCommand("mesh_to_splats");
+        ui::PinControl("Sculpt to splats");
         if (ImGui::Button(tr("Try a test head##splats"), ImVec2(-1, 0))) runCommand("splat_test_capture", {{"kind", std::string("head")}});
         ui::HelpText("Try a test head", nullptr,
                      "Load a built-in test capture (a stylised head as Gaussian splats, with a few floaters) to try Make "

@@ -2564,6 +2564,7 @@ private:
     std::vector<std::string> myPanelFolded_; // sections folded in My Panel (session only)
     std::unordered_map<std::string, std::string> myPanelTitles_; // section id -> its title as the palette gives it (English)
     bool myPanelProbe_ = false;       // drawMyPanelSection only learns the title
+    bool pinAuditOpenAll_ = false;    // UI tests (audit_pins): every section of a palette draws open
     struct MyPanelDrag {
         bool active = false, accepted = false, fromPanel = false;
         std::string entry;

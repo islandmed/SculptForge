@@ -16,6 +16,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
@@ -143,6 +144,30 @@ bool MyPanelDragSource(const char* id, bool section, const char* label, bool fro
 }
 
 namespace {
+// Pin audit (UI tests, audit_pins): every item a palette body draws, and which of them were offered as a My Panel / shelf entry
+// (MyPanelDragEntry, or HelpText / HelpAction through pinLastItem). One inside a marked item (the parts of a 3-field drag, a
+// slider's own text box) is covered by it. What is left over is a control that "any control on any shelf" does not reach.
+struct PinAuditItem {
+    ImGuiID id = 0;
+    ImGuiWindow* root = nullptr;
+    ImRect rect;
+    std::string where, label;
+};
+struct {
+    bool on = false;
+    std::string palette, section;
+    ImGuiWindow* root = nullptr; // the palette body's window (its popups and other windows are not its controls)
+    int frame = -1;              // the items are those of the frame drawn last
+    std::vector<PinAuditItem> items;
+    std::vector<std::pair<ImGuiWindow*, ImRect>> marks;
+} g_audit;
+void auditMark() {
+    if (!g_audit.on || !g_audit.root || ImGui::GetCurrentWindow()->RootWindow != g_audit.root) return;
+    g_audit.marks.push_back({g_audit.root, ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax())});
+}
+} // namespace
+
+namespace {
 // The item MyPanelDragEntry was last called for: a button or a section header is an entry of its own, not a control too
 // (pinLastItem leaves it alone when its HelpText / HelpAction follows).
 struct {
@@ -158,6 +183,7 @@ bool isDragItem() {
 } // namespace
 
 bool MyPanelDragEntry(const std::string& entry, const char* label, bool fromPanel) {
+    auditMark();
     g_dragItem = {ImGui::GetCurrentWindow(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetFrameCount()};
     if (!AltHeld() || CtrlHeld()) return false;
     if (entry.size() >= sizeof(MyPanelPayload::entry)) return false;
@@ -417,6 +443,7 @@ void pinLastItem(const std::string& key, const char* label) {
     if (scope.empty() || key.empty() || g_inActionButton) return;
     ImGuiWindow* window = ImGui::GetCurrentWindow();
     if (window->SkipItems) return; // the control was not drawn (a section My Panel is not drawing): no item to mark
+    auditMark();
     const bool alt = AltHeld() && !CtrlHeld();
     const bool touch = !g_pinActive && !alt && touchPinWanted();
     if (!g_pinActive && !alt && !touch) return; // nothing to do this frame: no counting either (every pass counts alike)
@@ -470,8 +497,16 @@ const std::string& TouchPinMenuEntry() {
 
 int TouchPinArmed() { return g_touchPin.armedCount; }
 
+void PinControl(const char* title) {
+    std::string key = title ? title : "";
+    if (const size_t hash = key.find("##"); hash != std::string::npos) key.resize(hash);
+    if (!key.empty()) pinLastItem(key, tr(key.c_str()));
+}
+
 void PinPalette(const char* paletteId) {
     g_pinPalette = paletteId ? paletteId : "";
+    g_audit.palette = g_pinPalette;
+    g_audit.root = g_pinPalette.empty() || !ImGui::GetCurrentWindow() ? nullptr : ImGui::GetCurrentWindow()->RootWindow;
     g_pinSection.clear();
     g_pinCountPalette.clear();
     g_pinCountSection.clear();
@@ -479,6 +514,7 @@ void PinPalette(const char* paletteId) {
 
 void PinSection(const char* sectionId) {
     g_pinSection = sectionId ? sectionId : "";
+    g_audit.section = g_pinSection;
     g_pinCountSection.clear();
 }
 
@@ -776,6 +812,13 @@ int HoverLiftsShown() { return g_liftsShown; }
 
 void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& max) {
     if (!id || !ctx || !ctx->CurrentWindow) return;
+    if (g_audit.on && g_audit.frame != ctx->FrameCount) {
+        g_audit.frame = ctx->FrameCount;
+        g_audit.items.clear();
+        g_audit.marks.clear();
+    }
+    if (g_audit.on && g_audit.root && ctx->CurrentWindow->RootWindow == g_audit.root && max.x > min.x && max.y > min.y)
+        g_audit.items.push_back({id, g_audit.root, ImRect(min, max), g_audit.palette + (g_audit.section.empty() ? "" : "/" + g_audit.section), {}});
     if (g_seenFrame != ctx->FrameCount) {
         g_seenFrame = ctx->FrameCount;
         g_seen.clear();
@@ -790,12 +833,50 @@ void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& ma
     g_seen.push_back({id, ImRect(min, max), ctx->CurrentWindow->ClipRect, ctx->CurrentWindow, false});
 }
 
-void NoteItemLabel(ImGuiID id) {
+void NoteItemLabel(ImGuiID id, const char* label) {
+    if (g_audit.on && label)
+        for (auto it = g_audit.items.rbegin(); it != g_audit.items.rend(); ++it)
+            if (it->id == id) {
+                if (it->label.empty()) it->label = label;
+                break;
+            }
     for (auto it = g_seen.rbegin(); it != g_seen.rend(); ++it)
         if (it->id == id) {
             it->labelled = true;
             return;
         }
+}
+
+void PinAuditBegin() {
+    g_audit.on = true;
+    g_audit.items.clear();
+    g_audit.marks.clear();
+}
+
+std::vector<std::string> PinAuditGaps() {
+    std::vector<std::string> out;
+    for (const PinAuditItem& item : g_audit.items) {
+        const ImVec2 c = item.rect.GetCenter();
+        bool covered = false;
+        for (const auto& m : g_audit.marks)
+            if (m.first == item.root && m.second.Contains(c)) {
+                covered = true;
+                break;
+            }
+        if (covered) continue;
+        std::string label = item.label;
+        if (const size_t hash = label.find("##"); hash != std::string::npos && hash > 0) label.resize(hash); // (the id part is not words)
+        const bool words = std::any_of(label.begin(), label.end(), [](char c) { return std::isalnum(static_cast<unsigned char>(c)) != 0; });
+        const std::string line = item.where + "/" + (label.empty() ? "(no label)" : !words ? "(icon)" : label); // (an icon button: its glyph is no words)
+        if (std::find(out.begin(), out.end(), line) == out.end()) out.push_back(line);
+    }
+    return out;
+}
+
+void PinAuditEnd() {
+    g_audit.on = false;
+    g_audit.items.clear();
+    g_audit.marks.clear();
 }
 
 namespace {
@@ -1239,6 +1320,7 @@ void resetUiGlobals() {
     g_pinCountSection.clear();
     g_pin = {};
     g_pinActive = g_inActionButton = false;
+    g_touchPin.armedCount = 0; // ("so far" is this script's: a warm app runs one script after another)
     g_shown.clear();
     g_popupInfo = true;
     g_nextShelf = ShelfNone, g_nextIndex = -1;

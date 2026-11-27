@@ -534,6 +534,7 @@ void App::drawPalette_Color() {
     if (painting) ImGui::PopStyleColor();
     ui::HelpAction(*this, "draw.paint");
     ImGui::Checkbox(tr("RGB while sculpting"), &paintRgb_);
+    ui::PinControl("RGB while sculpting");
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Sculpt brushes also paint the colour"));
 
     // The picker edits display (sRGB) values; the mesh stores linear colour.
@@ -543,6 +544,7 @@ void App::drawPalette_Color() {
                             ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_NoSidePreview |
                                 ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_DisplayHex))
         doc_.paintColor = srgbToLinear(srgb);
+    ui::PinControl("Paint colour");
     static const glm::vec3 kSwatches[] = {{1.0f, 1.0f, 1.0f},   {0.1f, 0.1f, 0.1f},   {0.85f, 0.12f, 0.1f},
                                           {0.95f, 0.5f, 0.12f}, {0.95f, 0.85f, 0.2f}, {0.2f, 0.65f, 0.25f},
                                           {0.15f, 0.35f, 0.85f}, {0.5f, 0.25f, 0.7f}, {0.87f, 0.66f, 0.55f},
@@ -587,13 +589,16 @@ void App::drawPalette_Color() {
     const std::string hex = colorToHex(doc_.paintColor);
     if (ImGui::Button(tr("Fill"), ImVec2(half, 0))) runCommand("paint_fill", {{"color", hex}});
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Fill the unmasked area (the whole mesh if nothing is masked)"));
+    ui::PinControl("Fill");
     ImGui::SameLine();
     ImGui::BeginDisabled(!doc_.mesh.hasMask());
     if (ImGui::Button(tr("Fill masked"), ImVec2(half, 0)))
         runCommand("paint_fill", {{"color", hex}, {"area", std::string("masked")}});
+    ui::PinControl("Fill masked");
     ImGui::EndDisabled();
     if (ImGui::Button(tr("Cavity"), ImVec2(half, 0))) runCommand("paint_from_cavity");
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Darken creases and cavities (respects the mask)"));
+    ui::PinControl("Cavity");
     ImGui::SameLine();
     ImGui::BeginDisabled(!doc_.mesh.hasColors() && !paintsTexture(doc_.mesh));
     if (ImGui::Button(tr("Clear"), ImVec2(half, 0))) runCommand("paint_clear");
@@ -601,6 +606,7 @@ void App::drawPalette_Color() {
     ui::HelpText("Clear", nullptr, "Remove all vertex paint from the Part, paint layers included (undoable).", "Color");
     drawLineGradientControls(); // LineGradient.cpp
     ImGui::Checkbox(tr("Show vertex paint"), &renderSettings_.showVertexPaint);
+    ui::PinControl("Show vertex paint");
     ImGui::Checkbox(tr("Colour tints the material"), &renderSettings_.colorTintsMaterial);
     ui::HelpText("Colour tints the material", nullptr,
                  "On a Part with no vertex paint, the colour above tints its Lit Sphere material, so you can try a "

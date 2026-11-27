@@ -12,6 +12,7 @@
 #include <initializer_list>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace sf {
 class App;
@@ -118,7 +119,12 @@ struct TileLiftScope {
 void DrawHover(App& app);
 // From the ImGui item hooks (Demo.cpp): where this frame's candidates for a ring are.
 void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& max);
-void NoteItemLabel(ImGuiID id);
+void NoteItemLabel(ImGuiID id, const char* label);
+// UI tests (audit_pins): the items a palette body draws between Begin and Gaps that were not offered as a My Panel / shelf entry,
+// as "palette/section/label" (items drawn while PinPalette names a palette; popups and other windows are not its controls).
+void PinAuditBegin();
+std::vector<std::string> PinAuditGaps();
+void PinAuditEnd();
 
 // Customize mode: shelves this payload ("SF_UIITEM") is dragged from and dropped on.
 enum Shelf { ShelfNone = -1, ShelfTop, ShelfLeft, ShelfRight, ShelfBottom };
@@ -167,6 +173,9 @@ int TouchPinArmed();
 // drag source for My Panel and the shelves, keyed by the help title (or the action id) inside the scope being drawn; while a
 // host draws one control (BeginPinnedControl) the one whose key matches is measured and made movable. A key repeated in a
 // scope gets "#2", "#3".
+// A control drawn with no HelpText of its own (a raw ImGui widget): call this right after it (and its tooltip) to make it an
+// entry too, keyed by `title` (what follows "##" is dropped). tests/ui/shelf_every_control.sfui fails on a control that has neither.
+void PinControl(const char* title);
 void PinPalette(const char* paletteId); // the palette whose body is being drawn ("" when done); resets the key counts
 void PinSection(const char* sectionId); // the open section being drawn ("" at its end)
 // Who draws a pinned control: My Panel, or one of the shelves (the Shelf values, 0-3).

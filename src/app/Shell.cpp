@@ -2576,9 +2576,11 @@ void App::drawPaletteBody(const std::string& id) {
     if (!def) return;
     ImGui::PushID(def->id);
     ui::PinPalette(def->id); // its controls are My Panel entries (Ui.h)
+    if (pinAuditOpenAll_) ImGui::PushClipRect(ImVec2(-1e5f, -1e5f), ImVec2(1e5f, 1e5f), false); // (audit_pins: nothing is scrolled out of sight)
     const bool readOnly = ui::BeginPaletteItems();
     (this->*(def->draw))();
     ui::EndPaletteItems(readOnly);
+    if (pinAuditOpenAll_) ImGui::PopClipRect();
     ui::PinPalette("");
     ImGui::PopID();
 }

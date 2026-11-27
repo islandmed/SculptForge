@@ -58,6 +58,7 @@ void App::facegroupMouseUp() {
 
 void App::drawFaceGroupsSection() {
     ImGui::Checkbox(tr("Show face groups"), &renderSettings_.showFaceGroups);
+    ui::PinControl("Show face groups");
     ImGui::SameLine();
     const Mesh& m = doc_.mesh;
     const std::array<uint64_t, 6> key = {doc_.undo.revision() + 1, uint64_t(doc_.modified), m.triangles.size(),
@@ -79,17 +80,23 @@ void App::drawFaceGroupsSection() {
     if (ImGui::Button(tr("By normals"), ImVec2(half, 0)))
         group("facegroup_auto_by_normals", {{"angle", double(facegroupAngle_)}});
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("New group wherever the surface turns more than the angle"));
+    ui::PinControl("By normals");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##pgangle", &facegroupAngle_, 1.0f, 90.0f, "Angle %.0f deg");
+    ui::PinControl("Normals angle");
     if (ImGui::Button(tr("By pieces"), ImVec2(half, 0))) group("facegroup_by_connectivity");
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("One group per disconnected piece"));
+    ui::PinControl("By pieces");
     ImGui::SameLine();
     if (ImGui::Button(tr("From mask"), ImVec2(half, 0))) group("facegroup_from_mask");
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tr("Masked triangles become a new group"));
+    ui::PinControl("From mask");
     if (ImGui::Button(tr("Merge visible"), ImVec2(half, 0))) group("facegroup_merge_visible");
+    ui::PinControl("Merge visible");
     ImGui::SameLine();
     if (ImGui::Button(tr("Clear groups"), ImVec2(half, 0))) runCommand("facegroup_clear");
+    ui::PinControl("Clear groups");
     ui::ActionButton(*this, "facegroup.uv_groups", ImVec2(half, 0));
 }
 
@@ -98,12 +105,13 @@ void App::drawVisibilitySection() {
     if (hideShape_ == SelectShape::Circle) drawCircleOptions("select");
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ImGui::BeginDisabled(!doc_.mesh.hasHidden());
-    if (ImGui::Button(tr("Show all"), ImVec2(half, 0))) runCommand("show_all");
+    ui::ActionButton(*this, "visibility.show_all", ImVec2(half, 0));
     ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::Button(tr("Invert visible"), ImVec2(half, 0))) runCommand("invert_visibility");
+    ui::PinControl("Invert visible");
     ImGui::BeginDisabled(!doc_.mesh.hasHidden());
-    if (ImGui::Button(tr("Remove Hidden"), ImVec2(half, 0))) runCommand("delete_hidden");
+    ui::ActionButton(*this, "visibility.delete_hidden", ImVec2(half, 0)); // (the action: a shelf or My Panel copy does the same, with undo)
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", tr("Ctrl+Shift+click a group to isolate it, +Alt to hide it, on the background to show all.\n"
@@ -111,6 +119,7 @@ void App::drawVisibilitySection() {
     ImGui::SameLine();
     ImGui::BeginDisabled(!doc_.mesh.hasMask());
     if (ImGui::Button(tr("Delete masked"), ImVec2(half, 0))) runCommand("delete_masked");
+    ui::PinControl("Delete masked");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", tr("Delete the masked triangles (average mask above 50%); undo brings them back"));

@@ -637,6 +637,7 @@ void App::drawPartsContents() {
     const float third = (ImGui::GetContentRegionAvail().x - 2 * style.ItemSpacing.x) / 3.0f;
     if (ImGui::Button(tr("Append"), ImVec2(third, 0))) ImGui::OpenPopup("##append");
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tr("Add a new Part beside the model"));
+    ui::PinControl("Append");
     if (ImGui::BeginPopup("##append")) {
         // Low-poly (core/PrimitiveKit.h): the cage Polygon mode starts from, instead of the dense sculpting mesh. A saved
         // choice; either way the primitive's settings stay editable in this panel until the Part is sculpted.
@@ -720,10 +721,12 @@ void App::drawPartsContents() {
     ImGui::SameLine();
     if (ImGui::Button(tr("Duplicate"), ImVec2(third, 0))) runCommand("part_duplicate");
     if (ImGui::IsItemHovered()) ImGui::SetTooltip(tr("Copy the active Part (%s)"), actions_.shortcutText("part.duplicate").c_str());
+    ui::PinControl("Duplicate");
     ImGui::SameLine();
     ImGui::BeginDisabled(count < 2);
     if (ImGui::Button(tr("Delete..."), ImVec2(third, 0)))
         confirm("Delete Part?", "Delete \"" + activeName + "\"? This can't be undone.", "Delete", "part_delete");
+    ui::PinControl("Delete...");
     ImGui::EndDisabled();
     // Linked Duplicates (#94): copies sharing one mesh, each placed on its own.
     {
@@ -766,6 +769,7 @@ void App::drawPartsContents() {
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", tr(solo ? "Show the other Parts again" : "Show only the active Part"));
+    ui::PinControl("Solo");
     ImGui::SameLine();
     const bool xray = renderSettings_.xray;
     if (xray) ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_ButtonActive]);
@@ -773,9 +777,11 @@ void App::drawPartsContents() {
     if (xray) ImGui::PopStyleColor();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", xray ? tr("Draw the other Parts solid again") : tr("See through the other Parts to the active one"));
+    ui::PinControl("X-Ray");
     ImGui::SameLine();
     ImGui::BeginDisabled(visibleCount == count);
     if (ImGui::Button(tr("Unhide all"), ImVec2(-1, 0))) runCommand("part_show_all");
+    ui::PinControl("Unhide all");
     ImGui::EndDisabled();
 
     const float half = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
@@ -788,6 +794,7 @@ void App::drawPartsContents() {
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", tr("Merge the active Part with the one below it"));
+    ui::PinControl("Merge down...");
     ImGui::SameLine();
     ImGui::BeginDisabled(visibleCount < 2);
     if (ImGui::Button(tr("Merge visible..."), ImVec2(half, 0)))
@@ -795,6 +802,7 @@ void App::drawPartsContents() {
                 "Merge the " + std::to_string(visibleCount) + " visible Parts into one? This can't be undone,\n"
                 "but Split groups separates them again.",
                 "Merge", "part_merge_visible");
+                ui::PinControl("Merge visible...");
     ImGui::EndDisabled();
 
     // Figure Pose (core/FigurePose.h): pose every visible Part through one light Pose Mesh.
@@ -807,6 +815,7 @@ void App::drawPartsContents() {
     } else {
         ImGui::BeginDisabled(visibleCount < 1);
         if (ImGui::Button(tr("Pose all Parts"), ImVec2(-1, 0))) runCommand("figure_pose_begin");
+        ui::PinControl("Pose all Parts");
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
             ImGui::SetTooltip("%s", tr("Pose the visible Parts together on one light Pose Mesh with the Gizmo and masks, "
@@ -827,12 +836,14 @@ void App::drawPartsContents() {
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", tr("One Part per face group"));
+    ui::PinControl("Split groups");
     ImGui::SameLine();
     ImGui::BeginDisabled(doc_.mesh.triangleCount() == 0);
     if (ImGui::Button(tr("Split parts"), ImVec2(half, 0))) runCommand("part_split_parts");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", tr("One Part per disconnected piece"));
+    ui::PinControl("Split parts");
     // Split off what is hidden, masked or not masked into a new Part below (one undo step each): "Split" and three
     // short buttons, so the row fits the narrowest tray; Keep original below them copies instead.
     {
@@ -848,6 +859,7 @@ void App::drawPartsContents() {
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal))
                 ImGui::SetTooltip("%s", tr(tip));
+                ui::PinControl(label);
         };
         splitButton("Hidden##part_split", "part_split_hidden", doc_.mesh.hasHidden(),
                     "Split hidden: the hidden triangles become a new Part");
@@ -860,6 +872,7 @@ void App::drawPartsContents() {
         ImGui::Checkbox(tr("Keep original##part_split"), &splitKeepOriginal_);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
             ImGui::SetTooltip("%s", tr("Split copies the triangles into the new Part and leaves this Part as it is"));
+        ui::PinControl("Keep original");
     }
     drawBooleanSection();
     if (fontSmall_) ImGui::PushFont(fontSmall_);
@@ -975,6 +988,7 @@ void App::drawBooleanSection() {
     ImGui::BeginDisabled(taking < 2);
     if (ImGui::Button(tr("Make Boolean Mesh"), ImVec2(ImGui::GetContentRegionAvail().x - optW - style.ItemSpacing.x, 0)))
         runCommand("make_boolean_mesh", booleanArgs());
+        ui::PinControl("Make Boolean Mesh");
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal)) {
         if (taking < 2)
@@ -1003,6 +1017,7 @@ void App::drawBooleanSection() {
     ImGui::Checkbox(tr("Preview##boolean"), &booleanPreview_);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("%s", tr("Show the result in the view in place of the Parts with a Boolean"));
+    ui::PinControl("Boolean preview");
     ImGui::SameLine();
     if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::AlignTextToFramePadding();

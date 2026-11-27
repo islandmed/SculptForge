@@ -292,7 +292,7 @@ bool App::subpalette(const char* id, const char* englishTitle) {
     }
     const char* title = tr(englishTitle); // the interface language (I18n.h); the id keeps the item's identity
     auto& open = layout_.openSubpalettes;
-    bool isOpen = std::find(open.begin(), open.end(), id) != open.end();
+    bool isOpen = pinAuditOpenAll_ || std::find(open.begin(), open.end(), id) != open.end();
     const float s = uiScale_;
     const float h = kSectionHeaderH * s;
     const ImVec2 p = ImGui::GetCursorScreenPos();

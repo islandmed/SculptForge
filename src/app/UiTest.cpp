@@ -301,6 +301,10 @@
 //                            order (the label##id of each), the shelves, the trays with their panels open or collapsed, the colour
 //                            cells, and the Preferences > Interface values. With GOLDEN (relative to the script) the dump must equal
 //                            that file: a Classic default that moved fails; SF_UI_GOLDEN_UPDATE=1 rewrites it (on purpose, reviewed)
+//   audit_pins NAME EXCLUDED  open every palette with all its sections, and list each control that can't be dragged onto a shelf or My
+//                            Panel ("palette/section/label") in --ui-out/NAME. EXCLUDED (relative to the script) lists the ones that
+//                            may not be, "palette/section/label  # reason" per line: a gap not listed fails
+//                            (tests/ui/shelf_every_control.sfui)
 //   action ID                run a registry action as its key, shelf tile or the command palette would
 //   dialog_answer PATH|cancel   what the next file or folder dialog answers (none ever opens from a script:
 //                            NativeDialog.h; PATH relative to the script); values dialogs_requested (dialogs and URLs
@@ -2332,7 +2336,7 @@ enum class StepVerb { None,
     PalmGuard, ClassicKeys, QuickTourOffers, KeyNavSpeed, MouseOrbitSpeed, TwoKeyWindow, InputStyle, SetNavDrag, Restart,
     GeneratorStub, Env, Run, RunFails, PythonStartup, FirstRunLanguage, SupportCard, MemberCard, MemberSignIn, Wait, WaitReal,
     WaitIdle, WaitFor, Expect, ExpectClear, ExpectText, RememberItems, ExpectTitle, ExpectStatus, ExpectHelp,
-    Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, DumpUi, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
+    Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, DumpUi, AuditPins, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
     PenStream, MouseSteps, OsMods, StuckMods, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
     SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
@@ -2432,6 +2436,7 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"expect_guide", StepVerb::ExpectGuide},
         {"dump_shortcuts", StepVerb::DumpShortcuts},
         {"dump_ui", StepVerb::DumpUi},
+        {"audit_pins", StepVerb::AuditPins},
         {"snapshot", StepVerb::Snapshot},
         {"interactive_strokes", StepVerb::InteractiveStrokes},
         {"mark_view", StepVerb::MarkView},
@@ -4580,6 +4585,73 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         break;
     }
+    case StepVerb::AuditPins: {
+        if (!need(2)) return false;
+        const std::string name = w[1], excluded = w[2];
+        // One palette per few frames (its drop-down, every section open); what the last frame drew and nothing offered as an entry.
+        auto st = std::make_shared<std::pair<size_t, int>>(0, -1);
+        auto order = std::make_shared<std::vector<std::string>>();
+        auto gaps = std::make_shared<std::set<std::string>>();
+        steps_.push_back([this, line, name, excluded, st, order, gaps](float) {
+            if (order->empty()) {
+                int count = 0;
+                const PaletteDef* list = palettes(count);
+                for (int i = 0; i < count; ++i)
+                    if (std::string(list[i].id) != "mypanel") order->push_back(list[i].id); // (My Panel draws the others' controls)
+                ui::PinAuditBegin();
+                app_.pinAuditOpenAll_ = true;
+            }
+            if (st->first < order->size()) {
+                const std::string& id = (*order)[st->first];
+                if (st->second < 0) {
+                    app_.removePaletteFromTrays(id); // (a palette in a tray is not drawn in its drop-down)
+                    app_.dropdown_ = id;
+                    app_.openDropdown_ = true;
+                    st->second = 0;
+                    return false;
+                }
+                if (++st->second < 4) return false;
+                std::set<std::string> here;
+                for (const std::string& g : ui::PinAuditGaps()) here.insert(g);
+                const bool shown = app_.dropdown_ == id;
+                if (!shown) fail(line, "the drop-down of palette " + id + " did not open");
+                gaps->insert(here.begin(), here.end());
+                app_.dropdown_.clear();
+                st->first++;
+                st->second = -1;
+                return false;
+            }
+            ui::PinAuditEnd();
+            app_.pinAuditOpenAll_ = false;
+            const std::filesystem::path dir(std::u8string(shotDir_.begin(), shotDir_.end()));
+            std::filesystem::create_directories(dir);
+            std::ofstream f(dir / name, std::ios::binary);
+            for (const std::string& g : *gaps) f << g << "\n";
+            f.close();
+            std::filesystem::path file(std::u8string(excluded.begin(), excluded.end()));
+            if (file.is_relative()) file = std::filesystem::path(std::u8string(scriptDir_.begin(), scriptDir_.end())) / file;
+            std::set<std::string> allowed;
+            std::ifstream in(file, std::ios::binary);
+            if (!in) fail(line, "can't read " + file.string());
+            for (std::string row; std::getline(in, row);) {
+                if (const size_t hash = row.find("  #"); hash != std::string::npos) row.resize(hash);
+                while (!row.empty() && (row.back() == ' ' || row.back() == '\r')) row.pop_back();
+                if (!row.empty() && row[0] != '#') allowed.insert(row);
+            }
+            // A row ending in * excludes every gap that starts with the rest (a list of installed brushes, a table's rows).
+            auto covers = [](const std::string& rule, const std::string& gap) {
+                return !rule.empty() && rule.back() == '*' ? gap.compare(0, rule.size() - 1, rule, 0, rule.size() - 1) == 0 : rule == gap;
+            };
+            std::string bad;
+            for (const std::string& g : *gaps)
+                if (std::none_of(allowed.begin(), allowed.end(), [&](const std::string& r) { return covers(r, g); }))
+                    bad += "\n  not draggable: " + g;
+            // (A listed control that is no gap any more is no failure: some are drawn only at some window sizes.)
+            if (!bad.empty()) fail(line, "controls that can't go on a shelf or My Panel:" + bad);
+            return true;
+        });
+        break;
+    }
     case StepVerb::DumpUi: {
         if (!need(1)) return false;
         const std::string name = w[1], golden = w.size() > 2 ? w[2] : std::string();
@@ -5752,7 +5824,7 @@ bool Demo::loadScript(const std::string& path, std::string& error) {
         lineText_ = line;
         if (take_) { // a benchmark take: only what a person does in real time
             const std::string& verb = words[0];
-            static const std::set<std::string> skipped = {"shot", "snapshot", "remember", "remember_items", "print", "dump_shortcuts", "dump_ui"};
+            static const std::set<std::string> skipped = {"shot", "snapshot", "remember", "remember_items", "print", "dump_shortcuts", "dump_ui", "audit_pins"};
             if (skipped.count(verb) || verb.rfind("expect", 0) == 0) {
                 SDL_Log("%s:%d: '%s' skipped (a take checks and shoots nothing)", scriptName_.c_str(), n, verb.c_str());
                 continue;
