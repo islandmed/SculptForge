@@ -406,7 +406,7 @@ void App::drawBrushSetSave() {
         const std::string name = trimmed(brushSets_.name);
         const int existing = name.empty() ? -1 : findSet(brushSets_.list, name);
         if (existing >= 0 && brushSets_.list[size_t(existing)].name == name)
-            ImGui::TextColored(ImVec4(0.94f, 0.53f, 0.18f, 1.0f), tr("Replaces the set %s."), name.c_str());
+            ImGui::TextColored(theme::ink(ImVec4(0.94f, 0.53f, 0.18f, 1.0f)), tr("Replaces the set %s."), name.c_str());
         ImGui::PopTextWrapPos();
         if (!error.empty()) ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", error.c_str());
         ImGui::BeginDisabled(name.empty());

@@ -15,7 +15,10 @@ expect_value tint@0.79,0.1,1.0,0.95 == 0         # the right tray
 
 click "3##lbrows"                              # another page button is the selected one now
 wait 0.2
-shot mono-library-rows3
+shot mono-library-rows3                         # (the pointer is still on it: hovered, the fill stays light, the text dark)
+hover "3##lbrows"
+wait 0.2
+shot mono-library-rows3-hover
 expect_value tint@0.08,0.08,0.88,0.16 == 0
 
 # The Neutral colours keep their orange: the probe sees it (so a pass above means something).

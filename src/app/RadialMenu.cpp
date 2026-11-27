@@ -364,8 +364,8 @@ void App::drawRadialMenu() {
         const float left = std::abs(x) < 0.2f ? p.x - w * 0.5f : x > 0.0f ? p.x - 18.0f * s : p.x - w + 18.0f * s;
         const ImVec2 a0(left, p.y - h * 0.5f), a1(left + w, p.y + h * 0.5f);
         const bool hot = i == radial_.hover;
-        dl->AddRectFilled(a0, a1, hot ? IM_COL32(0x3a, 0x30, 0x28, 0xf8) : IM_COL32(0x25, 0x25, 0x28, 0xf2), h * 0.5f);
-        dl->AddRect(a0, a1, hot ? ui::color::accent : checked ? IM_COL32(0xf0, 0x88, 0x2e, 0x80) : ui::color::border,
+        dl->AddRectFilled(a0, a1, hot ? (theme::look.monochrome ? IM_COL32(0x38, 0x38, 0x38, 0xf8) : IM_COL32(0x3a, 0x30, 0x28, 0xf8)) : IM_COL32(0x25, 0x25, 0x28, 0xf2), h * 0.5f);
+        dl->AddRect(a0, a1, hot ? ui::color::accent : checked ? theme::ink(IM_COL32(0xf0, 0x88, 0x2e, 0x80)) : ui::color::border,
                     h * 0.5f, 0, hot ? 2.0f * s : 1.0f);
         const ImU32 fg = !enabled ? ui::color::textDim : hot ? IM_COL32(0xff, 0xff, 0xff, 0xff) : ui::color::text;
         float tx = a0.x + 10.0f * s;

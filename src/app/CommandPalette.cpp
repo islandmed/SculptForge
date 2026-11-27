@@ -235,7 +235,7 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
     ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 6.0f * s);
     ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
     ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0x25 / 255.0f, 0x25 / 255.0f, 0x28 / 255.0f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(IM_COL32(0xf0, 0x88, 0x2e, 0x70)));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(theme::ink(IM_COL32(0xf0, 0x88, 0x2e, 0x70))));
     std::function<void()> pending;
     std::string prefill;
     if (ImGui::BeginPopup(kPopup, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings)) {
@@ -342,7 +342,7 @@ void CommandPalette::draw(App& app, const CanvasRect& area) {
                     if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogText("\n%s  %s  %s", shownLabel, trPath(a.palette).c_str(), chord.c_str());
                     rows->ChannelsSetCurrent(0);
                     if (r == selected_)
-                        rows->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), IM_COL32(0xf0, 0x88, 0x2e, 0x30), theme::rounding(4.0f * s));
+                        rows->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), theme::ink(IM_COL32(0xf0, 0x88, 0x2e, 0x30)), theme::rounding(4.0f * s));
                     else if (hovered)
                         rows->AddRectFilled(p, ImVec2(p.x + w, p.y + rowH), IM_COL32(0xff, 0xff, 0xff, 0x0a), theme::rounding(4.0f * s));
                 }

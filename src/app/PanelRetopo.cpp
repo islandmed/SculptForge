@@ -323,7 +323,7 @@ void App::drawVoxelResolution(bool compact) {
                                                                        : tr("About %s triangles, needs ~%s, %s free"),
                       tris.c_str(), memoryText(e.bytes).c_str(), memoryText(limits.available).c_str());
     if (smallFont()) ImGui::PushFont(smallFont());
-    ImGui::PushStyleColor(ImGuiCol_Text, fits ? theme::textDim : tier == MemoryTier::NeedsSwap ? theme::brand : theme::danger);
+    ImGui::PushStyleColor(ImGuiCol_Text, fits ? theme::textDim : tier == MemoryTier::NeedsSwap ? theme::ink(theme::brand) : theme::danger);
     ImGui::TextWrapped("%s", line); // (the swap and red lines are long: wrap, never clip at the panel edge)
     ImGui::PopStyleColor();
     if (smallFont()) ImGui::PopFont();
@@ -360,7 +360,7 @@ void App::drawVoxelHighResConfirm() {
         char need[256];
         std::snprintf(need, sizeof need, tr("This needs about %s; %s is free. It may use swap and be slow."), memoryText(e.bytes).c_str(),
                       memoryText(c.availableBytes).c_str());
-        ImGui::TextColored(theme::brand, "%s", need);
+        ImGui::TextColored(theme::ink(theme::brand), "%s", need);
         const std::string limit = "Limit used: " + memoryCeilingText(memoryLimits());
         if (smallFont()) ImGui::PushFont(smallFont());
         ImGui::TextColored(theme::textDim, "%s", limit.c_str());

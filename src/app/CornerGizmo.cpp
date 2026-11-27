@@ -30,7 +30,7 @@ ImU32 withAlpha(ImU32 col, float a) {
 
 constexpr ImU32 kAxisColours[3] = {IM_COL32(236, 84, 92, 255), IM_COL32(124, 196, 64, 255), IM_COL32(64, 140, 236, 255)};
 constexpr const char* kAxisNames[3] = {"X", "Y", "Z"};
-constexpr ImU32 kAccent = IM_COL32(240, 136, 46, 255); // theme::accent, the forge ember
+ImU32 kAccent() { return theme::ink(IM_COL32(240, 136, 46, 255)); } // theme::accent, the forge ember (white in Monochrome)
 
 } // namespace
 
@@ -149,7 +149,7 @@ void App::drawOrientationWidget(ImDrawList* dl, glm::vec2 c, float discR, bool l
             dl->AddLine(ImVec2(from.x, from.y), ImVec2(to.x, to.y), withAlpha(kAxisColours[e.axis], alpha * (near ? 0.9f : 0.6f)),
                         (e.negative ? 1.4f : 2.0f) * unit);
         }
-        dl->AddCircleFilled(tip, r, isHover ? kAccent : col, 24);
+        dl->AddCircleFilled(tip, r, isHover ? kAccent() : col, 24);
         if (!e.negative) // a glass highlight on the big dots
             dl->AddCircleFilled(ImVec2(tip.x - r * 0.3f, tip.y - r * 0.3f), r * 0.32f, IM_COL32(255, 255, 255, int(70 * alpha)), 12);
         if (isHover) dl->AddCircle(tip, r + 2.0f * unit, ringCol, 24, 1.5f * unit);
