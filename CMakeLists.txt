@@ -353,6 +353,9 @@ target_compile_definitions(sculptforge_core PUBLIC GLM_FORCE_XYZW_ONLY
 target_compile_definitions(sculptforge_core PRIVATE SCULPTFORGE_VERSION="${PROJECT_VERSION}") # written into projects
 if(MSVC)
   target_compile_options(sculptforge_core PRIVATE /W4 /utf-8 /permissive-)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang") # clang-cl: the float rules of the GCC/Clang branch below
+    target_compile_options(sculptforge_core PRIVATE -ffp-contract=off -fno-fast-math)
+  endif()
   target_compile_definitions(sculptforge_core PUBLIC NOMINMAX _USE_MATH_DEFINES)
 else()
   # -ffp-contract=off: no fused multiply-adds, so a result doesn't depend on the optimisation level (distro
