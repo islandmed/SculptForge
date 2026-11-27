@@ -11,7 +11,7 @@ expect_value hide_shape == 2
 # His sequence: Cut Line from the stroke popup, one cut with a plain drag, Esc, then a Ctrl+Shift drag.
 key g
 stroke_popup_item cut_line click
-key escape
+key g
 expect_value stroke_latch == 3
 expect_value hide_shape == 3
 view_drag 0.25 0.3 0.75 0.7
@@ -35,18 +35,18 @@ expect_value undo_steps == 2
 # Turned off by picking Cut Line in the popup again: the same.
 key g
 stroke_popup_item cut_line click
-key escape
+key g
 expect_value hide_shape == 3
 key g
 stroke_popup_item cut_line click
-key escape
+key g
 expect_value stroke_latch == 0
 expect_value hide_shape == 2
 
 # Another brush picked ends the latch: the same.
 key g
 stroke_popup_item cut_lasso click
-key escape
+key g
 expect_value hide_shape == 4
 key 2
 wait 0.1
@@ -60,7 +60,7 @@ click "Select Circle##select.circle"
 expect_value hide_shape == 7
 key g
 stroke_popup_item cut_line click
-key escape
+key g
 expect_value hide_shape == 3
 key escape
 expect_value stroke_latch == 0
@@ -69,9 +69,148 @@ expect_value hide_shape == 7
 # A shape picked on the panel while the latch is on is the user's: it stays when the latch ends.
 key g
 stroke_popup_item cut_line click
-key escape
+key g
 click "Select Rectangle##select.rect"
 expect_value hide_shape == 2
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+
+# One Esc (artist-qa 11-27): the popup open with a latch on, a single Esc closes it and ends the latch.
+key g
+stroke_popup_item cut_line click
+expect_value stroke_latch == 3
+expect_value stroke_popup_open == 1
+key escape
+expect_value stroke_popup_open == 0
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+
+# The Gizmo ends every latch (any mode), and a handle drag moves the Part instead of cutting, selecting or masking it.
+run new_sphere subdivisions=4
+camera 0 0
+remember triangles full
+remember center_x cx0
+# G > Cut Line, popup closed with G (latched), then the Gizmo: the latch ends, the drag moves the Part and nothing is cut.
+key g
+stroke_popup_item cut_line click
+key g
+expect_value stroke_latch == 3
+key shift+w
+expect_value gizmo_mode == 4
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+gizmo_drag move_x 80 0
+expect_value triangles == $full
+expect_value center_x != $cx0
+key ctrl+z
+expect_value center_x == $cx0
+# Back in Draw the latch does not come back.
+key shift+w
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+
+# The same for Select, Mask, Smooth and the mask shapes, on each Gizmo mode (Move W, Scale E, Rotate R, All Shift+W).
+run mask_clear
+key g
+stroke_popup_item select click
+key g
+expect_value stroke_latch > 0
+key w
+expect_value gizmo_mode == 1
+expect_value stroke_latch == 0
+gizmo_drag move_x 60 0
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key w
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+key g
+stroke_popup_item mask click
+key g
+expect_value stroke_latch > 0
+key e
+expect_value gizmo_mode == 2
+expect_value stroke_latch == 0
+gizmo_drag scale_uniform 40 -40
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key e
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+key g
+stroke_popup_item smooth click
+key g
+expect_value stroke_latch > 0
+key r
+expect_value gizmo_mode == 3
+expect_value stroke_latch == 0
+gizmo_drag rotate_y 40 20
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key r
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_rect click
+key g
+expect_value stroke_latch > 0
+key shift+w
+expect_value gizmo_mode == 4
+expect_value stroke_latch == 0
+gizmo_drag move_x 60 0
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key shift+w
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+key g
+stroke_popup_item mask_rect click
+key g
+expect_value stroke_latch > 0
+key w
+expect_value gizmo_mode == 1
+expect_value stroke_latch == 0
+gizmo_drag move_y 0 40
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key w
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+key g
+stroke_popup_item cut_lasso click
+key g
+expect_value stroke_latch > 0
+key e
+expect_value gizmo_mode == 2
+expect_value stroke_latch == 0
+gizmo_drag scale_uniform 40 -40
+expect_value triangles == $full
+expect_value masked == 0
+expect_value hidden == 0
+key ctrl+z
+key e
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 0
+
+# A latch picked while the Gizmo is on leaves the Gizmo (the popup's tiles are sculpting strokes) and latches.
+key shift+w
+expect_value gizmo_mode == 4
+key g
+stroke_popup_item cut_line click
+key g
+expect_value gizmo_mode == 0
+expect_value stroke_latch == 3
 key escape
 expect_value stroke_latch == 0
 expect_value hide_shape == 2

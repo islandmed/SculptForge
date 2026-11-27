@@ -3575,6 +3575,8 @@ private:
     std::string strokeModifierKeysText(StrokeModifier m) const; // the active input style's keys for a popup tile
     StrokeLatch strokeLatch() const; // the latch in effect (None once another brush was picked)
     void setStrokeLatch(StrokeLatch latch);
+    bool latchToolOk() const; // no Gizmo or other tool is taking the drags
+    void leaveToolsForLatch();
     struct StrokePopupOpen {
         bool open = false;
         ImVec2 at{0, 0};       // the panel's top-left
