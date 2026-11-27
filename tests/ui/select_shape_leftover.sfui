@@ -21,7 +21,11 @@ expect_value stroke_latch == 3
 key escape
 expect_value stroke_latch == 0
 expect_value hide_shape == 2
+# The left tray's Brush and Stroke tiles (the green Cut Line icons the tester still saw) show Select Rectangle again.
 hold ctrl+shift
+wait 0.2
+expect_value held_tile == 2
+shot select_after_latch_tray
 drag_path 0.4 0.4 0.6 0.45 keep
 wait 0.1
 shot select_after_latch_dragging
@@ -65,6 +69,10 @@ expect_value hide_shape == 3
 key escape
 expect_value stroke_latch == 0
 expect_value hide_shape == 7
+hold ctrl+shift
+wait 0.2
+expect_value held_tile == 7
+hold none
 
 # A shape picked on the panel while the latch is on is the user's: it stays when the latch ends.
 key g
