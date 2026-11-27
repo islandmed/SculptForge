@@ -222,3 +222,32 @@ expect_value stroke_latch == 3
 key escape
 expect_value stroke_latch == 0
 expect_value hide_shape == 2
+
+# Face groups by Ctrl+Shift (Mac report: "the polygroups can't be selected"): a Cut Line left from the latch ate the click (a
+# click cuts nothing). With the latch ended and no popup pick: Ctrl+Shift+click on a face group isolates it, a click on the
+# background shows everything again.
+run new_sphere subdivisions=4
+camera 0 0
+key g
+stroke_popup_item cut_line click
+key g
+key escape
+expect_value stroke_latch == 0
+expect_value hide_shape == 2
+remember groups g0
+hold ctrl
+drag_path 0.25 0.45 0.75 0.6
+hold none
+expect_value masked > 0
+key ctrl+w
+expect_value groups > $g0
+expect_value hidden == 0
+hold ctrl+shift
+drag_path 0.5 0.52 0.5 0.52
+hold none
+expect_value hidden > 0
+shot group_isolated_after_latch
+hold ctrl+shift
+drag_path 1.5 0.5 1.5 0.5
+hold none
+expect_value hidden == 0
