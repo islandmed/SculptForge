@@ -380,7 +380,7 @@ void App::drawPolyOverlay() {
     };
     const size_t cap = sel.element == PolyElement::Points ? kDrawnPoints : sel.element == PolyElement::Edges ? kDrawnEdges : kDrawnFaces;
     const size_t step = std::max<size_t>(1, ov.items.size() / cap);
-    // Two passes: the hidden part first (dim, thinner, outlines only, at most a sixteenth of the caps: an element costs the same
+    // Two passes: the hidden part first (dim, thinner, outlines only, at most a 128th of the caps (about 470 faces, 1170 edges): an element costs the same
     // as a visible one, and a select-all on a dense Part must stay quick), then the visible part over it exactly as before.
     ov.drawnFront = ov.drawnHidden = 0;
     for (int pass = uiPrefs_.showHiddenSelection ? 0 : 1; pass < 2; ++pass) {
@@ -391,7 +391,7 @@ void App::drawPolyOverlay() {
         size_t stride = step, seen = 0;
         if (!front) {
             const size_t hiddenCount = size_t(std::count(ov.visible.begin(), ov.visible.end(), uint8_t(0)));
-            stride = std::max<size_t>(1, hiddenCount / std::max<size_t>(1, cap / 16));
+            stride = std::max<size_t>(1, hiddenCount / std::max<size_t>(1, cap / 128));
         }
         for (size_t i = 0; i < ov.items.size(); i += front ? step : 1) {
             if ((ov.visible[i] != 0) != front) continue;
