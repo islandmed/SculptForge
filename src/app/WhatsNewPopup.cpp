@@ -500,8 +500,10 @@ void App::drawWhatsNew() {
         const float cy = b.y - barH - noteH * 0.5f;
         const char* link = tr(kWhatsNewMemberLink);
         const float lw = paint.measure(boldUi, 14.0f, link).x + 36.0f * k, tw = size.x - pad * 2.0f - lw - 24.0f * k;
-        const ImVec2 ts = paint.measure(bodyFont, 13.5f, tr(kWhatsNewMemberNote), tw);
-        paint.text(bodyFont, 13.5f, ImVec2(a.x + pad, std::floor(cy - ts.y * 0.5f)), tc(dim, fa), tr(kWhatsNewMemberNote), tw);
+        // (the UI font, not the card's Latin-only body font: the line is translated, so it needs the CJK glyphs)
+        ImFont* noteFont = ImGui::GetFont();
+        const ImVec2 ts = paint.measure(noteFont, 14.0f, tr(kWhatsNewMemberNote), tw);
+        paint.text(noteFont, 14.0f, ImVec2(a.x + pad, std::floor(cy - ts.y * 0.5f)), tc(dim, fa), tr(kWhatsNewMemberNote), tw);
         membership = pill(link, "Membership##whats_new.membership", b.x - pad - lw, false, cy).second;
     }
     {

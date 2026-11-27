@@ -1739,6 +1739,8 @@ if(SCULPTFORGE_BUILD_TESTS)
     # What's New's one membership line (shot at 1440 and 2880; the READY shots).
     sculptforge_ui_test(whats_new_member_note_1440 whats_new_member_note --size 1440x900)
     sculptforge_ui_test(whats_new_member_note_2880 whats_new_member_note --size 2880x1620)
+    sculptforge_ui_test(whats_new_member_note_cjk_1440 whats_new_member_note_cjk --size 1440x900)
+    sculptforge_ui_test(whats_new_member_note_cjk_2880 whats_new_member_note_cjk --size 2880x1620)
     sculptforge_ui_test(support_card_1440 support_card --size 1440x900)
     # Member betas are paused: the Help text and the Quick Tour last page name early builds (READY shots at 1440 + 2880).
     sculptforge_ui_test(betas_wording_1440 betas_wording --size 1440x900)
