@@ -883,40 +883,52 @@ void App::drawShadingControls() {
     ImGui::TextDisabled("%s", tr("Glass"));
     ui::Segmented(*this, {"part.glass_off", "part.glass_water", "part.glass_glass", "part.glass_diamond"});
     if (!part.glass.active()) return;
-    // Live while dragging (the view follows), one undoable command when let go.
+    // Live while dragging (the view follows), one undoable command when let go. (The Transmission slider stops at 0.02:
+    // at 0 the Part would stop being glass mid-drag and these rows would go; Off is the way back to opaque.)
     static PartGlass start;
+    static bool tintEditing = false;
     PartGlass g = part.glass;
-    auto live = [&](const char* label, const char* what, const char* help) {
-        if (ImGui::IsItemActivated()) start = part.glass;
-        if (ImGui::IsItemEdited()) part.glass = clampedGlass(g);
-        if (ImGui::IsItemDeactivatedAfterEdit()) {
-            const PartGlass end = part.glass;
-            part.glass = start;
+    auto commit = [&](bool withTint) {
+        const PartGlass end = part.glass;
+        part.glass = start;
+        Args a{{"transmission", double(end.transmission)}, {"ior", double(end.ior)}, {"depth", double(end.depth)}};
+        if (withTint) { // (only when the tint was edited: a hex colour is 8 bits a channel, the slider edits shouldn't round it)
             char hex[16];
             const glm::vec3 s = glm::clamp(linearToSrgb(end.tint), 0.0f, 1.0f) * 255.0f + 0.5f;
             std::snprintf(hex, sizeof hex, "#%02x%02x%02x", int(s.x), int(s.y), int(s.z));
-            runCommand("part_glass", {{"transmission", double(end.transmission)}, {"ior", double(end.ior)}, {"depth", double(end.depth)},
-                                      {"tint", std::string(hex)}});
+            a["tint"] = std::string(hex);
         }
+        runCommand("part_glass", a);
+    };
+    auto live = [&](const char* what, const char* help) {
+        if (ImGui::IsItemActivated()) start = part.glass;
+        if (ImGui::IsItemEdited()) part.glass = clampedGlass(g);
+        if (ImGui::IsItemDeactivatedAfterEdit()) commit(false);
         ui::HelpText(what, nullptr, help, "Material > This Part");
-        (void)label;
     };
     ImGui::SetNextItemWidth(-1);
-    ImGui::SliderFloat("##glass_transmission", &g.transmission, 0.0f, 1.0f, tr("Transmission %.2f"));
-    live("##glass_transmission", "Transmission",
-         "How see-through the Part is: 1 is clear, less lets its own surface show through.");
+    ImGui::SliderFloat("##glass_transmission", &g.transmission, 0.02f, 1.0f, tr("Transmission %.2f"));
+    live("Transmission", "How see-through the Part is: 1 is clear, less lets its own surface show through.");
     ImGui::SetNextItemWidth(-1);
     ImGui::SliderFloat("##glass_ior", &g.ior, kGlassIorMin, kGlassIorMax, tr("Index %.2f"));
-    live("##glass_ior", "Index",
+    live("Index",
          "The index of refraction: water 1.33, glass 1.5, diamond 2.42. A higher index mirrors the environment more strongly "
          "at the edges. The view does not bend what is behind the Part.");
     ImGui::SetNextItemWidth(-1);
     ImGui::SliderFloat("##glass_depth", &g.depth, kGlassDepthMin, kGlassDepthMax, tr("Depth %.2f"), ImGuiSliderFlags_Logarithmic);
-    live("##glass_depth", "Depth",
+    live("Depth",
          "How much glass gives the full tint, in quarter-sizes of the Part: thicker parts are tinted deeper, thin ones stay clear.");
+    // The colour picker is a pop-up: its edits come as changes, and the command runs once the mouse is let go.
     glm::vec3 tint = linearToSrgb(glm::clamp(g.tint, 0.0f, 1.0f));
-    if (ImGui::ColorEdit3(tr("Tint"), &tint.x, ImGuiColorEditFlags_NoInputs)) g.tint = srgbToLinear(glm::clamp(tint, 0.0f, 1.0f));
-    live("##glass_tint", "Tint", "The colour the glass takes on at full depth. White is clear.");
+    if (ImGui::ColorEdit3(tr("Tint"), &tint.x, ImGuiColorEditFlags_NoInputs)) {
+        if (!tintEditing) start = part.glass, tintEditing = true;
+        g.tint = srgbToLinear(glm::clamp(tint, 0.0f, 1.0f));
+        part.glass = clampedGlass(g);
+    } else if (tintEditing && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        tintEditing = false;
+        commit(true);
+    }
+    ui::HelpText("Tint", nullptr, "The colour the glass takes on at full depth. White is clear.", "Material > This Part");
     if (renderer_.glassDrawn() && !renderer_.glassThickness())
         ImGui::TextWrapped("%s", tr("This graphics chip can't tint glass by its thickness: it is drawn clear."));
 }

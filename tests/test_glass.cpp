@@ -89,6 +89,8 @@ TEST(glass_draw_order_is_back_to_front) {
     CHECK(order.size() == 4);
     CHECK(order[0] == 1 && order[1] == 3 && order[2] == 2 && order[3] == 0);
     CHECK(glassDrawOrder({}).empty());
+    const float nan = std::nanf("");
+    CHECK(glassDrawOrder({nan, 2.0f, nan, 1.0f}).size() == 4); // (a broken distance doesn't break the sort)
 }
 
 TEST(part_glass_command_and_undo) {

@@ -105,7 +105,9 @@ bool glassFromJson(const Json& j, PartGlass& out) {
 std::vector<size_t> glassDrawOrder(const std::vector<float>& distances) {
     std::vector<size_t> order(distances.size());
     std::iota(order.begin(), order.end(), size_t(0));
-    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return distances[a] > distances[b]; });
+    // (a distance that isn't a number sorts as 0: the comparison must stay a strict weak ordering)
+    auto key = [&](size_t i) { return std::isfinite(distances[i]) ? distances[i] : 0.0f; };
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key(a) > key(b); });
     return order;
 }
 
