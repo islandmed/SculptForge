@@ -281,6 +281,7 @@ void applyLook(const LookSettings& settings, std::string* status) {
     focusBorder = look.outlines == 2 ? mixc(tileBorder, textDim, 0.35f * opacity) : tileBorder;
     // Monochrome has no hue to mix into: the roles go fully grey and keep only their icons (and red for Danger).
     const bool monochrome = id == looks::LookId::ForgeTerminal && !settings.matchOmarchy && settings.scheme == "monochrome";
+    look.monochrome = monochrome;
     setRoles(rgb(palette.yellow), rgb(palette.red), id == looks::LookId::Phosphor || id == looks::LookId::Blueprint || monochrome,
              monochrome ? 1.0f : 0.5f);
     applyStyle();

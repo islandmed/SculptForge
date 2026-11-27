@@ -45,7 +45,7 @@ constexpr float kLabel = 22.0f;  // label under it
 constexpr float kGap = 8.0f;     // between tiles
 constexpr float kHeader = 26.0f; // tab row
 constexpr float kBottom = 10.0f; // below the tiles: the scrollbar's room
-constexpr ImU32 kAccent = IM_COL32(240, 136, 46, 255);
+ImU32 kAccent() { return theme::ink(IM_COL32(240, 136, 46, 255)); } // (white in Monochrome)
 constexpr ImU32 kStripBg = IM_COL32(20, 20, 22, 250); // #141416 at 98%
 constexpr ImU32 kHeaderLine = IM_COL32(46, 46, 50, 255);
 
@@ -714,7 +714,7 @@ void LibraryBrowser::drawHeader(App& app, float width) {
         ImGui::PopStyleColor(4);
         if (on) {
             const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
-            dl->AddRectFilled(ImVec2(a.x + 4, b.y - 2), ImVec2(b.x - 4, b.y), kAccent, theme::rounding(1.0f));
+            dl->AddRectFilled(ImVec2(a.x + 4, b.y - 2), ImVec2(b.x - 4, b.y), kAccent(), theme::rounding(1.0f));
         }
         static const char* const tips[] = {
             "Your projects (.sfproj) and recently opened projects.",
@@ -809,8 +809,11 @@ void LibraryBrowser::drawHeader(App& app, float width) {
         const bool on = app.layout_.libraryRows == r;
         char label[16];
         std::snprintf(label, sizeof label, "%d##lbrows", r);
-        if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(kAccent));
+        const bool darkInk = on && theme::look.monochrome; // (a white fill takes dark text)
+        if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(kAccent()));
+        if (darkInk) ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
         if (ImGui::Button(label, ImVec2(ImGui::GetFrameHeight(), 0))) app.layout_.libraryRows = r;
+        if (darkInk) ImGui::PopStyleColor();
         if (on) ImGui::PopStyleColor();
         ui::HelpText("Rows", nullptr, "How many rows of thumbnails the Library shows (1-4).", "Library");
         ImGui::SameLine(0, 2);
@@ -1037,7 +1040,7 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
         if (h.x + h.w < scrollX - tile || h.x > scrollX + viewW + tile) continue;
         ImDrawList* dl = ImGui::GetWindowDrawList();
         const float x0 = base.x + h.x, y0 = base.y + 4.0f * scale;
-        dl->AddLine(ImVec2(x0 + 1.0f, y0), ImVec2(x0 + 1.0f, y0 + float(rows) * rowH - 8.0f * scale), kAccent, 2.0f * scale);
+        dl->AddLine(ImVec2(x0 + 1.0f, y0), ImVec2(x0 + 1.0f, y0 + float(rows) * rowH - 8.0f * scale), kAccent(), 2.0f * scale);
         const ImVec2 t(x0 + 7.0f * scale, y0);
         dl->PushClipRect(t, ImVec2(x0 + h.w, y0 + float(rows) * rowH), true);
         dl->AddText(t, ImGui::GetColorU32(ImGuiCol_Text), h.text.c_str());
@@ -1111,7 +1114,7 @@ void LibraryBrowser::draw(App& app, const CanvasRect& canvas) {
         const ImVec2 a(io.MousePos.x - s * 0.5f, io.MousePos.y - s * 0.5f), b(a.x + s, a.y + s);
         fg->AddRectFilled(a, b, IM_COL32(42, 42, 46, 220), theme::rounding(4.0f));
         if (tex) fg->AddImageRounded(tex, a, b, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 220), theme::rounding(4.0f));
-        fg->AddRect(a, b, kAccent, theme::rounding(4.0f), 0, 1.5f);
+        fg->AddRect(a, b, kAccent(), theme::rounding(4.0f), 0, 1.5f);
     }
     if (pressing_ && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         if (tileDrag_ && canvas.contains(io.MousePos.x, io.MousePos.y) && !ImGui::GetCurrentContext()->HoveredWindow)
@@ -1156,7 +1159,7 @@ void LibraryBrowser::drawResizeHandle(App& app, ImVec2 pos, ImVec2 size) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
             const float w = 36.0f * scale, cx = pos.x + size.x * 0.5f;
             ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(cx - w * 0.5f, edge - 1.5f * scale), ImVec2(cx + w * 0.5f, edge + 1.5f * scale),
-                                                      active ? kAccent : IM_COL32(120, 120, 128, 255), 2.0f * scale);
+                                                      active ? kAccent() : IM_COL32(120, 120, 128, 255), 2.0f * scale);
         }
         ui::HelpText("Library size", nullptr, "Drag to make the Library's thumbnails bigger or smaller.", "Library");
     }

@@ -105,8 +105,13 @@ struct LookStyle {
     bool upperHeaders = false; // palette headers in capitals
     int outlines = 1;         // tiled looks' panel borders: 0 off, 1 subtle (the default), 2 on (LookSettings)
     float outlineOpacity = 1.0f; // Outline opacity (LookSettings), 0-1; the hover rings follow both
+    bool monochrome = false;  // Forge Terminal's Monochrome colours: no hue anywhere in the viewport cues either (brush ring, tags)
 };
 inline LookStyle look;
+
+// Monochrome has no hue: a hard-coded orange in the chrome (an underline, an "on" fill, a highlight) becomes the accent,
+// white there, and keeps its alpha. Every other look returns it as it is.
+inline ImU32 ink(ImU32 c) { return look.monochrome ? (u32(accent) & 0x00ffffffu) | (c & 0xff000000u) : c; }
 
 // The fonts a look may switch to (App fills them in at start-up); nullptr = keep the default.
 struct LookFonts {

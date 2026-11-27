@@ -222,7 +222,8 @@ enum class MaskArt { Pen, Lasso, Rect, Circle, Cavity, Peaks, FaceGroup, Colour,
                      Invert, Clear, All };
 
 constexpr ImU32 kClay = IM_COL32(196, 178, 160, 255), kClayShade = IM_COL32(150, 134, 120, 255),
-                kMasked = IM_COL32(52, 50, 56, 255), kLine = IM_COL32(240, 136, 46, 255);
+                kMasked = IM_COL32(52, 50, 56, 255);
+ImU32 kLine() { return theme::ink(IM_COL32(240, 136, 46, 255)); } // (white in Monochrome)
 
 void drawBall(ImDrawList* dl, ImVec2 c, float r) {
     dl->AddCircleFilled(c, r, kClayShade, 40);
@@ -251,13 +252,13 @@ void drawMaskArt(ImDrawList* dl, ImVec2 c, float r, MaskArt art) {
             pts[i] = ImVec2(c.x + std::cos(a) * r * k, c.y + std::sin(a) * r * k * 0.8f);
         }
         dl->AddConvexPolyFilled(pts, 16, kMasked);
-        dl->AddPolyline(pts, 16, kLine, ImDrawFlags_Closed, t * 0.7f);
+        dl->AddPolyline(pts, 16, kLine(), ImDrawFlags_Closed, t * 0.7f);
         break;
     }
     case MaskArt::Rect:
         drawBall(dl, c, r);
         dl->AddRectFilled(ImVec2(c.x - r * 0.55f, c.y - r * 0.4f), ImVec2(c.x + r * 0.55f, c.y + r * 0.4f), kMasked);
-        dl->AddRect(ImVec2(c.x - r * 0.55f, c.y - r * 0.4f), ImVec2(c.x + r * 0.55f, c.y + r * 0.4f), kLine, 0, 0,
+        dl->AddRect(ImVec2(c.x - r * 0.55f, c.y - r * 0.4f), ImVec2(c.x + r * 0.55f, c.y + r * 0.4f), kLine(), 0, 0,
                     t * 0.7f);
         break;
     case MaskArt::Circle: { // an ellipse masked, its centre marked
@@ -269,9 +270,9 @@ void drawMaskArt(ImDrawList* dl, ImVec2 c, float r, MaskArt art) {
             pts[i] = ImVec2(c.x + std::cos(a) * radius.x, c.y + std::sin(a) * radius.y);
         }
         dl->AddConvexPolyFilled(pts, 24, kMasked);
-        dl->AddPolyline(pts, 24, kLine, ImDrawFlags_Closed, t * 0.7f);
-        dl->AddLine(ImVec2(c.x - r * 0.12f, c.y), ImVec2(c.x + r * 0.12f, c.y), kLine, t * 0.6f);
-        dl->AddLine(ImVec2(c.x, c.y - r * 0.12f), ImVec2(c.x, c.y + r * 0.12f), kLine, t * 0.6f);
+        dl->AddPolyline(pts, 24, kLine(), ImDrawFlags_Closed, t * 0.7f);
+        dl->AddLine(ImVec2(c.x - r * 0.12f, c.y), ImVec2(c.x + r * 0.12f, c.y), kLine(), t * 0.6f);
+        dl->AddLine(ImVec2(c.x, c.y - r * 0.12f), ImVec2(c.x, c.y + r * 0.12f), kLine(), t * 0.6f);
         break;
     }
     case MaskArt::Cavity: // the creases masked
@@ -301,7 +302,7 @@ void drawMaskArt(ImDrawList* dl, ImVec2 c, float r, MaskArt art) {
         dl->PathFillConvex(IM_COL32(120, 170, 210, 255));
         dl->PathArcTo(c, r, -1.5708f, 1.5708f, 20);
         dl->PathFillConvex(kMasked);
-        dl->AddLine(ImVec2(c.x, c.y - r), ImVec2(c.x, c.y + r), kLine, t * 0.6f);
+        dl->AddLine(ImVec2(c.x, c.y - r), ImVec2(c.x, c.y + r), kLine(), t * 0.6f);
         break;
     case MaskArt::Colour: // a painted patch masked
         drawBall(dl, c, r);
@@ -312,22 +313,22 @@ void drawMaskArt(ImDrawList* dl, ImVec2 c, float r, MaskArt art) {
     case MaskArt::Facing: // what faces you masked, the sides free
         drawBall(dl, c, r);
         dl->AddCircleFilled(c, r * 0.58f, kMasked, 32);
-        dl->AddLine(ImVec2(c.x, c.y + r * 0.95f), ImVec2(c.x, c.y + r * 0.2f), kLine, t * 0.7f);
+        dl->AddLine(ImVec2(c.x, c.y + r * 0.95f), ImVec2(c.x, c.y + r * 0.2f), kLine(), t * 0.7f);
         dl->AddTriangleFilled(ImVec2(c.x - r * 0.14f, c.y + r * 0.32f), ImVec2(c.x + r * 0.14f, c.y + r * 0.32f),
-                              ImVec2(c.x, c.y + r * 0.12f), kLine);
+                              ImVec2(c.x, c.y + r * 0.12f), kLine());
         break;
     case MaskArt::Border: // an open disc, its rim masked
         dl->AddCircleFilled(c, r, kMasked, 40);
         dl->AddCircle(c, r, kClayShade, 40, t * 0.6f);
         dl->AddCircleFilled(c, r * 0.58f, kClay, 40);
-        dl->AddCircle(c, r * 0.58f, kLine, 40, t * 0.5f);
+        dl->AddCircle(c, r * 0.58f, kLine(), 40, t * 0.5f);
         break;
     case MaskArt::Grow:
     case MaskArt::Shrink: {
         drawBall(dl, c, r);
         const bool grow = art == MaskArt::Grow;
         dl->AddCircleFilled(c, r * (grow ? 0.62f : 0.32f), kMasked, 32);
-        dl->AddCircle(c, r * (grow ? 0.32f : 0.62f), kLine, 32, t * 0.6f);
+        dl->AddCircle(c, r * (grow ? 0.32f : 0.62f), kLine(), 32, t * 0.6f);
         break;
     }
     case MaskArt::Sharpen:
@@ -349,7 +350,7 @@ void drawMaskArt(ImDrawList* dl, ImVec2 c, float r, MaskArt art) {
         dl->PathFillConvex(kMasked);
         dl->PathArcTo(c, r, 1.5708f, 4.7124f, 20);
         dl->PathArcTo(c, r * 0.55f, 4.7124f, 1.5708f, 16);
-        dl->PathStroke(kLine, 0, t * 0.5f);
+        dl->PathStroke(kLine(), 0, t * 0.5f);
         break;
     case MaskArt::Clear:
         drawBall(dl, c, r);

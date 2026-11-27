@@ -3865,7 +3865,7 @@ void App::drawBrushTile(const char* id, ImVec2 size) {
         dl->AddImageRounded(tex, p0, p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, theme::rounding(4.0f * s));
     } else if (guidesMode_) { // QRemesh Guides (PanelRetopo.cpp)
         dl->AddCircleFilled(c, r, theme::u32(theme::tile), 32);
-        centredText(dl, fontIcons_, a, b, IM_COL32(255, 196, 64, 255), ICON_LC_SPLINE);
+        centredText(dl, fontIcons_, a, b, theme::ink(IM_COL32(255, 196, 64, 255)), ICON_LC_SPLINE);
     } else if (paintMode_) {
         const glm::vec3 pc = linearToSrgb(doc_.paintColor);
         dl->AddCircleFilled(c, r, theme::u32(ImVec4(pc.x, pc.y, pc.z, 1.0f)), 32);
@@ -3921,8 +3921,8 @@ void App::drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type) {
             pts[i] = at(0.16f + 0.62f * u, 0.62f - 0.3f * std::sin(u * 3.0f));
         }
         dl->AddPolyline(pts, 16, col, 0, 2.0f * s);
-        dl->AddLine(pts[15], at(0.86f, 0.24f), IM_COL32(240, 136, 46, 220), 1.0f * s);
-        dl->AddCircleFilled(at(0.86f, 0.24f), 3.0f * s, IM_COL32(240, 136, 46, 255));
+        dl->AddLine(pts[15], at(0.86f, 0.24f), theme::ink(IM_COL32(240, 136, 46, 220)), 1.0f * s); // (Monochrome: white)
+        dl->AddCircleFilled(at(0.86f, 0.24f), 3.0f * s, theme::ink(IM_COL32(240, 136, 46, 255)));
         break;
     }
     default: break;
