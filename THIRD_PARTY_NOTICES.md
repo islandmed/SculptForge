@@ -1992,9 +1992,10 @@ Public License instead of this License.
 https://github.com/bytecodealliance/wasmtime — Apache License 2.0 with LLVM Exception. Used unchanged (the
 Bytecode Alliance's prebuilt C API, cmake/Wasmtime.cmake).
 
-Its static library also holds about 170 Rust crates and the C code of ring, zstd and Intel's ittnotify, under MIT, BSD,
-ISC, Zlib, Unicode and Apache-2.0 terms. Their notices and licence texts are in CRATE_NOTICES.md (third_party/wasmtime/,
-installed beside this file), made by tools/licenses/rust_notices.py from Wasmtime's Cargo.lock at v51.0.0.
+Its static library also holds Rust crates and the C code of ring, zstd and Intel's ittnotify, under MIT, BSD, ISC, Zlib,
+Unicode and Apache-2.0 terms (one crate, option-ext, under MPL-2.0, unmodified). Their notices and licence texts are in
+CRATE_NOTICES.md (third_party/wasmtime/, installed beside this file): every crate Wasmtime's Cargo.lock at v51.0.0 reaches from
+the C API except tests, benchmarks, command-line tools and build helpers, made by tools/licenses/rust_notices.py.
 
 ```
 

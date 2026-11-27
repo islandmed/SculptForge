@@ -74,7 +74,7 @@ done
 
 # The licence and the third-party notices travel inside the APK (assets/, read by the About window): the licences of
 # what is linked in (MIT, BSD, OFL, ISC, Apache) want their notices with every binary copy, and a phone is offline.
-assets=$PWD/$out/assets
+case $out in /*) assets=$out/assets ;; *) assets=$PWD/$out/assets ;; esac
 rm -rf "$assets"
 mkdir -p "$assets"
 cp LICENSE LICENSE-EXCEPTION.md THIRD_PARTY_NOTICES.md "$assets/"
