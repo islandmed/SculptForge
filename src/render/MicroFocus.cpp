@@ -299,11 +299,15 @@ void MicroFocus::shadePages(const Mesh& mesh, MicroRenderer& r, size_t budgetPoi
     const size_t S = samples_;
     const size_t limit = budgetPoints ? std::max<size_t>(1, budgetPoints / S) : pendingShade_.size();
     std::vector<uint32_t> seeds; // base triangles
+    // From the slot after the last one shaded, round again (sorted by slot): a stroke that dirties more pages every frame than
+    // the budget takes would shade the lowest slots only, and the side of the mesh behind them only on release (#184).
+    std::rotate(pendingShade_.begin(), std::lower_bound(pendingShade_.begin(), pendingShade_.end(), shadeCursor_), pendingShade_.end());
     size_t used = 0;
     for (; used < pendingShade_.size() && seeds.size() < limit; ++used) {
         const uint32_t s = pendingShade_[used];
         if (page_[s]) seeds.push_back(r.order_[s]);
     }
+    if (used) shadeCursor_ = pendingShade_[used - 1] + 1;
     pendingShade_.erase(pendingShade_.begin(), pendingShade_.begin() + std::ptrdiff_t(used));
     if (seeds.empty()) return;
     std::sort(seeds.begin(), seeds.end());
