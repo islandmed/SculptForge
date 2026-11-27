@@ -1104,7 +1104,6 @@ highlight: Drape settles in tight folds instead of twitching, and Clay, Flatten 
   a curved surface, with no untouched gaps. Thanks @Devon0209 (#174).
 - **Remesh asks before dropping levels**: Voxel Remesh, Quad Remesh and Decimate say how many subdivision levels they
   would drop, with **Freeze Levels**, **Proceed** or **Cancel**. Thanks @TheLycanFenrir (#173).
-- **Founding Studio** is for the first 5 studios, a flat $150 a month, locked.
 - **Keyboard and mouse** guide: Option is Alt on macOS, and how to make Option Alt and Cmd Ctrl when the Windows
   version runs under CrossOver or Wine on a Mac. Thanks @fenixpoints.
 - **Find Problems**: **Fix all** now repairs messy meshes (a rough remesh, touching solids) completely, and anything
@@ -1686,8 +1685,8 @@ action: guide:performance.md#working-with-big-meshes
   shows now and then at a good moment (never mid-stroke, at most once a week); members sign in once with **I'm already
   a member** and it never shows again.
 - **Membership, simplified**: two memberships instead of four. **Member** ($5 a month or $48 a year) gets betas and
-  early builds, the monthly feature vote, Member Requests, #members and a name in the credits; **Studio** ($150 a
-  month) covers up to 10 artists, with priority support and a private channel. Help > Support SculptForge... shows
+  early builds, the monthly feature vote, Member Requests, #members and a name in the credits; **Studio** (a
+  personal quote) covers up to 10 artists, with priority support and a private channel. Help > Support SculptForge... shows
   both. Every release stays free for everyone.
 - **One-click update**: on the Linux AppImage and on Windows (installer or portable zip) the update banner has an
   **Update** button: it downloads the new version in the background, checks its signature and checksum, and installs
