@@ -200,20 +200,20 @@ jobs:
         run: |
           tools/ci/fetch.sh https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2-windows-x86_64.zip 6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84
           tools/ci/fetch.sh https://github.com/pal1000/mesa-dist-win/releases/download/26.2.4/mesa3d-26.2.4-release-msvc.7z 351fc8c8b695878ffb3eaa044b3ead08672a48b1a045e3c3e3975811df0f6695
-      - name: ccache (Windows; unpacked, standing in for cl.exe)
+      - name: ccache (Windows; unpacked, the compiler launcher of the clang-cl build)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $zip = '.deps\6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84-ccache-4.14.2-windows-x86_64.zip'
           Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP
-          $dir = "$env:RUNNER_TEMP\ccache-4.14.2-windows-x86_64"
-          "$dir" >> $env:GITHUB_PATH
-          # MSBuild runs "cl.exe" from CLToolPath (see Configure): ccache under that name, in a folder of its own, which
-          # runs the real cl.exe from the PATH MSBuild sets up.
-          $cl = "$env:RUNNER_TEMP\ccache-as-cl"
-          New-Item -ItemType Directory $cl | Out-Null
-          Copy-Item "$dir\ccache.exe" "$cl\cl.exe"
-          "SF_CCACHE_CL=$($cl -replace '\\', '/')" >> $env:GITHUB_ENV
+          "$env:RUNNER_TEMP\ccache-4.14.2-windows-x86_64" >> $env:GITHUB_PATH
+      - name: Compiler (Windows; clang-cl, the version Packages builds and measures with)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $v = & "C:\Program Files\LLVM\bin\clang-cl.exe" --version | Select-Object -First 1
+          Write-Host $v
+          if ($v -notmatch 'clang version 20\.1\.8') { throw "expected clang-cl 20.1.8 (as in packages.yml), got: $v" }
       - name: Compiler cache (restore)
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
@@ -235,19 +235,19 @@ jobs:
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: build
-          key: cmake-ci-${{ matrix.key }}~${{ steps.image.outputs.id }}-py${{ steps.py.outputs.python-version }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'packaging/linux/install-build-deps.sh') }}
+          key: cmake-ci-${{ matrix.key }}${{ runner.os == 'Windows' && '-clangcl' || '' }}~${{ steps.image.outputs.id }}-py${{ steps.py.outputs.python-version }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'packaging/linux/install-build-deps.sh') }}
       - name: Configure
         if: runner.os != 'Windows'
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="${{ env.pythonLocation }}/bin/python3"
-      - name: Configure (Visual Studio generator, as the release builds; ccache as cl.exe, one compiler per file)
+      - name: Configure (Windows; clang-cl with the MSVC STL and linker, Ninja Multi-Config, as the release builds)
         if: runner.os == 'Windows'
-        run: >
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSCULPTFORGE_USE_SYSTEM_SDL=OFF
-          -DCMAKE_VS_GLOBALS="CLToolExe=cl.exe;CLToolPath=${{ env.SF_CCACHE_CL }};TrackFileAccess=false;UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true"
-          -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="${{ env.pythonLocation }}/python.exe"
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
+          cmake -S . -B build -G "Ninja Multi-Config" -DCMAKE_C_COMPILER="C:/Program Files/LLVM/bin/clang-cl.exe" -DCMAKE_CXX_COMPILER="C:/Program Files/LLVM/bin/clang-cl.exe" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_BUILD_PYTHON=ON -DPython_EXECUTABLE="${{ env.pythonLocation }}\python.exe"
       - name: Configure cache (save; a miss, not from pull requests; one shard saves)
         if: steps.cmake-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && matrix.shard == 1
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
@@ -255,9 +255,18 @@ jobs:
           path: build
           key: ${{ steps.cmake-cache.outputs.cache-primary-key }}
       - name: Build
+        if: runner.os != 'Windows'
         run: |
           ccache -z
           cmake --build build --config Release --parallel 4
+          ccache -s -v
+      - name: Build (Windows; the compiler's environment from vcvars64)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
+          ccache -z
+          cmake --build build --config Release --parallel 4 || exit /b 1
           ccache -s -v
       - name: Compiler cache (save; not from pull requests; one shard saves)
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && matrix.shard == 1

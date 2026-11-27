@@ -471,46 +471,45 @@ jobs:
           path: .deps
           key: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Fetch.cmake', '.github/workflows/packages.yml') }}
           restore-keys: deps-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-
-      - name: ccache (the release binary, pinned by hash, standing in for cl.exe)
+      - name: ccache (the release binary, pinned by hash; the compiler launcher of the clang-cl build)
         shell: bash
         run: tools/ci/fetch.sh https://github.com/ccache/ccache/releases/download/v4.14.2/ccache-4.14.2-windows-x86_64.zip 6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84
-      - name: ccache (unpacked, as cl.exe)
+      - name: ccache (unpacked)
         shell: pwsh
         run: |
           $zip = '.deps\6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84-ccache-4.14.2-windows-x86_64.zip'
           Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP
-          $dir = "$env:RUNNER_TEMP\ccache-4.14.2-windows-x86_64"
-          "$dir" >> $env:GITHUB_PATH
-          $cl = "$env:RUNNER_TEMP\ccache-as-cl"
-          New-Item -ItemType Directory $cl | Out-Null
-          Copy-Item "$dir\ccache.exe" "$cl\cl.exe"
-          "SF_CCACHE_CL=$($cl -replace '\\', '/')" >> $env:GITHUB_ENV
+          "$env:RUNNER_TEMP\ccache-4.14.2-windows-x86_64" >> $env:GITHUB_PATH
           "CCACHE_DIR=$env:GITHUB_WORKSPACE\.ccache" >> $env:GITHUB_ENV
           "CCACHE_BASEDIR=$env:GITHUB_WORKSPACE" >> $env:GITHUB_ENV
       - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
-          key: ccache-pkg-windows.${{ github.sha }}
-          # CI's Windows job (same compiler; it adds the Python module) shares most object files.
+          key: ccache-pkg-windows-clangcl.${{ github.sha }}
           restore-keys: |
-            ccache-pkg-windows.
-            ccache-ci-windows.
+            ccache-pkg-windows-clangcl.
       - name: Python runtime (CPython 3.13 for Python scripting in the app, tools/ci/python-runtime.sh)
         shell: bash
         run: echo "SF_PYRT=$(SF_DEPS_CACHE=.deps tools/ci/python-runtime.sh windows "$(cygpath -m "$RUNNER_TEMP")/pyrt")" >> "$GITHUB_ENV"
-      - name: Build (Visual Studio generator; ccache as cl.exe, one compiler per file)
+      - name: Compiler (clang-cl 20.1.8, the version the build is made and measured with; a different one fails here, on purpose)
+        shell: pwsh
         run: |
+          $v = & "C:\Program Files\LLVM\bin\clang-cl.exe" --version | Select-Object -First 1
+          Write-Host $v
+          if ($v -notmatch 'clang version 20\.1\.8') { throw "expected clang-cl 20.1.8 (the windows-2022 image's LLVM when this was set up), got: $v. Measure the new version first (a bench.sh gate on the PC), then change this line." }
+      - name: Build (clang-cl with the MSVC STL and linker; Ninja Multi-Config keeps build\Release\; ccache as the launcher)
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
           ccache -z
-          cmake -S . -B build -DSCULPTFORGE_USE_SYSTEM_SDL=OFF `
-            -DCMAKE_VS_GLOBALS="CLToolExe=cl.exe;CLToolPath=${{ env.SF_CCACHE_CL }};TrackFileAccess=false;UseMultiToolTask=true;EnforceProcessCountAcrossBuilds=true" `
-            -DSCULPTFORGE_APP_PYTHON=ON -DSCULPTFORGE_PYTHON_RUNTIME="$env:SF_PYRT"
-          cmake --build build --config Release --parallel 4
+          cmake -S . -B build -G "Ninja Multi-Config" -DCMAKE_C_COMPILER="C:/Program Files/LLVM/bin/clang-cl.exe" -DCMAKE_CXX_COMPILER="C:/Program Files/LLVM/bin/clang-cl.exe" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DSCULPTFORGE_USE_SYSTEM_SDL=OFF -DSCULPTFORGE_APP_PYTHON=ON -DSCULPTFORGE_PYTHON_RUNTIME="%SF_PYRT%" || exit /b 1
+          cmake --build build --config Release || exit /b 1
           ccache -s
       - if: env.SAVE_CACHE == 'true'
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
-          key: ccache-pkg-windows.${{ github.sha }}
+          key: ccache-pkg-windows-clangcl.${{ github.sha }}
       - name: Test
         # UI tests need a display; they run in CI with Mesa's software OpenGL.
         run: ctest --test-dir build -C Release --output-on-failure -LE ui -j 4

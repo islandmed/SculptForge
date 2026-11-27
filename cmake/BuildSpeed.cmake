@@ -33,7 +33,7 @@ endif()
 
 # --- Precompiled headers: the standard library and glm, parsed once per target instead of once per file. ---
 # Only headers that never change with our sources (an edit to src/ never rebuilds a PCH). On by default where the
-# edit loop runs (Linux, GCC or Clang); elsewhere opt-in: CI on Windows caches with ccache standing in for cl.exe,
+# edit loop runs (Linux, GCC or Clang); elsewhere opt-in: CI on Windows caches with ccache,
 # which can't cache /Yu compiles, and macOS release builds are universal (one PCH can't serve two architectures).
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   set(sf_pch_default ON)
