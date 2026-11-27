@@ -9,6 +9,14 @@ Needs a real Windows 10 or 11 PC (the automated tests run on CI machines without
 - Keep Task Manager open while you orbit and sculpt: what is the most memory SculptForge used, and how big is the .sfdetail file?
 - Tell us your graphics card, CPU, RAM and Windows version, and anything that felt slower than on a smaller mesh.
 
+# Testers: Android, the licence and third-party notices (inside the app)
+Any Android phone or tablet, after the release that carries them. The notices are read from the APK itself, so no network is needed.
+- **Help > About SculptForge**: the paragraph under the copyright names the libraries, fonts, icons and data sets (it should mention Lucide, Noto Sans CJK, ICT-FaceKit, MakeHuman, Poly Haven, Wasmtime, CPython).
+- Tap **License**: a window opens with the GNU General Public License text. Scroll it; close it with the x.
+- Tap **Third-party notices**: a window opens with the notices (long, the first lines are a table; wide lines scroll sideways). Scroll to the end; the last section is "CPython's bundled libraries".
+- Switch the phone to flight mode and repeat both taps: they must still open (they must not try to open a web page).
+- If a button opens the browser or nothing happens, tell us the device and Android version, then **Help > Copy log to clipboard** and paste it to us.
+
 # Testers: Android Mali, the sphere vanishing (0.13.14 follow-up)
 For the member who reported it (Mali-G72, buffer-texture limit 65536) and any Mali phone or tablet; a Xiaomi that painted fine is not the case to repeat.
 - **Sphere**, 6 subdivisions (about 70k triangles, past 65k); the sphere is visible at once. **Texture Image > Auto UV > New Texture** (2K); **Paint into: Texture**; paint a stroke. Good: the sphere stays visible and the stroke shows.
