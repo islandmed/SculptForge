@@ -81,12 +81,13 @@ SculptForge has no telemetry, no account and no servers of its own. Once a day i
 
 SculptForge is free, and nothing in the app is ever paywalled. Every release stays free for everyone; bug-fix and security releases go out to all the same day.
 
-- **[Member](https://sculptforge.app/support.html?utm_campaign=github)** ($5 / month or $48 / year):
-  - Early builds (from SculptForge 2027, each release about two weeks early), and the monthly feature vote
-  - One Member Request a month, built first and credited to you
-  - #members on Discord and your name in the [credits](https://sculptforge.app/supporters.html)
-  - The first 100 are Founding Members, price locked for good
-- **[Studio](https://sculptforge.app/studios.html?utm_campaign=github#membership)** ($300 / month flat, any number of artists; Founding Studio $150 for the first 5): your own isolated build with your assets built in, a pinned version with security fixes, an offline signed installer, support and a private channel.
+- **[Member](https://sculptforge.app/support.html?utm_campaign=github)** ($5 / month or $48 / year, cancel anytime):
+  - Early builds: the next version before everyone else (from SculptForge 2027, each release about two weeks early)
+  - The monthly feature vote: pick what we build next
+  - Member Requests: one guaranteed request a month, built first and credited to you
+  - A personal 20% code for the shop, the #members channel on Discord, and your name in the [credits](https://sculptforge.app/supporters.html)
+  - The first 100 members are Founding Members: the Founder role on Discord for good, their name in the credits and their price locked for as long as they stay
+- **[Studio](https://sculptforge.app/studios.html?utm_campaign=github#membership)** (a personal quote for the whole studio, any number of artists; [get in touch](https://sculptforge.app/studios.html?utm_campaign=github#membership)): your own isolated build with your assets built in, a pinned version with security fixes, an offline signed installer, support and a private channel.
 
 <!-- Studio members' logos go here. -->
 
