@@ -991,29 +991,42 @@ step_release() {
 }
 
 # release_apk: a release's Android APKs (arm64-v8a + x86_64, signed with the CI runner's debug key so they install) go onto the
-# PRIVATE Insiders release, from the android.yml run of the tagged commit. Never the public release: a beta's own release on
-# $INSIDERS_REPO, or for a stable release a members-only release $T made there (Android stays members-only, owner 11-13). Fails soft: no run, a failed run, an expired artifact or a failed upload is a WARNING, and the
+# release from the android.yml run of the tagged commit: a stable release's own public release AND its members' release on
+# $INSIDERS_REPO (Android is free for everyone, members first: owner 11-27 "Ok lets go", ~/Work/.sf/state/owner-oks.md); a beta's own
+# release on $INSIDERS_REPO only. Fails soft: no run, a failed run, an expired artifact or a failed upload is a WARNING, and the
 # release ships without APKs (scripts/release.sh $V --from release adds them later). A red Android run gets one rerun of its failed
 # jobs (infra_retry: Maven Central answers shared CI IPs with 429 now and then, 0.14.1 and 0.14.2). Every case that ships without APKs
 # is LOUD: red, marked in $work/apk-missing, repeated by step_status, and the script exits 1 after its last step (the rest of the
-# train still runs: the release itself is fine). SHA256SUMS.txt (signed) is left alone; the APKs' sums are SHA256SUMS-android.txt.
+# train still runs: the release itself is fine). The last thing it does is count: each target release must list both APKs and
+# SHA256SUMS-android.txt, else the same loud stop. SHA256SUMS.txt (signed) is left alone; the APKs' sums are SHA256SUMS-android.txt.
 apk_missing() {
-    red "   WARNING: $* (the members' release is EMPTY of Android APKs until: $(resume release))"
+    red "   WARNING: $* (a release is missing its Android APKs until: $(resume release))"
     printf '%s\n' "$*" >> "$work/apk-missing"
+}
+# apk_lacks REPO: the Android assets release $T on REPO still lacks, one per line (nothing = complete: both APKs and the sums).
+apk_lacks() {
+    local names
+    names=$(gh release view "$T" -R "$1" --json assets -q '.assets[].name' 2>/dev/null || true)
+    grep -qE '^SculptForge-.*-android-arm64-v8a.*\.apk$' <<<"$names" || echo "the arm64-v8a APK"
+    grep -qE '^SculptForge-.*-android-x86_64.*\.apk$' <<<"$names" || echo "the x86_64 APK"
+    grep -qx 'SHA256SUMS-android.txt' <<<"$names" || echo "SHA256SUMS-android.txt"
 }
 release_apk() {
     [ -z "$PRE" ] || [ "$RELEASE_REPO" = "$INSIDERS_REPO" ] || return 0
-    local sha id c dir="$work/apk" abi f n=0 sums
+    local sha id c dir="$work/apk" abi f n=0 sums r lack targets=() todo=()
     rm -f "$work/apk-missing"
-    if [ -z "$PRE" ]; then # stable: Android stays members-only, on its own $INSIDERS_REPO release (owner 11-13)
+    if [ -z "$PRE" ]; then # stable: the members' release on $INSIDERS_REPO (made here when missing) and the public one
         if ! gh release view "$T" -R "$INSIDERS_REPO" >/dev/null 2>&1; then
             gh release create "$T" -R "$INSIDERS_REPO" --title "SculptForge $V for Android (members)" \
                 --notes "SculptForge $V for Android, for members: the arm64-v8a APK for phones and tablets, x86_64 for emulators. Please report problems in #members." >/dev/null 2>&1 ||
-                { apk_missing "could not create $T on $INSIDERS_REPO: $V ships without Android APKs"; return 0; }
+                { apk_missing "could not create $T on $INSIDERS_REPO: $V ships without Android APKs there"; }
         fi
-        gh release view "$T" -R "$INSIDERS_REPO" --json assets -q '.assets[].name' > "$work/assets-android" 2>/dev/null || : > "$work/assets-android"
-        if grep -qE '^SculptForge-.*-android-.*\.apk$' "$work/assets-android"; then ok "the Android APKs are already on $INSIDERS_REPO $T"; return 0; fi
-    elif grep -qE '^SculptForge-.*-android-.*\.apk$' "$work/assets"; then ok "the Android APKs are already on $T"; return 0; fi
+        targets=("$INSIDERS_REPO" "$RELEASE_REPO")
+    else
+        targets=("$RELEASE_REPO")
+    fi
+    for r in "${targets[@]}"; do [ -z "$(apk_lacks "$r")" ] || todo+=("$r"); done
+    if [ "${#todo[@]}" -eq 0 ]; then ok "the Android APKs are already on ${targets[*]} $T"; return 0; fi
     sha=$(git rev-parse "$T^{commit}" 2>/dev/null) || { apk_missing "no APKs on $T: $T is not a commit here"; return 0; }
     id=$(gh run list -R "$REPO" -w android.yml -c "$sha" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
     if [ -z "$id" ]; then # (0.13.1: a re-stage made a commit no Android run had built; the members' release came out empty)
@@ -1054,12 +1067,21 @@ release_apk() {
     sums="$dir/SHA256SUMS-android.txt"
     : > "$sums"
     for f in "${files[@]}"; do printf '%s  %s\n' "$(sha256 "$f")" "$(basename "$f")" >> "$sums"; n=$((n + 1)); done
-    if gh release upload "$T" -R "$INSIDERS_REPO" --clobber "${files[@]}" "$sums" >/dev/null 2>&1; then
-        ok "$n Android APK(s) from run $id on $INSIDERS_REPO $T (private; SHA256SUMS-android.txt)"
+    for r in "${todo[@]}"; do
+        if gh release upload "$T" -R "$r" --clobber "${files[@]}" "$sums" >/dev/null 2>&1; then
+            ok "$n Android APK(s) from run $id on $r $T (SHA256SUMS-android.txt)"
+        else
+            apk_missing "the APK upload to $r $T failed: that release ships without them"
+        fi
+    done
+    # The count: every target release lists both APKs and the sums (an upload that "worked" but left a release short is caught here).
+    for r in "${targets[@]}"; do
+        lack=$(apk_lacks "$r" | paste -sd, - | sed 's/,/, /g')
+        [ -z "$lack" ] || apk_missing "release $T on $r is missing $lack"
+    done
+    if [ ! -s "$work/apk-missing" ]; then
         # A beta's #members post comes from release.yml; a stable release's Android drop is posted by sfmonitor.
-        [ -n "$PRE" ] || { herdr agent prompt sfmonitor "post in #members: SculptForge $V for Android is up for members: https://github.com/$INSIDERS_REPO/releases/tag/$T (arm64-v8a for phones and tablets)" >/dev/null 2>&1 & } 2>/dev/null || true
-    else
-        apk_missing "the APK upload to $INSIDERS_REPO $T failed: the release ships without them"
+        [ -n "$PRE" ] || { herdr agent prompt sfmonitor "post in #members: SculptForge $V for Android is up (members first, free for everyone: https://github.com/$RELEASE_REPO/releases/tag/$T; arm64-v8a for phones and tablets)" >/dev/null 2>&1 & } 2>/dev/null || true
     fi
     return 0
 }

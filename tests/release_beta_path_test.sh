@@ -24,23 +24,26 @@ case "$1 $2" in
   "run download")
     while [ $# -gt 0 ]; do [ "$1" = -n ] && name=$2; [ "$1" = -D ] && dir=$2; shift; done
     mkdir -p "$dir"; echo apk > "$dir/SculptForge-9.9.9-android-${name#sculptforge-android-test-}-test.apk" ;;
-  "release upload") echo "$*" >> "$GH_UPLOADS" ;;
+  "release upload") echo "$*" >> "$GH_UPLOADS"
+    seen=; for a in "$@"; do if [ -n "$seen" ]; then basename "$a" >> "$GH_ASSETS"; fi; if [ "$a" = --clobber ]; then seen=1; fi; done ;;
 esac
 SH
 chmod +x "$S/bin/gh"
 printf '#!/bin/sh\nexit 0\n' > "$S/bin/herdr"; chmod +x "$S/bin/herdr" # a stable release prompts sfmonitor: never the real one
-export PATH=$S/bin:$PATH GH_LOG=$S/gh.log GH_UPLOADS=$S/uploads GH_ASSETS=$ROOT/tests/data/beta_release_assets.txt
+export PATH=$S/bin:$PATH GH_LOG=$S/gh.log GH_UPLOADS=$S/uploads GH_ASSETS=$S/assets
+cp "$ROOT/tests/data/beta_release_assets.txt" "$GH_ASSETS" # (an upload adds its files, so the count check after it sees them)
 export SF_LAUNCH_DIR=$S/launch
 REPO=pub/app INSIDERS_REPO=pri/insiders
 work=$S/work
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 ok() { echo "ok: $*"; }
+red() { echo "$*" >&2; }
 die() { echo "DIE: $*"; exit 1; } # as release.sh: the step stops there (inside the $( ) below)
 resume() { echo "resume-$1"; }
 gh_watch() { return 0; }
 infra_retry() { return 1; }
 run_failed_where() { echo "?"; }
-for f in step_release release_ready min_assets release_body_headline release_apk; do
+for f in step_release release_ready min_assets release_body_headline apk_missing apk_lacks release_apk; do
     grep -q "^$f()" "$ROOT/scripts/release.sh" || continue # (step_release says if one it calls is missing)
     # shellcheck disable=SC1090
     eval "$(sed -n "/^$f()/,/^}/p" "$ROOT/scripts/release.sh")" # not source <(...): macOS bash 3.2 cannot
@@ -59,7 +62,7 @@ grep -q 'arm64-v8a' "$S/uploads" && grep -q 'x86_64' "$S/uploads" && grep -q 'SH
 if grep -q 'pub/app' "$S/uploads"; then fail "touched the public repository"; fi
 
 # 2. the same list as a stable release: stops (a stable release has the install names and more assets)
-rm -f "$S/uploads"; rm -rf "$work/apk"
+rm -f "$S/uploads"; rm -rf "$work/apk"; cp "$ROOT/tests/data/beta_release_assets.txt" "$GH_ASSETS"
 V=9.9.9 T=v9.9.9 PRE= RELEASE_REPO=pub/app
 out=$(cd "$ROOT" && step_release 2>&1) && fail "a stable release with a beta's asset list passed: $out"
 echo "$out" | grep -q '^DIE:' || fail "stable: no stop: $out"
