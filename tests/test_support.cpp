@@ -46,6 +46,33 @@ TEST(appeal_card_is_once_per_version_and_never_for_members) {
     CHECK(due(p, "0.13.5"));
 }
 
+TEST(whats_new_member_note_is_the_versions_one_ask_and_never_a_price_or_checkout) {
+    // The footer line shows exactly when the appeal would be due (App::takeWhatsNewNote asks appealDue) and records the version.
+    SupportCardPrefs p;
+    p.starts = 2;
+    const auto due = [&](const SupportCardPrefs& q, bool member = false, bool studio = false, bool updatesOff = false,
+                         bool test = false) { return appealDue(q, "0.14.4", member, studio, updatesOff, test); };
+    CHECK(due(p));
+    CHECK(!due(p, true));                    // a signed-in member
+    CHECK(!due(p, false, true));             // a Studio build
+    CHECK(!due(p, false, false, true));      // update checks off (package managers, store builds)
+    CHECK(!due(p, false, false, false, true)); // tests, renders, CI
+    p.appealVersion = "0.14.4";              // shown once: the second time in the same version is no
+    CHECK(!due(p));
+    // Honest copy: no price, figure, countdown or urgency; the link is the membership page, tagged whats-new, never a checkout.
+    for (const std::string text : {std::string(kWhatsNewMemberNote), std::string(kWhatsNewMemberLink)}) {
+        CHECK(text.find('$') == std::string::npos);
+        CHECK(text.find_first_of("0123456789") == std::string::npos);
+        for (const char* word : {"limited", "only", "hurry", "last chance", "spots", "left", "Android", "Founding"})
+            CHECK(text.find(word) == std::string::npos);
+        CHECK(text.find("stripe") == std::string::npos && text.find("http") == std::string::npos);
+    }
+    const std::string url = supportPageUrl("whats-new");
+    CHECK(url.rfind(kSupportUrl, 0) == 0 && url.find("buy.stripe.com") == std::string::npos);
+    CHECK(url.find("utm_campaign=whats-new") != std::string::npos);
+    CHECK(!supportLinkAllowed(url)); // (the checkout filter does not accept it either: it is the page, not a checkout)
+}
+
 TEST(update_card_owed_after_the_appeal_skips_the_week_gap) {
     SupportCardPrefs p;
     p.shownAt = 1000; // the appeal just showed

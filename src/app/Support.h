@@ -189,8 +189,8 @@ struct SupportCardPrefs {
 };
 
 // The appeal card: one short note at startup, once per app version, from the second start on. Never for a member or a
-// Studio build, with update checks off (a package manager's build, the policy, SF_NO_UPDATE_CHECK) or in tests and
-// renders. Its version is recorded as it shows, so "Not now", the button or a crash all end it for that version.
+// Studio build, with update checks off (a package manager's build, the policy, SF_NO_UPDATE_CHECK, an app-store build) or
+// in tests and renders. After an update What's New's footer line (kWhatsNewMemberNote) takes its place for that version. Its version is recorded as it shows, so "Not now", the button or a crash all end it for that version.
 inline constexpr int kAppealFromStart = 2;
 inline bool appealDue(const SupportCardPrefs& p, std::string_view version, bool signedInMember, bool studio,
                       bool updateCheckOff, bool testMode) {
@@ -198,9 +198,16 @@ inline bool appealDue(const SupportCardPrefs& p, std::string_view version, bool 
     return p.starts >= kAppealFromStart && p.appealVersion != version;
 }
 
-// Android APKs are members-only for now (tablets: members first, then free), so no membership card of any kind shows in
-// them. Set this false when the tablet build goes free: the plea rules then apply as on desktop (App::pleaBlocked).
+// Android is free for everyone (since 11-26), but no membership card of any kind shows in the APKs: the safe default until
+// it is decided otherwise. Set this false to let the plea rules apply as on desktop (App::pleaBlocked).
 inline constexpr bool kAndroidMembersOnly = true;
+
+// The one quiet line in What's New's footer, shown when appealDue() holds for this version (so never for a member, a Studio
+// build, with update checks off or in tests) and then instead of the appeal card: one ask per update. Its link opens the
+// membership page (supportPageUrl("whats-new")), never a checkout. No price, no figure, no countdown (tests/test_support.cpp).
+inline constexpr const char* kWhatsNewMemberNote =
+    "SculptForge is free and stays free. Members get a say in what we build, their requests built first, and their name in the credits.";
+inline constexpr const char* kWhatsNewMemberLink = "Membership";
 
 enum class SupportCardReason { None, FirstRun, Manual };
 

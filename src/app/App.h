@@ -699,6 +699,7 @@ private:
     bool appealOwesUpdate_ = false;             // the pending appeal pre-empted an update moment (kept in updateOwed once it shows)
     void startupUpdateMoment();                 // startup: the update card's moment (a new version, or owed since the appeal)
     void launchAppeal();                        // startup: due -> pending (and the small card's update moment steps aside)
+    bool takeWhatsNewNote();                    // What's New opens: its footer line is due (Support.h) -> true, and it is this version's one ask
     void drawAppealCard();                      // PanelSupportCard.cpp
     void memberCardChoice(MemberCardChoice c);
     void verifyMember();                        // "I'm already a member": the member builds' GitHub sign-in
@@ -751,6 +752,7 @@ private:
     const whatsnew::Version* whatsNewVersion() const; // what the popup shows (UI tests), null when closed
     int whatsNewMore() const;       // improvements past the cards (UI tests)
     bool whatsNewScrolled() const;  // the cards scrolled (UI tests)
+    bool whatsNewNote() const;      // its footer's membership line is showing (UI tests)
     bool whatsNewEvent(const SDL_Event& e);           // input while it's open goes to it
     void drawWhatsNew();
     // A card's action: look:new, card:membership, brush:NAME, guide:FILE[#ANCHOR] or an action id (help.benchmark).

@@ -1,0 +1,20 @@
+# What's New's membership line in Japanese and Chinese: drawn from the UI font (the cards' own fonts are Latin only), so no "?"
+# boxes (glyphs_missing). The id suffixes stay the same in every language (tests/ui/whats_new_member_note.sfui is the English one).
+env SF_WHATS_NEW_VERSION 0.12.0
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+click "Preferences##palette.preferences"
+click "Interface##preferences.interface"
+click "日本語##language.ja"
+expect "ヘルプ##palette.help"
+member_card appeal starts=2
+click "ヘルプ##palette.help"
+click "新機能##help.whats_new"
+wait 0.5
+expect_value whats_new_note == 1
+expect_text SculptForge は無料
+expect_value glyphs_missing == 0
+shot whats-new-member-note-ja
+click "Close##whats_new"
+wait 0.4
+expect_value whats_new_open == 0
