@@ -971,9 +971,9 @@ glm::vec3 linearToSrgb(const glm::vec3& c) {
     return out;
 }
 
-void transferVertexAttributes(const Mesh& src, Mesh& dst) {
+void transferVertexAttributes(const Mesh& src, Mesh& dst, bool withColors) {
     const bool wantMask = src.mask.size() == src.positions.size() && !src.mask.empty();
-    const bool wantColors = src.colors.size() == src.positions.size() && !src.colors.empty();
+    const bool wantColors = withColors && src.colors.size() == src.positions.size() && !src.colors.empty();
     if ((!wantMask && !wantColors) || dst.positions.empty()) return;
 
     // Uniform hash grid with about one source vertex per cell.

@@ -135,7 +135,8 @@ TEST(attributes_transfer_through_remesh) {
             ++checked;
             if (r.mask[v] != (p.y > 0.0f ? 1.0f : 0.0f)) ++wrong;
         }
-        if (std::abs(p.x) > 0.15f && r.colors[v] != (p.x > 0.0f ? glm::vec3(1, 0, 0) : glm::vec3(1))) ++wrong;
+        // (Colour is interpolated across the closest old triangle: exact away from the red/white edge, to rounding.)
+        if (std::abs(p.x) > 0.15f && glm::length(r.colors[v] - (p.x > 0.0f ? glm::vec3(1, 0, 0) : glm::vec3(1))) > 1e-4f) ++wrong;
     }
     CHECK(checked > 100 && wrong == 0);
 }

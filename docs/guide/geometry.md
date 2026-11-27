@@ -118,7 +118,13 @@ lighter.
 What happens to your data:
 
 - Sculpt layers are baked into the surface: the result has no layers.
-- Mask and vertex paint are transferred from the nearest original vertex.
+- Mask is transferred from the nearest original vertex. Vertex paint too, unless the result has more triangles than
+  the Part had: then it takes the colour at the closest point of the original surface, blended across its triangle,
+  so a paint edge stays smooth. Paint lives on the vertices, so a result with fewer vertices than the Part had
+  softens paint finer than that (the status line says so): raise the Resolution to keep it, or paint into a
+  [texture](texture-painting.md#uvs-and-geometry), which Keep Texture carries.
+- The Part's materials are not touched: the Lit Sphere is the scene's (**Material** shelf tile), and a Part's PBR
+  material channels travel with its texture (Keep Texture, below).
 - Hidden faces and UVs are reset (everything becomes visible). Hidden parts are remeshed too.
 - Face groups are reset to one group unless **Keep Face Groups** (under the button, off by default) is on: then each
   new polygon takes the group of the original surface nearest its centre, so the groups come through with hard borders
