@@ -1,0 +1,16 @@
+# The right button of a row of two (Delete masked, beside Remove Hidden) goes on a shelf alone: its copy is that button, not the whole
+# row (artist-qa 11-27: the shelf and My Panel got a second Remove Hidden next to it).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=3
+run mask_all
+click "Parts##tool.part"                # (closed: the Visibility section is then in view)
+click "Visibility##tool.visibility"
+expect "Tool/Delete masked"
+expect "Tool/Remove Hidden##visibility.delete_hidden"
+hold alt
+drag_to "Tool/Delete masked" "Undo##edit.undo" 0 -22
+hold none
+expect_value "shelf_has_control:tool.visibility/Delete masked" == 1
+click "Visibility##tool.visibility"       # (closed: what is left in view is the shelf's copy)
+expect "Delete masked"
+expect_not "Remove Hidden##visibility.delete_hidden"
