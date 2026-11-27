@@ -787,6 +787,10 @@ The choice saves itself for the next session, and each project keeps the backgro
   a window. `sculptforge --fullscreen` starts that way. SculptForge reopens the way you left it; on macOS a window
   closed in full screen reopens maximised instead, so the menu bar and the window buttons stay reachable (press
   <kbd>F11</kbd> or the green button to go full screen again).
+- <kbd>Shift</kbd>+<kbd>F11</kbd> (or **View > Clean view**) goes fullscreen and hides everything but the 3D view: the
+  menu bar, shelves, trays, floating windows and status bar. Sculpting, navigation and the right-click menu work as
+  usual; a note says the key for a moment. Press the key again, <kbd>Esc</kbd> (when nothing else is using it) or
+  <kbd>F11</kbd>, and the window and layout come back as they were. Hold <kbd>Ctrl</kbd>+<kbd>Alt</kbd> and click the button to give it another key.
 - In the Classic layout, **Menus** in the title strip hides the palette bar; click it again to bring it back.
 - <kbd>Tab</kbd> hides the shelves and trays.
 - On MacBooks with a camera notch, SculptForge keeps the interface below the notch when it fills the screen

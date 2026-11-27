@@ -828,6 +828,10 @@ private:
     std::shared_ptr<StudioSignInJob> signInJob_; // Preferences > AI > Studio sign-in, while it runs
     bool showBrushLab_ = false; // floating; opened from the top shelf's AI Brush or the Brush palette
     bool hideUi_ = false;
+    // Clean view (View > Clean view): fullscreen with no bars, trays, shelves or floating windows, only the 3D view. The
+    // layout is never edited (ShellMetrics::bare), so leaving it restores everything; only the fullscreen state is kept.
+    bool cleanView_ = false, cleanViewWasFullscreen_ = false;
+    void setCleanView(bool on);
     uint64_t seenSplatsVersion_ = 0;
     ai::AiSettings aiSettings_;
     std::string aiSettingsPath_;
@@ -3290,7 +3294,7 @@ private:
     void drawViewportHint(const char* id, const char* text, ImU32 colour, float top);
     // A short note over the 3D view for a key that found nothing to act on (C with nothing under the pointer): the status
     // bar's message is small and elided in a narrow bar, and was missed. It also goes to the status bar.
-    void toastInViewport(const std::string& text);
+    void toastInViewport(const std::string& text, double seconds = 3.5);
     void drawViewportToast();
     std::string viewportToast_;
     double viewportToastUntil_ = 0.0;

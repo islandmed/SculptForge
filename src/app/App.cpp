@@ -2935,6 +2935,15 @@ void App::onKey(SDL_Keycode key, SDL_Keymod mod, bool repeat) {
         setGizmoMode(GizmoMode::Off);
         return;
     }
+    // Esc leaves Clean view once nothing else wants it: no drag, and no menu, pop-up, picker or text field (each closes
+    // itself on this same Esc when it is drawn, a frame later; the Quick Menu and the pickers are windows, not pop-ups).
+    const bool escBusy = quickMenu_.open || pickerOpen() || palette_.isOpen() || zsMenu_.open ||
+                         ui::TextFieldFocused() || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+    if (key == SDLK_ESCAPE && cleanView_ && !(mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_SHIFT | SDL_KMOD_GUI)) &&
+        drag_ == Drag::None && !escBusy && !actions_.actionForKey(key, mod)) {
+        setCleanView(false);
+        return;
+    }
     // Blender's Emulate Numpad: the number row works as the numpad, unless the key itself has an action.
     if (blenderStyle() && uiPrefs_.emulateNumpad && key >= SDLK_0 && key <= SDLK_9 &&
         !actions_.actionForChord(chordFromEvent(key, mod)))
@@ -4040,14 +4049,16 @@ void App::drawUi() {
     drawRadialMenu(); // radial menus (RadialMenu.cpp)
     drawStrokePopup(); // the stroke popup and a latched modifier's label at the cursor (StrokePopup.cpp)
     drawPartPopups();
-    if (showBrushLab_) drawBrushLab();
-    drawBrushGallery();
-    if (showImageTo3D_ && ai::aiEnabled()) drawImageTo3D(); // (closed when AI goes off; never drawn while it is)
-    drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
-    drawDeckWindow();  // File > Forge Deck (PanelDeck.cpp)
-    drawUvEditor();    // Tool > Texture Image > UV Editor (PanelUvEditor.cpp)
-    drawGarments();    // Tool > Garments > Pattern (PanelGarments.cpp)
-    drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
+    if (!cleanView_) { // Clean view hides the floating windows and strips (they come back as they were)
+        if (showBrushLab_) drawBrushLab();
+        drawBrushGallery();
+        if (showImageTo3D_ && ai::aiEnabled()) drawImageTo3D(); // (closed when AI goes off; never drawn while it is)
+        drawPhoneWindow(); // File > Capture from phone (PanelPhone.cpp)
+        drawDeckWindow();  // File > Forge Deck (PanelDeck.cpp)
+        drawUvEditor();    // Tool > Texture Image > UV Editor (PanelUvEditor.cpp)
+        drawGarments();    // Tool > Garments > Pattern (PanelGarments.cpp)
+        drawTimelineUi();  // the Sculpt Timeline strip, timelapse, proof mode HUD (PanelTimeline.cpp, ProofMode.cpp)
+    }
     pollAlphaFile();
     BrushAlpha::finishCreature(doc_.brushAlpha, false); // a Creature Skin alpha made in the background since the pick
     pollStencilFile();
@@ -4086,9 +4097,9 @@ void App::drawUi() {
     drawSculptableOverlay(); // Make sculptable: crop box, face landmarks (PanelSculptable.cpp)
     drawCaptureOverlay();    // Capture from view: the square, the result window (PanelKelvinlet.cpp)
     drawGradientOverlay();   // Line Gradient: the line and its end handles (LineGradient.cpp)
-    if (uiPrefs_.showAxes) drawCornerGizmo(); // X / Y / Z or the orientation widget in the canvas corner (#31, CornerGizmo.cpp)
+    if (uiPrefs_.showAxes && !cleanView_) drawCornerGizmo(); // X / Y / Z or the orientation widget in the canvas corner (#31, CornerGizmo.cpp)
     drawSplitViewUi();                        // the divider and the lens chips of a split view (SplitView.cpp)
-    if (uiPrefs_.showViewFigure) drawViewFigure();
+    if (uiPrefs_.showViewFigure && !cleanView_) drawViewFigure();
     drawAirStrokeIndicator(); // Start strokes off the model is on (#62, Input.cpp)
     drawViewportToast();
     if (drag_ == Drag::Insert) { // the size the insert will get

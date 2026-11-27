@@ -1337,7 +1337,7 @@ void App::registerLibraryActions() {
 
 void App::drawLibraryBrowserUi() {
     thumbs_.pump(renderer_);
-    libraryBrowser_.draw(*this, canvasRect());
+    if (!cleanView_) libraryBrowser_.draw(*this, canvasRect()); // (Clean view hides the panel; its pop-ups below stay)
     drawPickers(*this);
 }
 

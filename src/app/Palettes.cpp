@@ -878,6 +878,7 @@ void App::drawPalette_Render() {
     drawSplitViewSection(); // View > Split view (SplitView.cpp)
     drawReferencesSection(); // View > Reference images (ReferenceImages.cpp)
     actionRow(*this, {"view.frame", "view.fullscreen"});
+    actionRow(*this, {"view.clean"});
     actionRow(*this, {"ui.library", "ui.console"}); // (the SculptForge layout's View menu: they left the shelf)
 }
 

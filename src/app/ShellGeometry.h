@@ -89,6 +89,7 @@ struct ShellMetrics {
     float gap = 0.0f; // tiles: every region is inset so `gap` px of wallpaper shows between them and at the edges
                       // (bars and shelves grow by the gap first, so what's inside keeps its size); the dividers
                       // become the gaps beside the trays
+    bool bare = false; // Clean view: no bars, shelves, trays or console, the canvas fills the window below the notch
     float grow = 0.0f; // (internal) added to the bars' and shelves' sizes
     float windowW = 0.0f; // (internal) the whole window's width when laying out inside the gaps: narrow and the
                           // tray width follow the window, not the gap-inset span (#107)

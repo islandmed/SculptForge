@@ -1371,6 +1371,22 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "background_r" || name == "background_g" || name == "background_b") // 0-255, display values
         return std::round(app_.renderSettings_.backgroundColor[name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2] * 255.0f);
     if (name == "part_shading") return double(int(app_.doc_.activePartInfo().shading));
+    if (name == "clean_view") return app_.cleanView_ ? 1.0 : 0.0;
+    // Everything the shell draws around the 3D view, in px squared (0 in Clean view): bars, shelves, trays, console.
+    if (name == "chrome_area") {
+        double a = 0.0;
+        for (const CanvasRect* r : {&app_.shell_.title, &app_.shell_.paletteBar, &app_.shell_.topShelf, &app_.shell_.leftShelf,
+                                    &app_.shell_.rightShelf, &app_.shell_.bottomShelf, &app_.shell_.console,
+                                    &app_.shell_.leftTray, &app_.shell_.rightTray})
+            a += double(r->w) * double(r->h);
+        return a;
+    }
+    if (name == "canvas_fills_window") { // the 3D view covers the window below the notch band
+        int w = 0, h = 0;
+        SDL_GetWindowSize(app_.window_, &w, &h);
+        const CanvasRect c = app_.canvasRect();
+        return std::abs(c.w - float(w)) < 1.0f && std::abs(c.y + c.h - float(h)) < 1.0f ? 1.0 : 0.0;
+    }
     if (name == "shelves") return app_.layout_.shelvesVisible ? 1.0 : 0.0;
     if (name == "left_tray") return app_.layout_.leftTrayOpen ? double(app_.layout_.leftTray.size()) : -1.0;
     if (name == "right_tray") return app_.layout_.rightTrayOpen ? double(app_.layout_.rightTray.size()) : -1.0;
