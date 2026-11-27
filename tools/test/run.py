@@ -292,6 +292,17 @@ GPU_LOST = re.compile(r"Could not find a valid EGL device|D3D12: Removing Device
                       r"|failed to create dri2 screen|GL context lost")
 
 
+FAIL_LINE = re.compile(r"^(?:FAIL\b|FAILED\b|TIMEOUT\b|.*\b(?:assert|error|exception|crash|lost)\b)", re.I)
+
+
+def failure_reason(out):
+    """One line for a retried test's first failure (the stage summary shows it beside "passed after retry"): the first
+    FAIL/error line of its output, else its last line, capped."""
+    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    line = next((l for l in lines if FAIL_LINE.match(l)), lines[-1] if lines else "")
+    return re.sub(r"\s+", " ", re.sub(r"^FAIL\s+", "", line))[:400]
+
+
 def outputs(junit):
     if ET is None:
         return {}
@@ -435,7 +446,7 @@ def run_tests(argv=None):
             for n, case in hung.items():
                 print(f"TIMEOUT: {n}" + (f" hung in {case}" if case else ""), flush=True)
             failed = [n for n, (s, _) in res.items() if s == "fail" and n not in hung]
-            flaky = []
+            flaky, why = [], {}
             if failed:
                 print(f"\nrerunning {len(failed)} failed test(s) once: {' '.join(failed)}", flush=True)
                 ctest(build, names_args(failed, args), os.path.join(tmp, "b.xml"))
@@ -450,9 +461,10 @@ def run_tests(argv=None):
                             print(f"gpu: {n} failed with the graphics device gone, then passed: not a flake")
                         else:
                             flaky.append(n)
+                            why[n] = failure_reason(first.get(n, ""))
                             res[n] = ("flaky", res[n][1])
             for n in flaky:
-                print(f"flaky: {n} (failed, then passed on the rerun)")
+                print(f"flaky: {n} passed after retry ({why.get(n) or 'no output kept'})")
             if flaky and a.flaky_log:
                 sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
                 # The machine as a description (SF_MACHINE, else OS and CPU), never its host name: the file is public.
@@ -538,6 +550,8 @@ def self_test():
     b, _, nt = split_failures(["m"], {}, q, "2026-11-11", out(1064, 77))
     assert b == ["m"] and "[monkey 77]" in nt[0], nt  # another seed still blocks, and is named
     assert split_failures(["m"], {}, q, "2026-11-11", {})[0] == ["m"]  # no FAIL lines to match: blocks
+    assert failure_reason("noise\nFAIL m.sfui:64: render cell x: it differs by 4/255\nmore\n") == "m.sfui:64: render cell x: it differs by 4/255"
+    assert failure_reason("a\nlast line\n") == "last line" and failure_reason("") == ""  # (no FAIL line: the last one)
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
         f.write("# name | owner | until | task | why\nui_x | qa-lean | 2026-11-18 | fix/x | seed 1064 # leak\n"
                 "ui_y | qa | 2026-11-18 |  | no task\nbad line\n")
