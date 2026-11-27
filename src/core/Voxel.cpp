@@ -400,7 +400,6 @@ bool snapCreases(Mesh& m, const Mesh& source, const VoxelGrid& grid, const Neare
     // less within a cell (the bumpy bench spheres: none past 35).
     const float kFlat = std::cos(glm::radians(35.0f)), kHalfFlat = std::cos(glm::radians(17.5f)), kSharp = std::cos(glm::radians(70.0f));
     constexpr int kRounds = 5;
-    constexpr float kWideSlot = 1.2f; // (cells between a slot's walls from which it is followed)
     constexpr float kLambda = 0.3f, kReach = 1.0f; // (smoothing between rounds; planes within a cell count)
     constexpr float kOffMin = 0.1f, kOffFull = 0.2f; // (cells off the source: untouched below, full move above) // (cells off the source: untouched below, full move above)
     const auto& S = source.positions;
@@ -482,7 +481,7 @@ bool snapCreases(Mesh& m, const Mesh& source, const VoxelGrid& grid, const Neare
     // of its triangles' normals), from crease vertex i's triangles: the flanks (the most opposed pair) and the surface
     // around it (the triangle facing most like `around`) meet in the crease's bottom line, h below that surface, and open
     // to h (cot a1 + cot a2) across it (a1, a2: each flank's tilt from the surface).
-    auto measureCrease = [&](size_t i, const glm::vec3& x, const glm::vec3& around, float& flanks, float* gap = nullptr) {
+    auto measureCrease = [&](size_t i, const glm::vec3& x, const glm::vec3& around, float& flanks) {
         const int32_t* tris = &trisOf[i * kMax];
         std::array<glm::vec3, kMax> q, n;
         int count = 0;
@@ -499,7 +498,6 @@ bool snapCreases(Mesh& m, const Mesh& source, const VoxelGrid& grid, const Neare
             for (int c = a + 1; c < count; ++c)
                 if (const float d = glm::dot(n[size_t(a)], n[size_t(c)]); d < flanks) flanks = d, f1 = a, f2 = c;
         if (f1 < 0 || flanks >= kFlat || !(glm::length(around) > 0.0f)) return -1.0f;
-        if (gap) *gap = glm::length(q[size_t(f1)] - q[size_t(f2)]); // (between the two flanks' nearest points: a slot's width)
         const glm::vec3 up = glm::normalize(around);
         int top = -1;
         float facing = -2.0f;
@@ -524,11 +522,9 @@ bool snapCreases(Mesh& m, const Mesh& source, const VoxelGrid& grid, const Neare
     // wall or the other: shards and notches (artist-qa 11-25, a lip line).
     poolFor(crease.size(), [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
-            float flanks = 1.0f, gap = -1.0f;
-            const float w = measureCrease(i, original[crease[i]], m.normals[crease[i]], flanks, &gap);
-            // (walls facing each other more than 120 degrees apart are a slit only when closed or under 1.2 voxels apart: a deep slot
-            // with steep walls, 2 or 3 voxels wide, is a crease the vertices can follow, gh#240)
-            if ((flanks < -0.5f && !(gap >= kWideSlot * cell)) || (w >= 0.0f && w < cell)) changed[crease[i]] = 0, fadeOf[crease[i]] = 0.0f;
+            float flanks = 1.0f;
+            const float w = measureCrease(i, original[crease[i]], m.normals[crease[i]], flanks);
+            if (flanks < -0.5f || (w >= 0.0f && w < cell)) changed[crease[i]] = 0, fadeOf[crease[i]] = 0.0f;
         }
     }, 256);
     std::vector<glm::vec3> cur(original), moved(original), sum(nv);
@@ -1548,6 +1544,9 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
     // the nearest triangle puts outside the source): extra voxels that make a dotted rim along a deep crease (gh#240). Decided on the
     // signs as they are, then applied (VoxelSparse.cpp does the same on the bricks).
     {
+        constexpr float kBand = 3.0f;
+        constexpr float kMin = 0.5f; // (a sample within half a cell of the source is on its surface: the tip line of a crease at Resolution 2048 stays as it is)
+        constexpr int kT = 3; // (a wire of one voxel has 2 inside neighbours; what keeps a real fin or wire is the source's own side)
         const size_t X0 = size_t(dims.x), S0 = X0 * size_t(dims.y);
         std::vector<std::vector<uint32_t>> flips(size_t(dims.z));
         poolFor(size_t(dims.z), [&](size_t zb, size_t ze) {
@@ -1555,9 +1554,9 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
                 for (int y = 1; y + 1 < dims.y; ++y)
                     for (int x = 1; x + 1 < dims.x; ++x) {
                         const size_t i = grid.index(x, y, int(z));
-                        if (!solid[i] || !inside[i] || nearest[i] < 0 || dist2[i] > kLooseBand * kLooseBand) continue;
+                        if (!solid[i] || !inside[i] || nearest[i] < 0 || dist2[i] > kBand * kBand || dist2[i] < kMin * kMin) continue;
                         const int in = inside[i - 1] + inside[i + 1] + inside[i - X0] + inside[i + X0] + inside[i - S0] + inside[i + S0];
-                        if (in > kLooseInside) continue;
+                        if (in > kT) continue;
                         // (only when the nearest triangle of the source says it is outside too; a thin fin or wire of the source itself is
                         // inside it and stays)
                         if (sideOfTriangle(mesh, uint32_t(nearest[i]), grid.position(x, y, int(z))) > 0.0f) flips[z].push_back(uint32_t(i));

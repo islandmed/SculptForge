@@ -480,12 +480,15 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
     // nearest triangle puts outside the source): extra voxels that make a dotted rim along a deep crease (gh#240). As in Voxel.cpp,
     // decided on the signs as they are, then applied.
     {
+        constexpr float kBand = 3.0f;
+        constexpr float kMin = 0.5f; // (a sample within half a cell of the source is on its surface: the tip line of a crease at Resolution 2048 stays as it is)
+        constexpr int kT = 3; // (a wire of one voxel has 2 inside neighbours; what keeps a real fin or wire is the source's own side)
         const glm::ivec3 dirs0[6] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
         std::vector<std::vector<uint64_t>> flips((g.at.size() + 255) / 256);
         poolFor(g.at.size(), [&](size_t b0, size_t b1) {
             std::vector<uint64_t>& out = flips[b0 / 256];
             for (size_t i = b0 * kB3; i < b1 * kB3; ++i) {
-                if (!(flags[i] & kSolid) || !(flags[i] & kInside) || nearest[i] < 0 || dist2[i] > kLooseBand * kLooseBand) continue;
+                if (!(flags[i] & kSolid) || !(flags[i] & kInside) || nearest[i] < 0 || dist2[i] > kBand * kBand || dist2[i] < kMin * kMin) continue;
                 const glm::ivec3 p = g.sample(i);
                 if (!g.inGrid(p) || p.x < 1 || p.y < 1 || p.z < 1 || p.x + 1 >= g.dims.x || p.y + 1 >= g.dims.y || p.z + 1 >= g.dims.z) continue;
                 int in = 0;
@@ -494,7 +497,7 @@ Mesh sparseVoxelSurface(const Mesh& mesh, int resolution, int padding, float ban
                     const int64_t j = g.find(q.x, q.y, q.z);
                     in += j < 0 ? !g.out[g.brickOf(q.x, q.y, q.z)] : (flags[size_t(j)] & kInside) != 0; // (a uniform brick: all inside or all outside)
                 }
-                if (in > kLooseInside) continue;
+                if (in > kT) continue;
                 // (only when the nearest triangle of the source says it is outside too; a thin fin or wire of the source itself is inside it
                 // and stays)
                 if (sideOfTriangle(mesh, uint32_t(nearest[i]), origin + glm::vec3(p) * cell) > 0.0f) out.push_back(i);

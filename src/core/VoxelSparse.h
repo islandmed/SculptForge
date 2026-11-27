@@ -21,10 +21,6 @@ glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::v
 // The least |distance| (in cells) a sample gets: one exactly on the source (the tip line of a crease on a sample plane, Resolution 2048 of
 // gh#240) is inside or outside by the sign pass, but +0 reads as outside to the surface nets, which made zero-thickness membranes along it.
 constexpr float kOnSurface = 1e-3f;
-// The sign pass's loose-sample cleanup (Voxel.cpp and VoxelSparse.cpp): an inside sample within kLooseBand cells of the source with at most
-// kLooseInside of its 6 face neighbours inside, that the nearest triangle puts outside the source, is an extra voxel and is turned out.
-constexpr float kLooseBand = 3.0f;
-constexpr int kLooseInside = 3; // (a wire of one voxel has 2 inside neighbours; what keeps a real fin or wire is the source's own side)
 
 struct CreaseReport {
     size_t creases = 0, fine = 0;
