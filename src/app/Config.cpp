@@ -1647,12 +1647,14 @@ void App::drawHintsSection() {
             if (on) uiPrefs_.hiddenHints.erase(h.id);
             else uiPrefs_.hiddenHints.insert(h.id);
         }
+        ui::PinControl(h.name);
     }
     ImGui::EndDisabled();
     if (ImGui::Button(tr("Show all hints again##hints.reset"), ImVec2(-FLT_MIN, 0))) {
         uiPrefs_.showHints = true;
         uiPrefs_.hiddenHints.clear();
     }
+    ui::PinControl("Show all hints again");
 }
 
 void App::watchLayoutChanges() {
@@ -2187,6 +2189,7 @@ void drawInterfaceSection(App& app) {
         ImGui::SameLine();
         ImGui::BeginDisabled(!p.maskColorCustom);
         if (ImGui::Button(tr("Reset##mask_colour"))) app.setMaskColor(false, UiPrefs().maskColor);
+        ui::PinControl("Reset mask colour");
         ImGui::EndDisabled();
     }
     ImGui::Checkbox(tr("Reduce motion"), &p.reduceMotion);

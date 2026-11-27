@@ -1,0 +1,62 @@
+# "Any control on any shelf" (0.14.1) kept honest (a member, macOS: Remove Hidden would not go on a shelf or My Panel while Select
+# Lasso in the same panel did). Part 1: his sequence, with the shelf's copy doing the same work and an undo. Part 2: audit_pins opens
+# every palette with all its sections and fails on any control that is not offered as a shelf / My Panel entry, unless
+# tests/ui/shelf_every_control.excluded lists it with a reason.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=4
+# A hidden part: the cap that faces the camera is isolated, the rest hidden.
+run mask_by_facing x=0 y=0 z=1 angle=40
+run facegroup_from_mask
+run mask_clear
+run isolate_facegroup group=1
+remember triangles tris0
+expect_value hidden > 0
+click "Parts##tool.part"                # (closed: the Visibility section is then in view)
+click "Visibility##tool.visibility"
+expect "Tool/Remove Hidden##visibility.delete_hidden"
+expect_value "shelf_has_visibility.delete_hidden" == 0
+# Alt+drag onto the right shelf (the button did not run).
+hold alt
+drag_to "Tool/Remove Hidden##visibility.delete_hidden" "Undo##edit.undo" 0 -22
+hold none
+expect_value shelf_has_visibility.delete_hidden == 1
+expect_value triangles == $tris0
+shot shelf_remove_hidden
+# A long press: onto My Panel, and onto the left shelf (the press did not run it either).
+touch_hold "Tool/Remove Hidden##visibility.delete_hidden"
+expect_value touch_pin_menu == 1
+click "Add to My Panel"
+expect_value my_panel_entries == 1
+expect_value "mypanel_at@action:visibility.delete_hidden" == 0
+touch_hold "Tool/Remove Hidden##visibility.delete_hidden"
+click "Add to the left shelf"
+expect_value shelf_has_visibility.delete_hidden == 2
+expect_value triangles == $tris0
+# The shelf's copy does the same work as the palette's button: the hidden part is gone, one undo step brings it back.
+remember undo_steps steps0
+click "Visibility##tool.visibility"       # (closed: the only Remove Hidden left in view is the shelf's)
+click "Remove Hidden##visibility.delete_hidden"
+expect_value hidden == 0
+expect_value triangles < $tris0
+key ctrl+z
+expect_value triangles == $tris0
+expect_value hidden > 0
+# (the palette's own button is the same action)
+click "Visibility##tool.visibility"
+click "Tool/Remove Hidden##visibility.delete_hidden"
+expect_value hidden == 0
+key ctrl+z
+expect_value triangles == $tris0
+expect_value undo_steps == $steps0
+# A text box pressed while Alt is held (picking controls up) and Alt then let go: it closed the app (ImGui compared the text of a read-only
+# field it never kept). Selection Sets > Set name.
+click "Selection Sets##tool.selection_sets"
+expect "Tool/##setname"
+hold alt
+click "Tool/##setname"
+hold none
+wait 10
+expect "Tool/##setname"
+click "Selection Sets##tool.selection_sets"
+# The audit: every other control of every palette.
+audit_pins pin_gaps.txt shelf_every_control.excluded

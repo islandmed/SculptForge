@@ -404,6 +404,7 @@ bool App::maskButton(const char* id, const char* hint, int art, float width, boo
 
 void App::drawMaskingSection() {
     ImGui::Checkbox(tr("Show mask"), &renderSettings_.showMask);
+    ui::PinControl("Show mask");
     ImGui::SameLine();
     ImGui::TextDisabled("%s", tr(maskShape_ == SelectShape::Pen ? "(Ctrl paints, Ctrl+Alt erases)"
                                                              : "(Ctrl masks, Ctrl+Alt unmasks)"));
@@ -464,6 +465,7 @@ void App::drawMaskingSection() {
                  "Tool > Masking");
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##maskstrength", &maskStrength_, 0.01f, 1.0f, "Mask Strength %.2f");
+    ui::PinControl("Mask Strength");
 
     // Mask by: whole-mesh masks from the shape, the paint, the groups and the border. Each replaces the mask.
     group("Mask by");
@@ -542,6 +544,7 @@ void App::drawMaskingSection() {
     }
     ImGui::SetNextItemWidth(-1);
     tray::SliderInt("##maskpasses", &maskIterations_, 1, 20, "Passes %d");
+    ui::PinControl("Mask passes");
 
     // The options of the Mask by buttons.
     if (ImGui::TreeNodeEx(tr("Mask by options##mask"), ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -556,16 +559,21 @@ void App::drawMaskingSection() {
         ImGui::SetNextItemWidth(-1);
         if (ImGui::DragInt("##maskgroup", &maskGroup_, 0.1f, 0, 1 << 30, tr("Face group %d"), ImGuiSliderFlags_AlwaysClamp))
             maskGroup_ = std::max(0, maskGroup_);
+        ui::PinControl("Mask face group");
         ImGui::SetNextItemWidth(-1);
         ui::SliderInside("##maskcolortol", &maskColorTolerance_, 0.01f, 1.0f, "Colour tolerance %.2f");
+        ui::PinControl("Colour tolerance");
         ImGui::SetNextItemWidth(half);
         const char* facing[] = {tr("Faces the camera"), tr("Faces up"), tr("Faces down")};
         ImGui::Combo("##maskfacing", &maskFacingDir_, facing, 3);
+        ui::PinControl("Facing");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(-1);
         ui::SliderInside("##maskfacingangle", &maskFacingAngle_, 5.0f, 180.0f, "Angle %.0f");
+        ui::PinControl("Facing angle");
         ImGui::SetNextItemWidth(-1);
         tray::SliderInt("##maskborderrings", &maskBorderRings_, 1, 20, "Border rings %d");
+        ui::PinControl("Border rings");
         ui::Checkbox("Face Group borders##maskborder", &maskBorderGroups_);
         ui::HelpText("Face Group borders", nullptr, "By border also masks where face groups meet.", "Tool > Masking");
         ImGui::SameLine();

@@ -890,6 +890,7 @@ void App::drawFileMenuProjectItems() {
     if (ImGui::MenuItem(tr("Save Visible Parts As..."))) saveVisiblePartsAs();
     ImGui::SetNextItemWidth(120.0f * uiScale_);
     ImGui::SliderInt(tr("Autosave (min)"), &autosaveMinutes_, 0, 60, tr(autosaveMinutes_ ? "%d" : "off"));
+    ui::PinControl("Autosave (min)");
     if (ImGui::IsItemDeactivatedAfterEdit()) saveProjectPrefs();
 }
 
@@ -1157,9 +1158,11 @@ void App::drawUpdatesSection() {
     ImGui::TextUnformatted(tr("Update channel"));
     int channel = updateChannel_ == UpdateChannel::Preview ? 1 : 0;
     ImGui::BeginDisabled(channelLocked);
+    ImGui::BeginGroup(); // (both buttons are the one control the help below names)
     bool changed = ImGui::RadioButton((std::string(tr("Stable")) + "##prefs.update_stable").c_str(), &channel, 0);
     ImGui::SameLine();
     changed |= ImGui::RadioButton((std::string(tr("Preview (early builds)")) + "##prefs.update_preview").c_str(), &channel, 1);
+    ImGui::EndGroup();
     ImGui::EndDisabled();
     if (channelLocked) ui::ManagedBadge();
     ui::HelpText("Update channel", nullptr,

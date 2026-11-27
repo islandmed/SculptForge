@@ -1,0 +1,40 @@
+# Controls a palette draws that are NOT offered as a shelf / My Panel entry, and why (tests/ui/shelf_every_control.sfui).
+# "palette/section/label  # reason"; a row ending in * covers every gap that starts with the rest. A gap not listed fails the
+# test, a row that is no gap (a control some window sizes don't draw) is fine. New controls call ui::HelpText / ui::HelpAction / ui::PinControl instead of landing here.
+alpha/##alphafilter  # search box (text typed, not a setting)
+brush/*  # the brush list: one tile per installed brush (a brush goes on a shelf as a brush slot: Brushes > Add to shelf)
+color/(no label)*  # the ten colour swatches: presets of the colour picker above, which is an entry
+draw/35  # focal length presets: shortcuts for the Focal Length slider above, which is an entry
+draw/50  # (same)
+draw/85  # (same)
+draw/135  # (same)
+draw/Smooth only  # Strength-of-remesh presets: shortcuts for the slider above, which is an entry
+draw/Light  # (same)
+draw/Simplify  # (same)
+file/Blender  # File menu rows and sub-menus: the same actions are shelf tiles (file.save, file.save_as, ...), the sub-menus open lists
+file/Bridge  # (same)
+file/Maya  # (same)
+file/New from Starter Mesh  # (same)
+file/Open Recent  # (same: a list of files)
+file/Save  # (same)
+file/Save As...  # (same)
+file/Save Visible Parts As...  # (same)
+generate/generate.ai/(no label)*  # the prompt boxes (text typed each time)
+preferences/preferences.hotkeys/##hotkeys_filter  # search box
+preferences/preferences.hotkeys/(no label)*  # the shortcut table's rows: one per action, edited in place
+preferences/preferences.input/##radial.*  # the Radial Menus editor: its rows are a list of slots, not settings
+preferences/preferences.input/(no label)*  # (same)
+preferences/preferences.input/(icon)  # (same: the move up / down buttons of a row)
+preferences/preferences.updates/Sign in with GitHub  # the account sign-in is a step with a screen of its own, never a shelf button
+render/##viewname  # the name typed for a saved view
+splats/Tools  # a group header
+tool/tool.face/*  # group headers of the face shape sliders (the sliders under them are entries)
+tool/tool.layers/##newlayer  # the name typed for a new layer
+tool/tool.masking/Mask by options  # a group header (its sliders are entries)
+tool/tool.part/*  # the Part list: a row per Part (drag to reorder, eye / shade / boolean marks), its popups, and the boolean options opener
+preferences/preferences.ai/AI services & privacy  # opens a web page, not a setting
+preferences/preferences.ai/Copy path  # a copy helper beside a path
+preferences/preferences.ai/(no label)*  # a text box (the path or key being typed)
+preferences/preferences.support/Show the memberships  # opens a window
+preferences/preferences.tablet/*  # the pressure-curve presets (Soft, Linear, Firm, Fine detail): shortcuts for the curve beside them
+tool/tool.export/Folder  # the Unreal folder, a text box: on a side shelf its field has no room (the label takes the column); no typing there
