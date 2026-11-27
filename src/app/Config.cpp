@@ -1595,11 +1595,11 @@ void App::drawViewportHint(const char* id, const char* text, ImU32 colour, float
     ImGui::PopStyleVar(3);
 }
 
-void App::toastInViewport(const std::string& text) {
+void App::toastInViewport(const std::string& text, double seconds) {
     status_ = text;
     viewportToast_ = text;
-    viewportToastUntil_ = ImGui::GetTime() + 3.5;
-    redrawIn(3.6); // it goes by itself
+    viewportToastUntil_ = ImGui::GetTime() + seconds;
+    redrawIn(seconds + 0.1); // it goes by itself
 }
 
 void App::drawViewportToast() {

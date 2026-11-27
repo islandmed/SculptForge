@@ -79,6 +79,16 @@ ShellMetrics sculptForgeMetrics(float gap) {
 }
 
 ShellGeometry computeShell(const UiLayout& l, float W, float H, float s, float topInset, const ShellMetrics& m) {
+    if (m.bare) { // Clean view: the layout itself is untouched, so leaving it brings every bar and tray back
+        ShellGeometry g;
+        g.scale = s;
+        g.shelves = false;
+        g.narrow = (m.windowW > 0.0f ? m.windowW : W) / std::max(s, 0.01f) < kNarrowWidth;
+        const float inset = std::clamp(topInset, 0.0f, H * 0.25f);
+        g.notchBand = {0, 0, W, inset};
+        g.canvas = {0, inset, W, std::max(1.0f, H - inset)};
+        return g;
+    }
     if (m.gap > 0.0f) { // tiles: lay out in a window `gap` smaller, then inset every region by half the gap
         const float half = m.gap * 0.5f * s;
         ShellMetrics inner = m;

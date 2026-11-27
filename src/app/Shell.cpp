@@ -727,6 +727,15 @@ void App::registerShellActions() {
          "Render", "F11", "",
          [this] { SDL_SetWindowFullscreen(window_, !(SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN)); },
          [this] { return (SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN) != 0; }, nullptr});
+    add({"view.clean", "Clean view", ICON_LC_SCAN, "Fullscreen with only the 3D view: no menu bar, shelves, trays or status bar (again, or Esc: back).",
+         "Render", "Shift+F11", "", [this] { setCleanView(!cleanView_); }, [this] { return cleanView_; },
+         [] {
+#ifdef __ANDROID__
+             return false; // (the touch layout stays as it is)
+#else
+             return true;
+#endif
+         }});
     add({"view.splats", "Splats", ICON_LC_SPARKLE, "Show the Gaussian splat capture.", "Render", "", "",
          [this] { renderSettings_.showSplats = !renderSettings_.showSplats; },
          [this] { return renderSettings_.showSplats; }, [this] { return !doc_.splats.empty(); }});
@@ -1257,6 +1266,7 @@ void App::drawShell() {
         statusSince_ = ImGui::GetTime();
         if (!lastCommandOk_) redrawIn(6.05); // the error colour below goes after 6 s, idle or not
     }
+    if (cleanView_) return; // Clean view: only the 3D view (the pop-ups and overlays are drawn by the caller)
     drawLookChrome();
     drawCanvasFrame();
     if (sculptForgeLayout()) drawStatusBar(shell_);
@@ -1609,10 +1619,39 @@ void App::drawPaletteBar(const ShellGeometry& g) {
 // Looks and the SculptForge layout (Preferences > Interface > Look)
 // ---------------------------------------------------------------------------
 
+// Clean view: fullscreen, then the shell draws nothing but the 3D view (shellMetrics, drawShell). Leaving puts the window
+// back as it was; the trays, shelves and menu bar were never changed. Esc leaves too (App::onKey, after every other use of it).
+void App::setCleanView(bool on) {
+    if (on == cleanView_) return;
+    cleanView_ = on;
+    const bool full = (SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN) != 0;
+    if (on) {
+        cleanViewWasFullscreen_ = full;
+        if (!full) SDL_SetWindowFullscreen(window_, true);
+        dropdown_.clear(); // (a menu open under the bar goes with it)
+        openDropdown_ = false;
+        std::string key = "Esc";
+        const std::vector<Chord> chords = parseChords(actions_.shortcutText("view.clean"));
+        if (!chords.empty()) key = chordText(chords.front());
+        std::string hint = tr("Press %s to leave Clean view");
+        if (const size_t at = hint.find("%s"); at != std::string::npos) hint.replace(at, 2, key);
+        toastInViewport(hint, 2.0);
+    } else if (!cleanViewWasFullscreen_ && full) {
+        SDL_SetWindowFullscreen(window_, false);
+    }
+    updateCameraAspect();
+    redrawIn(0.0);
+}
+
 ShellMetrics App::shellMetrics() const {
     const float gap = theme::look.tiled ? theme::look.gap : 0.0f;
-    if (sculptForgeLayout()) return sculptForgeMetrics(gap);
+    if (sculptForgeLayout()) {
+        ShellMetrics m = sculptForgeMetrics(gap);
+        m.bare = cleanView_;
+        return m;
+    }
     ShellMetrics m;
+    m.bare = cleanView_;
     m.gap = gap;
     if (gap > 0.0f) m.dividerW = 0.0f; // the gaps beside the trays are the dividers
     return m;
