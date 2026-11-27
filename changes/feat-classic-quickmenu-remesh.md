@@ -5,5 +5,5 @@ added: **Quick Menu in the Classic layout**: the Quick Menu's last row (Quick Re
   SculptForge-layout only; the same commands, undo steps and dialogs in both layouts. The **Quick Remesh** button works in
   Classic even with the Quick Remesh keys off (Tool > Remesh > Quick Remesh), which stays the switch for Shift+R and N.
 testers:
-  - Classic layout: right click the canvas (or Space); the bottom row has Quick Remesh, Quad Remesh, Remove Hidden. Each runs once, Ctrl+Z undoes it.
+  - Classic layout: right click the canvas (or Space); the bottom row has Quick Remesh, Quad Remesh, Remove Hidden. Each runs once, Ctrl+Z undoes it (Remove Hidden says so when nothing is hidden). Your own Quick Remesh keys stay as set.
 ---
