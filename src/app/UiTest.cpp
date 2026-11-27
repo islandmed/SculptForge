@@ -143,7 +143,7 @@
 //                            the active Part with one triangle: 0 = watertight), solid_volume (the active Part's
 //                            volume with its open borders capped),
 //                            poly_mode (Tool > Polygon on), poly_element (0 Points, 1 Edges, 2 Faces), poly_selected / poly_total
-//                            (of that kind), poly_shown (drawn facing the camera), poly_hovered (the element under the cursor, -1 none),
+//                            (of that kind), poly_shown (drawn facing the camera), poly_drawn_front / poly_drawn_hidden (the selected elements the overlay drew last frame: facing the camera / dimmed on the far side), poly_hovered (the element under the cursor, -1 none),
 //                            poly_ops (operations in the registry), poly_preview (1 while an op's live preview is drawn),
 //                            poly_selected_min_edge (the shortest edge of the selected faces, scene units: a sliver check after Inset),
 //                            edited_parts (Parts with undo history), user_brushes (brushes in the
@@ -915,6 +915,9 @@ double Demo::query(const std::string& name, bool& known) const {
         for (uint8_t v : app_.polyOverlay_.visible) n += v;
         return double(n);
     }
+    // The selected elements the overlay drew last frame: facing the camera, and on the far side (dimmer; Show hidden selection)
+    if (name == "poly_drawn_front") return double(app_.polyOverlay_.drawnFront);
+    if (name == "poly_drawn_hidden") return double(app_.polyOverlay_.drawnHidden);
     if (name == "poly_hovered") return app_.polyOverlay_.hovered == ~0u ? -1.0 : double(app_.polyOverlay_.hovered);
     if (name == "poly_ops") return double(PolyOpRegistry::instance().all().size());
     if (name == "poly_preview") return app_.polyOverlay_.previewOk ? 1.0 : 0.0;

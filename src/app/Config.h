@@ -39,7 +39,8 @@ struct UiPrefs {
     std::string libraryFolder;  // "" = Documents/SculptForge
     bool alphabeticalPalettes = false; // strict A-Z palette bar (default: File, Edit first)
     bool appendLowPoly = false; // Parts > Append makes low-poly cages for Polygon mode (off: the dense sculpting meshes, as always)
-    int newerMenuRows = -1;     // the menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts, > Render bridge): -1 = by layout (Classic off, SculptForge on), 0 off, 1 on
+    bool showHiddenSelection = true; // Polygon mode draws the selection behind the surface too, dimmer (Tool > Polygon)
+    int newerMenuRows = -1;    // the menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts, > Render bridge): -1 = by layout (Classic off, SculptForge on), 0 off, 1 on
     // Preferences > Interface > Units (#148; core/Units.h ids): the unit sizes show in (brush ring, Part size, export
     // sizes, Measure), and the unit the numbers in OBJ and PLY files are read in (STL is millimetres by convention).
     std::string lengthUnit = "mm", fileUnit = "m";
