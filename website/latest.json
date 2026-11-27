@@ -1,18 +1,19 @@
 {
-  "version": "0.14.2",
+  "version": "0.14.3",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Dynamic keeps a painted Part's texture: sculpt with Dynamic on and the paint stays",
-    "Crease Line, Engrave and the other pinching cuts keep smooth walls over repeated passes",
-    "Dense Micro levels shade the surface right behind the brush (#184)",
-    "Add any control to a shelf or My Panel by touch: long-press it (requested by a member)"
+    "Focus Detail streams very dense Micro levels on Windows too",
+    "SculptForge on Android (early test build, free): tablets, phones and Chromebooks, a sideloaded .apk",
+    "Add your own HDRIs, and Clean view: fullscreen with only the 3D view (requested by a member)",
+    "Monochrome colours and Paint > Layers in the Color palette (requested by members)",
+    "Voxel Remesh keeps vertex paint smooth"
   ],
   "support": {
     "founding": {
       "taken": 17,
       "limit": 100
     },
-    "member_requests_this_release": 1
+    "member_requests_this_release": 4
   }
 }
