@@ -5272,7 +5272,27 @@ void App::drawPalette_Splats() {
     drawSculptableSection(); // Make sculptable (PanelSculptable.cpp)
 }
 
-bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring) {
+namespace {
+// The brush ring's line. Monochrome has no colour to tell the modes apart, so the line does: solid for Add, dashed for
+// Subtract, dotted for Smooth (App::drawBrushCursor). `halo` is a dark under-line so it reads on a light model too.
+enum class RingLine { Solid = 0, Dashed, Dotted };
+void strokeRing(ImDrawList* dl, const ImVec2* pts, int n, ImU32 col, float width, RingLine line, bool halo) {
+    auto pass = [&](ImU32 c, float w, float dot) {
+        if (line == RingLine::Solid) {
+            dl->AddPolyline(pts, n, c, ImDrawFlags_Closed, w);
+        } else if (line == RingLine::Dashed) {
+            for (int i = 0; i < n; ++i)
+                if ((i & 3) < 2) dl->AddLine(pts[i], pts[(i + 1) % n], c, w); // two segments on, two off
+        } else {
+            for (int i = 0; i < n; i += 2) dl->AddCircleFilled(pts[i], dot, c, 8);
+        }
+    };
+    if (halo) pass(IM_COL32(0, 0, 0, 130), width + 2.0f, width * 0.9f + 1.0f);
+    pass(col, width, width * 0.9f);
+}
+} // namespace
+
+bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring, int ringLine) {
     // Only what brushes work on: the active, visible Part with an up-to-date BVH (a stale one, after a
     // whole-mesh change, is rebuilt at the next press; until then the flat ring shows), not an LOD preview.
     if (previewLod_ >= 0 || doc_.bvhDirty) return false;
@@ -5294,12 +5314,13 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, fl
     auto facing = [&](const glm::vec3& p, const glm::vec3& pn) {
         return glm::dot(pn, ortho ? -forward : eye - p) > 0.0f;
     };
-    auto drawRing = [&](const std::vector<glm::vec3>& points, ImU32 colour, float width) {
+    const bool mono = theme::look.monochrome;
+    auto drawRing = [&](const std::vector<glm::vec3>& points, ImU32 colour, float width, RingLine line) {
         ImVec2 sp[64];
         const size_t count = std::min<size_t>(points.size(), 64);
         for (size_t i = 0; i < count; ++i)
             if (!partProject(points[i], sp[i])) return; // (behind the camera: a huge brush close up)
-        dl->AddPolyline(sp, int(count), colour, ImDrawFlags_Closed, width);
+        strokeRing(dl, sp, int(count), colour, width, line, mono && width > 1.5f);
     };
     auto fade = [](ImU32 colour, float k) {
         const ImU32 a = ImU32(float((colour >> IM_COL32_A_SHIFT) & 0xFF) * k);
@@ -5322,8 +5343,8 @@ bool App::drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, fl
         dl->AddCircleFilled(at, 2.25f * uiScale_, fade(col, 0.8f));
     }
     if (ring) {
-        drawRing(cursorRing_, col, 2.0f);
-        drawRing(cursorInner_, IM_COL32(255, 255, 255, 90), 1.0f);
+        drawRing(cursorRing_, col, 2.0f, RingLine(ringLine));
+        drawRing(cursorInner_, IM_COL32(255, 255, 255, 90), 1.0f, RingLine::Solid);
     }
     // The surface's direction: a short line out of the centre (with a dot where the brush touches).
     ImVec2 c0, c1;
@@ -5562,21 +5583,38 @@ void App::drawBrushCursor() {
         return;
     }
     const BrushType shownBrush = drag_ == Drag::Stroke ? strokeBrush_ : activeBrush(); // Shift mid-stroke draws a line
+    const bool mono = theme::look.monochrome; // Monochrome: white, the mode in the line (solid Add, dashed Subtract, dotted Smooth)
     ImU32 col = masking                                ? IM_COL32(230, 230, 230, 200)
                 : shownBrush == BrushType::Smooth    ? IM_COL32(120, 200, 255, 200)
                 : inverted                         ? IM_COL32(255, 110, 110, 200)
                                                    : IM_COL32(255, 190, 120, 200);
+    int ringLine = int(RingLine::Solid);
+    if (mono) {
+        col = masking ? IM_COL32(170, 170, 170, 215) : IM_COL32(245, 245, 245, 215);
+        ringLine = masking ? int(RingLine::Solid) : shownBrush == BrushType::Smooth ? int(RingLine::Dotted)
+                   : inverted                   ? int(RingLine::Dashed) : int(RingLine::Solid);
+    }
     if (!masking && paintMode_ && shownBrush != BrushType::Smooth) { // Paint brush: ring in the paint colour
         const glm::vec3 pc = linearToSrgb(inverted ? glm::vec3(1.0f) : doc_.paintColor);
         col = ImGui::GetColorU32(ImVec4(pc.x, pc.y, pc.z, 0.9f));
     }
     // Preferences > Cursor > Hide ring while stroking (#88): the dot and the symmetry dots stay.
     const bool ring = !(uiPrefs_.hideRingWhileStroking && drag_ == Drag::Stroke);
-    surfaceCursorShown_ = uiPrefs_.cursorFollowsSurface && drawSurfaceCursor(dl, c.x, c.y, r, focal, col, ring);
+    surfaceCursorShown_ = uiPrefs_.cursorFollowsSurface && drawSurfaceCursor(dl, c.x, c.y, r, focal, col, ring, ringLine);
     ringShown_ = ring;
+    ringLineShown_ = ringLine;
     if (!surfaceCursorShown_) {
         if (ring) {
-            dl->AddCircle(c, r, col, 64, 1.5f);
+            if (mono) {
+                ImVec2 fp[64];
+                for (int i = 0; i < 64; ++i) {
+                    const float a = float(i) * (6.2831853f / 64.0f);
+                    fp[i] = ImVec2(c.x + r * std::cos(a), c.y + r * std::sin(a));
+                }
+                strokeRing(dl, fp, 64, col, 1.5f, RingLine(ringLine), true);
+            } else {
+                dl->AddCircle(c, r, col, 64, 1.5f);
+            }
             // The inner ring is Falloff: where the falloff drops to half.
             dl->AddCircle(c, r * focalRingFraction(focal), IM_COL32(255, 255, 255, 90), 48, 1.0f);
         } else {
@@ -5613,7 +5651,7 @@ void App::drawBrushCursor() {
         const ImVec2 at0(c.x - size.x * 0.5f, tagY);
         dl->AddRectFilled(ImVec2(at0.x - pad, at0.y - pad), ImVec2(at0.x + size.x + pad, at0.y + size.y + pad),
                           IM_COL32(20, 20, 24, 190), 3.0f * uiScale_);
-        dl->AddText(at0, IM_COL32(255, 210, 130, 255), label);
+        dl->AddText(at0, mono ? IM_COL32(240, 240, 240, 255) : IM_COL32(255, 210, 130, 255), label);
         tagY += size.y + 2.0f * pad + 2.0f * uiScale_;
     }
     if (!sizeRingPreview_) drawPrecisionCursor(dl, c, r, col); // Steady Stroke's string, the precision drag, the size in mm (Precision.cpp; the pop-up shows the size itself)

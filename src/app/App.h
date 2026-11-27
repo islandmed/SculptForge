@@ -352,7 +352,7 @@ private:
     // The brush ring lying on the surface under (x, y) (#25, Preferences > Cursor > Cursor follows surface);
     // false when that point is off the model (the flat screen ring is drawn instead). `ring` false: only the
     // centre and the symmetry copies' dots (Hide ring while stroking). `focal`: the Falloff the inner ring shows.
-    bool drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring);
+    bool drawSurfaceCursor(ImDrawList* dl, float x, float y, float radiusPx, float focal, ImU32 col, bool ring, int ringLine = 0); // ringLine: 0 solid, 1 dashed, 2 dotted (Monochrome)
     bool sizeRingPreview_ = false; // the last ring drawn was the S / O pop-up's preview (UI tests: size_ring_preview)
     float sizeRingPreviewPx_ = 0.0f; // its radius, pixels (UI tests: size_ring_px)
     float sizeRingPreviewValue_ = 0.0f;       // the value it shows (Intensity 0..1: the disc inside the ring)
@@ -363,6 +363,7 @@ private:
     bool smoothBordersTagShown_ = false; // the last cursor drawn carried the "Smooth: face group borders only" tag (UI tests: smooth_borders_tag)
     bool frontFacesTagShown_ = false; // the last cursor drawn carried the "Front faces only" tag (UI tests: front_faces_tag)
     bool ringShown_ = true;           // the last cursor drawn had its ring (UI tests: cursor_ring)
+    int ringLineShown_ = 0;           // its line: 0 solid, 1 dashed, 2 dotted; only Monochrome varies it (UI tests: cursor_ring_line)
     void updateTitle();
 
     int runRecording(); // also runs UI tests (options_.uiTest)

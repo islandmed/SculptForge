@@ -105,6 +105,7 @@ struct LookStyle {
     bool upperHeaders = false; // palette headers in capitals
     int outlines = 1;         // tiled looks' panel borders: 0 off, 1 subtle (the default), 2 on (LookSettings)
     float outlineOpacity = 1.0f; // Outline opacity (LookSettings), 0-1; the hover rings follow both
+    bool monochrome = false;  // Forge Terminal's Monochrome colours: no hue anywhere in the viewport cues either (brush ring, tags)
 };
 inline LookStyle look;
 

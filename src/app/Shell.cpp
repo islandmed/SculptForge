@@ -3874,8 +3874,9 @@ void App::drawStrokeIcon(ImDrawList* dl, ImVec2 a, ImVec2 b, StrokeType type) {
             pts[i] = at(0.16f + 0.62f * u, 0.62f - 0.3f * std::sin(u * 3.0f));
         }
         dl->AddPolyline(pts, 16, col, 0, 2.0f * s);
-        dl->AddLine(pts[15], at(0.86f, 0.24f), IM_COL32(240, 136, 46, 220), 1.0f * s);
-        dl->AddCircleFilled(at(0.86f, 0.24f), 3.0f * s, IM_COL32(240, 136, 46, 255));
+        const bool mono = theme::look.monochrome; // (Monochrome: no hue, the dot is white)
+        dl->AddLine(pts[15], at(0.86f, 0.24f), mono ? IM_COL32(255, 255, 255, 220) : IM_COL32(240, 136, 46, 220), 1.0f * s);
+        dl->AddCircleFilled(at(0.86f, 0.24f), 3.0f * s, mono ? IM_COL32(255, 255, 255, 255) : IM_COL32(240, 136, 46, 255));
         break;
     }
     default: break;

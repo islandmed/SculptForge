@@ -1,0 +1,37 @@
+# The brush ring in Monochrome (Preferences > Interface > Look > Colours): no colour, so the mode is in the line:
+# solid Add, dashed Subtract (Alt), dotted Smooth (Shift). Other colour schemes keep the coloured solid ring.
+run new_sphere subdivisions=3
+run ui_look look=forge scheme=monochrome layout=sculptforge
+wait 0.2
+hover_model 0.5 0.5
+expect_value surface_cursor == 1
+expect_value cursor_ring_line == 0
+shot ring-add
+hold alt
+hover_model 0.52 0.5
+expect_value cursor_ring_line == 1
+shot ring-subtract
+hold none
+hold shift
+hover_model 0.5 0.52
+expect_value cursor_ring_line == 2
+shot ring-smooth
+hold none
+
+# Off the model: the flat ring uses the same lines.
+hover_window 0.68 0.5
+expect_value surface_cursor == 0
+expect_value cursor_ring_line == 0
+hold alt
+hover_window 0.69 0.5
+expect_value cursor_ring_line == 1
+shot ring-subtract-flat
+hold none
+
+# A coloured scheme keeps the solid ring in every mode.
+run ui_look look=forge scheme=neutral
+wait 0.2
+hold alt
+hover_model 0.5 0.5
+expect_value cursor_ring_line == 0
+hold none

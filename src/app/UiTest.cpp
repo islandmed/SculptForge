@@ -2161,6 +2161,7 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "smooth_borders_tag") return app_.smoothBordersTagShown_ ? 1.0 : 0.0;
     if (name == "front_faces_tag") return app_.frontFacesTagShown_ ? 1.0 : 0.0;
     if (name == "cursor_ring") return app_.ringShown_ ? 1.0 : 0.0;
+    if (name == "cursor_ring_line") return double(app_.ringLineShown_); // 0 solid (Add), 1 dashed (Subtract), 2 dotted (Smooth) in Monochrome
     if (name == "hide_ring_while_stroking") return app_.uiPrefs_.hideRingWhileStroking ? 1.0 : 0.0;
     if (name == "cursor_follows_surface") return app_.uiPrefs_.cursorFollowsSurface ? 1.0 : 0.0;
     if (name == "camera_yaw") return glm::degrees(app_.camera_.yaw);
