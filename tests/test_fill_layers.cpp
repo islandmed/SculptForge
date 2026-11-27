@@ -271,7 +271,7 @@ TEST(fill_layer_command_undo_and_projects) {
 
 TEST(material_recipes_are_data_and_wear_the_model) {
     const auto& list = builtinMaterialRecipes();
-    CHECK(list.size() == 4);
+    CHECK(list.size() == 6);
     for (const MaterialRecipe& r : list) CHECK(!r.name.empty() && !r.description.empty() && r.layers.size() >= 2);
     CHECK(findMaterialRecipe("Worn Metal") && findMaterialRecipe("painted_edges") && !findMaterialRecipe("glitter"));
     Document doc = makeDoc(trenchPart());
@@ -299,6 +299,57 @@ TEST(material_recipes_are_data_and_wear_the_model) {
     MaterialRecipe bad;
     std::string err;
     CHECK(!parseMaterialRecipe("{\"format\":\"other\"}", bad, err));
+}
+
+// Wax and Oil Stain use only channels the renderer has (colour, roughness, height) and Wax says honestly that it has
+// no translucency: its description names the stand-in, and never claims subsurface scattering.
+TEST(wax_and_oil_recipes_use_real_channels_and_say_so) {
+    const MaterialRecipe* wax = findMaterialRecipe("wax");
+    const MaterialRecipe* oil = findMaterialRecipe("Oil Stain");
+    CHECK(wax && oil);
+    if (!wax || !oil) return;
+    CHECK(wax->description.find("no translucency") != std::string::npos);
+    CHECK(wax->description.find("stand-in") != std::string::npos);
+    CHECK(oil->description.find("ubsurface") == std::string::npos && wax->description.find("ubsurface") == std::string::npos &&
+          wax->description.find("scattering") == std::string::npos);
+    for (const MaterialRecipe* r : {wax, oil})
+        for (const Json& l : r->layers.items())
+            for (const Json& c : l["fill"]["material"]["channels"].items())
+                CHECK(c.asString() == "base_color" || c.asString() == "roughness" || c.asString() == "metallic" || c.asString() == "height");
+    // Blur works within UV islands only: on these wide, soft masks it leaves hard straight steps along the island borders
+    // (artist-qa 11-26), so their softness comes from the generators' Softness and Levels instead.
+    for (const MaterialRecipe* r : {wax, oil})
+        for (const Json& l : r->layers.items())
+            for (const Json& e : l["fill"]["mask"].items()) CHECK(e["kind"].asString() != "blur");
+
+    // The spread of one channel over the texture's covered texels.
+    auto spread = [](const PaintTexture& t, Channel c, float& lo, float& hi) {
+        lo = 1.0f, hi = 0.0f;
+        for (int y = 40; y < 1000; y += 20)
+            for (int x = 40; x < 1000; x += 20) {
+                if (t.pixels[(size_t(y) * 1024 + size_t(x)) * 4 + 3] == 0) continue;
+                const float v = channelImage(t, c).value(x, y);
+                lo = std::min(lo, v), hi = std::max(hi, v);
+            }
+    };
+    Document doc = makeDoc(trenchPart());
+    CommandRegistry reg;
+    CHECK(reg.execute(doc, "material_recipe", {{"name", std::string("wax")}}).ok);
+    CHECK(doc.mesh.texture->layers.size() == 5 && channelEnabled(*doc.mesh.texture, Channel::Height) &&
+          channelEnabled(*doc.mesh.texture, Channel::Roughness));
+    float lo, hi;
+    spread(*doc.mesh.texture, Channel::Roughness, lo, hi);
+    std::printf("  wax roughness %.2f..%.2f\n", lo, hi);
+    CHECK(lo < 0.35f && hi > 0.45f && hi - lo > 0.15f); // semi-glossy, and it varies
+    spread(*doc.mesh.texture, Channel::Height, lo, hi);
+    std::printf("  wax height %.2f..%.2f\n", lo, hi);
+    CHECK(hi > 0.6f && lo >= 0.5f); // thickness only builds up
+    CHECK(reg.execute(doc, "undo").ok);
+
+    CHECK(reg.execute(doc, "material_recipe", {{"name", std::string("oil_stain")}}).ok);
+    spread(*doc.mesh.texture, Channel::Roughness, lo, hi);
+    std::printf("  oil roughness %.2f..%.2f\n", lo, hi);
+    CHECK(lo < 0.2f && hi > 0.5f); // glossy in the middle, rougher toward the rim
 }
 
 // The app's live re-bake (App::updateMeshMaps): the update runs on a worker thread while the main thread keeps
