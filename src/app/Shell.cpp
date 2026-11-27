@@ -725,7 +725,14 @@ void App::registerShellActions() {
     flag("view.mesh", "Show Mesh", ICON_LC_BOX, "Render", "", &renderSettings_.showMesh, "Draw the sculpt.");
     add({"view.fullscreen", "Fullscreen", ICON_LC_MAXIMIZE, "Fill the screen with SculptForge (again: back to a window).",
          "Render", "F11", "",
-         [this] { SDL_SetWindowFullscreen(window_, !(SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN)); },
+         [this] {
+             if (cleanView_) { // F11 in Clean view leaves both: a window without its menu bar would be a trap
+                 cleanViewWasFullscreen_ = false;
+                 setCleanView(false);
+                 return;
+             }
+             SDL_SetWindowFullscreen(window_, !(SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN));
+         },
          [this] { return (SDL_GetWindowFlags(window_) & SDL_WINDOW_FULLSCREEN) != 0; }, nullptr});
     add({"view.clean", "Clean view", ICON_LC_SCAN, "Fullscreen with only the 3D view: no menu bar, shelves, trays or status bar (again, or Esc: back).",
          "Render", "Shift+F11", "", [this] { setCleanView(!cleanView_); }, [this] { return cleanView_; },
