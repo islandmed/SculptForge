@@ -348,9 +348,6 @@ else()
   # -fno-fast-math: a packager's -ffast-math / -Ofast (CFLAGS come first, these win) would turn the brushes' NaN
   # guards (std::isfinite, gh#229) into nothing.
   target_compile_options(sculptforge_core PRIVATE -Wall -Wextra -Wno-unused-parameter -ffp-contract=off -fno-fast-math)
-  # -fno-trapping-math for the brush kernel's write loops (clang assumes it; GCC needs it to vectorise a loop with a
-  # float compare in it): same values, no floating-point trap handling anywhere in the app to keep.
-  set_source_files_properties(src/core/MicroSculpt.cpp PROPERTIES COMPILE_OPTIONS "-fno-trapping-math")
 endif()
 sculptforge_pch(sculptforge_core)
 set_source_files_properties(third_party/xatlas/xatlas.cpp third_party/tinyexr/tinyexr_impl.cpp ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedRecipes.cpp

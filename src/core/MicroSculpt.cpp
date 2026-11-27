@@ -25,7 +25,6 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <bit>
 #include <chrono>
 #include <thread>
 #include <cmath>
@@ -194,165 +193,6 @@ void interpolateCoarse(const float* coarse, uint32_t n, uint32_t stride, F&& app
 inline int16_t quantizeUnits(float units) {
     units = std::clamp(units, -32767.0f, 32767.0f);
     return int16_t(units >= 0.0f ? int(units + 0.5f) : -int(0.5f - units));
-}
-
-// interpolateCoarse + the plain write (no mask, no base freedom: the common case): the same values point by point, the
-// same expressions on the same operands (and no fused multiply-adds: -ffp-contract=off), so the same bits, written a row
-// at a time: a row's coarse values spread over its points, then straight loops the compiler can vectorise (the callback
-// loop was most of a dab at a billion triangles, 15-20 million points a dab). `triMax` and `over` as the callback's: the
-// points it wrote (a change of 0 isn't one). MicroStroke::fastWrite = false runs the callback loop instead (the test
-// compares the two).
-// SF_MICRO_PLAIN_WRITE=1: the callback write loops (A/B of the row loops on one build).
-bool plainWriteEnv() {
-    static const bool on = [] { const char* e = std::getenv("SF_MICRO_PLAIN_WRITE"); return e && e[0] == '1'; }();
-    return on;
-}
-
-struct WriteTables {
-    uint32_t n = 0, stride = 0;
-    std::vector<float> fi, fj, omfj, wa, wb, wc; // [rj * (n + 1) + i]: the weights of the cell's two halves at row rj
-    std::vector<uint8_t> low, corner;            // fi + fj <= 1; the cell's own corner (the coarse value itself)
-};
-const WriteTables& writeTablesFor(uint32_t n, uint32_t stride) {
-    thread_local WriteTables T;
-    if (T.n == n && T.stride == stride) return T;
-    T.n = n, T.stride = stride;
-    const size_t W = size_t(n) + 1, N = size_t(stride) * W;
-    for (std::vector<float>* v : {&T.fi, &T.fj, &T.omfj, &T.wa, &T.wb, &T.wc}) v->assign(N, 0.0f);
-    T.low.assign(N, 0), T.corner.assign(N, 0);
-    const float inv = 1.0f / float(stride);
-    for (uint32_t rj = 0; rj < stride; ++rj) {
-        const float fj = float(rj) * inv;
-        for (uint32_t i = 0; i <= n; ++i) {
-            const uint32_t ri = i % stride;
-            const float fi = float(ri) * inv;
-            const size_t k = size_t(rj) * W + i;
-            T.fi[k] = fi, T.fj[k] = fj, T.omfj[k] = 1.0f - fj;
-            T.wa[k] = 1.0f - fi - fj, T.wb[k] = fi + fj - 1.0f, T.wc[k] = 1.0f - fi;
-            T.low[k] = fi + fj <= 1.0f ? 1 : 0;
-            T.corner[k] = ri == 0 && rj == 0 ? 1 : 0;
-        }
-    }
-    return T;
-}
-
-// The interpolated change of every grid point a row at a time (interpolateCoarse's values, or forInterpolated's: the
-// same for the points inside the triangle): for each row j with a moved cell, row(j, i0, i1, d) with d[i] the change of
-// point (i, j) for i in [i0, i1) (0 in a cell none of whose corners moved; the points outside are not given).
-template <class F>
-void forInterpolatedRows(const float* coarse, uint32_t n, uint32_t stride, F&& row) {
-    const uint32_t cm = n / stride;
-    const WriteTables& T = writeTablesFor(n, stride);
-    const size_t W = size_t(n) + 1;
-    thread_local std::vector<float> e00, e10, e01, e11, drow; // the row's coarse values, one per point
-    for (std::vector<float>* v : {&e00, &e10, &e01, &e11, &drow}) v->resize(W + stride);
-    for (uint32_t j = 0; j <= n; ++j) {
-        const uint32_t cj = j / stride, rj = j % stride, cells = cm - cj;
-        const float* rowA = coarse + MicroMesh::index(0, cj, cm);
-        const float* rowB = cj + 1 <= cm ? coarse + MicroMesh::index(0, cj + 1, cm) : nullptr;
-        int lo = -1, hi = -1;
-        for (uint32_t ci = 0; ci <= cells; ++ci) { // (the cells of a row with a corner that moved: the others stay)
-            const float c00 = rowA[ci], c10 = ci + 1 <= cells ? rowA[ci + 1] : 0.0f;
-            const float c01 = rowB && ci + 1 <= cells ? rowB[ci] : 0.0f, c11 = rowB && ci + 2 <= cells ? rowB[ci + 1] : 0.0f;
-            const bool zero = c00 == 0.0f && c10 == 0.0f && c01 == 0.0f && c11 == 0.0f;
-            if (zero && lo < 0) continue; // (before the first moved cell nothing is read; between cells it must read 0)
-            if (!zero) {
-                if (lo < 0) lo = int(ci);
-                hi = int(ci);
-            }
-            float *p00 = &e00[size_t(ci) * stride], *p10 = &e10[size_t(ci) * stride], *p01 = &e01[size_t(ci) * stride], *p11 = &e11[size_t(ci) * stride];
-            for (uint32_t r = 0; r < stride; ++r) p00[r] = c00, p10[r] = c10, p01[r] = c01, p11[r] = c11;
-        }
-        if (lo < 0) continue;
-        const uint32_t i0 = uint32_t(lo) * stride, i1 = std::min(n - j + 1, uint32_t(hi + 1) * stride); // [i0, i1): i + j <= n
-        const size_t tb = size_t(rj) * W;
-        const float *__restrict fi = T.fi.data() + tb, *__restrict fj = T.fj.data() + tb, *__restrict omfj = T.omfj.data() + tb;
-        const float *__restrict wa = T.wa.data() + tb, *__restrict wb = T.wb.data() + tb, *__restrict wc = T.wc.data() + tb;
-        const uint8_t *__restrict low = T.low.data() + tb, *__restrict corner = T.corner.data() + tb;
-        const float *__restrict a00 = e00.data(), *__restrict a10 = e10.data(), *__restrict a01 = e01.data(), *__restrict a11 = e11.data();
-        float* __restrict d = drow.data();
-        for (uint32_t i = i0; i < i1; ++i) {
-            const float dLow = a00[i] * wa[i] + a10[i] * fi[i] + a01[i] * fj[i];
-            const float dHigh = a10[i] * omfj[i] + a11[i] * wb[i] + a01[i] * wc[i];
-            d[i] = corner[i] ? a00[i] : low[i] ? dLow : dHigh;
-        }
-        row(j, i0, i1, d);
-    }
-}
-
-// interpolateCoarse + the plain write (no mask, no base freedom: the common case): the same values point by point, the
-// same expressions on the same operands (and no fused multiply-adds: -ffp-contract=off), so the same bits, written a row
-// at a time: a row's coarse values spread over its points, then straight loops the compiler can vectorise (the callback
-// loop was most of a dab at a billion triangles, 15-20 million points a dab). `triMax` and `over` as the callback's: the
-// points it wrote (a change of 0 isn't one). MicroStroke::fastWrite = false runs the callback loop instead (the test
-// compares the two).
-void interpolateWrite(const float* coarse, uint32_t n, uint32_t stride, int16_t* g, float invStep, float step, float& overOut, int& triMaxOut) {
-    int tm = triMaxOut;
-    uint32_t ob = 0; // (the largest |change| that didn't fit, as float bits: ordered like the floats, no float max to reduce)
-    forInterpolatedRows(coarse, n, stride, [&](uint32_t j, uint32_t i0, uint32_t i1, const float* __restrict d) {
-        int16_t* __restrict row = g + MicroMesh::index(0, j, n);
-        uint32_t o = 0;
-        int t2 = 0;
-        for (uint32_t i = i0; i < i1; ++i) {
-            const float nd = float(row[i]) + d[i] * invStep; // (in units of the step)
-            const float c = std::fmin(std::fmax(nd, -32767.0f), 32767.0f); // quantizeUnits, without a branch on the sign
-            const int mag = int(std::fabs(c) + 0.5f);
-            const int q = c < 0.0f ? -mag : mag;
-            const bool on = d[i] != 0.0f;
-            const float a = std::fabs(nd);
-            o = std::max(o, on & (a > 32767.0f) ? std::bit_cast<uint32_t>(a) : 0u);
-            t2 = std::max(t2, on ? (q < 0 ? -q : q) : 0);
-            row[i] = on ? int16_t(q) : row[i];
-        }
-        ob = std::max(ob, o);
-        tm = std::max(tm, t2);
-    });
-    if (ob) overOut = std::max(overOut, std::bit_cast<float>(ob) * step);
-    triMaxOut = std::max(triMaxOut, tm); // (the edge callback may have raised it meanwhile)
-}
-
-// The Smooth write at stride > 1 (the callback loop's values): each grid point with an interpolated weight above 0 goes
-// towards its six neighbours' average (as they were: `before`) by that weight, at least half a step to move. The points
-// inside the triangle a row at a time; its edges (a few points a row) by the callback.
-template <bool Peaks, class Edge>
-void smoothWrite(const float* coarse, uint32_t n, uint32_t stride, int16_t* g, const int16_t* before, float step, float invStep, float& overOut,
-                 int& triMaxOut, Edge&& edge) {
-    int tm = triMaxOut;
-    uint32_t ob = 0;
-    forInterpolatedRows(coarse, n, stride, [&](uint32_t j, uint32_t i0, uint32_t i1, const float* __restrict w) {
-        const uint32_t base = MicroMesh::index(0, j, n);
-        int16_t* __restrict row = g + base;
-        if (j == 0 || j == n) { // (the rows along the triangle's edges)
-            for (uint32_t i = i0; i < i1; ++i) edge(base + i, i, j, w[i]);
-            return;
-        }
-        const ptrdiff_t up = ptrdiff_t(n + 1 - j), down = -ptrdiff_t(n + 2 - j);
-        const uint32_t a = std::max(i0, 1u), b = std::min(i1, n - j); // i > 0 and i + j < n: the inside
-        if (i0 == 0) edge(base, 0, j, w[0]);
-        if (i1 == n - j + 1) edge(base + n - j, n - j, j, w[n - j]); // (the diagonal edge)
-        const int16_t* __restrict q = before + base;
-        uint32_t o = 0;
-        int t2 = 0;
-        for (uint32_t i = a; i < b; ++i) {
-            float d = (int(q[i - 1]) + q[i + 1] + q[i + up] + q[i + up - 1] + q[i + down] + q[i + down + 1]) * (1.0f / 6.0f) - float(q[i]);
-            if (Peaks) d = std::fmin(0.0f, d);
-            d *= w[i];
-            const float delta = d * step;
-            const float nd = float(row[i]) + delta * invStep;
-            const float c = std::fmin(std::fmax(nd, -32767.0f), 32767.0f);
-            const int mag = int(std::fabs(c) + 0.5f);
-            const int qv = c < 0.0f ? -mag : mag;
-            const bool on = (w[i] > 0.0f) & (std::fabs(d) >= 0.5f);
-            const float an = std::fabs(nd);
-            o = std::max(o, on & (an > 32767.0f) ? std::bit_cast<uint32_t>(an) : 0u);
-            t2 = std::max(t2, on ? (qv < 0 ? -qv : qv) : 0);
-            row[i] = on ? int16_t(qv) : row[i];
-        }
-        ob = std::max(ob, o);
-        tm = std::max(tm, t2);
-    });
-    if (ob) overOut = std::max(overOut, std::bit_cast<float>(ob) * step);
-    triMaxOut = std::max(triMaxOut, tm); // (the edge callback may have raised it meanwhile)
 }
 
 // The six lattice neighbours of (i, j) inside the triangle.
@@ -1051,7 +891,7 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                 count += S;
             } else if (smoothFine) {
                 // Each grid point towards its neighbours' average (as at stride 1), by the interpolated weight.
-                const auto point = [&](uint32_t idx, uint32_t i, uint32_t j, float w) {
+                forInterpolated(coarse.data(), n, stride, [&](uint32_t idx, uint32_t i, uint32_t j, float w) {
                     if (w <= 0.0f) return;
                     float d;
                     if (i > 0 && j > 0 && i + j < n) { // (inside: the rows above and below by offset)
@@ -1067,17 +907,10 @@ void MicroStroke::dab(Mesh& m, const BVH& bvh, BrushType type, const glm::vec3& 
                     if (type == BrushType::SmoothPeaks) d = std::min(0.0f, d);
                     d *= w;
                     if (std::abs(d) >= 0.5f) apply(idx, d * mm.step); // (less rounds back to the value it has)
-                };
-                if (fastWrite && !plainWriteEnv() && !mk && !bf) {
-                    if (type == BrushType::SmoothPeaks) smoothWrite<true>(coarse.data(), n, stride, g, before.data(), mm.step, invStep, over, triMax, point);
-                    else smoothWrite<false>(coarse.data(), n, stride, g, before.data(), mm.step, invStep, over, triMax, point);
-                } else {
-                    forInterpolated(coarse.data(), n, stride, point);
-                }
+                });
                 count += S;
             } else {
-                if (fastWrite && !plainWriteEnv() && !mk && !bf) interpolateWrite(coarse.data(), n, stride, g, invStep, mm.step, over, triMax);
-                else interpolateCoarse(coarse.data(), n, stride, apply);
+                interpolateCoarse(coarse.data(), n, stride, apply);
                 count += S;
             }
             mm.triRange[t] = uint16_t(std::min(triMax, 32767));
