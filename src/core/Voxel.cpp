@@ -1496,6 +1496,7 @@ VoxelRemeshEstimate estimateVoxelRemesh(const Mesh& mesh, int resolution, double
         grid = cellsOfArea * 26.0 * 15.0 + bricks.x * bricks.y * bricks.z * 6.0;
     }
     e.bytes = size_t(grid + double(e.triangles) * kVoxelResultBytesPerTriangle);
+    if (remeshInterpolatesPaint(mesh, e.triangles)) e.bytes += size_t(double(mesh.triangleCount()) * kVoxelPaintBvhBytesPerTriangle);
     return e;
 }
 
@@ -1581,8 +1582,7 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
         if (open) dropSpecks(out, 64);
         noteFineCreases(mesh, resolution, creases, notes);
         if (!step(0.9f)) return {};
-        transferVertexAttributes(source, out, false);
-        transferSmoothColors(source, out);
+        transferRemeshPaint(source, out);
         if (keepGroups) transferFaceGroups(source, out);
         step(1.0f);
         return out;
@@ -1637,13 +1637,22 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
     // Mask and vertex paint follow the nearest original vertex; hidden flags and UVs don't survive a rebuild (everything
     // becomes visible group 0), and face groups only with Keep Face Groups (the nearest original triangle's).
     // The original's quads don't either: the new surface is all quads of its own.
-    transferVertexAttributes(source, out, false);
-    transferSmoothColors(source, out);
+    transferRemeshPaint(source, out);
     if (keepGroups) transferFaceGroups(source, out);
     step(1.0f);
     return out;
 }
 } // namespace
+
+bool remeshInterpolatesPaint(const Mesh& source, size_t resultTriangles) {
+    return source.colors.size() == source.positions.size() && !source.colors.empty() && resultTriangles > source.triangleCount();
+}
+
+void transferRemeshPaint(const Mesh& source, Mesh& dst) {
+    const bool smooth = remeshInterpolatesPaint(source, dst.triangleCount());
+    transferVertexAttributes(source, dst, !smooth);
+    if (smooth) transferSmoothColors(source, dst);
+}
 
 void transferSmoothColors(const Mesh& source, Mesh& dst) {
     if (source.colors.size() != source.positions.size() || source.colors.empty() || source.triangleCount() == 0 ||

@@ -11,6 +11,7 @@
 #include "core/PaintLayer.h"
 #include "core/Primitives.h"
 #include "core/VertexPaint.h"
+#include "core/Voxel.h"
 
 #include <algorithm>
 #include <cmath>
@@ -186,4 +187,42 @@ TEST(remesh_vertex_paint_invariant_never_changes_the_shape) {
     for (size_t v = 0; v < painted.mesh.positions.size() && v < plain.mesh.positions.size(); ++v)
         moved += painted.mesh.positions[v] != plain.mesh.positions[v];
     CHECK(moved == 0);
+}
+
+TEST(remesh_estimate_counts_the_paint_tree_only_when_paint_is_interpolated) {
+    // The interpolated copy builds a triangle tree over the old surface (80 bytes a triangle at its peak, measured on 21M
+    // triangles: +79% of a 2 GB remesh). The estimate counts it when the result is denser than the Part; a Part denser
+    // than its result keeps the nearest-vertex copy, which needs no tree, and the estimate stays as it was.
+    Mesh coarse = makeIcosphere(3);
+    Mesh dense = makeIcosphere(6);
+    const VoxelRemeshEstimate plainCoarse = estimateVoxelRemesh(coarse, 160);
+    paintField(coarse);
+    const VoxelRemeshEstimate paintedCoarse = estimateVoxelRemesh(coarse, 160);
+    CHECK(paintedCoarse.triangles > coarse.triangleCount());
+    CHECK(paintedCoarse.bytes == plainCoarse.bytes + size_t(double(coarse.triangleCount()) * kVoxelPaintBvhBytesPerTriangle));
+    const VoxelRemeshEstimate plainDense = estimateVoxelRemesh(dense, 32);
+    paintField(dense);
+    const VoxelRemeshEstimate paintedDense = estimateVoxelRemesh(dense, 32);
+    CHECK(paintedDense.triangles < dense.triangleCount());
+    CHECK(paintedDense.bytes == plainDense.bytes);
+    CHECK(remeshInterpolatesPaint(coarse, paintedCoarse.triangles));
+    CHECK(!remeshInterpolatesPaint(dense, paintedDense.triangles));
+}
+
+TEST(remesh_vertex_paint_invariant_dense_part_keeps_each_vertex_colour_exactly) {
+    // A Part denser than its result: each new vertex takes an old vertex's colour as it was (no blending, no tree).
+    CommandRegistry reg;
+    Document doc = paintedSphere();
+    const Mesh old = doc.mesh;
+    CHECK(reg.execute(doc, "remesh", {{"resolution", 32.0}}).ok);
+    CHECK(doc.mesh.triangleCount() < old.triangleCount());
+    size_t notFromOld = 0;
+    for (const glm::vec3& c : doc.mesh.colors) {
+        bool found = false;
+        for (const glm::vec3& o : old.colors)
+            if (c == o) { found = true; break; }
+        notFromOld += !found;
+        if (notFromOld > 0) break;
+    }
+    CHECK(notFromOld == 0);
 }
