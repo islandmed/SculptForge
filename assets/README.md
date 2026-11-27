@@ -8,7 +8,7 @@ to everyone.
 |---|---|---|
 | `starter/` | The starter meshes (File > New from Starter Mesh): small base cages as zlib-compressed `.sfproj.z` projects, with the subdivision levels added when they open. Provenance of each: [docs/starter-meshes.md](../docs/starter-meshes.md) | `tools/starter/build.sh` |
 | `insert-sets/` | The built-in "Creature bones" insert set, one multi-object OBJ, compressed. Every piece is designed from simple distance fields, with no outside meshes or scans | `tools/creature-bones/build.sh` |
-| `materials/` | The built-in Material Recipes (`.sfmaterial`: a stack of Fill layers saved as small JSON): worn metal, painted edges, dirt and dust, rusted iron | by hand, in the app |
+| `materials/` | The built-in Material Recipes (`.sfmaterial`: a stack of Fill layers saved as small JSON): worn metal, painted edges, dirt and dust, rusted iron, wax, oil stain | by hand, in the app |
 | `hdri/` | Three small CC0 environment maps for the PBR viewport (512 x 256) | credits in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) |
 | `face/` | The template head for Generate Facial Shapes. [Its README](face/README.md) has the source and licence | `tools/face/build_ict_template.py` |
 | `fonts/` | The interface fonts and the icon font, with their licences. CJK fonts are cut down to the characters the translations use | `tools/i18n/subset_cjk_font.py` |

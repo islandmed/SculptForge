@@ -27,6 +27,11 @@ roughness and the bumps as they will look in a game engine ([Material painting](
    - **Painted Edges**: painted metal with the paint chipped off its edges.
    - **Dirt and Dust**: dirt packed in the crevices and pale dust on top, to lay over any material.
    - **Rusted Iron**: dark iron with rust spreading from the crevices.
+   - **Wax**: warm, semi-glossy candle wax with a soft uneven build-up and glossier edges.
+     Its roughness drifts between satin and matte. SculptForge renders no translucency (light passing through a
+     material), so thin parts and edges get a lighter, warmer tint instead: a stand-in, not subsurface scattering.
+   - **Oil Stain**: patches of darker, more saturated amber with a soft edge, glossy in the middle and rougher
+     toward the rim. It lays its own colour; lay it over any material and the stain shows through its soft edge.
 3. The recipe adds its Fill layers on top of your layers, turning on the material channels it needs. The first
    time, the Part's Mesh Maps are baked in the background (a progress bar shows); the layers fill in when they
    are ready.
