@@ -115,4 +115,13 @@ std::string voxelRemeshNote(const VoxelRemeshNotes& notes);
 // worker thread (read-only on `source`).
 void transferFaceGroups(const Mesh& source, Mesh& dst);
 
+// Vertex paint onto a rebuilt surface: each vertex of `dst` takes the colour at the closest point of `source`'s surface,
+// interpolated across that triangle (the nearest-vertex copy of transferVertexAttributes steps in blocks wherever the new
+// surface is denser than the old one, so a paint edge came out jagged). Nothing if `source` has no paint.
+void transferSmoothColors(const Mesh& source, Mesh& dst);
+
+// What a remesh does to vertex paint, for the status line: "" when the Part has none, else how many vertices carry it and,
+// when the new surface has fewer, that paint finer than its vertices is softened.
+std::string vertexPaintNote(const Mesh& source, const Mesh& result);
+
 } // namespace sf

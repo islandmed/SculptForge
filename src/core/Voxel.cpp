@@ -1581,7 +1581,8 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
         if (open) dropSpecks(out, 64);
         noteFineCreases(mesh, resolution, creases, notes);
         if (!step(0.9f)) return {};
-        transferVertexAttributes(source, out);
+        transferVertexAttributes(source, out, false);
+        transferSmoothColors(source, out);
         if (keepGroups) transferFaceGroups(source, out);
         step(1.0f);
         return out;
@@ -1636,12 +1637,42 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
     // Mask and vertex paint follow the nearest original vertex; hidden flags and UVs don't survive a rebuild (everything
     // becomes visible group 0), and face groups only with Keep Face Groups (the nearest original triangle's).
     // The original's quads don't either: the new surface is all quads of its own.
-    transferVertexAttributes(source, out);
+    transferVertexAttributes(source, out, false);
+    transferSmoothColors(source, out);
     if (keepGroups) transferFaceGroups(source, out);
     step(1.0f);
     return out;
 }
 } // namespace
+
+void transferSmoothColors(const Mesh& source, Mesh& dst) {
+    if (source.colors.size() != source.positions.size() || source.colors.empty() || source.triangleCount() == 0 ||
+        dst.positions.empty())
+        return;
+    TriangleBVH bvh;
+    bvh.build(source.positions, source.triangles);
+    if (bvh.empty()) return;
+    const float reach = glm::length(source.bounds().extent()) + glm::length(dst.bounds().extent());
+    dst.colors.assign(dst.positions.size(), glm::vec3(1.0f));
+    poolFor(dst.positions.size(), [&](size_t b, size_t e) {
+        for (size_t i = b; i < e; ++i) {
+            SurfaceHit hit;
+            if (!bvh.closestPoint(dst.positions[i], reach, hit)) continue;
+            const glm::uvec3 tri = source.triangles[hit.prim];
+            const glm::vec3 c = source.colors[tri.x] * hit.bary.x + source.colors[tri.y] * hit.bary.y + source.colors[tri.z] * hit.bary.z;
+            if (std::isfinite(c.x) && std::isfinite(c.y) && std::isfinite(c.z)) dst.colors[i] = c;
+            else dst.colors[i] = source.colors[tri[hit.bary.y > hit.bary.x ? (hit.bary.z > hit.bary.y ? 2 : 1) : (hit.bary.z > hit.bary.x ? 2 : 0)]];
+        }
+    }, 1 << 13);
+    dst.markAllDirty();
+}
+
+std::string vertexPaintNote(const Mesh& source, const Mesh& result) {
+    if (source.colors.size() != source.positions.size() || source.colors.empty()) return {};
+    if (result.positions.size() >= source.positions.size()) return {};
+    return "; vertex paint now sits on " + std::to_string(result.positions.size()) + " vertices (was " +
+           std::to_string(source.positions.size()) + "), so paint finer than that is softened: raise the Resolution to keep it";
+}
 
 void transferFaceGroups(const Mesh& source, Mesh& dst) {
     if (!source.hasFaceGroups() || source.facegroups.size() != source.triangleCount() || dst.triangleCount() == 0 ||

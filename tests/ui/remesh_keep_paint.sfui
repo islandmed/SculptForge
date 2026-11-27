@@ -1,0 +1,29 @@
+# Voxel Remesh keeps the Part's paint (member report, 0.14.2): vertex paint follows the nearest old surface and comes out
+# of one undo step; a painted texture is kept with Keep Texture (the box only shows on a Part that has one).
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+key f
+camera 0 0
+input_style classic
+run set_color color=ff0000
+mouse_move 0.5 0.5
+action draw.paint
+expect_value paint_mode == 1
+remember paint_mean_g white_g
+stroke 0.3 0.5 0.7 0.5
+stroke 0.3 0.6 0.7 0.6
+expect_value paint_mean_g < $white_g
+remember paint_mean_g painted_g
+remember triangles before
+wait 45
+click "Remesh##tool.remesh"
+click "Voxel Remesh##geometry.remesh"
+wait_idle 120
+expect_status Remeshed
+expect_value triangles != $before
+expect_value paint_mean_g < $white_g
+wait 60
+shot remesh_after_vertex_paint
+key ctrl+z
+expect_value triangles == $before
+expect_value paint_mean_g < $white_g
