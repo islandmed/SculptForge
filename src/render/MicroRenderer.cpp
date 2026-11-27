@@ -664,6 +664,14 @@ void MicroRenderer::uploadDispTiles(const Mesh& mesh, std::vector<uint32_t>& slo
     BufferUpload::done();
 }
 
+// Tests (countSides): how many of `tris` have their centre at x >= 0 / x < 0, added to `counts`.
+void MicroRenderer::countBySide(const Mesh& mesh, std::span<const uint32_t> tris, size_t (&counts)[2]) const {
+    for (uint32_t t : tris) {
+        const glm::uvec3 tr = mesh.triangles[t];
+        ++counts[mesh.positions[tr.x].x + mesh.positions[tr.y].x + mesh.positions[tr.z].x >= 0.0f ? 0 : 1];
+    }
+}
+
 // Shading for the base triangles marked pending: all of it (`all`), or up to shadeBudget grid points of it.
 void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
     const MicroMesh& mm = *mesh.micro;
@@ -694,26 +702,40 @@ void MicroRenderer::shadePending(const Mesh& mesh, bool all) {
         pendingCount_ = staleCount_ = 0;
         return;
     }
-    // The pending triangles, newest first (scratch_ holds this sync's dirty ones, already marked), each written
+    // The pending triangles (scratch_ holds this sync's dirty ones, already marked), each written
     // alone: the neighbours whose shared edges and corners they change become stale_, written after them, and not
     // at all while a stroke runs (deferStale): its next dabs change most of them again, and what they'd change is
     // the brush's falloff tail at the patch border (usually nothing: a changed shared point changes both patches).
     // As many a frame as when each one also wrote its ring (~3 patches): shading as current as it was, for less.
+    // This sync's dirty ones go first when they fit; when they don't, the pick walks the pending set from a cursor
+    // that moves on every sync (#184: the lowest indices every frame starved the side of a symmetric stroke whose
+    // triangles come later: it shaded only on release), so every pending patch is shaded within ceil(pending/limit) syncs.
     const size_t limit = shadeBudget ? std::max<size_t>({1, shadeBudget / (S * 3), keepPace ? scratch_.size() : 0}) : SIZE_MAX;
     std::vector<uint32_t>& seeds = scratch_;
-    const bool full = seeds.size() >= limit; // (this sync's dirty ones fill it: sorted and unique already)
-    if (full) seeds.resize(limit);
-    else if (seeds.size() < limit)
-        for (size_t w = 0; w < pending_.size() && seeds.size() < limit; ++w)
-            for (uint64_t bits = pending_[w]; bits && seeds.size() < limit; bits &= bits - 1) {
-                const uint32_t t = uint32_t(w * 64 + size_t(std::countr_zero(bits)));
-                seeds.push_back(t);
+    if (countSides) countBySide(mesh, seeds, sideDirty_);
+    const bool fits = seeds.size() <= limit;
+    if (!fits) seeds.clear();
+    if (const size_t words = pending_.size(); words && (!fits || seeds.size() < limit)) {
+        const size_t target = limit;
+        const uint32_t cursor = shadeCursor_ < words * 64 ? shadeCursor_ : 0;
+        size_t w = cursor >> 6;
+        const uint64_t first = ~uint64_t(0) << (cursor & 63);
+        uint32_t last = cursor;
+        bool any = false;
+        for (size_t n = 0; n <= words && seeds.size() < target; ++n, w = w + 1 == words ? 0 : w + 1) {
+            uint64_t bits = pending_[w];
+            if (fits) bits &= ~mm.dirtyBits[w]; // (those are in seeds already)
+            bits &= n == 0 ? first : n == words ? ~first : ~uint64_t(0);
+            for (; bits && seeds.size() < target; bits &= bits - 1) {
+                last = uint32_t(w * 64 + size_t(std::countr_zero(bits)));
+                seeds.push_back(last);
+                any = true;
             }
-    if (!full) {
+        }
+        if (any) shadeCursor_ = last + 1;
         std::sort(seeds.begin(), seeds.end());
-        seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
-        if (seeds.size() > limit) seeds.resize(limit);
     }
+    if (countSides) countBySide(mesh, seeds, sideShaded_);
     const auto started = std::chrono::steady_clock::now();
     size_t shaded = 0;
     // In slices: an unbudgeted sync (undo of a huge stroke, a transform) staged every pending patch at once, ~1 GB at
@@ -805,6 +827,10 @@ size_t MicroRenderer::shadeSeeds(const Mesh& mesh, std::span<const uint32_t> see
 
 bool MicroRenderer::sync(Mesh& mesh) {
     MicroMesh& mm = *mesh.micro;
+    // (tests: SF_MICRO_COUNT_SIDES=1 counts the dirty and the shaded patches by the mesh's side; any other value clears the counts)
+    const char* countEnv = std::getenv("SF_MICRO_COUNT_SIDES");
+    countSides = countEnv && countEnv[0] == '1';
+    if (!countSides) sideDirty_[0] = sideDirty_[1] = sideShaded_[0] = sideShaded_[1] = 0;
     mm.ensureTopology(mesh);
     if (mm.dirtyBits.size() != (size_t(mm.baseTriangles) + 63) / 64) mm.dirtyBits.assign((size_t(mm.baseTriangles) + 63) / 64, 0);
     const bool baseMoved = mesh.dirtyBegin < mesh.dirtyEnd;

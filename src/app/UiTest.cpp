@@ -157,6 +157,7 @@
 //                            view_stale (gh#184: the view vs the same mesh sent up whole again, mean pixel difference 0-255),
 //                            view_vs_mark (mean pixel difference to mark_view's view), view_nearer_mark (that, less the same to mark_view other's),
 //                            micro_pending_coarse (Focus Detail: tiles whose coarse shading still waits for a frame),
+//                            micro_side_dirty_pos/neg and micro_side_shaded_pos/neg (patches a stroke changed / shaded on the x >= 0 / x < 0 side while env SF_MICRO_COUNT_SIDES is 1: #184),
 //                            micro_pending_shading (a micro level without Focus Detail: patches whose shading still waits),
 //                            micro_widen_deferrals (live strokes' range widens shown a frame late, MicroRenderer::sync),
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
@@ -794,6 +795,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "micro_tile_pages") return double(app_.renderer_.microTilePages());
     if (name == "micro_widen_deferrals") return double(app_.renderer_.microWidenDeferrals()); // (a stroke's range widen shown a frame late)
     if (name == "micro_pending_coarse") return double(app_.renderer_.microPendingCoarse()); // (Focus Detail: tiles whose coarse shading waits for a frame)
+    // Patches a stroke dirtied / shaded on each side of the mesh (x >= 0: pos, x < 0: neg) while env SF_MICRO_COUNT_SIDES is 1 (without Focus Detail)
+    if (name == "micro_side_dirty_pos" || name == "micro_side_dirty_neg" || name == "micro_side_shaded_pos" || name == "micro_side_shaded_neg")
+        return double(app_.renderer_.microSideCount(name.starts_with("micro_side_shaded"), name.ends_with("neg") ? 1 : 0));
     if (name == "micro_pending_shading") return double(app_.renderer_.microPendingShading()); // (without Focus Detail: pending + stale patches)
     if (name == "full_uploads") return double(app_.renderer_.fullUploads());
     if (name == "vertices") return double(m.vertexCount());

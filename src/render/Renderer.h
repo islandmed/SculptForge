@@ -361,6 +361,7 @@ public:
     size_t gpuBytes() const;
     // Micro grid points whose shading still waits for a frame's budget (MicroRenderer::pendingShading, all slots).
     size_t microPendingShading() const;
+    size_t microSideCount(bool shaded, int side) const; // (tests: MicroRenderer's SF_MICRO_COUNT_SIDES counts; side 0 x >= 0, 1 x < 0)
     size_t microPendingCoarse() const; // (MicroRenderer::pendingCoarse, all slots)
     size_t microWidenDeferrals() const; // (MicroRenderer::widenDeferrals, all slots)
     size_t microPendingPages() const;  // (MicroRenderer::pendingPages, all slots)

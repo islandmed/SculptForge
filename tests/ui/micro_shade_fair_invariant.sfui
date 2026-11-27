@@ -1,0 +1,49 @@
+# INVARIANT (shading fairness): no side of a symmetric stroke starves.
+# gh#184 (0.14.2, Micro 3 on a 2.6M base, Clay + Bolt alpha, X symmetry): while a stroke ran, the mirror side shaded live and the
+# side the brush was on only on release. A frame's dabs changed more patches than the frame's shading budget took, and the cut
+# kept the lowest triangle indices every frame, so the side whose triangles come later never had a turn. Now the pick walks the
+# dirty set from a cursor that moves on, and every changed patch is shaded within a few frames. With the budget squeezed so the
+# dirty set is far over it (SF_SHADE_BUDGET_POINTS; keep pace off, as on the Standard tier), both sides of the mesh must have
+# been shaded during the stroke (micro_side_shaded_*: patches shaded per side while SF_MICRO_COUNT_SIDES is 1), neither at less
+# than half the other's share; after the release everything is shaded as before. (cold: env is set here.)
+run ui_look look=classic layout=classic
+env SF_FOCUS_DETAIL 0
+run new_sphere subdivisions=6
+run micro_divide level=3
+wait_idle 120
+camera 0 0
+key f
+wait_idle 30
+
+interactive_strokes on
+expect_value symmetry_x == 1
+click "Clay##brush.clay"
+run brush_set_alpha name=Bolt
+brush_size 120
+# Prime the height range first: the stroke measured doesn't widen it.
+stroke 0.25 0.30 0.25 0.70 1.0
+stroke 0.25 0.70 0.25 0.30 1.0
+wait_value micro_pending_shading == 0 120 # (real time: llvmpipe takes far longer than this computer)
+wait_idle 60
+env SF_SHADE_BUDGET_POINTS 100000
+env SF_STROKE_KEEP_PACE 0
+env SF_MICRO_COUNT_SIDES 1
+drag_path 0.40 0.40 0.50 0.50 0.60 0.40 0.70 0.50 0.60 0.60 0.50 0.50 keep S=3
+expect_value stroking == 1
+print micro_side_dirty_pos
+print micro_side_dirty_neg
+print micro_side_shaded_pos
+print micro_side_shaded_neg
+remember micro_side_shaded_pos pos
+remember micro_side_shaded_neg neg
+expect_value micro_side_shaded_pos > 0
+expect_value micro_side_shaded_neg > 0
+expect_value micro_side_shaded_pos <= $neg*2
+expect_value micro_side_shaded_neg <= $pos*2
+release
+env SF_MICRO_COUNT_SIDES 0
+env SF_SHADE_BUDGET_POINTS 0
+env SF_STROKE_KEEP_PACE tier
+wait_value micro_pending_shading == 0 120
+wait_idle 60
+expect_value view_stale < 0.00001

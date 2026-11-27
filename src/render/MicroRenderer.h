@@ -55,6 +55,9 @@ public:
     size_t gpuBytes() const;
     bool closed() const { return closed_; }
     // Grid points whose shading still waits for a frame (budget), for tests and the benchmark.
+    // Tests: count this sync's dirty and shaded base triangles by the side of the mesh (x >= 0, x < 0) they sit on.
+    size_t sideDirty(int side) const { return sideDirty_[side]; }
+    size_t sideShaded(int side) const { return sideShaded_[side]; }
     size_t pendingShading() const { return pendingCount_ + staleCount_ + (sweepEnd_ - sweepNext_); }
     // Base triangles whose coarse shading waits for a frame's budget (MicroFocus: a stroke's changed tiles, a few frames' work).
     size_t pendingCoarse() const { return focus_ ? focus_->pendingCoarse() : 0; }
@@ -157,6 +160,10 @@ private:
     std::vector<uint32_t> outer_;
     double shadeNsPerPoint_ = 0.0;  // what shading a grid point (and sending it) took lately (TierConfig::strokeShadeMs)
     size_t pendingCount_ = 0;
+    uint32_t shadeCursor_ = 0;      // where the next over-budget pick starts in pending_ (shadePending: fair across syncs)
+    size_t sideDirty_[2] = {}, sideShaded_[2] = {};
+    bool countSides = false;
+    void countBySide(const Mesh& mesh, std::span<const uint32_t> tris, size_t (&counts)[2]) const;
     // Without Focus Detail, after a range widen (MicroMesh::rescaled: the heights re-sent, the shading kept, a step's
     // rounding off): every patch's shading again, base triangles sweepNext_ .. sweepEnd_ still to go, within the rest
     // budget once nothing else waits and no stroke runs (MicroFocus's sweep, for Windows and macOS).

@@ -97,6 +97,7 @@ private:
     size_t pageCount_ = 0, shadedPages_ = 0;
     bool pageTableDirty_ = true;
     std::vector<uint32_t> pendingShade_; // slots whose page waits for its full shading
+    uint32_t shadeCursor_ = 0;           // the next shadePages round starts at this slot (fair across frames)
     std::vector<int8_t> drawn_;          // per cluster: the level the last draw used (-1 = not drawn)
     uint32_t frame_ = 0;
     double shadeNsPerPoint_ = 0.0;
