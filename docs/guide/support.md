@@ -39,6 +39,11 @@ computer only and never sent.
 It comes at most once a week and never mid-stroke. **Not now** waits a week; after the third, a month; after the
 sixth, it only comes with an update.
 
+After an update, **What's New** may end with one quiet line: SculptForge is free and stays free, and members get a say,
+their requests built first and their name in the credits. Its **Membership** link opens the membership page (never a
+checkout). It is that version's one note, so the card above does not also come; **Close** ends it. Members, Studio
+builds and builds with update checks off never see it.
+
 **I'm already a member** signs in with GitHub (as member builds do) and hides it for good.
 
 </details>
