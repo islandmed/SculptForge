@@ -10,6 +10,7 @@
 
 #include "core/Document.h"
 #include "core/Mesh.h"
+#include "core/MemoryGuard.h"
 #include "core/PathStroke.h"
 #include "core/Primitives.h"
 #include "core/StarterMeshes.h"
@@ -484,6 +485,12 @@ TEST(nightly_voxel_remesh_repeated_crease_strokes_stay_one_piece_at_high_resolut
         CHECK(strokePath(doc, nullptr, BrushType::Crease, stroke, error) > 0);
     }
     for (int resolution : {1024, 1536, 2048}) {
+        // (a runner with too little free memory says so and skips the Resolution: the remesh would refuse, which is not what is tested)
+        const VoxelRemeshEstimate need = estimateVoxelRemesh(doc.mesh, resolution);
+        if (classifyMemory(need.bytes) != MemoryTier::Fits) {
+            std::printf("  res %d: SKIPPED, needs about %.1f GB and the free memory does not fit it\n", resolution, double(need.bytes) / 1073741824.0);
+            continue;
+        }
         const Mesh out = voxelRemesh(doc.mesh, resolution, &error);
         CHECK_MSG(out.triangleCount() > 0, error);
         if (out.triangleCount() == 0) continue;
