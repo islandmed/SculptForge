@@ -1335,7 +1335,26 @@ bool polyBevel(const Mesh& in, std::span<const glm::uvec2> edges, std::span<cons
 
 namespace {
 
-// Picked Points: the points are cut off. Picked Edges, or Faces: the edges (a face's edges, inner ones included).
+// Faces picked: the edges that bound the selection (one selected polygon beside them), so one side of a gridded cube
+// rounds its outline and leaves the cells alone. A selection with no border (a closed Part, all faces) takes the sharp
+// feature edges instead: the ones whose two polygons differ by more than kSharpDegrees.
+constexpr float kSharpDegrees = 30.0f;
+
+std::vector<glm::uvec2> faceBevelEdges(const PolyOpInput& in) {
+    const EdgeTopology& topo = in.topo;
+    auto selected = [&](uint32_t corner) { return corner != ~0u && in.triangleFlags[corner / 3] != 0; };
+    std::vector<glm::uvec2> border, sharp;
+    for (uint32_t e = 0; e < topo.edgeCount(); ++e) {
+        const uint32_t c = topo.edgeCorner[e], d = topo.twin[c];
+        const bool a = selected(c), b = selected(d);
+        if (!a && !b) continue;
+        if (a != b) border.push_back(topo.ends[e]);
+        else if (edgeAngle(in.mesh, topo, e) > kSharpDegrees) sharp.push_back(topo.ends[e]);
+    }
+    return border.empty() ? sharp : border;
+}
+
+// Picked Points: the points are cut off. Picked Edges: those edges. Picked Faces: the selection's border (faceBevelEdges).
 bool polyBevelOp(const PolyOpInput& in, PolyOpOutput& out, std::string& error) {
     const Mesh& m = in.mesh;
     const AABB box = m.bounds();
@@ -1351,13 +1370,19 @@ bool polyBevelOp(const PolyOpInput& in, PolyOpOutput& out, std::string& error) {
     o.limitWidth = argBool(in.args, "limit", true);
     o.newGroup = argBool(in.args, "new_group", true);
     o.vertices = in.element == PolyElement::Points;
-    if (o.vertices ? in.vertices.empty() : in.edgePairs.empty()) {
-        error = o.vertices ? "Bevel needs points: click one, Shift+click adds (Tool > Polygon)"
-                           : "Bevel needs edges: click one, Shift+click adds, or select faces for their edges (Tool > Polygon)";
+    std::vector<glm::uvec2> faceEdges;
+    if (in.element == PolyElement::Faces) faceEdges = faceBevelEdges(in);
+    const std::vector<glm::uvec2>& edges = in.element == PolyElement::Faces ? faceEdges : in.edgePairs;
+    if (o.vertices ? in.vertices.empty() : edges.empty()) {
+        if (in.element == PolyElement::Faces && !in.triangles.empty())
+            error = "Bevel found no edge to round: the selection has no border and the Part has no sharp edges (select edges instead)";
+        else
+            error = o.vertices ? "Bevel needs points: click one, Shift+click adds (Tool > Polygon)"
+                               : "Bevel needs edges: click one, Shift+click adds, or select faces for their border (Tool > Polygon)";
         return false;
     }
     PolyBevelResult r;
-    if (!polyBevel(m, in.edgePairs, in.vertices, o, out.mesh, r, error)) return false;
+    if (!polyBevel(m, edges, in.vertices, o, out.mesh, r, error)) return false;
     out.element = PolyElement::Faces;
     out.triangles = r.bevelTriangles;
     char buf[160];
@@ -1377,7 +1402,7 @@ void registerPolyBevelOp(PolyOpRegistry& reg) {
     PolyOp op;
     op.id = "bevel";
     op.label = "Bevel";
-    op.description = "Round or chamfer the selected edges (or the edges of the selected faces; selected points are cut off): "
+    op.description = "Round or chamfer the selected edges (or the border of the selected faces, or a closed Part's sharp edges; selected points are cut off): "
                      "a strip of faces across each edge, as wide as Width, with Segments faces shaped by the Profile.";
     op.credit = "@AbyssDragonModding (#225), members' ideas threads";
     op.needs = PolyElement::Edges;

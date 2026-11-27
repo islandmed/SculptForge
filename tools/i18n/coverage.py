@@ -65,7 +65,7 @@ DYNAMIC = {
         "Push the selected faces out along their normals (in, with a negative distance) with new side walls, as one "
         "region or face by face; selected open border edges extrude into a strip along the surface.",
         "How far out, as a fraction of the Part's size (negative: in).",
-        "Narrow the cap first by this much (a fraction of the Part's size), so the walls slant in.",
+        "Narrow the cap first by this much (a fraction of the selected region's narrowest width, per region), so the walls slant in.",
         "Each face on its own, with a groove between neighbours, instead of the connected region.",
         "Where the selection bends, every face still moves the full distance along its own normal.",
         "Move the whole region along one direction (its average normal) so it keeps its shape.",

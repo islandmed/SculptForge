@@ -95,7 +95,7 @@ UVs and paint. With a negative **Distance** the faces sink in instead.
 | Setting | Does |
 | --- | --- |
 | **Distance** | How far out (negative: in), as a fraction of the Part's size, so the same slider position means the same on a small and a big Part. 0 builds the walls flat, ready for the gizmo. |
-| **Inset** | Narrows the cap first, so the walls slant inward (a boss, a tapered plate). Too deep an inset is scaled back rather than folding the cap. |
+| **Inset** | Narrows the cap first, so the walls slant inward (a boss, a tapered plate), by this fraction of the selected region's narrowest width: 0.1 on one cell of a grid takes a tenth of the cell off each side, whatever the Part's size. Too deep an inset is scaled back rather than folding the cap. |
 | **Individual** | Each face on its own: every face gets its own walls, with a groove down to the surface between neighbours. Off: the connected selection moves as one region, with walls only on its border. |
 | **Even thickness** | Where the selection bends (two sides of a box), every face still moves the full distance along its own normal. Off: the shared edge moves along the averaged normal and comes out less. |
 | **Keep shape** | The whole region moves along one direction (its average normal) and keeps its shape, instead of inflating along each point's normal. |
@@ -138,8 +138,9 @@ Inset again for a second frame inside the first.
 ### Bevel
 
 **Bevel** rounds or chamfers the selected edges: each edge becomes a strip of faces across, and the faces on either side
-are cut back. With Faces picked, the faces' edges are bevelled; with Points picked, the points are cut off instead (a
-corner of a box becomes a triangle, or a rounded cap).
+are cut back. With Faces picked, the border of the selection is bevelled (select one side of a box and its outline
+rounds, the faces inside stay as they are); if the whole Part is selected, its sharp edges (over 30 degrees) are bevelled.
+With Points picked, the points are cut off instead (a corner of a box becomes a triangle, or a rounded cap).
 
 | Setting | Does |
 | --- | --- |

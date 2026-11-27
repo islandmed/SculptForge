@@ -717,8 +717,106 @@ const CommandRegistry& commands() {
 }
 } // namespace
 
+TEST(poly_bevel_on_faces_takes_the_selection_border) {
+    // A 4 x 4 cage cube. One side picked: only its 16 border edges bevel (the cells inside stay as they are, the
+    // waffle of 0.14.2 is gone). All faces picked: no border, so the sharp edges (the cube's 12, 4 cells long each = 48)
+    // bevel and the result is a rounded cube, the 1-cell cube's pattern scaled by the grid.
+    const CommandRegistry& reg = commands();
+    for (int n : {1, 4}) {
+        Document doc;
+        doc.setMesh(makeCube(n));
+        const uint32_t sideTris = uint32_t(doc.mesh.triangleCount());
+        reg.execute(doc, "poly_mode", {{"element", std::string("faces")}});
+        CommandResult r = reg.execute(doc, "poly_select", {{"op", std::string("group")}, {"group", 1.0}});
+        CHECK(r.ok);
+        CHECK(doc.polySelection.count() == size_t(n * n));
+        r = reg.execute(doc, "poly_op", {{"op", std::string("bevel")}, {"width", 0.03}, {"segments", 2.0}});
+        CHECK(r.ok);
+        CHECK(r.message.find("Bevelled " + std::to_string(4 * n) + " edges") != std::string::npos);
+        CHECK(isWatertight(doc.mesh));
+        CHECK(clean(doc.mesh));
+        // the inner points of the side are all still there, untouched
+        size_t kept = 0;
+        for (int i = 1; i < n; ++i)
+            for (int j = 1; j < n; ++j) {
+                const glm::vec3 want(1.0f, -1.0f + 2.0f * float(i) / float(n), -1.0f + 2.0f * float(j) / float(n));
+                for (const glm::vec3& p : doc.mesh.positions)
+                    if (glm::length(p - want) < 1e-5f) {
+                        ++kept;
+                        break;
+                    }
+            }
+        CHECK(kept == size_t((n - 1) * (n - 1)));
+        // Border strips only: 4 n edges x 2 segments of quads, the corner patches, and the side's own cells.
+        std::printf("  n=%d one side: %u -> %zu triangles\n", n, sideTris, doc.mesh.triangleCount());
+        CHECK(doc.mesh.triangleCount() < sideTris + 2 * 4 * size_t(n) * 2 * 2 + 64); // far below the waffle (664 at n=4)
+        reg.execute(doc, "undo", {});
+
+        reg.execute(doc, "poly_select", {{"op", std::string("all")}});
+        r = reg.execute(doc, "poly_op", {{"op", std::string("bevel")}, {"width", 0.05}, {"segments", 2.0}});
+        CHECK(r.ok);
+        CHECK(r.message.find("Bevelled " + std::to_string(12 * n) + " edges") != std::string::npos);
+        CHECK(isWatertight(doc.mesh));
+        CHECK(clean(doc.mesh));
+        CHECK(euler(doc.mesh) == 2);
+        // 6 n^2 face quads + 12 n edges x 2 strip quads + 8 corners x 3 quads
+        CHECK(doc.mesh.triangleCount() == 2 * size_t(6 * n * n + 12 * n * 2 + 8 * 3));
+        std::printf("  n=%d all faces: %zu triangles\n", n, doc.mesh.triangleCount());
+        const float w = 0.05f * 2.0f * std::sqrt(3.0f);
+        float worst = 0.0f;
+        for (const glm::vec3& p : doc.mesh.positions) worst = std::max(worst, std::abs(roundedBox(p, 1.0f, w)));
+        CHECK(worst < 1e-4f);
+    }
+}
+
+TEST(poly_bevel_on_faces_speed_on_a_cage) {
+    // Ops run once per click: the time of one side's border bevel (the op) against the old all-cell-edges bevel on the
+    // same selection, on a 4 x 4 and a 64 x 64 cage.
+    const CommandRegistry& reg = commands();
+    for (int n : {4, 64}) {
+        Document doc;
+        doc.setMesh(makeCube(n));
+        reg.execute(doc, "poly_mode", {{"element", std::string("faces")}});
+        reg.execute(doc, "poly_select", {{"op", std::string("group")}, {"group", 1.0}});
+        const Mesh before = doc.mesh;
+        PolyOpSelection sel;
+        std::string err;
+        const PolyOp* op = PolyOpRegistry::instance().find("bevel");
+        CHECK(op && polyOpSelection(doc, *op, sel, err));
+        PolyBevelOptions o;
+        o.width = 0.03f * 2.0f * std::sqrt(3.0f);
+        o.segments = 3;
+        auto time = [&](auto&& fn) {
+            const auto t0 = std::chrono::steady_clock::now();
+            fn();
+            return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() * 1000.0;
+        };
+        Mesh oldOut, newOut;
+        PolyBevelResult r;
+        const double oldMs = time([&] { CHECK(polyBevel(before, sel.edgePairs, {}, o, oldOut, r, err)); });
+        const double newMs = time([&] { CHECK(reg.execute(doc, "poly_op", {{"op", std::string("bevel")}, {"width", 0.03}, {"segments", 3.0}}).ok); });
+        std::printf("  n=%d one side, %zu cells: old (every cell edge) %.1f ms -> %zu tris, border only %.1f ms -> %zu tris\n", n,
+                    size_t(n) * size_t(n), oldMs, oldOut.triangleCount(), newMs, doc.mesh.triangleCount());
+        CHECK(doc.mesh.triangleCount() < oldOut.triangleCount());
+    }
+}
+
+TEST(poly_bevel_on_all_faces_of_a_smooth_part_has_no_edge_to_round) {
+    // No border and no sharp edge: nothing to do, said in words (not a bevel of every cell edge).
+    Document doc;
+    doc.setMesh(makeIcosphere(2, 1.0f));
+    const CommandRegistry& reg = commands();
+    reg.execute(doc, "poly_mode", {{"element", std::string("faces")}});
+    reg.execute(doc, "poly_select", {{"op", std::string("all")}});
+    const size_t tris = doc.mesh.triangleCount();
+    const CommandResult r = reg.execute(doc, "poly_op", {{"op", std::string("bevel")}});
+    CHECK(!r.ok);
+    CHECK(r.message.find("sharp") != std::string::npos);
+    CHECK(doc.mesh.triangleCount() == tris);
+}
+
 TEST(poly_bevel_op_runs_through_the_registry) {
-    // Registered as "bevel": edges picked -> the edges; faces picked -> their edges; points picked -> the points are
+    // Registered as "bevel": edges picked -> the edges; faces picked -> the selection's border; points picked -> the points are
     // cut off. Width is a share of the Part's size. One whole-mesh undo step; the result selects the bevel faces.
     const PolyOp* op = PolyOpRegistry::instance().find("bevel");
     CHECK(op != nullptr);
@@ -753,7 +851,7 @@ TEST(poly_bevel_op_runs_through_the_registry) {
     r = reg.execute(doc, "undo", {});
     CHECK(doc.mesh.triangleCount() == 12);
 
-    // Faces picked: their edges. One side of the cube -> its 4 edges.
+    // Faces picked: the border. One face of the cube -> its 4 edges.
     reg.execute(doc, "poly_mode", {{"element", std::string("faces")}});
     uint32_t front = 0;
     for (uint32_t t = 0; t < doc.mesh.triangleCount(); ++t) {
