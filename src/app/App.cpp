@@ -4113,6 +4113,16 @@ void App::drawUi() {
     drawBrushLibraryPopups();
     autosaveBrush();
 
+    if (!legalText_.empty()) { // the licence text, scrolling (long lines scroll sideways: no wrapping of a 200 KB text each frame)
+        const ImVec2 size = ImGui::GetMainViewport()->Size;
+        ImGui::SetNextWindowSize(ImVec2(size.x * 0.92f, size.y * 0.88f), ImGuiCond_Appearing);
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        bool open = true;
+        if (ImGui::Begin(legalTitle_.c_str(), &open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_HorizontalScrollbar))
+            ImGui::TextUnformatted(legalText_.c_str(), legalText_.c_str() + legalText_.size());
+        ImGui::End();
+        if (!open) std::string().swap(legalText_);
+    }
     if (showAbout_) {
         ImGui::SetNextWindowSize(ImVec2(460 * uiScale_, 0), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -4150,18 +4160,33 @@ void App::drawUi() {
                                "redistribute it and/or modify it under the terms of the GNU General Public License, "
                                "version 3 or later. It comes with ABSOLUTELY NO WARRANTY."));
             ImGui::Spacing();
-            ImGui::TextWrapped("%s", tr("Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx "
-                               "(MIT/public domain), xatlas (MIT), MikkTSpace (zlib), the Inter and JetBrains Mono typefaces "
-                               "(SIL OFL 1.1) and the MIT-licensed colours of the Forge Terminal look's schemes. Quad Remesh "
-                               "follows Instant Meshes "
-                               "(BSD-3-Clause). The phone link uses QR Code generator (MIT), libdatachannel and libjuice (MPL-2.0), usrsctp "
-                               "(BSD-3-Clause) and Mbed TLS (Apache-2.0). Uses libcurl (curl license) "
-                               "where available."));
+            ImGui::TextWrapped("%s", tr("Built with SDL 3 (zlib), Dear ImGui (MIT), GLM (MIT), stb (MIT/public domain), ufbx (MIT/public "
+                               "domain), xatlas (MIT), MikkTSpace (zlib), tinyexr (BSD-3-Clause), TweetNaCl (public domain), the "
+                               "Lucide icons (ISC), the Inter, JetBrains Mono and Noto Sans CJK typefaces (SIL OFL 1.1) and the MIT-"
+                               "licensed colours of the Forge Terminal look's schemes. Starter meshes: MakeHuman (CC0). Face "
+                               "template: ICT-FaceKit (MIT). Environments: Poly Haven (CC0). Quad Remesh follows Instant Meshes "
+                               "(BSD-3-Clause). The phone link uses QR Code generator (MIT), libdatachannel and libjuice (MPL-2.0), "
+                               "usrsctp (BSD-3-Clause) and Mbed TLS (Apache-2.0). Plugins run in Wasmtime (Apache-2.0 with LLVM "
+                               "exception) and scripts in CPython (PSF). Uses libcurl (curl license) where available."));
             ImGui::Spacing();
-            if (ImGui::Button(tr("License"))) sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/LICENSE");
+            // Android has the files in the APK (scripts/android-build.sh): read offline, in a window of our own. Elsewhere they
+            // are the web page's.
+            const auto legal = [&](const char* label, const char* file) {
+                if (!ImGui::Button(label)) return;
+#ifdef __ANDROID__
+                size_t size = 0;
+                if (void* data = SDL_LoadFile(file, &size)) {
+                    legalTitle_ = label;
+                    legalText_.assign(static_cast<const char*>(data), size);
+                    SDL_free(data);
+                    return;
+                }
+#endif
+                sf::dialogs::openUrl((std::string("https://github.com/islandmed/SculptForge/blob/main/") + file).c_str());
+            };
+            legal(tr("License"), "LICENSE");
             ImGui::SameLine();
-            if (ImGui::Button(tr("Third-party notices")))
-                sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/THIRD_PARTY_NOTICES.md");
+            legal(tr("Third-party notices"), "THIRD_PARTY_NOTICES.md");
             ImGui::SameLine();
             if (ImGui::Button(tr("AI services & privacy")))
                 sf::dialogs::openUrl("https://github.com/islandmed/SculptForge/blob/main/docs/ai-services.md");
