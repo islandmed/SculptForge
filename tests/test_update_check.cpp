@@ -4,6 +4,7 @@
 // The update check's feed and version comparison (src/core/UpdateCheck.cpp).
 #include "TestHarness.h"
 
+#include "app/AndroidHttp.h"
 #include "core/UpdateCheck.h"
 
 #include <fstream>
@@ -133,6 +134,19 @@ TEST(update_check_once_a_day) {
     CHECK(updateCheckDue(5000, 1000)); // the clock went back
 }
 
+// The start-up check (the same gate on every platform, Android included): the Preferences switch, SF_NO_UPDATE_CHECK and
+// the local-only runs turn it off; otherwise it runs at most once in 24 hours.
+TEST(update_check_start_up_gate_and_off_switch) {
+    const int64_t t0 = 1'700'000'000, day = kUpdateCheckInterval;
+    CHECK(updateCheckWanted(true, false, false, 0, t0));                    // first run
+    CHECK(!updateCheckWanted(true, false, false, t0, t0 + day - 1));        // checked less than a day ago
+    CHECK(updateCheckWanted(true, false, false, t0, t0 + day));             // a day later
+    CHECK(!updateCheckWanted(false, false, false, 0, t0));                  // the switch is off
+    CHECK(!updateCheckWanted(false, false, false, t0, t0 + 10 * day));      // ... however old the last check is
+    CHECK(!updateCheckWanted(true, true, false, 0, t0));                    // SF_NO_UPDATE_CHECK
+    CHECK(!updateCheckWanted(true, false, true, 0, t0));                    // a UI test or a take
+}
+
 TEST(update_feed_on_the_website_parses) {
     std::ifstream f(SF_TEST_DATA_DIR "/../../website/latest.json", std::ios::binary);
     CHECK(bool(f));
@@ -186,4 +200,23 @@ TEST(installer_update_choice_applies_once_per_installer_run) {
     // A file without a usable time is ignored.
     check = false;
     CHECK(!applyInstallerChoice(on, 0, applied, check) && !check);
+}
+
+// Android's own transport (app/AndroidHttp.h) only ever asks for the update feed's two addresses.
+TEST(android_update_feed_addresses_and_answers) {
+    using namespace sf::android;
+    CHECK(isUpdateFeedUrl(kUpdateFeedUrl));
+    CHECK(isUpdateFeedUrl(kUpdateFeedMirrorUrl));
+    CHECK(!isUpdateFeedUrl("http://sculptforge.app/latest.json"));                // https only
+    CHECK(!isUpdateFeedUrl("https://sculptforge.app.evil.example/latest.json"));  // the host, not a prefix of it
+    CHECK(!isUpdateFeedUrl("https://sculptforge.app@evil.example/latest.json"));
+    CHECK(!isUpdateFeedUrl("https://sculptforge.app/latest.json?v=0.14.2"));      // no query: nothing is sent about the app
+    CHECK(!isUpdateFeedUrl("https://sculptforge.app/../x"));
+    CHECK(!isUpdateFeedUrl("https://api.github.com/repos/x"));
+    const auto ok = parseFeedAnswer("200\n\n{\"version\":\"0.15.0\"}\nmore");
+    CHECK(ok.status == 200 && ok.error.empty() && ok.body == "{\"version\":\"0.15.0\"}\nmore");
+    const auto no = parseFeedAnswer("0\nUnable to resolve host\n");
+    CHECK(no.status == 0 && no.error == "Unable to resolve host" && no.body.empty());
+    CHECK(!parseFeedAnswer("garbage").error.empty());
+    CHECK(!parseFeedAnswer("x\ny\nz").error.empty());
 }

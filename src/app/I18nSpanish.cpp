@@ -3012,7 +3012,9 @@ constexpr Entry kSpanish[] = {
      "Una vez al día al iniciar, descarga del sitio web de SculptForge un archivo pequeño que nombra la versión más "
      "nueva, y muestra un aviso cuando hay una más nueva. La tarjeta de Creador destacado de la ventana de bienvenida "
      "llega con él (se apaga con este interruptor). No se envía nada sobre ti ni sobre tu equipo."},
-    {"Update channel", "Canal de actualización"},
+        {"Once a day it fetches a small file from sculptforge.app that names the newest version. Nothing about you or your device is sent. Also in Preferences > Updates.",
+     "Una vez al día descarga de sculptforge.app un archivo pequeño que nombra la versión más nueva. No se envía nada sobre ti ni sobre tu dispositivo. También en Preferencias > Actualizaciones."},
+{"Update channel", "Canal de actualización"},
     {"Stable", "Estable"},
     {"Preview (early builds)",
      "Vista previa (versiones anticipadas)"},

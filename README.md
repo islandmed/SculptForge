@@ -75,7 +75,7 @@ Video review by [askNK](https://www.youtube.com/watch?v=8oMCKB_7TRs). If sculptf
 
 ## Privacy
 
-SculptForge has no telemetry, no account and no servers of its own. AI features are optional and talk directly to the service you choose; [what is sent where](docs/ai-services.md).
+SculptForge has no telemetry, no account and no servers of its own. Once a day it can check whether a newer version is out (a small file from the website; nothing about you is sent, and Preferences > Updates turns it off). AI features are optional and talk directly to the service you choose; [what is sent where](docs/ai-services.md).
 
 ## Membership
 

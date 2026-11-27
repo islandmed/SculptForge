@@ -87,6 +87,13 @@ inline bool updateCheckDue(int64_t lastCheck, int64_t now) {
     return lastCheck <= 0 || now < lastCheck || now - lastCheck >= kUpdateCheckInterval;
 }
 
+// Whether the start-up check runs: the Preferences > Updates switch is on, SF_NO_UPDATE_CHECK is not set, it is not a
+// UI test or a take (local only), and the last check is a day old. The switch and the day gate apply on every platform
+// (Android included).
+inline bool updateCheckWanted(bool switchOn, bool envOff, bool localOnly, int64_t lastCheck, int64_t now) {
+    return switchOn && !envOff && !localOnly && updateCheckDue(lastCheck, now);
+}
+
 // The Windows installer's "Check for updates once a day" box: the installer writes bin/installer.json
 // ({"check_updates": true|false}) next to the program. The app applies the choice once per installer run, so a reinstall
 // sets it again and the Preferences > Updates switch is free to change it in between. `stamp` is the file's modification

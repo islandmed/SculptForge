@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- No permissions: projects live in the app's own storage, other files come through the system's document picker. -->
+<!-- One permission, INTERNET: the once-a-day update check (a small file from sculptforge.app; SculptForgeActivity.updateFeedGet),
+     which Preferences > Updates turns off. Projects live in the app's own storage, other files come through the system's document picker. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     android:installLocation="auto">
+
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature android:glEsVersion="0x00030002" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />

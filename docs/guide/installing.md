@@ -59,6 +59,9 @@ It is not in an app store. Members get it today; it is free for everyone on 26 N
    update over it. Copy projects out of its Projects folder before you do. This is a test build: a later version,
    signed with our own key, will need one more uninstall and reinstall.
 
+The app checks once a day whether a newer version is out and, if so, shows a banner with a link to this download page;
+it does not install the APK for you. See [Updating](#updating-and-uninstalling) for what the check sends.
+
 It is early: expect rough edges, and report bugs on [GitHub](https://github.com/islandmed/SculptForge/issues) or Discord.
 
 ### Install with one command
@@ -293,6 +296,10 @@ that names the newest version; if yours is older, a banner at the top of the 3D 
 Nothing about you or your computer is sent. **Help > Check for updates** asks right away, and
 **Edit > Preferences > Updates** turns the daily check off (and picks the update channel: **Stable**, or **Preview**
 for early builds).
+
+**On Android** it is the same file and the same switch (**Edit > Preferences > Updates**, also on the welcome window
+the first time), and the only network request the Android app makes: no ids, nothing about you or your device. The banner
+has **Download**, which opens this page; you install the new APK yourself.
 
 **One-click update.** The Linux AppImage, the Windows installer and portable zip, and the macOS app also get an
 **Update** button on the banner (on a Mac from the moment the project switches it on for everyone; until then the banner

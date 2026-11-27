@@ -243,8 +243,9 @@ void App::initProject() {
 #if SF_UPDATE_CHECK
     const int64_t now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     applyUpdatePolicy();
-    if (checkUpdates_ && options_.uiTest.empty() && options_.benchmarkScript.empty() && // (a take: local only)
-        !std::getenv("SF_NO_UPDATE_CHECK") && updateCheckDue(updateCheckedAt_, now))
+    if (updateCheckWanted(checkUpdates_, std::getenv("SF_NO_UPDATE_CHECK") != nullptr,
+                          !options_.uiTest.empty() || !options_.benchmarkScript.empty(), // (a take: local only)
+                          updateCheckedAt_, now))
         startUpdateCheck(false);
 #endif
     launchAppeal(); // (after the update policy: a studio's update lock counts)
@@ -1017,7 +1018,11 @@ void App::startUpdateCheck(bool manual) {
     const std::shared_ptr<MemberAuth> member =
         memberBuilds_ && options_.uiTest.empty() && !studioMode().active ? memberAuth_ : nullptr;
     // The featured creator card's feed rides along on the public feed only (never a studio's own channel).
+#ifdef __ANDROID__
+    const bool featuredToo = false; // Android fetches latest.json only (app/AndroidHttp.h)
+#else
     const bool featuredToo = !studioMode().active && policy::current().updateFeed.empty() && policy::current().updateMirror.empty();
+#endif
     const std::string featuredDir = prefDir_;
     std::thread([job, source, fallback, channel, member, featuredToo, featuredDir] {
         std::string body;
@@ -1102,7 +1107,11 @@ void App::drawUpdateBanner() {
         ImGui::TextDisabled(tr("(you have %s)"), appVersionLabel().c_str());
         for (const auto& h : u.highlights) ImGui::BulletText("%s", h.c_str());
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)); // wrapped: the sentence is long
+#ifdef __ANDROID__
+        ImGui::TextWrapped("%s", kFreeReleaseNote); // (this is the Android app: no "like SculptForge for Android")
+#else
         ImGui::TextWrapped("%s %s", kFreeReleaseNote, tr("Members get early builds, like SculptForge for Android today.")); // memberships (Support.h)
+#endif
         ImGui::PopStyleColor();
         if (guide_.bodyFont()) ImGui::PopFont();
         ImGui::Spacing();
@@ -1172,7 +1181,7 @@ void App::drawUpdatesSection() {
     ui::ActionButton(*this, "help.check_updates", ImVec2(-1, 0));
     if (updateJob_) ImGui::TextDisabled("%s", tr("Checking..."));
     else if (!updateStatus_.empty()) ImGui::TextWrapped("%s", updateStatus_.c_str());
-#if SF_UPDATE_CHECK
+#if SF_UPDATE_CHECK && !defined(__ANDROID__) // (no GitHub sign-in on Android: its builds come from the download page)
     drawMemberBuildsSection(); // (PanelUpdate.cpp)
 #endif
 }

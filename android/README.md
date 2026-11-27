@@ -47,9 +47,16 @@ need OpenGL ES 3.2, which every tablet of these families since about 2018 has.
   the app's `Projects` folder (on the device: `Android/data/org.sculptforge.app/files/Projects`, reachable over USB);
   **Open** shows the system's document picker and opens a copy of the chosen file. No storage permission.
 - No cloud backup (`allowBackup="false"`, no backup rules): projects stay on the device until the user exports one.
-- **Left out:** the plugin runtime, the live face feed, the update check and the tools that run other programs
-  (splat training, photo scans, video): starting one says it can't run on Android.
-- **Permissions:** none.
+- **Left out:** the plugin runtime, the live face feed and the tools that run other programs (splat training, photo
+  scans, video): starting one says it can't run on Android. The AI features and the brush gallery need a network
+  transport the Android build doesn't have yet.
+- **Update check:** once a day (at most) the app fetches `latest.json` from sculptforge.app (the same file as the desktop
+  app, then its GitHub copy if that fails): no query, no ids, nothing about you or the device, the fixed `SculptForge/0.1`
+  user agent. A newer version shows the usual banner with a link to the download page; the APK is not installed from
+  inside the app. **Edit > Preferences > Updates** (and the welcome window) turns it off. It goes through the activity's
+  `HttpURLConnection` (`SculptForgeActivity.updateFeedGet`, `src/app/AndroidHttp.cpp`), which accepts only those two
+  https addresses. `-DSCULPTFORGE_ANDROID_UPDATE_CHECK=OFF` builds without it, for a store build whose store does the updating.
+- **Permissions:** `INTERNET`, for that request only.
 
 ## Signing
 
