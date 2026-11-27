@@ -9,7 +9,9 @@
 #include "core/Uv.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <unordered_map>
 
@@ -50,10 +52,84 @@ glm::vec3 mitre(const std::vector<glm::vec3>& dirs, const glm::vec3& fallback) {
     return u / std::max(s, kMinMiter);
 }
 
-// The positions of `plan.moved` for distance and inset, into `positions` (sized for the result).
+// The positions of `plan.moved` for distance and inset (a fraction of each vertex's piece, Moved::insetExtent), into
+// `positions` (sized for the result).
 void placeMoved(const Mesh& mesh, const ExtrudePlan& plan, float distance, float inset, std::vector<glm::vec3>& positions) {
     for (const ExtrudePlan::Moved& m : plan.moved)
-        positions[m.vertex] = mesh.positions[plan.source[m.vertex]] + inset * m.insetDir + distance * m.dir;
+        positions[m.vertex] = mesh.positions[plan.source[m.vertex]] + (inset * m.insetExtent) * m.insetDir + distance * m.dir;
+}
+
+// A border edge of a selected piece (a connected part of the selection, or one polygon when individual).
+struct PieceEdge {
+    uint32_t piece, a, b;
+};
+
+// Per piece: the smallest extent of its border loop(s), the width across the piece along its narrowest direction in
+// its own plane (the plane of its area-weighted normal). The narrowest width of a shape is across one of its edges, so
+// the candidates are the in-plane normals of the border edges, one per degree; a piece with no usable edge falls back
+// to the smallest side of its border points' bounding box.
+std::unordered_map<uint32_t, float> pieceExtents(const Mesh& mesh, const std::vector<glm::vec3>& cross,
+                                                 const std::vector<uint32_t>& pieceOf, const std::vector<PieceEdge>& edges) {
+    struct Acc {
+        glm::vec3 normal{0.0f};
+        std::vector<const PieceEdge*> edges;
+    };
+    std::unordered_map<uint32_t, Acc> pieces;
+    for (uint32_t t = 0; t < pieceOf.size(); ++t)
+        if (pieceOf[t] != ~0u) pieces[pieceOf[t]].normal += cross[t];
+    for (const PieceEdge& e : edges) pieces[e.piece].edges.push_back(&e);
+    std::unordered_map<uint32_t, float> extent;
+    for (auto& [id, acc] : pieces) {
+        if (acc.edges.empty()) continue;
+        std::vector<glm::vec3> pts;
+        pts.reserve(acc.edges.size());
+        glm::vec3 lo(std::numeric_limits<float>::max()), hi(-std::numeric_limits<float>::max());
+        for (const PieceEdge* e : acc.edges) {
+            pts.push_back(mesh.positions[e->a]);
+            lo = glm::min(lo, pts.back());
+            hi = glm::max(hi, pts.back());
+        }
+        float best = std::numeric_limits<float>::max();
+        const glm::vec3 n = safeNormalize(acc.normal, glm::vec3(0.0f));
+        if (glm::dot(n, n) > 0.0f) {
+            const glm::vec3 t1 = safeNormalize(glm::cross(n, std::abs(n.x) < 0.9f ? glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0)), glm::vec3(0, 0, 1));
+            const glm::vec3 t2 = glm::cross(n, t1);
+            std::array<glm::vec3, 180> dirs{};
+            std::array<bool, 180> have{};
+            for (const PieceEdge* e : acc.edges) {
+                const glm::vec3 d = mesh.positions[e->b] - mesh.positions[e->a];
+                const glm::vec3 across = safeNormalize(glm::cross(n, d), glm::vec3(0.0f));
+                if (glm::dot(across, across) == 0.0f) continue;
+                float angle = std::atan2(glm::dot(across, t2), glm::dot(across, t1));
+                if (angle < 0.0f) angle += glm::pi<float>();
+                if (angle >= glm::pi<float>()) angle -= glm::pi<float>();
+                const size_t bin = std::min<size_t>(size_t(angle / glm::pi<float>() * 180.0f), 179);
+                if (!have[bin]) {
+                    have[bin] = true;
+                    dirs[bin] = across;
+                }
+            }
+            for (size_t i = 0; i < dirs.size(); ++i) {
+                if (!have[i]) continue;
+                float mn = std::numeric_limits<float>::max(), mx = -mn;
+                for (const glm::vec3& p : pts) {
+                    const float d = glm::dot(p, dirs[i]);
+                    mn = std::min(mn, d);
+                    mx = std::max(mx, d);
+                }
+                best = std::min(best, mx - mn);
+            }
+        }
+        if (!(best > 1e-9f && best < std::numeric_limits<float>::max())) {
+            const glm::vec3 size = hi - lo;
+            best = std::numeric_limits<float>::max();
+            for (int k = 0; k < 3; ++k)
+                if (size[k] > 1e-9f) best = std::min(best, size[k]);
+            if (best == std::numeric_limits<float>::max()) best = 0.0f;
+        }
+        extent[id] = best;
+    }
+    return extent;
 }
 
 // True when an inset too deep folds some cap polygon: it turns against its original normal, or one of its edges
@@ -269,9 +345,10 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
             if (isCap[v] && selectedAround[v] < mesh.vertexTriangles(v).size()) splits[v] = 1;
 
         // Regions (Along::Region): connected pieces of the selection.
+        // (also what the inset is measured on, so they are always found.)
         std::vector<uint32_t> region(nt, ~0u);
         std::vector<glm::vec3> regionNormal;
-        if (options.along == ExtrudeAlong::Region) {
+        {
             std::vector<uint32_t> parent(nt);
             std::iota(parent.begin(), parent.end(), 0u);
             auto find = [&](uint32_t x) {
@@ -327,6 +404,7 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
             }
         }
         // Boundary edges: the inset directions, then the walls.
+        std::vector<PieceEdge> borderEdges;
         for (uint32_t t = 0; t < nt; ++t) {
             if (!sel[t]) continue;
             const glm::vec3 n = safeNormalize(cross[t], glm::vec3(0.0f));
@@ -339,6 +417,7 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
                     gather[capOrder[a]].inward.push_back(inward);
                     gather[capOrder[b]].inward.push_back(inward);
                 }
+                borderEdges.push_back({region[t], a, b});
                 const uint32_t a2 = capIndex[a], b2 = capIndex[b];
                 plan.triangles.push_back({a, b, b2});
                 plan.triangles.push_back({a, b2, a2});
@@ -351,10 +430,18 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
                 ++plan.walls;
             }
         }
+        // The inset's unit: per cap vertex the smallest extent of the pieces whose border it is on.
+        const std::unordered_map<uint32_t, float> extents = pieceExtents(mesh, cross, region, borderEdges);
+        std::vector<float> vertexExtent(gather.size(), std::numeric_limits<float>::max());
+        for (const PieceEdge& e : borderEdges) {
+            const float x = extents.at(e.piece);
+            for (uint32_t v : {e.a, e.b}) vertexExtent[capOrder[v]] = std::min(vertexExtent[capOrder[v]], x);
+        }
         for (uint32_t v = 0; v < nv; ++v) {
             if (!isCap[v]) continue;
             const Gather& g = gather[capOrder[v]];
             ExtrudePlan::Moved m;
+            m.insetExtent = vertexExtent[capOrder[v]] == std::numeric_limits<float>::max() ? 0.0f : vertexExtent[capOrder[v]];
             m.vertex = capIndex[v];
             const glm::vec3 fallback = vertexNormal(mesh, v);
             if (options.along == ExtrudeAlong::Region) m.dir = safeNormalize(g.regionSum, fallback);
@@ -383,6 +470,7 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
         for (uint32_t t = 0; t < nt; ++t)
             if (sel[t]) polygonNormal[polygonOf[t]] += cross[t];
         std::vector<Gather> gather; // per new vertex
+        std::vector<uint32_t> copyPolygon; // per new vertex: the polygon (its lower triangle) it belongs to
         for (uint32_t t = 0; t < nt; ++t) {
             if (!sel[t]) continue;
             const uint32_t p = polygonOf[t];
@@ -391,6 +479,7 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
                 auto [it, inserted] = copyOf.try_emplace(key(p, v), uint32_t(plan.source.size()));
                 if (inserted) {
                     plan.source.push_back(v);
+                    copyPolygon.push_back(p);
                     gather.emplace_back();
                     gather.back().normals.push_back(safeNormalize(polygonNormal[p], vertexNormal(mesh, v)));
                 }
@@ -398,6 +487,7 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
             }
         }
         plan.newVertices = plan.source.size() - nv;
+        std::vector<PieceEdge> borderEdges;
         for (uint32_t t = 0; t < nt; ++t) {
             if (!sel[t]) continue;
             const uint32_t p = polygonOf[t];
@@ -412,6 +502,7 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
                     gather[a2 - nv].inward.push_back(inward);
                     gather[b2 - nv].inward.push_back(inward);
                 }
+                borderEdges.push_back({p, a, b});
                 plan.triangles.push_back({a, b, b2});
                 plan.triangles.push_back({a, b2, a2});
                 for (int i = 0; i < 2; ++i) {
@@ -423,9 +514,15 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
                 ++plan.walls;
             }
         }
+        // Each polygon is its own piece, so its copies share its extent.
+        std::vector<uint32_t> pieceOfTriangle(nt, ~0u);
+        for (uint32_t t = 0; t < nt; ++t)
+            if (sel[t]) pieceOfTriangle[t] = polygonOf[t];
+        const std::unordered_map<uint32_t, float> extents = pieceExtents(mesh, cross, pieceOfTriangle, borderEdges);
         for (size_t i = 0; i < gather.size(); ++i) {
             ExtrudePlan::Moved m;
             m.vertex = uint32_t(nv + i);
+            if (const auto it = extents.find(copyPolygon[i]); it != extents.end()) m.insetExtent = it->second;
             m.dir = gather[i].normals.front();
             m.insetDir = gather[i].inward.empty() ? glm::vec3(0.0f) : mitre(gather[i].inward, glm::vec3(0.0f));
             plan.moved.push_back(m);
@@ -651,7 +748,7 @@ bool polyExtrude(const PolyOpInput& in, PolyOpOutput& out, std::string& error) {
         error = plan.error;
         return false;
     }
-    const float inset = float(argNumber(in.args, "inset", 0.0)) * size;
+    const float inset = float(argNumber(in.args, "inset", 0.0)); // a share of the region's narrowest width, not of the Part
     out.mesh = buildExtrude(in.mesh, plan, distance, inset, false);
     out.element = PolyElement::Faces;
     for (uint32_t t = 0; t < plan.cap.size(); ++t)
@@ -675,7 +772,7 @@ void registerPolyExtrudeOp(PolyOpRegistry& reg) {
     op.preview = true;
     op.params = {
         {"distance", "Distance", -0.5, 0.5, 0.1, "How far out, as a fraction of the Part's size (negative: in)."},
-        {"inset", "Inset", 0.0, 0.25, 0.0, "Narrow the cap first by this much (a fraction of the Part's size), so the walls slant in."},
+        {"inset", "Inset", 0.0, 0.25, 0.0, "Narrow the cap first by this much (a fraction of the selected region's narrowest width, per region), so the walls slant in."},
         {"individual", "Individual", 0.0, 1.0, 0.0, "Each face on its own, with a groove between neighbours, instead of the connected region.", true},
         {"even", "Even thickness", 0.0, 1.0, 1.0, "Where the selection bends, every face still moves the full distance along its own normal.", true},
         {"flat", "Keep shape", 0.0, 1.0, 0.0, "Move the whole region along one direction (its average normal) so it keeps its shape.", true},

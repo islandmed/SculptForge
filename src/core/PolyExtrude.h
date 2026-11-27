@@ -12,8 +12,8 @@
 // walls on every edge, so neighbouring selected polygons come apart with a groove between them. A closed mesh
 // whose every polygon is selected has no border: it just inflates. Zero distance is allowed and gives
 // zero-height walls (the Polygon mode's gizmo pulls them up afterwards). The inset moves the border vertices
-// into the cap first (an offset of the border edges by that distance, mitred at corners, scaled back when a
-// cap polygon would fold), so the walls slant inward.
+// into the cap first (an offset of the border edges by that fraction of the selected piece's smallest extent, mitred
+// at corners, scaled back when a cap polygon would fold), so the walls slant inward.
 //
 // The result keeps every attribute it can: the caps keep their face groups, UVs, creases, mask and paint; new
 // vertices copy their source vertex (mask, paint, sculpt and paint layers); the walls are quads with a face
@@ -77,11 +77,12 @@ struct ExtrudePlan {
     std::vector<uint32_t> source;
     // The vertices that move (the caps' vertices, or the edge strip's new vertices), each with its offset
     // direction (unit, or mitred where `even` / an outward edge extrude asks) and its inset direction (in the cap,
-    // mitred): p + inset * insetDir + distance * dir.
+    // mitred): p + inset * insetExtent * insetDir + distance * dir.
     struct Moved {
         uint32_t vertex;
         glm::vec3 dir;
         glm::vec3 insetDir;
+        float insetExtent = 0.0f; // the smallest extent of the selected piece the vertex borders (what the inset is a fraction of)
     };
     std::vector<Moved> moved;
     std::vector<glm::uvec3> triangles; // the result's triangles (the kept ones first, in order, then the walls)
@@ -107,7 +108,8 @@ ExtrudePlan planExtrude(const Mesh& mesh, std::span<const uint8_t> selected, con
 // exactly one polygon); the others are skipped, and the plan refuses when none is left.
 ExtrudePlan planEdgeExtrude(const Mesh& mesh, std::span<const glm::uvec2> edges, const EdgeExtrudeOptions& options);
 
-// The mesh for `plan` at `distance` along the offset directions and `inset` into the caps (faces only; edges
+// The mesh for `plan` at `distance` along the offset directions and `inset` (a fraction of each selected piece's
+// smallest extent) into the caps (faces only; edges
 // ignore it). Topology and normals are built (`finish`; off for a result the Polygon mode registry finishes
 // itself); `plan.cap` is the new selection.
 Mesh buildExtrude(const Mesh& mesh, const ExtrudePlan& plan, float distance, float inset = 0.0f, bool finish = true);
@@ -123,8 +125,8 @@ bool extrudeEdges(const Mesh& mesh, std::span<const glm::uvec2> edges, const Edg
                   Mesh& out, std::vector<glm::uvec2>& newBorder, std::string& status);
 
 // The Polygon mode op (core/PolyOps.h): "extrude", on Faces (a region or individual faces, inset) or Edges (open
-// borders). distance and inset are fractions of the Part's size (its bounding box's diagonal), so one slider fits
-// every Part.
+// borders). distance is a fraction of the Part's size (its bounding box's diagonal), inset one of the selected region's
+// smallest extent, so one slider fits every Part and every selection.
 class PolyOpRegistry;
 void registerPolyExtrudeOp(PolyOpRegistry& reg);
 

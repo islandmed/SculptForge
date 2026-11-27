@@ -5441,7 +5441,7 @@ constexpr Entry kSimplifiedChinese[] = {
     {"Edges along normals", "沿法线的边"},
     {"Push the selected faces out along their normals (in, with a negative distance) with new side walls, as one region or face by face; selected open border edges extrude into a strip along the surface.", "沿所选面的法线向外推出（负距离时向内），并生成新的侧壁，可作为单个区域或逐面进行；所选的开放边界边会沿表面挤出一条带状面。"},
     {"How far out, as a fraction of the Part's size (negative: in).", "向外推出的距离，以零件尺寸的比例表示（负值：向内）。"},
-    {"Narrow the cap first by this much (a fraction of the Part's size), so the walls slant in.", "先将顶面缩小此量（零件尺寸的比例），使侧壁向内倾斜。"},
+    {"Narrow the cap first by this much (a fraction of the selected region's narrowest width, per region), so the walls slant in.", "先将顶面缩小此量（所选区域最小宽度的比例，每个区域各自计算），使侧壁向内倾斜。"},
     {"Each face on its own, with a groove between neighbours, instead of the connected region.", "每个面单独处理，相邻面之间留有凹槽，而不是连通的区域。"},
     {"Where the selection bends, every face still moves the full distance along its own normal.", "在选区弯曲处，每个面仍沿其自身法线移动完整距离。"},
     {"Move the whole region along one direction (its average normal) so it keeps its shape.", "沿单一方向（其平均法线）移动整个区域，以保持其形状。"},

@@ -168,7 +168,7 @@ TEST(poly_extrude_inset_on_extrude) {
     const double v0 = volume(cube);
     const ExtrudePlan plan = planExtrude(cube, selectGroup(cube, kPlusX), {});
     CHECK(plan.ok());
-    Mesh out = buildExtrude(cube, plan, 0.5f, 0.25f);
+    Mesh out = buildExtrude(cube, plan, 0.5f, 0.125f); // 0.125 of the 2-wide side = 0.25 in
     CHECK(closedAndOriented(out));
     // The cap is a 1.5 x 1.5 square at x = 1.5: its corner (1, 1, 1) went to (1.5, 0.75, 0.75)...
     bool corner = false;
@@ -194,10 +194,109 @@ TEST(poly_extrude_inset_on_extrude) {
     const float applied = moveExtrude(cube, plan, 0.5f, 5.0f, deep);
     CHECK(applied > 0.0f && applied < 1.0f);
     std::printf("  inset 5 on a 2-wide cap applied as %.4f\n", applied);
-    // 1.25 pushes the border through the cap's centre and out the other side (turned by 180 degrees, so the cap
-    // still faces +X): caught by the reversed edges and halved.
-    CHECK(near(moveExtrude(cube, plan, 0.5f, 1.25f, deep), 0.625f));
-    CHECK(near(moveExtrude(cube, plan, 0.5f, 0.9f, deep), 0.9f));
+    // An inset of 0.625 (1.25 in length on this 2-wide cap) pushes the border through the cap's centre and out the
+    // other side (turned by 180 degrees, so the cap still faces +X): caught by the reversed edges and halved.
+    CHECK(near(moveExtrude(cube, plan, 0.5f, 0.625f, deep), 0.3125f));
+    CHECK(near(moveExtrude(cube, plan, 0.5f, 0.45f, deep), 0.45f));
+}
+
+// The area of the polygons `plan` marked as the cap.
+double capArea(const Mesh& m, const ExtrudePlan& plan) {
+    double a = 0.0;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        if (!plan.cap[t]) continue;
+        const glm::uvec3& tri = m.triangles[t];
+        a += 0.5 * glm::length(glm::cross(m.positions[tri.y] - m.positions[tri.x], m.positions[tri.z] - m.positions[tri.x]));
+    }
+    return a;
+}
+
+// One cell of a +X side's grid (the cell holding the point nearest (1, 0.1, 0.1)).
+std::vector<uint8_t> oneCell(const Mesh& m) {
+    std::vector<uint8_t> sel(m.triangleCount(), 0);
+    uint32_t best = 0;
+    float bestDist = 1e9f;
+    for (uint32_t t = 0; t < m.triangleCount(); ++t) {
+        if (m.facegroupAt(t) != kPlusX) continue;
+        const glm::uvec3& tri = m.triangles[t];
+        const float d = glm::length((m.positions[tri.x] + m.positions[tri.y] + m.positions[tri.z]) / 3.0f - glm::vec3(1.0f, 0.1f, 0.1f));
+        if (d < bestDist) bestDist = d, best = t;
+    }
+    sel[best] = 1;
+    return sel;
+}
+
+TEST(poly_extrude_inset_is_a_share_of_the_selected_cell) {
+    // Inset 0.1 takes a tenth of the CELL off each side whatever the grid: the cap is (1 - 2 * 0.1)^2 of the cell on
+    // a 4 x 4 cage and on a 64 x 64 one (it was a share of the Part, which nearly closed a small cell).
+    for (int n : {4, 64}) {
+        const Mesh cube = makeCube(n);
+        std::vector<uint8_t> sel = oneCell(cube);
+        completePolygonSelection(cube, sel);
+        const double cell = 4.0 / double(n * n); // a side is 2 x 2
+        ExtrudePlan plan = planExtrude(cube, sel, {});
+        CHECK(plan.ok());
+        const Mesh flat = buildExtrude(cube, plan, 0.1f, 0.0f);
+        CHECK(near(float(capArea(flat, plan)), float(cell), float(cell) * 1e-3f));
+        const Mesh inset = buildExtrude(cube, plan, 0.1f, 0.1f);
+        CHECK(closedAndOriented(inset));
+        CHECK(near(float(capArea(inset, plan)), float(cell * 0.64), float(cell) * 1e-3f));
+        // 0.25 (the slider's end) leaves half the width: a quarter of the area.
+        const Mesh deep = buildExtrude(cube, plan, 0.1f, 0.25f);
+        CHECK(near(float(capArea(deep, plan)), float(cell * 0.25), float(cell) * 1e-3f));
+        // Individual polygons are pieces of their own too.
+        ExtrudeOptions o;
+        o.individual = true;
+        plan = planExtrude(cube, sel, o);
+        CHECK(plan.ok());
+        CHECK(near(float(capArea(buildExtrude(cube, plan, 0.1f, 0.1f), plan)), float(cell * 0.64), float(cell) * 1e-3f));
+    }
+}
+
+TEST(poly_extrude_inset_speed_on_a_cage) {
+    // The narrowest-width step costs one pass over the border: plan + build of one cell and of a whole side with Inset.
+    for (int n : {4, 64}) {
+        const Mesh cube = makeCube(n);
+        std::vector<uint8_t> cell = oneCell(cube), side = selectGroup(cube, kPlusX);
+        completePolygonSelection(cube, cell);
+        for (const auto* sel : {&cell, &side}) {
+            const auto t0 = std::chrono::steady_clock::now();
+            const ExtrudePlan plan = planExtrude(cube, *sel, {});
+            const Mesh out = buildExtrude(cube, plan, 0.1f, 0.1f);
+            const double ms = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() * 1000.0;
+            std::printf("  n=%d %s: plan + build with inset %.1f ms\n", n, sel == &cell ? "one cell" : "one side", ms);
+            CHECK(plan.ok() && closedAndOriented(out));
+        }
+    }
+}
+
+TEST(poly_extrude_inset_measures_each_piece_on_its_own) {
+    // Two separate pieces on one side: a single cell and a 2 x 2 block. The same inset takes the same share of each
+    // piece's narrowest width: 0.1 of 0.5 = 0.05 off the cell, 0.1 of 1.0 = 0.1 off the block.
+    const Mesh cube = makeCube(4);
+    std::vector<uint8_t> sel(cube.triangleCount(), 0);
+    for (uint32_t t = 0; t < cube.triangleCount(); ++t) {
+        if (cube.facegroupAt(t) != kPlusX) continue;
+        const glm::uvec3& tri = cube.triangles[t];
+        const glm::vec3 c = (cube.positions[tri.x] + cube.positions[tri.y] + cube.positions[tri.z]) / 3.0f;
+        const bool cell = c.y > 0.55f && c.z > 0.55f;           // the cell at +y +z (0.5 .. 1)
+        const bool block = c.y < -0.05f && c.z < -0.05f;        // the 2 x 2 block at -y -z
+        sel[t] = cell || block;
+    }
+    completePolygonSelection(cube, sel);
+    const ExtrudePlan plan = planExtrude(cube, sel, {});
+    CHECK(plan.ok());
+    const Mesh out = buildExtrude(cube, plan, 0.1f, 0.1f);
+    double cellArea = 0.0, blockArea = 0.0;
+    for (uint32_t t = 0; t < out.triangleCount(); ++t) {
+        if (!plan.cap[t]) continue;
+        const glm::uvec3& tri = out.triangles[t];
+        const glm::vec3 c = (out.positions[tri.x] + out.positions[tri.y] + out.positions[tri.z]) / 3.0f;
+        const double a = 0.5 * glm::length(glm::cross(out.positions[tri.y] - out.positions[tri.x], out.positions[tri.z] - out.positions[tri.x]));
+        (c.y > 0.0f ? cellArea : blockArea) += a;
+    }
+    CHECK(near(float(cellArea), 0.4f * 0.4f, 1e-4f));  // (0.5 - 2 * 0.05)^2
+    CHECK(near(float(blockArea), 0.8f * 0.8f, 1e-4f)); // (1 - 2 * 0.1)^2
 }
 
 TEST(poly_extrude_two_sides_normals_vs_region) {
