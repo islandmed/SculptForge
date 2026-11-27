@@ -297,9 +297,11 @@ FAIL_LINE = re.compile(r"^(?:FAIL\b|FAILED\b|TIMEOUT\b|.*\b(?:assert|error|excep
 
 def failure_reason(out):
     """One line for a retried test's first failure (the stage summary shows it beside "passed after retry"): the first
-    FAIL/error line of its output, else its last line, capped."""
+    FAIL/error line of its output, else its last line, capped. Absolute paths (a home folder, the PC's /root/wt, C:\\...) shrink to
+    their file name: the line goes into logs that can be public and must not name a machine or a user."""
     lines = [l.strip() for l in out.splitlines() if l.strip()]
     line = next((l for l in lines if FAIL_LINE.match(l)), lines[-1] if lines else "")
+    line = re.sub(r"(?:[A-Za-z]:)?(?:[\\/][\w.+~@-]+){2,}[\\/]([\w.+~@-]+)", r"\1", line)
     return re.sub(r"\s+", " ", re.sub(r"^FAIL\s+", "", line))[:400]
 
 
@@ -552,6 +554,9 @@ def self_test():
     assert split_failures(["m"], {}, q, "2026-11-11", {})[0] == ["m"]  # no FAIL lines to match: blocks
     assert failure_reason("noise\nFAIL m.sfui:64: render cell x: it differs by 4/255\nmore\n") == "m.sfui:64: render cell x: it differs by 4/255"
     assert failure_reason("a\nlast line\n") == "last line" and failure_reason("") == ""  # (no FAIL line: the last one)
+    assert failure_reason("FAIL m.sfui:6: x (picture: /root/wt/r014/src/build/ui-shots/m/FAIL-cell.png)") == \
+        "m.sfui:6: x (picture: FAIL-cell.png)"
+    assert failure_reason("error: cannot open /home/u/Work/c.txt and C:\\Users\\u\\x\\y.png") == "error: cannot open c.txt and y.png"
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
         f.write("# name | owner | until | task | why\nui_x | qa-lean | 2026-11-18 | fix/x | seed 1064 # leak\n"
                 "ui_y | qa | 2026-11-18 |  | no task\nbad line\n")
