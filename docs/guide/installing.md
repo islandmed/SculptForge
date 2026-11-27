@@ -55,9 +55,21 @@ It is not in an app store. Members get it today; it is free for everyone on 26 N
    (`arm64-v8a` for most phones and tablets, `x86_64` for Chromebooks with Intel or AMD) and check it against
    `SHA256SUMS-android.txt`.
 2. Open it from your browser or file manager and allow installs from that app when Android asks.
-3. If you installed an earlier test APK, uninstall it first: it is signed with a different key, and Android won't
-   update over it. Copy projects out of its Projects folder before you do. This is a test build: a later version,
-   signed with our own key, will need one more uninstall and reinstall.
+3. **One-time note:** builds from 0.14.3 on update in place, because they are signed with a stable key. Coming from an
+   earlier build, uninstall it once more first (save or export your project before: its Projects folder goes with it).
+
+**Check the signature.** Every release APK is signed with the same certificate. Its SHA-256 fingerprint is
+
+`BF:6A:F8:B2:FB:ED:6A:C2:BB:57:9F:1B:F8:7F:C5:84:32:DC:7F:5D:0D:34:2F:78:BF:CD:36:B6:A4:A5:83:CC`
+
+and you can compare it with the one in the APK on a computer that has the Android SDK build-tools:
+
+```sh
+apksigner verify --print-certs SculptForge-android.apk
+```
+
+The line `Signer #1 certificate SHA-256 digest` must match the fingerprint above, without the colons. If it doesn't, don't
+install the file and tell us on [GitHub](https://github.com/islandmed/SculptForge/issues).
 
 It is early: expect rough edges, and report bugs on [GitHub](https://github.com/islandmed/SculptForge/issues) or Discord.
 

@@ -53,7 +53,10 @@ need OpenGL ES 3.2, which every tablet of these families since about 2018 has.
 
 ## Signing
 
-Tester APKs (CI's artifact) carry the build machine's throwaway debug key: they install as they are, but one from
-another build machine needs the old one uninstalled first (projects in its Projects folder go with it: copy them
-off). A release APK is signed on the release machine with our own key
-(`~/.config/sculptforge/android-release.jks`, never committed): `scripts/android-sign.sh APK`.
+Tester APKs (CI's artifact on branches and main) carry the build machine's throwaway debug key: they install as they are,
+but one from another build machine needs the old one uninstalled first (projects in its Projects folder go with it: copy
+them off). Release APKs (a `v*` tag) are signed by android.yml's job `android-release-sign` with the permanent key
+(GitHub environment `android-release`: the owner approves each run; the keystore is a secret that only that job reads).
+`scripts/android-verify.sh APK...` checks the certificate against the pin in `scripts/android-cert.sha256`; the workflow and
+`scripts/release.sh` both run it, and release.sh uploads nothing that fails. `scripts/android-sign.sh` is the old
+by-hand signing with a local key and is not used for releases.

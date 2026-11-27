@@ -29,7 +29,7 @@ android {
             minifyEnabled false // (SDL's Java side is called from native code by name)
             // Tester builds (M1) carry the build machine's debug key, so they install as they are; a new key on
             // each CI runner means a tester uninstalls before installing a newer one. Release builds (-PsfUnsigned)
-            // stay unsigned for scripts/android-sign.sh and our release key.
+            // stay unsigned: android.yml signs a `v*` tag build with our release key (job android-release-sign).
             signingConfig project.hasProperty('sfUnsigned') ? null : signingConfigs.debug
         }
     }

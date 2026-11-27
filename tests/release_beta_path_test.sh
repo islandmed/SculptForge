@@ -23,11 +23,13 @@ case "$1 $2" in
   "run view") case "$*" in *status*) echo completed ;; *) echo success ;; esac ;;
   "run download")
     while [ $# -gt 0 ]; do [ "$1" = -n ] && name=$2; [ "$1" = -D ] && dir=$2; shift; done
-    mkdir -p "$dir"; echo apk > "$dir/SculptForge-9.9.9-android-${name#sculptforge-android-test-}-test.apk" ;;
+    [ "$name" = sculptforge-android-release ] || exit 1
+    mkdir -p "$dir"; echo apk > "$dir/SculptForge-9.9.9-android-arm64-v8a.apk"; echo apk > "$dir/SculptForge-9.9.9-android-x86_64.apk" ;;
   "release upload") echo "$*" >> "$GH_UPLOADS" ;;
 esac
 SH
 chmod +x "$S/bin/gh"
+printf '#!/bin/sh\nexit 0\n' > "$S/verify"; chmod +x "$S/verify"; export SF_ANDROID_VERIFY=$S/verify # (the pin check has its own test: release_apk)
 printf '#!/bin/sh\nexit 0\n' > "$S/bin/herdr"; chmod +x "$S/bin/herdr" # a stable release prompts sfmonitor: never the real one
 export PATH=$S/bin:$PATH GH_LOG=$S/gh.log GH_UPLOADS=$S/uploads GH_ASSETS=$ROOT/tests/data/beta_release_assets.txt
 export SF_LAUNCH_DIR=$S/launch

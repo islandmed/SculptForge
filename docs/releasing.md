@@ -296,10 +296,14 @@ Steps for a beta: `bump check ci tag release status`.
   `INSIDERS_REPO_TOKEN` (a fine-grained token for that repository only, Contents: read and write), and posts it in
   #members (`DISCORD_MEMBERS_WEBHOOK`). Nothing is published in the public repository, and the update feed is
   untouched: the app's Preview channel offers only what the feed names.
-  After the release is complete, `release_apk` adds the Android APKs (arm64-v8a, x86_64, signed with the CI runner's
-  debug key) from the android.yml run of the beta's commit to that private release, with `SHA256SUMS-android.txt`
-  (the signed `SHA256SUMS.txt` is left alone). Never the public release; no run, a red run, expired artifacts (14 days)
-  or a failed upload is a warning and the beta ships without them (`--from release` adds them later).
+  After the release is complete, `release_apk` adds the Android APKs (arm64-v8a, x86_64) from the android.yml run of the
+  tag to that private release, with `SHA256SUMS-android.txt` (the signed `SHA256SUMS.txt` is left alone). They are signed
+  with the permanent Android key by the job `android-release-sign` (environment `android-release`, tags `v*` only, the
+  owner approves each run; secrets ANDROID_KEYSTORE_B64 and ANDROID_KEY_PASSWORD, read by that job alone), and
+  `scripts/android-verify.sh` checks every APK against the pin in `scripts/android-cert.sha256` in the job and again
+  before the upload (a mismatch uploads nothing). Never the public release; no run, a red run, a run still waiting for the
+  approval, expired artifacts (14 days) or a failed upload is a warning and the release ships without them (approve the
+  deployment, then `--from release` adds them).
 - **status** prints the private release link, the invite command and the testers checklist (post it in #members).
 - No site, feed, AUR, Homebrew, Omarchy, winget or issue replies for a beta.
 

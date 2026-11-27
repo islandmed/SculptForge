@@ -990,9 +990,12 @@ step_release() {
     release_apk
 }
 
-# release_apk: a release's Android APKs (arm64-v8a + x86_64, signed with the CI runner's debug key so they install) go onto the
-# PRIVATE Insiders release, from the android.yml run of the tagged commit. Never the public release: a beta's own release on
-# $INSIDERS_REPO, or for a stable release a members-only release $T made there (Android stays members-only, owner 11-13). Fails soft: no run, a failed run, an expired artifact or a failed upload is a WARNING, and the
+# release_apk: a release's Android APKs (arm64-v8a + x86_64, signed with the permanent Android key by android.yml's job
+# android-release-sign, which waits for the owner's approval of the android-release deployment) go onto the
+# PRIVATE Insiders release, from the android.yml run of the tag. Never the public release: a beta's own release on
+# $INSIDERS_REPO, or for a stable release a members-only release $T made there (Android stays members-only, owner 11-13). Every APK is checked
+# against the pin in scripts/android-cert.sha256 (scripts/android-verify.sh) before anything is uploaded: a mismatch uploads nothing.
+# Fails soft: no run, a failed run, a run still waiting for the approval, an expired artifact or a failed upload is a WARNING, and the
 # beta ships without APKs (scripts/release.sh $V --from release adds them later). SHA256SUMS.txt (signed) is left alone;
 # the APKs' sums are SHA256SUMS-android.txt.
 release_apk() {
@@ -1008,12 +1011,12 @@ release_apk() {
         if grep -qE '^SculptForge-.*-android-.*\.apk$' "$work/assets-android"; then ok "the Android APKs are already on $INSIDERS_REPO $T"; return 0; fi
     elif grep -qE '^SculptForge-.*-android-.*\.apk$' "$work/assets"; then ok "the Android APKs are already on $T"; return 0; fi
     sha=$(git rev-parse "$T^{commit}" 2>/dev/null) || { printf '   WARNING: no APKs on %s: %s is not a commit here\n' "$T" "$T"; return 0; }
-    id=$(gh run list -R "$REPO" -w android.yml -c "$sha" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
+    id=$(gh run list -R "$REPO" -w android.yml -b "$T" -c "$sha" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
     if [ -z "$id" ]; then # (0.13.1: a re-stage made a commit no Android run had built; the members' release came out empty)
         echo "   no Android run for ${sha:0:8}: starting android.yml on $T ..."
         gh workflow run android.yml -R "$REPO" --ref "$T" >/dev/null 2>&1 || true
         for _ in $(seq 1 ${SF_APK_POLLS:-30}); do
-            id=$(gh run list -R "$REPO" -w android.yml -c "$sha" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
+            id=$(gh run list -R "$REPO" -w android.yml -b "$T" -c "$sha" -L 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
             [ -n "$id" ] && break
             sleep "${SF_APK_POLL_S:-10}"
         done
@@ -1023,23 +1026,30 @@ release_apk() {
             return 0
         fi
     fi
-    if [ "$(gh run view "$id" -R "$REPO" --json status -q .status 2>/dev/null)" != completed ]; then
-        echo "   waiting for the Android run $id ..."
-        gh_watch "$id" >/dev/null 2>&1 || true
-    fi
+    # (the signing job waits for the owner's click on the android-release deployment: never hold the release on it)
+    for _ in $(seq 1 ${SF_APK_RUN_POLLS:-40}); do
+        [ "$(gh run view "$id" -R "$REPO" --json status -q .status 2>/dev/null)" = completed ] && break
+        if [ "$(gh run view "$id" -R "$REPO" --json jobs -q '[.jobs[] | select(.name == "Sign the release APKs" and .status == "waiting")] | length' 2>/dev/null || echo 0)" != 0 ]; then
+            printf '   WARNING: no Android APKs yet: the android-release deployment of run %s waits for the owner'"'"'s approval (https://github.com/%s/actions/runs/%s); then %s\n' "$id" "$REPO" "$id" "$(resume release)"
+            return 0
+        fi
+        sleep "${SF_APK_RUN_S:-30}"
+    done
     c=$(gh run view "$id" -R "$REPO" --json conclusion -q .conclusion 2>/dev/null || true)
     if [ "$c" != success ]; then
-        printf '   WARNING: the Android run %s is "%s": the beta ships without APKs (https://github.com/%s/actions/runs/%s)\n' "$id" "${c:-unknown}" "$REPO" "$id"
+        printf '   WARNING: the Android run %s is "%s": the release ships without APKs (https://github.com/%s/actions/runs/%s)\n' "$id" "${c:-unknown}" "$REPO" "$id"
         return 0
     fi
     mkdir -p "$dir"
-    for abi in arm64-v8a x86_64; do
-        gh run download "$id" -R "$REPO" -n "sculptforge-android-test-$abi" -D "$dir/$abi" >/dev/null 2>&1 ||
-            printf '   WARNING: no %s APK from run %s (an artifact expires after 14 days)\n' "$abi" "$id"
-    done
+    gh run download "$id" -R "$REPO" -n sculptforge-android-release -D "$dir/release" >/dev/null 2>&1 ||
+        printf '   WARNING: no signed APKs from run %s (an artifact expires after 14 days)\n' "$id"
     local files=()
     while IFS= read -r f; do files+=("$f"); done < <(find "$dir" -name '*.apk' | sort)
-    [ "${#files[@]}" -gt 0 ] || { printf '   WARNING: no APK files from run %s: the beta ships without them\n' "$id"; return 0; }
+    [ "${#files[@]}" -gt 0 ] || { printf '   WARNING: no APK files from run %s: the release ships without them\n' "$id"; return 0; }
+    if ! "${SF_ANDROID_VERIFY:-$PWD/scripts/android-verify.sh}" "${files[@]}"; then
+        printf '   REFUSED: the Android APKs of run %s are not signed with the SculptForge Android key (pin: scripts/android-cert.sha256): nothing uploaded. Look at the run before anything else.\n' "$id"
+        return 0
+    fi
     sums="$dir/SHA256SUMS-android.txt"
     : > "$sums"
     for f in "${files[@]}"; do printf '%s  %s\n' "$(sha256 "$f")" "$(basename "$f")" >> "$sums"; n=$((n + 1)); done

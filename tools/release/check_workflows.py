@@ -28,6 +28,11 @@
     reads a secret, has an unpinned `uses:` or shell tracing, saves a cache in a step not limited to main (t0/ runs
     only restore), or can end red (its job must be continue-on-error: the verdict is the summary, a red T0 emails nobody).
   - another workflow that runs on branch pushes would also run for t0/** refs (branches-ignore them).
+  - Android release signing (android.yml): ANDROID_KEYSTORE_B64 / ANDROID_KEY_PASSWORD are read only by the job
+    android-release-sign, which runs in `environment: android-release`, only on `refs/tags/v*` (an `if:` as well), can't
+    write, never traces or puts the password on a command line, deletes the keystore in an `if: always()` step, and
+    checks the certificate with scripts/android-verify.sh; android.yml has no pull_request trigger, and a job on every
+    non-tag run asserts the signing job was skipped.
 
 Plain text parsing (no PyYAML): workflows here keep jobs at two spaces and their keys at four.
 """
@@ -40,6 +45,9 @@ MEMBER_ENV = "member-release"
 SIGNING = "secrets.UPDATE_SIGNING_KEY"
 SIGNPATH = "secrets.SIGNPATH_API_TOKEN"
 SIGNING_ENVS = {"release", MEMBER_ENV}
+ANDROID_SECRET = re.compile(r"secrets\.ANDROID_(KEYSTORE_B64|KEY_PASSWORD)\b")
+ANDROID_ENV = "android-release"
+ANDROID_JOB = "android-release-sign"
 SUMS_JOBS = ("sums", "wheel-sums")  # packages.yml: checksums of attested files, nothing of their own to attest
 ATTEST = re.compile(r"uses:\s*actions/attest-build-provenance@[0-9a-f]{40}\b")
 PINNED = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}(\s+#\s*\S.*)?$")
@@ -166,6 +174,55 @@ def check_signing(pk):
     return errs
 
 
+def check_android(files):
+    """The permanent Android release key (docs/releasing.md): see the module docstring."""
+    errs = []
+    for name, text in files.items():
+        if name != "android.yml" and re.search(r"\bANDROID_(KEYSTORE_B64|KEY_PASSWORD)\b", text):
+            errs.append(f"{name}: reads the Android release key (only android.yml's {ANDROID_JOB} may)")
+    text = files.get("android.yml")
+    if text is None:
+        return errs
+    on = re.search(r"^on:\s*\n(?:[ \t]+.*\n|\s*\n|#.*\n)*", text, re.M)
+    on = on.group(0) if on else text.split("\njobs:")[0]
+    if re.search(r"^\s+pull_request(_target)?\s*:", on, re.M):
+        errs.append("android.yml: runs on pull requests (the signing secrets live in this workflow)")
+    if re.search(r"^\s*permissions:\s*write-all\b|^\s+(contents|id-token|actions|packages):\s*write\b", text, re.M):
+        errs.append("android.yml: can write")
+    for job, lines in jobs(text).items():
+        body = "\n".join(lines)
+        if job != ANDROID_JOB:
+            if ANDROID_SECRET.search(body):
+                errs.append(f"android.yml: job {job} reads the Android release key (only {ANDROID_JOB} may)")
+            continue
+        if environment(lines) != ANDROID_ENV:
+            errs.append(f"android.yml: {job} is not in `environment: {ANDROID_ENV}` (the owner's approval, tags v* only)")
+        if not any(re.match(r"^    if:", l) and "refs/tags/v" in l for l in lines):
+            errs.append(f"android.yml: {job} has no job-level `if:` limiting it to refs/tags/v* (the environment rule is not the only lock)")
+        if not ANDROID_SECRET.search(body):
+            errs.append(f"android.yml: {job} does not read the Android release key")
+        if re.search(r"\bset\s+-\w*x|\bset\s+-o\s+xtrace", body):
+            errs.append(f"android.yml: {job} turns on shell tracing (it would log the password)")
+        if re.search(r"(--ks-pass|--key-pass)[ =]+(?!env:)|-(store|key)pass\b", body):
+            errs.append(f"android.yml: {job} gives apksigner a password that is not `env:` (a command line shows in the process list)")
+        if re.search(r"(echo|printf|cat)\b[^\n]*\$\{?ANDROID_KEY_PASSWORD", body):
+            errs.append(f"android.yml: {job} prints the key password")
+        if re.search(r":\s*write\b", body):
+            errs.append(f"android.yml: {job} can write")
+        cleanup = [b for b in re.split(r"\n(?=\s*- )", body) if re.search(r"^\s*(-\s+)?if:\s*always\(\)", b, re.M) and "rm -f" in b]
+        if not cleanup:
+            errs.append(f"android.yml: {job} has no `if: always()` step deleting the keystore")
+        if "android-verify.sh" not in body:
+            errs.append(f"android.yml: {job} does not check the certificate against the pin (scripts/android-verify.sh)")
+        if "umask 077" not in body:
+            errs.append(f"android.yml: {job} decodes the keystore without umask 077")
+    if ANDROID_JOB not in jobs(text):
+        errs.append(f"android.yml: no job {ANDROID_JOB}")
+    if not any(f"needs.{ANDROID_JOB}.result" in "\n".join(l) and "skipped" in "\n".join(l) for l in jobs(text).values()):
+        errs.append(f"android.yml: no job asserting {ANDROID_JOB} is skipped on runs that are not a release tag")
+    return errs
+
+
 def check(files):
     """files: {name: text}. Returns the list of problems."""
     errs = []
@@ -199,6 +256,7 @@ def check(files):
                 errs.append(f"{name}:{n}: `uses: {m.group(1)}` is not pinned to a full commit SHA (the signing action sees the token)")
         if name not in ("packages.yml", "release.yml") and SIGNPATH in text:
             errs.append(f"{name}: reads SIGNPATH_API_TOKEN (only packages.yml's Windows job and release.yml's call of it may)")
+    errs += check_android(files)
     pk = files.get("packages.yml")
     if pk is not None:
         errs += check_signing(pk)
@@ -476,6 +534,45 @@ PYPI = """  pypi:
 """
 
 
+ANDROID = """on:
+  push:
+    branches: [main]
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  android-release-sign:
+    needs: apk
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    environment: android-release
+    steps:
+      - name: Sign
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          umask 077
+          apksigner sign --ks-pass env:ANDROID_KEY_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD x
+      - name: Delete the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/android-release.p12"
+      - run: scripts/android-verify.sh signed/*.apk
+  release-sign-skipped:
+    needs: [apk, android-release-sign]
+    if: always() && !startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULT: ${{ needs.android-release-sign.result }}
+        run: '[ "$RESULT" = skipped ]'
+"""
+
+
 def self_test():
     cases = {
         "good": ({"release.yml": GOOD}, 0),
@@ -522,6 +619,29 @@ def self_test():
         "integrations dispatch": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace(
             "jobs:", "  workflow_dispatch:\njobs:", 1)}, 1),
         "integrations set -x": ({"release.yml": GOOD, "integrations.yml": INTEGRATIONS.replace("run: gh release", "run: set -x; gh release")}, 1),
+        "android good": ({"release.yml": GOOD, "android.yml": ANDROID}, 0),
+        "android no environment": ({"release.yml": GOOD, "android.yml": ANDROID.replace("    environment: android-release\n", "")}, 1),
+        "android other environment": ({"release.yml": GOOD, "android.yml": ANDROID.replace("environment: android-release", "environment: release")}, 1),
+        "android no tag if": ({"release.yml": GOOD, "android.yml": ANDROID.replace(
+            "    if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'pull_request'\n", "")}, 1),
+        "android on pull requests": ({"release.yml": GOOD, "android.yml": ANDROID.replace("on:\n  push:", "on:\n  pull_request:\n  push:")}, 1),
+        "android on pull_request_target": ({"release.yml": GOOD, "android.yml": ANDROID.replace("on:\n  push:", "on:\n  pull_request_target:\n  push:")}, 1),
+        "android key in another job": ({"release.yml": GOOD, "android.yml": ANDROID.replace(
+            "  apk:\n    runs-on: ubuntu-24.04\n", "  apk:\n    runs-on: ubuntu-24.04\n    env:\n      K: ${{ secrets.ANDROID_KEY_PASSWORD }}\n")}, 1),
+        "android key in another workflow": ({"release.yml": GOOD, "android.yml": ANDROID,
+                                             "x.yml": "jobs:\n  a:\n    env:\n      K: ${{ secrets.ANDROID_KEY_PASSWORD }}\n"}, 1),
+        "android password on the command line": ({"release.yml": GOOD, "android.yml": ANDROID.replace(
+            "--ks-pass env:ANDROID_KEY_PASSWORD", "--ks-pass pass:$ANDROID_KEY_PASSWORD")}, 1),
+        "android set -x": ({"release.yml": GOOD, "android.yml": ANDROID.replace("          umask 077\n", "          set -euxo pipefail\n          umask 077\n")}, 1),
+        "android prints the password": ({"release.yml": GOOD, "android.yml": ANDROID.replace(
+            "          umask 077\n", "          umask 077\n          echo $ANDROID_KEY_PASSWORD\n")}, 1),
+        "android keystore kept": ({"release.yml": GOOD, "android.yml": ANDROID.replace("        if: always()\n", "")}, 1),
+        "android no certificate check": ({"release.yml": GOOD, "android.yml": ANDROID.replace("scripts/android-verify.sh", "ls")}, 1),
+        "android no umask": ({"release.yml": GOOD, "android.yml": ANDROID.replace("          umask 077\n", "")}, 1),
+        "android job can write": ({"release.yml": GOOD, "android.yml": ANDROID.replace(
+            "    environment: android-release\n", "    environment: android-release\n    permissions:\n      contents: write\n")}, 1),
+        "android no skipped assertion": ({"release.yml": GOOD, "android.yml": ANDROID.replace("= skipped", "= x")}, 1),
+        "android unpinned": ({"release.yml": GOOD, "android.yml": ANDROID.replace("@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1", "@v7")}, 1),
         "t0 good": ({"release.yml": GOOD, "t0.yml": T0}, 0),
         "t0 on all branches": ({"release.yml": GOOD, "t0.yml": T0.replace("[main, 't0/**']", "['**']")}, 1),
         "t0 dispatch": ({"release.yml": GOOD, "t0.yml": T0.replace("permissions:", "  workflow_dispatch:\npermissions:")}, 1),
