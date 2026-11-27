@@ -1,0 +1,62 @@
+# Tool > Polygon: the selection on the far side of the model is drawn too, dimmer than the visible part (Show hidden
+# selection, on by default). Edges of a coarse cage all selected, seen from above and in front: some face the camera, some
+# are behind the surface. Both are drawn (poly_drawn_front / poly_drawn_hidden count what the overlay put on screen last
+# frame); the visible count is the same with the setting off, the hidden ones go; orbiting to the back swaps the two.
+run new_sphere subdivisions=1
+run part_append type=cube name=Box
+run part_delete index=0
+run qremesh target=600 detect_edges=true keep_groups=true adaptive=0 quality=false
+wait_idle 60
+orbit 120 -60
+key f
+zoom 0.7
+click "Polygon##tool.polygon"
+click "Polygon/Polygon mode"
+expect_value poly_mode == 1
+click "Polygon/Edges"
+expect_value poly_element == 1
+click "Polygon/All"
+expect_value poly_selected > 12
+wait_idle 5
+expect_value poly_drawn_front > 0
+expect_value poly_drawn_hidden > 0
+remember poly_drawn_front front0
+remember poly_drawn_hidden hidden0
+expect_value poly_shown == $front0
+shot polygon-hidden-selection-front
+ui_scale 200
+key f
+zoom 0.6
+shot polygon-hidden-selection-front-200
+ui_scale 100
+key f
+zoom 0.7
+
+# The setting off: the hidden part is not drawn, the visible part is exactly as before.
+click "Polygon/Show hidden selection"
+wait_idle 5
+expect_value poly_drawn_hidden == 0
+expect_value poly_drawn_front == $front0
+shot polygon-hidden-selection-off
+click "Polygon/Show hidden selection"
+wait_idle 5
+expect_value poly_drawn_hidden == $hidden0
+
+# From the other side: what was hidden now faces the camera, and the counts add up to the same selection.
+orbit 180 0
+wait_idle 5
+expect_value poly_drawn_front > 0
+expect_value poly_drawn_hidden > 0
+shot polygon-hidden-selection-back
+
+# Points and Faces too.
+click "Polygon/Points"
+click "Polygon/All"
+wait_idle 5
+expect_value poly_drawn_hidden > 0
+click "Polygon/Faces"
+click "Polygon/All"
+wait_idle 5
+expect_value poly_drawn_hidden > 0
+key escape
+expect_value poly_mode == 0

@@ -239,6 +239,7 @@
     "showViewFigure": false,
     "alphabeticalPalettes": false,
     "appendLowPoly": false,
+    "showHiddenSelection": true,
     "look": {
       "name": "classic",
       "scheme": "neutral",

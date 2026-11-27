@@ -1728,6 +1728,9 @@ if(SCULPTFORGE_BUILD_TESTS)
     # Bevel (tests/ui/polygon_bevel.sfui): the op's panel entry, preview and result at 100% and 200%.
     sculptforge_ui_test(polygon_bevel_1440 polygon_bevel --size 1440x900)
     sculptforge_ui_test(polygon_bevel_2880 polygon_bevel --size 2880x1800)
+    # Hidden selection (tests/ui/polygon_hidden_selection.sfui): the far side of the selection drawn dim, on and off.
+    sculptforge_ui_test(polygon_hidden_selection_1440 polygon_hidden_selection --size 1440x900)
+    sculptforge_ui_test(polygon_hidden_selection_2880 polygon_hidden_selection --size 2880x1800)
     # The Transform gizmo's look, each mode front and 3/4, 100% and 200% (tests/ui/gizmo/look.sfui).
     sculptforge_ui_test(gizmo_look_1440 gizmo/look --size 1440x900)
     sculptforge_ui_test(gizmo_look_2880 gizmo/look --size 2880x1800)

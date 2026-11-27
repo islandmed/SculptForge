@@ -18,7 +18,7 @@ Open the **Tool** panel on the right (not the Library's **Tool** tab, which hold
 - **Polygon mode**, the button that turns the mode on and off.
 - **Points**, **Edges** and **Faces**: what a click selects.
 - **All**, **None**, **Invert**, **Grow**, **Shrink**, **Loop**, **Ring** and **By Group**: selection helpers.
-- A line that counts the selection (*12 faces selected of 600*).
+- A line that counts the selection (*12 faces selected of 600*), and **Show hidden selection**: the selected points, edges and faces on the far side of the model are drawn too, dimmer and thinner than the ones facing you, so a selection reads from the front without orbiting (on by default; unselected ones stay hidden).
 - **Operations**: one button per operation, each with its settings underneath.
 
 Every button is an action you can put on a key or a shelf (**Edit > Preferences > Input**).
