@@ -3,6 +3,16 @@
 Thanks for your interest! SculptForge is GPL-3.0-or-later; by contributing you
 agree your work is licensed under the same terms.
 
+## Contributor Licence Agreement
+
+Before an outside pull request can be merged, its author agrees to the
+[SculptForge Contributor Licence Agreement](docs/CLA.md) once, by commenting this on the pull request:
+
+> I have read the SculptForge Contributor Licence Agreement v1.0 and I agree to it.
+
+You keep the copyright in your work. Contributors who have agreed are listed in
+[CONTRIBUTORS-CLA.md](CONTRIBUTORS-CLA.md). The DCO sign-off below is still required on every commit.
+
 ## Ground rules
 
 - **Clean-room only.** Do not contribute code, shaders, brushes, alphas, icons or
@@ -16,8 +26,8 @@ agree your work is licensed under the same terms.
 
 ## Developer Certificate of Origin
 
-SculptForge uses the [Developer Certificate of Origin 1.1](https://developercertificate.org) (DCO). There is no
-CLA: you keep the copyright to your work and license it under GPL-3.0-or-later.
+SculptForge uses the [Developer Certificate of Origin 1.1](https://developercertificate.org) (DCO), in addition to the
+[Contributor Licence Agreement](docs/CLA.md) above. You keep the copyright to your work.
 
 Sign off every commit with `git commit -s`, which adds a line like this to the commit message:
 

@@ -86,7 +86,8 @@ SculptForge is free, and nothing in the app is ever paywalled. Every release sta
 
 ## Contributing
 
-Contributions are welcome: bug reports, brushes, docs and code. Read [CONTRIBUTING.md](CONTRIBUTING.md)
+Contributions are welcome: bug reports, brushes, docs and code. Read [CONTRIBUTING.md](CONTRIBUTING.md) (outside pull requests need a one-time
+[Contributor Licence Agreement](docs/CLA.md) comment)
 and the [Code of Conduct](CODE_OF_CONDUCT.md). For questions, tips and showing your work, join the
 [SculptForge Discord](https://discord.gg/gWrYkEmQhH); bugs and feature requests go to [GitHub issues](https://github.com/islandmed/SculptForge/issues). Please report security issues privately (see
 [SECURITY.md](SECURITY.md)).
