@@ -2808,6 +2808,10 @@ constexpr Entry kSpanish[] = {
      "del proyecto, o ? para elegir uno al ejecutarla."},
     {"Recording macro", "Grabando macro"},
     // --- PanelPaintLayers.cpp (tools/i18n/coverage.py) ---
+    {"New layer", "Capa nueva"},
+    {"A paint layer, as in Tool > Paint Layers. Click to paint on it. Layers composite bottom to top with their blend mode and opacity.",
+     "Una capa de pintura, como en Tool > Paint Layers. Haz clic para pintar en ella. Las capas se componen de abajo arriba con su modo de fusión y su opacidad."},
+    {"Fill layer with a mask. Edit it under Tool > Paint Layers.", "Capa de relleno con máscara. Edítala en Tool > Paint Layers."},
     {"Lock the layer: the Paint brush, fills, clears and merges leave it alone.",
      "Bloquea la capa: el pincel Paint, los rellenos, los borrados y las fusiones no la tocan."},
     {"Show or hide the layer. Hidden layers don't show or export.",

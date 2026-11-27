@@ -7,6 +7,7 @@
 #include "app/AssetLibrary.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "app/Palettes.h"
 
 #include "core/LitSphere.h"
 #include "core/VertexPaint.h"
@@ -558,6 +559,12 @@ void App::drawPalette_Color() {
         if (i % 5 != 4) ImGui::SameLine();
     }
     ImGui::TextDisabled("%s", tr(paintsTexture(doc_.mesh) && hasMaterialChannels(*doc_.mesh.texture) ? "C over the model picks its material" : "C over the model picks its colour"));
+    // Layers: the Part's paint (or texture) layer stack in a compact list, above the PBR channels. Added after 0.14.2: in the
+    // Classic layout only with Show newer menu rows. Open or closed it is remembered (the section's own state).
+    if (newerMenuRows() && subpalette("color.layers", "Layers")) {
+        tray::Section section;
+        drawColorLayersCompact(); // PanelPaintLayers.cpp
+    }
     drawBrushMaterialContents(); // per-channel brush values when the texture has material channels (PanelPbr.cpp)
     {
         const Mesh& m = doc_.mesh;

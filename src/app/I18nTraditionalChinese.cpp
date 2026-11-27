@@ -2516,6 +2516,10 @@ constexpr Entry kTraditionalChinese[] = {
      "每行一個命令，與主控台相同（# 開頭為註解）。檔案：專案資料夾內的路徑，或用 ? 在執行時選取。"},
     {"Recording macro", "正在錄製巨集"},
     // --- PanelPaintLayers.cpp (tools/i18n/coverage.py) ---
+    {"New layer", "新增圖層"},
+    {"A paint layer, as in Tool > Paint Layers. Click to paint on it. Layers composite bottom to top with their blend mode and opacity.",
+     "繪製圖層，與 Tool > Paint Layers 相同。點擊即可在其上繪製。圖層由下而上依其混合模式與不透明度合成。"},
+    {"Fill layer with a mask. Edit it under Tool > Paint Layers.", "帶有遮罩的填充圖層。請在 Tool > Paint Layers 中編輯。"},
     {"Lock the layer: the Paint brush, fills, clears and merges leave it alone.",
      "鎖定圖層：Paint 筆刷、填滿、清除與合併都不會影響它。"},
     {"Show or hide the layer. Hidden layers don't show or export.", "顯示或隱藏圖層。隱藏的圖層不會顯示或匯出。"},

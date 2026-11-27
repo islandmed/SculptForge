@@ -169,6 +169,16 @@ Hold <kbd>Ctrl</kbd> over any control for its description. Every action is undoa
 > Merging a Multiply, Overlay or other blended layer onto a partly transparent layer can't always match, so the
 > result takes the lower layer's blend mode, as in Photoshop.
 
+### The Layers list in the Paint menu
+
+**Paint > Layers** (above the material channels) shows the same stack as Tool > Paint Layers as a compact list, so you can
+choose a layer, hide it and change how it blends without leaving the palette you paint in. Each row has the layer's name
+(shortened to fit the tray), its blend mode and opacity, and an eye; a Fill layer's row also carries an **M**, because it is
+the one kind of layer with a mask. Click a row to paint on that layer; the **Blend** menu and **Opacity** slider under the list
+edit the selected layer, and **New layer** adds one above it. It is the one stack: the same data, order and undo, and the layer
+you select here is the layer selected in Tool > Paint Layers. Click the **Layers** header to open or close the list; the
+palette remembers which. In the Classic layout (where the palette is called **Color**) the list is off until **Show newer menu rows** is on.
+
 ### Paint layers and sculpt layers
 
 They are separate stacks. **Tool > Layers** holds sculpt layers: shape changes exported as blend shapes.

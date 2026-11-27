@@ -1375,6 +1375,7 @@ if(SCULPTFORGE_BUILD_TESTS)
     file(GLOB SCULPTFORGE_UI_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/*.sfui)
     list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/mode_matrix\\.sfui$") # (four shards, below)
     list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/hardware_tier_panel\\.sfui$") # (only at 1440 and 2880, below)
+    list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/color_panel_layers\\.sfui$") # (only at 1440 and 2880, below: the default window is short enough that the Color window scrolls while rows are added)
     if(NOT SCULPTFORGE_MAC_SELF_UPDATE) # (the banner shows Download on a Mac: nothing of that script to drive)
       list(FILTER SCULPTFORGE_UI_TESTS EXCLUDE REGEX "/self_update_mac\\.sfui$")
     endif()
@@ -1391,6 +1392,12 @@ if(SCULPTFORGE_BUILD_TESTS)
     sculptforge_ui_test(curve_edit_2880 curve_edit --size 2880x1800)
     sculptforge_ui_test(color_material_entries_1440 color_material_entries --size 1440x900) # Color > Material rows before any channel is on
     sculptforge_ui_test(color_material_entries_2880 color_material_entries --size 2880x1800)
+    sculptforge_ui_test(color_panel_layers_1440 color_panel_layers --size 1440x900) # Color > Layers: the compact paint layer list
+    sculptforge_ui_test(color_panel_layers_2880 color_panel_layers --size 2880x1800)
+    sculptforge_ui_test(color_panel_layers_menu_1440 color_panel_layers_menu --size 1440x900)
+    sculptforge_ui_test(color_panel_layers_menu_2880 color_panel_layers_menu --size 2880x1800)
+    sculptforge_ui_test(color_panel_layers_classic_1440 color_panel_layers_classic --size 1440x900) # off in the Classic layout
+    sculptforge_ui_test(color_panel_layers_classic_2880 color_panel_layers_classic --size 2880x1800)
     sculptforge_ui_test(fill_effect_slider_keeps_1440 fill_effect_slider_keeps --size 1440x900)
     sculptforge_ui_test(fill_effect_slider_keeps_2880 fill_effect_slider_keeps --size 2880x1800)
     sculptforge_ui_test(scatter_1440 scatter --size 1440x900) # Tool > Scatter, its live redo and Separate Parts over 500
