@@ -14,12 +14,12 @@
   <a href="https://github.com/islandmed/SculptForge/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/islandmed/SculptForge/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/islandmed/SculptForge/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/islandmed/SculptForge?color=f28c3c"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue"></a>
-  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-555">
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android%20(early)-555">
 </p>
 
 **Sculpt with the brushes, symmetry and navigation you already know.** Free, open source, no subscription, no account.
 
-- **Fast and native:** starts instantly, works offline, on Linux, macOS and Windows.
+- **Fast and native:** starts instantly, works offline, on Linux, macOS and Windows, with an Android early test build, free for everyone.
 - **Free AI, built in:** describe a brush and Brush Lab builds it, or turn a sketch or a description into a sculptable model.
 - **Made for pipelines:** LOD chains, blend shapes, Send to Unreal, Blender, OpenUSD, FBX and glTF.
 
@@ -38,6 +38,12 @@
 **[Download for Windows](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-windows-x86_64-setup.exe)** ·
 **[Download for macOS](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-macos.dmg)** ·
 **[Download for Linux](https://github.com/islandmed/SculptForge/releases/latest/download/SculptForge-linux-x86_64.AppImage)** (AppImage, x86_64)
+
+**[Download for Android](https://github.com/islandmed/SculptForge/releases/latest)** (early test build, free)
+
+- Tablets, phones and Chromebooks, Android 9 or later, with touch and pen; not in an app store, so you sideload the `.apk`.
+- Take the `.apk` from the latest release: `arm64-v8a` for most phones and tablets, `x86_64` for Chromebooks with Intel or AMD. Check it against `SHA256SUMS-android.txt`.
+- Each test build is signed with a new key for now: save your sculpts outside the app, uninstall the old SculptForge, then install the new APK. A stable key is coming.
 
 Every link gets the newest version straight from GitHub. **[install/](install/README.md)** lists every package (.deb, .rpm, ARM64, portable .zip, Arch). Or install with one command:
 
