@@ -84,6 +84,7 @@ jobs:
           apk=$(tail -1 apk-path.txt)
           ls -l "$apk"
           unzip -l "$apk" | grep -E 'lib/${{ matrix.abi }}/lib(main|SDL3)\.so' | tee -a "$GITHUB_STEP_SUMMARY"
+          unzip -l "$apk" | grep -E 'assets/(LICENSE|THIRD_PARTY_NOTICES\.md)$' | tee -a "$GITHUB_STEP_SUMMARY" | wc -l | grep -qx 2 # the licence and the notices travel in the APK
           "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -1)/aapt2 dump permissions "$apk" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

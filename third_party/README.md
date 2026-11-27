@@ -12,7 +12,8 @@ package manager should supply, is not here: it is fetched at configure time, pin
 | `mikktspace/` | `mikktspace.h`, `mikktspace.c` | commit `3e895b4` | zlib | https://github.com/mmikk/MikkTSpace | Tangent frames for baked normal maps |
 | `tinyexr/` | `tinyexr.h` and friends, plus our `tinyexr_impl.cpp` (builds it with stb's zlib) | 1.0.13 | BSD 3-Clause (contains OpenEXR code under its BSD licence) | https://github.com/syoyo/tinyexr | Reading and writing OpenEXR (vector displacement maps) |
 | `qrcodegen/` | `qrcodegen.hpp`, `qrcodegen.cpp` | 1.8.0 | MIT | https://github.com/nayuki/QR-Code-generator | The phone link's pairing QR code |
-| `lucide/` | `IconsLucide.h`, generated from lucide-static and used with the font `assets/fonts/lucide.ttf` | lucide-static 1.52.0 | ISC | https://lucide.dev | The interface icons |
+| `lucide/` | `IconsLucide.h`, generated from lucide-static and used with the font `assets/fonts/lucide.ttf` | lucide-static 1.52.0 | ISC (about 100 icons derived from Feather: MIT) | https://lucide.dev | The interface icons |
+| `wasmtime/` | Only `CRATE_NOTICES.md`, the notices of the Rust crates and C code inside the Wasmtime library the build fetches (made by `tools/licenses/rust_notices.py`; installed beside THIRD_PARTY_NOTICES.md); no code | v51.0.0 | MIT, BSD, ISC, Zlib, Unicode, Apache-2.0 | https://github.com/bytecodealliance/wasmtime | Wasmtime's licence notices |
 | `makehuman/` | Only the licence text (`LICENSE.ASSETS.md`) of the base mesh behind the human starter meshes in `assets/starter`; no code | commit `a8bc2d5` | CC0 1.0 | https://github.com/makehumancommunity/makehuman | Starter meshes (see [docs/starter-meshes.md](../docs/starter-meshes.md)) |
 
 Each folder keeps its own licence file and, where it has one, a `SOURCE.txt` saying exactly which upstream files and

@@ -612,6 +612,7 @@ private:
     bool lastCommandOk_ = true; // result of the last runCommand (UI tests check it)
     bool showHelp_ = false;
     bool showAbout_ = false;
+    std::string legalTitle_, legalText_; // About > License / Third-party notices read from the APK on Android (the text; empty: closed)
     bool showConnectAi_ = false; // Help > Connect an AI tool (PanelConnectAi.cpp; only while AI is on)
     std::string connectClient_ = "claude_code"; // its "Pick your tool" choice (a connect::Client id)
     float connectScale_ = 0.0f;                 // the UI scale it was last placed for

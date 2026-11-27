@@ -72,6 +72,13 @@ for d in mdpi:48 hdpi:64 xhdpi:128 xxhdpi:128 xxxhdpi:256; do
   cp "assets/branding/sculptforge-${d##*:}.png" "$res/mipmap-${d%%:*}/ic_launcher.png"
 done
 
+# The licence and the third-party notices travel inside the APK (assets/, read by the About window): the licences of
+# what is linked in (MIT, BSD, OFL, ISC, Apache) want their notices with every binary copy, and a phone is offline.
+case $out in /*) assets=$out/assets ;; *) assets=$PWD/$out/assets ;; esac
+rm -rf "$assets"
+mkdir -p "$assets"
+cp LICENSE LICENSE-EXCEPTION.md THIRD_PARTY_NOTICES.md "$assets/"
+
 if ! command -v gradle >/dev/null; then # (pinned; checked against Gradle's published SHA-256)
   g=gradle-8.11.1
   if [ ! -x "$out/$g/bin/gradle" ]; then
@@ -87,7 +94,7 @@ task=assembleRelease
 # tried again, twice, after a pause and with --refresh-dependencies (drops those cached misses). Any other failure stops at once.
 refresh=
 for attempt in 1 2 3; do
-  if (cd android && gradle --no-daemon -q "$task" -PsfJniLibs="$jni" -PsfRes="$res" \
+  if (cd android && gradle --no-daemon -q "$task" -PsfJniLibs="$jni" -PsfRes="$res" -PsfAssets="$assets" \
         -PsfSdlJava="$sdl/android-project/app/src/main/java" -PsfVersion="$version" -PsfVersionCode="$code" $unsigned $refresh) \
         2>&1 | tee "$out/gradle.log"; then break; fi
   if [ "$attempt" -ge 3 ] || ! grep -qE 'Could not (resolve|find|get|GET)|Received status code (429|5[0-9][0-9])|timed out|Connection reset' "$out/gradle.log"; then
