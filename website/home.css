@@ -98,11 +98,11 @@
 .hb-hero h1 { font-size: clamp(2.6rem, 7vw, 5.4rem); font-weight: 800; letter-spacing: -0.045em; line-height: 0.98; max-width: 12em; }
 .hb-hero h1 em { font-style: normal; color: var(--accent); }
 .hb-lead { font-size: clamp(1.15rem, 2.2vw, 1.45rem); line-height: 1.45; color: var(--muted); max-width: 32em; margin: 0 0 8px; }
-.hb-grid { display: grid; grid-template-columns: 240px 1fr; gap: 24px 56px; padding: 56px 0; border-bottom: 1px solid var(--border); }
+.hb-grid { display: grid; grid-template-columns: 240px 1fr; gap: 24px 56px; padding-block: 56px; border-bottom: 1px solid var(--border); }
 .hb-grid h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); letter-spacing: -0.03em; margin: 0; }
 .hb-grid .n { display: block; color: var(--accent); font: 700 0.85rem Inter, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 8px; }
 .hb-grid p { max-width: 38em; }
 .hb-grid .ha-list { max-width: 38em; }
-@media (max-width: 760px) { .hb-grid { grid-template-columns: 1fr; padding: 40px 0; } }
-.hb-end { padding: 64px 0 80px; }
+@media (max-width: 760px) { .hb-grid { grid-template-columns: 1fr; padding-block: 40px; } }
+.hb-end { padding-block: 64px 80px; }
 .hb-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
