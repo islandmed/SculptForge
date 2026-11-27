@@ -15,6 +15,7 @@ highlight: SculptForge on Android (early test build, free): tablets, phones and 
 highlight: Add your own HDRIs, and Clean view: fullscreen with only the 3D view (requested by a member)
 highlight: Monochrome colours and Paint > Layers in the Color palette (requested by members)
 highlight: Voxel Remesh keeps vertex paint smooth
+highlight: Wax and Oil Stain Material Recipes (requested by a member)
 title: SculptForge on Android
 line: An early test build for tablets, phones and Chromebooks, free for everyone: download the .apk from the latest release and sideload it. It checks once a day for a newer version, and Edit > Preferences > Updates turns that off.
 action: guide:installing.md#android-early
@@ -41,6 +42,32 @@ action: guide:interface.md
   selection**), and Bevel on faces rounds only the outline of the selected faces.
 - **Wax** and **Oil Stain** Material Recipes, and every button, slider and box can now go on a shelf or My Panel.
 - A latched Line, Lasso or Rectangle shape turns off with Esc, by picking it again, or with its own button.
+- **Android early build**: free for everyone; download the `.apk` from the latest release on GitHub (Installing).
+  Members still get builds first.
+- **Android update check**: SculptForge for Android checks once a day whether a newer version is out and shows the
+  usual banner with a link to the download page. **Edit > Preferences > Updates** (and the welcome window) turns it
+  off.
+- **Paint > Layers**: a compact list of the paint layers above the material channels, with each layer's eye, blend
+  mode and opacity, so painting stays in one palette. *Requested by a member*
+- **Wax and Oil Stain Material Recipes**: in **Tool > Paint Layers > Material Recipe**, Wax lays semi-glossy candle
+  wax with a soft build-up and glossier edges; Oil Stain lays darker, more saturated patches with a soft edge, glossy
+  in the middle and rougher toward the rim. *Requested by a member*
+- **What's New** ends with one quiet line about memberships after an update (free and stays free; members get a say,
+  their requests first, their name in the credits), with a **Membership** link to the membership page. Members, Studio
+  builds and builds without update checks never see it, and it replaces the separate start-up note for that version.
+- **Polygon mode Bevel on faces** rounds only the outline of the selected faces (one side of a gridded box keeps its
+  inner cells), and **Extrude > Inset** is now a share of the selected faces' width.
+- **Hidden selection in Polygon mode**: selected points, edges and faces on the far side of the model are drawn too,
+  dimmer than the visible ones. **Tool > Polygon > Show hidden selection** turns it off.
+- **Turning off a latched Mask, Select or Cut shape**: a Line, Lasso or Rectangle picked in the stroke popup stays on
+  for every drag until you turn it off, and now there are three ways: press Esc, pick it again, or press its own
+  button in Tool > Masking, Visibility or Cut. A label in the corner of the canvas shows what is on and that Esc turns
+  it off.
+- **Every control on a shelf**: **Remove Hidden** and about 45 more buttons, sliders and boxes (Face Groups, Masking,
+  Parts, Color, Export, Visibility) can now go on a shelf or My Panel with Alt+drag or a long press, like the rest.
+- **Threads (next start)** counts every thread of your computer, even when an earlier start of the app saw fewer.
+- **Voxel Remesh and vertex paint**: the paint now follows the old surface smoothly (edges no longer come out in
+  blocks), and the status line says when a coarser result softens fine paint.
 
 ## Version 0.14.2
 

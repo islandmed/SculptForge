@@ -7,7 +7,7 @@
 
 
 <p align="center">
-  <strong>New in 0.14.2:</strong> dynamic keeps your painted texture, pinching cuts hold smooth walls, and dense Micro levels shade closer behind the brush (<a href="https://sculptforge.app/guide/dynamic-topology.md">how it works</a>)
+  <strong>New in 0.14.3:</strong> SculptForge on Android as a free early build, HDRIs of your own, a Clean view, Monochrome colours and Focus Detail on Windows (<a href="https://sculptforge.app/guide/installing.md#android-early">how it works</a>)
 </p>
 
 <p align="center">

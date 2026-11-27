@@ -6,6 +6,121 @@ All notable changes to SculptForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-11-27
+
+### Added
+- **Update check on Android**: once a day at most, the sideloaded APK fetches latest.json from sculptforge.app (then
+  its GitHub copy), the same file as the desktop app: no query, no ids, nothing about you or the device. A newer
+  version shows the update banner with a link to the download page (the APK is not installed from the app). Off with
+  **Edit > Preferences > Updates** or the welcome window's switch. Needs Android's `INTERNET` permission, the only
+  one. Store builds can leave it out (`SCULPTFORGE_ANDROID_UPDATE_CHECK=OFF`).
+- **Clean view** (View > Clean view, Shift+F11, rebindable): goes fullscreen and hides the menu bar, shelves, trays,
+  floating windows and status bar so only the 3D view is on screen; a 2 second note names the key. Sculpting,
+  navigation, the brush ring and the right-click menu keep working. The key again, or Esc once nothing else uses it,
+  leaves and restores the window and layout exactly.
+- **Paint > Layers** (the Color palette in the Classic layout): the Part's paint (or texture) layers in a compact
+  list, above the material channels: select a layer, show or hide it, set its blend mode and opacity, add a layer. It
+  is the same stack as Tool > Paint Layers (same data, order and undo). Opens and closes, remembered; in the Classic
+  layout it appears with Show newer menu rows.
+- Windows: Focus Detail streams very dense Micro levels from a .sfdetail file beside the project, as on Linux and
+  macOS: full detail loads where you look and sculpt, saves write only what changed.
+- **Add HDRI...** in the PBR view's Environment list: pick a `.hdr` or `.exr` file of your own once and it is listed
+  and remembered (by its path; the file is not copied). A file that goes missing greys its entry out instead of
+  failing, and **Remove from list** takes it out again. Images up to 8192 x 4096 are read, and `.exr` files must be
+  uncompressed.
+- **Environment: Fixed in the world / Follows the view** (Material > Viewport Shading): fixed in the world (as before)
+  the environment's highlights and background stay where they are while you orbit; following the view they stay still
+  on screen while the model turns, as the Lit Sphere view does (the lights you add already follow the view). The
+  Rotation slider works in both, and the choice is saved with the project.
+- **Monochrome** colour scheme for Forge Terminal (Preferences > Interface > Look > Colours, next to Neutral): every
+  panel, text and accent colour is a pure grey and the accent is white, so the current tool, the switches that are on,
+  the focus and selected text read by lightness (7:1 or better against idle controls). Deletes and errors keep their
+  red; masks, face groups and paint stay coloured. The Library's active tab underline and page buttons, the Packs
+  notes, the Mask icons and the Lazy Stroke dot are white too. `ui_look scheme=monochrome`. The default is unchanged.
+- **Wax and Oil Stain Material Recipes** (Tool > Paint Layers > Material Recipe): Wax is a warm, semi-glossy body
+  whose roughness varies, with a soft uneven build-up (height) and glossier edges; SculptForge renders no
+  translucency, so thin parts and edges get a lighter, warmer tint as a stand-in. Oil Stain lays patches of darker,
+  more saturated amber with a soft edge, glossy in the middle and rougher toward the rim. Both are Fill layers you can
+  edit, and they work with `material_recipe name=wax` / `name=oil_stain`.
+- **What's New membership line**: after an update, What's New's footer carries one quiet line (no price) and a link to
+  the membership page (utm_campaign=whats-new, never a checkout). It is this version's one ask, so the start-up note
+  does not also show; Close ends it. Not shown to members, Studio builds, with update checks off, in tests, or in the
+  Android APK.
+- **Show hidden selection** (Tool > Polygon): the selection on the far side of the surface is drawn dimmer and thinner
+  than the visible part, so you can see what is selected without orbiting. The visible selection looks as before,
+  unselected elements behind the surface stay hidden. On by default; saved in the preferences.
+- Focus Detail on very dense Micro levels keeps up while you sculpt and orbit: after a stroke or a camera move the
+  detail you left goes back to its coarse form in parallel and in small batches that fit the frame, instead of one
+  long frame, so the pause after a big brush is gone.
+
+### Changed
+- **Windows builds** are made with clang-cl 20.1.8 instead of MSVC. The heavy brush and mesh loops run faster on the
+  same hardware; strokes produce the same results (no fused multiply-adds, no fast-math), and the installer, zip and
+  signing steps are unchanged.
+- The Android APKs (arm64-v8a for phones and tablets, x86_64 for emulators) are attached to each public release too,
+  with SHA256SUMS-android.txt; members still get them first on their own release. The release script counts the files
+  on both releases and stops with an error if one is missing.
+- Guide: the Android early build is free for everyone, installed from the public latest release; the
+  members-repository step is gone. Early builds as a membership perk now read "the next version before everyone else".
+- Polygon mode, Extrude **Inset** is a fraction of the selected region's narrowest width (per separate region; same 0
+  to 0.25 range, same `inset` parameter for poly_op and MCP) instead of a fraction of the Part's size, so 0.1 takes a
+  tenth off each side of one cell of a grid and the cap no longer collapses into a stub. Scripts that passed a larger
+  inset for big regions get proportionally more inset on small cells and less on large regions.
+- The membership card no longer says early builds are "like SculptForge for Android today" (Android is free for
+  everyone). Its Member perks now read what members get today: one Member Request a month built first, the monthly
+  feature vote, the members' channel on Discord and your name in the credits. The Become a member button opens the
+  membership page (both prices, the terms) instead of the checkout, and the small update card says the same.
+  Translated in all interface languages.
+- **Third-party notices**: Help > About names every library, font, icon set and data set SculptForge ships (the Lucide
+  icons, the Noto Sans CJK fonts, the face template, the starter meshes, the environment maps, the plugin runtime and
+  the Python runtime were missing). The Android app now carries the licence and the full notices inside the app: the
+  About buttons open them offline.
+- **Third-party notices** (installed with the app): the notices file now holds the licence texts of the libraries
+  inside the bundled Python (OpenSSL, SQLite, expat, libffi, zlib, bzip2, xz, mpdecimal, libedit, ncurses, libuuid,
+  Berkeley DB), and `CRATE_NOTICES.md` beside it holds those of the Rust crates inside the plugin runtime. The logging
+  library's notice no longer carries another project's copyright line.
+
+### Fixed
+- The Android APK build no longer fails when Maven Central refuses the CI runner's dependency downloads (the 0.14.1
+  and 0.14.2 members' releases came out without APKs until the job was rerun): the Gradle dependencies are cached,
+  resolution is retried, and a release that still ends up without its APKs now stops the release script with an error.
+- Focus Detail files saved on Linux open on Windows and macOS too (every platform reads every detail file).
+- EXR files with damaged headers are rejected safely.
+- Polygon mode, Bevel with Faces picked bevelled every edge inside the selection (one side of a 4x4 cage box turned
+  into a waffle, all faces into a mess). It now bevels the selection's border only; a selection with no border (all
+  faces of a closed Part) bevels the sharp edges (over 30 degrees), so a gridded box rounds its 12 box edges. A smooth
+  Part with everything selected says there is no edge to round.
+- **A shape or modifier left latched from the stroke popup broke the Gizmo and the next Ctrl+Shift drag** (macOS
+  report, artist-qa): after Cut Line (or Select, Mask, Smooth) was latched from the stroke popup, switching to the
+  Gizmo left it on, so a drag on a handle moved nothing and on release cut the Part. Choosing the Gizmo (any mode) or
+  another tool that takes the drags now ends the latch, and a handle drag never cuts, selects or masks. One Esc ends a
+  latch even while it closes the popup (G or a click beside it closes the popup and keeps the latch), and with a Cut
+  Polyline latched one Esc drops its points and ends the latch (Enter only finishes the polyline). A Cut Line used
+  through the popup no longer stays on the Ctrl+Shift drag: ending the latch brings back the shape the Visibility and
+  Cut panels had, Select Rectangle at first, and a shape picked on a panel meanwhile stays.
+- **A latched shape could not be switched off** (macOS report, all systems): after Cut Line, Lasso or Rectangle (Mask,
+  Select or Cut) was picked in the stroke popup, plain drags kept using it, and the tool panel's shape buttons only
+  changed the shape and never ended it. Esc now ends a latch (Smooth, Mask, Select or a shape), the panel button of
+  the latched shape ends it, and a label stays in the corner of the canvas while one is on.
+- **Remove Hidden** (Tool > Visibility) and some 45 other controls (Show all, Invert visible, Delete masked, the Face
+  Groups buttons, the Masking sliders, the Parts buttons, Fill, Cavity, the colour picker, the LOD and Unreal export
+  controls, Autosave, the hint switches and more) could not be added to a shelf or My Panel. They can now; a shelf
+  copy of Remove Hidden does the same as the button, undo included. A UI test (`shelf_every_control`) now opens every
+  palette and fails on any control that cannot be added, so a new one cannot slip through; the few left out on purpose
+  (lists, text boxes, presets, menu rows) are listed with their reasons.
+- Holding **Alt** and clicking a text box in a palette (for example Tool > Selection Sets > Set name) closed the app
+  when Alt was let go; the box now just closes.
+- **A Threads setting above 16 capped at a stale count** (#184, thanks @HG4Science): the computer's thread count saved
+  in the hardware profile was trusted over the live one, so a profile written while the app was limited (a restricted
+  start, a container, a copied profile) held **Preferences > Performance > Threads** at that count for good. The count
+  is now read again at every start, and on Windows it covers every processor group.
+- **Voxel Remesh: vertex paint edges came out in blocks** when the new surface is denser than the old one, because
+  each new vertex copied the colour of the nearest old vertex. When the new surface has more triangles than the old
+  one, each new vertex now takes the colour at the closest point of the old surface, interpolated across its triangle
+  (a denser Part keeps the nearest-vertex copy, which needs no extra memory). When the result has fewer vertices than
+  the Part had, the status line says that paint finer than the new vertices is softened and that a higher Resolution
+  keeps it. Reported by a member.
+
 ## [0.14.2] - 2026-11-26
 
 ### Added

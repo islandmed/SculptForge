@@ -112,7 +112,13 @@ The layer&#x27;s own opacity, visibility and lock apply to all its channels.
 <strong>Environment</strong>: <strong>Studio</strong> (made by SculptForge), <strong>Photo Studio</strong>, <strong>Small Studio</strong> and <strong>Outdoor Sky</strong> (free CC0 photographs from Poly Haven). HDR images (<code>.hdr</code>, <code>.exr</code>) in the folders listed in the <code>SCULPTFORGE_HDRI_PATH</code> environment variable are added to the list.
 </li>
 <li>
+<strong>Add HDRI...</strong> (the last row of the Environment list) picks a <code>.hdr</code> or <code>.exr</code> file of your own. It is listed by its name from then on, in every session, and used at once. The file stays where it is: SculptForge keeps its path, not a copy, so if you move or delete it, its entry greys out (marked &quot;missing&quot;) until you put it back; a project that uses it opens with Studio&#x27;s light meanwhile. <strong>Remove from list</strong> takes an added HDRI out of the list again and never touches the file. Images up to 8192 x 4096 are read; for a bigger one, use a smaller copy (the view uses at most 256 pixels across). SculptForge reads <code>.hdr</code> files and <strong>uncompressed</strong> <code>.exr</code> files. An <code>.exr</code> saved with ZIP, PIZ or another compression is listed greyed out (&quot;can&#x27;t be used&quot;) with the reason, and Add HDRI... refuses it with the same reason: save it again with compression off, or as <code>.hdr</code>.
+</li>
+<li>
 <strong>Exposure</strong> in stops, <strong>Rotation</strong> of the environment, and the <strong>Tone map</strong>: ACES (filmic contrast), AgX (softer, keeps bright colours from going flat), Reinhard or None.
+</li>
+<li>
+<strong>Environment: Fixed in the world / Follows the view</strong> chooses what the environment, and the background if you show it, is fixed to. <em>Fixed in the world</em> (the default) keeps it where it is while you orbit, so the highlights stay on the same side of the model and the background moves on screen. <em>Follows the view</em> keeps the background and the highlights still on screen while the model turns, as the Lit Sphere view does. The lights you add (Key, Fill, Rim) always follow the view, whichever you choose. <strong>Rotation</strong> works in both. The setting is saved with the project.
 </li>
 <li>
 <strong>Show environment</strong> puts the environment behind the model, with a <strong>Blur</strong>.

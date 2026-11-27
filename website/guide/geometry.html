@@ -137,7 +137,10 @@ it runs in the background with a progress bar that moves through every stage; <s
 Sculpt layers are baked into the surface: the result has no layers.
 </li>
 <li>
-Mask and vertex paint are transferred from the nearest original vertex.
+Mask is transferred from the nearest original vertex. Vertex paint too, unless the result has more triangles than the Part had: then it takes the colour at the closest point of the original surface, blended across its triangle, so a paint edge stays smooth. Paint lives on the vertices, so a result with fewer vertices than the Part had softens paint finer than that (the status line says so): raise the Resolution to keep it, or paint into a <a href="texture-painting.html#uvs-and-geometry">texture</a>, which Keep Texture carries.
+</li>
+<li>
+The Part&#x27;s materials are not touched: the Lit Sphere is the scene&#x27;s (<strong>Material</strong> shelf tile), and a Part&#x27;s PBR material channels travel with its texture (Keep Texture, below).
 </li>
 <li>
 Hidden faces and UVs are reset (everything becomes visible). Hidden parts are remeshed too.
