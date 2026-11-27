@@ -1076,6 +1076,21 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "look_outline_opacity") return double(std::lround(app_.uiPrefs_.look.outlineOpacity * 100.0f)); // percent
     if (name == "look_outlines") return double(app_.uiPrefs_.look.outlines); // 0 off, 1 subtle, 2 on
     if (name == "look_neutral") return app_.uiPrefs_.look.scheme == "neutral" ? 1.0 : 0.0; // Forge Terminal's Neutral colours
+    if (name == "look_monochrome") return app_.uiPrefs_.look.scheme == "monochrome" ? 1.0 : 0.0; // Forge Terminal's grey-only colours
+    if (name == "style_accent_chroma") { // 0 when the accent has no hue (Monochrome), else the spread of its channels in 0-255
+        const ImVec4& a = theme::accent;
+        return std::round(std::max({a.x, a.y, a.z}) * 255.0f - std::min({a.x, a.y, a.z}) * 255.0f);
+    }
+    if (name == "style_active_contrast" || name == "style_on_contrast" || name == "style_text_contrast" || name == "style_on_text_contrast") { // WCAG ratio x10
+        auto lin = [](float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); };
+        auto lum = [&](const ImVec4& c) { return 0.2126f * lin(c.x) + 0.7152f * lin(c.y) + 0.0722f * lin(c.z); };
+        auto ratio = [&](const ImVec4& a, const ImVec4& b) { return (std::max(lum(a), lum(b)) + 0.05f) / (std::min(lum(a), lum(b)) + 0.05f); };
+        const double r = name == "style_active_contrast" ? ratio(theme::accent, theme::button)       // current tool against an idle button
+                         : name == "style_on_contrast"   ? ratio(theme::toggleOn, theme::toggleOff) // an on switch against an off one
+                         : name == "style_on_text_contrast" ? std::min(ratio(theme::textBright, theme::toggleOn), ratio(theme::textBright, theme::toggleOnHover)) // its label
+                                                         : ratio(theme::textOnAccent, theme::accent); // the label on the accent fill
+        return std::round(r * 10.0);
+    }
     if (name == "look") return double(app_.uiPrefs_.look.look); // 0 Classic, 1 Forge Terminal, 2 Phosphor, 3 Blueprint
     if (name == "hover_rings") return double(ui::HoverRingsShown()); // hover and focus rings drawn last frame
     if (name == "hover_lifts") return double(ui::HoverLiftsShown()); // tiles lifted last frame

@@ -1,0 +1,38 @@
+# Monochrome colours (Preferences > Interface > Look > Colours): brightness only, no hue in the accent, and the
+# active, on and selected states still read by lightness (WCAG ratios x10 from the theme's own tokens).
+run new_sphere subdivisions=3
+expect_value look_monochrome == 0
+expect_value style_accent_chroma > 100        # Neutral: the orange accent has a hue
+
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Interface##preferences.interface"
+click "##look_scheme"
+expect "Monochrome##scheme.monochrome"
+click "Monochrome##scheme.monochrome"
+wait 0.2
+expect_value look == 1
+expect_value look_monochrome == 1
+expect_value style_accent_chroma == 0
+expect_value style_active_contrast >= 70      # the current tool against an idle button: 7:1
+expect_value style_text_contrast >= 70        # its label on the accent fill
+expect_value style_on_contrast >= 20          # an on switch against an off one: clearly different
+expect_value style_on_text_contrast >= 45     # its label on the fill, hovered or not: 4.5:1
+shot monochrome-prefs
+key escape
+
+# The tools, the tray and a menu keep working in the grey scheme.
+run ui_look look=forge scheme=monochrome layout=sculptforge
+wait 0.2
+expect "Sculpt##menu.sculpt"
+expect "Clay##brush.clay"
+shot monochrome-sculpt
+click "Sculpt##menu.sculpt"
+shot monochrome-menu
+key escape
+
+# Back to the default colours: the accent is orange again.
+run ui_look look=forge scheme=neutral
+wait 0.2
+expect_value look_monochrome == 0
+expect_value style_accent_chroma > 100

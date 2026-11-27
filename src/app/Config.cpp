@@ -2730,13 +2730,15 @@ void App::drawLookSection() {
         const looks::SchemeInfo* cur = looks::findScheme(l.scheme);
         ImGui::BeginDisabled(l.matchOmarchy);
         ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::BeginCombo("##look_scheme", (std::string(tr("Colours:")) + " " + (cur ? cur->name : list[0].name)).c_str())) {
+        if (ImGui::BeginCombo("##look_scheme", (std::string(tr("Colours:")) + " " + tr(cur ? cur->name : list[0].name)).c_str())) {
             for (int i = 0; i < n; ++i) {
-                const std::string item = std::string(list[i].name) + "##scheme." + list[i].key;
+                const std::string item = std::string(tr(list[i].name)) + "##scheme." + list[i].key;
                 if (ImGui::Selectable(item.c_str(), cur == &list[i])) {
                     l.scheme = list[i].key;
                     lookDirty_ = true;
                 }
+                if (std::string_view(list[i].key) == "monochrome" && ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", tr("Grey only, no hue: the accent is white. Warnings and deletes keep their red."));
                 // Its background and accent as two dots at the right.
                 const ImVec2 b = ImGui::GetItemRectMax();
                 const float r = 4.0f * s, cy = (ImGui::GetItemRectMin().y + b.y) * 0.5f;

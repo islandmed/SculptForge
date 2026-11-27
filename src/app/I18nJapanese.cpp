@@ -87,6 +87,8 @@ constexpr Entry kJapanese[] = {
      "外観"},
     {"Colours:",
      "カラー:"},
+    {"Monochrome", "モノクロ"},
+    {"Grey only, no hue: the accent is white. Warnings and deletes keep their red.", "グレーのみで色相なし。アクセントは白です。警告と削除は赤のままです。"},
     {"Match my desktop theme",
      "デスクトップテーマに合わせる"},
     {"Uses your Omarchy theme's colours when Omarchy is installed",
