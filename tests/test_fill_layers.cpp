@@ -335,7 +335,7 @@ TEST(wax_and_oil_recipes_use_real_channels_and_say_so) {
     Document doc = makeDoc(trenchPart());
     CommandRegistry reg;
     CHECK(reg.execute(doc, "material_recipe", {{"name", std::string("wax")}}).ok);
-    CHECK(doc.mesh.texture->layers.size() == 6 && channelEnabled(*doc.mesh.texture, Channel::Height) &&
+    CHECK(doc.mesh.texture->layers.size() == 5 && channelEnabled(*doc.mesh.texture, Channel::Height) &&
           channelEnabled(*doc.mesh.texture, Channel::Roughness));
     float lo, hi;
     spread(*doc.mesh.texture, Channel::Roughness, lo, hi);

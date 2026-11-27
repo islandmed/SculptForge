@@ -3,7 +3,7 @@
   "version": 1,
   "id": "wax",
   "name": "Wax",
-  "description": "Candle wax: a warm, semi-glossy body whose roughness drifts from satin to matte, with a soft uneven build-up, rolled edges and wax pooled in the creases. SculptForge renders no translucency, so thin parts and edges get a lighter, warmer tint as a stand-in for light passing through.",
+  "description": "Candle wax: a warm, semi-glossy body whose roughness drifts from satin to matte, with a soft uneven build-up and rolled edges. SculptForge renders no translucency, so thin parts and edges get a lighter, warmer tint as a stand-in for light passing through.",
   "layers": [
     {
       "name": "Wax Body",
@@ -23,15 +23,8 @@
     {
       "name": "Rolled Edges",
       "fill": {
-        "material": {"channels": ["roughness", "height"], "roughness": 0.22, "height": 0.66},
-        "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.5, "softness": 0.8, "breakup": 0.3, "scale": 0.04, "seed": 8}]
-      }
-    },
-    {
-      "name": "Pooled Wax",
-      "fill": {
-        "material": {"channels": ["roughness", "height"], "roughness": 0.2, "height": 0.74},
-        "mask": [{"kind": "generator", "generator": "dirt", "level": 0.5, "softness": 0.8, "breakup": 0.5, "scale": 0.05, "seed": 6}]
+        "material": {"channels": ["roughness", "height"], "roughness": 0.22, "height": 0.58},
+        "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.5, "softness": 0.9, "breakup": 0.0, "scale": 0.04, "seed": 8}]
       }
     },
     {
@@ -45,10 +38,10 @@
     {
       "name": "Light Wrap Tint",
       "fill": {
-        "material": {"channels": ["base_color"], "color": [1.0, 0.8, 0.42]},
-        "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.65, "softness": 0.7, "breakup": 0.3, "scale": 0.04, "seed": 12},
-                 {"kind": "generator", "generator": "thickness", "blend": "add", "level": 0.6, "softness": 0.6, "breakup": 0.2, "scale": 0.05, "seed": 13},
-                 {"kind": "levels", "out_high": 1.0}]
+        "material": {"channels": ["base_color"], "color": [0.96, 0.84, 0.6]},
+        "mask": [{"kind": "generator", "generator": "edge_wear", "level": 0.5, "softness": 0.9, "breakup": 0.0, "scale": 0.04, "seed": 12},
+                 {"kind": "generator", "generator": "thickness", "blend": "add", "level": 0.5, "softness": 0.9, "breakup": 0.0, "scale": 0.05, "seed": 13},
+                 {"kind": "levels", "out_high": 0.4}]
       }
     }
   ]
