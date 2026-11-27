@@ -5,7 +5,7 @@
 # - A release: "## SculptForge X.Y.Z", the headline (the feed's first highlight) in bold, the other highlights, and masked
 #   [Download] · [What's new] links, with the release card (website/media/release-X.Y.Z.jpg, committed to the site by the
 #   launch kit) as the embed image. The job waits up to CARD_WAIT_MINUTES for the card to be live and posts without it after.
-#   While website/media/TEXT_ONLY exists the post is text only: no wait, no request to the card URL, no embed.
+#   While website/media/TEXT_ONLY.md exists the post is text only: no wait, no request to the card URL, no embed.
 #   The Release workflow publishes with GITHUB_TOKEN, and GitHub sends no `release` event for that, so its
 #   successful run (workflow_run) triggers the post; `release: published` covers a release published by hand.
 # - A beta (a vX.Y.Z-beta.N or -rc.N pre-release): "## SculptForge X.Y.Z Beta N is out for testing", the highlights of
@@ -13,7 +13,7 @@
 #   release.sh step "site" writes the highlights to website/latest.json on main after the release is out, so the
 #   job waits (up to FEED_WAIT_MINUTES) for the feed to name this version, then posts without highlights if it never does.
 # - Run workflow: posts .github/announcements/<file> (at most 2000 characters), with an optional embed image: a
-#   path under website/ that is already live on sculptforge.app (refused while website/media/TEXT_ONLY exists).
+#   path under website/ that is already live on sculptforge.app (refused while website/media/TEXT_ONLY.md exists).
 name: Discord announcement
 
 on:
@@ -53,7 +53,7 @@ jobs:
           sparse-checkout: |
             .github/announcements/
             website/latest.json
-            website/media/TEXT_ONLY
+            website/media/TEXT_ONLY.md
           sparse-checkout-cone-mode: false
       - name: Post to Discord
         id: post
@@ -121,7 +121,7 @@ jobs:
               except Exception:
                   return None
 
-          MARKER = "website/media/TEXT_ONLY"
+          MARKER = "website/media/TEXT_ONLY.md"
 
           def text_only():
               """Owner rule 11-24: release posts carry no generated card or image until new art is approved. The marker file
