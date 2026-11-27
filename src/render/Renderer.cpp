@@ -576,7 +576,8 @@ vec4 glassOut(vec3 n, vec3 v, vec3 base, vec3 refl, vec3 body) {
         if (back < 0.99999) { // (no back face behind: an open sheet has no thickness)
             float thick = max(eyeDistance(back) - eyeDistance(gl_FragCoord.z), 0.0);
             vec3 att = -log(max(uGlassTint, vec3(0.002)));
-            absorbed = 1.0 - dot(exp(-att * (thick / uGlass.z)), vec3(1.0 / 3.0));
+            // (never fully opaque: tinted glass gets darker where it is thick, but what is behind it still shows)
+            absorbed = min(1.0 - dot(exp(-att * (thick / uGlass.z)), vec3(1.0 / 3.0)), 0.7);
         }
     }
     float a = F + (1.0 - F) * absorbed;
