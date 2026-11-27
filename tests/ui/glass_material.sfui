@@ -1,0 +1,90 @@
+# Glass, water and diamond (core/PartGlass.h): a Part's own look, set in the Material palette's This Part section, saved
+# in projects and in glTF. In the Classic layout the rows come with "Show newer menu rows", or when the Part is glass already.
+# Files are written to the working directory (the build folder).
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=5
+run uv_auto resolution=1024
+run texture_create size=1024
+run paint_material color=c0392b roughness=0.6 metallic=0
+key p
+stroke 0.2 0.5 0.8 0.5
+stroke 0.2 0.35 0.8 0.35
+stroke 0.2 0.65 0.8 0.65
+key escape
+run part_append type=sphere size=0.5
+run transform translate=-0.45,0,0.9
+run viewport_shading mode=pbr
+wait_value environment_pending == 0
+expect_value part_glass == 0
+expect_value glass_drawn == 0
+
+# Classic keeps its menus as they were: no glass rows until the Part is glass or newer rows are shown.
+click "Material##palette.material"
+expect_not "Glass##part.glass_glass"
+key escape
+
+# A script (or the command palette) makes it glass; the rows then show, and the view draws it.
+run part_glass preset=glass
+expect_value part_glass == 1
+expect_value part_glass_ior == 1.5
+camera 20 10
+wait 0.3
+shot glass-over-painted
+expect_value glass_drawn == 1
+expect_value glass_thickness == 1
+click "Material##palette.material"
+expect "Water##part.glass_water"
+expect "Diamond##part.glass_diamond"
+shot material-palette
+click "Water##part.glass_water"
+expect_value part_glass_ior == 1.33
+click "Diamond##part.glass_diamond"
+expect_value part_glass_ior == 2.42
+key escape
+wait 0.3
+shot diamond
+run part_glass preset=water depth=3 tint=66ccaa
+wait 0.3
+shot water-deep-tint
+
+# One undo step each; Off makes it ordinary.
+run undo
+expect_value part_glass_ior == 2.42
+run redo
+expect_value part_glass_ior == 1.33
+run part_glass preset=none
+expect_value part_glass == 0
+wait 0.3
+shot ordinary-again
+expect_value glass_drawn == 0
+run undo
+expect_value part_glass_ior == 1.33
+
+# Projects keep it; so does glTF (written and opened again).
+run save_project path=sf_ui_glass.sfproj
+run new_sphere subdivisions=2
+expect_value part_glass == 0
+run open path=sf_ui_glass.sfproj
+expect_value parts == 2
+run part_select index=1
+expect_value part_glass_ior == 1.33
+run export_glb path=sf_ui_glass.glb
+run new_sphere subdivisions=2
+run open path=sf_ui_glass.glb
+expect_value parts == 2
+run part_select index=1
+expect_value part_glass == 1
+expect_value dirty == 0
+
+# A graphics chip that can't make the thickness target draws clear, and the panel says so.
+env SF_GLASS_NO_THICKNESS 1
+run part_glass preset=glass
+wait 0.5
+shot glass-no-thickness
+expect_value glass_drawn == 1
+expect_value glass_thickness == 0
+click "Material##palette.material"
+expect_text This graphics chip can't tint glass by its thickness
+shot no-thickness-note
+key escape
+env SF_GLASS_NO_THICKNESS 0

@@ -66,6 +66,20 @@ std::string vec3Json(const glm::vec3& v) {
     return s.str();
 }
 
+// The glTF extensions of a glass Part's material: KHR_materials_transmission, _ior and _volume. The volume is written
+// in the Part's own lengths: a wall of a quarter of its size (thicknessFactor) and the depth that reaches the full tint
+// (attenuationDistance), so a reading viewer tints as thick as the viewport does.
+std::string glassExtensionsJson(const PartGlass& g, float size) {
+    std::ostringstream s;
+    s.precision(9);
+    s << "{\"KHR_materials_transmission\":{\"transmissionFactor\":" << g.transmission << "},\"KHR_materials_ior\":{\"ior\":" << g.ior << "}";
+    if (size > 0.0f)
+        s << ",\"KHR_materials_volume\":{\"thicknessFactor\":" << size * kGlassWallFraction << ",\"attenuationDistance\":"
+          << g.depth * kGlassWallFraction * size << ",\"attenuationColor\":" << vec3Json(g.tint) << "}";
+    s << "}";
+    return s.str();
+}
+
 bool writeGlbFile(const std::string& path, std::string jsonStr, const std::vector<uint8_t>& bin, std::string& error) {
     while (jsonStr.size() % 4) jsonStr += ' ';
     const uint32_t totalLength = 12 + 8 + uint32_t(jsonStr.size()) + 8 + uint32_t(bin.size());
@@ -117,6 +131,7 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
     std::vector<View> views;
     std::ostringstream accessors, meshes, nodes, images, materials;
     int accessorCount = 0, textureCount = 0, materialCount = 0; // images and textures share an index
+    bool anyGlass = false;
 
     auto addVec3 = [&](const std::vector<glm::vec3>& v, bool withMinMax) {
         size_t off = bin.append(v.data(), v.size() * sizeof(glm::vec3));
@@ -285,7 +300,19 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
             if (const PbrPng* e = findPbrPng(pbr, "emissive"))
                 materials << ",\"emissiveTexture\":{\"index\":" << addImage(e->png, "emissive") << "},\"emissiveFactor\":[1,1,1]";
             if (hasPbrTexture(mesh) && channelEnabled(*mesh.texture, Channel::Opacity)) materials << ",\"alphaMode\":\"BLEND\"";
+            if (objects[oi].glass.active()) {
+                const AABB b = mesh.bounds();
+                materials << ",\"extensions\":" << glassExtensionsJson(objects[oi].glass, b.valid() ? glm::length(b.max - b.min) : 0.0f);
+                anyGlass = true;
+            }
             materials << "}";
+        } else if (objects[oi].glass.active()) { // a glass Part without a texture still gets its material
+            const AABB b = mesh.bounds();
+            material = materialCount++;
+            materials << (material ? "," : "") << "{\"name\":\"" << jsonEscape(name)
+                      << "\",\"pbrMetallicRoughness\":{\"baseColorFactor\":[1,1,1,1],\"metallicFactor\":0,\"roughnessFactor\":0.05},\"extensions\":"
+                      << glassExtensionsJson(objects[oi].glass, b.valid() ? glm::length(b.max - b.min) : 0.0f) << "}";
+            anyGlass = true;
         }
 
         addNode(oi);
@@ -342,7 +369,10 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
     }
 
     std::ostringstream json;
-    json << "{\"asset\":{\"version\":\"2.0\",\"generator\":\"SculptForge\"},\"scene\":0,\"scenes\":[{";
+    json << "{\"asset\":{\"version\":\"2.0\",\"generator\":\"SculptForge\"}";
+    if (anyGlass) // (used, not required: a viewer without them shows the Part as an opaque base)
+        json << ",\"extensionsUsed\":[\"KHR_materials_ior\",\"KHR_materials_transmission\",\"KHR_materials_volume\"]";
+    json << ",\"scene\":0,\"scenes\":[{";
     if (objects.size() > 1) json << "\"name\":\"" << jsonEscape(sceneName) << "\",";
     json << "\"nodes\":[";
     for (size_t i = 0; i < objects.size(); ++i) json << (i ? "," : "") << i;
@@ -358,9 +388,9 @@ bool saveGlb(const std::string& path, const std::vector<MeshObjectRef>& objects,
         json << ",\"images\":[" << images.str() << "],\"samplers\":[{\"magFilter\":9729,\"minFilter\":9987,"
              << "\"wrapS\":10497,\"wrapT\":10497}],\"textures\":[";
         for (int i = 0; i < textureCount; ++i) json << (i ? "," : "") << "{\"sampler\":0,\"source\":" << i << "}";
-        (void)materialCount;
-        json << "],\"materials\":[" << materials.str() << "]";
+        json << "]";
     }
+    if (materialCount) json << ",\"materials\":[" << materials.str() << "]";
     if (animated)
         json << ",\"animations\":[{\"name\":\"" << jsonEscape(animation->name) << "\",\"samplers\":[" << samplers.str()
              << "],\"channels\":[" << channels.str() << "]}]";
@@ -708,7 +738,32 @@ struct GltfObject {
     std::vector<float> targetWeights;
     bool targetsConsistent = true;
     bool uvs = false; // some primitive had TEXCOORD_0
+    bool glassSeen = false;  // a material with KHR_materials_transmission was read (the first one counts)
+    PartGlass glass;
+    double attenuationDistance = std::numeric_limits<double>::infinity(); // KHR_materials_volume
 };
+
+// A material's KHR_materials_transmission / _ior / _volume: the Part's glass (core/PartGlass.h). The tint and the depth
+// only mean something with a finite attenuation distance (glTF's default is none); the depth is set once the object's
+// size is known.
+void readGlassMaterial(const Json& material, GltfObject& o) {
+    if (o.glassSeen) return;
+    const Json& ext = material["extensions"];
+    if (!ext.isObject()) return;
+    const double transmission = ext["KHR_materials_transmission"]["transmissionFactor"].asNumber(0.0);
+    if (!(transmission > 0.001)) return;
+    o.glassSeen = true;
+    o.glass.transmission = float(transmission);
+    o.glass.ior = float(ext["KHR_materials_ior"]["ior"].asNumber(1.5));
+    const Json& volume = ext["KHR_materials_volume"];
+    const double distance = volume["attenuationDistance"].asNumber(std::numeric_limits<double>::infinity());
+    if (std::isfinite(distance) && distance > 0.0) {
+        o.attenuationDistance = distance;
+        const Json& c = volume["attenuationColor"];
+        if (c.isArray() && c.size() == 3)
+            o.glass.tint = glm::vec3(float(c[size_t(0)].asNumber(1.0)), float(c[size_t(1)].asNumber(1.0)), float(c[size_t(2)].asNumber(1.0)));
+    }
+}
 
 // Splits a GLB container into its JSON text and BIN chunk; false with `error` on a malformed container.
 bool parseGlb(const std::vector<uint8_t>& file, std::string& jsonText, std::vector<uint8_t>& bin, bool& hasBin,
@@ -909,6 +964,8 @@ bool readGltf(const std::string& path, bool split, std::vector<MeshObject>& out,
                     continue;
                 }
                 if (!prim["mode"].isNull() && jsonEnum(prim["mode"]) != 4) continue; // triangles only
+                if (const int mi = prim["material"].isNull() ? -1 : jsonIndex(prim["material"]); mi >= 0 && size_t(mi) < r.doc["materials"].size())
+                    readGlassMaterial(r.doc["materials"][size_t(mi)], o);
                 if (prim["attributes"]["POSITION"].isNull()) continue;
                 std::vector<glm::vec3> pos;
                 if (!r.readVec3(jsonIndex(prim["attributes"]["POSITION"]), pos)) return false;
@@ -1032,7 +1089,18 @@ bool readGltf(const std::string& path, bool split, std::vector<MeshObject>& out,
                 layers.push_back({o.targetNames[k], std::move(o.targetDeltas[k]), o.targetWeights[k]});
         if (!o.m.colors.empty()) o.m.colors.resize(o.m.positions.size(), glm::vec3(1.0f));
         if (!o.uvs) o.m.uvs.clear();
-        out.push_back({o.name, weldImported(o.m, layers)});
+        PartGlass glass;
+        if (o.glassSeen) {
+            glass = o.glass;
+            if (std::isfinite(o.attenuationDistance)) { // the depth in quarter-sizes of the object
+                glm::vec3 lo(std::numeric_limits<float>::max()), hi(std::numeric_limits<float>::lowest());
+                for (const glm::vec3& p : o.m.positions) lo = glm::min(lo, p), hi = glm::max(hi, p);
+                const float size = glm::length(hi - lo);
+                if (size > 0.0f) glass.depth = float(o.attenuationDistance) / (kGlassWallFraction * size);
+            }
+            glass = clampedGlass(glass);
+        }
+        out.push_back({o.name, weldImported(o.m, layers), glass});
     }
     if (out.empty() && !(splatsOut && !splatsOut->empty())) {
         error = r.error.empty() ? "No triangle meshes found in " + path : r.error;

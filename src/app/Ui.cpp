@@ -605,7 +605,7 @@ bool IsChoiceAction(std::string_view id) {
     return id == "draw.raise" || id == "draw.lower" || id == "material.smooth" || id == "material.flat" ||
            id == "view.background_gradient" || id == "view.background_flat" || id == "view.shading_lit_sphere" ||
            id == "view.shading_pbr" ||
-           id.rfind("part.shading_", 0) == 0 || id.rfind("brush.pen_", 0) == 0 || id.substr(0, 8) == "uv.mode_";
+           id.rfind("part.shading_", 0) == 0 || id.rfind("part.glass_", 0) == 0 || id.rfind("brush.pen_", 0) == 0 || id.substr(0, 8) == "uv.mode_";
 }
 
 void CentredGlyph(ImDrawList* dl, ImFont* font, ImVec2 a, ImVec2 b, ImU32 col, const char* glyph) {

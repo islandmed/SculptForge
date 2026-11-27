@@ -5,6 +5,7 @@
 #include "core/EnvironmentMath.h"
 #include "core/LitSphere.h"
 #include "core/Mesh.h"
+#include "core/PartGlass.h"
 #include "core/Reference.h"
 #include "core/Splats.h"
 #include "core/UploadOrder.h"
@@ -189,6 +190,7 @@ struct SceneMesh {
     bool pbr = false;       // the view shades PBR: upload the texture's material channels and their tangents
     const MeshOverlay* overlay = nullptr; // the UV Editor's view of the active mesh (must outlive the frame)
     glm::mat4 model{1.0f}; // where the mesh is in the scene (Part::transform)
+    PartGlass glass;       // the Part's glass look: drawn after the opaque Parts, farthest first (Part::glass)
 };
 
 // Part of the target the 3D view is drawn into (framebuffer pixels, origin bottom-left); the rest is
@@ -225,7 +227,7 @@ public:
     // drops the fanciest bit left, in the order ghost, PBR, normal map, texture, per-triangle data, flat. Returns
     // `features` unchanged when nothing more can go (then the mesh isn't drawn, and the log says why).
     static int simplerMeshFeatures(int features) {
-        for (int bit : {kGhost, kPbr, kNormalMap, kTextured, kPrim, kFlat})
+        for (int bit : {kGlass, kGhost, kPbr, kNormalMap, kTextured, kPrim, kFlat})
             if ((features & bit) && !(bit == kGhost && (features & kMicro))) return features & ~bit; // (a micro level's kWide stays)
         return features;
     }
@@ -279,6 +281,10 @@ public:
     // Part `id` has a painted texture (or UV checker) this GPU cannot show on the model (too many triangles for its
     // limits): painting still goes into the texture, the model draws without it. The panel says so.
     bool textureNotShown(uint32_t id) const;
+    // Glass: a see-through Part was drawn last frame, and whether it got the thickness tint (false: the graphics chip
+    // couldn't make the back-face depth target, or SF_GLASS_NO_THICKNESS is set: the glass is clear, not deeper where thick).
+    bool glassDrawn() const { return glassDrawnLast_; }
+    bool glassThickness() const { return backDepthReady_; }
     // The GPU rejected drawing the texture (a GL error at its first textured draw, logged): the Part draws plain, with a status.
     bool textureRejected(uint32_t id) const;
     bool microWide(uint32_t id) const; // (tests: Part `id` is a micro level whose per-slot tables are 2D textures)
@@ -401,7 +407,7 @@ public:
     // The stroke-only programs (predictive preview, draft normals) compiled so far: drawSlot warms them before a stroke.
     int strokePrograms() const {
         int n = 0;
-        for (int f = 0; f < 256; ++f) n += programs_[f].id && (f & (kGhost | kFlat)) ? 1 : 0;
+        for (int f = 0; f < 512; ++f) n += programs_[f].id && (f & (kGhost | kFlat)) ? 1 : 0;
         return n;
     }
     // At rest (still 150 ms, no stroke) an over-budget mesh draws in full detail when one full frame fits the still-frame
@@ -748,17 +754,17 @@ private:
               lightLevels = -1, alpha = -1, microWire = -1, occAlpha = -1, occLight = -1, lightCount = -1, lightDirs = -1,
               lightCols = -1;
         GLint hasOrm = -1, hasEmissive = -1, hasMatNormal = -1, envLevels = -1, exposure = -1, toneMap = -1, material = -1,
-              pbrCavity = -1, viewToEnv = -1, sh = -1;
+              pbrCavity = -1, viewToEnv = -1, sh = -1, glass = -1, glassTint = -1, projZ = -1;
         // The units the environment and BRDF table are bound to (meshProgram: a micro level's own buffers hold 8-15).
         GLenum envUnit = 0x84CA, brdfUnit = 0x84CB; // GL_TEXTURE10, GL_TEXTURE11
         GLint ghostGroups = -1, ghostRange = -1, ghostEdge = -1, ghostA = -1, ghostB = -1, ghostC = -1, ghostD = -1, ghostBound = -1, ghostKind = -1, ghostFocal = -1;
     };
     static constexpr int kPaint = 1, kPrim = 2, kTextured = 4, kNormalMap = 8, kFlat = 16, kMicro = 32, kGhost = 64,
-                         kPbr = 128;
+                         kPbr = 128, kGlass = 256; // kGlass: the see-through Parts' shading (their own pass)
     static constexpr int kFocus = kPaint; // with kMicro: a streamed level (render/MicroFocus.h; micro programs never paint)
     static constexpr int kWide = kGhost;  // with kMicro: the per-slot tables are 2D textures (past the GPU's buffer-texture limit: TexelStore.h)
     static constexpr int kTiles = kPrim;  // with kMicro: Adaptive Detail tile pages (render/MicroTilePages.h; only while a Part has some)
-    MeshProgram programs_[256];
+    MeshProgram programs_[512];
     void drawMicro(const MeshSlot& s, bool active, bool flat, const RenderSettings& settings);
     std::string programError_;
     const MeshProgram* meshProgram(int features);
@@ -772,7 +778,23 @@ private:
         bool flat;
         bool moved = false;      // drawn with `model` (a linked copy, #94)
         glm::mat4 model{1.0f};
+        PartGlass glass;
+        bool glassDraw = false;  // drawn this frame in the glass pass (set by draw(); drawItem skips it in the opaque ones)
     };
+    // Glass (core/PartGlass.h): drawn after the opaque Parts and X-Ray, each Part farthest first as its back faces and
+    // then its front faces, blended with a Fresnel opacity. glassPass_: 0 = not in a glass pass, 1 = the blended
+    // faces, 2 = the back faces' depth into backDepthTex_ (the front faces read it for the thickness tint).
+    void drawGlassParts(std::vector<DrawItem*>& items, int targetWidth, int targetHeight, const RenderSettings& settings);
+    void setGlassUniforms(const MeshProgram& p, const MeshSlot& s) const;
+    bool ensureBackDepth(int width, int height);
+    void freeBackDepth();
+    int glassPass_ = 0;
+    PartGlass glassCur_;
+    float glassScale_ = 1.0f; // the drawn Part's model scale (view-space lengths)
+    GLuint backDepthTex_ = 0, backDepthFbo_ = 0, backDepthRb_ = 0;
+    int backDepthW_ = 0, backDepthH_ = 0, backDepthFailedW_ = 0, backDepthFailedH_ = 0;
+    bool backDepthReady_ = false;
+    bool glassDrawnLast_ = false;
     // drawSlot for `item`: with its model matrix in the frame's view and culling (restored after).
     void drawItem(const MeshSlot& s, const DrawItem& item, const RenderSettings& settings);
     std::vector<DrawItem> drawList_;      // visible meshes, in scene order

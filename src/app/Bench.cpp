@@ -80,9 +80,12 @@ int runAppBenchmark(BenchCommandLine cl) {
         // when the model is not in the picture (render_matrix's check on the real hardware: nightly).
         const bool renderCheck = std::getenv("SF_BENCH_RENDER_CHECK") && std::string(std::getenv("SF_BENCH_RENDER_CHECK")) == "1";
         bool checkPbr = false, checkWire = false, checkFlat = false, renderCheckFailed = false;
-        auto scene = [&flat, &checkPbr, &checkWire, &checkFlat](Mesh& m) {
+        // SF_BENCH_GLASS=1: the mesh is a glass Part (core/PartGlass.h): its orbit rows say what glass costs a frame.
+        const bool glass = std::getenv("SF_BENCH_GLASS") && std::string(std::getenv("SF_BENCH_GLASS")) == "1";
+        auto scene = [&flat, &glass, &checkPbr, &checkWire, &checkFlat](Mesh& m) {
             SceneMesh sm{1, &m, true, true, nullptr, checkWire, flat || checkFlat};
             sm.pbr = checkPbr;
+            if (glass) sm.glass = glassFromPreset(GlassPreset::Glass);
             return std::vector<SceneMesh>{sm};
         };
         gpu.upload = [&](Mesh& m) {

@@ -97,6 +97,7 @@ add_library(sculptforge_core STATIC
   src/core/SelectionSets.cpp
   src/core/ScreenSelect.cpp
   src/core/Parts.cpp
+  src/core/PartGlass.cpp
   src/core/Units.cpp
   src/core/Garment.cpp
   src/core/GarmentMesh.cpp

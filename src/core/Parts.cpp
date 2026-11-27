@@ -282,6 +282,7 @@ std::vector<MeshObjectRef> visiblePartObjects(const Document& doc, bool instance
         const Part& p = doc.parts[size_t(i)];
         MeshObjectRef o{name, &doc.partMesh(i)};
         o.ai = p.ai; // (exporters with a place for it keep the AI provenance tag)
+        o.glass = p.glass;
         if (instances) {
             o.transform = p.transform;
             const auto first = std::find(data.begin(), data.end(), p.data.get());
@@ -312,7 +313,8 @@ void setSceneObjects(Document& doc, std::vector<MeshObject> objects, const std::
         return objects.size() == 1 || objects[i].name.empty() ? fallbackName : objects[i].name;
     };
     doc.setMesh(std::move(objects[0].mesh), nameOf(0));
-    for (size_t i = 1; i < objects.size(); ++i) doc.addPart(std::move(objects[i].mesh), nameOf(i), false);
+    doc.parts[0].glass = objects[0].glass;
+    for (size_t i = 1; i < objects.size(); ++i) doc.parts[size_t(doc.addPart(std::move(objects[i].mesh), nameOf(i), false))].glass = objects[i].glass;
     doc.markClean();
 }
 
@@ -429,6 +431,7 @@ CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, co
     const bool visible = from.visible;
     const uint32_t folder = from.folder;
     const Shading shading = from.shading;
+    const PartGlass glass = from.glass; // (a piece of a glass Part is glass)
     const AiProvenance ai = from.ai; // (a piece of an AI-made model is still one)
     const glm::mat4 place = from.transform; // (a moved linked copy, #94: the piece stays where it was seen)
     const int at = doc.addPart(std::move(piece), doc.uniquePartName(source + " " + suffix), false, doc.activePart + 1);
@@ -436,6 +439,7 @@ CommandResult splitOffPart(Document& doc, TriangleSet set, const char* label, co
     added.visible = visible;
     added.folder = folder;
     added.shading = shading;
+    added.glass = glass;
     added.ai = ai;
     added.transform = place;
     const uint32_t id = added.id;
@@ -721,6 +725,7 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
         const bool visible = from.visible;
         const uint32_t folder = from.folder;
         const Shading shading = from.shading;
+        const PartGlass glass = from.glass;
         const AiProvenance ai = from.ai;
         const glm::mat4 place = from.transform; // (a moved linked copy: the piece stays where it was placed)
         const int index = doc.addPart(std::move(piece), doc.uniquePartName(label), false, doc.activePart + 1);
@@ -728,6 +733,7 @@ CommandResult insertPiece(Document& doc, Mesh prim, const Args& a, const std::st
         added.visible = visible;
         added.folder = folder;
         added.shading = shading;
+        added.glass = glass;
         added.ai = ai;
         added.transform = place;
         const std::string name = added.name;
@@ -811,6 +817,7 @@ void registerPartCommands(CommandRegistry& reg) {
              [](Document& doc, const Args& a) -> CommandResult {
                  Mesh m;
                  std::string name;
+                 PartGlass glass; // (a file's single object keeps its glass)
                  std::optional<PrimitiveSpec> spec; // a primitive: its settings stay editable (core/PrimitiveKit.h)
                  if (a.contains("path")) {
                      // Load through `open` into a scratch document, so every format and its attributes work;
@@ -824,13 +831,15 @@ void registerPartCommands(CommandRegistry& reg) {
                      if (scratch.partCount() == 1) {
                          if (scratch.mesh.triangleCount() == 0) return {false, path + " has no mesh to append"};
                          m = std::move(scratch.mesh);
+                         glass = scratch.parts[0].glass;
                          name = fileStem(path);
                      } else {
                          const int first = doc.partCount();
                          size_t tris = 0;
                          for (int i = 0; i < scratch.partCount(); ++i) {
                              tris += scratch.partMesh(i).triangleCount();
-                             doc.addPart(std::move(scratch.partMesh(i)), scratch.parts[size_t(i)].name, false);
+                             const int added = doc.addPart(std::move(scratch.partMesh(i)), scratch.parts[size_t(i)].name, false);
+                             doc.parts[size_t(added)].glass = scratch.parts[size_t(i)].glass;
                          }
                          doc.selectPart(first);
                          return {true, "Appended " + std::to_string(scratch.partCount()) + " Parts from " + path + " (" +
@@ -883,6 +892,7 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (a.contains("name")) name = argString(a, "name");
                  const size_t tris = m.triangleCount();
                  const int i = doc.addPart(std::move(m), name);
+                 doc.parts[size_t(i)].glass = glass;
                  if (spec) setPrimitiveSpec(*doc.parts[size_t(i)].data, *spec, doc.partUndo(i).revision());
                  return {true, "Appended Part " + doc.parts[size_t(i)].name + " (" + countText(tris) + ")"};
              }});
@@ -982,12 +992,14 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (i < 0) return notFound(a);
                  Mesh copy = doc.partMesh(i);
                  const Shading shading = doc.parts[size_t(i)].shading;
+                 const PartGlass glass = doc.parts[size_t(i)].glass;
                  const PartBoolean boolean = doc.parts[size_t(i)].boolean;
                  const uint32_t folder = doc.parts[size_t(i)].folder;
                  const glm::mat4 place = doc.parts[size_t(i)].transform;
                  const AiProvenance ai = doc.parts[size_t(i)].ai;
                  const int added = doc.addPart(std::move(copy), doc.duplicatePartName(doc.parts[size_t(i)].name), true, i + 1);
                  doc.parts[size_t(added)].shading = shading;
+                 doc.parts[size_t(added)].glass = glass;
                  doc.parts[size_t(added)].boolean = boolean; // (a copy of a cutter cuts too)
                  doc.parts[size_t(added)].folder = folder; // (right below it: the folder stays together)
                  doc.parts[size_t(added)].transform = place;
@@ -1073,6 +1085,52 @@ void registerPartCommands(CommandRegistry& reg) {
                  if (s.shading != mode) doc.modified = true;
                  s.shading = mode;
                  return {true, s.name + " shading: " + shadingName(mode)};
+             }});
+
+    reg.add({"part_glass",
+             "Make a Part glass, water or diamond (or ordinary again): how see-through it is, its index of refraction, "
+             "and the tint it takes on through its thickness. The view draws it clear with the edges reflecting the "
+             "environment more (Fresnel) and thicker glass tinted deeper; it does not bend what is behind it, and "
+             "dispersion and caustics belong to the Render Bridge. Saved in the project and in glTF.",
+             {{"preset", T::String, "water, glass or diamond (sets the whole look first), or none to make the Part ordinary.", false},
+              {"transmission", T::Number, "0-1: 0 is an ordinary Part, 1 clear glass.", false},
+              {"ior", T::Number, "Index of refraction, 1-2.5 (water 1.33, glass 1.5, diamond 2.42).", false},
+              {"tint", T::String, "The colour at full depth (#rrggbb, r,g,b or a name); white is clear.", false},
+              {"depth", T::Number, "How much glass gives the full tint, in quarter-sizes of the Part (0.05-8, default 1).", false},
+              indexParam, nameParam},
+             [](Document& doc, const Args& a) -> CommandResult {
+                 const int i = targetPart(doc, a);
+                 if (i < 0) return notFound(a);
+                 PartGlass g = doc.parts[size_t(i)].glass;
+                 bool given = false;
+                 if (a.contains("preset")) {
+                     const std::string name = argString(a, "preset");
+                     if (name == "none" || name == "off") {
+                         g = PartGlass();
+                     } else {
+                         GlassPreset p;
+                         if (!parseGlassPreset(name, p)) return {false, "Unknown preset '" + name + "' (water, glass, diamond, none)"};
+                         g = glassFromPreset(p);
+                         given = true;
+                     }
+                 }
+                 if (a.contains("transmission")) g.transmission = float(argNumber(a, "transmission", g.transmission)), given = true;
+                 if (a.contains("ior")) g.ior = float(argNumber(a, "ior", g.ior)), given = true;
+                 if (a.contains("depth")) g.depth = float(argNumber(a, "depth", g.depth)), given = true;
+                 if (a.contains("tint")) {
+                     if (!parseColor(argString(a, "tint"), g.tint)) return {false, "Unknown colour '" + argString(a, "tint") + "'"};
+                     given = true;
+                 }
+                 // An index or a tint on an ordinary Part makes it glass (clear) rather than doing nothing.
+                 if (given && !a.contains("transmission") && !a.contains("preset") && !g.active()) g.transmission = 1.0f;
+                 g = clampedGlass(g);
+                 Part& s = doc.parts[size_t(i)];
+                 doc.setPartGlass(i, g, "Glass");
+                 char buf[160];
+                 if (!g.active()) return {true, s.name + " is an ordinary Part"};
+                 std::snprintf(buf, sizeof buf, " is glass: transmission %.2f, ior %.2f, depth %.2f", double(g.transmission),
+                               double(g.ior), double(g.depth));
+                 return {true, s.name + buf};
              }});
 
     // Folders (#96): group Parts in the list; hide, show and move (transform folder=true) a folder at once.

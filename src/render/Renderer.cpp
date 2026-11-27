@@ -551,6 +551,42 @@ vec3 viewRay() {
     vec2 ndc = (gl_FragCoord.xy - uViewport.xy) / uViewport.zw * 2.0 - 1.0;
     return normalize(vec3(-ndc / uProjScale, 1.0));
 }
+#ifdef GLASS
+// Glass (core/PartGlass.h): clear, Fresnel-weighted, tinted deeper where it is thicker. Not refraction: what is behind
+// is seen straight, as through a pane. uGlass = transmission, F0, the length of full tint in view units (0 = none) and
+// 1 when the back faces' depth (uBackDepth) is there for the thickness; uProjZ = the projection's [2][2], [3][2] and
+// 1 for an orthographic view.
+uniform vec4 uGlass;
+uniform vec3 uGlassTint;
+uniform vec3 uProjZ;
+uniform sampler2D uBackDepth;
+float eyeDistance(float zw) {
+    float zn = zw * 2.0 - 1.0;
+    return uProjZ.z > 0.5 ? (uProjZ.y - zn) / uProjZ.x : uProjZ.y / (zn + uProjZ.x);
+}
+// n faces the viewer. base: the Part's own surface (its weight is 1 - transmission), refl: the light the surface
+// mirrors, body: the light the tint catches inside. Returns the colour (linear, not premultiplied) and its cover.
+vec4 glassOut(vec3 n, vec3 v, vec3 base, vec3 refl, vec3 body) {
+    float k = 1.0 - max(dot(n, v), 1e-4);
+    float F = uGlass.y + (1.0 - uGlass.y) * k * k * k * k * k;
+    if (!gl_FrontFacing) F *= 0.5; // (the far side seen from inside: a fainter mirror)
+    float absorbed = 0.0;
+    if (gl_FrontFacing && uGlass.z > 0.0 && uGlass.w > 0.5) {
+        float back = texelFetch(uBackDepth, ivec2(gl_FragCoord.xy), 0).r;
+        if (back < 0.99999) { // (no back face behind: an open sheet has no thickness)
+            float thick = max(eyeDistance(back) - eyeDistance(gl_FragCoord.z), 0.0);
+            vec3 att = -log(max(uGlassTint, vec3(0.002)));
+            absorbed = 1.0 - dot(exp(-att * (thick / uGlass.z)), vec3(1.0 / 3.0));
+        }
+    }
+    float a = F + (1.0 - F) * absorbed;
+    vec3 rgb = F * refl + (1.0 - F) * absorbed * body;
+    float t = uGlass.x;
+    float cover = 1.0 - t * (1.0 - a);
+    return vec4((t * rgb + (1.0 - t) * base) / max(cover, 1e-4), cover);
+}
+vec4 glassFinish(vec3 c, float cover) { return vec4(pow(clamp(c, 0.0, 1.0), vec3(1.0 / 2.2)), cover); }
+#endif
 #ifdef PBR
 // PBR viewport (core/EnvironmentMath.h): Cook-Torrance GGX through the split sum (the environment prefiltered per
 // roughness level in the mips of uEnvTex, the BRDF's scale and bias in uBrdfLut), diffuse from the environment's
@@ -706,6 +742,15 @@ void main() {
         }
         if (uHasEmissive == 1) emissive = texture(uEmissiveTex, vUv).rgb;
 #endif
+#ifdef GLASS
+        {
+            float ex = exp2(uExposure);
+            vec3 base = uGlass.x < 0.999 ? pbrShade(albedo, n, v, rough, metal, ao, curvature, emissive) : vec3(0.0);
+            vec4 g = glassOut(n, v, base, envSample(reflect(-v, n), 0.04 * uEnvLevels) * ex, uGlassTint * shIrradiance(n) * ex);
+            fragColor = glassFinish(toneMapped(g.rgb), g.a);
+            return;
+        }
+#endif
         vec3 c = toneMapped(pbrShade(albedo, n, v, rough, metal, ao, curvature, emissive));
         if (uShowMask == 1) c = maskTint(c, V_MASK);
         fragColor = finish(c);
@@ -725,6 +770,13 @@ void main() {
         float mridge = smoothstep(0.03, 0.2, -curvature);
         vec3 c = mc * tint * (1.0 - uLitSphereCavity.x * mcrease) * (1.0 + uLitSphereCavity.y * mridge);
         if (uLightCount > 0) c += addedLights(n, v, tint, 40.0) * (1.0 - uLitSphereCavity.x * mcrease);
+#ifdef GLASS
+        {
+            vec4 g = glassOut(n, v, c, mc, mc * uGlassTint);
+            fragColor = glassFinish(g.rgb, g.a);
+            return;
+        }
+#endif
         if (uShowMask == 1) c = maskTint(c, V_MASK);
         fragColor = finish(c);
         return;
@@ -748,6 +800,14 @@ void main() {
     c += vec3(spec) * (1.0 - crease) + rim * vec3(0.8, 0.85, 1.0);
     c = c * uLightLevels.x + albedo * uLightLevels.y * 0.6;
     if (uLightCount > 0) c += addedLights(n, v, albedo, 40.0) * cavity;
+#ifdef GLASS
+    {
+        vec3 lit = vec3(0.12 * hemi + 0.95 * diff * diff + fillL) * uLightLevels.x + vec3(uLightLevels.y * 0.6);
+        vec4 g = glassOut(n, v, c, lit + vec3(spec * 2.0), lit * uGlassTint);
+        fragColor = glassFinish(g.rgb, g.a);
+        return;
+    }
+#endif
     if (uShowMask == 1) c = maskTint(c, V_MASK);
     fragColor = finish(c);
 }
@@ -1081,6 +1141,7 @@ constexpr GLenum kTexture5 = 0x84C5; // kTexture5 (baked normal map)
 constexpr GLenum kTexture6 = 0x84C6; // kTexture6 (its tangents)
 constexpr GLenum kRgb = 0x1907, kRgb8 = 0x8051; // GL_RGB, GL_RGB8
 // PBR view: ORM 8, emissive 9, environment 10, BRDF table 11.
+constexpr GLenum kTexture13 = 0x84CD; // (glass: the back faces' depth)
 constexpr GLenum kTexture8 = 0x84C8, kTexture9 = 0x84C9, kTexture10 = 0x84CA, kTexture11 = 0x84CB;
 constexpr GLenum kRgba16f = 0x881A, kRgb16f = 0x881B, kRg16f = 0x822F, kRg = 0x8227, kRepeat = 0x2901, kMaxLevel = 0x813D;
 
@@ -1295,7 +1356,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (!(features & kMicro) && (features & (kTextured | kNormalMap))) features |= kTextured | kPrim;
     // (micro levels: no per-vertex paint, per-triangle data or predictive preview)
     if (features & kMicro) features &= kMicro | kFlat | kPbr | kWide | ((features & kFocus) ? kFocus : kTiles);
-    MeshProgram& p = programs_[features & 255];
+    MeshProgram& p = programs_[features & 511];
     if (p.id) return &p;
     const auto simpler = [&]() -> const MeshProgram* {
         const int next = simplerMeshFeatures(features);
@@ -1313,6 +1374,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     if (features & kFlat) prefix += "#define FLAT\n";
     if ((features & kGhost) && !(features & kMicro)) prefix += "#define GHOST\n";
     if (features & kPbr) prefix += "#define PBR\n";
+    if (features & kGlass) prefix += "#define GLASS\n";
     const std::string vs = prefix + ((features & kMicro) ? microVertexShaderSource() : kMeshVS), fs = prefix + kMeshFS,
                       gs = prefix + kMeshGS;
     p.id = link(vs.c_str(), fs.c_str(), programError_, nullptr, (features & kTextured) ? gs.c_str() : nullptr);
@@ -1382,6 +1444,9 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     p.pbrCavity = at("uPbrCavity");
     p.viewToEnv = at("uViewToEnv");
     p.sh = at("uSH");
+    p.glass = at("uGlass");
+    p.glassTint = at("uGlassTint");
+    p.projZ = at("uProjZ");
     // Texture units: groups 1, lit sphere 2, UVs 3, painted texture 4, normal map 5, tangents 6, cluster table 7.
     gl::UseProgram(p.id);
     gl::Uniform1i(at("uGroupIds"), 1);
@@ -1395,6 +1460,7 @@ const Renderer::MeshProgram* Renderer::meshProgram(int features) {
     gl::Uniform1i(at("uClusterPrims"), 7);
     gl::Uniform1i(at("uOrmTex"), 8);
     gl::Uniform1i(at("uEmissiveTex"), 9);
+    gl::Uniform1i(at("uBackDepth"), 13); // (glass: this Part's back faces' depth)
     // A micro level's buffer textures take units 8-15 (render/MicroRenderer.cpp, MicroFocus.cpp): two samplers of
     // different types on one unit fail every draw, and a micro mesh in the PBR view drew nothing at all. Its program has
     // no UVs or painted texture, so the environment and BRDF table go on their units (3, 4) there.
@@ -1653,6 +1719,7 @@ void Renderer::shutdown() {
     litsphereTextures_.clear();
     litsphereHashes_.clear();
     litsphereRevision_ = 0;
+    freeBackDepth();
     for (GLuint* t : {&envTexture_, &brdfTexture_})
         if (*t) gl::DeleteTextures(1, t);
     envIndex_ = envFailedIndex_ = -1;
@@ -2040,7 +2107,7 @@ void Renderer::syncScene(const std::vector<SceneMesh>& scene) {
             ms.overlay = first->active ? first->overlay : nullptr;
             sync(ms, *first->mesh, first->normalMap, first->wireframe && first->active, first->pbr);
         }
-        drawList_.push_back({m.id, m.active, m.flat, m.model != glm::mat4(1.0f), m.model});
+        drawList_.push_back({m.id, m.active, m.flat, m.model != glm::mat4(1.0f), m.model, m.glass});
     }
 }
 
@@ -2059,6 +2126,7 @@ glm::mat3 Renderer::normalFixFor(const glm::mat3& m) {
 }
 
 void Renderer::drawItem(const MeshSlot& s, const DrawItem& item, const RenderSettings& settings) {
+    if (item.glassDraw != (glassPass_ != 0)) return; // (glass has its own passes, drawGlassParts; the others skip it)
     if (!item.moved) {
         drawSlot(s, item.active, item.flat, settings);
         return;
@@ -2073,6 +2141,149 @@ void Renderer::drawItem(const MeshSlot& s, const DrawItem& item, const RenderSet
     frameView_ = view;
     frameNormalFix_ = glm::mat3(1.0f);
     frameCull_ = cull;
+}
+
+// ---------------------------------------------------------------------------
+// Glass (core/PartGlass.h)
+// ---------------------------------------------------------------------------
+
+namespace {
+constexpr GLenum kGlassLess = 0x0201, kGlassDepthComponent = 0x1902, kGlassR8 = 0x8229, kDrawFramebufferBinding = 0x8CA6;
+} // namespace
+
+void Renderer::freeBackDepth() {
+    if (backDepthFbo_) gl::DeleteFramebuffers(1, &backDepthFbo_);
+    if (backDepthRb_) gl::DeleteRenderbuffers(1, &backDepthRb_);
+    if (backDepthTex_) gl::DeleteTextures(1, &backDepthTex_);
+    backDepthFbo_ = backDepthRb_ = backDepthTex_ = 0;
+    backDepthW_ = backDepthH_ = 0;
+    backDepthReady_ = false;
+}
+
+// The target the glass Parts' back faces draw their depth into: a depth texture the size of the view (a one-channel
+// colour target beside it, so the target is complete on every driver). Made when glass first shows, freed when the
+// last glass Part goes. False when the driver can't (or SF_GLASS_NO_THICKNESS=1, to try that path): the glass is then
+// clear, without the thickness tint.
+bool Renderer::ensureBackDepth(int width, int height) {
+    const char* noThickness = std::getenv("SF_GLASS_NO_THICKNESS"); // =1: try the path of a chip that can't (tests)
+    if (noThickness && *noThickness && *noThickness != '0') {
+        if (backDepthTex_) freeBackDepth();
+        return false;
+    }
+    if (backDepthTex_ && width == backDepthW_ && height == backDepthH_) return true;
+    if (width == backDepthFailedW_ && height == backDepthFailedH_) return false; // (not every frame again)
+    freeBackDepth();
+    bool ok = width > 0 && height > 0;
+    if (ok) {
+        GLint previous = 0;
+        gl::GetIntegerv(kDrawFramebufferBinding, &previous);
+        gl::ActiveTexture(kTexture13);
+        gl::GenTextures(1, &backDepthTex_);
+        gl::BindTexture(GL_TEXTURE_2D, backDepthTex_);
+        gl::TexImage2D(GL_TEXTURE_2D, 0, GLint(GL_DEPTH_COMPONENT24), width, height, 0, kGlassDepthComponent, GL_UNSIGNED_INT, nullptr);
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_NEAREST));
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_NEAREST));
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GLint(GL_CLAMP_TO_EDGE));
+        gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GLint(GL_CLAMP_TO_EDGE));
+        gl::BindTexture(GL_TEXTURE_2D, 0);
+        gl::ActiveTexture(GL_TEXTURE0);
+        gl::GenRenderbuffers(1, &backDepthRb_);
+        gl::BindRenderbuffer(GL_RENDERBUFFER, backDepthRb_);
+        gl::RenderbufferStorage(GL_RENDERBUFFER, kGlassR8, width, height);
+        gl::GenFramebuffers(1, &backDepthFbo_);
+        gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, backDepthFbo_);
+        gl::FramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, backDepthRb_);
+        gl::FramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, backDepthTex_, 0);
+        ok = gl::CheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE && gl::GetError() == GL_NO_ERROR;
+        gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, GLuint(previous));
+    }
+    if (!ok) {
+        freeBackDepth();
+        backDepthFailedW_ = width;
+        backDepthFailedH_ = height;
+        SDL_Log("Glass: no depth target for the thickness tint on this graphics chip; glass draws clear");
+        return false;
+    }
+    backDepthW_ = width;
+    backDepthH_ = height;
+    backDepthFailedW_ = backDepthFailedH_ = 0;
+    return true;
+}
+
+void Renderer::setGlassUniforms(const MeshProgram& p, const MeshSlot& s) const {
+    const PartGlass& g = glassCur_;
+    const float size = s.box.valid() ? glm::length(s.box.max - s.box.min) : 1.0f;
+    const bool thickness = glassPass_ == 1 && backDepthReady_;
+    // The length of glass that gives the full tint: `depth` quarter-sizes of the Part, in view-space units.
+    const float length = thickness ? g.depth * kGlassWallFraction * size * glassScale_ : 0.0f;
+    gl::Uniform4fv(p.glass, 1, glm::value_ptr(glm::vec4(g.transmission, glassF0(g.ior), length, thickness ? 1.0f : 0.0f)));
+    gl::Uniform3fv(p.glassTint, 1, glm::value_ptr(g.tint));
+    const bool orthographic = frameProj_[3][3] == 1.0f;
+    gl::Uniform3fv(p.projZ, 1, glm::value_ptr(glm::vec3(frameProj_[2][2], frameProj_[3][2], orthographic ? 1.0f : 0.0f)));
+    gl::ActiveTexture(kTexture13);
+    gl::BindTexture(GL_TEXTURE_2D, thickness ? backDepthTex_ : 0);
+    gl::ActiveTexture(GL_TEXTURE0);
+}
+
+// The glass Parts, farthest first (by where their bounds' centre is in front of the eye: exact for Parts that don't
+// interleave, which is what a one-sort-per-Part pass can give): each draws its back faces' depth (for the tint),
+// then its back faces and its front faces blended over everything drawn so far. Nothing is written to the depth
+// buffer, so what is behind one glass Part stays visible through the next.
+void Renderer::drawGlassParts(std::vector<DrawItem*>& items, int targetWidth, int targetHeight, const RenderSettings& settings) {
+    auto findSlot = [this](uint32_t id) -> const MeshSlot* {
+        for (const auto& s : slots_)
+            if (s.id == id) return &s;
+        return nullptr;
+    };
+    std::vector<float> distance;
+    distance.reserve(items.size());
+    for (const DrawItem* item : items) {
+        const MeshSlot* s = findSlot(item->id);
+        const glm::vec3 centre = s && s->box.valid() ? 0.5f * (s->box.min + s->box.max) : glm::vec3(0.0f);
+        distance.push_back(-(frameView_ * item->model * glm::vec4(centre, 1.0f)).z);
+    }
+    GLint previous = 0;
+    gl::GetIntegerv(kDrawFramebufferBinding, &previous);
+    backDepthReady_ = ensureBackDepth(targetWidth, targetHeight);
+    keepBackfaces_ = true;
+    for (const size_t k : glassDrawOrder(distance)) {
+        const DrawItem& item = *items[k];
+        const MeshSlot* s = findSlot(item.id);
+        if (!s) continue;
+        glassCur_ = item.glass;
+        glassScale_ = item.moved ? std::cbrt(std::abs(glm::determinant(glm::mat3(item.model)))) : 1.0f;
+        if (backDepthReady_) { // the back faces' depth alone, this Part's
+            gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, backDepthFbo_);
+            gl::ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+            gl::DepthMask(GL_TRUE);
+            gl::Clear(GL_DEPTH_BUFFER_BIT);
+            gl::DepthFunc(kGlassLess);
+            glassPass_ = 2;
+            xrayCull_ = GL_FRONT;
+            drawItem(*s, item, settings);
+            gl::DepthFunc(GL_LEQUAL);
+            gl::BindFramebuffer(GL_DRAW_FRAMEBUFFER, GLuint(previous));
+        }
+        gl::Enable(GL_BLEND);
+        gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        gl::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE); // (the alpha channel carries the shadows' facing: left alone)
+        gl::DepthMask(GL_FALSE);
+        glassPass_ = 1;
+        for (GLenum cull : {GL_FRONT, GL_BACK}) { // back faces, then front faces
+            xrayCull_ = cull;
+            drawItem(*s, item, settings);
+        }
+    }
+    xrayCull_ = 0;
+    glassPass_ = 0;
+    keepBackfaces_ = false;
+    gl::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    gl::DepthMask(GL_TRUE);
+    gl::Disable(GL_BLEND);
+    gl::CullFace(GL_BACK);
+    gl::ActiveTexture(kTexture13);
+    gl::BindTexture(GL_TEXTURE_2D, 0);
+    gl::ActiveTexture(GL_TEXTURE0);
 }
 
 // The packed vertices of dirtyRuns_ (all of them when `full`, which also sizes the buffer). A vertex that left
@@ -3999,6 +4210,18 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && !item.active) others = true;
     auto seeThrough = [&](const DrawItem& item) { return xray && (others ? !item.active : true); };
     drawAlpha_ = 1.0f;
+    // Glass Parts (core/PartGlass.h) wait for their own pass after the opaque ones (and a micro-displaced Part, whose
+    // levels draw through their own program, stays opaque); a thumbnail shows the Part as it is, not see-through.
+    std::vector<DrawItem*> glassItems;
+    for (DrawItem& item : drawList_) {
+        const MeshSlot* s = thumbnailPass_ || !item.glass.active() ? nullptr : findSlot(item.id);
+        item.glassDraw = s && s->drawnTriangles > 0 && !s->micro;
+        if (item.glassDraw) glassItems.push_back(&item);
+    }
+    if (!thumbnailPass_) { // (a Part thumbnail's draw has no glass: it must not end the view's)
+        glassDrawnLast_ = !glassItems.empty();
+        if (glassItems.empty() && backDepthTex_) freeBackDepth(); // (no glass: nothing of it stays in memory)
+    }
     for (const DrawItem& item : drawList_)
         if (const MeshSlot* s = findSlot(item.id); s && s->drawnTriangles > 0 && !seeThrough(item))
             drawItem(*s, item, settings);
@@ -4044,13 +4267,14 @@ void Renderer::draw(const Camera& camera, int targetWidth, int targetHeight, con
         gl::DepthMask(GL_TRUE);
         gl::Disable(GL_BLEND);
     }
+    if (!glassItems.empty()) drawGlassParts(glassItems, targetWidth, targetHeight, settings);
     proxyUsed_ = settings.motionProxy;
     gl::Disable(GL_POLYGON_OFFSET_FILL);
     for (GLenum unit : {kTexture7, kTexture6, GL_TEXTURE3, GL_TEXTURE1}) {
         gl::ActiveTexture(unit);
         gl::BindTexture(GL_TEXTURE_BUFFER, 0);
     }
-    for (GLenum unit : {kTexture11, kTexture10, kTexture9, kTexture8, kTexture5, GL_TEXTURE4, GL_TEXTURE3, kTexture2}) {
+    for (GLenum unit : {kTexture13, kTexture11, kTexture10, kTexture9, kTexture8, kTexture5, GL_TEXTURE4, GL_TEXTURE3, kTexture2}) {
         gl::ActiveTexture(unit);
         gl::BindTexture(GL_TEXTURE_2D, 0);
     }
@@ -4612,7 +4836,8 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     // (Not through the textured program's geometry shader: those meshes are sculpted without the preview.)
     const bool ghost = active && s.id == ghostId_ && !ghost_.empty() && !settings.motionProxy && !textured && !normalMapped;
     const int features = (s.hasColors || s.hasMask ? kPaint : 0) | (groups == 1 || groups == 3 ? kPrim : 0) |
-                         (textured ? kTextured : 0) | (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0) | (pbr ? kPbr : 0);
+                         (textured ? kTextured : 0) | (normalMapped ? kNormalMap : 0) | (flat ? kFlat : 0) | (pbr ? kPbr : 0) |
+                         (glassPass_ == 1 ? kGlass : 0);
     const MeshProgram* p = meshProgram(features);
     if (!p) return;
     const auto bind = [&](const MeshProgram* p) {
@@ -4664,6 +4889,7 @@ void Renderer::drawSlot(const MeshSlot& s, bool active, bool flat, const RenderS
     gl::Uniform1i(p->groups, groups);
     gl::Uniform1i(p->dim, !active && settings.dimInactive ? 1 : 0);
     setLightUniforms(*p, settings);
+    if (features & kGlass) setGlassUniforms(*p, s);
     gl::Uniform1i(p->twoSided, 1);
     gl::Uniform1i(p->checker, checker ? 1 : 0);
     gl::Uniform1f(p->checkerScale, checker ? s.overlay->checkerScale : 8.0f);

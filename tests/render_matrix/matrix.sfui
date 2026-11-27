@@ -170,5 +170,23 @@ render_cell "flat x Micro tiles, close-up" mode=flat target=0,0,1 distance=0.05
 render_cell "Lit Sphere x Micro tiles" mode=lit
 env SF_MICRO_TILES 0
 
+# --- Glass (core/PartGlass.h): a glass sphere beside a painted one, in each shading; then with no thickness target
+# (SF_GLASS_NO_THICKNESS: the driver that can't make one draws the glass clear, not nothing).
+run new_sphere subdivisions=4
+run part_append type=sphere size=0.6
+run part_glass preset=glass
+wait 0.3
+render_cell "Lit Sphere x glass" mode=lit
+render_cell "PBR x glass" mode=pbr
+render_cell "Lit Sphere x glass, four lights" mode=lit lights=1
+render_cell "PBR x glass, four lights" mode=pbr lights=1
+render_cell "flat x glass" mode=flat
+run part_glass preset=diamond
+render_cell "PBR x diamond" mode=pbr
+env SF_GLASS_NO_THICKNESS 1
+render_cell "Lit Sphere x glass, no thickness target" mode=lit
+render_cell "PBR x glass, no thickness target" mode=pbr
+env SF_GLASS_NO_THICKNESS 0
+
 # What the matrix would have caught (see the PBR x Micro cells on 0.12.15): the same cells all pass here.
 expect_value render_coverage > 0.3

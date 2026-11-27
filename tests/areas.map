@@ -255,6 +255,7 @@ test_layers_roundtrip       io
 test_map_export             io
 test_bake                   io
 test_camera                 render
+test_glass                  render
 test_backdrop               render
 test_environment            render
 test_ghost                  render

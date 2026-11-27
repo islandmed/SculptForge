@@ -8,6 +8,7 @@
 
 #include "core/AiProvenance.h"
 #include "core/Mesh.h"
+#include "core/PartGlass.h"
 
 #include <memory>
 #include <string>
@@ -19,6 +20,7 @@ namespace sf {
 struct MeshObject {
     std::string name; // as stored in the file (may be empty)
     Mesh mesh;
+    PartGlass glass{}; // glTF's transmission / ior / volume, when the file has them (core/PartGlass.h)
 };
 
 // An object to write: its name and a mesh owned by the caller (or by `owned`, e.g. a copy placed in the scene).
@@ -31,6 +33,7 @@ struct MeshObjectRef {
     glm::mat4 transform{1.0f};
     int instanceOf = -1;
     std::shared_ptr<const Mesh> owned{};
+    PartGlass glass{}; // the Part's glass look: glTF writes KHR_materials_transmission / ior / volume for it
     AiProvenance ai{}; // the Part's AI provenance tag, if any: glTF extras, USD customData, OBJ comments keep it
 };
 

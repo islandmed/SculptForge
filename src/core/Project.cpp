@@ -885,6 +885,7 @@ struct LoadedPart {
     bool visible = true;
     int8_t shownBeforeSolo = -1;
     Shading shading = Shading::Default;
+    PartGlass glass;
     PartBoolean boolean = PartBoolean::None;
     int folder = -1; // index into the manifest's part_folders (#96)
     int activeLayer = -1;
@@ -986,6 +987,7 @@ bool saveProject(const std::string& path, const Document& doc, std::string& erro
         st.set("visible", savedVisible(s));
         if (s.shownBeforeSolo >= 0) st.set("shown_before_solo", s.shownBeforeSolo != 0); // (optional: Solo in progress)
         if (s.shading != Shading::Default) st.set("shading", shadingName(s.shading)); // (no format change: optional)
+        if (s.glass.active()) st.set("glass", glassToJson(s.glass)); // (optional, as shading: older versions ignore it)
         if (s.boolean != PartBoolean::None) st.set("boolean", partBooleanName(s.boolean)); // (optional, as shading)
         if (!s.ai.empty()) st.set("ai_provenance", aiProvenanceToJson(s.ai)); // (optional, as shading; core/AiProvenance.h)
         if (const int f = doc.partFolderIndex(s.folder); f >= 0) st.set("folder", folderIndex[size_t(f)]); // (#96: optional, as shading)
@@ -1238,6 +1240,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             s.visible = sj["visible"].asBool(true);
             if (sj["shown_before_solo"].isBool()) s.shownBeforeSolo = sj["shown_before_solo"].asBool(true) ? 1 : 0;
             if (sj["shading"].isString()) parseShading(sj["shading"].asString(), s.shading); // unknown: Default
+            glassFromJson(sj["glass"], s.glass); // (absent or not an object: not glass)
             if (sj["boolean"].isString()) parsePartBoolean(sj["boolean"].asString(), s.boolean); // unknown: None
             s.folder = int(sj["folder"].asNumber(-1));
             s.bridgeName = sj["bridge_name"].asString();
@@ -1370,6 +1373,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
     doc.parts[0].visible = parts[0].visible;
     doc.parts[0].shownBeforeSolo = parts[0].shownBeforeSolo;
     doc.parts[0].shading = parts[0].shading;
+    doc.parts[0].glass = parts[0].glass;
     doc.parts[0].boolean = parts[0].boolean;
     doc.parts[0].transform = parts[0].transform;
     if (parts[0].primitive) setPrimitiveSpec(*doc.parts[0].data, *parts[0].primitive, doc.undo.revision());
@@ -1380,6 +1384,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
             doc.parts[size_t(at)].visible = parts[i].visible;
             doc.parts[size_t(at)].shownBeforeSolo = parts[i].shownBeforeSolo;
             doc.parts[size_t(at)].shading = parts[i].shading;
+            doc.parts[size_t(at)].glass = parts[i].glass;
             doc.parts[size_t(at)].boolean = parts[i].boolean;
             doc.parts[size_t(at)].ai = parts[i].ai;
             continue;
@@ -1390,6 +1395,7 @@ bool loadProject(const std::string& path, Document& doc, std::string& error) {
         s.visible = parts[i].visible;
         s.shownBeforeSolo = parts[i].shownBeforeSolo;
         s.shading = parts[i].shading;
+        s.glass = parts[i].glass;
         s.boolean = parts[i].boolean;
         s.transform = parts[i].transform;
         s.ai = parts[i].ai;

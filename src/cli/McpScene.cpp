@@ -105,6 +105,7 @@ Json partDetail(const Document& doc, int i) {
     Json o = partSummary(doc, i);
     o.set("id", double(part.id));
     o.set("shading", shadingName(part.shading));
+    if (part.glass.active()) o.set("glass", glassToJson(part.glass));
     o.set("boolean", partBooleanName(part.boolean));
     if (const int f = doc.partFolderIndex(part.folder); f >= 0) o.set("folder", doc.partFolders[size_t(f)].name);
     if (const AABB b = mesh.bounds(); b.valid()) o.set("bounds", boundsJson(b));

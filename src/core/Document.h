@@ -9,6 +9,7 @@
 #include "core/EdgeSelect.h"
 #include "core/Json.h"
 #include "core/Mesh.h"
+#include "core/PartGlass.h"
 #include "core/PolyMode.h"
 #include "core/PrimitiveKit.h"
 #include "core/QRemeshGuides.h"
@@ -70,6 +71,7 @@ struct Part {
     // remembered (a Part made during Solo, or Solo is off).
     int8_t shownBeforeSolo = -1;
     Shading shading = Shading::Default; // per-Part override of the scene's shading
+    PartGlass glass; // glass, water or diamond (core/PartGlass.h); transmission 0 = an ordinary Part
     PartBoolean boolean = PartBoolean::None; // its part in the scene's Boolean
     uint32_t folder = 0;                // the PartFolder it's in (its id), 0 = none
     // Where the mesh is in the scene: world = transform * mesh position. Identity unless the Part is a linked copy
@@ -102,6 +104,9 @@ struct PartStep {
     std::unique_ptr<Part> stashed;
     bool isTransform = false;
     glm::mat4 transform{1.0f};
+    // With `isGlass` it instead changed Part `id`'s glass (Document::setPartGlass): `glass` holds the other look.
+    bool isGlass = false;
+    PartGlass glass;
     // Parts the step hid when it added Part `id` (Make Boolean Mesh hides its sources): undo shows them again, redo
     // hides them. `returnTo`: when Part `id` is the active one (and no linked copy can take over), undo makes this
     // Part active before taking it away.
@@ -231,6 +236,8 @@ struct Document {
     bool makeUnique(int i);
     // Sets Part `i`'s transform as an undoable step in its history (`label`).
     void setPartTransform(int i, const glm::mat4& transform, const std::string& label);
+    // Part `i`'s glass look as `glass`, as one undo step (in that Part's history). No step when it is unchanged.
+    void setPartGlass(int i, const PartGlass& glass, const std::string& label);
     // Makes Part `i` the one tools and commands edit.
     void selectPart(int i);
     // Inserts a Part at `at` (-1 = end of the list), made active when `select`; returns its index. `built`:

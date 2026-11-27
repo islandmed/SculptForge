@@ -187,6 +187,10 @@ uint64_t sceneHash(const Document& doc, HashScope scope) {
         h.str(p.name);
         h.word(uint64_t(p.visible) | uint64_t(p.boolean) << 8 | uint64_t(p.shading) << 16 | uint64_t(p.folder) << 24);
         h.bytes(&p.transform, sizeof p.transform);
+        if (p.glass.active()) { // (nothing added for a scene without glass: its hash stays as it was)
+            const float g[6] = {p.glass.transmission, p.glass.ior, p.glass.tint.x, p.glass.tint.y, p.glass.tint.z, p.glass.depth};
+            h.bytes(g, sizeof g);
+        }
         const Mesh& m = doc.partMesh(i);
         h.vec(m.positions);
         h.vec(m.triangles);

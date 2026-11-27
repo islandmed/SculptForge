@@ -729,6 +729,28 @@ void App::registerShellActions() {
                    "The active Part always shades smooth, whatever the scene's shading. Saved in the project.");
     partShading("part.shading_flat", "Flat", Shading::Flat,
                    "The active Part always shades flat (faceted), whatever the scene's shading. Saved in the project.");
+    // Glass, water, diamond (core/PartGlass.h): a preset sets the look, the sliders below the row refine it.
+    auto partGlass = [this, &add](const char* id, const char* label, const char* preset, const char* description) {
+        const std::string name = preset;
+        add({id, label, nullptr, description, "Material > This Part", "", "part_glass",
+             [this, name] { runCommand("part_glass", {{"preset", name}}); },
+             [this, name] {
+                 const PartGlass& g = doc_.activePartInfo().glass;
+                 GlassPreset p;
+                 return name == "none" ? !g.active() : g.active() && parseGlassPreset(name, p) && std::abs(g.ior - glassPresetIor(p)) < 0.005f;
+             },
+             nullptr});
+    };
+    partGlass("part.glass_off", "Off", "none", "The active Part is an ordinary opaque Part again.");
+    partGlass("part.glass_water", "Water", "water",
+              "Make the active Part water: see-through with an index of 1.33 and a faint blue-green tint that deepens where it is thick. "
+              "The view shows it clear with Fresnel reflections; it does not bend what is behind it. Saved in the project and in glTF.");
+    partGlass("part.glass_glass", "Glass", "glass",
+              "Make the active Part glass: see-through with an index of 1.5. The view shows it clear with Fresnel reflections; "
+              "it does not bend what is behind it. Saved in the project and in glTF.");
+    partGlass("part.glass_diamond", "Diamond", "diamond",
+              "Make the active Part diamond: see-through with an index of 2.42, so its edges mirror the environment strongly. "
+              "Fire and caustics are not drawn in the view: the Render Bridge renders those. Saved in the project and in glTF.");
     flag("view.mesh", "Show Mesh", ICON_LC_BOX, "Render", "", &renderSettings_.showMesh, "Draw the sculpt.");
     add({"view.fullscreen", "Fullscreen", ICON_LC_MAXIMIZE, "Fill the screen with SculptForge (again: back to a window).",
          "Render", "F11", "",

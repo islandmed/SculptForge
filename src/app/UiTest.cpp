@@ -108,7 +108,7 @@
 //   expect_value NAME OP N   triangles, vertices, layers, brushes, masked, hidden, groups, colored,
 //                            can_undo, newer_menu_rows (1 while the menu rows added after 0.13.0 show), level_switches (the Level slider's switches), typing (1 while a slider's number is typed), dirty, splats, show_face groups, show_mask, show_mesh, wireframe,
 //                            detached_panels (in windows of their own), flat_shading (the scene's: 1 Flat), gradient_background (1 Gradient, 0 Flat Colour),
-//                            background_r / background_g / background_b (the flat colour, 0-255), part_shading (0 Scene, 1 Smooth, 2 Flat),
+//                            background_r / background_g / background_b (the flat colour, 0-255), part_shading (0 Scene, 1 Smooth, 2 Flat), part_glass (the active Part's transmission), part_glass_ior, glass_drawn, glass_thickness,
 //                            custom_lit spheres (Lit Spheres loaded from images), material_custom (1 when the view uses
 //                            one), lit sphere_files (images in the library's Lit Spheres folder),
 //                            support_requests (times Support SculptForge was clicked; never opens a browser in tests),
@@ -1395,6 +1395,10 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "background_r" || name == "background_g" || name == "background_b") // 0-255, display values
         return std::round(app_.renderSettings_.backgroundColor[name.back() == 'r' ? 0 : name.back() == 'g' ? 1 : 2] * 255.0f);
     if (name == "part_shading") return double(int(app_.doc_.activePartInfo().shading));
+    if (name == "part_glass") return double(app_.doc_.activePartInfo().glass.transmission); // 0 = not glass
+    if (name == "part_glass_ior") return double(app_.doc_.activePartInfo().glass.ior);
+    if (name == "glass_drawn") return app_.renderer_.glassDrawn() ? 1.0 : 0.0;       // a glass Part was drawn last frame
+    if (name == "glass_thickness") return app_.renderer_.glassThickness() ? 1.0 : 0.0; // ... with the thickness tint
     if (name == "clean_view") return app_.cleanView_ ? 1.0 : 0.0;
     // Everything the shell draws around the 3D view, in px squared (0 in Clean view): bars, shelves, trays, console.
     if (name == "chrome_area") {

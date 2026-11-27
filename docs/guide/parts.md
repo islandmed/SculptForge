@@ -345,6 +345,34 @@ Face groups, UVs and vertex paint stay on both sides; the rim gets a new face gr
 it. On a Part that is closed already, Solidify says so and changes nothing. One undo step. From a script:
 `solidify thickness=0.03 both=false`.
 
+## Glass, water and diamond
+
+Any Part can be see-through. In **Render > Materials > This Part** (the same rows are in **Tool > Viewport Look**), pick
+**Glass**, **Water** or **Diamond**; **Off** makes it an ordinary Part again. In the Classic layout these rows show
+with **Edit > Preferences > Interface > Show newer menu rows**, and always on a Part that is glass already.
+
+| Control | What it does |
+|---|---|
+| **Transmission** | How see-through the Part is: 1 is clear; less lets the Part's own surface (its colour and paint) show through |
+| **Index** | The index of refraction: water 1.33, glass 1.5, diamond 2.42. The higher it is, the more strongly the edges mirror the environment |
+| **Depth** | How much glass gives the full tint, in quarter-sizes of the Part. Thick parts are tinted deeper than thin ones |
+| **Tint** | The colour the glass takes on at full depth; white is clear. Water starts with a faint blue-green |
+
+What you see: the Part is drawn after the opaque ones, its far side and then its near side, with the edges reflecting
+the environment more (Fresnel, from the index) and the tint deepening where the glass is thick. Several glass Parts draw
+farthest first, which is right for Parts that don't pass through each other. It works in every shading: the Lit Sphere
+view uses the sphere's light, the PBR view the environment.
+
+What it is not: the view does **not** bend the scene behind the glass (it is seen straight through, as through a
+pane), and nothing is ray traced. Fire (dispersion) and caustics are not drawn at all; send the scene to the
+[Render Bridge](render-bridge.md) for those. A Part with Adaptive Detail levels is drawn opaque. On a graphics chip that
+can't make the depth target the tint needs, glass is drawn clear and the panel says so.
+
+Glass is saved in the project, is one undo step, and is copied with the Part. In **glTF / GLB** it is written as
+`KHR_materials_transmission`, `KHR_materials_ior` and `KHR_materials_volume` on the Part's material (listed as used, never
+required, so a viewer without them shows the Part opaque) and read back from the same three. From a script:
+`part_glass preset=water`, or `part_glass transmission=0.9 ior=1.7 tint=99ccff depth=2`.
+
 ## Delete a Part
 
 Click **Delete...** (or right-click a row > **Delete...**) and confirm. The last Part can't be deleted, and a
@@ -356,7 +384,7 @@ delete can't be undone.
 |---|---|
 | Project (`.sfproj`) | Every Part is saved with its name, visibility, folder, attributes, layers and active layer; [linked copies](linked-duplicates.md) keep their link |
 | OBJ | Each visible Part is an `o` object; on import, `o` objects become Parts and `g` groups become face groups |
-| glTF / GLB | One node and mesh per visible Part, both ways |
+| glTF / GLB | One node and mesh per visible Part, both ways; a [glass](#glass-water-and-diamond) Part keeps its transmission, index and tint |
 | FBX | One model per visible Part (with LODs, an LOD group each), both ways |
 | USD | One Mesh prim per visible Part, both ways |
 | Bridge | Each visible Part is sent as its own object |
@@ -393,6 +421,7 @@ used.
 | `part_split_groups` / `part_split_parts` | Split |
 | `part_split_hidden` / `part_split_masked` / `part_split_unmasked` | Split off into a new Part (undoable; `keep=true` copies and leaves the source as it is) |
 | `part_shading mode=flat` | Shade a Part `default` (as the scene), `smooth` or `flat` |
+| `part_glass preset=glass` | Make a Part `water`, `glass` or `diamond` (`none`: ordinary again); `transmission=`, `ior=`, `tint=`, `depth=` set the look |
 | `part_boolean name=Bolt mode=subtract` | Set a Part's Boolean: `none`, `add`, `subtract` or `intersect` |
 | `make_boolean_mesh` | Make Boolean Mesh; `weld=`, `keep_groups=`, `cut_group=` (all `true` by default); `voxel_fallback=false` fails instead of using voxels; `resolution=` (32-512, default 256) for the voxels |
 | `boolean_parts op=subtract a=Body b=Bolt` | The Boolean of two Parts into a new Part, whatever their marks (`union`, `subtract`, `intersect`; `a` and `b` are names or list indices); the same options |

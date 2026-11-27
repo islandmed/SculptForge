@@ -165,6 +165,13 @@ bool Document::applyPartStep(PartStep& step) {
         modified = true;
         return true;
     }
+    if (step.isGlass) {
+        const int i = partIndex(step.id);
+        if (i < 0) return false;
+        std::swap(parts[size_t(i)].glass, step.glass);
+        modified = true;
+        return true;
+    }
     auto showHid = [&](bool show) {
         for (uint32_t id : step.hid)
             if (const int k = partIndex(id); k >= 0) parts[size_t(k)].visible = show;
@@ -348,6 +355,7 @@ int Document::linkedDuplicate(int i, const glm::vec3& offset) {
                            glm::translate(glm::mat4(1.0f), offset) * parts[size_t(i)].transform, i + 1);
     parts[size_t(at)].visible = parts[size_t(at - 1)].visible;
     parts[size_t(at)].shading = parts[size_t(at - 1)].shading;
+    parts[size_t(at)].glass = parts[size_t(at - 1)].glass;
     parts[size_t(at)].boolean = parts[size_t(at - 1)].boolean;
     parts[size_t(at)].ai = parts[size_t(at - 1)].ai;
     selectPart(at);
@@ -398,6 +406,19 @@ void Document::setPartTransform(int i, const glm::mat4& transform, const std::st
     r.part->isTransform = true;
     r.part->transform = parts[size_t(i)].transform;
     parts[size_t(i)].transform = transform;
+    partUndo(i).push(std::move(r));
+    modified = true;
+}
+
+void Document::setPartGlass(int i, const PartGlass& glass, const std::string& label) {
+    if (i < 0 || i >= partCount() || parts[size_t(i)].glass == glass) return;
+    UndoRecord r;
+    r.label = label;
+    r.part = std::make_shared<PartStep>();
+    r.part->id = parts[size_t(i)].id;
+    r.part->isGlass = true;
+    r.part->glass = parts[size_t(i)].glass;
+    parts[size_t(i)].glass = glass;
     partUndo(i).push(std::move(r));
     modified = true;
 }
