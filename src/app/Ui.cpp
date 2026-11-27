@@ -4,6 +4,7 @@
 
 #include "app/App.h"
 #include "app/Demo.h"
+#include "app/ItemInfo.h"
 #include "app/UiServe.h"
 #include "app/I18n.h"
 #include "app/Shell.h"
@@ -268,9 +269,6 @@ struct TouchPinState {
     int armedCount = 0;
 } g_touchPin;
 
-// The item just drawn takes a value from a drag or from typing (a slider, a drag box, a text box): ImGui sets Inputable on it (the patched
-// imgui_widgets.cpp, cmake/Dependencies.cmake, keeps the flag; the item hook that gets it alone is only on in recordings and tests).
-bool ItemIsValueBox() { return (GImGui->LastItemData.StatusFlags & ImGuiItemStatusFlags_Inputable) != 0; }
 
 bool g_pointerPen = false; // the last mouse event was the pen's (the SDL backend tells a mouse from a finger, not from a pen)
 
