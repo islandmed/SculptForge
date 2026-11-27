@@ -282,9 +282,10 @@ make it **Always** (no key needed, handy with a pen) or **Never**.
 ## The Quick Menu
 
 Press <kbd>Space</kbd> for the Quick Menu under the cursor: the Brush, Stroke, Alpha and Material tiles,
-Size, Falloff, Intensity and Colour intensity, Add / Sub, Sculpt / Paint, Rgb and X symmetry, and (in the
-SculptForge layout) **Quick Remesh**, **Quad Remesh** and **Remove Hidden**, so a remesh mid-sculpt is one right click
-away (see [Quick Remesh](geometry.md#quick-remesh)). Hold
+Size, Falloff, Intensity and Colour intensity, Add / Sub, Sculpt / Paint, Rgb and X symmetry, and (in the Classic
+and the SculptForge layout alike) a last row with **Quick Remesh**, **Quad Remesh** and **Remove Hidden**, so a remesh
+mid-sculpt is one right click away (see [Quick Remesh](geometry.md#quick-remesh)). The **Quick Remesh** button works even
+where the Quick Remesh keys are off (the Classic default). Hold
 <kbd>Space</kbd> and let go to close it again (it stays while the pointer is on it), or tap <kbd>Space</kbd> to
 keep it open until you click elsewhere or press <kbd>Esc</kbd>. Clicking a tile opens its picker.
 
