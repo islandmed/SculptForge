@@ -164,6 +164,7 @@ Json toJson(const UiPrefs& p) {
     if (p.cornerPosition == 1) j.set("cornerGizmoPosition", std::string("top-right"));
     j.set("alphabeticalPalettes", p.alphabeticalPalettes);
     j.set("appendLowPoly", p.appendLowPoly);
+    j.set("showHiddenSelection", p.showHiddenSelection);
     if (p.newerMenuRows >= 0) j.set("newerMenuRows", p.newerMenuRows != 0); // (unset = by layout)
     lookToJson(p, j);
     j.set("language", p.language);
@@ -306,6 +307,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     if (j["cornerGizmoPosition"].isString()) p.cornerPosition = j["cornerGizmoPosition"].asString() == "top-right" ? 1 : 0;
     p.alphabeticalPalettes = j["alphabeticalPalettes"].asBool(p.alphabeticalPalettes);
     p.appendLowPoly = j["appendLowPoly"].asBool(p.appendLowPoly);
+    p.showHiddenSelection = j["showHiddenSelection"].asBool(p.showHiddenSelection);
     if (j["newerMenuRows"].isBool()) p.newerMenuRows = j["newerMenuRows"].asBool() ? 1 : 0;
     // A ui.json from before 0.10.7 names neither: it was stored with the Classic look and the Classic layout,
     // and keeps them (the new-look card offers the new default once, PanelSupport.cpp).

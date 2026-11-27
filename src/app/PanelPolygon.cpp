@@ -32,6 +32,9 @@ constexpr ImU32 kSelected = IM_COL32(255, 168, 48, 255), kSelectedFill = IM_COL3
                 kHover = IM_COL32(250, 246, 220, 255), kRemove = IM_COL32(255, 96, 80, 255),
                 kPreview = IM_COL32(90, 205, 255, 235), kShadow = IM_COL32(12, 12, 16, 170);
 
+// The selection on the far side of the surface: about a third as opaque and a quarter thinner than the visible part.
+constexpr float kHiddenFade = 0.35f, kHiddenWidth = 0.75f;
+
 bool ctrlKey(SDL_Keymod mod) { return (mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0; }
 
 std::string vec3Text(const glm::vec3& v) {
@@ -347,17 +350,24 @@ void App::drawPolyOverlay() {
     ImDrawList* dl = ImGui::GetBackgroundDrawList(); // under the panels, over the model
     dl->PushClipRect(ImVec2(cr.x, cr.y), ImVec2(cr.x + cr.w, cr.y + cr.h), true);
     const float s = uiScale_;
+    // `fade` scales the opacity and the width of what is drawn: 1 for the visible selection, kHiddenFade for the part of it
+    // on the far side of the surface (the overlay has no depth test, so it is drawn over the model either way).
+    float fade = 1.0f;
+    auto faded = [&](ImU32 col) {
+        const float a = float((col >> IM_COL32_A_SHIFT) & 0xFF) * fade;
+        return (col & ~IM_COL32_A_MASK) | (ImU32(a + 0.5f) << IM_COL32_A_SHIFT);
+    };
     auto line = [&](uint32_t a, uint32_t b, ImU32 col, float width) {
         ImVec2 pa, pb;
         if (!partProject(m.positions[a], pa) || !partProject(m.positions[b], pb)) return;
-        dl->AddLine(pa, pb, kShadow, width + 2.0f * s);
-        dl->AddLine(pa, pb, col, width);
+        dl->AddLine(pa, pb, faded(kShadow), width + 2.0f * s);
+        dl->AddLine(pa, pb, faded(col), width);
     };
     auto point = [&](uint32_t v, ImU32 col, float r) {
         ImVec2 p;
         if (!partProject(m.positions[v], p)) return;
-        dl->AddCircleFilled(p, r + 1.5f * s, kShadow, 12);
-        dl->AddCircleFilled(p, r, col, 12);
+        dl->AddCircleFilled(p, r + 1.5f * s, faded(kShadow), 12);
+        dl->AddCircleFilled(p, r, faded(col), 12);
     };
     auto face = [&](uint32_t t, ImU32 fill, ImU32 col, float width) {
         uint32_t vs[4];
@@ -365,20 +375,37 @@ void App::drawPolyOverlay() {
         ImVec2 pts[4];
         for (int i = 0; i < n; ++i)
             if (!partProject(m.positions[vs[i]], pts[i])) return;
-        if ((fill >> IM_COL32_A_SHIFT) != 0) dl->AddConvexPolyFilled(pts, n, fill);
-        dl->AddPolyline(pts, n, col, ImDrawFlags_Closed, width);
+        if ((fill >> IM_COL32_A_SHIFT) != 0) dl->AddConvexPolyFilled(pts, n, faded(fill));
+        dl->AddPolyline(pts, n, faded(col), ImDrawFlags_Closed, width);
     };
     const size_t cap = sel.element == PolyElement::Points ? kDrawnPoints : sel.element == PolyElement::Edges ? kDrawnEdges : kDrawnFaces;
     const size_t step = std::max<size_t>(1, ov.items.size() / cap);
-    for (size_t i = 0; i < ov.items.size(); i += step) {
-        if (!ov.visible[i]) continue;
-        const uint32_t id = ov.items[i];
-        switch (sel.element) {
-        case PolyElement::Points: point(id, kSelected, 3.0f * s); break;
-        case PolyElement::Edges: line(topo.ends[id].x, topo.ends[id].y, kSelected, 2.0f * s); break;
-        case PolyElement::Faces: face(id, kSelectedFill, kSelected, 1.5f * s); break;
+    // Two passes: the hidden part first (dim, thinner, outlines only, at most a sixteenth of the caps: an element costs the same
+    // as a visible one, and a select-all on a dense Part must stay quick), then the visible part over it exactly as before.
+    ov.drawnFront = ov.drawnHidden = 0;
+    for (int pass = uiPrefs_.showHiddenSelection ? 0 : 1; pass < 2; ++pass) {
+        const bool front = pass == 1;
+        size_t& drawn = front ? ov.drawnFront : ov.drawnHidden;
+        fade = front ? 1.0f : kHiddenFade;
+        const float w = front ? 1.0f : kHiddenWidth;
+        size_t stride = step, seen = 0;
+        if (!front) {
+            const size_t hiddenCount = size_t(std::count(ov.visible.begin(), ov.visible.end(), uint8_t(0)));
+            stride = std::max<size_t>(1, hiddenCount / std::max<size_t>(1, cap / 16));
+        }
+        for (size_t i = 0; i < ov.items.size(); i += front ? step : 1) {
+            if ((ov.visible[i] != 0) != front) continue;
+            if (!front && seen++ % stride != 0) continue;
+            const uint32_t id = ov.items[i];
+            ++drawn;
+            switch (sel.element) {
+            case PolyElement::Points: point(id, kSelected, 3.0f * s * w); break;
+            case PolyElement::Edges: line(topo.ends[id].x, topo.ends[id].y, kSelected, 2.0f * s * w); break;
+            case PolyElement::Faces: face(id, front ? kSelectedFill : 0, kSelected, 1.5f * s * w); break;
+            }
         }
     }
+    fade = 1.0f;
     // The op preview: the result's selected faces, outlined.
     if (ov.previewOk)
         for (const auto& [a, b] : ov.previewEdges) {
@@ -433,6 +460,9 @@ void App::drawPolygonContents() {
     ImGui::SameLine();
     ui::ActionButton(*this, "polygon.group", ImVec2(-1, 0));
     if (polyMode_) ImGui::TextDisabled("%s", polySelectionText(doc_.polySelection, doc_.mesh).c_str());
+    ui::Checkbox(tr("Show hidden selection"), &uiPrefs_.showHiddenSelection);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+        ImGui::SetTooltip("%s", tr("Draw the selected points, edges and faces on the far side of the model too, dimmer than the visible ones."));
 
     ImGui::Spacing();
     tray::GroupLabel(*this, "Operations");

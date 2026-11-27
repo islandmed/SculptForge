@@ -1877,6 +1877,7 @@ private:
         std::vector<uint32_t> items;  // the selected elements of the picked kind (faces: one half per polygon)
         std::vector<uint8_t> visible; // per item: facing the camera
         uint32_t hovered = ~0u;
+        size_t drawnFront = 0, drawnHidden = 0; // the selected elements drawn last frame: facing the camera / on the far side (dim)
         // A live preview of an op while its slider moves: the result mesh's selected faces' edges.
         std::string previewOp;
         Args previewArgs;
