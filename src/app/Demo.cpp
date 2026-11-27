@@ -111,8 +111,8 @@ void ImGuiTestEngineHook_ItemAdd(ImGuiContext* ctx, ImGuiID id, const ImRect& bb
     }
 }
 
-void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* label, ImGuiItemStatusFlags flags) {
-    sf::ui::NoteItemLabel(id, label, (flags & ImGuiItemStatusFlags_Inputable) != 0); // (sliders and drag boxes: a value from a drag, or typed)
+void ImGuiTestEngineHook_ItemInfo(ImGuiContext* ctx, ImGuiID id, const char* label, ImGuiItemStatusFlags) {
+    sf::ui::NoteItemLabel(id, label);
     auto it = items().rects.find(id);
     if (!label || it == items().rects.end()) return;
     std::string text(label);

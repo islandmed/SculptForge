@@ -242,6 +242,14 @@ sf_imgui_widgets_patch("        // Tabbing or CTRL+click on Slider turns it into
             if ((clicked && g.IO.KeyCtrl) || double_clicked || (g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_PreferInput)))
                 temp_input_is_active = true;
 ")
+# A slider, a drag box and a text box keep ImGuiItemStatusFlags_Inputable on the item (ImGui only hands it to the test hook, which is
+# off in a normal run): the touch long press must not start on a control that takes its value from a drag (src/app/Ui.cpp ItemIsValueBox).
+sf_imgui_widgets_patch("    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, g.LastItemData.StatusFlags | (temp_input_allowed ? ImGuiItemStatusFlags_Inputable : 0));"
+"    if (temp_input_allowed) g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_Inputable; // (SculptForge)
+    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, g.LastItemData.StatusFlags);")
+sf_imgui_widgets_patch("    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, g.LastItemData.StatusFlags | ImGuiItemStatusFlags_Inputable);"
+"    g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_Inputable; // (SculptForge)
+    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, g.LastItemData.StatusFlags);")
 file(WRITE ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp.new "${SF_IMGUI_WIDGETS}")
 configure_file(${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp.new ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp COPYONLY)
 

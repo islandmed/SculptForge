@@ -247,7 +247,7 @@ void SameLineAt(float cursorPosX) {
 namespace {
 // Touch and pen without a keyboard (Ui.h TouchPin): a finger or the pen held still on an item for kLongPress opens a menu that
 // adds it to My Panel or a shelf, as an Alt-drag would. The press is taken from the item when it fires (its click is
-// cancelled). Sliders and drag boxes never start one (g_valueItem): their press is always a drag.
+// cancelled). Sliders and drag boxes never start one (ItemIsValueBox): their press is always a drag.
 constexpr double kLongPress = 0.5; // seconds
 struct TouchPinState {
     ImGuiID item = 0;        // the item the press in progress began on
@@ -268,7 +268,9 @@ struct TouchPinState {
     int armedCount = 0;
 } g_touchPin;
 
-ImGuiID g_valueItem = 0; // the last item that takes a value from a drag (a slider, a drag box): NoteItemLabel, from the item hook
+// The item just drawn takes a value from a drag or from typing (a slider, a drag box, a text box): ImGui sets Inputable on it (the patched
+// imgui_widgets.cpp, cmake/Dependencies.cmake, keeps the flag; the item hook that gets it alone is only on in recordings and tests).
+bool ItemIsValueBox() { return (GImGui->LastItemData.StatusFlags & ImGuiItemStatusFlags_Inputable) != 0; }
 
 bool g_pointerPen = false; // the last mouse event was the pen's (the SDL backend tells a mouse from a finger, not from a pen)
 
@@ -361,10 +363,10 @@ void touchPinItem(const std::string& entry, const char* label) {
             t.rcPopups = g.OpenPopupStack.Size;
         }
         // A finger or the pen.
-        // Not on a slider or a drag box (anything that takes a value from a drag, g_valueItem): a finger that rests on one while it
+        // Not on a slider or a drag box (anything that takes a value from a drag or typing, ItemIsValueBox): a finger that rests on one while it
         // thinks, or moves slowly, or whose moves this screen delivers late, would have its drag taken for a hold (member bug on an
         // Android tablet, 11-27: the value froze half a second in and the menu opened). Those take the Alt-drag, or a right-click.
-        if (io.MouseClicked[0] && t.pressOnUi && ImGui::IsItemHovered() && id != g_valueItem) {
+        if (io.MouseClicked[0] && t.pressOnUi && ImGui::IsItemHovered() && !ItemIsValueBox()) {
             t.item = id;
             t.pressedAt = io.MouseClickedTime[0];
             t.at = io.MouseClickedPos[0];
@@ -837,8 +839,7 @@ void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& ma
     g_seen.push_back({id, ImRect(min, max), ctx->CurrentWindow->ClipRect, ctx->CurrentWindow, false});
 }
 
-void NoteItemLabel(ImGuiID id, const char* label, bool draggable) {
-    if (draggable) g_valueItem = id;
+void NoteItemLabel(ImGuiID id, const char* label) {
     if (g_audit.on && label)
         for (auto it = g_audit.items.rbegin(); it != g_audit.items.rend(); ++it)
             if (it->id == id) {

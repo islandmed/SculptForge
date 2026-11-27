@@ -6,6 +6,6 @@ testers:
 ---
 Branch fix/touch-pin-slider-drag. Cause (since 0.14.1): the long press (ui::TouchPin, kLongPress 0.5 s) took a press that stayed within 8 px for half a
 second and cancelled the slider's drag; a slow drag, or one whose moves arrive late, looked like a hold. A first try with a 1.5 px slop for sliders
-still failed on a device (ebarranco, 11-27). Now a slider or any drag/typed-value box (the item hook's Inputable flag, g_valueItem in Ui.cpp) never
+still failed on a device (ebarranco, 11-27). Now a slider or any drag/typed-value box (ImGui's Inputable item flag, kept by the patched imgui_widgets.cpp, read by ItemIsValueBox in Ui.cpp) never
 starts a hold, so the two cannot conflict whatever the touch events look like. Touch pinning of a slider needs a pin handle (not built).
 Tests: tests/ui/touch_slider_drag.sfui (verb touch_slide), touch_add_to_shelf.sfui.
