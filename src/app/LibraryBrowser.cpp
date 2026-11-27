@@ -811,9 +811,13 @@ void LibraryBrowser::drawHeader(App& app, float width) {
         std::snprintf(label, sizeof label, "%d##lbrows", r);
         const bool darkInk = on && theme::look.monochrome; // (a white fill takes dark text)
         if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(kAccent()));
-        if (darkInk) ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
+        if (darkInk) { // (hovered or pressed it stays a light fill, so the dark text still reads)
+            ImGui::PushStyleColor(ImGuiCol_Text, theme::textOnAccent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::accentHover);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, theme::accentHover);
+        }
         if (ImGui::Button(label, ImVec2(ImGui::GetFrameHeight(), 0))) app.layout_.libraryRows = r;
-        if (darkInk) ImGui::PopStyleColor();
+        if (darkInk) ImGui::PopStyleColor(3);
         if (on) ImGui::PopStyleColor();
         ui::HelpText("Rows", nullptr, "How many rows of thumbnails the Library shows (1-4).", "Library");
         ImGui::SameLine(0, 2);
