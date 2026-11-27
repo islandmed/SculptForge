@@ -2,10 +2,10 @@
 # block); Esc closes it, Try it opens the feature, Full release notes opens the guide chapter, which shows the last
 # three versions in full and folds the older ones into groups.
 # The window is pinned to 0.12.0's five cards (SF_WHATS_NEW_VERSION; the chapter starts at 0.11.0), so this stays valid
-# after each release; the guide chapter below is pinned to 0.14.3 (SF_GUIDE_VERSION), so it checks 0.14.3's section
+# after each release; the guide chapter below is pinned to 0.14.4 (SF_GUIDE_VERSION), so it checks 0.14.4's section
 # before and after the release.
 env SF_WHATS_NEW_VERSION 0.12.0
-env SF_GUIDE_VERSION 0.14.3
+env SF_GUIDE_VERSION 0.14.4
 run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
 run new_sphere subdivisions=3
 click "Help##palette.help"
@@ -55,12 +55,12 @@ wait 0.3
 expect_value whats_new_open == 0
 expect_value guide_open == 1
 expect_guide whats-new.md
+expect_text "Version 0.14.4"
+expect_text "Both sides of a mirrored Micro stroke shade as you sculpt, and Monochrome reaches the last orange corners."
 expect_text "Version 0.14.3"
 expect_text "SculptForge on Android as a free early build, HDRIs of your own, a Clean view, Monochrome colours and Focus Detail on Windows."
 expect_text "Version 0.14.2"
 expect_text "Dynamic keeps your painted texture, pinching cuts hold smooth walls, and dense Micro levels shade closer behind the brush."
-expect_text "Version 0.14.1"
-expect_text "Up to four lights of your own with a shadow strength, any control on any shelf, and one place for the camera's navigation bindings."
 expect_value whats_new_contents == 6   # 3 versions in full, then the groups of older versions (the chapter starts at 0.11.0)
 expect_value whats_new_expanded == 1
 shot whats-new-guide

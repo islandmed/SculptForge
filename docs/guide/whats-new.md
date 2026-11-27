@@ -5,6 +5,28 @@ shows its main features, each with a **Try it** button; **Help > What's New** op
 three versions in full, then the older ones in groups. Every detail is in the
 [changelog](https://github.com/islandmed/SculptForge/blob/main/CHANGELOG.md).
 
+## Version 0.14.4
+
+```features
+date: 2026-11-27
+tagline: Both sides of a mirrored Micro stroke shade as you sculpt, and Monochrome reaches the last orange corners.
+highlight: Micro levels: both sides of a mirrored stroke shade while you sculpt, not only on release (#184)
+highlight: Monochrome colours reach the Command palette, the radial menu and context menus (requested by a member)
+highlight: Monochrome: shortcut boxes, selected text, the guide's search highlight and the Library's page buttons lose the last orange
+title: Both sides shade live
+line: On a dense Micro level with X symmetry, the side under the brush and its mirror both pick up the shading while the pen is down, not only when you lift it.
+action: guide:performance.md
+title: Monochrome everywhere
+line: With Monochrome colours, the Command palette (F3), the radial menu, context menus, shortcut boxes and selected text are grey and white too.
+action: guide:interface.md
+```
+
+- **Micro levels**: with X symmetry on a dense Micro level, both sides of a stroke shade while you sculpt; before, the
+  mirrored side often waited until you lifted the pen. The shading per frame is the same. Thanks @HG4Science (#184).
+- **Monochrome colours**: the Command palette's frame and highlighted row, shortcut boxes, the radial menu's highlight,
+  the corner gizmo's hover dot, the guide's search highlight, selected text and the Library's page buttons take the
+  white accent instead of orange. *Requested by a member*
+
 ## Version 0.14.3
 
 ```features
