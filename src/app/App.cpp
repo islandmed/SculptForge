@@ -4331,7 +4331,6 @@ void App::drawGameExportContents() {
     ImGui::SeparatorText(tr("Unreal Engine"));
     ImGui::PushItemWidth(-ImGui::CalcTextSize("Folder").x - ImGui::GetStyle().ItemInnerSpacing.x);
     ImGui::InputText(tr("Folder"), unrealDestination_, sizeof unrealDestination_);
-    ui::PinControl("Unreal folder");
     if (unrealHeightCm_ <= 0.0f) unrealHeightCm_ = std::max(1.0f, doc_.mesh.bounds().extent().y * 100.0f);
     ImGui::DragFloat(tr("Height"), &unrealHeightCm_, 1.0f, 1.0f, 100000.0f, "%.0f cm");
     ui::PinControl("Unreal height");

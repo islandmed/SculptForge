@@ -161,6 +161,7 @@ struct {
     std::vector<PinAuditItem> items;
     std::vector<std::pair<ImGuiWindow*, ImRect>> marks;
 } g_audit;
+int g_paletteAltFrame = -10; // the last frame a palette drew read-only for Alt (BeginPaletteItems)
 void auditMark() {
     if (!g_audit.on || !g_audit.root || ImGui::GetCurrentWindow()->RootWindow != g_audit.root) return;
     g_audit.marks.push_back({g_audit.root, ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax())});
@@ -534,7 +535,10 @@ PinnedControl EndPinnedControl() {
 
 bool BeginPaletteItems() {
     const bool readOnly = AltHeld() && !CtrlHeld();
-    if (readOnly) ImGui::PushItemFlag(ImGuiItemFlags_ReadOnly, true);
+    if (readOnly) {
+        ImGui::PushItemFlag(ImGuiItemFlags_ReadOnly, true);
+        g_paletteAltFrame = ImGui::GetFrameCount();
+    }
     return readOnly;
 }
 
@@ -812,6 +816,14 @@ int HoverLiftsShown() { return g_liftsShown; }
 
 void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& max) {
     if (!id || !ctx || !ctx->CurrentWindow) return;
+    // A text box pressed while Alt made it read-only (picking a control up) must not stay open once Alt is let go: ImGui keeps no text for a
+    // read-only one and then compares that null text and crashes (Alt+click on Selection Sets > Set name, 11-26). Close it, and the
+    // note it leaves for the field's next draw, before the field is drawn.
+    if (ctx->InputTextState.ID != 0 && ctx->ActiveId == ctx->InputTextState.ID && (ctx->InputTextState.Flags & ImGuiInputTextFlags_ReadOnly) &&
+        ctx->FrameCount - g_paletteAltFrame <= 2 && !AltHeld()) {
+        ImGui::ClearActiveID();
+        ctx->InputTextDeactivatedState.ID = 0;
+    }
     if (g_audit.on && g_audit.frame != ctx->FrameCount) {
         g_audit.frame = ctx->FrameCount;
         g_audit.items.clear();

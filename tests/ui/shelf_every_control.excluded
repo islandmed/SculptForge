@@ -37,3 +37,4 @@ preferences/preferences.ai/Copy path  # a copy helper beside a path
 preferences/preferences.ai/(no label)*  # a text box (the path or key being typed)
 preferences/preferences.support/Show the memberships  # opens a window
 preferences/preferences.tablet/*  # the pressure-curve presets (Soft, Linear, Firm, Fine detail): shortcuts for the curve beside them
+tool/tool.export/Folder  # the Unreal folder, a text box: on a side shelf its field has no room (the label takes the column); no typing there

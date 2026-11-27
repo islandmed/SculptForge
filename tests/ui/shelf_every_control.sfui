@@ -48,5 +48,15 @@ expect_value hidden == 0
 key ctrl+z
 expect_value triangles == $tris0
 expect_value undo_steps == $steps0
+# A text box pressed while Alt is held (picking controls up) and Alt then let go: it closed the app (ImGui compared the text of a read-only
+# field it never kept). Selection Sets > Set name.
+click "Selection Sets##tool.selection_sets"
+expect "Tool/##setname"
+hold alt
+click "Tool/##setname"
+hold none
+wait 10
+expect "Tool/##setname"
+click "Selection Sets##tool.selection_sets"
 # The audit: every other control of every palette.
 audit_pins pin_gaps.txt shelf_every_control.excluded
