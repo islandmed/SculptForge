@@ -310,7 +310,8 @@ TEST(wax_and_oil_recipes_use_real_channels_and_say_so) {
     if (!wax || !oil) return;
     CHECK(wax->description.find("no translucency") != std::string::npos);
     CHECK(wax->description.find("stand-in") != std::string::npos);
-    CHECK(oil->description.find("ubsurface") == std::string::npos && wax->description.find("scattering") == std::string::npos);
+    CHECK(oil->description.find("ubsurface") == std::string::npos && wax->description.find("ubsurface") == std::string::npos &&
+          wax->description.find("scattering") == std::string::npos);
     for (const MaterialRecipe* r : {wax, oil})
         for (const Json& l : r->layers.items())
             for (const Json& c : l["fill"]["material"]["channels"].items())

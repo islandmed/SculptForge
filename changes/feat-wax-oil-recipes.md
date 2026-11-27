@@ -7,4 +7,4 @@ testers:
   - Sculpt a bust, Tool > Texture Image > Auto UV, New Texture; Tool > Paint Layers > Material Recipe > Wax; Render > Materials > Viewport Shading > PBR. Good: warm semi-glossy wax, brighter rims and thin parts, glossy pools in the creases, no dark or noisy artefacts.
   - Same with Oil Stain on top of another recipe or a plain colour: patches of dark amber, soft at the rim, sharp highlight in the middle; Undo removes it.
 ---
-Tests: tests/test_fill_layers.cpp (material_recipes_are_data_and_wear_the_model, wax_and_oil_recipes).
+Tests: tests/test_fill_layers.cpp (material_recipes_are_data_and_wear_the_model, wax_and_oil_recipes_use_real_channels_and_say_so).
