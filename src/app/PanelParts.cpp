@@ -1273,14 +1273,14 @@ void App::drawPartPopups() {
 
 // X-Ray's strength: how much the see-through Parts let through, 0% (solid) to 100% (a faint ghost); the default 70% is
 // the look X-Ray always had. Display only (RenderSettings::xrayOpacity): nothing in the material, the mesh or an export
-// reads it. Moving it turns X-Ray on; a reference image behind the model stays visible while sculpting.
+// reads it. Shown while X-Ray is on (the panels keep their layout otherwise); a reference image behind the model
+// stays visible while sculpting.
 void App::drawSeeThroughSlider(const char* id) {
+    if (!renderSettings_.xray) return;
     float percent = std::round((1.0f - renderSettings_.xrayOpacity) * 100.0f);
     ImGui::SetNextItemWidth(-1);
-    if (ui::SliderInside(id, &percent, 0.0f, 100.0f, "See-through %.0f%%")) {
+    if (ui::SliderInside(id, &percent, 0.0f, 100.0f, "See-through %.0f%%"))
         renderSettings_.xrayOpacity = std::clamp(1.0f - percent / 100.0f, kXrayMinOpacity, 1.0f);
-        renderSettings_.xray = true;
-    }
     ui::HelpText("See-through", nullptr,
                  "How much X-Ray lets through, 0 (solid) to 100 (a faint ghost); 70 is the usual X-Ray look. Only changes the "
                  "view, never the Part or an export, and sculpting works on the visible front surface as always. Saved with "
