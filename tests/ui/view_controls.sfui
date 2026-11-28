@@ -22,6 +22,13 @@ run part_solo
 wait 0.2
 shot xray-solo
 run part_solo
+# See-through strength: the slider's value is kept (display only), at 70% by default.
+expect_value xray_strength == 70
+run xray on=true strength=90
+expect_value xray_strength == 90
+wait 0.2
+shot xray-solo-90
+run xray strength=70
 click "X-Ray"
 expect_value xray == 0
 

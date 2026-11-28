@@ -2628,6 +2628,7 @@ private:
     void drawPalette_Material();
     void drawPalette_Preferences();
     void drawPalette_Render();
+    void drawSeeThroughSlider(const char* id); // X-Ray's strength (PanelParts.cpp), shared by the Parts panel and the Render palette
     void drawPalette_Script();
     void drawPalette_Splats();
     void drawPalette_Stroke();

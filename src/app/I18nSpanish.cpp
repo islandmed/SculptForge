@@ -2240,6 +2240,10 @@ constexpr Entry kSpanish[] = {
     {"Integrations", "Integraciones"},
     {"Support", "Apoyo"},
     {"X-Ray", "Rayos X"},
+    {"See-through %.0f%%", "Transparencia %.0f%%"},
+    {"See-through", "Transparencia"},
+    {"How much X-Ray lets through, 0 (solid) to 100 (a faint ghost); 70 is the usual X-Ray look. Only changes the view, never the Part or an export, and sculpting works on the visible front surface as always. Saved with the project; Ctrl+click to type.",
+     "Cuánto deja ver Rayos X, de 0 (sólido) a 100 (un fantasma tenue); 70 es el aspecto habitual. Solo cambia la vista, nunca la Pieza ni una exportación, y se esculpe sobre la superficie frontal visible como siempre. Se guarda con el proyecto; Ctrl+clic para escribir el valor."},
     {"View resolution", "Resolución de vista"},
     {"Decimate leaves masked vertices where they are, so masked areas keep their triangles exactly; the rest is "
      "decimated around them.",

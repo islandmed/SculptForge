@@ -491,6 +491,8 @@ void App::storeProjectSettings() {
 
     Json render = Json::object();
     render.set("wireframe", renderSettings_.wireframe);
+    render.set("xray", renderSettings_.xray); // (display only: see-through, with its strength)
+    render.set("xray_opacity", double(renderSettings_.xrayOpacity));
     render.set("base_color", vec3Json(renderSettings_.baseColor));
     render.set("show_vertexpaint", renderSettings_.showVertexPaint);
     render.set("color_tints_material", renderSettings_.colorTintsMaterial);
@@ -648,6 +650,9 @@ void App::applyProjectSettings() {
         }
     if (const Json& r = s["render"]; r.isObject()) {
         readBool(r, "wireframe", renderSettings_.wireframe);
+        renderSettings_.xray = r["xray"].asBool(false); // (per scene: projects from before it open solid, at the default strength)
+        renderSettings_.xrayOpacity = float(r["xray_opacity"].asNumber(RenderSettings().xrayOpacity));
+        renderSettings_.xrayOpacity = std::clamp(renderSettings_.xrayOpacity, kXrayMinOpacity, 1.0f);
         readVec3(r["base_color"], renderSettings_.baseColor);
         readBool(r, "show_vertexpaint", renderSettings_.showVertexPaint);
         readBool(r, "color_tints_material", renderSettings_.colorTintsMaterial);

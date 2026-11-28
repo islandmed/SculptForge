@@ -1967,6 +1967,7 @@ double Demo::query(const std::string& name, bool& known) const {
         return app_.renderer_.floorGridDrawn() ? 1.0 : 0.0;
     }
     if (name == "xray") return app_.renderSettings_.xray ? 1.0 : 0.0;
+    if (name == "xray_strength") return std::round((1.0 - double(app_.renderSettings_.xrayOpacity)) * 100.0); // See-through, in percent
     if (name == "view_ao") return app_.renderSettings_.ambientOcclusion ? 1.0 : 0.0;
     if (name == "view_shadows") return app_.renderSettings_.shadows ? 1.0 : 0.0;
     if (name == "occlusion_on") return app_.renderer_.occlusionWanted(app_.renderSettings_) ? 1.0 : 0.0; // shadows or AO shade the view

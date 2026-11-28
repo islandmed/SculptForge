@@ -862,6 +862,7 @@ void App::drawPalette_Render() {
     bool xray = renderSettings_.xray;
     if (ui::Checkbox("X-Ray##render", &xray)) runCommand("xray", {{"on", xray}});
     ui::HelpAction(*this, "view.xray");
+    drawSeeThroughSlider("##seethrough_render");
     ImGui::BeginDisabled(doc_.splats.empty());
     ImGui::Checkbox(tr("Show Splats"), &renderSettings_.showSplats);
     ImGui::EndDisabled();
