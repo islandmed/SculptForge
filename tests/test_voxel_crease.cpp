@@ -82,7 +82,7 @@ TEST(voxel_crease_invariant_fine_creases_stay_clean) {
     // (0.6 before gh#240's fixes. Surface nets now keeps the two walls of a thin slit as two sheets, which also steadies the
     // unsnapped surface: depth cv 0.442 -> 0.405 unsnapped, 0.264 -> 0.255 snapped, so the ratio crosses 0.6 by the denominator;
     // the snapped figure is held on its own.)
-    CHECK(on.m.depthCv <= 0.65 * off.m.depthCv);
+    CHECK(on.m.depthCv <= 0.75 * off.m.depthCv); // (the loose-sample cleanup of the sign pass steadies the unsnapped surface too: 0.405 -> 0.340, snapped 0.255 -> 0.240)
     CHECK(on.m.depthCv <= 0.27);
     CHECK(on.m.normalErrDeg <= 0.6 * off.m.normalErrDeg);
     CHECK(on.m.profileErr <= 0.6 * off.m.profileErr);
