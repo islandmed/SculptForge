@@ -1,0 +1,57 @@
+# Quad Remesh's 50% / 200% buttons act on the Target itself (member request): each click halves or doubles it, so three
+# clicks of 50% from 100000 give 50000, 25000, 12500. Until the Target has been set they start from the Part's polygon
+# count (the first click behaves as it always did), and the target stops at 100 and 2 million with a note.
+run ui_look look=classic layout=classic
+run new_sphere subdivisions=5
+click "Geometry##tool.geometry"
+expect "QRemesh/50%"
+expect_value retopo_target == 5000
+
+# Never set: the first click starts from the Part's polygon count, whatever the default Target is.
+remember triangles tris
+click "QRemesh/50%"
+expect_value retopo_target > 5000
+expect_value retopo_target < $tris
+
+# Ctrl-hover help says what the buttons do.
+hold ctrl
+hover "QRemesh/50%"
+expect_help "Halve the target"
+hover "QRemesh/200%"
+expect_help "Double the target"
+hold none
+
+# Set to 100000 by typing: 50% three times halves it each time.
+double_click "QRemesh/##qtarget"
+type_here 100000
+key enter
+expect_value retopo_target == 100000
+click "QRemesh/50%"
+expect_value retopo_target == 50000
+click "QRemesh/50%"
+expect_value retopo_target == 25000
+click "QRemesh/50%"
+expect_value retopo_target == 12500
+shot target_halved
+
+# 200% doubles it back, step by step.
+click "QRemesh/200%"
+expect_value retopo_target == 25000
+click "QRemesh/200%"
+expect_value retopo_target == 50000
+
+# 100% is the Part's polygon count again, then 50% halves that.
+click "QRemesh/100%"
+expect_value retopo_target == $tris
+click "QRemesh/50%"
+expect_value retopo_target < $tris
+
+# The limits: the lowest is 100 (with a note), and 200% climbs back from it.
+double_click "QRemesh/##qtarget"
+type_here 150
+key enter
+click "QRemesh/50%"
+expect_value retopo_target == 100
+expect_status "lowest"
+click "QRemesh/200%"
+expect_value retopo_target == 200

@@ -1836,6 +1836,7 @@ private:
     struct RetopoSettings {
         int method = 0; // 0 = QRemesh 2 (QRemeshMethod::V2), 1 = Legacy
         int target = 5000;
+        bool targetSet = false; // the 50% / 200% steps start from the Part's polygon count until the Target has been set
         float adaptive = 0.5f;
         bool keepGroups = false, detectEdges = true, useVertexPaint = false, symmetry = true, keepOriginal = false;
         bool keepMasked = false; // Keep Masked (#43): the masked area stays as it is (core/KeepMasked.h)
