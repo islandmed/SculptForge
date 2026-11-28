@@ -217,7 +217,6 @@ test_gizmo_all              ui
 test_shell_layout           ui
 test_shell_quote            ui
 test_ui_scale               ui
-test_hooks_off              ui
 test_radial_menu            ui
 test_mac_menu               ui
 test_support                ui
