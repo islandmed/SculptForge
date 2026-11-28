@@ -11,6 +11,8 @@
 #include "core/ScreenSelect.h"
 #include "core/Sculpt.h"
 
+#include <map>
+#include <array>
 #include <algorithm>
 #include <cmath>
 
@@ -174,6 +176,89 @@ TEST(mask_all_invert_clear_undo) {
     bool ok = true;
     for (uint32_t v = 0; v < h.mesh.vertexCount(); ++v) ok &= h.mesh.mask[v] == (h.mesh.vertexHidden(v) ? 0.0f : 1.0f);
     CHECK(ok);
+}
+
+TEST(mask_blur_click_passes_grow_by_radius) {
+    // 1x: every click as today. 2x: the reach (sqrt of passes) doubles per click: 1, 4, 16, 64 passes.
+    for (int k = 0; k < 6; ++k) CHECK(maskBlurClickPasses(1, 1.0f, k, 10000) == 1);
+    CHECK(maskBlurClickPasses(1, 2.0f, 0, 10000) == 1);
+    CHECK(maskBlurClickPasses(1, 2.0f, 1, 10000) == 4);
+    CHECK(maskBlurClickPasses(1, 2.0f, 2, 10000) == 16);
+    CHECK(maskBlurClickPasses(1, 2.0f, 3, 10000) == 64);
+    CHECK(maskBlurClickPasses(1, 2.0f, 4, 10000) == 100); // the command's limit
+    CHECK(maskBlurClickPasses(3, 2.0f, 1, 10000) == 12);
+    CHECK(maskBlurClickPasses(1, 9.0f, 1, 10000) == 9);   // growth stops at 3x
+    // A dense Part caps the reach (work = passes x vertices), never below the passes asked for.
+    CHECK(maskBlurClickPasses(1, 2.0f, 5, 2500000) == 16);
+    CHECK(maskBlurClickPasses(1, 2.0f, 5, 40000000) == 1);
+    CHECK(maskBlurClickPasses(20, 2.0f, 2, 2500000) == 20);
+
+    // The passes really widen the soft edge: 16 passes soften more of a sphere than 4.
+    Document a = makeDoc(makeIcosphere(4));
+    Document b = makeDoc(makeIcosphere(4));
+    maskHalf(a.mesh);
+    maskHalf(b.mesh);
+    CHECK(registry().execute(a, "mask_blur", {{"iterations", 4.0}}).ok);
+    CHECK(registry().execute(b, "mask_blur", {{"iterations", 16.0}}).ok);
+    auto soft = [](const Mesh& m) {
+        return std::count_if(m.mask.begin(), m.mask.end(), [](float v) { return v > 0.02f && v < 0.98f; });
+    };
+    CHECK(soft(b.mesh) > soft(a.mesh));
+}
+
+TEST(mask_blur_widening_invariants) {
+    // What the widening promises on a dense curved mesh: each longer blur only softens the edge further (it never
+    // leaves the mask's own range, never darkens or lights the far side, and stays mirror-symmetric), so a chain of
+    // clicks at 1, 4, 16 passes moves the edge smoothly outward.
+    Document d = makeDoc(makeIcosphere(5));
+    const uint32_t n = d.mesh.vertexCount();
+    // (the half's mask: 1 for x > 0, 0 for x < 0 and 0.5 on the plane, so the mask is its own mirror image's inverse)
+    auto halfMask = [](Mesh& m) {
+        maskHalf(m);
+        for (uint32_t v = 0; v < m.vertexCount(); ++v)
+            if (std::abs(m.positions[v].x) < 1e-5f) m.mask[v] = 0.5f;
+    };
+    // The mirror vertex of each (x -> -x), found by position.
+    std::map<std::array<int, 3>, uint32_t> byPos;
+    auto key = [](const glm::vec3& p) { return std::array<int, 3>{int(std::lround(p.x * 2e4f)), int(std::lround(p.y * 2e4f)), int(std::lround(p.z * 2e4f))}; };
+    for (uint32_t v = 0; v < n; ++v) byPos[key(d.mesh.positions[v])] = v;
+    std::vector<uint32_t> mirror(n, UINT32_MAX);
+    for (uint32_t v = 0; v < n; ++v) {
+        glm::vec3 p = d.mesh.positions[v];
+        p.x = -p.x;
+        auto it = byPos.find(key(p));
+        if (it != byPos.end()) mirror[v] = it->second;
+    }
+    size_t prevSoft = 0;
+    float prevReach = 0.0f;
+    for (int passes : {1, 4, 16}) {
+        Document c = makeDoc(makeIcosphere(5));
+        halfMask(c.mesh);
+        CHECK(registry().execute(c, "mask_blur", {{"iterations", double(passes)}}).ok);
+        const auto& m = c.mesh.mask;
+        CHECK(std::all_of(m.begin(), m.end(), [](float v) { return v >= 0.0f && v <= 1.0f; })); // never leaves 0..1
+        size_t soft = 0, asym = 0, checked = 0;
+        float reach = 0.0f; // the widest distance from the x = 0 plane that a vertex is partly masked
+        for (uint32_t v = 0; v < n; ++v) {
+            const float x = c.mesh.positions[v].x;
+            if (m[v] > 0.02f && m[v] < 0.98f) {
+                ++soft;
+                reach = std::max(reach, std::abs(x));
+            }
+            if (mirror[v] != UINT32_MAX && std::abs(x) > 1e-4f) {
+                ++checked;
+                asym += std::abs(m[v] + m[mirror[v]] - 1.0f) > 1e-3f; // the blur of a half and of its mirror add up to 1
+            }
+            if (x > 0.0f) CHECK(m[v] >= 0.5f - 1e-4f); // the masked side stays on its side of the edge
+            else CHECK(m[v] <= 0.5f + 1e-4f);
+        }
+        CHECK(checked > n / 2);
+        CHECK(asym == 0);
+        CHECK(soft > prevSoft);   // more passes soften more vertices ...
+        CHECK(reach > prevReach); // ... and reach further from the edge
+        prevSoft = soft;
+        prevReach = reach;
+    }
 }
 
 TEST(mask_blur_sharpen_grow_shrink) {

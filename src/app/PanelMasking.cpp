@@ -10,12 +10,14 @@
 #include "app/Pickers.h"
 #include "app/Ui.h"
 #include "app/I18n.h"
+#include "core/Masking.h"
 #include "core/Micro.h"
 
 #include <IconsLucide.h>
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <string>
 
 namespace sf {
@@ -95,7 +97,24 @@ void App::maskClickRelease() {
     maskClickPending_ = false;
     const bool sharpen = strokeInvert_;
     endStroke(); // nothing was dabbed: no undo step
-    if (anyMasked(doc_.mesh)) runCommand(sharpen ? "mask_sharpen" : "mask_blur");
+    if (!anyMasked(doc_.mesh)) return;
+    if (sharpen) runCommand("mask_sharpen");
+    else runMaskBlur();
+}
+
+void App::runMaskBlur() {
+    constexpr double kMaskBlurChainSeconds = 2.0;
+    const double now = double(SDL_GetTicksNS()) * 1e-9;
+    const bool chained = maskBlurStreak_ > 0 && now - maskBlurAt_ <= kMaskBlurChainSeconds && doc_.undo.topSeq() == maskBlurSeq_;
+    if (!chained) maskBlurStreak_ = 0;
+    const int passes = maskBlurClickPasses(maskIterations_, maskBlurGrowth_, maskBlurStreak_, doc_.mesh.vertexCount());
+    const uint64_t before = doc_.undo.topSeq();
+    runCommand("mask_blur", {{"iterations", double(passes)}});
+    if (doc_.undo.topSeq() == before) return; // nothing changed (or queued): the chain stays as it was
+    maskBlurLastPasses_ = passes;
+    maskBlurStreak_ = maskBlurGrowth_ > 1.0f ? maskBlurStreak_ + 1 : 0; // (1x: nothing to chain)
+    maskBlurSeq_ = doc_.undo.topSeq();
+    maskBlurAt_ = now;
 }
 
 // classic convention: Ctrl+drag on the background with MaskPen draws a mask rectangle (#48) that masks what it
@@ -136,7 +155,8 @@ void App::maskSelectMouseUp() {
         if (!pick(selectPath_.front().x, selectPath_.front().y, hit)) {
             if (!alt) runCommand("mask_invert");
         } else if (anyMasked(doc_.mesh) && !blenderStyle()) {
-            runCommand(alt ? "mask_sharpen" : "mask_blur");
+            if (alt) runCommand("mask_sharpen");
+            else runMaskBlur();
         }
         return;
     }
@@ -540,11 +560,22 @@ void App::drawMaskingSection() {
     };
     for (const Op& op : ops) {
         next();
-        if (maskButton(op.id, op.hint, int(op.art), cell)) runCommand(op.command, op.passes ? passes : Args{});
+        if (maskButton(op.id, op.hint, int(op.art), cell)) {
+            if (std::strcmp(op.command, "mask_blur") == 0) runMaskBlur();
+            else runCommand(op.command, op.passes ? passes : Args{});
+        }
     }
     ImGui::SetNextItemWidth(-1);
     tray::SliderInt("##maskpasses", &maskIterations_, 1, 20, "Passes %d");
     ui::PinControl("Mask passes");
+    ImGui::SetNextItemWidth(-1);
+    ui::SliderInside("##maskblurgrowth", &maskBlurGrowth_, 1.0f, 3.0f, "Each blur widens %.1fx");
+    ui::HelpText("Each blur widens", nullptr,
+                 "Each Blur click in a row (within about 2 seconds, on the same mask) reaches this many times further than "
+                 "the click before: at 2x a few clicks go from a slightly soft edge to a very soft one. 1x blurs every "
+                 "click the same, as always. Big Parts cap the reach to stay quick.",
+                 "Tool > Masking");
+    ui::PinControl("Each blur widens");
 
     // The options of the Mask by buttons.
     if (ImGui::TreeNodeEx(tr("Mask by options##mask"), ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen)) {

@@ -304,6 +304,14 @@ bool maskBlur(Mesh& mesh, int iterations) {
     });
 }
 
+int maskBlurClickPasses(int basePasses, float growth, int streak, size_t vertexCount) {
+    basePasses = std::clamp(basePasses, 1, 100);
+    growth = std::clamp(growth, 1.0f, 3.0f);
+    const double wanted = double(basePasses) * std::pow(double(growth), 2.0 * std::max(streak, 0));
+    const double cap = std::clamp(kMaskBlurWorkBudget / double(std::max<size_t>(vertexCount, 1)), double(basePasses), 100.0);
+    return int(std::lround(std::min(wanted, cap)));
+}
+
 bool maskSharpen(Mesh& mesh, int iterations) {
     if (!mesh.hasMask()) return false;
     return repeatPass(mesh, iterations, [&](const std::vector<float>& m, uint32_t v) {

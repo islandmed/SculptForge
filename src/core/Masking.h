@@ -28,6 +28,12 @@ bool maskAll(Mesh& mesh);
 bool maskInvert(Mesh& mesh);
 // Averages each value with its neighbours `iterations` times (softens edges).
 bool maskBlur(Mesh& mesh, int iterations);
+// Passes for the click number `streak` (0 = the first) of consecutive blur clicks: a blur's reach grows with the
+// square root of its passes, so a radius that widens `growth` times per click (1 = every click as `basePasses`, up to
+// 3) takes basePasses * growth^(2 * streak) passes. Capped at 100 (the command's limit) and so a dense Part still
+// answers fast: passes * vertexCount stays under kMaskBlurWorkBudget (never below `basePasses`).
+constexpr double kMaskBlurWorkBudget = 40e6;
+int maskBlurClickPasses(int basePasses, float growth, int streak, size_t vertexCount);
 // Pushes values towards 0 or 1 and tightens soft edges (inverse of blur).
 bool maskSharpen(Mesh& mesh, int iterations);
 // Grows / shrinks the masked region by one edge ring per iteration.
