@@ -2750,11 +2750,14 @@ constexpr Entry kSimplifiedChinese[] = {
      "Legacy: the method of SculptForge 0.9 (more poles, a split look).",
      "Quad Remesh 2（默认）：以整个模型为单一整数网格求解的曲率对齐布线，极点只出现在形体需要之处，边环不中断；开放的"
      "导引曲线会成为精确的边环。旧版：SculptForge 0.9 的方法（极点较多，看起来较零碎）。"},
-    {"About how many quads Quad Remesh makes (Ctrl+click to type a number). 50% / 100% / 200% set it from the Part's current polygon count.", "Quad Remesh 大约生成的四边面数量（按住 Ctrl 并单击可输入数字）。50%／100%／200%会按部件当前多边形数量设置。"},
-    {"Target half the Part's current polygon count.", "目标为部件当前多边形数量的一半。"},
+    {"About how many quads Quad Remesh makes (Ctrl+click to type a number). 100% sets it to the Part's current polygon count; 50% and 200% halve and double the Target, click after click.",
+     "Quad Remesh 大约生成的四边面数量（按住 Ctrl 并单击可输入数字）。100%设为部件当前的多边形数量；50%和200%会把目标减半或加倍，可连续点击。"},
+    {"Halve the target: each click halves Target Quads (the first click starts from the Part's current polygon count).",
+     "目标减半：每点一次，Target Quads 减半（第一次点击从部件当前的多边形数量开始）。"},
     {"Target the Part's current polygon count (to clean up topology without changing its density).",
      "目标为部件当前多边形数量（在不改变密度的情况下整理拓扑）。"},
-    {"Target twice the Part's current polygon count.", "目标为部件当前多边形数量的两倍。"},
+    {"Double the target: each click doubles Target Quads (the first click starts from the Part's current polygon count).",
+     "目标加倍：每点一次，Target Quads 加倍（第一次点击从部件当前的多边形数量开始）。"},
     {"0: quads all about the same size. Higher: smaller quads where the surface curves, bigger ones on flat areas "
      "(the count stays near the target).",
      "0：四边面大小大致相同。较高：表面弯曲处四边面较小，平坦处较大（数量维持在目标附近）。"},

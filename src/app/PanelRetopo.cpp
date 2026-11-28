@@ -254,7 +254,8 @@ void App::drawGuideStrength(bool compact) {
 void App::drawTargetQuads(bool compact) {
     if (!compact) ImGui::SetNextItemWidth(-1);
     const bool grab = !compact && beginShelfGrab();
-    tray::SliderInt(compact ? "##qtarget.shelf" : "##qtarget", &retopo_.target, 100, 200000, "Target Quads %d", ImGuiSliderFlags_Logarithmic);
+    if (tray::SliderInt(compact ? "##qtarget.shelf" : "##qtarget", &retopo_.target, 100, 200000, "Target Quads %d", ImGuiSliderFlags_Logarithmic))
+        retopo_.targetSet = true;
     if (grab) endShelfGrab("##qtargetgrab", "widget.target_quads", "Target Quads");
 }
 
@@ -866,20 +867,34 @@ void App::drawQRemeshContents() {
     }
     drawTargetQuads();
     ui::HelpText("Target Quads", nullptr,
-                 "About how many quads Quad Remesh makes (Ctrl+click to type a number). 50% / 100% / 200% set it from "
-                 "the Part's current polygon count.",
+                 "About how many quads Quad Remesh makes (Ctrl+click to type a number). 100% sets it to the Part's "
+                 "current polygon count; 50% and 200% halve and double the Target, click after click.",
                  kQRemeshPath);
     const size_t faces = faceCount(doc_.mesh);
-    auto setTarget = [&](double k) { retopo_.target = int(std::clamp(double(faces) * k, 100.0, 2'000'000.0)); };
-    if (ImGui::Button(tr("50%"), ImVec2(third, 0))) setTarget(0.5);
-    ui::HelpText("50%", nullptr, "Target half the Part's current polygon count.", kQRemeshPath);
+    // 50% / 200% act on the Target itself, so clicks add up (50k, 25k, 12.5k); until the Target has been set they start
+    // from the Part's polygon count, which is also what 100% sets. Clamped to 100..2M with a note at the limit.
+    auto setTarget = [&](double k, bool fromTarget) {
+        constexpr double lo = 100.0, hi = 2'000'000.0;
+        const double from = fromTarget && retopo_.targetSet ? double(retopo_.target) : double(faces);
+        const double want = from * k;
+        retopo_.target = int(std::clamp(want, lo, hi));
+        retopo_.targetSet = true;
+        if (want < lo) status_ = "Target Quads is at its lowest, " + std::to_string(retopo_.target);
+        else if (want > hi) status_ = "Target Quads is at its highest, " + std::to_string(retopo_.target);
+    };
+    if (ImGui::Button(tr("50%"), ImVec2(third, 0))) setTarget(0.5, true);
+    ui::HelpText("50%", nullptr,
+                 "Halve the target: each click halves Target Quads (the first click starts from the Part's current polygon count).",
+                 kQRemeshPath);
     ImGui::SameLine();
-    if (ImGui::Button(tr("100%"), ImVec2(third, 0))) setTarget(1.0);
+    if (ImGui::Button(tr("100%"), ImVec2(third, 0))) setTarget(1.0, false);
     ui::HelpText("100%", nullptr, "Target the Part's current polygon count (to clean up topology without changing its density).",
                  kQRemeshPath);
     ImGui::SameLine();
-    if (ImGui::Button(tr("200%"), ImVec2(-1, 0))) setTarget(2.0);
-    ui::HelpText("200%", nullptr, "Target twice the Part's current polygon count.", kQRemeshPath);
+    if (ImGui::Button(tr("200%"), ImVec2(-1, 0))) setTarget(2.0, true);
+    ui::HelpText("200%", nullptr,
+                 "Double the target: each click doubles Target Quads (the first click starts from the Part's current polygon count).",
+                 kQRemeshPath);
 
     ImGui::SetNextItemWidth(-1);
     ui::SliderInside("##qadaptive", &retopo_.adaptive, 0.0f, 1.0f, "Size Variation %.2f");
