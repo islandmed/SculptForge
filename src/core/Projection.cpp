@@ -13,6 +13,16 @@
 
 namespace sf {
 
+namespace {
+// The nearest point q of `o` counts when the way to it is within acos(minCos) of the normal's line (no normal: any).
+bool nearestIsAlongNormal(const glm::vec3& o, const glm::vec3& q, const glm::vec3& n, float minCos) {
+    if (minCos <= -1.0f || glm::dot(n, n) < 0.5f) return true;
+    const glm::vec3 d = q - o;
+    const float len = glm::length(d);
+    return len <= 1e-12f || std::abs(glm::dot(d, n)) >= minCos * len;
+}
+} // namespace
+
 bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sources, const ProjectOptions& opt,
                        std::vector<glm::vec3>& positions, std::vector<glm::vec3>* colors, ProjectStats& stats,
                        std::string& error, const ProjectProgress& progress) {
@@ -54,6 +64,7 @@ bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sourc
     positions = target.positions;
     if (doColors) *colors = target.hasColors() ? target.colors : std::vector<glm::vec3>(nv, glm::vec3(1.0f));
     std::vector<float> moved(nv, 0.0f); // weight each vertex was projected with (0 = untouched)
+    std::vector<float> follow(nv, 0.0f); // weight of a vertex whose nearest point lay off to the side (it follows its ring)
     std::atomic<size_t> projected{0}, missed{0}, masked{0}, done{0};
     std::atomic<bool> cancel{false};
     const auto& tp = bvh.triangles();
@@ -71,8 +82,12 @@ bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sourc
             const glm::vec3 n = hasNormals ? target.normals[v] : glm::vec3(0.0f);
             SurfaceHit out, in, hit;
             const bool hasN = glm::dot(n, n) > 0.25f;
-            const bool hitOut = hasN && bvh.raycast(o, n, reach, out);
-            const bool hitIn = hasN && bvh.raycast(o, -n, reach, in);
+            // Only surface that faces the way the vertex does (rays go on past the far wall of a crevice).
+            FacingFilter ff;
+            if (hasN) ff = {glm::normalize(n), opt.facing};
+            const FacingFilter* facing = hasN && opt.facing > -1.0f ? &ff : nullptr;
+            const bool hitOut = hasN && bvh.raycast(o, n, reach, out, facing);
+            const bool hitIn = hasN && bvh.raycast(o, -n, reach, in, facing);
             bool found = true;
             glm::vec3 to;
             if (hitOut && hitIn && opt.mean) {
@@ -81,13 +96,18 @@ bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sourc
             } else if (hitOut || hitIn) {
                 hit = hitOut && (!hitIn || out.distance <= in.distance) ? out : in;
                 to = hit.position;
-            } else if (bvh.closestPoint(o, reach, hit)) { // no surface straight along the normal: nearest point
-                to = hit.position;
+            } else if (bvh.closestPoint(o, reach, hit, facing)) { // no surface straight along the normal: the nearest point
+                if (nearestIsAlongNormal(o, hit.position, hasN ? glm::normalize(n) : glm::vec3(0.0f), opt.fallbackCos)) {
+                    to = hit.position;
+                } else { // ... which is off to the side: it follows its neighbours below
+                    follow[v] = w;
+                    found = false;
+                }
             } else {
                 found = false;
             }
             if (!found) {
-                ++m;
+                if (follow[v] <= 0.0f) ++m; // (a vertex that follows its ring is counted below)
                 continue;
             }
             ++p;
@@ -106,6 +126,113 @@ bool computeProjection(const Mesh& target, const std::vector<const Mesh*>& sourc
     if (cancel) {
         error = "Project Detail cancelled";
         return false;
+    }
+    // A vertex whose nearest source point lay off to the side takes the median offset (and mean colour) of its projected
+    // neighbours; a few rounds let it reach across a patch of such vertices. (In a concave pocket many vertices share one
+    // nearest point: taking it would pinch them together; leaving them behind would leave steps.)
+    if (opt.geometry || doColors) {
+        std::vector<uint32_t> todo;
+        for (size_t v = 0; v < nv; ++v)
+            if (follow[v] > 0.0f) todo.push_back(uint32_t(v));
+        std::vector<std::pair<uint32_t, glm::vec3>> got;
+        std::vector<float> c[3];
+        for (int round = 0; round < 4 && !todo.empty(); ++round) {
+            got.clear();
+            std::vector<uint32_t> rest;
+            std::vector<glm::vec3> gotColor;
+            for (uint32_t v : todo) {
+                for (auto& x : c) x.clear();
+                glm::vec3 col(0.0f);
+                for (uint32_t u : target.neighbors(v)) {
+                    if (moved[u] <= 0.0f) continue;
+                    const glm::vec3 d = positions[u] - target.positions[u];
+                    for (int k = 0; k < 3; ++k) c[k].push_back(d[k]);
+                    if (doColors) col += (*colors)[u];
+                }
+                if (c[0].empty()) {
+                    rest.push_back(v);
+                    continue;
+                }
+                glm::vec3 med;
+                for (int k = 0; k < 3; ++k) {
+                    std::nth_element(c[k].begin(), c[k].begin() + ptrdiff_t(c[k].size() / 2), c[k].end());
+                    med[k] = c[k][c[k].size() / 2];
+                }
+                got.emplace_back(v, med);
+                gotColor.push_back(col / float(c[0].size()));
+            }
+            if (got.empty()) break;
+            for (size_t i = 0; i < got.size(); ++i) {
+                const uint32_t v = got[i].first;
+                if (opt.geometry) positions[v] = target.positions[v] + got[i].second * follow[v];
+                if (doColors) (*colors)[v] = glm::mix((*colors)[v], gotColor[i], follow[v]);
+                moved[v] = follow[v];
+            }
+            projected += got.size();
+            todo.swap(rest);
+        }
+        missed += todo.size(); // (nothing projected around them)
+    }
+    // Outlier guard: a vertex whose offset differs from its 1-ring's median offset by more than `outlier` edge lengths
+    // reached across to another plate or fin instead of its own surface. It takes the ring's median offset (a few
+    // rounds, so a small cluster that jumped together is pulled back too).
+    if (opt.outlier > 0.0f && (opt.geometry || doColors)) {
+        std::vector<glm::vec3> off(nv, glm::vec3(0.0f)), next;
+        std::vector<uint8_t> bad(nv, 0);
+        for (size_t v = 0; v < nv; ++v)
+            if (moved[v] > 0.0f) off[v] = positions[v] - target.positions[v];
+        std::atomic<size_t> nbad{0};
+        for (int round = 0; round < 3; ++round) {
+            next = off;
+            std::atomic<size_t> changed{0};
+            parallelFor(nv, [&](size_t b, size_t e) {
+                std::vector<float> c[3];
+                size_t count = 0;
+                for (size_t v = b; v < e; ++v) {
+                    if (moved[v] <= 0.0f) continue;
+                    const auto ring = target.neighbors(uint32_t(v));
+                    float edge = 0.0f;
+                    for (auto& x : c) x.clear();
+                    for (uint32_t u : ring) {
+                        edge += glm::length(target.positions[u] - target.positions[v]);
+                        if (moved[u] <= 0.0f) continue;
+                        for (int k = 0; k < 3; ++k) c[k].push_back(off[u][k]);
+                    }
+                    if (c[0].size() < 3) continue;
+                    edge /= float(ring.size());
+                    glm::vec3 med;
+                    for (int k = 0; k < 3; ++k) {
+                        std::nth_element(c[k].begin(), c[k].begin() + ptrdiff_t(c[k].size() / 2), c[k].end());
+                        med[k] = c[k][c[k].size() / 2];
+                    }
+                    if (glm::length(off[v] - med) > opt.outlier * edge) {
+                        next[v] = med;
+                        if (!bad[v]) bad[v] = 1, ++count; // (each vertex counted once; flags are per-vertex, no race)
+                        ++changed;
+                    }
+                }
+                nbad += count;
+            });
+            off.swap(next);
+            if (changed == 0) break;
+        }
+        if (nbad > 0) {
+            std::vector<glm::vec3> col;
+            if (doColors) col = *colors;
+            parallelFor(nv, [&](size_t b, size_t e) {
+                for (size_t v = b; v < e; ++v) {
+                    if (!bad[v]) continue;
+                    if (opt.geometry) positions[v] = target.positions[v] + off[v];
+                    if (!doColors) continue;
+                    glm::vec3 sum(0.0f);
+                    int n = 0;
+                    for (uint32_t u : target.neighbors(uint32_t(v)))
+                        if (moved[u] > 0.0f && !bad[u]) sum += col[u], ++n;
+                    if (n > 0) (*colors)[v] = sum / float(n);
+                }
+            });
+        }
+        stats.outliers = nbad;
     }
     // Blur: smooth the offsets of the projected vertices.
     if (opt.geometry && opt.blur > 0) {

@@ -313,6 +313,180 @@ TEST(project_all_brings_detail_back) {
     CHECK(doc.mesh.colors == divided.colors);
 }
 
+namespace {
+
+// A flat grid of triangles in the plane x = `x` covering y, z in [-0.5, 1.5], facing +x (or -x).
+Mesh wallPlate(float x, bool facePlusX, int n = 20) {
+    Mesh m;
+    for (int j = 0; j <= n; ++j)
+        for (int i = 0; i <= n; ++i) m.positions.push_back({x, -0.5f + 2.0f * float(i) / float(n), -0.5f + 2.0f * float(j) / float(n)});
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i) {
+            const uint32_t a = uint32_t(j * (n + 1) + i), b = a + 1, c = a + uint32_t(n + 1), d = c + 1;
+            if (facePlusX) m.triangles.push_back({a, b, c}), m.triangles.push_back({b, d, c});
+            else m.triangles.push_back({a, c, b}), m.triangles.push_back({b, c, d});
+        }
+    m.rebuildTopology();
+    m.recomputeAllNormals();
+    return m;
+}
+
+} // namespace
+
+// A crevice: two walls 0.055 apart facing each other. The target is a sheet facing +x, 0.03 in front of the left wall (it
+// sits where the sculpt's wall was before the detail came in) and only 0.025 from the right wall, which faces away from it.
+TEST(project_all_does_not_jump_across_a_crevice) {
+    const Mesh left = wallPlate(-0.05f, true), right = wallPlate(0.005f, false);
+    Mesh target = wallPlate(-0.02f, true, 10);
+    for (auto& p : target.positions) p.y = (p.y + 0.5f) * 0.5f, p.z = (p.z + 0.5f) * 0.5f; // inside the walls' extent
+    target.recomputeAllNormals();
+    std::vector<const Mesh*> sources{&left, &right};
+    auto run = [&](bool mean, float facing) {
+        ProjectOptions o;
+        o.distance = 0.1f;
+        o.mean = mean;
+        o.facing = facing;
+        o.vertexpaint = false;
+        std::vector<glm::vec3> positions;
+        ProjectStats st;
+        std::string err;
+        CHECK(computeProjection(target, sources, o, positions, nullptr, st, err));
+        CHECK(st.projected == target.vertexCount());
+        float lo = 1e9f, hi = -1e9f;
+        for (const glm::vec3& p : positions) lo = std::min(lo, p.x), hi = std::max(hi, p.x);
+        return std::make_pair(lo, hi);
+    };
+    // Without the facing test the nearest hit is the right wall (or, with Mean, halfway to it): the sheet crosses the gap.
+    const auto old = run(false, -1.0f);
+    CHECK(std::abs(old.first - 0.005f) < 1e-4f && std::abs(old.second - 0.005f) < 1e-4f);
+    const auto oldMean = run(true, -1.0f);
+    CHECK(std::abs(oldMean.first - (-0.0225f)) < 1e-4f);
+    // With it every vertex lands on the wall it belongs to, Mean included (one accepted hit: nothing to average).
+    for (bool mean : {false, true})
+        for (float facing : {0.0f, 0.2f, 0.5f}) {
+            const auto r = run(mean, facing);
+            CHECK(std::abs(r.first - (-0.05f)) < 1e-4f && std::abs(r.second - (-0.05f)) < 1e-4f);
+        }
+}
+
+// The facing test also holds for the nearest-point fallback (no hit along the normal) and keeps a hit on a tilted wall.
+TEST(project_all_facing_filters_the_closest_point_fallback) {
+    const Mesh left = wallPlate(-0.05f, true), right = wallPlate(0.005f, false);
+    TriangleBVH bvh;
+    std::vector<glm::vec3> P = left.positions;
+    std::vector<glm::uvec3> T = left.triangles;
+    const uint32_t off = uint32_t(P.size());
+    P.insert(P.end(), right.positions.begin(), right.positions.end());
+    for (const auto& t : right.triangles) T.push_back(t + glm::uvec3(off));
+    bvh.build(std::move(P), std::move(T));
+    SurfaceHit h;
+    const FacingFilter f{{1.0f, 0.0f, 0.0f}, 0.2f};
+    CHECK(bvh.closestPoint({-0.02f, 0.5f, 0.5f}, 0.1f, h));
+    CHECK(std::abs(h.position.x - 0.005f) < 1e-4f);
+    CHECK(bvh.closestPoint({-0.02f, 0.5f, 0.5f}, 0.1f, h, &f));
+    CHECK(std::abs(h.position.x - (-0.05f)) < 1e-4f);
+    // A ray from the same point along +x skips the back-facing right wall and finds nothing further.
+    CHECK(bvh.raycast({-0.02f, 0.5f, 0.5f}, {1, 0, 0}, 0.1f, h));
+    CHECK(!bvh.raycast({-0.02f, 0.5f, 0.5f}, {1, 0, 0}, 0.1f, h, &f));
+    CHECK(bvh.raycast({-0.02f, 0.5f, 0.5f}, {-1, 0, 0}, 0.1f, h, &f));
+}
+
+namespace {
+
+// A square grid over x, y in [-half, half] lifted to z = k (x^2 + y^2): a bowl (a concave pocket) facing +z.
+Mesh bowl(float k, float half, int n) {
+    Mesh m;
+    for (int j = 0; j <= n; ++j)
+        for (int i = 0; i <= n; ++i) {
+            const float x = -half + 2.0f * half * float(i) / float(n), y = -half + 2.0f * half * float(j) / float(n);
+            m.positions.push_back({x, y, k * (x * x + y * y)});
+        }
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i) {
+            const uint32_t a = uint32_t(j * (n + 1) + i), b = a + 1, c = a + uint32_t(n + 1), d = c + 1;
+            m.triangles.push_back({a, b, c});
+            m.triangles.push_back({b, d, c});
+        }
+    m.rebuildTopology();
+    m.recomputeAllNormals();
+    return m;
+}
+
+float triArea(const std::vector<glm::vec3>& p, const glm::uvec3& t) {
+    return 0.5f * glm::length(glm::cross(p[t.y] - p[t.x], p[t.z] - p[t.x]));
+}
+
+} // namespace
+
+// A concave pocket (a palate) projected from a source that is off it (a dome inside the pocket): the rays from the walls
+// miss or hit the far side, and the nearest point of many vertices is the same spot. Taking it pinches the pocket to a
+// star (triangles and edges shrink to nothing); a vertex with no surface its way follows its neighbours instead.
+TEST(project_all_does_not_pinch_a_concave_pocket) {
+    const Mesh source = bowl(-0.5f, 1.0f, 24);
+    const Mesh target = bowl(1.5f, 1.0f, 40);
+    std::vector<const Mesh*> sources{&source};
+    auto worst = [&](const ProjectOptions& o) {
+        std::vector<glm::vec3> positions;
+        ProjectStats st;
+        std::string err;
+        CHECK(computeProjection(target, sources, o, positions, nullptr, st, err));
+        float area = 1e9f, edge = 1e9f;
+        for (const glm::uvec3& t : target.triangles) {
+            area = std::min(area, triArea(positions, t) / triArea(target.positions, t));
+            for (int k = 0; k < 3; ++k) {
+                const uint32_t a = t[k], b = t[(k + 1) % 3];
+                edge = std::min(edge, glm::length(positions[a] - positions[b]) / glm::length(target.positions[a] - target.positions[b]));
+            }
+        }
+        return std::make_pair(area, edge);
+    };
+    ProjectOptions old; // before: any hit, any nearest point
+    old.distance = 0.3f;
+    old.vertexpaint = false;
+    old.facing = -1.0f;
+    old.fallbackCos = -1.0f;
+    old.outlier = 0.0f;
+    const auto before = worst(old);
+    ProjectOptions now = old;
+    now.facing = ProjectOptions().facing;
+    now.fallbackCos = ProjectOptions().fallbackCos;
+    now.outlier = ProjectOptions().outlier;
+    const auto after = worst(now);
+    std::printf("  smallest triangle area / edge length vs the target: %.3f / %.3f before, %.3f / %.3f after\n", before.first,
+                before.second, after.first, after.second);
+    CHECK(before.first < 0.1f || before.second < 0.1f); // the case is real: the old rule pinches it
+    CHECK(after.first >= 0.1f);
+    CHECK(after.second >= 0.1f);
+}
+
+// A small fin standing in front of a plate: the rays of the few vertices under it hit the fin (a front-facing hit, a
+// long way nearer than the plate their neighbours reach) and the sheet tears into a spike. Those vertices follow their ring.
+TEST(project_all_pulls_back_vertices_that_reached_another_fin) {
+    const Mesh plate = wallPlate(-0.3f, true);
+    Mesh fin = wallPlate(-0.1f, true, 2);
+    for (auto& p : fin.positions) p.y = 0.47f + (p.y + 0.5f) * 0.055f, p.z = 0.47f + (p.z + 0.5f) * 0.055f; // 0.47 .. 0.58: four vertices
+    Mesh target = wallPlate(0.0f, true, 20);
+    for (auto& p : target.positions) p.y = (p.y + 0.5f) * 0.5f, p.z = (p.z + 0.5f) * 0.5f; // 0 .. 1, an edge is 0.05
+    target.recomputeAllNormals();
+    std::vector<const Mesh*> sources{&plate, &fin};
+    auto reach = [&](float outlier) {
+        ProjectOptions o;
+        o.distance = 0.3f; // 0.42: reaches the plate
+        o.vertexpaint = false;
+        o.outlier = outlier;
+        std::vector<glm::vec3> positions;
+        ProjectStats st;
+        std::string err;
+        CHECK(computeProjection(target, sources, o, positions, nullptr, st, err));
+        size_t onFin = 0, onPlate = 0;
+        for (const glm::vec3& p : positions) onFin += std::abs(p.x - (-0.1f)) < 1e-4f, onPlate += std::abs(p.x - (-0.3f)) < 1e-4f;
+        CHECK(onFin + onPlate == positions.size());
+        return onFin;
+    };
+    CHECK(reach(0.0f) == 4); // the four vertices under the fin, as before
+    CHECK(reach(2.0f) == 0); // every one of them back on the plate
+}
+
 TEST(project_all_respects_mask_and_options) {
     CommandRegistry reg;
     Document doc = sculptedSphere(5);
