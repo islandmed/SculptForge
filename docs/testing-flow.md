@@ -74,11 +74,21 @@ stay in `~/Work/.sf/t0-ci/<worktree>/`.
 - **Always green**: the job is `continue-on-error` and the script never fails, so a red T0 emails nobody. The verdict
   is the run summary and the artifact `t0-result` (`result.json`: green/red, stage, failed tests; `failed.txt`:
   LastTestsFailed + FAILED lines; `output.txt`: `ctest --output-on-failure` on the failed tests).
+- **Jobs** (11-27, T0 under 30 minutes): `build` (marks, gallery gate, the build, test selection, and the split of the tests over
+  runners by measured duration: `tools/ci/shard.py` with `tools/ci/test_costs.json`), then `test` (a matrix of N runners, sized by
+  the plan, each downloads the build as the artifact `t0-tree` and runs its share) and `iwyu` (iwyu_lite on the changed C++ files)
+  side by side, then `verdict` (`tools/ci/verdict.py` merges them into the artifact `t0-result`, the same `result.json` and
+  `summary.md` as before, plus `tests_run`, `shards` and `times.tsv`). A run with few tests plans one test job. A test job that
+  dies leaves no verdict (t0-ci.sh reruns the failed jobs once). Each job has its own `timeout-minutes`.
+  Refresh the costs after a full run: `python3 tools/ci/shard.py costs ~/Work/.sf/t0-ci/<wt>/times.tsv > /tmp/c && mv /tmp/c tools/ci/test_costs.json`
+  (t0-ci.sh keeps `times.tsv` in the results folder).
 - **Cache**: every push to main builds once and saves `ccache-t0-linux.<commit>` (main's own CI mostly reuses
-  staging's run and builds nothing, and a `t0/` ref can only read its own and main's caches). `t0/` runs only restore.
+  staging's run and builds nothing, and a `t0/` ref can only read its own and main's caches). A `t0/release/**` run (a release
+  batch's T0, repeated all day) also saves `ccache-t0rel-linux.<commit>` when its build missed more than 10% of the compiles, and
+  restores its own first, then main's. Other `t0/` runs only restore.
 - **Locked down** (`tools/release/check_workflows.py`): pushes to main and `t0/**` only, `contents: read`, no
   secrets, pinned actions; other branch-push workflows ignore `t0/**`.
-- A branch older than t0.yml gets it (and `tools/ci/t0.sh`) from origin/main in one extra commit, "t0-ci overlay";
+- A branch older than t0.yml gets it (and `tools/ci/t0.sh`, `shard.py`, `verdict.py`, `test_costs.json`) from origin/main in one extra commit, "t0-ci overlay";
   the tests are still picked from the branch's own files.
 - The PC stays for GPU-specific checks (it runs the D3D12 GPU path), T1 and release staging.
 
