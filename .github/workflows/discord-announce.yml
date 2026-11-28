@@ -5,6 +5,7 @@
 # - A release: "## SculptForge X.Y.Z", the headline (the feed's first highlight) in bold, the other highlights, and masked
 #   [Download] · [What's new] links, with the release card (website/media/release-X.Y.Z.jpg, committed to the site by the
 #   launch kit) as the embed image. The job waits up to CARD_WAIT_MINUTES for the card to be live and posts without it after.
+#   While website/media/TEXT_ONLY.md exists the post is text only: no wait, no request to the card URL, no embed.
 #   The Release workflow publishes with GITHUB_TOKEN, and GitHub sends no `release` event for that, so its
 #   successful run (workflow_run) triggers the post; `release: published` covers a release published by hand.
 # - A beta (a vX.Y.Z-beta.N or -rc.N pre-release): "## SculptForge X.Y.Z Beta N is out for testing", the highlights of
@@ -12,7 +13,7 @@
 #   release.sh step "site" writes the highlights to website/latest.json on main after the release is out, so the
 #   job waits (up to FEED_WAIT_MINUTES) for the feed to name this version, then posts without highlights if it never does.
 # - Run workflow: posts .github/announcements/<file> (at most 2000 characters), with an optional embed image: a
-#   path under website/ that is already live on sculptforge.app.
+#   path under website/ that is already live on sculptforge.app (refused while website/media/TEXT_ONLY.md exists).
 name: Discord announcement
 
 on:
@@ -24,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       file:
-        description: "Markdown file in .github/announcements/ (e.g. membership-v2.md)"
+        description: "Markdown file in .github/announcements/ (e.g. wayland.md)"
         required: true
         type: string
       image:
@@ -52,6 +53,7 @@ jobs:
           sparse-checkout: |
             .github/announcements/
             website/latest.json
+            website/media/TEXT_ONLY.md
           sparse-checkout-cone-mode: false
       - name: Post to Discord
         id: post
@@ -119,6 +121,25 @@ jobs:
               except Exception:
                   return None
 
+          MARKER = "website/media/TEXT_ONLY.md"
+
+          def text_only():
+              """Owner rule 11-24: release posts carry no generated card or image until new art is approved. The marker file
+              is the switch; delete it to allow embeds again."""
+              return pathlib.Path(MARKER).is_file()
+
+          def release_card(version, wait_minutes):
+              """The release card's live URL for a stable release (waiting up to wait_minutes for the site to serve it), or
+              None. Under the marker: None at once, without a request to the card URL."""
+              if text_only():
+                  print(f"text only ({MARKER}): no card"); return None
+              wait = time.time() + 60 * wait_minutes
+              while not (card := card_url(version)) and time.time() < wait:
+                  time.sleep(30)
+              if not card:
+                  print(f"::warning::{SITE}/media/release-{version}.jpg never went live; posting without the card")
+              return card
+
           if event == "workflow_dispatch":
               base = pathlib.Path(".github/announcements").resolve()
               name = env("FILE", "").strip().removeprefix(".github/announcements/")
@@ -127,6 +148,9 @@ jobs:
                   sys.exit(f"file: want a .md file inside .github/announcements/, got {name!r}")
               text = path.read_text(encoding="utf-8").strip()
               image = env("IMAGE", "").strip()
+              if image and text_only():
+                  sys.exit(f"image: {image!r} was asked for, but {MARKER} exists: release posts are text only until new art "
+                           "is approved. Run again without the image, or delete the marker to allow embeds.")
               if image:
                   if (not re.fullmatch(r"website/[A-Za-z0-9._/-]+\.(png|jpe?g|gif|webp)", image)
                           or ".." in image.split("/")):
@@ -178,15 +202,9 @@ jobs:
                   if len(text) <= 2000 or not highlights:
                       break
                   highlights.pop()
-              card = None
               if not pre:  # the release card leads the post; the launch kit commits it to the site shortly after the release
-                  wait = time.time() + 60 * float(env("CARD_WAIT_MINUTES", "20"))
-                  while not (card := card_url(version)) and time.time() < wait:
-                      time.sleep(30)
-                  if card:
+                  if card := release_card(version, float(env("CARD_WAIT_MINUTES", "20"))):
                       payload["embeds"] = [{"image": {"url": card}}]
-                  else:
-                      print(f"::warning::{SITE}/media/release-{version}.jpg never went live; posting without the card")
               if not payload.get("embeds"):
                   payload["flags"] = 4  # no link previews: the post itself is the summary (flag 4 would hide the card too)
               what = tag

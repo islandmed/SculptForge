@@ -124,4 +124,35 @@ step = YML[YML.find("- name: Mark the release as posted"):]
 if not step.startswith("- name: Mark the release as posted") or "steps.post.outputs.posted != ''" not in step \
         or "actions/upload-artifact@" not in step or "name: discord-posted-${{ steps.post.outputs.posted }}" not in step:
     fail("no pinned upload of the discord-posted-<tag> marker after a post")
+# 11-27: text only while website/media/TEXT_ONLY.md exists (owner 11-24: no generated cards public until new art is approved).
+# Under the marker the release path never asks for the card (no request, no wait); without it, it asks as before.
+import os
+import tempfile
+
+if "website/media/TEXT_ONLY.md" not in YML.split("sparse-checkout:")[1].split("sparse-checkout-cone-mode")[0]:
+    fail("the job's sparse checkout lacks website/media/TEXT_ONLY.md")
+if "membership-v2" in YML:
+    fail("the file input's example names a deleted file")
+if "if image and text_only():" not in src or src.find("if image and text_only():") > src.find("re.fullmatch(r\"website/"):
+    fail("the manual path must refuse an image under the marker before using it")
+if not (ROOT / "website" / "media" / "TEXT_ONLY.md").is_file():
+    fail("website/media/TEXT_ONLY.md is missing")
+ru = Urllib()
+ru.answer = Resp(200, "image/jpeg")
+rg = load(["card_url", "text_only", "release_card"], urllib=type("m", (), {"request": ru}), pathlib=pathlib,
+          time=__import__("time"), MARKER="website/media/TEXT_ONLY.md")
+here = os.getcwd()
+with tempfile.TemporaryDirectory() as d:
+    os.chdir(d)
+    try:
+        os.makedirs("website/media")
+        pathlib.Path("website/media/TEXT_ONLY.md").write_text("x\n")
+        before = len(Urllib.seen)  # .seen is shared by every Urllib
+        if rg["release_card"]("0.14.4", 20) is not None or len(Urllib.seen) != before:
+            fail(f"under the marker the card was asked for: {Urllib.seen[before:]!r}")
+        os.remove("website/media/TEXT_ONLY.md")
+        if rg["release_card"]("0.14.4", 20) != "https://sculptforge.app/media/release-0.14.4.jpg":
+            fail("without the marker the live card is not used")
+    finally:
+        os.chdir(here)
 print("discord_announce ok")
