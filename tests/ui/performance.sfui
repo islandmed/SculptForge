@@ -82,6 +82,28 @@ expect_value view_samples == 4
 click "Preferences##palette.preferences"
 click "Fast Navigation"
 key escape
+# Fast Navigation off survives a restart. Turbo (View > Turbo) is the one thing that keeps the lighter view while it is
+# off, and the panel says so (#184).
+click "Preferences##palette.preferences"
+click "Fast Navigation"
+key escape
+restart
+orbit 120 0
+expect_value view_samples == 4
+key ctrl+alt+t
+expect_status Turbo on
+orbit 120 0
+expect_value view_samples == 1
+click "Preferences##palette.preferences"
+expect_text Turbo is on
+click "Turn Turbo off##perf.turbo_off"
+expect_status Turbo off
+key escape
+orbit 120 0
+expect_value view_samples == 4
+click "Preferences##palette.preferences"
+click "Fast Navigation"
+key escape
 env SF_FAST_NAVIGATION_TRIANGLES 10000000
 
 # The settings are in the F3 command palette.

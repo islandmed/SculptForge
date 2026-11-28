@@ -78,6 +78,8 @@ void App::registerPerformanceUiActions() {
         [this] {
             uiPrefs_.fastNavigation = !uiPrefs_.fastNavigation;
             status_ = uiPrefs_.fastNavigation ? "Fast Navigation on" : "Fast Navigation off";
+            if (!uiPrefs_.fastNavigation && turbo_) // (Turbo keeps its own lighter view while the view moves, #184)
+                status_ += ", but Turbo is on: the view stays light while it moves (View > Turbo)";
         },
         [this] { return uiPrefs_.fastNavigation; },
         "While you rotate, pan or zoom a big scene (over the hardware profile's motion proxy threshold, which the "
@@ -258,6 +260,10 @@ void App::drawPerformanceSection() {
     bool fast = uiPrefs_.fastNavigation;
     if (ImGui::Checkbox(tr("Fast Navigation"), &fast)) actions_.find("perf.fast_navigation")->run();
     ui::HelpAction(*this, "perf.fast_navigation");
+    if (turbo_) { // Turbo draws the lighter view on its own: say so, or the checkbox seems to do nothing (#184)
+        dimText(tr("Turbo is on: the view stays light while it moves, whatever this says."));
+        if (ImGui::SmallButton(tr("Turn Turbo off##perf.turbo_off"))) actions_.find("view.turbo")->run();
+    }
     if (perf_.samplesUsed > 0 && perf_.samplesUsed < uiPrefs_.antialiasing && !perf_.fastNow)
         dimText("The GPU had no room for " + std::to_string(uiPrefs_.antialiasing) + "x: using " +
                 (perf_.samplesUsed == 1 ? std::string("none") : std::to_string(perf_.samplesUsed) + "x") + ".");
