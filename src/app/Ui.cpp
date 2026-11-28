@@ -544,6 +544,16 @@ PinnedControl EndPinnedControl() {
 
 bool BeginPaletteItems() {
     const bool readOnly = AltHeld() && !CtrlHeld();
+    // A text box pressed while Alt made it read-only (picking a control up) must not stay open once Alt is let go: ImGui keeps no text for a
+    // read-only one and then compares that null text and crashes (Alt+click on Selection Sets > Set name, 11-26; the typed number of a
+    // slider, gh#184). Close it, and the note it leaves for the field's next draw, before any field is drawn. (This runs every frame for
+    // every user: ui::NoteItem is called by ImGui's test hook only, which is off outside tests and recordings.)
+    ImGuiContext* ctx = ImGui::GetCurrentContext();
+    if (!readOnly && ctx && ctx->InputTextState.ID != 0 && ctx->ActiveId == ctx->InputTextState.ID &&
+        (ctx->InputTextState.Flags & ImGuiInputTextFlags_ReadOnly) && ctx->FrameCount - g_paletteAltFrame <= 2) {
+        ImGui::ClearActiveID();
+        ctx->InputTextDeactivatedState.ID = 0;
+    }
     if (readOnly) {
         ImGui::PushItemFlag(ImGuiItemFlags_ReadOnly, true);
         g_paletteAltFrame = ImGui::GetFrameCount();
@@ -827,14 +837,6 @@ void NoteItem(ImGuiContext* ctx, ImGuiID id, const ImVec2& min, const ImVec2& ma
     if (!id || !ctx || !ctx->CurrentWindow) return;
     g_prevItem = g_lastItem; // (pinLastItem asks what stood before the item it marks)
     g_lastItem = {ctx->CurrentWindow, ImRect(min, max)};
-    // A text box pressed while Alt made it read-only (picking a control up) must not stay open once Alt is let go: ImGui keeps no text for a
-    // read-only one and then compares that null text and crashes (Alt+click on Selection Sets > Set name, 11-26). Close it, and the
-    // note it leaves for the field's next draw, before the field is drawn.
-    if (ctx->InputTextState.ID != 0 && ctx->ActiveId == ctx->InputTextState.ID && (ctx->InputTextState.Flags & ImGuiInputTextFlags_ReadOnly) &&
-        ctx->FrameCount - g_paletteAltFrame <= 2 && !AltHeld()) {
-        ImGui::ClearActiveID();
-        ctx->InputTextDeactivatedState.ID = 0;
-    }
     if (g_audit.on && g_audit.frame != ctx->FrameCount) {
         g_audit.frame = ctx->FrameCount;
         g_audit.items.clear();

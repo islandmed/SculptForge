@@ -242,6 +242,22 @@ sf_imgui_widgets_patch("        // Tabbing or CTRL+click on Slider turns it into
             if ((clicked && g.IO.KeyCtrl) || double_clicked || (g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_PreferInput)))
                 temp_input_is_active = true;
 ")
+# A text field takes the focus read-only (a slider's typed number while Alt or a finger held it: ui::BeginPaletteItems, SliderInside): ImGui
+# keeps no text for it (TextA stays empty, its data pointer null). Drawn writable the next frame while still active, it compared and edited
+# that null text (gh#184: the app closed on the Size slider; Alt+click on a text box, 11-26). Such a field is closed instead, and a field that
+# lost the focus without text applies none: the compare only decides whether a typed text is applied.
+sf_imgui_widgets_patch("    if (state != NULL)
+        state->TextSrc = is_readonly ? buf : state->TextA.Data;
+"
+"    if (state != NULL)
+    {
+        if (!is_readonly && state->TextA.Data == NULL && g.ActiveId == id)
+            ClearActiveID(); // (SculptForge: gh#184)
+        state->TextSrc = (is_readonly || state->TextA.Data == NULL) ? buf : state->TextA.Data;
+    }
+")
+sf_imgui_widgets_patch("IsItemDeactivatedAfterEdit() && !is_readonly && strcmp(g.InputTextDeactivatedState.TextA.Data, buf) != 0)"
+"IsItemDeactivatedAfterEdit() && !is_readonly && g.InputTextDeactivatedState.TextA.Data && strcmp(g.InputTextDeactivatedState.TextA.Data, buf) != 0) // (SculptForge: gh#184)")
 file(WRITE ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp.new "${SF_IMGUI_WIDGETS}")
 configure_file(${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp.new ${CMAKE_BINARY_DIR}/imgui_hooked/imgui_widgets.cpp COPYONLY)
 

@@ -1,0 +1,4 @@
+---
+fixed: "**Brush size slider**: the app no longer closes when the typed number of a slider (double-click it to type an exact value) was opened while Alt was held over a palette and then Alt was let go (#184, thanks @HG4Science for the crash log). ImGui keeps no text for a read-only field and then read that missing text; such a field now closes instead, and the Alt check that closes it runs for everyone, not only in UI tests. The same sequence of Remove Above, Micro divide, strokes and Undo / Redo is covered by a new test and runs clean."
+---
+Reviewers: the crash frames of the report (stripped RPM build) are ImGui SliderScalar > TempInputScalar > InputTextEx > strcmp, not undo or micro code; the fix is the Alt guard in ui::BeginPaletteItems (moved out of NoteItem, which only the test hook calls) plus a patch of InputTextEx in cmake/Dependencies.cmake. tests/test_imgui_readonly_text.cpp runs with the item hook off.

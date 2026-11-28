@@ -997,7 +997,8 @@ if(SCULPTFORGE_BUILD_TESTS)
   sculptforge_pch(sculptforge_tests)
   if(SCULPTFORGE_BUILD_APP) # the action registry (key chords, shortcut overrides) needs SDL's key names
     target_link_libraries(sculptforge_tests PRIVATE sculptforge_actions)
-    target_compile_definitions(sculptforge_tests PRIVATE SF_TEST_ACTIONS)
+    target_compile_definitions(sculptforge_tests PRIVATE SF_TEST_ACTIONS SF_TEST_IMGUI)
+    target_link_libraries(sculptforge_tests PRIVATE imgui) # tests/test_hooks_off.cpp: a headless ImGui context, the item hook off
   endif()
   if(MSVC)
     target_compile_options(sculptforge_tests PRIVATE /utf-8)
