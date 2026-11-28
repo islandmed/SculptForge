@@ -1063,6 +1063,7 @@ void App::drawInputSection() {
     }
     drawRadialMenusSection(); // RadialMenu.cpp
     drawSpaceMouseSection();  // SpaceMouse.cpp
+    drawControllerSection();  // Controller.cpp
 }
 
 // Preferences > Cursor (#88): the system cursor over the view and the brush ring.

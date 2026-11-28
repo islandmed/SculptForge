@@ -150,6 +150,7 @@ ui_performance              sculpt
 ui_precision*               sculpt
 ui_sculpt_basics            sculpt
 ui_size_*                   sculpt
+ui_controller_buttons       sculpt
 ui_spacemouse*              sculpt
 ui_stencil                  sculpt
 ui_stroke_*                 sculpt
@@ -356,6 +357,7 @@ src/app/StrokePopup*               sculpt
 src/app/Precision*                 sculpt
 src/app/Tablet*                    sculpt
 src/app/SpaceMouse*                sculpt
+src/app/Controller*                sculpt
 src/app/Touch*                     sculpt
 src/app/Wintab*                    sculpt
 src/app/Bench*                     sculpt

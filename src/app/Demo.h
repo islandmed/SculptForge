@@ -295,6 +295,11 @@ private:
     SDL_Joystick* virtualSpaceMouseHandle_ = nullptr;
     bool attachVirtualSpaceMouse();
     void detachVirtualSpaceMouse();
+    // Simulated game controller (gamepad_* steps): an SDL virtual gamepad, found and opened by the app as a real one.
+    SDL_JoystickID virtualPad_ = 0;
+    SDL_Joystick* virtualPadHandle_ = nullptr;
+    bool attachVirtualPad();
+    void detachVirtualPad();
 };
 
 } // namespace sf

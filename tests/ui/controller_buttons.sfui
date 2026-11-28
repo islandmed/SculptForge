@@ -1,0 +1,159 @@
+# Game controller buttons as shortcuts (Discord, a member's request: pick from a pop-up menu with a controller in Clean
+# view). A virtual gamepad (SDL) is plugged in; Preferences > Hotkeys binds its buttons the way keys are bound (click the
+# controller tile of an action, press the button; Esc cancels, Backspace clears); a pie menu on a held button follows
+# the pen: hold, point, let go; a tapped Quick Menu stays open, a second tap closes it; a trigger counts as a button;
+# it all works in Clean view; unplugging while a button is held lets it go; nothing is bound and nothing changes
+# until a controller is plugged in and a button is chosen.
+run ui_look look=classic layout=classic        # written for the Classic look and the classic palette bar and shelves
+run new_sphere subdivisions=3
+camera 0 0
+expect_value controller_connected == 0
+expect_value controller_buttons == 0
+
+# Without a controller the Hotkeys list has no controller tile (nothing changes for people without one).
+click "Preferences##palette.preferences"
+click "Hotkeys##preferences.hotkeys"
+type "##hotkeys_filter" "Radial menu 1"
+expect_not "##hkpad.radial.menu1"
+key escape
+
+# Plug it in: the app opens it; its buttons mean nothing until bound.
+gamepad_plug
+expect_value controller_connected == 1
+hover_window 0.5 0.5
+gamepad_press south
+expect_value radial_open == 0
+
+# Bind South (A / Cross) to Radial menu 1 (Brushes): click its tile, press the button.
+click "Preferences##palette.preferences"
+type "##hotkeys_filter" "Radial menu 1"
+click "##hkpad.radial.menu1"
+shot capture
+gamepad_press south
+expect_value controller_buttons == 1
+shot bound
+key escape
+
+# Hold South, point right at Move, let go: it runs (the same as holding T).
+hover_window 0.5 0.5
+gamepad_down south
+expect_value radial_open == 1
+expect_value radial_held == 1
+expect_value radial_menu == 0
+expect_value controller_held == 1
+hover_window 0.57 0.5 0.15
+expect_value radial_hover == 2
+shot pie_open
+gamepad_up south
+expect_value radial_open == 0
+expect_value radial_ran == 2
+expect_value brush_type == 3
+expect_value controller_held == 0
+
+# A quick tap leaves the pie open for a click; tapping the button again closes it.
+hover_window 0.5 0.5
+gamepad_press south
+expect_value radial_open == 1
+expect_value radial_held == 0
+gamepad_press south
+expect_value radial_open == 0
+
+# The Quick Menu on East (B / Circle): a tap keeps it open, a second tap closes it.
+click "Preferences##palette.preferences"
+type "##hotkeys_filter" "Quick Menu"
+click "##hkpad.ui.quickmenu"
+gamepad_press east
+expect_value controller_buttons == 2
+key escape
+gamepad_press east
+expect_value quickmenu_open == 1
+gamepad_press east
+expect_value quickmenu_open == 0
+# Held, it closes when the button is let go away from the menu (let go over it, it stays until the pointer leaves).
+hover_window 0.9 0.9
+gamepad_down east
+expect_value quickmenu_open == 1
+hover_window 0.2 0.8
+wait 0.4
+gamepad_up east
+expect_value quickmenu_open == 0
+
+# Clean view: the same pie from the same button, nothing else on screen.
+key shift+f11
+wait 0.3
+expect_value clean_view == 1
+hover_window 0.5 0.5
+gamepad_down south
+expect_value radial_open == 1
+hover_window 0.5 0.4 0.15
+expect_value radial_hover == 0
+shot clean_pie
+gamepad_up south
+expect_value radial_open == 0
+expect_value brush_type == 0
+key shift+f11
+wait 0.2
+expect_value clean_view == 0
+
+# Unplugged while the button is held: the pie lets go with it (nothing stays open for good).
+hover_window 0.5 0.5
+gamepad_down south
+expect_value radial_open == 1
+wait 0.4
+gamepad_unplug
+expect_value controller_connected == 0
+expect_value radial_open == 0
+expect_value controller_held == 0
+# Plugged back in, the bindings are still there.
+gamepad_plug
+expect_value controller_connected == 1
+expect_value controller_buttons == 2
+gamepad_press south
+expect_value radial_open == 1
+key escape
+expect_value radial_open == 0
+
+# A trigger is a button past 60 percent: the right one is Undo.
+click "Preferences##palette.preferences"
+type "##hotkeys_filter" "Undo"
+click "##hkpad.edit.undo"
+gamepad_trigger right 0.3
+expect_value controller_buttons == 2
+gamepad_trigger right 1
+expect_value controller_buttons == 3
+gamepad_trigger right 0
+key escape
+stroke 0.45 0.5 0.55 0.5
+expect_value can_undo == 1
+gamepad_trigger right 0.5
+expect_value can_undo == 1
+gamepad_trigger right 1
+expect_value can_undo == 0
+gamepad_trigger right 0
+
+# Esc cancels a capture and Backspace clears the buttons of an action.
+click "Preferences##palette.preferences"
+type "##hotkeys_filter" "Undo"
+click "##hkpad.edit.undo"
+key escape
+expect_value controller_buttons == 3
+click "Preferences##palette.preferences"
+type "##hotkeys_filter" "Undo"
+click "##hkpad.edit.undo"
+key backspace
+expect_value controller_buttons == 2
+key escape
+
+# Binding a button that runs something else moves it (South: Radial menu 1 -> the Quick Menu).
+click "Preferences##palette.preferences"
+type "##hotkeys_filter" "Quick Menu"
+click "##hkpad.ui.quickmenu"
+gamepad_press south
+expect_value controller_buttons == 2
+key escape
+hover_window 0.9 0.9
+gamepad_press south
+expect_value radial_open == 0
+expect_value quickmenu_open == 1
+key escape
+expect_value quickmenu_open == 0

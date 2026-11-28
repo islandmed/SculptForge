@@ -174,6 +174,7 @@ Json toJson(const UiPrefs& p) {
     j.set("fileUnit", p.fileUnit);
     j.set("tablet", toJson(p.tablet));
     j.set("spaceMouse", toJson(p.spaceMouse));
+    j.set("controller", toJson(p.controller));
     j.set("antialiasing", double(p.antialiasing));
     j.set("fastNavigation", p.fastNavigation);
     j.set("viewResolution", double(p.viewResolution));
@@ -323,6 +324,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     if (const LengthUnit* u = findLengthUnit(j["fileUnit"].asString())) p.fileUnit = u->id;
     fromJson(j["tablet"], p.tablet);
     fromJson(j["spaceMouse"], p.spaceMouse);
+    fromJson(j["controller"], p.controller);
     const int aa = int(j["antialiasing"].asNumber(p.antialiasing));
     p.antialiasing = aa >= 8 ? 8 : aa >= 4 ? 4 : aa >= 2 ? 2 : 1;
     p.fastNavigation = j["fastNavigation"].asBool(p.fastNavigation);
@@ -1872,6 +1874,7 @@ void App::beginShortcutCapture(const std::string& actionId, bool sequence) {
     if (!a) return;
     capturingShortcut_ = actionId;
     captureSequence_ = sequence;
+    captureController_ = false; // (beginControllerCapture sets it after this)
     captureFirst_.clear();
     conflict_ = {};
     shortcutAnchor_ = {}; // the button (or tile) clicked just now, so the Replace / Cancel popup can stay clear of it
@@ -1906,6 +1909,19 @@ bool App::captureShortcutKey(SDL_Keycode key, SDL_Keymod mod) {
     if (isModifierKey(key)) return true;
     const Action* a = actions_.find(capturingShortcut_);
     const std::string label = a ? a->label : capturingShortcut_;
+    if (captureController_) { // waiting for a controller button: Esc and Backspace only, any other key keeps waiting
+        if (key == SDLK_ESCAPE) {
+            status_ = "Controller button unchanged";
+        } else if (key == SDLK_BACKSPACE || key == SDLK_DELETE) {
+            uiPrefs_.controller.unbindAction(capturingShortcut_);
+            status_ = label + ": no controller button";
+        } else {
+            return true;
+        }
+        captureController_ = false;
+        capturingShortcut_.clear();
+        return true;
+    }
     if (key == SDLK_ESCAPE) {
         status_ = "Shortcut unchanged";
     } else if (key == SDLK_BACKSPACE || key == SDLK_DELETE) {
@@ -2096,8 +2112,9 @@ void App::drawHelpConsoleUi() {
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs)) {
             ImGui::PushFont(helpTitleFont());
-            ImGui::Text(captureSequence_ ? tr(ICON_LC_KEYBOARD "  Press two keys in a row for '%s'")
-                                         : tr(ICON_LC_KEYBOARD "  Press a key for '%s'"),
+            ImGui::Text(captureController_ ? tr(ICON_LC_GAMEPAD_2 "  Press a controller button for '%s'")
+                        : captureSequence_ ? tr(ICON_LC_KEYBOARD "  Press two keys in a row for '%s'")
+                                           : tr(ICON_LC_KEYBOARD "  Press a key for '%s'"),
                         a ? a->label.c_str() : capturingShortcut_.c_str());
             ImGui::PopFont();
             if (captureSequence_ && !captureFirst_.empty()) { // the first key is in: now the second
@@ -2105,13 +2122,20 @@ void App::drawHelpConsoleUi() {
                 ImGui::SameLine();
                 ImGui::TextColored(col(ui::color::textDim), "%s", tr("then..."));
             }
-            const std::string now = actions_.shortcutText(capturingShortcut_);
+            std::string now = actions_.shortcutText(capturingShortcut_);
+            if (captureController_) {
+                now.clear();
+                for (const std::string& b : uiPrefs_.controller.buttonsOf(capturingShortcut_))
+                    now += (now.empty() ? "" : ", ") + controllerButtonText(b);
+            }
             ImGui::TextColored(col(ui::color::textDim), "%s", tr("Now:"));
             ImGui::SameLine();
             if (now.empty())
                 ImGui::TextColored(col(ui::color::textDim), "%s", tr("none"));
+            else if (captureController_) ImGui::TextUnformatted(now.c_str());
             else ui::Keycaps(now);
             ImGui::TextColored(col(ui::color::textDim), "%s",
+                               captureController_ ? tr("Esc cancels, Backspace clears. A button that's bound already moves here.") :
                                captureSequence_ ? tr("Two different keys. Esc cancels, Backspace removes the two-key shortcuts.")
                                                 : tr("Esc cancels, Backspace clears. A key that's taken asks first."));
         }
@@ -2615,8 +2639,11 @@ void drawShortcutCell(App& app, const Action& a, float s, const char* path) {
     const bool modified = reg.hasOverride(a.id); // the arrow beside it puts the default back
     if (!shared.empty()) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::danger));
     else if (modified) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::accent));
-    const float tile = ImGui::GetFrameHeight() + 2.0f * s; // each small button beside the key (reset, two keys)
-    if (ImGui::Button((text + "##hk." + a.id).c_str(), ImVec2(-(tile * (modified ? 2.0f : 1.0f)), 0)))
+    const float tile = ImGui::GetFrameHeight() + 2.0f * s; // each small button beside the key (reset, two keys, controller)
+    // The controller tile shows while a controller or the SpaceMouse is plugged in, or this action has a button of its own.
+    const std::vector<std::string> padButtons = app.uiPrefs_.controller.buttonsOf(a.id);
+    const bool padTile = app.controllerConnected() || !padButtons.empty();
+    if (ImGui::Button((text + "##hk." + a.id).c_str(), ImVec2(-(tile * ((modified ? 2.0f : 1.0f) + (padTile ? 1.0f : 0.0f))), 0)))
         app.beginShortcutCapture(a.id);
     if (!shared.empty() || modified) ImGui::PopStyleColor();
     const std::string title = std::string(tr("Shortcut for")) + " " + trAction(a.id, a.label);
@@ -2642,6 +2669,27 @@ void drawShortcutCell(App& app, const Action& a, float s, const char* path) {
                  "window in Preferences > Input), or both pressed together. Each key still works alone if it is "
                  "bound; it runs when the window is up and the other key did not come.",
                  path);
+    if (padTile) {
+        ImGui::SameLine(0.0f, 2.0f * s);
+        const bool capturingPad = capturing && app.capturingController();
+        if (!padButtons.empty() || capturingPad) ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::accent));
+        const bool padClicked = ImGui::Button(("##hkpad." + a.id).c_str(), ImVec2(tile - 2.0f * s, 0.0f)); // (wide enough for the icon)
+        {   // the gamepad drawn over the button, which keeps a plain id (scripts click it by "##hkpad.<action>")
+            const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+            const ImVec2 sz = ImGui::CalcTextSize(ICON_LC_GAMEPAD_2);
+            ImGui::GetWindowDrawList()->AddText(ImVec2((lo.x + hi.x - sz.x) * 0.5f, (lo.y + hi.y - sz.y) * 0.5f),
+                                                ImGui::GetColorU32(ImGuiCol_Text), ICON_LC_GAMEPAD_2);
+        }
+        if (!padButtons.empty() || capturingPad) ImGui::PopStyleColor();
+        if (padClicked) app.beginControllerCapture(a.id);
+        std::string bound;
+        for (const std::string& b : padButtons) bound += (bound.empty() ? "" : ", ") + app.controllerButtonText(b);
+        const std::string padTitle = std::string(tr("Controller button")) + (bound.empty() ? "" : ": " + bound);
+        ui::HelpText(padTitle.c_str(), nullptr,
+                     "Click, then press a button of a game controller (or the SpaceMouse) to run this action with it. Esc "
+                     "cancels, Backspace clears. A pie menu on a button works in Clean view too.",
+                     path);
+    }
     if (modified) {
         ImGui::SameLine(0.0f, 2.0f * s);
         const bool resetClicked = ImGui::SmallButton(("##hkreset." + a.id).c_str());

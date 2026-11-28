@@ -52,6 +52,29 @@ add the strings `LeftOptionIsAlt` and `RightOptionIsAlt` set to `y` (Option beco
 `RightCommandIsCtrl` set to `y` (Cmd becomes Ctrl). Restart SculptForge. The setting belongs to the bottle, so a new
 bottle needs it again.
 
+### Controller buttons
+
+Any button of a game controller, or of a SpaceMouse, can run any action, the way a key does. Plug the controller in
+and open **Edit > Preferences > Hotkeys**: a small controller button appears at the right of each action's key. Click
+it, then press the button you want. <kbd>Esc</kbd> cancels and <kbd>Backspace</kbd> frees the action's buttons. A
+button that ran something else moves to the new action (the status bar says what it ran before). The controller
+button is lit when the action has one, and its tip names it. **Edit > Preferences > Input > Controller** lists every
+bound button, with the controller's name, the last button you pressed and a cross to free one.
+
+- The action runs when the button goes down. A pie menu (see [Radial menus](sculpting.md#radial-menus)), the **Quick
+  Menu** and the **Stroke popup** follow the button as they follow their key: hold it, point with the pen or mouse and
+  let go to pick, or tap it and click; tap it again to close. That works in
+  [Clean view](interface.md#fullscreen-hiding-panels-and-the-camera-notch) too, so you can summon a brush picker from the controller with nothing else on screen.
+- The face buttons, bumpers, the d-pad, Start, Back, the stick clicks and the paddles can be bound, and each trigger
+  counts as a button once you pull it past half way. Buttons only: the sticks do nothing here, and nothing rumbles.
+- Controllers plug in and out while SculptForge runs. Unplug one while a pie menu is held on its button and the menu lets go.
+- A button does nothing while you type in a text field. **Use controller buttons** in **Edit > Preferences > Input > Controller**
+  turns them all off.
+- A SpaceMouse button bound here wins over the same button's setting in **Edit > Preferences > Input > SpaceMouse**, which
+  keeps its short list for the buttons you leave alone.
+- Nothing changes if you have no controller: the controller button in Hotkeys shows only while one is plugged in (or the
+  action already has a button).
+
 ## Keyboard shortcuts
 
 The table lists the default shortcut of every action in the SculptForge style, grouped by palette. It is

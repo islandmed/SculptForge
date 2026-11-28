@@ -61,6 +61,7 @@
 #include "core/Stroke.h"
 #include "core/StrokePath.h"
 #include "core/SurfaceCursor.h"
+#include "core/Controller.h"
 #include "core/SpaceMouse.h"
 #include "core/TouchGesture.h"
 #include "core/Tablet.h"
@@ -3070,6 +3071,7 @@ private:
     std::string configDir_;           // <prefs>/ (ui.json, console_history.txt, recent_actions.txt)
     std::string capturingShortcut_;   // action id waiting for a key
     bool captureSequence_ = false;    // ...for two keys in a row (added to its other keys)
+    // (captureController_, with the controller block: ...for a controller button instead)
     std::string captureFirst_;        // the first key of that sequence, once pressed
     struct ShortcutConflict {
         std::string actionId, chord, holders; // the action being set, the key pressed, "Orbit left, Zoom in"
@@ -3838,6 +3840,37 @@ private:
     Uint64 spaceMouseReadNs_ = 0;
     bool spaceMouseEcho(const SDL_Event& e) const;
     // ---- end SpaceMouse ----
+    // ---- Controller buttons (Controller.cpp, core/Controller.h, docs/guide/shortcuts.md) ----
+    // Any button of a game controller (SDL's gamepad API: a trigger counts once pulled past half way) or of the
+    // SpaceMouse can be bound to any action in Preferences > Hotkeys (click the pad tile of the row, press the
+    // button), the way a key is: the action runs on the press. A pie menu, the Quick Menu and the stroke popup
+    // follow the button as they follow a key: held, point, let go; or tapped, they stay open. Buttons only (no
+    // sticks, no rumble); plug and unplug while running; nothing changes without a controller.
+    void controllerEvent(const SDL_Event& e);     // gamepad hot-plug, buttons, triggers
+    void controllerScan();                        // open every gamepad SDL lists
+    void controllerClose(SDL_JoystickID id);
+    void controllerCloseAll();
+    // A button went down or up (a gamepad's or the SpaceMouse's): true when the press was used (it bound the button
+    // being captured, or ran its action). SpaceMouse buttons not bound here fall back to Preferences > Input >
+    // SpaceMouse.
+    bool controllerPress(const std::string& button, bool down);
+    void beginControllerCapture(const std::string& actionId); // Hotkeys: the next button press becomes its button
+    bool controllerConnected() const { return !pads_.empty() || spaceMouse_ != nullptr; }
+    bool capturingController() const { return captureController_ && !capturingShortcut_.empty(); }
+    void drawControllerSection();                 // Preferences > Input > Controller
+    std::string controllerButtonText(const std::string& button) const; // the translated name
+    struct Pad {
+        SDL_JoystickID id = 0;
+        SDL_Gamepad* pad = nullptr;
+        std::string name;
+        std::array<bool, 2> trigger{}; // left, right: past the press threshold now
+    };
+    std::vector<Pad> pads_;
+    std::string controllerLast_;          // the button pressed last, for Preferences ("Pad A / Cross")
+    bool captureController_ = false;      // capturingShortcut_ waits for a controller button, not a key
+    SDL_Keycode controllerCode(const std::string& button) const; // the pseudo key a held pie menu waits on
+    std::vector<std::string> controllerHeld_; // buttons whose press ran an action, until they are let go
+    // ---- end Controller buttons ----
     // ---- Touch (Touch.cpp, core/TouchGesture.h, docs/guide/navigation.md) ----
     // Two fingers on a touch screen pan, pinch-zoom and twist the view; on a trackpad they pinch-zoom and twist
     // (their scroll stays the wheel). One finger on a touch screen still sculpts: its mouse press waits kTouchHold
