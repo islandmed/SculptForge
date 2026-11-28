@@ -802,7 +802,7 @@ void App::registerShellActions() {
          "Remesh the active Part at the Voxel Remesh resolution, in the background (on by default in the SculptForge layout, off in Classic; Tool > Remesh > Quick Remesh switches it).",
          "Tool > Remesh", "Shift+R", "",
          [this] {
-             if (quickRemeshOn()) quickRemesh(RemeshTrigger::Quick);
+             if (quickRemeshOn() || quickMenu_.open) quickRemesh(RemeshTrigger::Quick); // (the Quick Menu's button always works)
              else status_ = "Quick Remesh is off: turn it on in Tool > Remesh";
          },
          nullptr, nullptr});

@@ -1,6 +1,6 @@
 # Remesh and Remove Hidden one right click or one key away (0.14.0, a member's request): the Quick Menu's third row
 # (Quick Remesh, Quad Remesh, Remove Hidden) in the SculptForge layout, Ctrl+Shift+H in the SculptForge key style, and
-# the Classic layout and Classic keys as they were.
+# the Classic layout's Quick Menu with the same row, and Classic keys as they were.
 run ui_look look=forge layout=sculptforge
 run new_sphere subdivisions=4
 key f
@@ -46,12 +46,48 @@ expect_shortcut geometry.quick_remesh Shift+R
 input_style sculptforge
 expect_shortcut visibility.delete_hidden Ctrl+Shift+H
 
-# The Classic layout's Quick Menu is as it was: no third row, and Quick Remesh is off there unless ticked (by layout).
+# The Classic layout's Quick Menu has the same row (a member's request, same commands, same undo). Quick Remesh the keys
+# are off there unless ticked, but the menu's own button always works.
 run ui_look look=classic layout=classic
 expect_value quick_remesh == 0
+run new_sphere subdivisions=4
+key f
+camera 0 0
+remember triangles before
 button_drag right 0.3 0.35 0.3 0.35 0.1
 expect_value quickmenu_open == 1
 expect "##qm_drawsize"
-expect_not "Remove Hidden##visibility.delete_hidden"
-expect_not "Quad Remesh##geometry.qremesh"
+expect "Quick Remesh##geometry.quick_remesh"
+expect "Quad Remesh##geometry.qremesh"
+expect "Remove Hidden##visibility.delete_hidden"
+shot quickmenu_row_classic
+click "Quick Remesh##geometry.quick_remesh"
+expect_value voxel_remesh_running == 1
+wait_idle 120
+expect_status Quick Remesh: remeshed
+expect_value triangles != $before
+key ctrl+z
+expect_value triangles == $before
+# Remove Hidden: nothing hidden says so; hide half, then the button removes it (one undo step).
+click "Remove Hidden##visibility.delete_hidden"
+expect_status Nothing is hidden
+expect_value triangles == $before
+run hide_rect x0=0 y0=-1 x1=1 y1=1
+expect_value quickmenu_open == 1
+click "Remove Hidden##visibility.delete_hidden"
+expect_status Deleted
+expect_value triangles < $before
+key ctrl+z
+expect_value triangles == $before
+# Quad Remesh runs the same command as Tool > Remesh's button, in the background; one undo step (hidden shown first:
+# with half hidden it asks, as everywhere).
+run show_all
+expect_value quickmenu_open == 1
+click "Quad Remesh##geometry.qremesh"
+expect_value qremesh_running == 1
+wait_idle 120
+expect_status quads
+key ctrl+z
+expect_value triangles == $before
 key escape
+expect_value quickmenu_open == 0

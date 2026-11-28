@@ -1259,16 +1259,14 @@ void App::drawQuickMenu() {
         ui::ActionButton(*this, "draw.rgb");
         ImGui::SameLine();
         ui::ActionButton(*this, "transform.symmetry_x");
-        if (uiPrefs_.shellLayout != 0) {
-            // Remesh and Remove Hidden one right click away (a member, 0.14.0): Quick Remesh (the Voxel Remesh at Tool >
-            // Remesh's Resolution, in the background), Quad Remesh and Remove Hidden. The Classic layout's menu is as it was.
-            const float third = (width - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f; // (the rows above)
-            ui::ActionButton(*this, "geometry.quick_remesh", ImVec2(third, 0));
-            ImGui::SameLine();
-            ui::ActionButton(*this, "geometry.qremesh", ImVec2(third, 0));
-            ImGui::SameLine();
-            ui::ActionButton(*this, "visibility.delete_hidden", ImVec2(third, 0));
-        }
+        // Remesh and Remove Hidden one right click away (a member request, in both layouts): Quick Remesh
+        // (the Voxel Remesh at Tool > Remesh's Resolution, in the background), Quad Remesh and Remove Hidden. One row, no rings.
+        const float third = (width - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f; // (the rows above)
+        ui::ActionButton(*this, "geometry.quick_remesh", ImVec2(third, 0));
+        ImGui::SameLine();
+        ui::ActionButton(*this, "geometry.qremesh", ImVec2(third, 0));
+        ImGui::SameLine();
+        ui::ActionButton(*this, "visibility.delete_hidden", ImVec2(third, 0));
         const bool clicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right);
         const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
         if (clicked && !hovered && ImGui::GetFrameCount() > quickMenu_.openedFrame + 1) close = true;
