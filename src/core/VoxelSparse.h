@@ -18,10 +18,19 @@ glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::v
 // whether the triangles changed (rebuild the topology).
 // `report`: the crease vertices the pass found, how many of them it couldn't bring onto the source (a crease finer
 // than the voxels), and those creases' typical width (scene units).
+// The least |distance| (in cells) a sample gets: one exactly on the source (the tip line of a crease on a sample plane, Resolution 2048 of
+// gh#240) is inside or outside by the sign pass, but +0 reads as outside to the surface nets, which made zero-thickness membranes along it.
+constexpr float kOnSurface = 1e-3f;
+
 struct CreaseReport {
     size_t creases = 0, fine = 0;
     float fineWidth = 0.0f;
+    size_t splitCells = 0;   // (surface-nets cells whose surface is more than one piece: two walls touching)
+    size_t sealedOpened = 0; // (samples of a crease the wall closing had sealed that the sign test turned outside again)
 };
+// Which side of triangle `t` the point `p` is on, by the triangle's own plane at the point on it nearest to `p`: > 0 outside
+// (the side its normal points to), < 0 inside.
+float sideOfTriangle(const Mesh& mesh, uint32_t t, const glm::vec3& p);
 bool voxelCreaseSnap();
 bool snapVoxelCreases(Mesh& m, const Mesh& source, const glm::vec3& origin, float cell, const glm::ivec3& dims,
                       const std::function<int32_t(const glm::ivec3&)>& nearestAt, CreaseReport* report = nullptr);

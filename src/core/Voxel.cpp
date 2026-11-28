@@ -19,6 +19,7 @@
 #include "core/CloseHoles.h"
 #include "core/HardwareProfile.h"
 #include "core/MemoryGuard.h"
+#include "core/SurfaceNetsCell.h"
 #include "core/SurfaceQuery.h"
 #include "core/ThreadPool.h"
 #include "core/VoxelSparse.h"
@@ -186,9 +187,15 @@ bool hasOpenEdges(const Mesh& mesh) {
     return open.load();
 }
 
+constexpr float kSpeckCells = 64.0f; // (a ball 5 voxels across)
+
 // Drops the pieces of a surface-nets mesh (quads as triangle pairs t, t + 1) with fewer than `maxTriangles`
-// triangles, when a bigger one is left: single-voxel specks where a sign flips next to a cap.
-void dropSpecks(Mesh& m, size_t maxTriangles) {
+// triangles, or (minCells > 0) enclosing less than minCells voxels at `resolution` across, when a bigger one is left:
+// single-voxel specks where a sign flips next to a cap, and the loose bits and slivers a crease's rim leaves (surface nets
+// used to weld them to the wall at one vertex; they are pieces of their own now, and under ~4 voxels they are no detail).
+// A piece that is a small shell of the source itself (a separate bead or stud of a few voxels) is detail and stays: its
+// box holds the whole box of a source shell that small.
+void dropSpecks(Mesh& m, const Mesh& source, size_t maxTriangles, int resolution = 0, float minCells = 0.0f) {
     std::vector<uint32_t> parent(m.vertexCount());
     std::iota(parent.begin(), parent.end(), 0u);
     auto find = [&](uint32_t a) {
@@ -201,11 +208,113 @@ void dropSpecks(Mesh& m, size_t maxTriangles) {
     }
     std::vector<uint32_t> size(m.vertexCount(), 0);
     for (const glm::uvec3& t : m.triangles) ++size[find(t.x)];
-    if (std::count_if(size.begin(), size.end(), [&](uint32_t c) { return c >= maxTriangles; }) == 0) return;
+    // (a piece of 4096 triangles or more is no speck by size or by volume: nothing to judge then, the usual case)
+    constexpr uint32_t kSmall = 4096;
+    bool anySmall = false;
+    for (uint32_t v = 0; v < m.vertexCount() && !anySmall; ++v) anySmall = size[v] > 0 && size[v] < kSmall;
+    if (!anySmall) return;
+    std::unordered_map<uint32_t, double> volume;     // (of the small pieces, in voxels)
+    std::unordered_map<uint32_t, uint8_t> membrane;  // (pieces with no thickness)
+    if (resolution > 0) {
+        glm::vec3 lo(1e30f), hi(-1e30f);
+        for (const glm::vec3& p : m.positions) lo = glm::min(lo, p), hi = glm::max(hi, p);
+        const double cell = double(std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z})) / double(resolution);
+        // Each small piece's volume against its own centre (a closed piece's volume doesn't depend on the origin, an open sheet's does:
+        // measured from its own centre a flat one is 0) and its area: a piece thinner than 0.05 voxel on average is a membrane, whatever
+        // its triangle count (a flat piece along the tip line of a crease, gh#240); a one-voxel fin is 0.5.
+        std::unordered_map<uint32_t, std::pair<glm::dvec3, double>> centre;
+        for (const glm::uvec3& t : m.triangles)
+            if (const uint32_t root = find(t.x); size[root] < kSmall) {
+                auto& c = centre[root];
+                c.first += glm::dvec3(m.positions[t.x]) + glm::dvec3(m.positions[t.y]) + glm::dvec3(m.positions[t.z]), c.second += 3.0;
+            }
+        for (auto& [root, c] : centre) c.first /= c.second;
+        std::unordered_map<uint32_t, double> area;
+        for (const glm::uvec3& t : m.triangles)
+            if (const uint32_t root = find(t.x); size[root] < kSmall) {
+                const glm::dvec3 o = centre[root].first, a = glm::dvec3(m.positions[t.x]) - o, b = glm::dvec3(m.positions[t.y]) - o,
+                                 c = glm::dvec3(m.positions[t.z]) - o;
+                volume[root] += glm::dot(a, glm::cross(b, c)) / 6.0;
+                area[root] += 0.5 * glm::length(glm::cross(b - a, c - a));
+            }
+        for (auto& [root, v] : volume) {
+            membrane[root] = std::abs(v) < 0.05 * area[root] * cell;
+            v = std::abs(v) / (cell * cell * cell);
+        }
+    }
+    auto isSpeckRaw = [&](uint32_t root) {
+        if (size[root] < maxTriangles) return true;
+        if (const auto mem = membrane.find(root); mem != membrane.end() && mem->second) return true;
+        const auto it = volume.find(root);
+        return minCells > 0.0f && it != volume.end() && it->second < double(minCells);
+    };
+    // (the specks' boxes, then the source's small shells: only when there is a speck to judge)
+    std::vector<uint32_t> specks;
+    for (uint32_t v = 0; v < m.vertexCount(); ++v)
+        if (size[v] > 0 && size[v] < kSmall && find(v) == v && isSpeckRaw(v)) specks.push_back(v);
+    std::vector<uint8_t> detail(m.vertexCount(), 0);
+    // (a piece of under 24 triangles is under two voxels across: no shell of the source is that small, nothing to look up for it)
+    constexpr uint32_t kTiny = 24;
+    const bool judge = resolution > 0 && std::any_of(specks.begin(), specks.end(), [&](uint32_t v) { return size[v] >= kTiny; });
+    if (judge) {
+        glm::vec3 lo(1e30f), hi(-1e30f);
+        for (const glm::vec3& p : m.positions) lo = glm::min(lo, p), hi = glm::max(hi, p);
+        const float cell = std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z}) / float(resolution);
+        // Source shells (welded by position, a quarter cell), those whose box is under 8 cells across.
+        std::unordered_map<uint64_t, uint32_t> ids;
+        std::vector<uint32_t> sp(source.positions.size()), sparent;
+        auto idOf = [&](const glm::vec3& p) {
+            const glm::ivec3 q = glm::ivec3(glm::floor(p / (cell * 0.25f)));
+            const uint64_t k = (uint64_t(uint32_t(q.x) & 0x1fffff) << 42) | (uint64_t(uint32_t(q.y) & 0x1fffff) << 21) | (uint32_t(q.z) & 0x1fffff);
+            const auto [it, added] = ids.emplace(k, uint32_t(sparent.size()));
+            if (added) sparent.push_back(it->second);
+            return it->second;
+        };
+        for (size_t i = 0; i < sp.size(); ++i) sp[i] = idOf(source.positions[i]);
+        auto sfind = [&](uint32_t a) {
+            while (sparent[a] != a) a = sparent[a] = sparent[sparent[a]];
+            return a;
+        };
+        for (const glm::uvec3& t : source.triangles) {
+            sparent[sfind(sp[t.y])] = sfind(sp[t.x]);
+            sparent[sfind(sp[t.z])] = sfind(sp[t.x]);
+        }
+        struct Box { glm::vec3 lo{1e30f}, hi{-1e30f}; };
+        std::unordered_map<uint32_t, Box> shells;
+        for (const glm::uvec3& t : source.triangles)
+            for (int k = 0; k < 3; ++k) {
+                Box& b = shells[sfind(sp[t[k]])];
+                b.lo = glm::min(b.lo, source.positions[t[k]]);
+                b.hi = glm::max(b.hi, source.positions[t[k]]);
+            }
+        std::vector<Box> small;
+        for (const auto& [root, b] : shells)
+            if (std::max({b.hi.x - b.lo.x, b.hi.y - b.lo.y, b.hi.z - b.lo.z}) < 8.0f * cell) small.push_back(b);
+        if (!small.empty()) {
+            std::unordered_map<uint32_t, Box> pieceBoxes;
+            for (uint32_t v : specks)
+                if (size[v] >= kTiny) pieceBoxes[v];
+            for (uint32_t v = 0; v < m.vertexCount(); ++v)
+                if (auto it = pieceBoxes.find(find(v)); it != pieceBoxes.end()) {
+                    it->second.lo = glm::min(it->second.lo, m.positions[v]);
+                    it->second.hi = glm::max(it->second.hi, m.positions[v]);
+                }
+            for (const auto& [root, pb] : pieceBoxes)
+                for (const Box& b : small)
+                    if (glm::all(glm::lessThanEqual(pb.lo - 1.5f * cell, b.lo)) && glm::all(glm::lessThanEqual(b.hi, pb.hi + 1.5f * cell))) {
+                        detail[root] = 1;
+                        break;
+                    }
+        }
+    }
+    auto isSpeck = [&](uint32_t root) { return isSpeckRaw(root) && !detail[root]; };
+    bool bigOne = false;
+    for (uint32_t v = 0; v < m.vertexCount() && !bigOne; ++v) bigOne = size[v] > 0 && find(v) == v && !isSpeck(v);
+    if (!bigOne) return;
     std::vector<glm::uvec3> kept;
     kept.reserve(m.triangles.size());
     for (const glm::uvec3& t : m.triangles)
-        if (size[find(t.x)] >= maxTriangles) kept.push_back(t);
+        if (!isSpeck(find(t.x))) kept.push_back(t);
     if (kept.size() == m.triangles.size()) return;
     std::vector<uint32_t> remap(m.vertexCount(), ~0u);
     std::vector<glm::vec3> positions;
@@ -230,16 +339,18 @@ void dropSpecks(Mesh& m, size_t maxTriangles) {
 
 } // namespace
 
+void dropVoxelSpecks(Mesh& m, const Mesh& source, int resolution) { dropSpecks(m, source, 64, resolution, kSpeckCells); }
+
 // The stages with Cancel and progress inside (StagePoll above); Voxel.h's plain versions call these with no poll.
 std::vector<uint8_t> solidifyShellPolled(const VoxelGrid& shell, float threshold, int closeRadius, bool keepAllParts,
                                          const StagePoll& poll, bool& stopped);
 bool rasterizeMeshShellPolled(const Mesh& mesh, VoxelGrid& grid, const StagePoll& poll);
 Mesh meshFromFieldPolled(const VoxelGrid& grid, const std::vector<float>& f, float iso, int smoothIterations, const StagePoll& poll,
-                         bool& stopped);
+                         bool& stopped, size_t* splitCells = nullptr);
 // `nearestOut`: each sample's nearest triangle (-1: none measured), for snapCreases.
 std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& grid, const std::vector<uint8_t>& solid,
                                              float band, const StagePoll& poll, bool& stopped,
-                                             std::vector<int32_t>* nearestOut = nullptr);
+                                             std::vector<int32_t>* nearestOut = nullptr, size_t* sealedOpened = nullptr);
 
 glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c);
 
@@ -733,6 +844,13 @@ glm::vec3 closestOnTriangle(const glm::vec3& p, const glm::vec3& a, const glm::v
     return a + ab * (vb * denom) + ac * (vc * denom);
 }
 
+float sideOfTriangle(const Mesh& mesh, uint32_t t, const glm::vec3& p) {
+    const auto& P = mesh.positions;
+    const glm::uvec3 tri = mesh.triangles[t];
+    const glm::vec3 nrm = glm::cross(P[tri.y] - P[tri.x], P[tri.z] - P[tri.x]);
+    return glm::dot(p - closestOnTriangle(p, P[tri.x], P[tri.y], P[tri.z]), nrm);
+}
+
 bool makeVoxelGrid(const AABB& box, int resolution, int padding, VoxelGrid& grid, size_t maxCells) {
     if (!box.valid()) return false;
     resolution = std::max(resolution, 4);
@@ -837,7 +955,7 @@ Mesh meshFromField(const VoxelGrid& grid, const std::vector<float>& f, float iso
 }
 
 Mesh meshFromFieldPolled(const VoxelGrid& grid, const std::vector<float>& f, float iso, int smoothIterations, const StagePoll& poll,
-                         bool& stopped) {
+                         bool& stopped, size_t* splitCells) {
     stopped = false;
     auto stop = [&] { return stopped = true, Mesh{}; };
     const glm::ivec3 dims = grid.dims;
@@ -849,6 +967,8 @@ Mesh meshFromFieldPolled(const VoxelGrid& grid, const std::vector<float>& f, flo
 
     // One vertex per cell that the surface passes through (surface nets). Slices run in parallel, each numbering its
     // own vertices; the slices' counts then give the global numbers, in the same z, y, x order as a serial scan.
+    const SurfaceNetsCells& cells3 = SurfaceNetsCells::get();
+    std::atomic<size_t> split{0};
     std::vector<std::vector<glm::vec3>> slicePositions(size_t(cells.z));
     poolFor(size_t(cells.z), [&](size_t zb, size_t ze) {
         for (int z = int(zb); z < int(ze); ++z) {
@@ -862,25 +982,31 @@ Mesh meshFromFieldPolled(const VoxelGrid& grid, const std::vector<float>& f, flo
                         inside += c[size_t(k)] > iso;
                     }
                     if (inside == 0 || inside == 8) continue;
-                    glm::vec3 sum(0.0f);
-                    int crossings = 0;
+                    const int config = SurfaceNetsCells::key(c, iso);
+                    glm::vec3 sum[4] = {glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(0.0f)};
+                    int crossings[4] = {0, 0, 0, 0};
                     for (int a = 0; a < 8; ++a)
-                        for (int bit = 1; bit < 8; bit <<= 1) {
-                            if (a & bit) continue;
-                            const int b = a | bit;
+                        for (int axis = 0; axis < 3; ++axis) {
+                            if (a >> axis & 1) continue;
+                            const int b = a | 1 << axis;
                             const float fa = c[size_t(a)], fb = c[size_t(b)];
                             if ((fa > iso) == (fb > iso)) continue;
                             const float t = (iso - fa) / (fb - fa);
                             const glm::vec3 pa(a & 1, (a >> 1) & 1, (a >> 2) & 1);
                             const glm::vec3 pb(b & 1, (b >> 1) & 1, (b >> 2) & 1);
-                            sum += glm::mix(pa, pb, t);
-                            ++crossings;
+                            const int piece = cells3.piece[size_t(config)][size_t(SurfaceNetsCells::edgeId(a, axis))];
+                            sum[piece] += glm::mix(pa, pb, t);
+                            ++crossings[piece];
                         }
-                    cellVertex[cellIndex(x, y, z)] = int32_t(out.size());
-                    out.push_back(grid.position(x, y, z) + sum / float(crossings) * grid.cell);
+                    const int pieces = cells3.count[size_t(config)];
+                    if (pieces > 1) split.fetch_add(1, std::memory_order_relaxed);
+                    const int32_t first = int32_t(out.size());
+                    cellVertex[cellIndex(x, y, z)] = pieces == 1 ? first : -(first + 2); // (a cell of several pieces: -(first + 2))
+                    for (int i = 0; i < pieces; ++i) out.push_back(grid.position(x, y, z) + sum[i] / float(crossings[i]) * grid.cell);
                 }
         }
     }, 1);
+    if (splitCells) *splitCells = split.load();
     if (!poll.at(1, 5)) return stop();
     std::vector<size_t> firstVertex(size_t(cells.z) + 1, 0);
     for (size_t z = 0; z < size_t(cells.z); ++z) firstVertex[z + 1] = firstVertex[z] + slicePositions[z].size();
@@ -893,6 +1019,7 @@ Mesh meshFromFieldPolled(const VoxelGrid& grid, const std::vector<float>& f, flo
             if (firstVertex[z] == 0) continue;
             for (size_t i = z * cellSlice; i < (z + 1) * cellSlice; ++i)
                 if (cellVertex[i] >= 0) cellVertex[i] += int32_t(firstVertex[z]);
+                else if (cellVertex[i] != -1) cellVertex[i] -= int32_t(firstVertex[z]);
         }
     }, 1);
 
@@ -921,7 +1048,15 @@ Mesh meshFromFieldPolled(const VoxelGrid& grid, const std::vector<float>& f, flo
                             glm::ivec3 c = p;
                             c[u] += du[k];
                             c[v] += dv[k];
-                            quad[size_t(k)] = cellVertex[cellIndex(c.x, c.y, c.z)];
+                            int32_t vtx = cellVertex[cellIndex(c.x, c.y, c.z)];
+                            if (vtx < -1) { // (a cell of several pieces: the one holding this grid edge)
+                                std::array<float, 8> cv;
+                                for (int j = 0; j < 8; ++j) cv[size_t(j)] = f[grid.index(c.x + (j & 1), c.y + ((j >> 1) & 1), c.z + ((j >> 2) & 1))];
+                                const int config = SurfaceNetsCells::key(cv, iso);
+                                const glm::ivec3 lo = p - c;
+                                vtx = -vtx - 2 + cells3.piece[size_t(config)][size_t(SurfaceNetsCells::edgeId(lo.x | lo.y << 1 | lo.z << 2, axis))];
+                            }
+                            quad[size_t(k)] = vtx;
                             ok &= quad[size_t(k)] >= 0;
                         }
                         if (!ok) continue;
@@ -1001,7 +1136,8 @@ std::vector<float> insideDistanceField(const Mesh& mesh, const VoxelGrid& grid, 
 }
 
 std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& grid, const std::vector<uint8_t>& solid,
-                                             float band, const StagePoll& poll, bool& stopped, std::vector<int32_t>* nearestOut) {
+                                             float band, const StagePoll& poll, bool& stopped, std::vector<int32_t>* nearestOut,
+                                             size_t* sealedOpened) {
     stopped = false;
     auto stop = [&] { return stopped = true, std::vector<float>{}; };
     static const bool timing = std::getenv("SF_VOXEL_TIMING") != nullptr;
@@ -1350,14 +1486,40 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
     // Sign: the flood fill is certain about the outside and about the deep inside; next to the surface (nearOutside:
     // within 2 samples, any axis, of an outside sample) the nearest triangle's side decides, which keeps sub-voxel
     // detail instead of voxel stair-steps.
+    // A crease narrower than about 4 samples is sealed by the wall closing (the walls are thickened by a sample each and
+    // the flood never gets in): its air counts as solid, and the sign of the nearest triangle only reached 2 samples down
+    // from its mouth, so the rest filled up and the surface between the two came out as speckled sheets (gh#240). The
+    // nearest triangle decides for every solid sample within kSealed of the surface too. A surface buried inside another
+    // part must still count as buried there: its front side is solid, as a sealed gap is; the difference is that a gap's
+    // far wall is within kHug of the probe and has the sample on its outer side as well.
+    constexpr float kSealed = 2.5f, kHug = 2.0f, kBack = -0.3f, kProbe = 2.5f, kGap = 1.25f;
+    // A crease's far wall: the surface nearest the probe (within kHug cells) has this sample on its outer side too, faces back at
+    // this sample's own surface (`n`: its unit normal; normals more than ~107 degrees apart: neighbouring triangles of one smooth
+    // surface, a pole's fan, a terrace step are never a crease's wall), and the gap between the two walls (kProbe along the normal
+    // from the near wall, less or plus the probe's distance to the far wall, by its side of it) is at least kGap cells: a closed
+    // slit (the lips) is narrower than the grid can hold, and opening it only chips its edge. `pw`: the probe's position.
+    auto outsideFarWall = [&](size_t probeIndex, const glm::vec3& p, const glm::vec3& pw, const glm::vec3& n) {
+        if (nearest[probeIndex] < 0 || dist2[probeIndex] >= kHug * kHug) return false;
+        const glm::uvec3 t = mesh.triangles[size_t(nearest[probeIndex])];
+        const glm::vec3 m = glm::cross(P[t.y] - P[t.x], P[t.z] - P[t.x]);
+        const float l = glm::length(m);
+        if (!(l > 0.0f) || glm::dot(m / l, n) >= kBack || sideOfTriangle(mesh, uint32_t(nearest[probeIndex]), p) <= 0.0f) return false;
+        const glm::vec3 d = pw - closestOnTriangle(pw, P[t.x], P[t.y], P[t.z]);
+        const float e = glm::length(d) / grid.cell;
+        const float gap = glm::dot(d, m) > 0.0f ? kProbe + e : kProbe - e; // (the probe in the gap, or past the far wall)
+        return gap >= kGap;
+    };
     std::vector<uint8_t> inside(n);
+    std::atomic<size_t> opened{0};
     poolFor(size_t(dims.z), [&](size_t zb, size_t ze) {
+        size_t openedHere = 0;
         for (int z = int(zb); z < int(ze); ++z)
             for (int y = 0; y < dims.y; ++y)
                 for (int x = 0; x < dims.x; ++x) {
                     const size_t i = grid.index(x, y, z);
+                    const bool sealed = solid[i] && !nearOutside[i] && nearest[i] >= 0 && dist2[i] <= kSealed * kSealed;
                     if (!solid[i]) inside[i] = 0;
-                    else if (!nearOutside[i] || nearest[i] < 0) inside[i] = 1;
+                    else if (!(nearOutside[i] || sealed) || nearest[i] < 0) inside[i] = 1;
                     else {
                         const glm::uvec3 tri = mesh.triangles[size_t(nearest[i])];
                         const glm::vec3 nrm = glm::cross(P[tri.y] - P[tri.x], P[tri.z] - P[tri.x]);
@@ -1365,14 +1527,18 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
                         const glm::vec3 onSurface = closestOnTriangle(p, P[tri.x], P[tri.y], P[tri.z]);
                         // A surface buried inside another part (solid just outside it too) doesn't bound the solid.
                         const float len = glm::length(nrm);
-                        const glm::ivec3 probe(glm::round((onSurface + nrm * (2.5f * grid.cell / std::max(len, 1e-20f)) -
-                                                           grid.origin) / grid.cell));
+                        const glm::vec3 probeAt = onSurface + nrm * (kProbe * grid.cell / std::max(len, 1e-20f));
+                        const glm::ivec3 probe(glm::round((probeAt - grid.origin) / grid.cell));
                         const bool buried = len > 0.0f && glm::all(glm::greaterThanEqual(probe, glm::ivec3(0))) &&
-                                            glm::all(glm::lessThan(probe, dims)) && solid[grid.index(probe.x, probe.y, probe.z)];
+                                            glm::all(glm::lessThan(probe, dims)) && solid[grid.index(probe.x, probe.y, probe.z)] &&
+                                            !outsideFarWall(grid.index(probe.x, probe.y, probe.z), p, probeAt, nrm / len);
                         inside[i] = buried || glm::dot(p - onSurface, nrm) < 0.0f;
+                        openedHere += sealed && !inside[i];
                     }
                 }
+        opened.fetch_add(openedHere, std::memory_order_relaxed);
     }, 1);
+    if (sealedOpened) *sealedOpened = opened.load();
     std::vector<uint8_t>().swap(nearOutside);
     // The late gather: a solid sample 3 from the outside next to one the sign test turned may be half of a straddling
     // pair, so it needs its value too (the small triangles' part; the big ones splatted it already). Rare.
@@ -1424,7 +1590,7 @@ std::vector<float> insideDistanceFieldPolled(const Mesh& mesh, const VoxelGrid& 
     std::vector<float> f(n);
     poolFor(n, [&](size_t b, size_t e) {
         for (size_t i = b; i < e; ++i) {
-            const float d = std::sqrt(dist2[i]);
+            const float d = std::max(std::sqrt(dist2[i]), kOnSurface); // (a sample exactly on the source keeps its sign: +0 would read as outside)
             f[i] = inside[i] || !reached[i] ? d : -d;
         }
     }, 1 << 16);
@@ -1579,7 +1745,8 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
             else if (error && error->empty()) *error = "Remesh produced no surface";
             return {};
         }
-        if (open) dropSpecks(out, 64);
+        const bool rims = creases.sealedOpened > 0 || creases.splitCells > 0; // (sealed creases opened, or walls touching)
+        if (open || rims) dropSpecks(out, mesh, 64, resolution, rims ? kSpeckCells : 0.0f);
         noteFineCreases(mesh, resolution, creases, notes);
         if (!step(0.9f)) return {};
         transferRemeshPaint(source, out);
@@ -1618,12 +1785,13 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
     // Mesh the signed distance to the original surface (positive inside), not the blocky occupancy: the result
     // lands on the original surface with no voxel terracing.
     std::vector<int32_t> nearest;
-    const std::vector<float> field =
-        insideDistanceFieldPolled(mesh, grid, solid, 3.0f, {&stepFn, 0.25f, 0.6f}, stopped, g_creaseSnap ? &nearest : nullptr);
+    size_t sealedOpened = 0;
+    const std::vector<float> field = insideDistanceFieldPolled(mesh, grid, solid, 3.0f, {&stepFn, 0.25f, 0.6f}, stopped,
+                                                               g_creaseSnap ? &nearest : nullptr, &sealedOpened);
     if (stopped) return {};
     std::vector<uint8_t>().swap(solid);
     if (!step(0.6f)) return {};
-    Mesh out = meshFromFieldPolled(grid, field, 0.0f, 2, {&stepFn, 0.6f, 0.85f}, stopped);
+    Mesh out = meshFromFieldPolled(grid, field, 0.0f, 2, {&stepFn, 0.6f, 0.85f}, stopped, &creases.splitCells);
     if (stopped) return {};
     if (g_creaseSnap) {
         if (snapCreases(out, mesh, grid, [&](const glm::ivec3& s) { return nearest[grid.index(s.x, s.y, s.z)]; }, &creases))
@@ -1631,7 +1799,10 @@ Mesh voxelRemeshImpl(const Mesh& source, int resolution, std::string* error, con
         out.recomputeAllNormals();
         noteFineCreases(mesh, resolution, creases, notes);
     }
-    if (open) dropSpecks(out, 64); // (a few voxels: never detail at a remesh resolution)
+    // (a few voxels: never detail at a remesh resolution. Where the sign test opened a sealed crease, the tip of a groove
+    // under a voxel wide can leave one-voxel pieces of its own.)
+    const bool rims = sealedOpened > 0 || creases.splitCells > 0;
+    if (open || rims) dropSpecks(out, mesh, 64, resolution, rims ? kSpeckCells : 0.0f);
     if (out.triangleCount() == 0 && error) *error = "Remesh produced no surface";
     if (!step(0.9f)) return {};
     // Mask and vertex paint follow the nearest original vertex; hidden flags and UVs don't survive a rebuild (everything
