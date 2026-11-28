@@ -248,7 +248,16 @@ glm::vec3 TriangleBVH::faceNormal(uint32_t t) const {
     return len > 0.0f ? n / len : glm::vec3(0.0f);
 }
 
-bool TriangleBVH::closestPoint(const glm::vec3& p, float maxDistance, SurfaceHit& hit) const {
+namespace {
+// (the triangle normal is not normalised: its length is the cross product's, so compare against minDot * length)
+bool facesAlong(const FacingFilter* f, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c) {
+    if (!f) return true;
+    const glm::vec3 n = glm::cross(b - a, c - a);
+    return glm::dot(n, f->dir) > f->minDot * glm::length(n);
+}
+} // namespace
+
+bool TriangleBVH::closestPoint(const glm::vec3& p, float maxDistance, SurfaceHit& hit, const FacingFilter* facing) const {
     if (bvh_.empty()) return false;
     const auto& nodes = bvh_.nodes();
     const auto& order = bvh_.order();
@@ -267,7 +276,8 @@ bool TriangleBVH::closestPoint(const glm::vec3& p, float maxDistance, SurfaceHit
                 glm::vec3 bary;
                 const glm::vec3 q = closestPointOnTriangle(p, positions_[tri.x], positions_[tri.y], positions_[tri.z], bary);
                 const float d2 = glm::dot(q - p, q - p);
-                if (d2 < best2 || (d2 == best2 && (!found || t < hit.prim))) { // (a tie: the lowest triangle)
+                if ((d2 < best2 || (d2 == best2 && (!found || t < hit.prim))) && // (a tie: the lowest triangle)
+                    facesAlong(facing, positions_[tri.x], positions_[tri.y], positions_[tri.z])) {
                     best2 = d2;
                     found = true;
                     hit.prim = t;
@@ -292,7 +302,8 @@ bool TriangleBVH::closestPoint(const glm::vec3& p, float maxDistance, SurfaceHit
     return found;
 }
 
-bool TriangleBVH::raycast(const glm::vec3& origin, const glm::vec3& dir, float maxT, SurfaceHit& hit) const {
+bool TriangleBVH::raycast(const glm::vec3& origin, const glm::vec3& dir, float maxT, SurfaceHit& hit,
+                          const FacingFilter* facing) const {
     if (bvh_.empty()) return false;
     const auto& nodes = bvh_.nodes();
     const auto& order = bvh_.order();
@@ -326,6 +337,7 @@ bool TriangleBVH::raycast(const glm::vec3& origin, const glm::vec3& dir, float m
                 if (v < 0.0f || u + v > 1.0f) continue;
                 const float tt = glm::dot(e2, qv) * invDet;
                 if (tt < 0.0f || tt > bestT || (tt == bestT && found && t > hit.prim)) continue; // (a tie: the lowest)
+                if (facing && !facesAlong(facing, a, positions_[tri.y], positions_[tri.z])) continue; // (on to the next hit)
                 bestT = tt;
                 found = true;
                 hit.prim = t;

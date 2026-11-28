@@ -42,6 +42,13 @@ private:
     std::vector<uint32_t> order_;
 };
 
+// Accept only triangles that face along `dir`: dot(triangle normal, dir) > minDot (both unit length). A rejected triangle
+// is skipped, so a query goes on to the nearest accepted one (Project Detail: the far wall of a crevice faces back).
+struct FacingFilter {
+    glm::vec3 dir{0.0f};
+    float minDot = 0.0f;
+};
+
 class TriangleBVH {
 public:
     // Takes the triangles to query (hidden ones should be left out by the caller).
@@ -50,10 +57,11 @@ public:
     bool empty() const { return bvh_.empty(); }
 
     // Closest surface point within `maxDistance` of `p`.
-    bool closestPoint(const glm::vec3& p, float maxDistance, SurfaceHit& hit) const;
+    bool closestPoint(const glm::vec3& p, float maxDistance, SurfaceHit& hit, const FacingFilter* facing = nullptr) const;
     // Nearest hit along the ray (either side of a triangle) with 0 <= t <= maxT; `dir` need not be unit
-    // length (t is in its units).
-    bool raycast(const glm::vec3& origin, const glm::vec3& dir, float maxT, SurfaceHit& hit) const;
+    // length (t is in its units). `facing`: only triangles it accepts count.
+    bool raycast(const glm::vec3& origin, const glm::vec3& dir, float maxT, SurfaceHit& hit,
+                 const FacingFilter* facing = nullptr) const;
 
     const std::vector<glm::vec3>& positions() const { return positions_; }
     const std::vector<glm::uvec3>& triangles() const { return triangles_; }

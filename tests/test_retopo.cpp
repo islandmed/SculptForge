@@ -5,11 +5,12 @@
 // quads, near the target count and the sculpt's surface (Hausdorff distance); Follow Face Groups, symmetry, open
 // surfaces, vertex paint density, mask / colour transfer, cancel; projecting detail back onto a divided retopo
 // brings the error down and respects the mask; both commands are one undo step.
-// SF_RETOPO_BENCH=1 also times both on a 1M+ triangle sculpt.
+// SF_RETOPO_BENCH=1 also times both on a 1M+ triangle sculpt; SF_PROJECT_BENCH=<.sfproj> times Project Detail old vs new.
 #include "TestHarness.h"
 
 #include "core/Commands.h"
 #include "core/Primitives.h"
+#include "core/Project.h"
 #include "core/Projection.h"
 #include "core/QRemesh.h"
 #include "core/SurfaceQuery.h"
@@ -18,6 +19,10 @@
 #include <cmath>
 #include <cstdlib>
 #include <set>
+#include <vector>
+#ifdef __linux__
+#include <sys/resource.h>
+#endif
 
 using namespace sf;
 
@@ -313,6 +318,180 @@ TEST(project_all_brings_detail_back) {
     CHECK(doc.mesh.colors == divided.colors);
 }
 
+namespace {
+
+// A flat grid of triangles in the plane x = `x` covering y, z in [-0.5, 1.5], facing +x (or -x).
+Mesh wallPlate(float x, bool facePlusX, int n = 20) {
+    Mesh m;
+    for (int j = 0; j <= n; ++j)
+        for (int i = 0; i <= n; ++i) m.positions.push_back({x, -0.5f + 2.0f * float(i) / float(n), -0.5f + 2.0f * float(j) / float(n)});
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i) {
+            const uint32_t a = uint32_t(j * (n + 1) + i), b = a + 1, c = a + uint32_t(n + 1), d = c + 1;
+            if (facePlusX) m.triangles.push_back({a, b, c}), m.triangles.push_back({b, d, c});
+            else m.triangles.push_back({a, c, b}), m.triangles.push_back({b, c, d});
+        }
+    m.rebuildTopology();
+    m.recomputeAllNormals();
+    return m;
+}
+
+} // namespace
+
+// A crevice: two walls 0.055 apart facing each other. The target is a sheet facing +x, 0.03 in front of the left wall (it
+// sits where the sculpt's wall was before the detail came in) and only 0.025 from the right wall, which faces away from it.
+TEST(project_all_does_not_jump_across_a_crevice) {
+    const Mesh left = wallPlate(-0.05f, true), right = wallPlate(0.005f, false);
+    Mesh target = wallPlate(-0.02f, true, 10);
+    for (auto& p : target.positions) p.y = (p.y + 0.5f) * 0.5f, p.z = (p.z + 0.5f) * 0.5f; // inside the walls' extent
+    target.recomputeAllNormals();
+    std::vector<const Mesh*> sources{&left, &right};
+    auto run = [&](bool mean, float facing) {
+        ProjectOptions o;
+        o.distance = 0.1f;
+        o.mean = mean;
+        o.facing = facing;
+        o.vertexpaint = false;
+        std::vector<glm::vec3> positions;
+        ProjectStats st;
+        std::string err;
+        CHECK(computeProjection(target, sources, o, positions, nullptr, st, err));
+        CHECK(st.projected == target.vertexCount());
+        float lo = 1e9f, hi = -1e9f;
+        for (const glm::vec3& p : positions) lo = std::min(lo, p.x), hi = std::max(hi, p.x);
+        return std::make_pair(lo, hi);
+    };
+    // Without the facing test the nearest hit is the right wall (or, with Mean, halfway to it): the sheet crosses the gap.
+    const auto old = run(false, -1.0f);
+    CHECK(std::abs(old.first - 0.005f) < 1e-4f && std::abs(old.second - 0.005f) < 1e-4f);
+    const auto oldMean = run(true, -1.0f);
+    CHECK(std::abs(oldMean.first - (-0.0225f)) < 1e-4f);
+    // With it every vertex lands on the wall it belongs to, Mean included (one accepted hit: nothing to average).
+    for (bool mean : {false, true})
+        for (float facing : {0.0f, 0.2f, 0.5f}) {
+            const auto r = run(mean, facing);
+            CHECK(std::abs(r.first - (-0.05f)) < 1e-4f && std::abs(r.second - (-0.05f)) < 1e-4f);
+        }
+}
+
+// The facing test also holds for the nearest-point fallback (no hit along the normal) and keeps a hit on a tilted wall.
+TEST(project_all_facing_filters_the_closest_point_fallback) {
+    const Mesh left = wallPlate(-0.05f, true), right = wallPlate(0.005f, false);
+    TriangleBVH bvh;
+    std::vector<glm::vec3> P = left.positions;
+    std::vector<glm::uvec3> T = left.triangles;
+    const uint32_t off = uint32_t(P.size());
+    P.insert(P.end(), right.positions.begin(), right.positions.end());
+    for (const auto& t : right.triangles) T.push_back(t + glm::uvec3(off));
+    bvh.build(std::move(P), std::move(T));
+    SurfaceHit h;
+    const FacingFilter f{{1.0f, 0.0f, 0.0f}, 0.2f};
+    CHECK(bvh.closestPoint({-0.02f, 0.5f, 0.5f}, 0.1f, h));
+    CHECK(std::abs(h.position.x - 0.005f) < 1e-4f);
+    CHECK(bvh.closestPoint({-0.02f, 0.5f, 0.5f}, 0.1f, h, &f));
+    CHECK(std::abs(h.position.x - (-0.05f)) < 1e-4f);
+    // A ray from the same point along +x skips the back-facing right wall and finds nothing further.
+    CHECK(bvh.raycast({-0.02f, 0.5f, 0.5f}, {1, 0, 0}, 0.1f, h));
+    CHECK(!bvh.raycast({-0.02f, 0.5f, 0.5f}, {1, 0, 0}, 0.1f, h, &f));
+    CHECK(bvh.raycast({-0.02f, 0.5f, 0.5f}, {-1, 0, 0}, 0.1f, h, &f));
+}
+
+namespace {
+
+// A square grid over x, y in [-half, half] lifted to z = k (x^2 + y^2): a bowl (a concave pocket) facing +z.
+Mesh bowl(float k, float half, int n) {
+    Mesh m;
+    for (int j = 0; j <= n; ++j)
+        for (int i = 0; i <= n; ++i) {
+            const float x = -half + 2.0f * half * float(i) / float(n), y = -half + 2.0f * half * float(j) / float(n);
+            m.positions.push_back({x, y, k * (x * x + y * y)});
+        }
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i) {
+            const uint32_t a = uint32_t(j * (n + 1) + i), b = a + 1, c = a + uint32_t(n + 1), d = c + 1;
+            m.triangles.push_back({a, b, c});
+            m.triangles.push_back({b, d, c});
+        }
+    m.rebuildTopology();
+    m.recomputeAllNormals();
+    return m;
+}
+
+float triArea(const std::vector<glm::vec3>& p, const glm::uvec3& t) {
+    return 0.5f * glm::length(glm::cross(p[t.y] - p[t.x], p[t.z] - p[t.x]));
+}
+
+} // namespace
+
+// A concave pocket (a palate) projected from a source that is off it (a dome inside the pocket): the rays from the walls
+// miss or hit the far side, and the nearest point of many vertices is the same spot. Taking it pinches the pocket to a
+// star (triangles and edges shrink to nothing); a vertex with no surface its way follows its neighbours instead.
+TEST(project_all_does_not_pinch_a_concave_pocket) {
+    const Mesh source = bowl(-0.5f, 1.0f, 24);
+    const Mesh target = bowl(1.5f, 1.0f, 40);
+    std::vector<const Mesh*> sources{&source};
+    auto worst = [&](const ProjectOptions& o) {
+        std::vector<glm::vec3> positions;
+        ProjectStats st;
+        std::string err;
+        CHECK(computeProjection(target, sources, o, positions, nullptr, st, err));
+        float area = 1e9f, edge = 1e9f;
+        for (const glm::uvec3& t : target.triangles) {
+            area = std::min(area, triArea(positions, t) / triArea(target.positions, t));
+            for (int k = 0; k < 3; ++k) {
+                const uint32_t a = t[k], b = t[(k + 1) % 3];
+                edge = std::min(edge, glm::length(positions[a] - positions[b]) / glm::length(target.positions[a] - target.positions[b]));
+            }
+        }
+        return std::make_pair(area, edge);
+    };
+    ProjectOptions old; // before: any hit, any nearest point
+    old.distance = 0.3f;
+    old.vertexpaint = false;
+    old.facing = -1.0f;
+    old.fallbackCos = -1.0f;
+    old.outlier = 0.0f;
+    const auto before = worst(old);
+    ProjectOptions now = old;
+    now.facing = ProjectOptions().facing;
+    now.fallbackCos = ProjectOptions().fallbackCos;
+    now.outlier = ProjectOptions().outlier;
+    const auto after = worst(now);
+    std::printf("  smallest triangle area / edge length vs the target: %.3f / %.3f before, %.3f / %.3f after\n", before.first,
+                before.second, after.first, after.second);
+    CHECK(before.first < 0.1f || before.second < 0.1f); // the case is real: the old rule pinches it
+    CHECK(after.first >= 0.1f);
+    CHECK(after.second >= 0.1f);
+}
+
+// A small fin standing in front of a plate: the rays of the few vertices under it hit the fin (a front-facing hit, a
+// long way nearer than the plate their neighbours reach) and the sheet tears into a spike. Those vertices follow their ring.
+TEST(project_all_pulls_back_vertices_that_reached_another_fin) {
+    const Mesh plate = wallPlate(-0.3f, true);
+    Mesh fin = wallPlate(-0.1f, true, 2);
+    for (auto& p : fin.positions) p.y = 0.47f + (p.y + 0.5f) * 0.055f, p.z = 0.47f + (p.z + 0.5f) * 0.055f; // 0.47 .. 0.58: four vertices
+    Mesh target = wallPlate(0.0f, true, 20);
+    for (auto& p : target.positions) p.y = (p.y + 0.5f) * 0.5f, p.z = (p.z + 0.5f) * 0.5f; // 0 .. 1, an edge is 0.05
+    target.recomputeAllNormals();
+    std::vector<const Mesh*> sources{&plate, &fin};
+    auto reach = [&](float outlier) {
+        ProjectOptions o;
+        o.distance = 0.3f; // 0.42: reaches the plate
+        o.vertexpaint = false;
+        o.outlier = outlier;
+        std::vector<glm::vec3> positions;
+        ProjectStats st;
+        std::string err;
+        CHECK(computeProjection(target, sources, o, positions, nullptr, st, err));
+        size_t onFin = 0, onPlate = 0;
+        for (const glm::vec3& p : positions) onFin += std::abs(p.x - (-0.1f)) < 1e-4f, onPlate += std::abs(p.x - (-0.3f)) < 1e-4f;
+        CHECK(onFin + onPlate == positions.size());
+        return onFin;
+    };
+    CHECK(reach(0.0f) == 4); // the four vertices under the fin, as before
+    CHECK(reach(2.0f) == 0); // every one of them back on the plate
+}
+
 TEST(project_all_respects_mask_and_options) {
     CommandRegistry reg;
     Document doc = sculptedSphere(5);
@@ -345,6 +524,101 @@ TEST(project_all_respects_mask_and_options) {
     // Nothing visible to project from.
     doc.parts[0].visible = false;
     CHECK(!reg.execute(doc, "project_all", {}).ok);
+}
+
+// The geometric invariant of Project Detail on a dense curved mesh: where the target and the source agree (no crevice, no
+// pocket) the new rules change nothing, and nowhere do they make the surface rougher.
+TEST(project_all_leaves_a_clean_dense_case_unchanged) {
+    CommandRegistry reg;
+    Document doc = sculptedSphere(6);
+    doc.parts[0].name = "Sculpt";
+    const Mesh source = doc.mesh;
+    doc.addPart(doc.mesh, "Retopo");
+    CHECK(reg.execute(doc, "qremesh", {{"target", 2000.0}}).ok);
+    CHECK(reg.execute(doc, "subdivide", {{"levels", 2.0}}).ok);
+    const Mesh divided = doc.mesh;
+    std::vector<const Mesh*> sources{&source};
+    ProjectOptions now, old;
+    now.vertexpaint = old.vertexpaint = false;
+    now.distance = old.distance = 0.05f;
+    old.facing = -1.0f;
+    old.fallbackCos = -1.0f;
+    old.outlier = 0.0f;
+    std::vector<glm::vec3> a, b;
+    ProjectStats sa, sb;
+    std::string err;
+    CHECK(computeProjection(divided, sources, now, a, nullptr, sa, err));
+    CHECK(computeProjection(divided, sources, old, b, nullptr, sb, err));
+    const float tol = 1e-6f * diagonal(divided);
+    size_t differ = 0;
+    for (size_t v = 0; v < a.size(); ++v) differ += glm::length(a[v] - b[v]) > tol;
+    // Spikes: a vertex whose offset differs from its ring's mean offset by more than 4 mean edge lengths.
+    auto spikes = [&](const std::vector<glm::vec3>& p) {
+        size_t n = 0;
+        for (uint32_t v = 0; v < divided.vertexCount(); ++v) {
+            glm::vec3 mean(0.0f);
+            float edge = 0.0f;
+            const auto ring = divided.neighbors(v);
+            for (uint32_t u : ring) mean += p[u] - divided.positions[u], edge += glm::length(divided.positions[u] - divided.positions[v]);
+            if (ring.empty()) continue;
+            mean /= float(ring.size());
+            edge /= float(ring.size());
+            n += glm::length((p[v] - divided.positions[v]) - mean) > 4.0f * edge;
+        }
+        return n;
+    };
+    const size_t spikesNow = spikes(a), spikesOld = spikes(b);
+    std::printf("  %zu of %zu vertices differ from the old result, spiked vertices %zu now / %zu before, missed %zu / %zu\n", differ,
+                a.size(), spikesNow, spikesOld, sa.missed, sb.missed);
+    CHECK(differ * 200 <= a.size()); // under 0.5 %: the retopo is far from any crevice here
+    CHECK(spikesNow <= spikesOld);
+    CHECK(sa.missed <= sb.missed + a.size() / 200);
+}
+
+// SF_PROJECT_BENCH=<project with a dense sculpt> [SF_PROJECT_BENCH_MODE=old|new|both]: the 11-27 repro (voxel remesh 300 of
+// a copy, divided twice) timed with the old rules (facing, outlier and fallback off) against the new ones, interleaved.
+TEST(project_all_bench_old_vs_new) {
+    const char* path = std::getenv("SF_PROJECT_BENCH");
+    if (!path) return;
+    const std::string mode = std::getenv("SF_PROJECT_BENCH_MODE") ? std::getenv("SF_PROJECT_BENCH_MODE") : "both";
+    CommandRegistry reg;
+    Document doc;
+    std::string err;
+    CHECK(loadProject(path, doc, err));
+    CHECK(reg.execute(doc, "part_duplicate", {{"index", 0.0}}).ok);
+    CHECK(reg.execute(doc, "remesh", {{"resolution", 300.0}, {"keep_texture", false}}).ok);
+    CHECK(reg.execute(doc, "subdiv_divide", {}).ok);
+    CHECK(reg.execute(doc, "subdiv_divide", {}).ok);
+    std::vector<const Mesh*> sources{&doc.partMesh(0)};
+    ProjectOptions now, old;
+    now.vertexpaint = old.vertexpaint = false;
+    old.facing = -1.0f;
+    old.fallbackCos = -1.0f;
+    old.outlier = 0.0f;
+    std::printf("  bench: target %zu triangles, source %zu\n", doc.mesh.triangleCount(), sources[0]->triangleCount());
+    std::vector<double> tOld, tNew;
+    for (int run = 0; run < 5; ++run)
+        for (int which = 0; which < 2; ++which) {
+            const bool useOld = which == 0;
+            if ((useOld && mode == "new") || (!useOld && mode == "old")) continue;
+            std::vector<glm::vec3> pos;
+            ProjectStats st;
+            CHECK(computeProjection(doc.mesh, sources, useOld ? old : now, pos, nullptr, st, err));
+            (useOld ? tOld : tNew).push_back(st.seconds);
+        }
+    auto report = [](const char* name, std::vector<double> t) {
+        if (t.empty()) return;
+        std::sort(t.begin(), t.end());
+        std::printf("  bench: %s median %.3f s, IQR %.3f (min %.3f max %.3f, %zu runs)\n", name, t[t.size() / 2],
+                    t[(t.size() * 3) / 4] - t[t.size() / 4], t.front(), t.back(), t.size());
+    };
+    report("old", tOld);
+    report("new", tNew);
+#ifdef __linux__
+    rusage ru{};
+    getrusage(RUSAGE_SELF, &ru);
+    std::printf("  bench: peak_ram_mb %ld (whole process, mode %s)\n", ru.ru_maxrss / 1024, mode.c_str());
+#endif
 }
 
 TEST(retopo_bench_1m_triangles) {
