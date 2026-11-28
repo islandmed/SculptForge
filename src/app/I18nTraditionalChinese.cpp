@@ -2779,11 +2779,11 @@ constexpr Entry kTraditionalChinese[] = {
     {"About how many quads Quad Remesh makes (Ctrl+click to type a number). 100% sets it to the Part's current polygon count; 50% and 200% halve and double the Target, click after click.",
      "Quad Remesh 大約產生的四邊面數量（按住 Ctrl 並按一下可輸入數字）。100%設為部件目前的多邊形數量；50%和200%會把目標減半或加倍，可連續點擊。"},
     {"Halve the target: each click halves Target Quads (the first click starts from the Part's current polygon count).",
-     "目標減半：每按一次，Target Quads 減半（第一次按下從部件目前的多邊形數量開始）。"},
+     "目標減半：每按一次，目標四邊面數 減半（第一次按下從部件目前的多邊形數量開始）。"},
     {"Target the Part's current polygon count (to clean up topology without changing its density).",
      "目標為部件目前的多邊形數量（在不改變密度的情況下整理拓樸）。"},
     {"Double the target: each click doubles Target Quads (the first click starts from the Part's current polygon count).",
-     "目標加倍：每按一次，Target Quads 加倍（第一次按下從部件目前的多邊形數量開始）。"},
+     "目標加倍：每按一次，目標四邊面數 加倍（第一次按下從部件目前的多邊形數量開始）。"},
     {"0: quads all about the same size. Higher: smaller quads where the surface curves, bigger ones on flat areas "
      "(the count stays near the target).",
      "0：四邊面大小大致相同。較高：表面彎曲處四邊面較小，平坦處較大（數量維持在目標附近）。"},

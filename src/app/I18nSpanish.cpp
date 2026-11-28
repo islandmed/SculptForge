@@ -3091,11 +3091,11 @@ constexpr Entry kSpanish[] = {
     {"About how many quads Quad Remesh makes (Ctrl+click to type a number). 100% sets it to the Part's current polygon count; 50% and 200% halve and double the Target, click after click.",
      "Más o menos cuántos quads hace Quad Remesh (Ctrl+clic para escribir un número). 100% lo fija en el número de polígonos actual de la Pieza; 50% y 200% reducen a la mitad y duplican el Objetivo, clic tras clic."},
     {"Halve the target: each click halves Target Quads (the first click starts from the Part's current polygon count).",
-     "Reducir a la mitad el objetivo: cada clic divide Target Quads entre dos (el primer clic parte del número de polígonos actual de la Pieza)."},
+     "Reducir a la mitad el objetivo: cada clic divide Quads objetivo entre dos (el primer clic parte del número de polígonos actual de la Pieza)."},
     {"Target the Part's current polygon count (to clean up topology without changing its density).",
      "Objetivo: los polígonos actuales de la Pieza (para limpiar la topología sin cambiar su densidad)."},
     {"Double the target: each click doubles Target Quads (the first click starts from the Part's current polygon count).",
-     "Duplicar el objetivo: cada clic multiplica Target Quads por dos (el primer clic parte del número de polígonos actual de la Pieza)."},
+     "Duplicar el objetivo: cada clic multiplica Quads objetivo por dos (el primer clic parte del número de polígonos actual de la Pieza)."},
     {"0: quads all about the same size. Higher: smaller quads where the surface curves, bigger ones on flat areas "
      "(the count stays near the target).",
      "0: quads todos más o menos del mismo tamaño. Más alto: quads más pequeños donde la superficie se curva, más "
