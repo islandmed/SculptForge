@@ -75,6 +75,7 @@ TEST(imgui_text_field_pressed_read_only_then_writable_does_not_compare_null_text
 // The same on a slider's typed number (the double-click patch opens it; here Ctrl+click, as ImGui does).
 TEST(imgui_slider_number_opened_read_only_then_writable_does_not_compare_null_text) {
     sf::test::HooksOffContext context;
+    ImGui::GetIO().ConfigMacOSXBehaviors = false; // (on a Mac ImGui reads Ctrl as Cmd; Ctrl+click is what opens the typed number)
     Probe p;
     p.frame(false, true);
     mouse(100, 42, false);
