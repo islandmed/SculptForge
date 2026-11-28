@@ -1001,6 +1001,15 @@ private:
     bool strokeMask_ = false; // the current stroke edits the mask
     float maskStrength_ = 1.0f;
     int maskIterations_ = 1;
+    // Each blur widens (Tool > Masking, 1 = off): consecutive Blur clicks on one mask take more passes, so its radius
+    // grows `maskBlurGrowth_` times per click. A chain ends when the mask changes by anything but a blur (the undo
+    // history moved on) or after kMaskBlurChainSeconds.
+    float maskBlurGrowth_ = 1.0f;
+    int maskBlurStreak_ = 0;
+    int maskBlurLastPasses_ = 0;
+    uint64_t maskBlurSeq_ = 0; // the history position the last blur left
+    double maskBlurAt_ = 0.0;
+    void runMaskBlur(); // Blur (button, Ctrl+click on the model)
     float cavityThreshold_ = 0.02f;
     int maskGroup_ = 0;
     float maskColorTolerance_ = 0.15f; // Tool > Masking > By colour

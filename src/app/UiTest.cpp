@@ -162,7 +162,7 @@
 //                            micro_widen_deferrals (live strokes' range widens shown a frame late, MicroRenderer::sync),
 //                            moved (vertices moved since `snapshot`), moved_max / moved_sum (distance),
 //                            moved_raised (the most a vertex rose along its snapshot normal), moved_raised_plane (along the
-//                            last stroke's plane or its X mirror, the lesser: a plane cut lays undercuts in the plane), moved_masked (masked vertices that moved), mask_soft (vertices partly masked),
+//                            last stroke's plane or its X mirror, the lesser: a plane cut lays undercuts in the plane), moved_masked (masked vertices that moved), mask_soft (vertices partly masked), mask_blur_passes / mask_blur_radius (the last Blur click's passes and their reach),
 //                            micro_moved (micro grid points whose height changed since `snapshot`), micro_masked / micro_mask_soft, micro_step
 //                            (micro grid points masked at least half / partly),
 //                            selection_shown (1 while a rectangle / lasso selection is drawn), selection_x0 / selection_y0 (its first point, window px)
@@ -1708,6 +1708,8 @@ double Demo::query(const std::string& name, bool& known) const {
         for (float v : m.mask) n += v > 0.5f;
         return double(n);
     }
+    if (name == "mask_blur_passes") return double(app_.maskBlurLastPasses_); // the last Blur click's passes
+    if (name == "mask_blur_radius") return std::sqrt(double(app_.maskBlurLastPasses_)); // ... its reach (grows with sqrt passes)
     if (name == "micro_moved") { // micro grid points whose height changed since `snapshot` (-1: no micro level or snapshot)
         if (!m.micro || baseMicro_.size() != m.micro->disp.size()) return -1.0;
         size_t n = 0;

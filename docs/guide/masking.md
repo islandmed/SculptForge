@@ -158,7 +158,11 @@ shape or **Mask by** button masks (0.01 to 1).
 | **Clear** | Unmask everything. | `mask_clear` |
 | **All** | Mask every visible vertex. | `mask_all` |
 
-**Passes** sets how many times Grow, Shrink, Sharpen and Blur run (1 to 20). **Mask by options** holds the rest:
+**Passes** sets how many times Grow, Shrink, Sharpen and Blur run (1 to 20). **Each blur widens** (1x to 3x, default 1x) makes
+Blur reach further with every click in a row: at 2x the second click softens over twice the width of the first, the third over
+four times, so a few clicks go from a slightly soft edge to a very soft one. The chain restarts when the mask changes any other
+way, after an undo, or after about 2 seconds without a click; each click is still one undo step, and big Parts cap the reach to
+stay quick. At 1x every click blurs the same. **Mask by options** holds the rest:
 
 | Option | For | |
 |---|---|---|
