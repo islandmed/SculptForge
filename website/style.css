@@ -43,7 +43,7 @@ h2 { font-size: clamp(1.7rem, 3vw, 2.4rem); font-weight: 700; }
 h3 { font-size: 1.15rem; font-weight: 600; }
 p { margin: 0 0 1em; }
 
-.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
+.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 24px; padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
 
 /* Navigation */
 .nav { position: sticky; top: 0; z-index: 10; background: rgba(15, 15, 18, 0.82); backdrop-filter: blur(10px);
@@ -232,7 +232,7 @@ p { margin: 0 0 1em; }
 
 @media (max-width: 620px) {
   body { font-size: 16px; }
-  .wrap { padding: 0 16px; }
+  .wrap { padding: 0 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   .nav-inner { height: 56px; }
   .nav nav { gap: 8px; }
 
@@ -514,6 +514,8 @@ body.scrolled .nav { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
 .guide-main { min-width: 0; }
 .guide-article { max-width: 780px; }
 .guide-article h1 { font-size: clamp(2rem, 3.4vw, 2.7rem); margin-bottom: 0.6em; }
+.guide-article :not(pre) > code, .guide-article li, .guide-article p { overflow-wrap: anywhere; }  /* a long path or URL wraps instead of widening the phone page (11-27) */
+.shot figcaption { padding: 0 8px; }
 .guide-article h2 { font-size: clamp(1.4rem, 2.2vw, 1.75rem); margin: 2.1em 0 0.6em; padding-bottom: 0.3em;
                     border-bottom: 1px solid var(--border); scroll-margin-top: 84px; }
 .guide-article h3 { font-size: 1.15rem; margin: 1.7em 0 0.5em; scroll-margin-top: 84px; }
@@ -734,8 +736,7 @@ kbd { display: inline-block; min-width: 1.5em; padding: 0.05em 0.45em; border: 1
   .guide-article th, .guide-article td { padding: 8px 10px; }
   .guide-article td code { word-break: break-word; }
   .guide-article p a { overflow-wrap: anywhere; }
-  .shot { margin: 1.2em -16px; }
-  .shot img { border-radius: 0; border-left: 0; border-right: 0; }
+  .shot { margin: 1.2em 0; }
   .pager { grid-template-columns: 1fr; }
   .pager .next { grid-column: 1; }
   .code-block .copy { opacity: 1; }

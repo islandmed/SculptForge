@@ -1,19 +1,16 @@
 {
-  "version": "0.14.3",
+  "version": "0.14.4",
   "download": "https://github.com/islandmed/SculptForge/releases/latest",
   "notes": "https://sculptforge.app/guide/whats-new.html",
   "highlights": [
-    "Focus Detail streams very dense Micro levels on Windows too",
-    "SculptForge on Android (early test build, free): tablets, phones and Chromebooks, a sideloaded .apk",
-    "Add your own HDRIs, and Clean view: fullscreen with only the 3D view (requested by a member)",
-    "Monochrome colours and Paint > Layers in the Color palette (requested by members)",
-    "Voxel Remesh keeps vertex paint smooth"
+    "Micro levels: both sides of a mirrored stroke shade while you sculpt, not only on release (#184)",
+    "Monochrome colours reach the Command palette, the radial menu and context menus (requested by a member)",
+    "Monochrome: shortcut boxes, selected text, the guide's search highlight and the Library's page buttons lose the last orange"
   ],
   "support": {
     "founding": {
       "taken": 17,
       "limit": 100
-    },
-    "member_requests_this_release": 4
+    }
   }
 }

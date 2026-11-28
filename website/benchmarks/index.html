@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>SculptForge Benchmarks</title>
   <meta name="description" content="Sculpting 6 to 805 million triangles in SculptForge, measured: frame times, worst stall and memory on real computers. A free scene pack and one command reproduce it on yours; community results are listed by hardware.">
   <meta property="og:title" content="SculptForge benchmarks: a public scene pack, 6M to 201M triangles, measured on real computers">
@@ -41,6 +41,8 @@
     .steps strong { font-size: 1.02rem; }
     .steps p { margin: 8px 0 0; }
     .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+    .filters label { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+    .filters select { min-width: 0; max-width: 100%; }  /* a long scene name must not widen the phone page (11-27) */
     select { font: inherit; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
     .scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
     table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
