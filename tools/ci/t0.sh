@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # T0 on GitHub Actions (.github/workflows/t0.yml, docs/testing-flow.md): the same checks as ~/Work/.sf/t0.sh on the PC:
-# check_marks, then a build and only the tests this branch's changes can break (tools/test/impacted.py, against its
+# check_marks and check_test_hook, then a build and only the tests this branch's changes can break (tools/test/impacted.py, against its
 # merge base with origin/main), CPU only (Mesa llvmpipe, SDL offscreen).
 #   tools/ci/t0.sh [out dir, default t0-result]
 #   tools/ci/t0.sh --warm       the build only (t0.yml on main: saves the compiler cache every T0 starts from)
@@ -36,6 +36,8 @@ EOF
 
 # Marks first (as t0.sh): another app's name in a comment is red before anything is built.
 if [ -z "$warm" ] && ! python3 -I tools/check_marks.py > "$out/output.txt" 2>&1; then failed=check_marks; finish; fi
+# Production code never reads what only the ImGui test hook fills (tools/ci/check_test_hook.py): seconds, no build.
+if [ -z "$warm" ] && ! python3 -I tools/ci/check_test_hook.py > "$out/output.txt" 2>&1; then failed=test_hook_guard; finish; fi
 : > "$out/output.txt"
 
 base=$(git merge-base origin/main HEAD 2>/dev/null || echo origin/main)
