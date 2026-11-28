@@ -5,4 +5,3 @@ testers:
   - Any OS: sculpt a model with sharp plates or ridges, duplicate it, Remesh the copy low, Divide twice, Project Detail at the default Dist (also with Mean on): the borders stay clean, no hair-like fins along the crevices.
   - Any OS: a concave pocket (inside of a mouth) projected the same way: smooth, no star-shaped pinch.
 ---
-Reviewers: measurements and the spike counts per setting are in REPORT.md.
