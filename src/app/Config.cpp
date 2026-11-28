@@ -12,6 +12,7 @@
 #include "app/OrbitSpeed.h"
 
 #include "app/App.h"
+#include "app/Demo.h"
 #include "app/UiServe.h"
 #include "app/CrashLog.h"
 #include "core/PerfTrace.h"
@@ -36,6 +37,7 @@
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <ctime>
 #include <unordered_map>
 #include <array>
 #include <cctype>
@@ -1029,28 +1031,34 @@ void App::initActions() {
     // --- Config (Preferences > Saving & Layouts) ---
     // Preferences and the layout save themselves (#117, layoutSavedKey_); Save Layout marks the layout Revert returns to. config.store (Ctrl+Shift+I before
     // 0.11.1) stays as an id, so keymaps and macros that name it still load: it saves the preferences at once.
-    add("config.save_layout", "Save Layout", "Preferences > Saving & Layouts", nullptr, [this] { saveLayout(); }, ICON_LC_SAVE, nullptr,
+    add("config.save_layout", "Save my layout", "Preferences > Saving & Layouts", nullptr, [this] { saveLayout(); }, ICON_LC_SAVE, nullptr,
         nullptr, nullptr,
-        "Make the current layout (shelves, trays, open palettes) the one Revert to Saved Layout returns to. The layout, "
-        "preferences and shortcuts also save themselves.");
+        "Keep the current layout (shelves, trays, open palettes) as your saved layout, the one Restore my saved layout returns to. "
+        "The layout, preferences and shortcuts also save themselves.");
     add("config.store", "Save Preferences Now", "Preferences > Saving & Layouts", nullptr, [this] { savePrefsNow(); }, ICON_LC_SAVE,
         nullptr, nullptr, nullptr,
         "Write the preferences and shortcuts to disk now. Not needed: they save themselves a moment after every change.");
-    add("config.restore_standard", "Reset Layout and Shortcuts", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(3); },
+    add("config.restore_standard", "Reset layout and shortcuts", "Preferences > Saving & Layouts", nullptr, [this] { askLayoutReset(3); },
         ICON_LC_ROTATE_CCW, nullptr, nullptr, nullptr,
-        "Go back to the built-in layout, shortcuts and radial menus. They save themselves; Revert to Saved Layout still "
-        "returns to the layout Save Layout kept.");
-    add("config.reset_layout", "Reset Layout", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(2); },
+        "Go back to the built-in layout, shortcuts and radial menus. Your current ones are kept as a backup (Undo last reset); "
+        "your saved layout stays, and Restore my saved layout still returns to it.");
+    add("config.reset_layout", "Reset panels and shelves", "Preferences > Saving & Layouts", nullptr, [this] { askLayoutReset(2); },
         ICON_LC_LAYOUT_TEMPLATE, nullptr, nullptr, nullptr,
         "Back to the built-in shelves, trays and panels, with every panel in the main window. Shortcuts and preferences stay. "
+        "Your current layout is kept as a backup (Undo last reset). "
         "Always works, whatever state the layout is in (a layout that can't be used: start with --reset-layout).");
-    add("config.restore_custom", "Revert to Saved Layout", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(1); },
+    add("config.restore_custom", "Restore my saved layout", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(1); },
         ICON_LC_ARCHIVE_RESTORE, nullptr, nullptr, [this] { return storedLayout_.isObject(); },
-        "Go back to the layout the last Save Layout kept (the layout in use saves itself, so this is the way back to it).");
-    add("config.load", "Import Interface...", "Preferences > Saving & Layouts", "Ctrl+L", [this] { loadUiDialog(); },
+        "Go back to the layout the last Save my layout kept (the layout in use saves itself, so this is the way back to it). "
+        "The layout you have now is kept as a backup (Undo last reset).");
+    add("config.undo_reset", "Undo last reset", "Preferences > Saving & Layouts", nullptr, [this] { queueLayoutOp(5); },
+        ICON_LC_UNDO_2, nullptr, nullptr, [this] { return resetBackup().isObject(); },
+        "Put back the layout, shortcuts, radial menus and panel windows you had before the last reset (or restore). Kept "
+        "across a restart.");
+    add("config.load", "Import layout file...", "Preferences > Saving & Layouts", "Ctrl+L", [this] { loadUiDialog(); },
         ICON_LC_FOLDER_INPUT, nullptr, nullptr, nullptr,
-        "Load a layout and shortcuts file someone shared (or you saved with Export Interface).");
-    add("config.save", "Export Interface...", "Preferences > Saving & Layouts", nullptr, [this] { saveUiDialog(); },
+        "Load a layout and shortcuts file someone shared (or you saved with Export layout file).");
+    add("config.save", "Export layout file...", "Preferences > Saving & Layouts", nullptr, [this] { saveUiDialog(); },
         ICON_LC_FOLDER_OUTPUT, nullptr, nullptr, nullptr,
         "Save the layout, shortcuts and interface preferences to a file you can share.");
     add("config.customize", "Customize Shelves", "Preferences > Saving & Layouts", nullptr,
@@ -1261,6 +1269,7 @@ bool App::saveUiPrefs(std::string& err) {
     Json j = Json::object();
     j.set("version", 1.0);
     layoutsToUiJson(j, toAutosaveJson(layout_), storedLayout_);
+    if (storedLayout_.isObject() && layoutSavedAt_ > 0.0) j.set("layoutSavedAt", layoutSavedAt_);
     j.set("shortcuts", actions_.overridesToJson());
     j.set("prefs", toJson(uiPrefs_));
     j.set("radialMenus", toJson(radialMenus_));
@@ -1328,6 +1337,9 @@ void App::restartPrefsForTest(const std::string& uiJson) {
     layout_ = standardLayout(uiPrefs_.shellLayout);
     layout_.customize = customize;
     storedLayout_ = Json();
+    layoutSavedAt_ = 0.0;
+    resetBackup_ = Json(); // (a start of its own: read again from the folder)
+    resetBackupLoaded_ = false;
     std::string err;
     if (fileExists(uiConfigPath()) && !readUiConfig(uiConfigPath(), err, true)) status_ = err;
     applyInputStyle();
@@ -1375,7 +1387,10 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
     fromJson(j["prefs"], prefs);
     UiLayout layout = standardLayout(prefs.shellLayout);
     if (hasLayout && !fromJson(layouts.current, layout, err, prefs.shellLayout)) return false;
-    if (own) storedLayout_ = layouts.saved; // (Revert to Saved Layout returns to this; the layout in use is the one above)
+    if (own) { // (Restore my saved layout returns to this; the layout in use is the one above)
+        storedLayout_ = layouts.saved;
+        layoutSavedAt_ = storedLayout_.isObject() ? j["layoutSavedAt"].asNumber(0.0) : 0.0;
+    }
     uiPrefs_ = std::move(prefs);
     lookDirty_ = true;
     requestUiScale(); // its UI scale
@@ -1403,21 +1418,24 @@ bool App::readUiConfig(const std::string& path, std::string& err, bool own) {
 void App::saveLayout() {
     std::string err;
     if (uiConfigPath().empty()) {
-        status_ = "Can't save the layout: no settings folder";
+        status_ = "Layout NOT saved: no settings folder";
     } else {
         const Json before = storedLayout_;
+        const double beforeAt = layoutSavedAt_;
         noteLayoutStored();
         if (saveUiPrefs(err)) {
             status_ = "Layout saved";
         } else {
             storedLayout_ = before;
-            status_ = err;
+            layoutSavedAt_ = beforeAt;
+            status_ = "Layout NOT saved: " + err; // (Restore my saved layout stays greyed)
         }
     }
 }
 
 void App::noteLayoutStored() {
     storedLayout_ = toJson(layout_);
+    layoutSavedAt_ = double(std::time(nullptr));
     layoutBaseline_ = layoutKey();
 }
 
@@ -1429,7 +1447,8 @@ void App::restoreStandardUi() {
     resetRadialMenus();
     resetPanels(); // every panel back in the main window (PanelWindows.cpp)
     layoutBaseline_ = layoutKey();
-    status_ = "Standard layout and shortcuts restored";
+    status_ = "Standard layout and shortcuts restored - Undo last reset brings back the ones you had";
+    noteResetDone();
 }
 
 void App::applyPendingLayoutOp() {
@@ -1437,10 +1456,20 @@ void App::applyPendingLayoutOp() {
     if (op == 0) return;
     autosaveNow(); // unsaved work first: whatever happens next, it is on disk
     std::string err;
+    // Whatever replaces the layout in use keeps it first; no backup, no reset.
+    const bool replaces = op == 2 || op == 3 || op == 6 || (op == 1 && storedLayout_.isObject());
+    if (replaces && !backUpBeforeReset(op == 1 ? "Restore my saved layout" : op == 2 ? "Reset panels and shelves"
+                                                : op == 3 ? "Reset layout and shortcuts" : "Reset panel windows")) {
+        return;
+    }
     if (op == 1) restoreCustomUi();
     else if (op == 2) resetLayoutOnly();
     else if (op == 3) restoreStandardUi();
-    else if (op == 4) status_ = readUiConfig(std::exchange(pendingImportPath_, std::string()), err)
+    else if (op == 5) undoLastReset();
+    else if (op == 6) {
+        resetPanels();
+        status_ = "Every panel is back in the main window";
+    } else if (op == 4) status_ = readUiConfig(std::exchange(pendingImportPath_, std::string()), err)
                                     ? std::string("Interface loaded") : err;
 }
 
@@ -1451,7 +1480,8 @@ void App::resetLayoutOnly() {
     resetPanels();
     dropdown_.clear();
     layoutBaseline_ = layoutKey();
-    status_ = "Standard layout restored";
+    status_ = "Standard layout restored - Undo last reset brings back the one you had";
+    noteResetDone();
 }
 
 std::vector<std::string> App::missingShelfWidgets() const {
@@ -1497,7 +1527,7 @@ void App::restoreCustomUi() {
     std::string err;
     UiLayout layout = standardLayout(uiPrefs_.shellLayout);
     if (!storedLayout_.isObject()) {
-        status_ = "No saved layout yet - Save Layout first";
+        status_ = "Nothing saved yet - Save my layout first";
     } else if (!fromJson(storedLayout_, layout, err, uiPrefs_.shellLayout)) {
         status_ = err;
     } else {
@@ -1505,8 +1535,129 @@ void App::restoreCustomUi() {
         layout_ = std::move(layout); // (the autosave then writes it as the layout in use)
         dropdown_.clear();
         layoutBaseline_ = layoutKey();
-        status_ = "Saved layout restored";
+        status_ = "Saved layout restored - Undo last reset brings back the one you had";
+        noteResetDone();
     }
+}
+
+// ---------------------------------------------------------------------------
+// The backup every Reset (and Restore) keeps: ui.reset-backup.json
+// ---------------------------------------------------------------------------
+
+std::string App::resetBackupPath() const { return configDir_.empty() ? std::string() : configDir_ + "ui.reset-backup.json"; }
+
+const Json& App::resetBackup() {
+    if (!resetBackupLoaded_) {
+        resetBackupLoaded_ = true;
+        resetBackup_ = Json();
+        const std::string path = resetBackupPath();
+        std::ifstream f(path.empty() ? std::filesystem::path() : fsPath(path), std::ios::binary);
+        Json j;
+        std::string err;
+        if (f && Json::parse(std::string(std::istreambuf_iterator<char>(f), {}), j, err) && j["layout"].isObject()) resetBackup_ = std::move(j);
+    }
+    return resetBackup_;
+}
+
+// What a reset would replace, as one string: a Reset of exactly what the last one left has nothing to lose.
+std::string App::uiStateKey() const {
+    std::string k = layoutKey() + actions_.overridesToJson().dump() + toJson(radialMenus_).dump();
+    for (const PanelWindow& p : panelWindows_) k += "|" + p.id;
+    return k;
+}
+
+bool App::backUpBeforeReset(const char* what) {
+    // Renders and recordings use the standard layout and never write the user's settings folder; UI tests do (a fresh one).
+    if (configDir_.empty() || (uiConfigDeterministic_ && options_.uiTest.empty())) return true;
+    const std::string key = uiStateKey();
+    const Json& last = resetBackup();
+    if (last.isObject() && last["after"].asString() == key) return true; // already what the last reset left: the backup holds the real layout
+    for (const PanelWindow& p : panelWindows_) notePanelPlacement(p); // where the windows are now
+    Json j = Json::object();
+    j.set("version", 1.0);
+    j.set("what", std::string(what));
+    j.set("at", double(std::time(nullptr)));
+    j.set("layout", toJson(layout_)); // (all of it: the backup is exact)
+    j.set("shortcuts", actions_.overridesToJson());
+    j.set("radialMenus", toJson(radialMenus_));
+    Json open = Json::array();
+    for (const PanelWindow& p : panelWindows_) open.push(p.id);
+    j.set("panelsOpen", std::move(open));
+    j.set("panels", panelPlacementsToJson(panelPlacements_));
+    j.set("after", std::string()); // (noteResetDone fills it in)
+    std::string err;
+    if (!writeJsonAtomic(resetBackupPath(), j, err)) {
+        status_ = "Nothing was reset: your current layout couldn't be kept as a backup. " + err;
+        return false;
+    }
+    resetBackup_ = std::move(j);
+    resetBackupLoaded_ = true;
+    return true;
+}
+
+void App::noteResetDone() {
+    if (!resetBackup().isObject() || resetBackupPath().empty()) return;
+    resetBackup_.set("after", uiStateKey());
+    std::string err;
+    if (!writeJsonAtomic(resetBackupPath(), resetBackup_, err)) SDL_Log("%s", err.c_str());
+}
+
+void App::undoLastReset() {
+    const Json backup = resetBackup();
+    if (!backup.isObject()) {
+        status_ = "Nothing to undo yet";
+        return;
+    }
+    std::string err;
+    UiLayout layout = standardLayout(uiPrefs_.shellLayout);
+    if (!fromJson(backup["layout"], layout, err, uiPrefs_.shellLayout)) {
+        status_ = err;
+        return;
+    }
+    layout.customize = layout_.customize;
+    layout_ = std::move(layout);
+    actions_.overridesFromJson(backup["shortcuts"]);
+    if (backup.has("radialMenus")) applyRadialMenusJson(backup["radialMenus"]);
+    resetPanels(); // the windows the reset left, docked; then the ones there were, out again where they were
+    panelPlacements_ = panelPlacementsFromJson(backup["panels"]);
+    for (const Json& id : backup["panelsOpen"].items())
+        if (id.isString()) detachPanel(id.asString(), true);
+    dropdown_.clear();
+    layoutBaseline_ = layoutKey();
+    std::error_code ec;
+    std::filesystem::remove(fsPath(resetBackupPath()), ec);
+    resetBackup_ = Json();
+    resetBackupLoaded_ = true;
+    status_ = "Your layout from before the reset is back";
+}
+
+void App::drawResetConfirm() {
+    static constexpr const char* kPopup = "Replace your layout?##reset_confirm";
+    if (openResetConfirm_) {
+        openResetConfirm_ = false;
+        if (!options_.renderPath.empty() || !options_.recordPath.empty()) queueLayoutOp(std::exchange(resetConfirmOp_, 0)); // renders and recordings: nobody to ask (UI tests ask, and click it)
+        else ImGui::OpenPopup(kPopup);
+    }
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (!ImGui::BeginPopupModal(kPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) return;
+    Demo::pushScope("Reset layout");
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 26.0f);
+    ImGui::TextUnformatted(tr("This replaces your current layout. Your current one is kept as a backup."));
+    if (resetConfirmOp_ == 3) ImGui::TextDisabled("%s", tr("Shortcuts and radial menus go back to the built-in ones too."));
+    ImGui::TextDisabled("%s", tr("Undo last reset (Preferences > Saving & Layouts) puts it back, also after a restart."));
+    ImGui::PopTextWrapPos();
+    ImGui::Spacing();
+    if (ImGui::Button(tr("Replace my layout##reset_confirm"))) {
+        queueLayoutOp(std::exchange(resetConfirmOp_, 0));
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(tr("Cancel##reset_confirm")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        resetConfirmOp_ = 0;
+        ImGui::CloseCurrentPopup();
+    }
+    Demo::popScope();
+    ImGui::EndPopup();
 }
 
 void App::saveUiDialog() {
@@ -1665,7 +1816,7 @@ void App::watchLayoutChanges() {
     if (layoutHintShown_ || uiConfigDeterministic_ || ++layoutCheckFrame_ % 20 != 0) return;
     if (layoutKey() == layoutBaseline_) return;
     layoutHintShown_ = true; // once per session
-    status_ = "Layout changes save themselves - Preferences > Saving & Layouts > Save Layout sets what Revert returns to";
+    status_ = "Layout changes save themselves - Preferences > Saving & Layouts > Save my layout sets what Restore my saved layout returns to";
 }
 
 // ---------------------------------------------------------------------------
@@ -2080,26 +2231,50 @@ void drawConfigSection(App& app) {
     bool customize = app.layout().customize;
     if (ImGui::Checkbox(tr("Customize Shelves"), &customize)) app.actions().find("config.customize")->run();
     ui::HelpAction(app, "config.customize");
-    ui::ActionButton(app, "config.save_layout", full, ui::Look::IconLabel);
-    ui::ActionButton(app, "config.restore_custom", full, ui::Look::IconLabel);
-    ui::ActionButton(app, "config.reset_layout", full, ui::Look::IconLabel);
-    ui::ActionButton(app, "config.restore_standard", full, ui::Look::IconLabel);
     // Widgets (colour picker, brush tiles, sliders) dragged off a shelf can't be dragged back from a palette: put back here.
     for (const std::string& id : app.missingShelfWidgets()) {
         const std::string name = id.substr(7);
         const std::string label = std::string(tr("Put back on the shelf: ")) + name + "##putback." + id;
         if (ImGui::Button(label.c_str(), full)) app.addShelfWidget(id);
     }
+    auto note = [](const std::string& text) {
+        ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(text.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::PopStyleColor();
+    };
+    auto when = [](double t) {
+        const std::time_t at = std::time_t(t);
+        char buf[48] = {};
+        std::tm tm{};
+#ifdef _WIN32
+        localtime_s(&tm, &at);
+#else
+        localtime_r(&at, &tm);
+#endif
+        std::strftime(buf, sizeof buf, "%Y-%m-%d %H:%M", &tm);
+        return std::string(buf);
+    };
+    // Three blocks: what you keep, what you share, and what throws the layout away (each of those keeps a backup first).
+    ImGui::SeparatorText(tr("My layout"));
+    ui::ActionButton(app, "config.save_layout", full, ui::Look::IconLabel);
+    ui::ActionButton(app, "config.restore_custom", full, ui::Look::IconLabel);
+    if (!app.hasSavedLayout()) note(tr("Nothing saved yet"));
+    else if (app.layoutSavedAt() > 0.0) note(std::string(tr("Saved ")) + when(app.layoutSavedAt()));
+    ImGui::SeparatorText(tr("Share"));
+    ui::ActionButton(app, "config.save", full, ui::Look::IconLabel); // (full width: the longer names need it)
+    ui::ActionButton(app, "config.load", full, ui::Look::IconLabel);
+    ImGui::SeparatorText(tr("Start over"));
+    ui::ActionButton(app, "config.reset_layout", full, ui::Look::IconLabel);
+    ui::ActionButton(app, "config.restore_standard", full, ui::Look::IconLabel);
     ui::ActionButton(app, "panel.reset", full, ui::Look::IconLabel); // panels in windows of their own (PanelWindows.cpp)
-    const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-    ui::ActionButton(app, "config.save", ImVec2(half, 0), ui::Look::IconLabel);
-    ImGui::SameLine();
-    ui::ActionButton(app, "config.load", ImVec2(half, 0), ui::Look::IconLabel);
-    ImGui::PushStyleColor(ImGuiCol_Text, col(ui::color::textDim));
-    ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextUnformatted(tr("Preferences, shortcuts and the layout save themselves. Save Layout sets the layout Revert to Saved Layout returns to."));
-    ImGui::PopTextWrapPos();
-    ImGui::PopStyleColor();
+    ui::ActionButton(app, "config.undo_reset", full, ui::Look::IconLabel);
+    if (const Json& b = app.resetBackup(); b.isObject()) {
+        const std::string name = b["what"].asString();
+        note(std::string(tr("Last backup")) + ": " + tr(name.c_str()) + ", " + when(b["at"].asNumber(0.0)));
+    }
+    note(tr("Each of these asks once and keeps your current layout as a backup first. Preferences, shortcuts and the layout save themselves."));
 }
 
 void drawInterfaceSection(App& app) {

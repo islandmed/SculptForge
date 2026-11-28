@@ -1,0 +1,107 @@
+# Reset can't wipe a custom UI for good (a member lost theirs trying to restore it): Preferences > Saving & Layouts has
+# three blocks (My layout, Share, Start over); every Reset asks once, keeps the layout it replaces as a backup, and
+# Undo last reset puts back exactly that (layout, shortcuts, panel windows), also after a restart. Restore my saved
+# layout with nothing saved does nothing.
+run ui_look look=classic layout=classic
+wait 1.0 # (the first autosave look must pass: ui.json then holds the Classic layout the restart below reads back)
+run new_sphere subdivisions=3
+
+# Nothing saved yet: Restore is greyed, says so, and changes nothing.
+click "Preferences##palette.preferences"
+click "Saving & Layouts##preferences.config"
+expect_text "My layout"
+expect_text "Share"
+expect_text "Start over"
+expect_text "Nothing saved yet"
+expect_value saved_layout == 0
+shot blocks_nothing_saved
+key escape
+remember ui_state_hash untouched
+action config.restore_custom
+wait 0.3
+expect_status "Nothing saved yet"
+expect_value reset_backup_file == 0
+expect_value ui_state_hash == $untouched
+
+# A custom UI: a tray closed, a key rebound, a palette in a window of its own.
+click "##rightdivider"
+expect_value right_tray_open == 0
+set_shortcut view.pan_left J
+click "Color##palette.color"
+click "Color/##detach"
+wait 0.2
+expect_value detached_panels == 1
+remember ui_state_hash custom
+action config.undo_reset
+wait 0.3
+expect_status "Nothing to undo yet"
+expect_value ui_state_hash == $custom
+
+# Cancel on the question changes nothing and writes no backup.
+action config.restore_standard
+expect_text "This replaces your current layout. Your current one is kept as a backup."
+shot confirm
+click "Cancel##reset_confirm"
+wait 0.2
+expect_value ui_state_hash == $custom
+expect_value reset_backup_file == 0
+
+# Confirmed: back to the standard UI, the old one kept.
+action config.restore_standard
+click "Replace my layout##reset_confirm"
+wait 0.3
+expect_status "Standard layout and shortcuts restored"
+expect_value reset_backup_file == 1
+expect_value right_tray_open == 1
+expect_value detached_panels == 0
+remember ui_state_hash standard
+shot after_reset
+
+# A second Reset of what the first one left has nothing to lose: it must not replace the backup.
+action config.reset_layout
+click "Replace my layout##reset_confirm"
+wait 0.3
+expect_value ui_state_hash == $standard
+
+# Through a restart, Undo last reset puts back exactly the custom UI.
+expect_value shell_layout == 0
+restart
+wait 0.3
+expect_value shell_layout == 0
+expect_value reset_backup_file == 1
+expect_value ui_state_hash == $standard
+click "Preferences##palette.preferences"
+click "Saving & Layouts##preferences.config"
+expect_text "Start over"
+shot blocks_undo
+key escape
+action config.undo_reset
+wait 0.3
+expect_status "Your layout from before the reset is back"
+expect_value ui_state_hash == $custom
+expect_value right_tray_open == 0
+expect_value detached_panels == 1
+expect_value reset_backup_file == 0
+
+# Save my layout shows when, Restore my saved layout asks nothing but keeps what it replaces.
+action config.save_layout
+expect_value saved_layout == 1
+# (a member on macOS: Restore after Save gave the default; the save has to survive a restart and come back as saved)
+restart
+wait 0.3
+expect_value saved_layout == 1
+expect_value right_tray_open == 0
+click "##rightdivider"
+expect_value right_tray_open == 1
+remember ui_state_hash edited
+action config.restore_custom
+wait 0.3
+expect_value right_tray_open == 0
+expect_value reset_backup_file == 1
+click "Preferences##palette.preferences"
+expect_text "Start over"
+shot blocks_saved
+key escape
+action config.undo_reset
+wait 0.3
+expect_value ui_state_hash == $edited

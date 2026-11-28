@@ -286,7 +286,7 @@ works like any other palette: put it in a tray, or open it in a window of its ow
 
 However My Panel is open (its key, the Edit menu, a tray, or a window of its own), hold <kbd>Alt</kbd> and drag an
 entry onto it. In a window of its own the entry lands at the end of the panel; drag within that window to reorder.
-What is in My Panel is saved with your layout (**Edit > Preferences > Saving & Layouts**), and **Reset Layout** empties it.
+What is in My Panel is saved with your layout (**Edit > Preferences > Saving & Layouts**), and **Reset panels and shelves** empties it (**Undo last reset** brings it back).
 
 ## The shelves
 
@@ -594,7 +594,7 @@ See [Scripting and automation](scripting.md) for the command language, scripts a
 
 Everything about the layout can change: which palettes sit in the trays, what's on each shelf, and which keys
 do what. **Shortcuts, preferences and the layout save themselves** (the layout a couple of seconds after a change and when
-you quit); **Save Layout** marks the layout **Revert to Saved Layout** returns to.
+you quit); **Save my layout** marks the layout **Restore my saved layout** returns to.
 
 ### Move, add and remove shelf items
 
@@ -605,7 +605,7 @@ you quit); **Save Layout** marks the layout **Revert to Saved Layout** returns t
      from palettes to a shelf;
    - along its shelf, or to another shelf, to **move** it;
    - off the shelves (onto the canvas, for example) to **remove** it.
-3. Turn **Customize Shelves** off when you're done, and click **Save Layout** (same palette) to keep the result.
+3. Turn **Customize Shelves** off when you're done, and click **Save my layout** (same palette) to keep the result.
 
 Right-clicking a shelf item and choosing **Remove from shelf** works without Customize mode. So does **adding any control**:
 hold <kbd>Alt</kbd> (without <kbd>Ctrl</kbd>) and drag any checkbox, slider, choice, readout or button from any palette
@@ -637,21 +637,30 @@ Every preference (key style, shortcuts, tablet, interface, performance, radial m
 after you change it; there is nothing to press. So does the layout: what you change in the shelves, trays and open
 palettes is written a couple of seconds later and when you quit, so a restart or a crash brings it back.
 
-**Save Layout** marks a layout you like, so **Revert to Saved Layout** can return to it later. All in
-**Edit > Preferences > Saving & Layouts**:
+**Edit > Preferences > Saving & Layouts** has three blocks. **My layout** is the layout you keep, **Share** moves it to
+another computer, and **Start over** throws the layout away, which is why each of those asks once first and **always keeps
+what it replaces as a backup**.
 
-| Item | What it does |
-|---|---|
-| **Save Layout** | Marks the current shelves, trays and open palettes as the layout Revert returns to |
-| **Revert to Saved Layout** | Goes back to the layout the last Save Layout kept (the autosave then keeps that one) |
-| **Reset Layout and Shortcuts** | Goes back to the built-in layout, shortcuts and radial menus (Revert to Saved Layout still returns to the one Save Layout kept) |
-| **Export Interface...** | Saves the layout, shortcuts and preferences to a `.json` file you can share |
-| **Import Interface...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (its layout saves itself like any other) |
+| Block | Item | What it does |
+|---|---|---|
+| My layout | **Save my layout** | Marks the current shelves, trays and open palettes as your saved layout (the time is shown under it) |
+| My layout | **Restore my saved layout** | Goes back to the layout the last Save my layout kept (the autosave then keeps that one). Greyed, with "Nothing saved yet", until you have saved one |
+| Share | **Export layout file...** | Saves the layout, shortcuts and preferences to a `.json` file you can share |
+| Share | **Import layout file...** (<kbd>Ctrl</kbd>+<kbd>L</kbd>) | Loads such a file (its layout saves itself like any other) |
+| Start over | **Reset panels and shelves** | Built-in shelves, trays and panels, every panel in the main window; shortcuts and preferences stay |
+| Start over | **Reset layout and shortcuts** | Goes back to the built-in layout, shortcuts and radial menus (Restore my saved layout still returns to your saved one) |
+| Start over | **Reset panel windows** | Puts every panel that is in a window of its own back in the main window |
+| Start over | **Undo last reset** | Puts back exactly what the last reset (or restore) replaced: layout, shortcuts, radial menus and panel windows. Kept across a restart |
+
+Each Reset asks "This replaces your current layout. Your current one is kept as a backup." and writes the backup
+(`ui.reset-backup.json` in the settings folder) before it changes anything; if the backup cannot be written, nothing is reset. A second
+Reset of what the first one left keeps the first backup, so pressing Reset twice never loses the layout you had.
+**Restore my saved layout** keeps the layout you had too, without asking.
 
 The command palette (<kbd>F3</kbd>) also has **Save Preferences Now**, which writes them at once; you never need it.
 
 The first time you change the layout in a session, the status line tells you once: "Layout changes save themselves -
-Edit > Preferences > Saving & Layouts > Save Layout sets what Revert returns to". What a session changes by itself (the console and Library being open, the Library
+Edit > Preferences > Saving & Layouts > Save my layout sets what Restore my saved layout returns to". What a session changes by itself (the console and Library being open, the Library
 tab) doesn't count as a layout change.
 
 ### Layout presets

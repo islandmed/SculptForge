@@ -564,10 +564,11 @@ void App::registerPanelActions() {
         },
         [this] { return panelDetached("controls"); });
     add("panel.reset", "Reset panel windows", ICON_LC_PANEL_TOP,
-        "Put every panel that is in a window of its own back in the main window, and forget where those windows were.",
+        "Put every panel that is in a window of its own back in the main window, and forget where those windows were. "
+        "Undo last reset brings the windows back.",
         [this] {
-            resetPanels();
-            status_ = "Every panel is back in the main window";
+            if (panelWindows_.empty() && panelPlacements_.empty()) status_ = "No panel windows to reset";
+            else askLayoutReset(6); // asks first and keeps the windows' places (Config.cpp)
         });
 }
 

@@ -9,7 +9,7 @@ click "Color/##detach"
 wait 0.2
 expect_value detached_panels == 1
 key f3
-type "##Command palette" "save layout"
+type "##Command palette" "save my layout"
 key enter
 expect_status "Layout saved"
 # Unsaved work (a stroke) is put on disk before Revert / Reset run, whatever happens next.
@@ -27,7 +27,7 @@ hold none
 expect_value shelf_has_widget.color == 0
 shot picker_gone
 key f3
-type "##Command palette" "revert to saved"
+type "##Command palette" "restore my saved"
 key enter
 expect_status "Saved layout restored"
 expect_value autosave_file == 1
@@ -36,6 +36,7 @@ expect_value detached_panels == 1
 wait 0.3
 shot reverted
 action config.reset_layout
+click "Replace my layout##reset_confirm"
 expect_status "Standard layout restored"
 expect_value shelf_has_widget.color == 1
 expect_value detached_panels == 0

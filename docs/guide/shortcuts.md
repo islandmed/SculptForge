@@ -148,8 +148,8 @@ generated from SculptForge's action registry, the same source as the Controls wi
 
 | Action | Keys | What it does |
 |---|---|---|
-| Export Interface... | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Save the layout, shortcuts and interface preferences to a file you can share. |
-| Import Interface... | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Load a layout and shortcuts file someone shared (or you saved with Export Interface). |
+| Export layout file... | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Save the layout, shortcuts and interface preferences to a file you can share. |
+| Import layout file... | <kbd>Ctrl</kbd>+<kbd>L</kbd> | Load a layout and shortcuts file someone shared (or you saved with Export layout file). |
 | Radial menu 1: Brushes | <kbd>T</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
 | Radial menu 2: Masking | <kbd>Y</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
 | Radial menu 3: Strokes | <kbd>J</kbd> | Hold the key, flick toward an item and let go to run it; or tap the key and click one. Edit it in Preferences > Input > Radial Menus. |
@@ -434,7 +434,7 @@ Sculpt keymaps, the keys of every action it has an equivalent for: the views, th
 strength, the mask, hiding, subdivision levels, undo and redo. Mouse buttons and keys for things SculptForge doesn't
 have are left alone; the status bar says how many keys it took.
 
-The file is read as text and never run. The keys save themselves; **Reset Layout and Shortcuts** goes back to the
+The file is read as text and never run. The keys save themselves; **Reset layout and shortcuts** goes back to the
 defaults.
 
 ## Classic sculpting keys that work differently

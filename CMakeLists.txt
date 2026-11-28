@@ -1607,11 +1607,16 @@ if(SCULPTFORGE_BUILD_TESTS)
     # A shelf slot follows its brush through a rename (tests/ui/shelf_slot_rename.sfui).
     sculptforge_ui_test(shelf_slot_rename_1440 shelf_slot_rename --size 1440x900)
     sculptforge_ui_test(shelf_slot_rename_2880 shelf_slot_rename --size 2880x1800)
-    # Revert to Saved Layout / Reset Layout from a layout with the colour picker dragged off (tests/ui/layout_revert.sfui),
+    # Restore my saved layout / Reset panels and shelves from a layout with the colour picker dragged off (tests/ui/layout_revert.sfui),
     # at 1440 px of UI and at 200 % (2880 px).
     sculptforge_ui_test(layout_revert_1440 layout_revert --size 1440x900)
     sculptforge_ui_test(layout_revert_2880 layout_revert --size 2880x1800)
-    # The layout saves itself; Save Layout marks what Revert returns to (tests/ui/layout_autosave.sfui).
+    # Reset keeps a backup and asks once; Undo last reset puts it back, also after a restart (tests/ui/layout_reset_undo.sfui).
+    sculptforge_ui_test(layout_reset_undo_1440 layout_reset_undo --size 1440x900)
+    sculptforge_ui_test(layout_reset_undo_2880 layout_reset_undo --size 2880x1800)
+    sculptforge_ui_test(layout_reset_undo_sf_1440 layout_reset_undo_sf --size 1440x900)
+    sculptforge_ui_test(layout_reset_undo_sf_2880 layout_reset_undo_sf --size 2880x1800)
+    # The layout saves itself; Save my layout marks what Restore my saved layout returns to (tests/ui/layout_autosave.sfui).
     sculptforge_ui_test(layout_autosave_1440 layout_autosave --size 1440x900)
     sculptforge_ui_test(layout_autosave_2880 layout_autosave --size 2880x1800)
     # Front faces only's tag by the cursor and in the Brush palette, at 1440 px and at 200 % (tests/ui/front_faces_tag.sfui).

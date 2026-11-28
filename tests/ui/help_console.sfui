@@ -1,4 +1,4 @@
-# Ctrl-hover help, the command palette, the script console and Save Layout / Revert
+# Ctrl-hover help, the command palette, the script console and Save my layout / Restore
 # (ui-spec sections 7, 8 and 9.2).
 run new_sphere subdivisions=3
 expect_value triangles == 1280
@@ -113,24 +113,25 @@ click "Console/Copy session as script"
 expect_clipboard "remesh resolution=64"
 expect_clipboard "subdivide"
 
-# Save Layout writes ui.json; Reset Layout and Shortcuts resets; Revert to Saved Layout brings the layout back (shortcuts save themselves).
+# Save my layout writes ui.json; Reset layout and shortcuts resets; Restore my saved layout brings the layout back (shortcuts save themselves).
 click "Console/Clear console"
 expect_no_text "> remesh"
 key f3
-type "##Command palette" "save layout"
+type "##Command palette" "save my layout"
 key enter
 expect_status "Layout saved"
 expect_value ui_config == 1
 key f3
 type "##Command palette" "reset layout and shortcuts"
 key enter
+click "Replace my layout##reset_confirm"
 expect_status "Standard layout and shortcuts restored"
 expect_value console_open == 0
 key shift+f
 expect_value wireframe == 1
 key shift+f
 key f3
-type "##Command palette" "revert to saved"
+type "##Command palette" "restore my saved"
 key enter
 expect_status "Saved layout restored"
 expect_value console_open == 1

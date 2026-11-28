@@ -4041,6 +4041,7 @@ void App::drawUi() {
     if (doc_.extractPreview.id && !doc_.sculptor.strokeActive()) doc_.dropExtractPreview(true);
     drawProjectPopups();
     drawDynamicOffer();
+    drawResetConfirm();
     if (hideUi_) return; // demos: clean beauty shots
     // Draw order (ui-spec §12): shells, Library, floating windows, then pop-ups and help.
     drawShell();
