@@ -19,7 +19,7 @@ Quick answers:
 | The cursor jumps when the pen touches down | **Edit > Preferences > Tablet > Mouse mode (relative)** |
 | "Windows protected your PC" | **More info**, then **Run anyway** ([First launch warnings](#first-launch-warnings-on-macos-and-windows)) |
 | Text and buttons too small or too large | **Edit > Preferences > Interface > UI scale** ([details](#text-and-buttons-are-too-small-or-too-large)) |
-| Menus or shelves look wrong after an update | **Edit > Preferences > Saving & Layouts > Reset Layout and Shortcuts** ([Reset the interface](#reset-the-interface)) |
+| Menus or shelves look wrong after an update | **Edit > Preferences > Saving & Layouts > Reset layout and shortcuts** ([Reset the interface](#reset-the-interface)) |
 | Sculpting feels slow | [The viewport is slow](#the-viewport-is-slow) |
 | Lost work after a crash | [Recovering work after a crash](#recovering-work-after-a-crash) |
 | Want the Classic layout back | **Edit > Preferences > Interface > Look > Layout > Classic** |
@@ -219,18 +219,20 @@ font DPI (Xft.dpi); if Automatic looks wrong there, pick a size.
 ### My layout is gone after a restart
 
 Shortcuts, preferences and the layout (shelves, trays, open palettes) save themselves: the layout a couple of seconds after
-you change it, and again when you quit. If a layout is not what you left, **Revert to Saved Layout**
-(**Edit > Preferences > Saving & Layouts**) goes back to the one **Save Layout** last kept, and a copy of `ui.json` from
+you change it, and again when you quit. If a layout is not what you left, **Restore my saved layout**
+(**Edit > Preferences > Saving & Layouts**) goes back to the one **Save my layout** last kept, and a copy of `ui.json` from
 before each session that changed it is kept as `ui.prev.json` and `ui.prev2.json` in the settings folder (quit, rename one to
 `ui.json`). See [The interface](interface.md#saving-preferences-and-layouts).
 
 ### Reset the interface
 
-- **Edit > Preferences > Saving & Layouts > Reset Layout and Shortcuts** returns to the built-in layout and default shortcuts. Both
-  save themselves; **Revert to Saved Layout** still returns to the layout **Save Layout** last kept.
-- **Reset Layout** (same place, or <kbd>F3</kbd> and type "reset layout") restores only the shelves, trays and panels and keeps your shortcuts and preferences. It works whatever state the layout is in. Starting `sculptforge --reset-layout` does it before the window opens.
+- **Every reset asks once and keeps what it replaces as a backup.** Reset the wrong thing? **Edit > Preferences > Saving & Layouts > Undo last reset**
+  puts back the layout, shortcuts, radial menus and panel windows you had, also after a restart.
+- **Edit > Preferences > Saving & Layouts > Reset layout and shortcuts** returns to the built-in layout and default shortcuts. Both
+  save themselves; **Restore my saved layout** still returns to the layout **Save my layout** last kept.
+- **Reset panels and shelves** (same place, or <kbd>F3</kbd> and type "reset panels") restores only the shelves, trays and panels and keeps your shortcuts and preferences. It works whatever state the layout is in. Starting `sculptforge --reset-layout` does it before the window opens.
 - A colour picker, brush tile or slider you dragged off a shelf is listed in the same section with **Put back on the shelf**.
-- **Revert to Saved Layout** goes back to the layout the last **Save Layout** kept (the layout in use saves itself, so Revert is the way back to the one you marked).
+- **Restore my saved layout** goes back to the layout the last **Save my layout** kept (the layout in use saves itself, so Restore is the way back to the one you marked). With nothing saved it says "Nothing saved yet" and changes nothing.
 - To start completely fresh, quit SculptForge and delete `ui.json` (layout, shortcuts, interface preferences)
   and `imgui.ini` (positions of floating windows such as Brush Lab) from the settings folder below.
 
@@ -253,7 +255,8 @@ SculptForge keeps its settings in one folder per user:
 
 | File or folder | What it holds |
 |---|---|
-| `ui.json` | Shortcut changes, preferences and the layout (saved as you change them), and the layout **Save Layout** kept |
+| `ui.json` | Shortcut changes, preferences and the layout (saved as you change them), and the layout **Save my layout** kept |
+| `ui.reset-backup.json` | What the last reset or restore replaced (**Undo last reset** reads it) |
 | `ui.prev.json`, `ui.prev2.json` | Copies of `ui.json` from before the last two sessions that changed the layout |
 | `imgui.ini` | Positions and sizes of floating windows |
 | `ai.json` | AI settings: providers, models, keys, ComfyUI address (readable only by your account) |
@@ -271,7 +274,7 @@ Your **library folder** (projects, tools, alphas, images, splats and snapshots s
 separate: `Documents/SculptForge` by default, changeable in **Edit > Preferences > Library > Library folder**.
 
 > **Tip:** To move settings to another computer, copy `ui.json`, `ai.json` and the `brushes` folder. For a
-> shared layout, use **Edit > Preferences > Saving & Layouts > Export Interface...** and **Import Interface...** instead.
+> shared layout, use **Edit > Preferences > Saving & Layouts > Export layout file...** and **Import layout file...** instead.
 
 ## The log file
 

@@ -1,0 +1,40 @@
+# layout_reset_undo.sfui in the SculptForge layout (menus by task): the same commands, the same question, the same backup.
+run ui_look look=classic layout=sculptforge
+run new_sphere subdivisions=3
+wait 1.0
+expect_value shell_layout == 1
+remember ui_state_hash untouched
+action config.restore_custom
+wait 0.3
+expect_status "Nothing saved yet"
+expect_value reset_backup_file == 0
+expect_value ui_state_hash == $untouched
+
+click "##rightdivider"
+set_shortcut view.pan_left J
+wait 0.3
+remember ui_state_hash custom
+action config.restore_standard
+click "Replace my layout##reset_confirm"
+wait 0.3
+expect_value reset_backup_file == 1
+expect_value ui_state_hash != $custom
+shot after_reset
+# Reset again from the page (opening it changes the layout's open sections): the backup must stay the custom one.
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Saving & Layouts##preferences.config"
+click "Reset panels and shelves##config.reset_layout"
+click "Replace my layout##reset_confirm"
+wait 0.3
+action config.undo_reset
+wait 0.3
+expect_value ui_state_hash == $custom
+
+# Menus: Edit > Preferences > Saving & Layouts shows the three blocks.
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Saving & Layouts##preferences.config"
+expect_text "My layout"
+expect_text "Start over"
+shot blocks

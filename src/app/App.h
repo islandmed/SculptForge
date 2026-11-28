@@ -194,6 +194,8 @@ public:
 
     ActionRegistry& actions() { return actions_; }
     UiLayout& layout() { return layout_; }
+    bool hasSavedLayout() const { return storedLayout_.isObject(); } // Save my layout ran (Preferences > Saving & Layouts)
+    double layoutSavedAt() const { return layoutSavedAt_; }
     // The menu rows added after 0.13.0 (File > Render with..., Preferences > Scripts and > Render bridge, Brush > Contact facing): off in the Classic
     // layout (its menus keep their old rows) unless Preferences > Interface > Show newer menu rows says so; on in SculptForge.
     bool newerMenuRows() const { return uiPrefs_.newerMenuRows < 0 ? uiPrefs_.shellLayout == 1 : uiPrefs_.newerMenuRows != 0; }
@@ -284,6 +286,7 @@ private:
     // Dynamic on a Part with subdivision levels: Freeze Levels (one undo step), then Dynamic on.
     void freezeLevelsAndDynamic();
     void drawDynamicOffer(); // the pop-up setDynamic opens instead of a dead-end message
+    void drawResetConfirm(); // "This replaces your current layout..." before every Reset (Config.cpp)
     bool openDynamicOffer_ = false;
     // Remove Below / Remove Above from the interface: a confirmation naming the levels that go (scripts run directly).
     void confirmLevelDelete(const std::string& command);
@@ -2904,10 +2907,25 @@ public:
     void restoreStandardUi();
     // Revert / Reset run at the top of the next frame (applyPendingLayoutOp, Shell.cpp), never inside the palette that
     // asked: they swap the layout, the shell mode, the preferences and the fonts under the frame being drawn.
-    int pendingLayoutOp_ = 0;            // 1 Revert to Saved Layout, 2 Reset Layout, 3 Reset Layout and Shortcuts, 4 import
+    int pendingLayoutOp_ = 0;            // 1 Restore my saved layout, 2 Reset panels and shelves, 3 Reset layout and shortcuts, 4 import,
+                                         // 5 Undo last reset, 6 Reset panel windows
     std::string pendingImportPath_;
     void queueLayoutOp(int op) { pendingLayoutOp_ = op; redrawIn(0.0); }
     void applyPendingLayoutOp();
+    // Every Reset (and Restore) keeps what it replaces first: ui.reset-backup.json in the settings folder (layout, saved layout's
+    // time aside, shortcuts, radial menus, panel windows), which Undo last reset puts back, also after a restart. Asked once first.
+    void askLayoutReset(int op) { resetConfirmOp_ = op; openResetConfirm_ = true; }
+    bool backUpBeforeReset(const char* what); // false: no backup could be written, so nothing is reset
+    void noteResetDone();                     // the backup learns what the reset left (a second Reset of that keeps the first backup)
+    void undoLastReset();
+    const Json& resetBackup();                // lazily read; null: none
+    std::string uiStateKey() const;           // layout, shortcuts, radial menus and panel windows in use
+    std::string resetBackupPath() const;
+    int resetConfirmOp_ = 0;
+    bool openResetConfirm_ = false;
+    Json resetBackup_;
+    bool resetBackupLoaded_ = false;
+    double layoutSavedAt_ = 0.0;              // when Save my layout last ran (unix seconds; 0: unknown or never)
     bool autosaveNow(); // an autosave right now if there is unsaved work (before a risky step); true if one was written
     void resetLayoutOnly();  // config.reset_layout: the built-in layout and every panel back in the main window; keys stay
     std::vector<std::string> missingShelfWidgets() const; // the standard shelves' widgets (colour picker, tiles...) no shelf holds now

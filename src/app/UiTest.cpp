@@ -434,6 +434,7 @@
 //   start_view               the camera as a fresh start has it, then the first frame's fit into the view (a phone's narrow one)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
 //                            content scale changes, with SDL's event (Windows DPI, another monitor); pixel_density PERCENT: the window's pixel density (Retina; expect_value font_density, glyph_texels: x100); logical_width W: the display scale that makes the window W logical px wide (#105)
+//   expect_value reset_backup_file (1 when ui.reset-backup.json exists), ui_state_hash (layout, shortcuts, radial menus and panel windows in use: remember it, reset, undo, compare), saved_layout (1 after Save my layout)
 //   expect_value ui_scale (percent built now), font_height (default font, px), frame_height, panel_width (right
 //                            shelf, px), title_height, glyphs_missing (glyphs drawn as "?" in the last frame),
 //                            glyphs_merged (typed characters taken from other fonts: SF_FALLBACK_FONTS, the system's),
@@ -1438,6 +1439,13 @@ double Demo::query(const std::string& name, bool& known) const {
         const std::string p = app_.configDir_ + "ui.prev2.json";
         return !app_.configDir_.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
     }
+    if (name == "reset_backup_file") { // ui.reset-backup.json: what the last Reset / Restore replaced (Config.cpp backUpBeforeReset)
+        std::error_code ec;
+        const std::string p = app_.resetBackupPath();
+        return !p.empty() && std::filesystem::is_regular_file(std::filesystem::path(std::u8string(p.begin(), p.end())), ec) ? 1.0 : 0.0;
+    }
+    if (name == "ui_state_hash") return double(std::hash<std::string>{}(app_.uiStateKey()) % 1000000000000ull); // layout + shortcuts + radial menus + panel windows
+    if (name == "saved_layout") return app_.hasSavedLayout() ? 1.0 : 0.0;
     if (name == "layout_autosaved") return app_.layoutKey() == app_.layoutSavedKey_ ? 1.0 : 0.0; // ui.json holds the layout in use
     if (name == "autosave_file" || name == "autosave_prev_file") { // the project autosave in the settings folder (PanelProject.cpp)
         std::error_code ec;

@@ -67,7 +67,7 @@ click "Viewport Look##tool.display"
 run ui_look look=classic layout=classic        # the classic palette bar: Preferences is a palette
 click "Preferences##palette.preferences"
 click "Saving & Layouts##preferences.config"
-expect "Save Layout##config.save_layout"
+expect "Save my layout##config.save_layout"
 shot saving-layouts-100
 ui_scale 200
 wait 0.3

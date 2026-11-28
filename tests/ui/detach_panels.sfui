@@ -20,6 +20,7 @@ expect_value detached_panels == 1
 click "Preferences##palette.preferences"
 click "Saving & Layouts##preferences.config"
 click "Reset panel windows##panel.reset"
+click "Replace my layout##reset_confirm"
 expect_value detached_panels == 0
 expect_status "back in the main window"
 key escape
