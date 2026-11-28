@@ -2920,7 +2920,6 @@ public:
     const Json& resetBackup();                // lazily read; null: none
     std::string uiStateKey() const;           // layout, shortcuts, radial menus and panel windows in use
     std::string resetBackupPath() const;
-    Json panelsJson() const;                  // panels.json's content (PanelWindows.cpp)
     int resetConfirmOp_ = 0;
     bool openResetConfirm_ = false;
     Json resetBackup_;

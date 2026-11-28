@@ -655,7 +655,7 @@ what it replaces as a backup**.
 Each Reset asks "This replaces your current layout. Your current one is kept as a backup." and writes the backup
 (`ui.reset-backup.json` in the settings folder) before it changes anything; if the backup cannot be written, nothing is reset. A second
 Reset of what the first one left keeps the first backup, so pressing Reset twice never loses the layout you had.
-**Restore my saved layout** keeps the layout you had too, without asking.
+**Restore my saved layout** and **Import layout file...** keep the layout you had too, without asking (you chose the file or the saved layout yourself).
 
 The command palette (<kbd>F3</kbd>) also has **Save Preferences Now**, which writes them at once; you never need it.
 

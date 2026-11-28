@@ -1457,9 +1457,11 @@ void App::applyPendingLayoutOp() {
     autosaveNow(); // unsaved work first: whatever happens next, it is on disk
     std::string err;
     // Whatever replaces the layout in use keeps it first; no backup, no reset.
-    const bool replaces = op == 2 || op == 3 || op == 6 || (op == 1 && storedLayout_.isObject());
+    // (Import layout file replaces it too: the file dialog was its question.)
+    const bool replaces = op == 2 || op == 3 || op == 4 || op == 6 || (op == 1 && storedLayout_.isObject());
     if (replaces && !backUpBeforeReset(op == 1 ? "Restore my saved layout" : op == 2 ? "Reset panels and shelves"
-                                                : op == 3 ? "Reset layout and shortcuts" : "Reset panel windows")) {
+                                                : op == 3 ? "Reset layout and shortcuts" : op == 4 ? "Import layout file"
+                                                                                                    : "Reset panel windows")) {
         return;
     }
     if (op == 1) restoreCustomUi();
@@ -1468,9 +1470,13 @@ void App::applyPendingLayoutOp() {
     else if (op == 5) undoLastReset();
     else if (op == 6) {
         resetPanels();
-        status_ = "Every panel is back in the main window";
-    } else if (op == 4) status_ = readUiConfig(std::exchange(pendingImportPath_, std::string()), err)
-                                    ? std::string("Interface loaded") : err;
+        status_ = "Every panel is back in the main window - Undo last reset brings the windows back";
+        noteResetDone();
+    } else if (op == 4) {
+        status_ = readUiConfig(std::exchange(pendingImportPath_, std::string()), err)
+                      ? std::string("Interface loaded - Undo last reset brings back the one you had") : err;
+        noteResetDone();
+    }
 }
 
 void App::resetLayoutOnly() {
