@@ -1274,6 +1274,10 @@ if(SCULPTFORGE_BUILD_TESTS)
     add_test(NAME release_pin_whats_new COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/pin_whats_new_test.py --self-test)
     # The launch headline, README line and HIGHLIGHTS name only what the release's notes name (release.sh stage/check).
     add_test(NAME release_notes_names COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/release/notes_names.py --self-test)
+    # Production code never reads what only the ImGui test hook fills (docs/testing-flow.md): the check, and its fixtures.
+    add_test(NAME test_hook_guard COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/check_test_hook.py
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME test_hook_guard_self_test COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/check_test_hook.py --self-test)
     # scripts/merge-queue.sh refuses a merge or squash that throws away the other side's change (tools/ci/no_revert.py).
     add_test(NAME ci_no_revert COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ci/no_revert.py --self-test)
     # A branch made from an old tree (a squash with reset --soft onto a moved origin/main) put older main files back (0.11.11).

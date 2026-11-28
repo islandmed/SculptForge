@@ -203,6 +203,17 @@ Every tier runs ctest through `tools/test/run.py --build build [-- ctest args]`:
   copies there: render/BufferUpload.h). A test that loses the device there is a bug to isolate, not a test to label away: the render
   matrix's cells fail by name when the context is gone after their frame.
 
+## The item hook is off for users
+
+UI tests run with the item hook on (`ImGuiContext::TestEngineHookItems`, src/app/App.cpp: only recordings and tests; the hook
+functions in src/app/Demo.cpp collect each item's rectangle, label and status flags); a behaviour that depends on item info
+must be proven with the hook off (the `hooks_off_*` tests, tests/test_hooks_off.cpp with the harness tests/HooksOff.h: no window, an ImGui context with
+the hook off; add a case per guard), and production code never reads hook state (the T0 check `test_hook_guard`,
+tools/ci/check_test_hook.py: the Demo accessors, the variables the hook functions fill, `TestEngineHookItems`, and status flags
+ImGui gives only to the hook; it names file:line, and `--self-test` runs its fixtures). A guard needing a flag ImGui hands only to
+the hook gets it by a checked patch in cmake/Dependencies.cmake that keeps the flag on `LastItemData` (as `Inputable`).
+(fix/touch-pin-slider-drag 11-27: its UI tests passed on state only the hook fills, and it did nothing for users.)
+
 ## Modes and the monkey
 
 A mode that won't let go (Draw Tube or Append > Insert taking every drag after another brush was picked) breaks the
