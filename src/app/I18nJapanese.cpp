@@ -7269,6 +7269,8 @@ constexpr Entry kJapanese[] = {
      "ショートカットとラジアルメニューも組み込みのものに戻ります。"},
     {"Undo last reset (Preferences > Saving & Layouts) puts it back, also after a restart.",
      "「直前のリセットを元に戻す」（環境設定 > 保存とレイアウト）で、再起動後も元に戻せます。"},
+    {"Replace your layout?",
+     "レイアウトを置き換えますか？"},
 };
 
 } // namespace

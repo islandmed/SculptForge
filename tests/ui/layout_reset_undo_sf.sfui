@@ -20,6 +20,13 @@ wait 0.3
 expect_value reset_backup_file == 1
 expect_value ui_state_hash != $custom
 shot after_reset
+# Reset again from the page (opening it changes the layout's open sections): the backup must stay the custom one.
+click "Edit##menu.edit"
+click "Preferences##section.preferences"
+click "Saving & Layouts##preferences.config"
+click "Reset panels and shelves##config.reset_layout"
+click "Replace my layout##reset_confirm"
+wait 0.3
 action config.undo_reset
 wait 0.3
 expect_value ui_state_hash == $custom

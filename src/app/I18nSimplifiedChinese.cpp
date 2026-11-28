@@ -6060,6 +6060,8 @@ constexpr Entry kSimplifiedChinese[] = {
      "快捷键和径向菜单也会回到内置的。"},
     {"Undo last reset (Preferences > Saving & Layouts) puts it back, also after a restart.",
      "“撤销上次重置”（偏好设置 > 保存与布局）可以恢复，重启后也可以。"},
+    {"Replace your layout?",
+     "替换你的布局？"},
 };
 
 } // namespace

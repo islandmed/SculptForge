@@ -57,8 +57,11 @@ expect_value detached_panels == 0
 remember ui_state_hash standard
 shot after_reset
 
-# A second Reset of what the first one left has nothing to lose: it must not replace the backup.
-action config.reset_layout
+# A second Reset of what the first one left has nothing to lose: it must not replace the backup, even though
+# opening Preferences and its section to find the button is itself a layout change (artist-qa 11-27).
+click "Preferences##palette.preferences"
+click "Saving & Layouts##preferences.config"
+click "Reset panels and shelves##config.reset_layout"
 click "Replace my layout##reset_confirm"
 wait 0.3
 expect_value ui_state_hash == $standard

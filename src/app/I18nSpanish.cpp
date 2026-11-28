@@ -6552,6 +6552,8 @@ constexpr Entry kSpanish[] = {
      "Los atajos y los menús radiales vuelven también a los incluidos."},
     {"Undo last reset (Preferences > Saving & Layouts) puts it back, also after a restart.",
      "Deshacer el último restablecimiento (Preferencias > Guardado y diseños) lo recupera, también tras reiniciar."},
+    {"Replace your layout?",
+     "¿Reemplazar tu diseño?"},
 };
 
 } // namespace

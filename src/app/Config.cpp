@@ -1567,7 +1567,14 @@ const Json& App::resetBackup() {
 
 // What a reset would replace, as one string: a Reset of exactly what the last one left has nothing to lose.
 std::string App::uiStateKey() const {
-    std::string k = layoutKey() + actions_.overridesToJson().dump() + toJson(radialMenus_).dump();
+    UiLayout l = layout_;
+    l.openSubpalettes.clear(); // (which section of a palette is open: opening Preferences to reset again changes it, not the layout)
+    l.consoleOpen = false;
+    l.consoleHeight = 0;
+    l.libraryOpen = false;
+    l.libraryTab.clear();
+    l.customize = false;
+    std::string k = toJson(l).dump() + actions_.overridesToJson().dump() + toJson(radialMenus_).dump();
     for (const PanelWindow& p : panelWindows_) k += "|" + p.id;
     return k;
 }
@@ -1638,7 +1645,8 @@ void App::undoLastReset() {
 }
 
 void App::drawResetConfirm() {
-    static constexpr const char* kPopup = "Replace your layout?##reset_confirm";
+    const std::string title = std::string(tr("Replace your layout?")) + "##reset_confirm";
+    const char* kPopup = title.c_str();
     if (openResetConfirm_) {
         openResetConfirm_ = false;
         if (!options_.renderPath.empty() || !options_.recordPath.empty()) queueLayoutOp(std::exchange(resetConfirmOp_, 0)); // renders and recordings: nobody to ask (UI tests ask, and click it)

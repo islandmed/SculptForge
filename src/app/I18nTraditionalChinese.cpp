@@ -6058,6 +6058,8 @@ constexpr Entry kTraditionalChinese[] = {
      "快速鍵和放射狀選單也會回到內建的。"},
     {"Undo last reset (Preferences > Saving & Layouts) puts it back, also after a restart.",
      "「復原上次重設」（偏好設定 > 儲存與版面）可以恢復，重新啟動後也可以。"},
+    {"Replace your layout?",
+     "取代你的版面配置？"},
 };
 
 } // namespace
