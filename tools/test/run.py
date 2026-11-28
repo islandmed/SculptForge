@@ -297,13 +297,14 @@ FAIL_LINE = re.compile(r"^(?:FAIL\b|FAILED\b|TIMEOUT\b|.*\b(?:assert|error|excep
 
 # An absolute path of 2+ segments (/a/b, C:\a\b, a trailing separator too), not the tail of a relative one (src/app/x, 4/255, 58%/x).
 ABS_PATH = re.compile(r"(?<![\w.%/\\])(?:[A-Za-z]:)?(?:[\\/][\w.+~@<>-]+){2,}[\\/]?")
-HOME_DIR = re.compile(r"^(?:[A-Za-z]:)?[\\/](?:home|Users)[\\/][^\\/]+[\\/]?$", re.I)
+# A home folder (/home/u, C:\Users\Ann Lee): its name may hold spaces or an apostrophe; group 1 is what follows it.
+HOME_PATH = re.compile(r"(?<![\w.%/\\])(?:[A-Za-z]:)?[\\/](?:home|Users)[\\/][\w.<>@+~-]+(?:[ '][\w.<>@+~-]+)*"
+                       r"((?:[\\/][\w.+~@<>-]+)*)[\\/]?", re.I)
+FILE_URL = re.compile(r"\bfile://(?:/(?=[A-Za-z]:)|(?=/))")
 
 
-def _short_path(m):
-    """A path's last segment; a home folder itself (/home/u, C:\\Users\\u: its last segment is the user's name) becomes ~."""
-    p = m.group(0)
-    return "~" if HOME_DIR.match(p) else re.split(r"[\\/]", p.rstrip("\\/"))[-1]
+def _last_segment(p):
+    return re.split(r"[\\/]", p.rstrip("\\/"))[-1]
 
 
 def failure_reason(out):
@@ -312,7 +313,9 @@ def failure_reason(out):
     their file name: the line goes into logs that can be public and must not name a machine or a user."""
     lines = [l.strip() for l in out.splitlines() if l.strip()]
     line = next((l for l in lines if FAIL_LINE.match(l)), lines[-1] if lines else "")
-    line = ABS_PATH.sub(_short_path, line)
+    line = FILE_URL.sub("", line)  # (file:///home/u/x.png is a path like any other)
+    line = HOME_PATH.sub(lambda m: _last_segment(m.group(1)) if m.group(1) else "~", line)  # (a bare home folder: its last segment is the user)
+    line = ABS_PATH.sub(lambda m: _last_segment(m.group(0)), line)
     return re.sub(r"\s+", " ", re.sub(r"^FAIL\s+", "", line))[:400]
 
 
@@ -571,6 +574,11 @@ def self_test():
     assert failure_reason("error: cannot open /home/<user>") == "error: cannot open ~"  # (2 segments: the home folder itself)
     assert failure_reason("error: cwd /home/<user>/ now") == "error: cwd ~ now"  # (trailing separator)
     assert failure_reason("error: C:\\Users\\<user>") == "error: ~"
+    assert failure_reason("error: file:///home/<user>/x.png") == "error: x.png"  # (a URL: the path after file:// like any other)
+    assert failure_reason("error: file:///C:/Users/Ann Lee/x.png failed") == "error: x.png failed"
+    assert failure_reason("error: C:\\Users\\Ann Lee\\x") == "error: x"  # (a user name with a space)
+    assert failure_reason("error: open '/home/ann' failed") == "error: open '~' failed"
+    assert failure_reason("error: /home/O'Brien/x.png") == "error: x.png"
     assert failure_reason("error: no /tmp/x/ here") == "error: no x here"  # (any 2-segment path: its last segment)
     assert failure_reason("error: src/app/x.cpp:4 differs 4/255, 58.5%/x") == "error: src/app/x.cpp:4 differs 4/255, 58.5%/x"  # (relative: kept)
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
