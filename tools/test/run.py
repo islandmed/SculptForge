@@ -292,6 +292,33 @@ GPU_LOST = re.compile(r"Could not find a valid EGL device|D3D12: Removing Device
                       r"|failed to create dri2 screen|GL context lost")
 
 
+FAIL_LINE = re.compile(r"^(?:FAIL\b|FAILED\b|TIMEOUT\b|.*\b(?:assert|error|exception|crash|lost)\b)", re.I)
+
+
+# An absolute path of 2+ segments (/a/b, C:\a\b, a trailing separator too), not the tail of a relative one (src/app/x, 4/255, 58%/x).
+ABS_PATH = re.compile(r"(?<![\w.%/\\])(?:[A-Za-z]:)?(?:[\\/][\w.+~@<>-]+){2,}[\\/]?")
+# A home folder (/home/u, C:\Users\Ann Lee): its name may hold spaces or an apostrophe; group 1 is what follows it.
+HOME_PATH = re.compile(r"(?<![\w.%/\\])(?:[A-Za-z]:)?[\\/](?:home|Users)[\\/][\w.<>@+~-]+(?:[ '][\w.<>@+~-]+)*"
+                       r"((?:[\\/][\w.+~@<>-]+)*)[\\/]?", re.I)
+FILE_URL = re.compile(r"\bfile://(?:/(?=[A-Za-z]:)|(?=/))")
+
+
+def _last_segment(p):
+    return re.split(r"[\\/]", p.rstrip("\\/"))[-1]
+
+
+def failure_reason(out):
+    """One line for a retried test's first failure (the stage summary shows it beside "passed after retry"): the first
+    FAIL/error line of its output, else its last line, capped. Absolute paths (a home folder, the PC's /root/wt, C:\\...) shrink to
+    their file name: the line goes into logs that can be public and must not name a machine or a user."""
+    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    line = next((l for l in lines if FAIL_LINE.match(l)), lines[-1] if lines else "")
+    line = FILE_URL.sub("", line)  # (file:///home/u/x.png is a path like any other)
+    line = HOME_PATH.sub(lambda m: _last_segment(m.group(1)) if m.group(1) else "~", line)  # (a bare home folder: its last segment is the user)
+    line = ABS_PATH.sub(lambda m: _last_segment(m.group(0)), line)
+    return re.sub(r"\s+", " ", re.sub(r"^FAIL\s+", "", line))[:400]
+
+
 def outputs(junit):
     if ET is None:
         return {}
@@ -435,7 +462,7 @@ def run_tests(argv=None):
             for n, case in hung.items():
                 print(f"TIMEOUT: {n}" + (f" hung in {case}" if case else ""), flush=True)
             failed = [n for n, (s, _) in res.items() if s == "fail" and n not in hung]
-            flaky = []
+            flaky, why = [], {}
             if failed:
                 print(f"\nrerunning {len(failed)} failed test(s) once: {' '.join(failed)}", flush=True)
                 ctest(build, names_args(failed, args), os.path.join(tmp, "b.xml"))
@@ -450,9 +477,10 @@ def run_tests(argv=None):
                             print(f"gpu: {n} failed with the graphics device gone, then passed: not a flake")
                         else:
                             flaky.append(n)
+                            why[n] = failure_reason(first.get(n, ""))
                             res[n] = ("flaky", res[n][1])
             for n in flaky:
-                print(f"flaky: {n} (failed, then passed on the rerun)")
+                print(f"flaky: {n} passed after retry ({why.get(n) or 'no output kept'})")
             if flaky and a.flaky_log:
                 sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
                 # The machine as a description (SF_MACHINE, else OS and CPU), never its host name: the file is public.
@@ -538,6 +566,21 @@ def self_test():
     b, _, nt = split_failures(["m"], {}, q, "2026-11-11", out(1064, 77))
     assert b == ["m"] and "[monkey 77]" in nt[0], nt  # another seed still blocks, and is named
     assert split_failures(["m"], {}, q, "2026-11-11", {})[0] == ["m"]  # no FAIL lines to match: blocks
+    assert failure_reason("noise\nFAIL m.sfui:64: render cell x: it differs by 4/255\nmore\n") == "m.sfui:64: render cell x: it differs by 4/255"
+    assert failure_reason("a\nlast line\n") == "last line" and failure_reason("") == ""  # (no FAIL line: the last one)
+    assert failure_reason("FAIL m.sfui:6: x (picture: /root/wt/r014/src/build/ui-shots/m/FAIL-cell.png)") == \
+        "m.sfui:6: x (picture: FAIL-cell.png)"
+    assert failure_reason("error: cannot open /home/u/Work/c.txt and C:\\Users\\u\\x\\y.png") == "error: cannot open c.txt and y.png"
+    assert failure_reason("error: cannot open /home/<user>") == "error: cannot open ~"  # (2 segments: the home folder itself)
+    assert failure_reason("error: cwd /home/<user>/ now") == "error: cwd ~ now"  # (trailing separator)
+    assert failure_reason("error: C:\\Users\\<user>") == "error: ~"
+    assert failure_reason("error: file:///home/<user>/x.png") == "error: x.png"  # (a URL: the path after file:// like any other)
+    assert failure_reason("error: file:///C:/Users/Ann Lee/x.png failed") == "error: x.png failed"
+    assert failure_reason("error: C:\\Users\\Ann Lee\\x") == "error: x"  # (a user name with a space)
+    assert failure_reason("error: open '/home/ann' failed") == "error: open '~' failed"
+    assert failure_reason("error: /home/O'Brien/x.png") == "error: x.png"
+    assert failure_reason("error: no /tmp/x/ here") == "error: no x here"  # (any 2-segment path: its last segment)
+    assert failure_reason("error: src/app/x.cpp:4 differs 4/255, 58.5%/x") == "error: src/app/x.cpp:4 differs 4/255, 58.5%/x"  # (relative: kept)
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
         f.write("# name | owner | until | task | why\nui_x | qa-lean | 2026-11-18 | fix/x | seed 1064 # leak\n"
                 "ui_y | qa | 2026-11-18 |  | no task\nbad line\n")

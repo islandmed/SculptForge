@@ -815,7 +815,10 @@ step_stage() {
     export REPO V; export -f infra_retry infra_rerun flaky_note run_failed_where server_error gh_watch
     local mq_rc=0 t
     SF_STAGE_CI_REUSED=$reused SF_PC_PRIO=1 "${MERGE_QUEUE:-scripts/merge-queue.sh}" staging ${with:+--with "$with"} "$sha" || mq_rc=$?
-    for t in $(sed -n 's/^flaky: \([^ ]*\).*/\1/p' "/tmp/merge-queue-with-${sha:0:8}.log" 2>/dev/null | sort -u); do flaky_note "$t" "PC suite, ctest --rerun-failed"; done
+    local why   # (run.py: "flaky: NAME passed after retry (<the first failure's line>)")
+    for t in $(sed -n 's/^flaky: \([^ ]*\).*/\1/p' "/tmp/merge-queue-with-${sha:0:8}.log" 2>/dev/null | sort -u); do
+        why=$(sed -n "s/^flaky: $t passed after retry (\(.*\))\$/\1/p" "/tmp/merge-queue-with-${sha:0:8}.log" 2>/dev/null | head -1 | tr '|' '/')
+        flaky_note "$t" "PC suite, rerun${why:+: $why}"; done
     stage_flaky_summary
     [ $mq_rc = 0 ] || die "staging ${sha:0:8} is red, or main moved (above)" "fix the batch (main moved: merge origin/main), then $(resume bump)"
     ok "main is the staged ${sha:0:8} ($V); packages.yml is building its packages on the staging push"

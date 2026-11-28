@@ -178,7 +178,8 @@ Every tier runs ctest through `tools/test/run.py --build build [-- ctest args]`:
   `SDL_` and GL driver variables. Script tests that nobody listed in `READS` hash every tracked file. A fingerprint
   that passed on the first try is skipped next time, so a rerun of the full suite runs only what changed. The cache
   is never used on CI, and the nightly run on the PC runs everything without it once.
-- **Flakes**: failed tests run once more. A test that passes on the rerun is logged as `flaky: name`, added to
+- **Flakes**: failed tests run once more. A test that passes on the rerun is logged as `flaky: name passed after retry (<its first failure line>)`
+  (the stage summary and `~/Work/.sf/logs/flaky.md` carry that reason), added to
   `tests/flaky.md` (by pc.sh, t0.sh and t1.sh), and doesn't fail the run. A test listed there twice gets the label
   `flaky`, and a failure then never blocks a release. Its owner fixes it or deletes it.
 - **Budget**: a test slower than `--budget` seconds fails the run. For the `sculptforge_tests` shards, each TEST

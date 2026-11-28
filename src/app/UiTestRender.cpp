@@ -167,8 +167,10 @@ bool Demo::parseRenderStep(int line, const std::vector<std::string>& w, std::str
             s.splatViewColor = true;
             s.splatShPerVertex = true;
             ok = ok && app.renderer_.renderToImage(cam, size, size, s, corner.rgba, err);
+            // Colour only: the pre-pass carries the colour, never the opacity. On Mesa's OpenGL over D3D12 the same draw twice gives
+            // one pixel whose ALPHA differs by up to 4 (a splat pile-up at the discard threshold; 0.14.3 T1, 1 run in ~8), colour by 1.
             for (size_t p = 0; ok && p < img.rgba.size(); ++p)
-                prepassDiff = std::max(prepassDiff, std::abs(int(img.rgba[p]) - int(corner.rgba[p])));
+                if (p % 4 != 3) prepassDiff = std::max(prepassDiff, std::abs(int(img.rgba[p]) - int(corner.rgba[p])));
             if (!app.renderer_.splatColorPrepass()) prepassDiff = 256; // (both drawn per corner: nothing compared)
         }
         app.renderSettings_ = saved;
