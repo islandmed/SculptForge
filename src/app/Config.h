@@ -13,6 +13,7 @@
 #include "app/UiScale.h"
 #include "core/Json.h"
 #include "core/ModifierBrush.h"
+#include "core/Controller.h"
 #include "core/SpaceMouse.h"
 #include "core/Tablet.h"
 
@@ -154,6 +155,7 @@ struct UiPrefs {
     bool confirmSubdivide = true; // Subdivide (removes levels) asks first on a Part with levels (Don't ask again)
     TabletSettings tablet;      // Preferences > Tablet: pressure curve, eraser, pen buttons
     SpaceMouseSettings spaceMouse; // Preferences > Input > SpaceMouse
+    ControllerSettings controller; // Preferences > Hotkeys: the controller and SpaceMouse buttons
     // Preferences > Performance (PanelPerformance.cpp).
     int antialiasing = 4;       // samples per pixel in the 3D view: 1 (off), 2, 4 or 8
     bool fastNavigation = true; // big scenes draw without antialiasing while the view moves

@@ -299,6 +299,10 @@
         ""
       ]
     },
+    "controller": {
+      "enabled": true,
+      "buttons": {}
+    },
     "antialiasing": 4,
     "fastNavigation": true,
     "viewResolution": 100,

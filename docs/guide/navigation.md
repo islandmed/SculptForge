@@ -237,7 +237,9 @@ pen while they turn the view, and that works best, but you don't have to.
 - **Invert**: reverse any of the six moves (Pan X, Zoom, Pan Y, Tilt, Roll, Spin). If a direction feels wrong on
   your model of SpaceMouse, flip it here.
 - **Left button**, **Right button** (and **Button 3** onwards on models with more): Frame, Frame Part, the
-  axis views, Orthographic, Undo, Redo or Nothing.
+  axis views, Orthographic, Undo, Redo or Nothing. For any other action (a pie menu, the Quick Menu, a brush), bind the
+  button in **Edit > Preferences > Hotkeys** like a controller button: see
+  [Controller buttons](shortcuts.md#controller-buttons).
 - **SpaceMouse defaults** puts everything back.
 
 These settings save themselves.

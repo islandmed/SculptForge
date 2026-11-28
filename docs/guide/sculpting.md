@@ -328,6 +328,10 @@ Make your own in **Edit > Preferences > Input > Radial Menus** (up to 8 menus of
   action names, never anything that runs: names this version doesn't know are left out.
 - **Restore default menus** brings back Brushes and Masking.
 
+A game controller's button can open a pie menu too: bind it to **Radial menu 1** (or any menu) in
+**Edit > Preferences > Hotkeys** (see [Controller buttons](shortcuts.md#controller-buttons)). Hold the button, point with
+the pen or mouse, let go. It works in Clean view.
+
 Your menus save themselves.
 
 ## Whole-Part deformations

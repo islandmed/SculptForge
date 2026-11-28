@@ -244,6 +244,7 @@ add_library(sculptforge_core STATIC
   src/core/RadialMenu.cpp
   src/core/StrokePopup.cpp
   src/core/SpaceMouse.cpp
+  src/core/Controller.cpp
   src/core/TouchGesture.cpp
   src/io/ObjIO.cpp
   src/io/FbxIO.cpp
@@ -619,6 +620,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/OsModifiers.cpp
     src/app/Wintab.cpp
     src/app/SpaceMouse.cpp
+    src/app/Controller.cpp
     src/app/Touch.cpp
     src/app/Input.cpp
     src/app/RadialMenu.cpp

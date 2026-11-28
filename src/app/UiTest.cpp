@@ -431,6 +431,15 @@
 //   spacemouse_unplug        unplug it
 //   expect_value spacemouse_connected (1 when the app opened it), spacemouse_moving (1 while it moves the view),
 //                            spacemouse_echo (1 while a mouse wheel would be dropped as the driver's echo)
+//
+// Simulated game controller: an SDL virtual gamepad (Controller.cpp; hot-plug included). BUTTON is an id of
+// core/Controller.h without "pad.": south, east, west, north, leftshoulder, dpad_up, start, back, ...
+//   gamepad_plug             plug it in (the app opens it); gamepad_unplug unplugs it, letting go of what was held
+//   gamepad_press BUTTON     press and let go (the frames between: a tap)
+//   gamepad_down BUTTON      press and hold until gamepad_up BUTTON
+//   gamepad_trigger left|right V   pull a trigger to V (0..1): a button once past 60 percent
+//   expect_value controller_connected (gamepads the app opened), controller_buttons (buttons bound),
+//                            controller_held (buttons whose press ran an action and are still down)
 //   start_view               the camera as a fresh start has it, then the first frame's fit into the view (a phone's narrow one)
 //   ui_scale PERCENT | auto  Preferences > Interface > UI scale (applied live, #87); display_scale PERCENT: the display's
 //                            content scale changes, with SDL's event (Windows DPI, another monitor); pixel_density PERCENT: the window's pixel density (Retina; expect_value font_density, glyph_texels: x100); logical_width W: the display scale that makes the window W logical px wide (#105)
@@ -704,6 +713,37 @@ bool Demo::attachVirtualSpaceMouse() {
         return false;
     }
     return true;
+}
+
+bool Demo::attachVirtualPad() {
+    if (virtualPad_) return true;
+    SDL_VirtualJoystickDesc desc;
+    SDL_INIT_INTERFACE(&desc);
+    desc.type = SDL_JOYSTICK_TYPE_GAMEPAD; // (SDL maps a virtual gamepad's buttons and axes in SDL_GamepadButton's order)
+    desc.vendor_id = 0x1209;
+    desc.product_id = 0x5F01;
+    desc.naxes = SDL_GAMEPAD_AXIS_COUNT;
+    desc.nbuttons = SDL_GAMEPAD_BUTTON_COUNT;
+    desc.name = "Controller (UI test)";
+    virtualPad_ = SDL_AttachVirtualJoystick(&desc);
+    if (!virtualPad_) return false;
+    virtualPadHandle_ = SDL_OpenJoystick(virtualPad_);
+    if (!virtualPadHandle_) {
+        SDL_DetachVirtualJoystick(virtualPad_);
+        virtualPad_ = 0;
+        return false;
+    }
+    for (SDL_GamepadAxis a : {SDL_GAMEPAD_AXIS_LEFT_TRIGGER, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER}) // triggers rest at their minimum
+        SDL_SetJoystickVirtualAxis(virtualPadHandle_, a, -32768);
+    return true;
+}
+
+void Demo::detachVirtualPad() {
+    if (!virtualPad_) return;
+    SDL_CloseJoystick(virtualPadHandle_);
+    SDL_DetachVirtualJoystick(virtualPad_);
+    virtualPad_ = 0;
+    virtualPadHandle_ = nullptr;
 }
 
 void Demo::detachVirtualSpaceMouse() {
@@ -2242,6 +2282,9 @@ double Demo::query(const std::string& name, bool& known) const {
     if (name == "touch_fingers") return double(app_.touch_.fingers());
     if (name == "tablet_palm_rejection") return app_.uiPrefs_.tablet.palmRejection ? 1.0 : 0.0;
     if (name == "palm_guard") return app_.palmGuard() ? 1.0 : 0.0;
+    if (name == "controller_connected") return double(app_.pads_.size());
+    if (name == "controller_buttons") return double(app_.uiPrefs_.controller.buttons.size());
+    if (name == "controller_held") return double(app_.controllerHeld_.size());
     if (name == "spacemouse_connected") return app_.spaceMouse_ ? 1.0 : 0.0;
     if (name == "spacemouse_moving") return app_.spaceMouseMoving() ? 1.0 : 0.0;
     if (name == "spacemouse_echo") { // a mouse's wheel turned now would be taken for the driver's echo
@@ -2427,7 +2470,7 @@ enum class StepVerb { None,
     Clipboard, ExpectClipboard, ExpectValue, WaitValue, ExpectGuide, DumpShortcuts, DumpUi, AuditPins, Snapshot, InteractiveStrokes, MarkView, Print, Remember,
     PenStroke, PenDragItem, PenTap, PenButton, PenHover, PenMove, PenEnter, PenDrag, PenPressure, SdlPenMouse, PenLost,
     PenStream, MouseSteps, OsMods, StuckMods, WindowFocus, MouseLeave, Wheel, WheelItem, MouseMove, ClickHere, MouseBy, TouchPinch, Spacemouse,
-    SpacemouseButton, SpacemouseUnplug, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
+    SpacemouseButton, SpacemouseUnplug, GamepadPlug, GamepadUnplug, GamepadButton, GamepadTrigger, TabletPlug, TabletUnplug, PenNew, PenOut, PenPress, PenSample, PenLift,
     SpacemouseEcho, PenRest, ViewTrace, Shot,
 };
 static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
@@ -2555,6 +2598,9 @@ static const std::unordered_map<std::string_view, StepVerb>& stepVerbs() {
         {"spacemouse", StepVerb::Spacemouse}, {"spacemouse_hold", StepVerb::Spacemouse},
         {"spacemouse_button", StepVerb::SpacemouseButton},
         {"spacemouse_unplug", StepVerb::SpacemouseUnplug},
+        {"gamepad_plug", StepVerb::GamepadPlug}, {"gamepad_unplug", StepVerb::GamepadUnplug},
+        {"gamepad_press", StepVerb::GamepadButton}, {"gamepad_down", StepVerb::GamepadButton},
+        {"gamepad_up", StepVerb::GamepadButton}, {"gamepad_trigger", StepVerb::GamepadTrigger},
         {"tablet_plug", StepVerb::TabletPlug},
         {"tablet_unplug", StepVerb::TabletUnplug},
         {"pen_new", StepVerb::PenNew},
@@ -5361,6 +5407,74 @@ bool Demo::parseStep(int line, const std::vector<std::string>& w, std::string& e
         });
         wait(0.05f);
         run([this, button] { SDL_SetJoystickVirtualButton(virtualSpaceMouseHandle_, button, false); });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::GamepadPlug: {
+        steps_.push_back([this, line](float t) {
+            if (t == 0.0f && !attachVirtualPad()) {
+                fail(line, std::string("cannot attach a virtual gamepad: ") + SDL_GetError());
+                return true;
+            }
+            if (!app_.pads_.empty()) return true;
+            if (t > 2.0f) fail(line, "the app didn't open the virtual gamepad");
+            return t > 2.0f;
+        });
+        wait(0.05f);
+        break;
+    }
+    case StepVerb::GamepadUnplug: {
+        run([this] { detachVirtualPad(); });
+        wait(0.1f);
+        break;
+    }
+    case StepVerb::GamepadButton: {
+        if (!need(1)) return false;
+        // The button's index in SDL_GamepadButton (the virtual gamepad's button N is gamepad button N); SDL's own
+        // names ("a", "dpad_up", "leftshoulder") or the places ("south", "east", "west", "north").
+        int index = -1;
+        for (int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT; ++b) {
+            const char* name = SDL_GetGamepadStringForButton(SDL_GamepadButton(b));
+            if (name && w[1] == name) index = b;
+        }
+        if (w[1] == "south") index = SDL_GAMEPAD_BUTTON_SOUTH;
+        else if (w[1] == "east") index = SDL_GAMEPAD_BUTTON_EAST;
+        else if (w[1] == "west") index = SDL_GAMEPAD_BUTTON_WEST;
+        else if (w[1] == "north") index = SDL_GAMEPAD_BUTTON_NORTH;
+        if (index < 0) {
+            fail(line, "unknown gamepad button '" + w[1] + "'");
+            return false;
+        }
+        const bool press = verb != "gamepad_up";
+        steps_.push_back([this, line, press, index](float t) {
+            if (t == 0.0f && !attachVirtualPad()) {
+                fail(line, std::string("cannot attach a virtual gamepad: ") + SDL_GetError());
+                return true;
+            }
+            if (app_.pads_.empty()) {
+                if (t > 2.0f) fail(line, "the app didn't open the virtual gamepad");
+                return t > 2.0f;
+            }
+            SDL_SetJoystickVirtualButton(virtualPadHandle_, index, press);
+            return true;
+        });
+        wait(0.1f);
+        if (verb == "gamepad_press") {
+            run([this, index] { SDL_SetJoystickVirtualButton(virtualPadHandle_, index, false); });
+            wait(0.1f);
+        }
+        break;
+    }
+    case StepVerb::GamepadTrigger: {
+        if (!need(2)) return false;
+        const bool left = w[1] == "left";
+        const float v = std::clamp(num(2, 0), 0.0f, 1.0f);
+        run([this, left, v] {
+            if (!attachVirtualPad()) return;
+            // (a virtual gamepad's trigger axis runs the joystick's full range: SDL reads -32768 as 0 and 32767 as 1)
+            SDL_SetJoystickVirtualAxis(virtualPadHandle_, left ? SDL_GAMEPAD_AXIS_LEFT_TRIGGER : SDL_GAMEPAD_AXIS_RIGHT_TRIGGER,
+                                       Sint16(std::lround(v * 65535.0f - 32768.0f)));
+        });
         wait(0.1f);
         break;
     }

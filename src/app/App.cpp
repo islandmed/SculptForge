@@ -209,6 +209,9 @@ bool App::init(const AppOptions& options) {
     if (!headless || !options.uiTest.empty()) {
         if (SDL_InitSubSystem(SDL_INIT_JOYSTICK)) spaceMouseScan();
         else SDL_Log("SDL joystick init failed (no SpaceMouse): %s", SDL_GetError());
+        // Game controllers for their buttons (Controller.cpp); also not fatal.
+        if (SDL_InitSubSystem(SDL_INIT_GAMEPAD)) controllerScan();
+        else SDL_Log("SDL gamepad init failed (no controller buttons): %s", SDL_GetError());
     }
 
     glWindowAttributes();
@@ -451,6 +454,7 @@ void App::shutdown() {
     if (blenderInitialised_) writeBridgeHeartbeat(blenderExchangeRoot(), true); // the add-on starts a new one
 
     spaceMouseClose();
+    controllerCloseAll();
     shutdownHardwareProfile(); // its timer queries need the GL context
     waitLastFrame();
     if (refTexture_) gl::DeleteTextures(1, &refTexture_);
@@ -694,6 +698,7 @@ int App::runUiTest(int w, int h, int fps) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) // the script provides all input (its SpaceMouse is a virtual joystick)
             if (e.type >= SDL_EVENT_JOYSTICK_AXIS_MOTION && e.type < SDL_EVENT_GAMEPAD_AXIS_MOTION) spaceMouseEvent(e);
+            else if (e.type >= SDL_EVENT_GAMEPAD_AXIS_MOTION && e.type <= SDL_EVENT_GAMEPAD_REMAPPED) controllerEvent(e);
         if (demo_->finished()) {
             if (finalFrame) break;
             finalFrame = true; // one more frame, for a failure screenshot
@@ -1237,8 +1242,11 @@ int App::run() {
             if (ev.type == SDL_EVENT_KEYMAP_CHANGED || ev.type == SDL_EVENT_KEYBOARD_ADDED ||
                 ev.type == SDL_EVENT_KEYBOARD_REMOVED || ev.type == SDL_EVENT_MOUSE_ADDED ||
                 ev.type == SDL_EVENT_MOUSE_REMOVED || ev.type == SDL_EVENT_CLIPBOARD_UPDATE ||
-                (ev.type == SDL_EVENT_JOYSTICK_AXIS_MOTION && !spaceMouseDeflected()))
-                return; // nothing on screen changes (a hand resting on a SpaceMouse: inside its dead zone)
+                (ev.type == SDL_EVENT_JOYSTICK_AXIS_MOTION && !spaceMouseDeflected()) ||
+                ev.type == SDL_EVENT_JOYSTICK_UPDATE_COMPLETE || ev.type == SDL_EVENT_GAMEPAD_AXIS_MOTION ||
+                ev.type == SDL_EVENT_GAMEPAD_UPDATE_COMPLETE)
+                return; // nothing on screen changes (a hand resting on a SpaceMouse: inside its dead zone; a pad's sticks:
+                        // its buttons and triggers ask for their frame themselves, controllerPress)
             // A mouse motion event that doesn't move the mouse: what a window system sends when the cursor's shape
             // changes or the window is refocused under a still pointer (the crosshair over the view, #73). Not input,
             // and nothing to draw: counting it would make setting the cursor wake the idle loop.
@@ -1253,6 +1261,7 @@ int App::run() {
             const bool input = (ev.type >= SDL_EVENT_KEY_DOWN && ev.type < SDL_EVENT_JOYSTICK_AXIS_MOTION) ||
                                (ev.type >= SDL_EVENT_FINGER_DOWN && ev.type <= SDL_EVENT_FINGER_CANCELED) ||
                                (ev.type >= SDL_EVENT_PEN_PROXIMITY_IN && ev.type <= SDL_EVENT_PEN_AXIS) ||
+                               ev.type == SDL_EVENT_JOYSTICK_BUTTON_DOWN || ev.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ||
                                ev.type == SDL_EVENT_DROP_FILE;
             const double t = seconds();
             activeUntil_ = std::max(activeUntil_, t + (input ? std::max(0.75, double(uiPrefs_.tooltipDelay) + 0.5) : 0.1));
@@ -2013,7 +2022,15 @@ void App::dispatchEvent(const SDL_Event& event) {
     case SDL_EVENT_JOYSTICK_REMOVED:
     case SDL_EVENT_JOYSTICK_AXIS_MOTION:
     case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
+    case SDL_EVENT_JOYSTICK_BUTTON_UP:
         spaceMouseEvent(e); // a SpaceMouse (SpaceMouse.cpp)
+        break;
+    case SDL_EVENT_GAMEPAD_ADDED:
+    case SDL_EVENT_GAMEPAD_REMOVED:
+    case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+    case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+    case SDL_EVENT_GAMEPAD_BUTTON_UP:
+        controllerEvent(e); // a game controller's buttons (Controller.cpp)
         break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
         windowFocused_ = true;

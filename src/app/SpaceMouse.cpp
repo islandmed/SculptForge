@@ -135,14 +135,23 @@ void App::spaceMouseEvent(const SDL_Event& e) {
             spaceMouseScan(); // another one may still be plugged in
         }
         break;
+    case SDL_EVENT_JOYSTICK_BUTTON_UP:
+        if (!spaceMouse_ || e.jbutton.which != spaceMouseId_) break;
+        controllerPress(controllerSpaceMouseId(e.jbutton.button), false); // (a pie menu held on it: let go)
+        break;
     case SDL_EVENT_JOYSTICK_BUTTON_DOWN: {
         if (!spaceMouse_ || e.jbutton.which != spaceMouseId_) break;
         spaceMouseLastButton_ = e.jbutton.button;
         const SpaceMouseSettings& s = uiPrefs_.spaceMouse;
+        // A button bound in Preferences > Hotkeys (any action) comes first; Preferences > Input > SpaceMouse keeps its
+        // own list for the buttons not bound there. Capturing a binding works whatever the SpaceMouse's own switches say.
+        const std::string id = controllerSpaceMouseId(e.jbutton.button);
+        if (!id.empty() && (capturingController() || (s.enabled && !spaceMouseHeld() && !uiPrefs_.controller.actionFor(id).empty())))
+            if (controllerPress(id, true)) break;
         if (!s.enabled || e.jbutton.button >= s.buttons.size() || spaceMouseHeld()) break;
-        const std::string& id = s.buttons[e.jbutton.button];
-        if (id.empty()) break;
-        const Action* a = actions_.find(id);
+        const std::string& actionId = s.buttons[e.jbutton.button];
+        if (actionId.empty()) break;
+        const Action* a = actions_.find(actionId);
         if (a && a->run && (!a->enabled || a->enabled())) a->run();
         break;
     }
