@@ -20,7 +20,7 @@
 #                     RELEASE=X.Y.Z ~/Work/.sf/merge-batch.sh uses it before its own staging run)
 #   scripts/release.sh X.Y.Z-beta.N --yes  a beta (also -rc.N): a members-only pre-release in the private repository
 #                     sculptforge/sculptforge-insiders, announced in #members (see "Betas" below and docs/releasing.md)
-#   HIGHLIGHTS=file   the update feed's 3-5 highlight lines, one per line (default: the version's highlight: lines in
+#   HIGHLIGHTS=file   the update feed's 3-5 highlight lines (1-5 for a point release X.Y.Z, Z>0), one per line (default: the version's highlight: lines in
 #                     What's New and the note fragments, tools/release/assemble_notes.py X.Y.Z --highlights)
 #   (the home page's What's New area is written by tools/guide/build_site.py from docs/guide/whats-new.md: the
 #   version's ```features block, its tagline and pictures; CARD is no longer used)
@@ -415,14 +415,16 @@ headline_check() {
     return 0
 }
 prerelease_is() { grep -qx "set(SCULPTFORGE_PRERELEASE \"$1\")" CMakeLists.txt; }
-# HIGHLIGHTS names a file of 3-5 non-empty lines.
+# HIGHLIGHTS names a file of 3-5 non-empty lines; a point release (X.Y.Z, Z>0) may have 1-2 (retro 0.14.4: a one-fix extra
+# train had to be padded to 3).
+highlights_min() { [ "${BASE##*.}" = 0 ] && echo 3 || echo 1; }
 highlights_ok() {
     local n
     [ -n "${HIGHLIGHTS:-}" ] && [ -f "$HIGHLIGHTS" ] || return 1
     n=$(grep -c '[^[:space:]]' "$HIGHLIGHTS" || true)
-    [ "$n" -ge 3 ] && [ "$n" -le 5 ]
+    [ "$n" -ge "$(highlights_min)" ] && [ "$n" -le 5 ]
 }
-highlights_fix="write 3-5 one-line highlights (what users get) to a file and run again with HIGHLIGHTS=that-file"
+highlights_fix="write $(highlights_min)-5 one-line highlights (what users get) to a file and run again with HIGHLIGHTS=that-file"
 # The words people write for What's New: the guide section and (after step bump wrote it) the UI test's pin to it.
 words_ok() {
     python3 tools/check_marks_media.py >/dev/null 2>&1 || die "an image or video shows a mark: $(python3 tools/check_marks_media.py 2>/dev/null | grep -v '^check_marks_media:' | head -3)" "swap in a clean capture from current main (python3 tools/check_marks_media.py lists them), commit, push main"
@@ -545,7 +547,7 @@ preflight() {
             python3 tools/release/assemble_notes.py "$BASE" --highlights >"$HIGHLIGHTS"
             highlights_ok || HIGHLIGHTS=
         fi
-        highlights_ok || die "HIGHLIGHTS must name a file with 3-5 highlight lines for the update feed (now: '${HIGHLIGHTS:-unset}')" "$highlights_fix"
+        highlights_ok || die "HIGHLIGHTS must name a file with $(highlights_min)-5 highlight lines for the update feed (now: '${HIGHLIGHTS:-unset}')" "$highlights_fix"
         # Every credit in them is copied from a note of the batch (a credit typed from memory names the wrong person).
         out=$(python3 tools/release/check_credits.py --highlights "$HIGHLIGHTS" --version "$BASE" 2>&1) ||
             die "$out" "write each credit exactly as that branch's changes/ note does (or fix the note), run again"
@@ -1183,12 +1185,12 @@ step_site() {
         highlights_ok || die "the update feed needs this release's highlights" "$highlights_fix --from site"
         card_ok || die "website/index.html has no 'new in $V' card and announcement bar" "$card_fix"
         python3 -I scripts/ai3d-health.py --write >/dev/null 2>&1 || true # (the free Spaces' health note rides the feed: no block = all up)
-        python3 - "$V" "$HIGHLIGHTS" "$(member_requests_file)" <<'PY'
+        python3 - "$V" "$HIGHLIGHTS" "$(member_requests_file)" "$(highlights_min)" <<'PY'
 import json, os, sys
-v, notes, mr_file = sys.argv[1], sys.argv[2], sys.argv[3]
+v, notes, mr_file, lo = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
 lines = [l.strip() for l in open(notes, encoding="utf-8") if l.strip()]
-if not 3 <= len(lines) <= 5:
-    sys.exit(f"{notes}: want 3-5 highlight lines, found {len(lines)}")
+if not lo <= len(lines) <= 5:
+    sys.exit(f"{notes}: want {lo}-5 highlight lines, found {len(lines)}")
 with open("website/latest.json", encoding="utf-8") as f:
     feed = json.load(f)
 feed["version"], feed["highlights"] = v, lines
