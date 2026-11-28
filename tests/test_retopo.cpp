@@ -5,11 +5,12 @@
 // quads, near the target count and the sculpt's surface (Hausdorff distance); Follow Face Groups, symmetry, open
 // surfaces, vertex paint density, mask / colour transfer, cancel; projecting detail back onto a divided retopo
 // brings the error down and respects the mask; both commands are one undo step.
-// SF_RETOPO_BENCH=1 also times both on a 1M+ triangle sculpt.
+// SF_RETOPO_BENCH=1 also times both on a 1M+ triangle sculpt; SF_PROJECT_BENCH=<.sfproj> times Project Detail old vs new.
 #include "TestHarness.h"
 
 #include "core/Commands.h"
 #include "core/Primitives.h"
+#include "core/Project.h"
 #include "core/Projection.h"
 #include "core/QRemesh.h"
 #include "core/SurfaceQuery.h"
@@ -18,6 +19,10 @@
 #include <cmath>
 #include <cstdlib>
 #include <set>
+#include <vector>
+#ifdef __linux__
+#include <sys/resource.h>
+#endif
 
 using namespace sf;
 
@@ -519,6 +524,101 @@ TEST(project_all_respects_mask_and_options) {
     // Nothing visible to project from.
     doc.parts[0].visible = false;
     CHECK(!reg.execute(doc, "project_all", {}).ok);
+}
+
+// The geometric invariant of Project Detail on a dense curved mesh: where the target and the source agree (no crevice, no
+// pocket) the new rules change nothing, and nowhere do they make the surface rougher.
+TEST(project_all_leaves_a_clean_dense_case_unchanged) {
+    CommandRegistry reg;
+    Document doc = sculptedSphere(6);
+    doc.parts[0].name = "Sculpt";
+    const Mesh source = doc.mesh;
+    doc.addPart(doc.mesh, "Retopo");
+    CHECK(reg.execute(doc, "qremesh", {{"target", 2000.0}}).ok);
+    CHECK(reg.execute(doc, "subdivide", {{"levels", 2.0}}).ok);
+    const Mesh divided = doc.mesh;
+    std::vector<const Mesh*> sources{&source};
+    ProjectOptions now, old;
+    now.vertexpaint = old.vertexpaint = false;
+    now.distance = old.distance = 0.05f;
+    old.facing = -1.0f;
+    old.fallbackCos = -1.0f;
+    old.outlier = 0.0f;
+    std::vector<glm::vec3> a, b;
+    ProjectStats sa, sb;
+    std::string err;
+    CHECK(computeProjection(divided, sources, now, a, nullptr, sa, err));
+    CHECK(computeProjection(divided, sources, old, b, nullptr, sb, err));
+    const float tol = 1e-6f * diagonal(divided);
+    size_t differ = 0;
+    for (size_t v = 0; v < a.size(); ++v) differ += glm::length(a[v] - b[v]) > tol;
+    // Spikes: a vertex whose offset differs from its ring's mean offset by more than 4 mean edge lengths.
+    auto spikes = [&](const std::vector<glm::vec3>& p) {
+        size_t n = 0;
+        for (uint32_t v = 0; v < divided.vertexCount(); ++v) {
+            glm::vec3 mean(0.0f);
+            float edge = 0.0f;
+            const auto ring = divided.neighbors(v);
+            for (uint32_t u : ring) mean += p[u] - divided.positions[u], edge += glm::length(divided.positions[u] - divided.positions[v]);
+            if (ring.empty()) continue;
+            mean /= float(ring.size());
+            edge /= float(ring.size());
+            n += glm::length((p[v] - divided.positions[v]) - mean) > 4.0f * edge;
+        }
+        return n;
+    };
+    const size_t spikesNow = spikes(a), spikesOld = spikes(b);
+    std::printf("  %zu of %zu vertices differ from the old result, spiked vertices %zu now / %zu before, missed %zu / %zu\n", differ,
+                a.size(), spikesNow, spikesOld, sa.missed, sb.missed);
+    CHECK(differ * 200 <= a.size()); // under 0.5 %: the retopo is far from any crevice here
+    CHECK(spikesNow <= spikesOld);
+    CHECK(sa.missed <= sb.missed + a.size() / 200);
+}
+
+// SF_PROJECT_BENCH=<project with a dense sculpt> [SF_PROJECT_BENCH_MODE=old|new|both]: the 11-27 repro (voxel remesh 300 of
+// a copy, divided twice) timed with the old rules (facing, outlier and fallback off) against the new ones, interleaved.
+TEST(project_all_bench_old_vs_new) {
+    const char* path = std::getenv("SF_PROJECT_BENCH");
+    if (!path) return;
+    const std::string mode = std::getenv("SF_PROJECT_BENCH_MODE") ? std::getenv("SF_PROJECT_BENCH_MODE") : "both";
+    CommandRegistry reg;
+    Document doc;
+    std::string err;
+    CHECK(loadProject(path, doc, err));
+    CHECK(reg.execute(doc, "part_duplicate", {{"index", 0.0}}).ok);
+    CHECK(reg.execute(doc, "remesh", {{"resolution", 300.0}, {"keep_texture", false}}).ok);
+    CHECK(reg.execute(doc, "subdiv_divide", {}).ok);
+    CHECK(reg.execute(doc, "subdiv_divide", {}).ok);
+    std::vector<const Mesh*> sources{&doc.partMesh(0)};
+    ProjectOptions now, old;
+    now.vertexpaint = old.vertexpaint = false;
+    old.facing = -1.0f;
+    old.fallbackCos = -1.0f;
+    old.outlier = 0.0f;
+    std::printf("  bench: target %zu triangles, source %zu\n", doc.mesh.triangleCount(), sources[0]->triangleCount());
+    std::vector<double> tOld, tNew;
+    for (int run = 0; run < 5; ++run)
+        for (int which = 0; which < 2; ++which) {
+            const bool useOld = which == 0;
+            if ((useOld && mode == "new") || (!useOld && mode == "old")) continue;
+            std::vector<glm::vec3> pos;
+            ProjectStats st;
+            CHECK(computeProjection(doc.mesh, sources, useOld ? old : now, pos, nullptr, st, err));
+            (useOld ? tOld : tNew).push_back(st.seconds);
+        }
+    auto report = [](const char* name, std::vector<double> t) {
+        if (t.empty()) return;
+        std::sort(t.begin(), t.end());
+        std::printf("  bench: %s median %.3f s, IQR %.3f (min %.3f max %.3f, %zu runs)\n", name, t[t.size() / 2],
+                    t[(t.size() * 3) / 4] - t[t.size() / 4], t.front(), t.back(), t.size());
+    };
+    report("old", tOld);
+    report("new", tNew);
+#ifdef __linux__
+    rusage ru{};
+    getrusage(RUSAGE_SELF, &ru);
+    std::printf("  bench: peak_ram_mb %ld (whole process, mode %s)\n", ru.ru_maxrss / 1024, mode.c_str());
+#endif
 }
 
 TEST(retopo_bench_1m_triangles) {
